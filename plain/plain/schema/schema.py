@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, ClassVar, Self, cast
 
 from plain.exceptions import ValidationError
-from plain.forms.fields import Field, FileField
+from plain.forms.fields import Field, FileField, MultipleChoiceField
 
 from .result import Invalid
 
@@ -188,6 +188,9 @@ class Schema(metaclass=SchemaMeta):
         files_map: dict[str, Any] = files if files is not None else {}
         cleaned: dict[str, Any] = {}
         errors: dict[str, list[str]] = {}
+        # MultiValueDict carries multi-valued keys; plain dicts don't. For
+        # multi-select fields we need to pull all values, not just the last.
+        is_multi_value_dict = hasattr(raw, "getlist")
 
         for name, field in cls._schema_fields.items():
             is_file_field = isinstance(field, FileField)
@@ -203,7 +206,10 @@ class Schema(metaclass=SchemaMeta):
                 except ValidationError as e:
                     errors[name] = list(e.messages)
             else:
-                raw_value = raw.get(name)
+                if is_multi_value_dict and isinstance(field, MultipleChoiceField):
+                    raw_value = raw.getlist(name)  # ty: ignore[unresolved-attribute]
+                else:
+                    raw_value = raw.get(name)
                 try:
                     cleaned[name] = field.clean(raw_value)
                 except ValidationError as e:

@@ -13,11 +13,27 @@ anywhere a dict needs to become typed Python data.
 
 from __future__ import annotations
 
-from plain.internal.files.uploadedfile import UploadedFile
+from typing import TYPE_CHECKING
 
 from .bind import BoundField, BoundSchema
 from .result import Invalid
 from .schema import Schema, make_schema
+
+if TYPE_CHECKING:
+    # Re-export for type hints. Importing at runtime triggers a cycle via
+    # plain.http → plain.internal.files.uploadhandler → plain.internal.files.uploadedfile.
+    from plain.internal.files.uploadedfile import UploadedFile  # noqa: F401
+
+
+def __getattr__(name: str):
+    """Lazy attribute lookup for `UploadedFile` so we don't trigger the
+    plain.http import chain at plain.schema module load time."""
+    if name == "UploadedFile":
+        from plain.internal.files.uploadedfile import UploadedFile
+
+        return UploadedFile
+    raise AttributeError(f"module 'plain.schema' has no attribute {name!r}")
+
 
 __all__ = (
     "BoundField",

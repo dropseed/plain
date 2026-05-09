@@ -5,20 +5,19 @@ from typing import Any
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
 from plain.http import JsonResponse, RedirectResponse, Response
-from plain.schema import Invalid
+from plain.schema import BoundSchema, Invalid
 from plain.urls import reverse, reverse_lazy
 from plain.views import (
-    CreateView,
     DeleteView,
     DetailView,
     ListView,
-    UpdateView,
+    SchemaCreateView,
+    SchemaUpdateView,
     View,
 )
 
-from .forms import TaskForm, TaskTitleForm
 from .models import Project, Tag, Task
-from .schemas import TaskTitleSchema
+from .schemas import TaskSchema, TaskTitleSchema
 
 
 class TaskListView(AuthView, ListView):
@@ -52,7 +51,8 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
-        context["title_form"] = TaskTitleForm(request=self.request)
+        # Unbound BoundSchema for the inline title-edit form.
+        context["title_form"] = BoundSchema(schema_class=TaskTitleSchema)
         return context
 
     def htmx_post_rename(self) -> None:
@@ -82,22 +82,39 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
         return JsonResponse({"valid": True})
 
 
-class TaskCreateView(AuthView, CreateView):
+class TaskCreateView(AuthView, SchemaCreateView[TaskSchema]):
+    """Schema-based create view.
+
+    Replaces the previous CreateView/ModelForm setup. The TaskSchema
+    declares fields explicitly; FK/M2M IDs are validated against the
+    user's owned Projects/Tags via `resolve_relations()`.
+    """
+
     template_name = "tasks/create.html"
-    form_class = TaskForm
+    schema_class = TaskSchema
     login_required = True
 
-    def get_form_kwargs(self) -> dict[str, Any]:
-        return {**super().get_form_kwargs(), "owner": self.user}
+    def schema_valid(self, result: TaskSchema) -> Response:
+        assert self.user is not None  # guaranteed by login_required=True
+        relations = result.resolve_relations(owner=self.user)
+        if isinstance(relations, Invalid):
+            bound = BoundSchema.from_invalid(TaskSchema, relations)
+            return self.schema_invalid(bound)
 
-    def form_valid(self, form: TaskForm) -> Any:  # ty: ignore[invalid-method-override]
-        form.instance.owner = self.user
-        return super().form_valid(form)
+        task = Task()
+        task.owner = self.user
+        result.apply_to_task(task, project=relations["project"])
+        task.save()
+        if relations["tags"]:
+            task.tags.set(relations["tags"])
+
+        self.object = task
+        return super().schema_valid(result)
 
 
-class TaskUpdateView(AuthView, UpdateView):
+class TaskUpdateView(AuthView, SchemaUpdateView[TaskSchema]):
     template_name = "tasks/update.html"
-    form_class = TaskForm
+    schema_class = TaskSchema
     context_object_name = "task"
     login_required = True
 
@@ -107,8 +124,32 @@ class TaskUpdateView(AuthView, UpdateView):
             id=self.url_kwargs["id"],
         ).first()
 
-    def get_form_kwargs(self) -> dict[str, Any]:
-        return {**super().get_form_kwargs(), "owner": self.user}
+    def get_initial(self) -> dict[str, Any]:
+        # SchemaUpdateView's default is `getattr(self.object, name)` per field;
+        # for FK and M2M we want IDs, not the related instances.
+        return {
+            "project": self.object.project_id if self.object.project_id else None,
+            "title": self.object.title,
+            "notes": self.object.notes,
+            "due_date": self.object.due_date,
+            "priority": self.object.priority,
+            "is_complete": self.object.is_complete,
+            "tags": [str(t.id) for t in self.object.tags.all()],
+        }
+
+    def schema_valid(self, result: TaskSchema) -> Response:
+        assert self.user is not None  # guaranteed by login_required=True
+        relations = result.resolve_relations(owner=self.user)
+        if isinstance(relations, Invalid):
+            bound = BoundSchema.from_invalid(
+                TaskSchema, relations, initial=self.get_initial()
+            )
+            return self.schema_invalid(bound)
+
+        result.apply_to_task(self.object, project=relations["project"])
+        self.object.save()
+        self.object.tags.set(relations["tags"])
+        return RedirectResponse(self.get_success_url(result))
 
 
 class TaskDeleteView(AuthView, DeleteView):

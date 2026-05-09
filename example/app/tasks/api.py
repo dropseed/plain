@@ -7,9 +7,8 @@ from plain.auth.views import LoginRequired
 from plain.schema import Invalid
 from plain.urls import Router, path
 
-from .forms import TaskForm
 from .models import Task
-from .schemas import TaskQuickAddSchema
+from .schemas import TaskQuickAddSchema, TaskSchema
 
 TASK_SCHEMA = {
     "type": "object",
@@ -70,10 +69,8 @@ class TaskListAPIView(APIView):
 
     @openapi.schema(
         {
-            "summary": "Create a task from a JSON body using TaskForm.",
-            "requestBody": openapi.json_body(
-                {"$ref": "#/components/schemas/Task"},
-            ),
+            "summary": "Create a task from a JSON body using TaskSchema.",
+            "requestBody": openapi.schema_body(TaskSchema),
             "responses": {
                 "201": {
                     "description": "The created task.",
@@ -89,11 +86,20 @@ class TaskListAPIView(APIView):
         user = get_request_user(self.request)
         if not user:
             raise LoginRequired(login_url=None)
-        form = TaskForm(request=self.request, owner=user)
-        if not form.is_valid():
-            return 400, {"errors": form.errors}
-        form.instance.owner = user
-        task = form.save()
+        result = TaskSchema.validate(self.request.json_data)
+        if isinstance(result, Invalid):
+            return 400, {"errors": result.errors}
+
+        relations = result.resolve_relations(owner=user)
+        if isinstance(relations, Invalid):
+            return 400, {"errors": relations.errors}
+
+        task = Task()
+        task.owner = user
+        result.apply_to_task(task, project=relations["project"])
+        task.save()
+        if relations["tags"]:
+            task.tags.set(relations["tags"])
         return 201, _serialize(task)
 
 
