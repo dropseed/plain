@@ -344,3 +344,53 @@ def test_filefield_with_other_field_errors():
     assert isinstance(result, Invalid)
     assert "title" in result.errors
     assert "document" in result.errors
+
+
+# ---------------------------------------------------------------------------
+# apply_to(instance) — schema-to-model helper
+# ---------------------------------------------------------------------------
+
+
+class _Bag:
+    """Plain attribute bag standing in for a model instance."""
+
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+def test_apply_to_copies_validated_fields_onto_instance():
+    class S(Schema):
+        title: str = types.TextField(min_length=1)
+        priority: str = types.ChoiceField(choices=[("low", "L"), ("high", "H")])
+
+    result = S.validate({"title": "Q3", "priority": "high"})
+    assert not isinstance(result, Invalid)
+
+    target = _Bag(title="old", priority="low", unrelated="kept")
+    returned = result.apply_to(target)
+
+    assert returned is target  # chainable
+    assert target.title == "Q3"
+    assert target.priority == "high"
+    assert target.unrelated == "kept"  # untouched fields not clobbered
+
+
+def test_apply_to_skips_unset_fields_after_partial_validation():
+    """In partial mode a schema may be missing some fields entirely.
+    apply_to() must not zero them out on the target."""
+
+    class S(Schema):
+        title: str = types.TextField()
+        priority: str = types.ChoiceField(choices=[("low", "L"), ("high", "H")])
+
+    # Validate with only `title` present, partial=True — `priority` stays unset.
+    result = S.validate({"title": "Q3"}, partial=True)
+    assert not isinstance(result, Invalid)
+    assert not hasattr(result, "priority")
+
+    target = _Bag(title="old", priority="low")
+    result.apply_to(target)
+
+    assert target.title == "Q3"
+    assert target.priority == "low"  # preserved

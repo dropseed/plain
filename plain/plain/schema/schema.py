@@ -98,6 +98,34 @@ class Schema(metaclass=SchemaMeta):
     def __hash__(self) -> int:
         return hash(tuple(getattr(self, k, None) for k in self._schema_fields))
 
+    def apply_to[Instance](self, instance: Instance) -> Instance:
+        """Copy validated field values onto an existing object — typically
+        a model instance about to be saved.
+
+        Walks `_schema_fields`, calling `setattr(instance, name, value)` for
+        each field that's set on the schema. Fields missing from the schema
+        instance (e.g. after `partial=True` validation) are skipped, leaving
+        the target's existing value intact. Returns `instance` for chaining.
+
+            class EditContactView(View):
+                def post(self):
+                    result = ContactSchema.validate(self.request.form_data)
+                    if isinstance(result, Invalid):
+                        return self.render(form=BoundSchema.from_invalid(...))
+                    result.apply_to(self.contact).save()
+                    return RedirectResponse(...)
+
+        Field-name mismatches (schema field doesn't exist on the target)
+        raise `AttributeError` only if the target uses ``__slots__`` —
+        regular Python objects accept arbitrary attribute assignment, so
+        the caller is responsible for keeping schema and target field
+        names aligned.
+        """
+        for name in self._schema_fields:
+            if hasattr(self, name):
+                setattr(instance, name, getattr(self, name))
+        return instance
+
     def check(
         self, *, context: dict[str, Any] | None = None
     ) -> dict[str, list[str]] | None:

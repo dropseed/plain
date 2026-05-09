@@ -55,16 +55,14 @@ class ContactSchemaView(View):
             bound = BoundSchema.from_invalid(ContactSchema, result)
             return self.render_template_response(bound)
 
-        # result IS the typed ContactSchema instance — attribute access
-        # is statically typed without a `.data` indirection.
-        ContactSubmission.query.create(
-            name=result.name,
-            email=result.email,
-            subject=result.subject,
-            message=result.message,
-            company=result.company or "",
-            subscribe=result.subscribe,
-        )
+        # result IS the typed ContactSchema. apply_to() copies validated
+        # fields onto a fresh model instance — schema and model field names
+        # line up, so this stays type-safe end-to-end without naming the
+        # same fields twice.
+        submission = result.apply_to(ContactSubmission())
+        # `company` is `str | None` on the schema; model wants `""` for null.
+        submission.company = result.company or ""
+        submission.save()
         return RedirectResponse(reverse_lazy("contacts:success"))
 
     def render_template_response(self, form: BoundSchema) -> Response:
