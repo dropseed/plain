@@ -13,8 +13,9 @@ A `Schema` declares fields with type annotations and validators; `.validate(data
 - [Partial validation](#partial-validation)
 - [File uploads](#file-uploads)
 - [HTML rendering with BoundSchema](#html-rendering-with-boundschema)
+- [ModelSchema for model-bound input](#modelschema-for-model-bound-input)
 - [OpenAPI integration](#openapi-integration)
-- [When to use Schema vs Form](#when-to-use-schema-vs-form)
+- [Property tests with Hypothesis](#property-tests-with-hypothesis)
 - [Installation](#installation)
 
 ## Overview
@@ -184,7 +185,42 @@ class ContactView(View):
         ...
 ```
 
-The bound form's duck-typed surface (`html_id`, `html_name`, `value()`, `errors`, `field`, `non_field_errors`, `fields`) matches `plain.forms.BoundField`, so existing form templates render against `BoundSchema` unchanged.
+The bound form's duck-typed surface (`html_id`, `html_name`, `value()`, `errors`, `field`, `non_field_errors`, `fields`) is the same surface the previous `plain.forms.BoundField` exposed — existing form templates render against `BoundSchema` unchanged.
+
+`SchemaView`, `SchemaCreateView`, `SchemaUpdateView`, and `SchemaDeleteView` in `plain.views` orchestrate the GET / POST / re-render-or-redirect cycle for full HTML pages. Generic over the schema type — `SchemaView[ContactSchema]` gives type-checked access in `schema_valid()`.
+
+## ModelSchema for model-bound input
+
+For schemas backed by a `postgres.Model`, use `plain.postgres.modelschema.ModelSchema`. The metaclass walks model fields and auto-derives Schema fields from each annotation:
+
+```python
+from plain.postgres.modelschema import ModelSchema
+
+class TaskSchema(ModelSchema):
+    model = Task
+
+    title: str
+    notes: str | None
+    project: Project | None        # FK → ModelChoiceField
+    tags: list[Tag]                # M2M → ModelMultipleChoiceField
+    is_complete: bool
+```
+
+Annotations that don't match a model field are left as plain Schema fields (so you can mix in extras like `confirm_password`). Explicitly-declared Field instances override the auto-derived one.
+
+For per-request queryset scoping (the multi-tenant FK/M2M case), pass `context["querysets"]`:
+
+```python
+result = TaskSchema.validate(
+    request.json_data,
+    context={"querysets": {
+        "project": Project.query.filter(owner=user),
+        "tags": Tag.query.filter(owner=user),
+    }},
+)
+```
+
+`save_to(instance)` and `save()` apply validated values and persist (M2M is set after the instance has a primary key).
 
 ## OpenAPI integration
 
@@ -240,26 +276,16 @@ The strategy walks the schema fields and emits constrained values per type — `
 
 `hypothesis` is not a Plain dependency; install it as a dev dependency to use this module.
 
-## When to use Schema vs Form
+## When to use Schema vs ModelSchema vs inline
 
-Different jobs:
+- **`Schema`** — anything not bound to a model: JSON APIs, HTMX actions, job payloads, webhooks, full HTML pages backed by `BoundSchema`, CLI scripts, tests.
+- **`ModelSchema`** — model-edit pages, admin CRUD, anywhere fields auto-derive from a `postgres.Model`. Auto-handles FK and M2M.
+- **Inline field** — trivial single-value parsing for cases where a class is overkill:
+  ```python
+  pin_id = types.IntegerField(min_value=1).clean(request.form_data["pin_id"])
+  ```
 
-- **`Schema`** — parsing + validating typed input. Use everywhere: HTML forms (paired with `BoundSchema`), JSON APIs, HTMX actions, job payloads, webhook handlers, CLI scripts, tests. Never bound to a request.
-- **`Form`** (in `plain.forms`) — the existing class-based form with `BoundField`, prefixed multi-form pages, and the GET/POST render-with-errors round-trip. Largely supplanted by Schema + BoundSchema for new code.
-
-If your endpoint isn't rendering an HTML form back to the user, you don't need `Form` — reach for `Schema`. That includes:
-
-- JSON API endpoints
-- HTMX action handlers (`htmx_post_*`)
-- Background job payload validation
-- Webhook receivers
-- One-off `validate()` calls in tests / scripts
-
-Inline parsing of a single field is also fine for trivial cases:
-
-```python
-pin_id = types.IntegerField(min_value=1).clean(request.form_data["pin_id"])
-```
+If you're tempted to `request.json_data["x"]` and then check it manually — write a Schema instead.
 
 ## Installation
 
