@@ -79,7 +79,26 @@ class Schema(metaclass=SchemaMeta):
     def __init__(self, **data: Any) -> None:
         for name in self._schema_fields:
             if name in data:
-                setattr(self, name, data[name])
+                object.__setattr__(self, name, data[name])
+        object.__setattr__(self, "_frozen", True)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        # Schemas are frozen after construction. Mutating a validated
+        # instance defeats the contract — `result.email` is supposed to
+        # carry the cleaned value, not whatever someone assigned later.
+        if getattr(self, "_frozen", False):
+            raise AttributeError(
+                f"{type(self).__name__} is frozen — schema instances are "
+                f"immutable after validation; cannot set {name!r}."
+            )
+        object.__setattr__(self, name, value)
+
+    def __delattr__(self, name: str) -> None:
+        if getattr(self, "_frozen", False):
+            raise AttributeError(
+                f"{type(self).__name__} is frozen — cannot delete {name!r}."
+            )
+        object.__delattr__(self, name)
 
     def __repr__(self) -> str:
         attrs = ", ".join(

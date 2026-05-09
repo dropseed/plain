@@ -374,6 +374,29 @@ def test_apply_to_copies_validated_fields_onto_instance():
     assert target.unrelated == "kept"  # untouched fields not clobbered
 
 
+def test_schema_instance_is_frozen():
+    """Schemas are immutable after validation — accidentally re-assigning
+    a field on the result would silently lie about what was validated."""
+
+    class S(Schema):
+        a: int = types.IntegerField()
+
+    result = S.validate({"a": "1"})
+    assert not isinstance(result, Invalid)
+    assert result.a == 1
+
+    import pytest
+
+    with pytest.raises(AttributeError, match="frozen"):
+        result.a = 99
+
+    with pytest.raises(AttributeError, match="frozen"):
+        result.unrelated = "x"
+
+    with pytest.raises(AttributeError, match="frozen"):
+        del result.a
+
+
 def test_apply_to_skips_unset_fields_after_partial_validation():
     """In partial mode a schema may be missing some fields entirely.
     apply_to() must not zero them out on the target."""
