@@ -222,6 +222,24 @@ class TaskGetView(APIView):
         ...
 ```
 
+## Property tests with Hypothesis
+
+`plain.schema.testing.schema_strategy()` produces a Hypothesis strategy that generates valid input dicts for any schema. Useful for fuzz-testing endpoints — every keystroke shouldn't produce a 500.
+
+```python
+from hypothesis import given
+from plain.schema.testing import schema_strategy
+
+@given(payload=schema_strategy(MySchema))
+def test_view_handles_any_valid_payload(client, payload):
+    response = client.post("/api/things/", data=payload)
+    assert response.status_code == 201
+```
+
+The strategy walks the schema fields and emits constrained values per type — `IntegerField(min_value, max_value)` becomes `st.integers(min, max)`, `ChoiceField(choices=...)` becomes `st.sampled_from(...)`, and so on. Optional fields (`required=False`) are randomly omitted. `FileField`/`ImageField`/`JSONField` raise `NotImplementedError` — build a custom strategy for those and merge with the schema's other fields.
+
+`hypothesis` is not a Plain dependency; install it as a dev dependency to use this module.
+
 ## When to use Schema vs Form
 
 Different jobs:

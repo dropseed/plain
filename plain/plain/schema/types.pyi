@@ -20,6 +20,8 @@ from decimal import Decimal
 from typing import Any, Literal, overload
 from uuid import UUID
 
+from plain.internal.files.uploadedfile import UploadedFile
+
 # Text fields
 @overload
 def TextField(
@@ -349,8 +351,6 @@ def JSONField(
 ) -> Any: ...
 
 # File fields — return UploadedFile (or None when required=False).
-from plain.internal.files.uploadedfile import UploadedFile
-
 @overload
 def FileField(
     *,

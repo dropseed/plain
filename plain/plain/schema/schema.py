@@ -199,7 +199,7 @@ class Schema(metaclass=SchemaMeta):
                 raw_value = files_map.get(name)
                 try:
                     # FileField.clean takes (data, initial=None)
-                    cleaned[name] = field.clean(raw_value, None)  # ty: ignore[invalid-argument-type]
+                    cleaned[name] = field.clean(raw_value, None)
                 except ValidationError as e:
                     errors[name] = list(e.messages)
             else:
