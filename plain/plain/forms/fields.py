@@ -627,7 +627,7 @@ class FileField(Field):
         "invalid": "No file was submitted. Check the encoding type on the form.",
         "missing": "No file was submitted.",
         "empty": "The submitted file is empty.",
-        "text": pluralize_lazy(
+        "max_length": pluralize_lazy(
             "Ensure this filename has at most %(max)d character (it has %(length)d).",
             "Ensure this filename has at most %(max)d characters (it has %(length)d).",
             "max",

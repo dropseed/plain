@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from plain.schema import Invalid, Schema, make_schema, types
 
 
@@ -264,3 +266,81 @@ def test_partial_empty_input_is_valid():
 
     result = S.validate({}, partial=True)
     assert not isinstance(result, Invalid)
+
+
+# ---------------------------------------------------------------------------
+# files= kwarg — file upload support
+# ---------------------------------------------------------------------------
+
+
+def _file(name: str = "report.pdf", content: bytes = b"hello") -> Any:
+    from plain.internal.files.uploadedfile import SimpleUploadedFile
+
+    return SimpleUploadedFile(name, content, "application/pdf")
+
+
+def test_filefield_reads_from_files_not_data():
+    class Upload(Schema):
+        title: str = types.TextField()
+        document: Any = types.FileField()
+
+    f = _file()
+    result = Upload.validate({"title": "Q3"}, files={"document": f})
+    assert not isinstance(result, Invalid)
+    assert result.title == "Q3"
+    assert result.document.name == "report.pdf"
+    assert result.document.size == len(b"hello")
+
+
+def test_filefield_missing_is_required_error():
+    class Upload(Schema):
+        document: Any = types.FileField()
+
+    result = Upload.validate({}, files={})
+    assert isinstance(result, Invalid)
+    assert "document" in result.errors
+
+
+def test_filefield_optional_when_required_false():
+    class Upload(Schema):
+        title: str = types.TextField()
+        avatar: Any = types.FileField(required=False)
+
+    result = Upload.validate({"title": "x"})
+    assert not isinstance(result, Invalid)
+    assert result.title == "x"
+
+
+def test_partial_includes_files_for_presence_check():
+    class Upload(Schema):
+        title: str = types.TextField(min_length=1)
+        document: Any = types.FileField()
+
+    # Just the file present in partial mode — title missing but skipped.
+    f = _file()
+    result = Upload.validate({}, files={"document": f}, partial=True)
+    assert not isinstance(result, Invalid)
+    assert result.document.name == "report.pdf"
+
+
+def test_files_default_to_empty_dict():
+    """Schemas without FileField don't need files= to be passed."""
+
+    class S(Schema):
+        title: str = types.TextField()
+
+    result = S.validate({"title": "x"})
+    assert not isinstance(result, Invalid)
+
+
+def test_filefield_with_other_field_errors():
+    """File fields and regular fields error independently."""
+
+    class Upload(Schema):
+        title: str = types.TextField(min_length=5)
+        document: Any = types.FileField()
+
+    result = Upload.validate({"title": "x"}, files={})
+    assert isinstance(result, Invalid)
+    assert "title" in result.errors
+    assert "document" in result.errors

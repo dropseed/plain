@@ -11,6 +11,7 @@ A `Schema` declares fields with type annotations and validators; `.validate(data
 - [Type narrowing](#type-narrowing)
 - [Cross-field validation](#cross-field-validation)
 - [Partial validation](#partial-validation)
+- [File uploads](#file-uploads)
 - [HTML rendering with BoundSchema](#html-rendering-with-boundschema)
 - [OpenAPI integration](#openapi-integration)
 - [When to use Schema vs Form](#when-to-use-schema-vs-form)
@@ -138,6 +139,29 @@ def htmx_post_validate(self):
         return JsonResponse({"valid": False, "errors": result.errors})
     return JsonResponse({"valid": True})
 ```
+
+## File uploads
+
+Pass `request.files` as the `files=` kwarg to validate uploads. `FileField` and `ImageField` declarations populate from `files`; everything else continues to read from `data`.
+
+```python
+class AttachmentSchema(Schema):
+    description: str = types.TextField(max_length=500)
+    document: Any = types.FileField(max_length=120)
+
+class UploadView(View):
+    def post(self):
+        result = AttachmentSchema.validate(
+            self.request.form_data,
+            files=self.request.files,
+        )
+        if isinstance(result, Invalid):
+            return self.render_errors(result.errors)
+        # result.document is the UploadedFile; result.description is str.
+        ...
+```
+
+`partial=True` includes `files` in its presence check, so HTMX live-validate can also handle file fields.
 
 ## HTML rendering with BoundSchema
 

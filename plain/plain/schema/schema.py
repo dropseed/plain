@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, ClassVar, Self, cast
 
 from plain.exceptions import ValidationError
-from plain.forms.fields import Field
+from plain.forms.fields import Field, FileField
 
 from .result import Invalid
 
@@ -117,6 +117,7 @@ class Schema(metaclass=SchemaMeta):
         cls,
         data: dict[str, Any] | None,
         *,
+        files: Any = None,
         context: dict[str, Any] | None = None,
         partial: bool = False,
     ) -> Self | Invalid:
@@ -126,23 +127,40 @@ class Schema(metaclass=SchemaMeta):
         attributes) or `Invalid` (per-field errors). Never raises on
         validation failure.
 
-        Set `partial=True` to validate only the fields present in `data` —
-        missing required fields don't error and `check()` is skipped.
-        Useful for HTMX live-validation where each keystroke sends just
-        one field.
+        For file uploads, pass `request.files` (a `MultiValueDict[str,
+        UploadedFile]`) as `files=`. `FileField`/`ImageField` declarations
+        are populated from `files` instead of `data`; everything else
+        reads from `data` as usual.
+
+        Set `partial=True` to validate only the fields present in `data`/
+        `files` — missing required fields don't error and `check()` is
+        skipped. Useful for HTMX live-validation where each keystroke
+        sends just one field.
         """
         raw = data or {}
+        files_map: dict[str, Any] = files if files is not None else {}
         cleaned: dict[str, Any] = {}
         errors: dict[str, list[str]] = {}
 
         for name, field in cls._schema_fields.items():
-            if partial and name not in raw:
+            is_file_field = isinstance(field, FileField)
+            present = name in (files_map if is_file_field else raw)
+            if partial and not present:
                 continue
-            raw_value = raw.get(name)
-            try:
-                cleaned[name] = field.clean(raw_value)
-            except ValidationError as e:
-                errors[name] = list(e.messages)
+
+            if is_file_field:
+                raw_value = files_map.get(name)
+                try:
+                    # FileField.clean takes (data, initial=None)
+                    cleaned[name] = field.clean(raw_value, None)  # ty: ignore[invalid-argument-type]
+                except ValidationError as e:
+                    errors[name] = list(e.messages)
+            else:
+                raw_value = raw.get(name)
+                try:
+                    cleaned[name] = field.clean(raw_value)
+                except ValidationError as e:
+                    errors[name] = list(e.messages)
 
         if errors:
             return Invalid(errors=errors, raw=raw)

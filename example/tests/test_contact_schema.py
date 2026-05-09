@@ -173,3 +173,55 @@ def test_choice_field_selected_after_invalid_repost():
     form = BoundSchema.from_invalid(ContactSchema, result)
     html = _render(form)
     assert '<option value="bug" selected>' in html
+
+
+# ---------------------------------------------------------------------------
+# File upload via Schema
+# ---------------------------------------------------------------------------
+
+
+def _uploaded(name: str = "report.pdf", content: bytes = b"hello"):
+    from plain.internal.files.uploadedfile import SimpleUploadedFile
+
+    return SimpleUploadedFile(name, content, "application/pdf")
+
+
+def test_attachment_upload_schema_validates_file_and_text():
+    from app.contacts.schemas import AttachmentUploadSchema
+
+    f = _uploaded()
+    result = AttachmentUploadSchema.validate(
+        {"description": "Q3 report"}, files={"document": f}
+    )
+    assert not isinstance(result, Invalid)
+    assert result.description == "Q3 report"
+    assert result.document.name == "report.pdf"
+    assert result.document.size == len(b"hello")
+
+
+def test_attachment_upload_schema_missing_file_is_required_error():
+    from app.contacts.schemas import AttachmentUploadSchema
+
+    result = AttachmentUploadSchema.validate({"description": "Q3 report"}, files={})
+    assert isinstance(result, Invalid)
+    assert "document" in result.errors
+
+
+def test_attachment_upload_schema_long_filename_rejected():
+    from app.contacts.schemas import AttachmentUploadSchema
+
+    long_name = "x" * 200 + ".pdf"
+    result = AttachmentUploadSchema.validate(
+        {"description": "ok"}, files={"document": _uploaded(name=long_name)}
+    )
+    assert isinstance(result, Invalid)
+    assert "document" in result.errors
+
+
+def test_attachment_upload_schema_text_and_file_errors_independently():
+    """Both fields can fail independently — validation isn't short-circuited."""
+    from app.contacts.schemas import AttachmentUploadSchema
+
+    result = AttachmentUploadSchema.validate({"description": ""}, files={})
+    assert isinstance(result, Invalid)
+    assert set(result.errors) == {"description", "document"}
