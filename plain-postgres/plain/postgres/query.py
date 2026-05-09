@@ -380,7 +380,13 @@ class QuerySet[T: "Model"]:
         self.__dict__.update(state)
 
     def __repr__(self) -> str:
-        data: list[Any] = list(self[: REPR_OUTPUT_SIZE + 1])
+        # Don't run SQL from __repr__ — error reporters (Sentry, pdb,
+        # exception templates) call repr() on stack-frame locals to
+        # build error events. If the queryset hasn't been evaluated, a
+        # surprise SELECT inside an exception path is a known footgun.
+        if self._result_cache is None:
+            return f"<{self.__class__.__name__} [unevaluated]>"
+        data: list[Any] = list(self._result_cache[: REPR_OUTPUT_SIZE + 1])
         if len(data) > REPR_OUTPUT_SIZE:
             data[-1] = "...(remaining elements truncated)..."
         return f"<{self.__class__.__name__} {data!r}>"
