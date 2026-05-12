@@ -93,14 +93,21 @@ diff /tmp/jinja.html /tmp/prototype.html
 
 The prototype is discarded after Phase 0; lessons inform Phases 1–7. Do not skip — this is the cheapest place to discover a fundamental design problem.
 
-**Status: substantial progress.** The engine in [`plain-html/`](plain-html/) covers Phase 0–7 functionality (frontmatter parser, tokenizer with opaque `<script>`/`<style>` bodies, tag-tree builder, tree-walking renderer, contextual escape, filesystem loader, includes with slots and dynamic dispatch, globals registry, parity harness). Phases 8–9 (`plain html check` and ty integration) are still TODO. Phases 10–16 (the per-package migration) are partially done:
+**Status: substantial progress.** The engine in [`plain-html/`](plain-html/) covers Phase 0–7 functionality (frontmatter parser, tokenizer with opaque `<script>`/`<style>` bodies, tag-tree builder, tree-walking renderer, contextual escape, filesystem loader, includes with slots and dynamic `:include={expr}` dispatch, globals registry that pulls in Jinja env globals, Python-keyword `class_` alias). Phases 8–9 (`plain html check` and ty integration) are still TODO. Phases 10–16 (the per-package migration) are largely done:
 
-- **Example app (Phase 10):** every template in `example/app/templates/` ported to `.plain`. Every example route returns 200 through plain.html end-to-end.
-- **Helper packages on every-page render path:** tailwind, pageviews, htmx, toolbar core, toolbar panels (request, exception button, session, email, observer) — all on plain.html.
-- **Small package templates:** loginlink, oauth, pages, support, jobs/values, observer/values, passwords/values, plus admin value templates and a couple of admin elements — ported. `plain.templates.Template` now falls back from `.html` to `.plain` so existing Jinja call-sites pick up ported templates without code changes.
-- **Remaining:** admin's layout chain (`admin/base.html`, `_header.html`, `_menu_section.html`, `list.html`, `detail.html`, `ui.html`, etc. — `{% extends %}` chains have to migrate together so callers and bases agree on engine), observer's main UI (traces, span, trace_detail), toolbar's exception panel, and a long tail of jobs/flags admin forms and admin elements that bind `class` (a Python keyword) as a prop name.
+- **Example app (Phase 10):** every template in `example/app/templates/` has a `.plain` counterpart. Every example route returns 200 through plain.html end-to-end.
+- **`plain.templates.Template`** routes `.html` callers to `.plain` when the file exists in a `templates/` dir, so the migration is invisible to view code — no `template_name` changes needed.
+- **`plain.elements`** also goes through `plain.templates.Template`, so `<admin.X>` element tags in Jinja templates pick up `.plain` element ports transparently.
+- **`plain.admin` (Phases 11–12):** ~47/48 templates ported. Live and exercised: `base`, `_header`, `_menu_section`, `header_branding`, `page`, `index`, `list`, `detail`, `delete`, `search`, `preflight`, `setting_detail`, all elements (`Input`, `Select`, `Textarea`, `Checkbox`, the four `*Field` wrappers, `Label`, `Submit`, `FieldErrors`, `Icon`, `SearchInput`, `Help`), all card templates (`base`, `card`, `key_value`, `chart`, `table`), all value templates, and the toolbar button. Only `ui.html` (1149-line component catalog) and a handful of less-trafficked templates remain Jinja.
+- **`plain.toolbar` (Phase 14):** `toolbar`, `request`, `exception_button` ported. Toolbar panels — `session` (`plain.sessions`), `email` (`plain.email`), `observer` (`plain.observer`) — all on plain.html. The exception panel itself stays Jinja for now (renders only on errors).
+- **`plain.tailwind`, `plain.htmx`, `plain.pageviews`, `plain.sessions`, `plain.email`:** the rendered templates each package contributes are on plain.html.
+- **`plain.loginlink`, `plain.oauth`, `plain.pages`, `plain.support`, `plain.passwords`:** primary templates ported.
+- **`plain.observer`:** `trace_detail`, `partials/log`, `toolbar/observer`, both value templates ported. Main UI (`traces`, `trace`, `partials/span`, `toolbar/observer_button`) still Jinja — large, htmx-heavy; out of scope for this iteration.
+- **Remaining**: `admin/ui.html`, observer's main UI, toolbar's exception panel, a few admin-element-using package forms (`flags/admin/plainflags/flagresult_form.html`, `jobs/admin/plainqueue/jobresult_detail.html`).
 
-The parity harness in [`plain-html/tests/parity/`](plain-html/tests/parity/) holds the original byte-level comparison against Jinja for the two seed fixtures.
+Smoke verification: `/`, `/notes/`, `/tasks/`, `/tasks/1/`, `/contacts/`, `/contacts/archive/`, `/login/`, `/sse/`, `/admin/`, `/admin/p/<model>/`, `/admin/p/<model>/<id>/`, `/admin/settings/`, `/admin/settings/<name>/`, `/admin/preflight/`, `/admin/search/`, `/observer/` — all return 200, with the bulk of rendering routed through plain.html.
+
+The parity harness in [`plain-html/tests/parity/`](plain-html/tests/parity/) holds byte-level comparison against Jinja for the two seed fixtures from the early tracer-bullet work.
 
 ---
 
