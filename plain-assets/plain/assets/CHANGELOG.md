@@ -1,5 +1,19 @@
 # plain-assets changelog
 
+## [0.3.0](https://github.com/dropseed/plain/releases/plain-assets@0.3.0) (2026-05-12)
+
+### What's changed
+
+- **Command renamed: `plain assets build` → `plain assets compile`.** Now that the command lives under `plain.assets` (not core deploy-prep), the verb follows what the asset pipeline actually does. Pre-steps (user shell commands, package entry points) generate inputs that get compiled. ([3b30b62309](https://github.com/dropseed/plain/commit/3b30b62309))
+- **User shell commands move from `[tool.plain.assets.build.run]` to `[tool.plain.assets.run]`.** Drops the redundant `.build.` segment.
+- **Entry-point group renamed from `plain.assets.build` to `plain.assets.compile`.** Packages registering pre-compile hooks update their group name.
+
+### Upgrade instructions
+
+- Replace `plain assets build` with `plain assets compile` in deploy scripts, Procfiles, and CI.
+- Rename `[tool.plain.assets.build.run]` → `[tool.plain.assets.run]` in your `pyproject.toml`.
+- If you ship a third-party package with a build entry point, rename the group from `plain.assets.build` to `plain.assets.compile`. Framework-internal packages (`plain.tailwind`, `plain.esbuild`) are updated in this release wave.
+
 ## [0.2.0](https://github.com/dropseed/plain/releases/plain-assets@0.2.0) (2026-05-12)
 
 ### What's changed
