@@ -23,31 +23,42 @@ def _render_jinja(template_name: str, context: dict[str, Any]) -> SafeString:
 
 def tailwind_css() -> SafeString:
     from plain.assets.finders import _APP_ASSETS_DIR
+    from plain.html import render
+    from plain.html.loader import find_template
     from plain.runtime import settings
 
     path = str(settings.TAILWIND_DIST_PATH.relative_to(_APP_ASSETS_DIR))
-    return _render_jinja("tailwind/css.html", {"tailwind_css_path": path})
+    template = find_template("tailwind/css")
+    return mark_safe(render(template, {"tailwind_css_path": path}))
 
 
 def pageviews_js(request: Any) -> SafeString:
+    from plain.html import render
+    from plain.html.loader import find_template
     from plain.urls import reverse
 
-    return _render_jinja(
-        "pageviews/js.html",
-        {"request": request, "pageviews_track_url": reverse("pageviews:track")},
+    template = find_template("pageviews/js")
+    return mark_safe(
+        render(
+            template,
+            {"request": request, "pageviews_track_url": reverse("pageviews:track")},
+        )
     )
 
 
 def toolbar(request: Any) -> SafeString:
-    """Render the dev toolbar via the existing Jinja path.
+    """Render the dev toolbar.
 
-    The toolbar templates and `Toolbar` class are still Jinja-bound. We build
-    the same toolbar object here and hand it to the Jinja environment so the
-    output matches the pre-migration rendering. Porting the toolbar end-to-end
-    is a later phase.
+    The outer toolbar template (`toolbar/toolbar.plain`) now renders through
+    plain.html. Individual panels still resolve through `Template(name)`, so
+    their engine is decided per-file by extension — `.plain` goes through
+    plain.html, `.html` falls back to Jinja during migration.
     """
+    from plain.html import render
+    from plain.html.loader import find_template
     from plain.toolbar.toolbar import Toolbar
 
     context = {"request": request}
     context["toolbar"] = Toolbar(context)
-    return _render_jinja("toolbar/toolbar.html", context)
+    template = find_template("toolbar/toolbar")
+    return mark_safe(render(template, context))

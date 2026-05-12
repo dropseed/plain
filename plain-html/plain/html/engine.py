@@ -55,7 +55,11 @@ def render_source(
     fmdict, body = fm.split(source)
     tokens = tokenize(body)
     tree = parse(tokens)
-    ctx = context or {}
+    ctx = dict(context or {})
+    # Any declared attr the caller didn't pass defaults to None so `:if={x}`
+    # truthy checks work without raising NameError.
+    for attr_name in fmdict.get("attrs", {}) or {}:
+        ctx.setdefault(attr_name, None)
     # The view-level context (request, DEBUG, etc.) flows down into every
     # `:include`d template so layouts and components don't have to thread it
     # explicitly. Caller-passed attrs override.

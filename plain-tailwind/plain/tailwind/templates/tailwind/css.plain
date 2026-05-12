@@ -1,0 +1,5 @@
+---
+attrs:
+  tailwind_css_path: str
+---
+<link href={asset(tailwind_css_path)} rel="stylesheet">
