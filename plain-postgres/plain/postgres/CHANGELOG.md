@@ -1,5 +1,15 @@
 # plain-postgres changelog
 
+## [0.103.4](https://github.com/dropseed/plain/releases/plain-postgres@0.103.4) (2026-05-12)
+
+### What's changed
+
+- **`postgres.duplicate_indexes` preflight check now skips partial indexes** (those with a `condition=`). Previously a bare `Index(fields=[fk])` carried for FK coverage was flagged as redundant with a partial composite `Index(fields=[fk, ...], condition=Q(...))`, contradicting the `postgres.missing_fk_index` check. The two warnings are now mutually consistent — partials don't cover full-column lookups, so they can't shadow a single-column index. ([1e8a3f72db](https://github.com/dropseed/plain/commit/1e8a3f72db))
+
+### Upgrade instructions
+
+- No changes required. Apps that were silencing `postgres.duplicate_indexes` to work around the false positive can drop the silence.
+
 ## [0.103.3](https://github.com/dropseed/plain/releases/plain-postgres@0.103.3) (2026-05-08)
 
 ### What's changed
