@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.33.2](https://github.com/dropseed/plain/releases/plain-api@0.33.2) (2026-05-12)
+
+### What's changed
+
+- README updated to reference the new `[tool.plain.assets.build.run]` namespace (was `[tool.plain.build.run]`) for the OpenAPI build step. See [plain-assets 0.2.0](../../../plain-assets/plain/assets/CHANGELOG.md). ([f698ec3436](https://github.com/dropseed/plain/commit/f698ec3436))
+
+### Upgrade instructions
+
+- No code changes required. If you copy-pasted the OpenAPI build snippet into your `pyproject.toml`, update its section header from `[tool.plain.build.run]` to `[tool.plain.assets.build.run]`.
+
 ## [0.33.1](https://github.com/dropseed/plain/releases/plain-api@0.33.1) (2026-05-08)
 
 ### What's changed
