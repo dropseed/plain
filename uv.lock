@@ -962,7 +962,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-dev"
-version = "0.61.0"
+version = "0.62.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },

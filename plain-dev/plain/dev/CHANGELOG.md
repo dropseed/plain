@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.62.0](https://github.com/dropseed/plain/releases/plain-dev@0.62.0) (2026-05-12)
+
+### What's changed
+
+- `plain pre-commit` now invokes `plain assets compile` (renamed from `plain assets build` — see [plain-assets 0.3.0](../../../plain-assets/plain/assets/CHANGELOG.md)). Pins `plain.assets>=0.3.0`. ([3b30b62309](https://github.com/dropseed/plain/commit/3b30b62309))
+
+### Upgrade instructions
+
+- No changes required if you upgrade `plain.assets` to 0.3.0+ in the same step.
+
 ## [0.61.0](https://github.com/dropseed/plain/releases/plain-dev@0.61.0) (2026-05-12)
 
 ### What's changed
