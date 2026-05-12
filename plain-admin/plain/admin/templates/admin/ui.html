@@ -339,7 +339,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {% call section("typography", "Typography",
-   "Defaults: Inter (sans) and JetBrains Mono (mono), both vendored under `assets/admin/fonts/`. Override `--font-sans` / `--font-mono` on `.plain-admin` to retheme — Tailwind's `font-sans` / `font-mono` utilities pick those up automatically. To swap or drop the bundled `@font-face` declarations, override the `admin_fonts` block in `admin/base.html`.") %}
+   "Defaults: Inter (sans) and JetBrains Mono (mono), both vendored under `assets/admin/fonts/`. Override `--font-sans` / `--font-mono` on `.plain-admin` to retheme — Tailwind's `font-sans` / `font-mono` utilities pick those up automatically. To swap or drop the bundled `@font-face` declarations, shadow `admin/base.html` in your app (extending `admin/_base.html`) and override the `admin_fonts` block.") %}
 
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
     <div class="rounded-admin-md border border-admin-border p-2 flex items-center gap-3">

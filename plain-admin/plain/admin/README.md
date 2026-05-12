@@ -619,7 +619,7 @@ The admin ships [Inter](https://github.com/rsms/inter) (sans) and
 [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (mono), vendored
 under `plain.admin`'s assets and licensed under the SIL Open Font License 1.1.
 Their `@font-face` declarations live in an overridable `admin_fonts` block
-of `admin/base.html`; the defaults of `--font-sans` and `--font-mono` lead
+of `admin/_base.html`; the defaults of `--font-sans` and `--font-mono` lead
 with these families and fall back to the system stack.
 
 Three override patterns:
@@ -633,8 +633,9 @@ Three override patterns:
 ```
 
 ```jinja
-{# 2. Replace the bundled fonts with your own. #}
-{% extends "admin/base.html" %}
+{# 2. Replace the bundled fonts with your own.
+   In app/templates/admin/base.html: #}
+{% extends "admin/_base.html" %}
 {% block admin_fonts %}
 <style nonce="{{ request.csp_nonce }}">
 @font-face {
@@ -826,6 +827,17 @@ The callable should return `True` to allow access, `False` to deny it. Views can
 #### How do I customize the admin templates?
 
 Override any admin template by creating a file with the same path in your app's templates directory. For example, to customize the list view, create `app/templates/admin/list.html`.
+
+For project-wide hooks (extra `<head>` scripts, swapping fonts, wrapping `content`), shadow `admin/base.html` and extend `admin/_base.html` from it. The thin `admin/base.html` exists as a user-overridable layer; `admin/_base.html` is the structural template — don't override it directly.
+
+```jinja
+{# app/templates/admin/base.html #}
+{% extends "admin/_base.html" %}
+
+{% block header_scripts %}
+<script src="{{ asset('analytics.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+{% endblock %}
+```
 
 #### How do I add a standalone admin page without a viewset?
 
