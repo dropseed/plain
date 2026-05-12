@@ -1,0 +1,66 @@
+---
+attrs:
+  global_search_query: str = ""
+  searchable_views: list = []
+  app_name: str = "Plain"
+  admin_force_theme: str = ""
+  description: str = ""
+  image: Any = None
+  links: dict = {}
+  extra_links: dict = {}
+  parent_view_classes: list = []
+  object: Any = None
+  cards: list = []
+---
+<template :include="admin/base"
+    title={"Search results for \"" + global_search_query + "\"" if global_search_query else "Search"}
+    app_name={app_name} admin_force_theme={admin_force_theme}
+    description={description} image={image} links={links} extra_links={extra_links}
+    parent_view_classes={parent_view_classes} object={object} cards={cards}>
+
+<form method="GET" action={url('admin:search')} class="mb-6">
+    <template :include="elements/admin/SearchInput"
+        name="query"
+        id="query"
+        value={global_search_query or ""}
+        placeholder="Search admin..."
+        wrapper_class="max-w-md"
+        autofocus={True}
+    />
+</form>
+
+<template :if={global_search_query}>
+<div id="search-results" class="*:mt-10 *:first:mt-0 *:empty:mt-0 *:empty:hidden">
+    <div :for={view in searchable_views}
+        hx-get={view.get_view_url() + "?search=" + global_search_query + "&page_size=5"}
+        hx-trigger="load from:body"
+        plain-hx-fragment="list">
+    </div>
+</div>
+<div id="no-results" class="hidden text-center py-12">
+    <p class="text-admin-muted-foreground">No results found for "{global_search_query}"</p>
+</div>
+<script nonce={request.csp_nonce}>
+    // Show "no results" message if all search result containers are empty
+    function checkForResults() {
+        const results = document.getElementById('search-results');
+        const noResults = document.getElementById('no-results');
+        if (results && noResults) {
+            const hasContent = Array.from(results.children).some(child => child.innerHTML.trim() !== '');
+            noResults.classList.toggle('hidden', hasContent);
+        }
+    }
+    let checkTimeout;
+    const resultsContainer = document.getElementById('search-results');
+    if (resultsContainer) {
+        resultsContainer.addEventListener('htmx:afterSwap', function() {
+            clearTimeout(checkTimeout);
+            checkTimeout = setTimeout(checkForResults, 100);
+        });
+        setTimeout(checkForResults, 500);
+    }
+</script>
+</template>
+
+<p :if={not global_search_query} class="text-admin-muted-foreground hidden sm:block">Enter a search query in the top bar</p>
+</template>
