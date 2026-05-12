@@ -11,7 +11,7 @@ dependencies = ["plain<1.0.0", "plain.assets>=0.1.0,<1.0.0"]
 [project.entry-points."plain.dev"]
 "esbuild" = "plain.esbuild.entrypoints:run_dev_build"
 
-[project.entry-points."plain.build"]
+[project.entry-points."plain.assets.build"]
 "esbuild" = "plain.esbuild.entrypoints:run_build"
 
 [tool.hatch.build.targets.wheel]

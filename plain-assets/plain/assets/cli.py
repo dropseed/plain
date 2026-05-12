@@ -59,6 +59,7 @@ def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
         for name, data in (
             pyproject.get("tool", {})
             .get("plain", {})
+            .get("assets", {})
             .get("build", {})
             .get("run", {})
             .items()
@@ -70,7 +71,7 @@ def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
                 sys.exit(result.returncode)
 
     # Then run installed package build steps (like tailwind, esbuild)
-    for entry_point in entry_points(group="plain.build"):
+    for entry_point in entry_points(group="plain.assets.build"):
         print_event(f"{entry_point.name}...")
         entry_point.load()()
 

@@ -51,6 +51,21 @@ By default, this [generates "fingerprinted" and compressed versions of the asset
 
 The purpose of fingerprinting the assets is to allow the browser to cache them indefinitely. When the content of the file changes, the fingerprint will change, and the browser will use the newer file. This cuts down on the number of requests that your app has to handle related to assets.
 
+### Pre-compile build steps
+
+`plain assets build` runs three things in order before compiling assets:
+
+1. User-defined shell commands from `[tool.plain.assets.build.run]` in your `pyproject.toml`. Useful for codegen that produces files into `app/assets/`:
+
+    ```toml
+    [tool.plain.assets.build.run]
+    openapi = {cmd = "plain api generate-openapi --validate > app/assets/openapi.json"}
+    ```
+
+2. Package-registered build hooks via the `plain.assets.build` entry-point group. Packages like `plain.tailwind` and `plain.esbuild` ship one of these to compile CSS / JS before the asset fingerprinter runs.
+
+3. The asset compile itself (fingerprinting, compression).
+
 ## Using `AssetView` directly
 
 In some situations you may want to use the `AssetView` at a custom URL, for example to serve a `favicon.ico`. You can do this quickly by using the `AssetView.as_view()` class method.
