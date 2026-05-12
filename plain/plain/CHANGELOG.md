@@ -1,5 +1,28 @@
 # plain changelog
 
+## [0.142.0](https://github.com/dropseed/plain/releases/plain@0.142.0) (2026-05-12)
+
+### What's changed
+
+- **`plain.assets` extracted to a sibling `plain.assets` package.** The asset finder, manifest, compile pipeline, URL routing, view, settings (`ASSETS_REDIRECT_ORIGINAL`, `ASSETS_CDN_URL`, `ASSETS_LOG_304`), and the `asset()` template global all moved out of `plain` core into a dedicated `plain.assets` package. Core no longer carries any HTML-asset-serving code or settings. This fixes a layering inversion (core templates previously imported from `plain.assets.urls`) and lets REST-only services skip installing it entirely. ([844f46e428](https://github.com/dropseed/plain/commit/844f46e428))
+- **`plain build` removed; use `plain assets build` instead.** The build orchestrator (user `[tool.plain.build.run]` commands + `plain.build` entry points + asset compile) lives in `plain.assets` now. `plain.tailwind` and `plain.esbuild` keep registering `plain.build` entry points; the runner that iterates them just moved.
+
+### Upgrade instructions
+
+- Install `plain.assets`:
+    ```
+    uv add plain.assets
+    ```
+- Add it to `INSTALLED_PACKAGES`:
+    ```python
+    INSTALLED_PACKAGES = [
+        ...
+        "plain.assets",
+    ]
+    ```
+- Replace `plain build` with `plain assets build` in deploy scripts, Procfiles, and CI.
+- `from plain.assets import ...` continues to work as a namespace import, but you must have `plain.assets` installed for the package's `INSTALLED_PACKAGES` registration (CLI command, template global, default settings) to take effect.
+
 ## [0.141.1](https://github.com/dropseed/plain/releases/plain@0.141.1) (2026-05-08)
 
 ### What's changed
