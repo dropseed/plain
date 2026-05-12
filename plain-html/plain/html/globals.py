@@ -36,16 +36,25 @@ def all_globals() -> dict[str, Any]:
 def _load_defaults() -> None:
     """Pull Plain's default Jinja globals into the plain.html scope so the same
     helpers (`url`, `asset`, `reverse`, etc.) are available in both engines.
-    Also expose the package-helper shims (`tailwind_css`, `pageviews_js`,
-    `toolbar`) that bridge to Jinja-rendered package templates until those
-    are ported.
+    Also picks up anything registered via `register_template_global` (e.g.
+    `is_package_installed`, `get_current_session`) and exposes the
+    package-helper shims (`tailwind_css`, `pageviews_js`, `toolbar`) that
+    bridge to Jinja-rendered package templates until those are ported.
     """
     try:
+        from plain.templates.jinja import environment
         from plain.templates.jinja.globals import default_globals
     except ImportError:
         return
     for name, value in default_globals.items():
         _GLOBALS.setdefault(name, value)
+    # Trigger Jinja env setup and pull anything `register_template_global`
+    # added on top of the defaults.
+    try:
+        for name, value in environment.globals.items():  # type: ignore[attr-defined]
+            _GLOBALS.setdefault(name, value)
+    except Exception:
+        pass
 
     from plain.utils.safestring import SafeString, mark_safe
 
