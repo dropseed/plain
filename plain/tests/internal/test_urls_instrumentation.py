@@ -4,14 +4,13 @@ Internal because these tests pin the *value* of the path stored on OTel
 spans and exception logs — implementation surface that step #3 of the
 URL routing arc will change.
 
-Today these record two different things:
-- OTel `url.path` span attribute → `request.path_info` (see
-  `plain/internal/handlers/base.py:126`)
-- Exception log `path` field → `request.path` (see
-  `plain/logs/exceptions.py:49` and `internal/handlers/exception.py:64`)
+Both observability reads use `request.path`:
+- OTel `url.path` span attribute (see `plain/internal/handlers/base.py:126`)
+- Exception log `path` field (see `plain/logs/exceptions.py:49` and
+  `internal/handlers/exception.py:64`)
 
-Step #3 normalizes the path *before* anything else runs, so both reads
-collapse to "the normalized path" — and a new `request.raw_path` carries
+Step #3 normalizes the path *before* anything else runs, so `request.path`
+becomes the canonical normalized form and a new `request.raw_path` carries
 the original for forensics.
 """
 
@@ -50,8 +49,8 @@ def _request_span(spans):
     raise AssertionError("No span with url.path attribute found")
 
 
-def test_otel_url_path_uses_path_info_for_canonical_request(app_router):
-    """`GET /` → `url.path` span attribute is `/` (request.path_info)."""
+def test_otel_url_path_records_request_path(app_router):
+    """`GET /` → `url.path` span attribute is `/` (request.path)."""
     Client().get("/")
     span = _request_span(app_router)
     assert span.attributes[url_attributes.URL_PATH] == "/"
@@ -108,12 +107,12 @@ def test_csrf_middleware_reads_path_info():
 
 
 def test_exception_log_records_request_path(error_client):
-    """Exception log `path` field uses `request.path` (not `request.path_info`).
+    """Exception log `path` field uses `request.path`, same source as the OTel
+    span attribute (per the divergence fix that unified both).
 
-    Today these are the same for typical requests, but `request.path` and
-    `request.path_info` are distinct attributes that could diverge (SCRIPT_NAME).
-    Step #3 unifies the read path: both span and log should reflect the
-    canonical normalized path.
+    Step #3 will redefine `request.path` as the normalized canonical path
+    (and add `request.raw_path` for the original); both observability sites
+    automatically pick up the new value because they already share a source.
 
     Attach the capture handler to the framework's module-cached logger
     instance (`plain.logs.exceptions.request_logger`) rather than fetching

@@ -123,7 +123,7 @@ class BaseHandler:
         span_attributes: dict[str, Any] = {
             "plain.request.id": request.unique_id,
             http_attributes.HTTP_REQUEST_METHOD: span_method,
-            url_attributes.URL_PATH: request.path_info,
+            url_attributes.URL_PATH: request.path,
             url_attributes.URL_SCHEME: request.scheme,
         }
 
