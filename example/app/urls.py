@@ -16,8 +16,8 @@ from plain.auth.views import LogoutView
 from plain.observer.urls import ObserverRouter
 from plain.pageviews.urls import PageviewsRouter
 from plain.passwords.views import PasswordLoginView
+from plain.templates.views import TemplateView
 from plain.urls import Router, include, path
-from plain.views import TemplateView
 
 
 class LoginView(PasswordLoginView):

@@ -8,6 +8,7 @@ INSTALLED_PACKAGES = [
     "plain.postgres",
     "plain.htmx",
     "plain.tailwind",
+    "plain.templates",
     "plain.admin",
     "app.users",
 ]

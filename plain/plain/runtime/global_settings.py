@@ -191,10 +191,6 @@ PREFLIGHT_SILENCED_CHECKS: list[str] = []
 # Silence specific check results by id
 PREFLIGHT_SILENCED_RESULTS: list[str] = []
 
-# MARK: Templates
-
-TEMPLATES_JINJA_ENVIRONMENT: str = "plain.templates.jinja.DefaultEnvironment"
-
 # MARK: Shell
 
 SHELL_IMPORT: str = ""

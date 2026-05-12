@@ -5,7 +5,7 @@ from typing import Any
 
 from plain.forms import BaseForm
 from plain.http import Response
-from plain.views import CreateView, UpdateView
+from plain.templates.views import CreateView, UpdateView
 
 from .forms import (
     ChildCascadeForm,

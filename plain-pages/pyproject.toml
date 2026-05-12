@@ -9,6 +9,7 @@ requires-python = ">=3.13"
 dependencies = [
   "plain>=0.123.0,<1.0.0",
   "plain.assets>=0.1.0,<1.0.0",
+  "plain.templates<1.0.0",
   "mistune>=3.0.0",
   "python-frontmatter>=1.0.0",
   "pygments>=2.0.0",

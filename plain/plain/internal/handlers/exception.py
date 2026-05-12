@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING
 from plain.http import HTTPException, Response
 from plain.logs import get_framework_logger, log_exception
 from plain.runtime import settings
-from plain.templates import Template, TemplateFileMissing
 
 if TYPE_CHECKING:
     from plain.http import Request
@@ -26,10 +25,24 @@ if TYPE_CHECKING:
 request_logger = get_framework_logger("plain.request")
 
 
+def _plain_text_response(status: int) -> Response:
+    response = Response(status_code=status, content_type="text/plain; charset=utf-8")
+    response.content = f"{status} {response.reason_phrase}"
+    return response
+
+
 def response_for_exception(request: Request, exc: Exception) -> Response:
     log_exception(request, exc)
 
     status = exc.status_code if isinstance(exc, HTTPException) else 500
+
+    try:
+        from plain.templates import Template, TemplateFileMissing
+    except ImportError:
+        response = _plain_text_response(status)
+        if status >= 500:
+            response.exception = exc
+        return response
 
     try:
         body = Template(f"{status}.html").render(
@@ -42,10 +55,7 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
         )
         response = Response(body, status_code=status)
     except TemplateFileMissing:
-        response = Response(
-            status_code=status, content_type="text/plain; charset=utf-8"
-        )
-        response.content = f"{status} {response.reason_phrase}"
+        response = _plain_text_response(status)
     except Exception as render_exc:
         if settings.DEBUG:
             raise

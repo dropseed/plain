@@ -15,10 +15,10 @@ from plain.http import (
     RedirectResponse,
 )
 from plain.signing import BadSignature, SignatureExpired, TimestampSigner
+from plain.templates.views import CreateView, FormView
 from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
 from plain.utils.encoding import force_bytes
-from plain.views import CreateView, FormView
 
 from .forms import (
     PasswordChangeForm,

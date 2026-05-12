@@ -4,8 +4,14 @@ from typing import Any
 
 from plain.auth.views import AuthView
 from plain.forms import BaseForm
+from plain.templates.views import (
+    CreateView,
+    DeleteView,
+    DetailView,
+    ListView,
+    UpdateView,
+)
 from plain.urls import reverse_lazy
-from plain.views import CreateView, DeleteView, DetailView, ListView, UpdateView
 
 from .forms import NoteForm
 from .models import Note

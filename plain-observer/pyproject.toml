@@ -10,6 +10,7 @@ dependencies = [
   "plain>=0.135.0,<1.0.0",
   "plain.admin<1.0.0",
   "plain.postgres>=0.98.0,<1.0.0",
+  "plain.templates<1.0.0",
   "opentelemetry-sdk>=1.34.1",
   "sqlparse>=0.3.1",
 ]

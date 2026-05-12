@@ -1,19 +1,137 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from functools import cached_property
 from typing import Any
 
 from plain.exceptions import ImproperlyConfigured
+from plain.forms import BaseForm, Form
+from plain.http import NotFoundError404, RedirectResponse, Response
+from plain.runtime import settings
+from plain.views import View
+
+from .core import Template, TemplateFileMissing
 
 try:
     from plain.postgres.exceptions import ObjectDoesNotExist
 except ImportError:
     ObjectDoesNotExist = None  # ty: ignore[invalid-assignment]
 
-from plain.forms import BaseForm, Form
-from plain.http import NotFoundError404, Response
 
-from .forms import FormView
-from .templates import TemplateView
+class TemplateView(View):
+    """
+    Render a template.
+    """
+
+    template_name: str | None = None
+
+    def get_template_context(self) -> dict[str, Any]:
+        return {
+            "request": self.request,
+            "template_names": self.get_template_names(),
+            "DEBUG": settings.DEBUG,
+        }
+
+    def get_template_names(self) -> list[str]:
+        """
+        Return a list of template names to be used for the request.
+        """
+        if self.template_name:
+            return [self.template_name]
+
+        return []
+
+    def get_template(self) -> Template:
+        template_names = self.get_template_names()
+
+        if isinstance(template_names, str):
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__}.get_template_names() must return a list of strings, "
+                f"not a string. Did you mean to return ['{template_names}']?"
+            )
+
+        if not template_names:
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__} requires a template_name or get_template_names()."
+            )
+
+        for template_name in template_names:
+            try:
+                return Template(template_name)
+            except TemplateFileMissing:
+                pass
+
+        raise TemplateFileMissing(template_names)
+
+    def render_template(self) -> str:
+        return self.get_template().render(self.get_template_context())
+
+    def get(self) -> Response:
+        return Response(self.render_template())
+
+
+class FormView[F: "BaseForm"](TemplateView):
+    """A view for displaying a form and rendering a template response.
+
+    Generic over the form type. Subclasses that want type-safe access to
+    their specific form should parameterize: `FormView[MyForm]`. The
+    `form_class` attribute must still be set separately at runtime.
+    """
+
+    form_class: type[F] | None = None
+    success_url: Callable | str | None = None
+
+    def get_form(self) -> F:
+        """Return an instance of the form to be used in this view."""
+        if not self.form_class:
+            raise ImproperlyConfigured(
+                f"No form class provided. Define {self.__class__.__name__}.form_class or override "
+                f"{self.__class__.__name__}.get_form()."
+            )
+        return self.form_class(**self.get_form_kwargs())
+
+    def get_form_kwargs(self) -> dict[str, Any]:
+        """Return the keyword arguments for instantiating the form."""
+        return {
+            "initial": {},
+            "request": self.request,
+        }
+
+    def get_success_url(self, form: F) -> str:
+        """Return the URL to redirect to after processing a valid form."""
+        if not self.success_url:
+            raise ImproperlyConfigured("No URL to redirect to. Provide a success_url.")
+        return str(self.success_url)  # success_url may be lazy
+
+    def form_valid(self, form: F) -> Response:
+        """If the form is valid, redirect to the supplied URL."""
+        return RedirectResponse(self.get_success_url(form))
+
+    def form_invalid(self, form: F) -> Response:
+        """If the form is invalid, render the invalid form."""
+        context = {
+            **self.get_template_context(),
+            "form": form,
+        }
+        return Response(self.get_template().render(context))
+
+    def get_template_context(self) -> dict[str, Any]:
+        """Insert the form into the context dict."""
+        context = super().get_template_context()
+        context["form"] = self.get_form()
+        return context
+
+    def post(self) -> Response:
+        """
+        Handle POST requests: instantiate a form instance with the passed
+        POST variables and then check if it's valid.
+        """
+        form = self.get_form()
+        if form.is_valid():
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)
 
 
 class CreateView(FormView):
@@ -21,7 +139,6 @@ class CreateView(FormView):
     View for creating a new object, with a response rendered by a template.
     """
 
-    # TODO? would rather you have to specify this...
     def get_success_url(self, form: BaseForm) -> str:
         """Return the URL to redirect to after processing a valid form."""
         if self.success_url:
@@ -162,3 +279,14 @@ class ListView(TemplateView, ABC):
         if self.context_object_name:
             context[self.context_object_name] = self.objects
         return context
+
+
+__all__ = [
+    "TemplateView",
+    "FormView",
+    "CreateView",
+    "UpdateView",
+    "DeleteView",
+    "DetailView",
+    "ListView",
+]
