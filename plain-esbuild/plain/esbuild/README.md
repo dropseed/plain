@@ -75,9 +75,9 @@ Yes, esbuild must be available via `npx`. Make sure you have a `package.json` in
 npm install --save-dev esbuild
 ```
 
-#### How do I use this with `plain assets build`?
+#### How do I use this with `plain assets compile`?
 
-The esbuild commands integrate with the Plain build system through [entrypoints](./entrypoints.py). When you run `plain assets build`, it will automatically run esbuild first if you have configured it in your build pipeline.
+The esbuild commands integrate with the asset compile pipeline through [entrypoints](./entrypoints.py). When you run `plain assets compile`, it will automatically run esbuild first if you have configured it in your build pipeline.
 
 #### Can I customize esbuild options?
 

@@ -452,7 +452,7 @@ uv add --dev openapi-spec-validator
 To build the JSON when you deploy, add a build command to your `pyproject.toml` file:
 
 ```toml
-[tool.plain.assets.build.run]
+[tool.plain.assets.run]
 openapi = {cmd = "plain api generate-openapi --validate > app/assets/openapi.json"}
 ```
 

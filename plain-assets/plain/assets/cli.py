@@ -20,7 +20,7 @@ def cli() -> None:
     """Asset management"""
 
 
-@cli.command()
+@cli.command(name="compile")
 @click.option(
     "--keep-original/--no-keep-original",
     "keep_original",
@@ -42,15 +42,15 @@ def cli() -> None:
     default=True,
     help="Compress the assets",
 )
-def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
-    """Pre-deployment build: run user commands, package build entry points, and compile assets."""
+def compile_cmd(keep_original: bool, fingerprint: bool, compress: bool) -> None:
+    """Run pre-compile hooks, then fingerprint and compress assets."""
 
     if not keep_original and not fingerprint:
         raise click.UsageError(
             "You must either keep the original assets or fingerprint them."
         )
 
-    # Run user-defined build commands first
+    # Run user-defined pre-compile shell commands first
     pyproject_path = plain.runtime.APP_PATH.parent / "pyproject.toml"
     if pyproject_path.exists():
         with pyproject_path.open("rb") as f:
@@ -60,7 +60,6 @@ def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
             pyproject.get("tool", {})
             .get("plain", {})
             .get("assets", {})
-            .get("build", {})
             .get("run", {})
             .items()
         ):
@@ -70,8 +69,8 @@ def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
                 click.secho(f"Error in {name} (exit {result.returncode})", fg="red")
                 sys.exit(result.returncode)
 
-    # Then run installed package build steps (like tailwind, esbuild)
-    for entry_point in entry_points(group="plain.assets.build"):
+    # Then run installed package pre-compile hooks (like tailwind, esbuild)
+    for entry_point in entry_points(group="plain.assets.compile"):
         print_event(f"{entry_point.name}...")
         entry_point.load()()
 
