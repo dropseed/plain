@@ -8,6 +8,7 @@ hottest user-facing path.
 
 from __future__ import annotations
 
+import threading
 import uuid
 
 import pytest
@@ -162,6 +163,81 @@ def test_enqueue_failure_records_error_type_on_metric(
     assert all(
         p.attributes.get("messaging.system") == "plain.jobs" for p in sent_points
     )
+
+
+# --- Worker run-loop span -----------------------------------------------
+
+
+def _build_worker_for_loop_test() -> Worker:
+    """Construct a Worker bypassing __init__ so `_run_loop` can run a single
+    iteration without a real ProcessPoolExecutor. Tests override the maintenance
+    methods to control when the loop exits."""
+    worker = Worker.__new__(Worker)
+    worker.queues = ["default"]
+    worker._is_shutting_down = False
+    worker._heartbeat_registered = True
+    worker._inflight_futures = {}
+    worker._inflight_lock = threading.Lock()
+    worker.max_processes = 1
+    worker.max_pending_per_process = 1
+    worker.maybe_heartbeat = lambda: None
+    worker.maybe_log_stats = lambda: None
+    worker.maybe_check_job_results = lambda: None
+    worker.maybe_schedule_jobs = lambda: None
+    return worker
+
+
+@pytest.mark.usefixtures("db")
+def test_worker_loop_emits_internal_span_per_iteration(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """Each worker loop iteration wraps the maintenance work in a `worker loop`
+    INTERNAL span so DB transients during maintenance land on a span."""
+    from opentelemetry.trace import StatusCode
+
+    worker = _build_worker_for_loop_test()
+
+    def shutdown_during_heartbeat() -> None:
+        worker._is_shutting_down = True
+
+    worker.maybe_heartbeat = shutdown_during_heartbeat  # ty: ignore[invalid-assignment]
+    worker._run_loop()
+
+    loop_spans = [s for s in otel_spans.get_finished_spans() if s.name == "worker loop"]
+    assert len(loop_spans) == 1
+    span = loop_spans[0]
+    assert span.kind == SpanKind.INTERNAL
+    assert span.status.status_code == StatusCode.UNSET
+
+
+@pytest.mark.usefixtures("db")
+def test_worker_loop_records_error_when_maintenance_fails(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """A maintenance exception leaves the loop running and stamps the canonical
+    failure signal (status=ERROR + error.type) on the `worker loop` span. This
+    is the path that previously swallowed DB transients like the production
+    `psycopg.OperationalError` we saw escaping `rescue_job_results`."""
+    from opentelemetry.trace import StatusCode
+
+    worker = _build_worker_for_loop_test()
+
+    def boom_then_shutdown() -> None:
+        worker._is_shutting_down = True
+        raise RuntimeError("db transient")
+
+    worker.maybe_heartbeat = boom_then_shutdown  # ty: ignore[invalid-assignment]
+    # Must NOT raise — the loop catches and continues, just like in production.
+    worker._run_loop()
+
+    loop_spans = [s for s in otel_spans.get_finished_spans() if s.name == "worker loop"]
+    assert len(loop_spans) == 1
+    span = loop_spans[0]
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    exception_events = [e for e in span.events if e.name == "exception"]
+    assert exception_events
 
 
 # --- Worker-state observable gauges -------------------------------------
