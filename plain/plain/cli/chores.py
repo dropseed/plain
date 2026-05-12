@@ -78,7 +78,7 @@ def run_chores(name: tuple[str, ...], dry_run: bool) -> None:
             continue
 
         with tracer.start_as_current_span(
-            f"chore {chore_name}", kind=trace.SpanKind.INTERNAL
+            f"chore {chore_name}", kind=trace.SpanKind.CONSUMER
         ) as span:
             try:
                 chore = chore_class()

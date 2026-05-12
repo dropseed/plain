@@ -43,9 +43,10 @@ def _chore_span(name: str):
 
 
 @pytest.mark.usefixtures("_otel_clean")
-def test_chore_emits_internal_span_on_success() -> None:
-    """Each chore execution gets a `chore {name}` INTERNAL span so the run is
-    observable as a workflow boundary."""
+def test_chore_emits_consumer_span_on_success() -> None:
+    """Each chore execution gets a `chore {name}` CONSUMER span — the chore
+    is the unit of work being consumed. CONSUMER puts it in the canonical
+    error-attribution set (SERVER/CONSUMER/PRODUCER) alongside jobs."""
     name = _qualname(_SuccessChore)
     result = CliRunner().invoke(
         cli, ["chores", "run", "--name", name], prog_name="plain"
@@ -53,7 +54,7 @@ def test_chore_emits_internal_span_on_success() -> None:
     assert result.exit_code == 0
 
     span = _chore_span(f"chore {name}")
-    assert span.kind == trace.SpanKind.INTERNAL
+    assert span.kind == trace.SpanKind.CONSUMER
     assert span.status.status_code == trace.StatusCode.UNSET
 
 
