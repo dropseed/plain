@@ -1,5 +1,19 @@
 # plain-jobs changelog
 
+## [0.53.0](https://github.com/dropseed/plain/releases/plain-jobs@0.53.0) (2026-05-12)
+
+### What's changed
+
+- **Worker maintenance loop is now wrapped in an OTel span.** Previously, DB transients during heartbeat/rescue/schedule work were swallowed by the outer `except Exception` with `logger.exception` only — invisible to OTel-based exception tooling. The new `worker loop` `INTERNAL` span stamps `status=ERROR` + `error.type` on failed iterations while preserving the log-and-continue behavior. ([c72ebe74bd](https://github.com/dropseed/plain/commit/c72ebe74bd))
+- **Job-lookup failures in `process_job` now get a fallback `CONSUMER` span.** Previously a psycopg transient during the row lookup (before `JobProcess.run()` started its own span) only left a `CLIENT` span — invisible under entry-span error attribution. The new wrapper span captures lookup-time failures and stays out of the way on the success path. The worker maintenance loop kind also flipped from `INTERNAL` → `CONSUMER` to match the chore convention. ([f4444949c7](https://github.com/dropseed/plain/commit/f4444949c7))
+- **`exception.escaped` no longer emitted on framework spans.** The OTel semconv attribute is deprecated upstream (semconv PR #1716) and the Python SDK records it inconsistently. `status=ERROR` + `error.type` is the canonical signal now. ([bb9251f165](https://github.com/dropseed/plain/commit/bb9251f165))
+- Pins `plain>=0.143.0`.
+
+### Upgrade instructions
+
+- No code changes required.
+- If your dashboards or alerts filter on `exception.escaped`, switch to filtering on `span.status_code = 'ERROR'` + `error.type` instead.
+
 ## [0.52.2](https://github.com/dropseed/plain/releases/plain-jobs@0.52.2) (2026-05-06)
 
 ### What's changed
