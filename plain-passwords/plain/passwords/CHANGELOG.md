@@ -1,5 +1,16 @@
 # plain-passwords changelog
 
+## [0.26.1](https://github.com/dropseed/plain/releases/plain-passwords@0.26.1) (2026-05-12)
+
+### What's changed
+
+- `CreateView` and `FormView` imports moved from `plain.views` to `plain.templates.views` to match the [`plain.templates` carve-out](../../../plain/plain/CHANGELOG.md). The end-user `PasswordLoginView`/`PasswordResetView`/etc. API is unchanged. ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- Pins `plain>=0.143.0` and `plain.templates>=0.1.0`.
+
+### Upgrade instructions
+
+- No code changes required if you upgrade `plain` to 0.143.0 in the same step.
+
 ## [0.26.0](https://github.com/dropseed/plain/releases/plain-passwords@0.26.0) (2026-05-05)
 
 ### What's changed
