@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.61.0](https://github.com/dropseed/plain/releases/plain-dev@0.61.0) (2026-05-12)
+
+### What's changed
+
+- **`plain pre-commit` now runs `plain assets build` instead of `plain build`** (which has been removed from `plain` core in 0.142.0 and now lives in the new `plain.assets` package). ([844f46e428](https://github.com/dropseed/plain/commit/844f46e428))
+- Adds explicit `plain.assets>=0.1.0,<1.0.0` and bumps the `plain` minimum to `>=0.142.0,<1.0.0` to match.
+
+### Upgrade instructions
+
+- Install `plain.assets` if you don't already — `plain pre-commit` needs it for the build step. See the [`plain` 0.142.0 release notes](../../../plain/plain/CHANGELOG.md) for the full migration.
+
 ## [0.60.4](https://github.com/dropseed/plain/releases/plain-dev@0.60.4) (2026-05-05)
 
 ### What's changed
