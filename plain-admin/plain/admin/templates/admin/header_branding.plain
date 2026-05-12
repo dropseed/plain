@@ -1,0 +1,7 @@
+---
+attrs:
+  app_name: str = "Plain"
+---
+<a href="/" class="text-sm font-medium text-admin-muted-foreground hover:text-admin-foreground/85">{app_name}</a>
+<span class="text-admin-muted-foreground/50">/</span>
+<a href={url('admin:index')} class="text-sm font-medium text-admin-foreground hover:text-admin-foreground/85">Admin</a>

@@ -1,0 +1,45 @@
+---
+attrs:
+  sections: dict = {}
+  header_label: str = ""
+  pinned_slugs: set = set()
+  slug: str = ""
+---
+<div :if={sections} class="menu-section data-[header=packages]:pt-3 data-[header=packages]:mt-3" data-header={header_label.lower()}>
+    <div class="relative flex items-center px-1.5 pt-1 pb-2">
+        <span class="text-[10px] font-medium text-admin-muted-foreground/80 uppercase tracking-widest">{header_label}</span>
+        <div class="flex-1 ml-2.5 h-px bg-gradient-to-r from-stone-200 to-transparent"></div>
+    </div>
+    <template :for={(section, views) in sections.items()}>
+        <div :if={section} class="mt-4 mb-1.5 px-1.5 menu-subsection" data-section={section.lower()}>
+            <span class="text-[10px] font-medium text-admin-muted-foreground/80 uppercase tracking-wider">{section}</span>
+        </div>
+        <div class="space-y-0.5 menu-items-group" data-section={section.lower() if section else ""}>
+            <div :for={view in views}
+                class="menu-item group flex items-center gap-1 rounded-admin-lg transition-colors data-[current]:bg-admin-muted [&[data-current]_a]:text-admin-foreground [&[data-current]_a]:font-medium [&[data-current]_a]:hover:bg-transparent"
+                data-title={view.get_nav_title().lower()}
+                data-current={view.get_slug() == slug or None}
+            >
+                <a
+                    href={view.get_view_url()}
+                    class="flex-1 flex items-center gap-2 px-1.5 py-2 text-sm rounded-admin-lg transition-colors text-admin-foreground/85 hover:text-admin-foreground hover:bg-admin-muted/40"
+                >
+                    <template :if={view.nav_icon}><template :include="elements/admin/Icon" name={view.nav_icon} class="text-admin-muted-foreground/80 flex-shrink-0" /></template>
+                    <span>{view.get_nav_title()}</span>
+                </a>
+                <form :if={view.get_slug() in pinned_slugs} method="POST" action={url('admin:unpin')} class="contents">
+                    <input type="hidden" name="view_slug" value={view.get_slug()}>
+                    <button type="submit" class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost mr-1" title="Unpin">
+                        <template :include="elements/admin/Icon" name="pin-fill" class="text-sm" />
+                    </button>
+                </form>
+                <form :if={view.get_slug() not in pinned_slugs} method="POST" action={url('admin:pin')} class="contents">
+                    <input type="hidden" name="view_slug" value={view.get_slug()}>
+                    <button type="submit" class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost text-admin-muted-foreground/50 opacity-0 group-hover:opacity-100 mr-1" title="Pin to nav">
+                        <template :include="elements/admin/Icon" name="pin" class="text-sm" />
+                    </button>
+                </form>
+            </div>
+        </div>
+    </template>
+</div>

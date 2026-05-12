@@ -1,0 +1,1 @@
+<template :include="admin/base"></template>

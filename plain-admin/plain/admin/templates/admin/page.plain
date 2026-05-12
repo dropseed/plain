@@ -1,0 +1,5 @@
+---
+slots:
+  default: required
+---
+<template :include="admin/base">{children}</template>
