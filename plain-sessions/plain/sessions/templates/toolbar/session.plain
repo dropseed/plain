@@ -1,0 +1,13 @@
+---
+imports:
+  - from plain.sessions import get_request_session
+---
+<dl class="text-sm grid grid-cols-1 sm:grid-cols-[max-content_1fr] sm:gap-y-2 gap-x-8 px-6 py-4">
+    <template :for={(k, v) in get_request_session(request).items()}>
+    <dt class="font-mono">{k}</dt>
+    <dd class="text-sm text-white/50 max-h-32 overflow-auto">
+        <pre :if={hasattr(v, "__iter__") and not isinstance(v, str)}><code>{v}</code></pre>
+        <template :if={not (hasattr(v, "__iter__") and not isinstance(v, str))}>{v}</template>
+    </dd>
+    </template>
+</dl>
