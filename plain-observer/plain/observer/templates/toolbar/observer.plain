@@ -1,0 +1,47 @@
+---
+attrs:
+  observer: Any
+---
+<div id="observer-traces" class="h-full" data-observer-mode={observer.mode() if observer else ""} data-traces-url={url('observer:traces')}>
+    <div class="px-6 py-4 text-center">
+        <p>Loading spans...</p>
+    </div>
+</div>
+<script nonce={request.csp_nonce}>
+(function() {
+    var container = document.getElementById('observer-traces');
+    var loaded = false;
+    var parent = container.parentNode;
+    var observerMode = container.dataset.observerMode;
+    var tracesUrl = container.dataset.tracesUrl;
+
+    // Auto-enable summary mode if no mode is set
+    if (!observerMode || observerMode === "None") {
+        var form = new FormData();
+        form.append('observe_action', 'summary');
+
+        fetch(tracesUrl, {
+            method: 'POST',
+            body: form,
+            credentials: 'same-origin'
+        });
+    }
+
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting && !loaded) {
+                loaded = true;
+                var iframe = document.createElement('iframe');
+                iframe.src = tracesUrl;
+                iframe.frameBorder = "0";
+                iframe.width = "100%";
+                iframe.height = "100%";
+                container.innerHTML = '';
+                container.appendChild(iframe);
+                observer.disconnect();
+            }
+        });
+    }, { root: parent, threshold: 0 });
+    observer.observe(container);
+})();
+</script>
