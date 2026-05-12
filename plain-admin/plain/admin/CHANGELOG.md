@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.82.0](https://github.com/dropseed/plain/releases/plain-admin@0.82.0) (2026-05-12)
+
+### What's changed
+
+- **Admin base template split into structural and overridable layers.** Renamed `admin/base.html` → `admin/_base.html` (structural, not meant to be overridden) and added a thin `admin/base.html` that extends it. Users can now shadow `admin/base.html` in their app to add header scripts, swap fonts, etc. without forking the entire structural template. ([fbf61d21ae](https://github.com/dropseed/plain/commit/fbf61d21ae))
+- View imports updated from `from plain.views import (TemplateView, CreateView, ...)` to `from plain.templates.views import ...` as part of the `plain.templates` carve-out. End-user `AdminView` subclasses are unaffected. ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- Pins `plain>=0.143.0` and `plain.templates>=0.1.0`.
+
+### Upgrade instructions
+
+- If you override `admin/base.html` in your app today, rename the file to `admin/_base.html` (or move your customization into the new `admin/base.html` shadowing layer, which is now the recommended override point).
+
 ## [0.81.3](https://github.com/dropseed/plain/releases/plain-admin@0.81.3) (2026-05-12)
 
 ### What's changed
