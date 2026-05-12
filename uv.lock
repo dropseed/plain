@@ -1038,7 +1038,7 @@ version = "0.0.1"
 source = { editable = "plain-html" }
 dependencies = [
     { name = "plain" },
-    { name = "pyyaml" },
+    { name = "python-frontmatter" },
 ]
 
 [package.dev-dependencies]
@@ -1049,7 +1049,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
-    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "python-frontmatter", specifier = ">=1.1.0" },
 ]
 
 [package.metadata.requires-dev]

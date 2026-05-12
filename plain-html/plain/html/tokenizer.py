@@ -1,15 +1,12 @@
 """HTML-aware tokenizer.
 
-Phase 0 scope: emit a flat token stream from a template body string. Tokens
-carry enough structure for the parser to build a tag tree. Attribute values
-are split into literal segments and `{expr}` segments so the compiler/renderer
-can apply contextual escape.
+Phase 0 scope: emit a flat token stream from a template body string. Attribute
+values are split into typed segments (`AttrText` / `AttrExpr`) so the
+compiler/renderer can apply contextual escape without sniffing strings.
 
 Out of scope for Phase 0:
 - `<script>` / `<style>` opaque body handling (treated as regular text)
-- Source positions (line/col) — included as offsets but not yet plumbed into
-  every error path
-- Unicode tag-name validation (we accept ASCII letter prefixes)
+- Source positions plumbed into every error path
 """
 
 from __future__ import annotations
@@ -41,6 +38,36 @@ class TokenizeError(Exception):
 
 
 @dataclass
+class AttrText:
+    """A literal-text segment inside an attribute value."""
+
+    text: str
+
+
+@dataclass
+class AttrExpr:
+    """A `{python_expr}` segment inside an attribute value."""
+
+    code: str
+
+
+AttrSegment = AttrText | AttrExpr
+
+
+@dataclass
+class Attribute:
+    """One attribute on a start tag.
+
+    `segments=None` means a boolean attribute with no `=value`. Otherwise the
+    list of segments concatenates to the rendered value (after each
+    `AttrExpr` is evaluated and contextually escaped).
+    """
+
+    name: str
+    segments: list[AttrSegment] | None
+
+
+@dataclass
 class TextToken:
     text: str
     offset: int
@@ -67,7 +94,7 @@ class DoctypeToken:
 @dataclass
 class StartTagToken:
     name: str
-    attrs: list[tuple[str, list | None, bool]] = field(default_factory=list)
+    attrs: list[Attribute] = field(default_factory=list)
     self_closing: bool = False
     offset: int = 0
 
@@ -103,7 +130,6 @@ def tokenize(source: str) -> list[Token]:
     while i < n:
         c = source[i]
 
-        # HTML comment
         if source.startswith("<!--", i):
             flush_text()
             end = source.find("-->", i + 4)
@@ -114,7 +140,6 @@ def tokenize(source: str) -> list[Token]:
             text_start = i
             continue
 
-        # Doctype
         if source.startswith("<!", i):
             flush_text()
             end = source.find(">", i + 2)
@@ -125,7 +150,6 @@ def tokenize(source: str) -> list[Token]:
             text_start = i
             continue
 
-        # End tag
         if source.startswith("</", i):
             flush_text()
             end = source.find(">", i + 2)
@@ -139,7 +163,6 @@ def tokenize(source: str) -> list[Token]:
             text_start = i
             continue
 
-        # Start tag
         if c == "<" and i + 1 < n and (source[i + 1].isalpha() or source[i + 1] == "/"):
             flush_text()
             tok, new_i = _consume_start_tag(source, i)
@@ -148,7 +171,6 @@ def tokenize(source: str) -> list[Token]:
             text_start = i
             continue
 
-        # Template comment {# ... #}
         if source.startswith("{#", i):
             flush_text()
             end = source.find("#}", i + 2)
@@ -158,7 +180,7 @@ def tokenize(source: str) -> list[Token]:
             text_start = i
             continue
 
-        # Literal { and } via {{ and }}
+        # `{{` / `}}` are the f-string-style escapes for literal `{` and `}`.
         if source.startswith("{{", i):
             text_buf.append("{")
             i += 2
@@ -168,7 +190,6 @@ def tokenize(source: str) -> list[Token]:
             i += 2
             continue
 
-        # Expression {expr}
         if c == "{":
             flush_text()
             expr, new_i = _consume_expr(source, i)
@@ -185,10 +206,10 @@ def tokenize(source: str) -> list[Token]:
 
 
 def _consume_expr(source: str, start: int) -> tuple[str, int]:
-    """Consume a {python_expr} starting at the '{' position.
+    """Consume a `{python_expr}` starting at the `{` position.
 
-    Tracks brace depth so nested dict/set literals work: ``{ {"a": 1} }``.
-    Honors string quoting to avoid being fooled by braces inside strings.
+    Tracks brace depth so nested dict/set literals work, and honors string
+    quoting so braces inside strings don't fool the counter.
     """
     assert source[start] == "{"
     i = start + 1
@@ -229,7 +250,6 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
     assert source[start] == "<"
     i = start + 1
     n = len(source)
-    # Tag name
     name_start = i
     while i < n and (source[i].isalnum() or source[i] in "-_:"):
         i += 1
@@ -237,11 +257,10 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
     if not name:
         raise TokenizeError(f"Expected tag name at offset {start}")
 
-    attrs: list[tuple[str, list | None, bool]] = []
+    attrs: list[Attribute] = []
     self_closing = False
 
     while i < n:
-        # Skip whitespace
         while i < n and source[i] in " \t\r\n":
             i += 1
         if i >= n:
@@ -256,7 +275,6 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
             i += 2
             break
 
-        # Attribute name
         attr_name_start = i
         while i < n and source[i] not in " \t\r\n=/>":
             i += 1
@@ -264,14 +282,11 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
         if not attr_name:
             raise TokenizeError(f"Expected attribute name at offset {attr_name_start}")
 
-        # Optional value
-        # Skip whitespace before '='
         j = i
         while j < n and source[j] in " \t\r\n":
             j += 1
         if j < n and source[j] == "=":
             i = j + 1
-            # Skip whitespace after '='
             while i < n and source[i] in " \t\r\n":
                 i += 1
             if i >= n:
@@ -280,18 +295,10 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
             ac = source[i]
             if ac == '"' or ac == "'":
                 segments, i = _consume_quoted_attr(source, i, ac)
-                # If the entire value is one expression and no literal, mark as expression
-                is_expr = (
-                    len(segments) == 1
-                    and isinstance(segments[0], tuple)
-                    and segments[0][0] == "expr"
-                )
-                attrs.append((attr_name, segments, is_expr))
             elif ac == "{":
                 expr, i = _consume_expr(source, i)
-                attrs.append((attr_name, [("expr", expr)], True))
+                segments = [AttrExpr(expr)]
             else:
-                # Unquoted value: read until whitespace or '>' or '/>'
                 val_start = i
                 while (
                     i < n
@@ -299,10 +306,10 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
                     and not source.startswith("/>", i)
                 ):
                     i += 1
-                attrs.append((attr_name, [("text", source[val_start:i])], False))
+                segments = [AttrText(source[val_start:i])]
+            attrs.append(Attribute(name=attr_name, segments=segments))
         else:
-            # Boolean attribute (no value)
-            attrs.append((attr_name, None, False))
+            attrs.append(Attribute(name=attr_name, segments=None))
 
     return (
         StartTagToken(name=name, attrs=attrs, self_closing=self_closing, offset=start),
@@ -310,17 +317,19 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
     )
 
 
-def _consume_quoted_attr(source: str, start: int, quote: str) -> tuple[list, int]:
-    """Consume `"static {expr} more"` returning a list of ('text', s) and ('expr', code) segments."""
+def _consume_quoted_attr(
+    source: str, start: int, quote: str
+) -> tuple[list[AttrSegment], int]:
+    """Consume `"static {expr} more"` returning typed segments."""
     assert source[start] == quote
     i = start + 1
     n = len(source)
-    segments: list = []
+    segments: list[AttrSegment] = []
     buf: list[str] = []
 
     def flush() -> None:
         if buf:
-            segments.append(("text", "".join(buf)))
+            segments.append(AttrText("".join(buf)))
             buf.clear()
 
     while i < n:
@@ -339,7 +348,7 @@ def _consume_quoted_attr(source: str, start: int, quote: str) -> tuple[list, int
         if c == "{":
             flush()
             expr, i = _consume_expr(source, i)
-            segments.append(("expr", expr))
+            segments.append(AttrExpr(expr))
             continue
         buf.append(c)
         i += 1

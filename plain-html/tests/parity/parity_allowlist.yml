@@ -21,6 +21,19 @@ differences:
     plan: |
       Acceptable. The normalized diff is the authoritative comparison.
 
+  - id: escape-entity-style
+    severity: cosmetic
+    fixtures: ["greeting"]
+    description: |
+      Jinja autoescape (via markupsafe) emits `&#34;` and `&#39;` for `"` and
+      `'`. plain.html escapes via `plain.utils.html.conditional_escape`, which
+      uses the stdlib `html.escape` and emits the named entities `&quot;` and
+      `&#x27;`. Both are HTML-equivalent — browsers render identically.
+    plan: |
+      Acceptable. Aligning entity style is a one-line change in either
+      direction; deferred until the post-migration period when there's only
+      one renderer and "Jinja-compatible" stops being a constraint.
+
   - id: boolean-attribute-rendering
     severity: spec-intentional
     fixtures: ["tasks_list"]

@@ -27,20 +27,21 @@ Exits non-zero if any normalized diff is non-empty.
 ```
 fixture/scenario      raw    normalized
 ---------------------------------------
-greeting/one          match  match
+greeting/one          DIFF   DIFF
 greeting/many         match  match
 greeting/none         match  match
 tasks_list/populated  DIFF   DIFF
 tasks_list/empty      DIFF   match
 
-5 comparison(s), 1 normalized-diff failure(s).
+5 comparison(s), 2 normalized-diff failure(s).
 ```
 
-Interpretation:
+Interpretation — every remaining diff maps to an allowlist entry:
 
-- **`greeting` (3/3 byte-identical)** — the engine produces byte-identical output to Jinja when the templates are written on a single line. Demonstrates parity at the level of text, expression interpolation, attribute interpolation, fragment conditionals (`<template :if>`), and HTML escape.
-- **`tasks_list/empty` (normalized match)** — Jinja's `{% if %}` block syntax produces empty lines in the output that plain.html's element-level directives don't; whitespace-normalization erases the difference. See `parity_allowlist.yml` (`inter-tag-whitespace`).
-- **`tasks_list/populated` (normalized DIFF)** — same whitespace difference as above, plus a real semantic difference: `data-done={task.done}` renders as `data-done` (when True) or omitted (when False) under plain.html, vs `data-done="True"` / `data-done="False"` under Jinja. See `parity_allowlist.yml` (`boolean-attribute-rendering`). This is the spec's intended HTML-aware boolean-attribute behavior, not a bug.
+- **`greeting/many` / `greeting/none` (byte-identical)** — text, expression interpolation, attribute interpolation, fragment conditionals (`<template :if>`), and HTML escape all produce identical bytes under both renderers when the input has no quote characters that would surface the next item.
+- **`greeting/one` (DIFF: `escape-entity-style`)** — `"the engineer"` round-trips through escape. Jinja's markupsafe emits `&#34;`, `plain.utils.html.escape` (stdlib) emits `&quot;`. Browser-equivalent; cosmetic.
+- **`tasks_list/empty` (normalized match: `inter-tag-whitespace`)** — Jinja's `{% if %}` block syntax preserves the surrounding blank lines; plain.html's element-level directives don't. Whitespace-normalization erases it.
+- **`tasks_list/populated` (DIFF: `inter-tag-whitespace` + `boolean-attribute-rendering`)** — same whitespace difference, plus the spec-intentional HTML-aware boolean-attribute rendering: `data-done={task.done}` becomes `data-done` (True) or absent (False/None) under plain.html, vs `data-done="True"` / `data-done="False"` under Jinja.
 
 ## What this validates
 

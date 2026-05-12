@@ -1,4 +1,8 @@
---- jinja:tasks_list.html [populated] (normalized)+++ plain:tasks_list.plain [populated] (normalized)@@ -8,15 +8,15 @@ <span>Templates marked &#34;done&#34; run under the new engine.</span>
+--- jinja:tasks_list.html [populated] (normalized)+++ plain:tasks_list.plain [populated] (normalized)@@ -5,19 +5,19 @@ </header>
+ <div class="alert" data-severity="info">
+ <strong>Migration in progress</strong>
+-<span>Templates marked &#34;done&#34; run under the new engine.</span>
++<span>Templates marked &quot;done&quot; run under the new engine.</span>
  </div>
  <ul class="task-list" data-owner="42">
 -<li class="task" data-id="1" data-done="True">
@@ -12,7 +16,9 @@
  <span class="due">2026-05-13</span>
  <span class="tags"><span class="tag">tests</span></span>
 -</li><li class="task" data-id="3" data-done="False">
+-<a href="/tasks/3/" class="title">Audit &#34;render path&#34;</a>
 +</li><li class="task" data-id="3">
- <a href="/tasks/3/" class="title">Audit &#34;render path&#34;</a>
++<a href="/tasks/3/" class="title">Audit &quot;render path&quot;</a>
  <span class="due">2026-05-14</span>
  </li>
+ </ul>
