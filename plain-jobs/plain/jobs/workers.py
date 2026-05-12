@@ -189,7 +189,7 @@ class Worker:
 
         while not self._is_shutting_down:
             with tracer.start_as_current_span(
-                "worker loop", kind=trace.SpanKind.INTERNAL
+                "worker loop", kind=trace.SpanKind.CONSUMER
             ) as span:
                 try:
                     self.maybe_heartbeat()
@@ -616,7 +616,22 @@ def process_job(job_process_uuid: str) -> None:
     try:
         worker_pid = os.getpid()
 
-        job_process = JobProcess.query.get(uuid=job_process_uuid)
+        try:
+            job_process = JobProcess.query.get(uuid=job_process_uuid)
+        except Exception as e:
+            # The CONSUMER span inside JobProcess.run() is never reached if
+            # the lookup itself fails. Emit one here so the failure has an
+            # entry-span home in OTel (e.g. a psycopg transient on this read
+            # would otherwise leave only a CLIENT span, which entry-span
+            # filtering excludes).
+            with tracer.start_as_current_span(
+                "process job",
+                kind=trace.SpanKind.CONSUMER,
+            ) as span:
+                span.record_exception(e)
+                span.set_status(trace.StatusCode.ERROR)
+                span.set_attribute(ERROR_TYPE, format_exception_type(e))
+            raise
 
         logger.info(
             "Executing job",

@@ -165,6 +165,39 @@ def test_enqueue_failure_records_error_type_on_metric(
     )
 
 
+# --- process_job lookup failure ---------------------------------------------
+
+
+@pytest.mark.usefixtures("db")
+def test_process_job_emits_consumer_span_when_lookup_fails(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """JobProcess.run() creates the CONSUMER span — but `process_job` does the
+    JobProcess row lookup first. A DB transient on that lookup leaves only a
+    CLIENT span, which entry-span filtering correctly excludes. The fallback
+    CONSUMER span at the top of process_job ensures lookup failures still
+    surface."""
+    from opentelemetry.trace import StatusCode
+
+    from plain.jobs.workers import process_job
+
+    # A random UUID won't match any row — JobProcess.query.get raises
+    # DoesNotExist, which is the simplest way to exercise the lookup-failure
+    # path without monkey-patching the DB.
+    process_job(str(uuid.uuid4()))
+
+    spans = [s for s in otel_spans.get_finished_spans() if s.name == "process job"]
+    assert len(spans) == 1
+    span = spans[0]
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    # JobProcess.DoesNotExist via plain-postgres' base manager.
+    assert "DoesNotExist" in span.attributes["error.type"]
+    exception_events = [e for e in span.events if e.name == "exception"]
+    assert exception_events
+
+
 # --- Worker run-loop span -----------------------------------------------
 
 
@@ -188,11 +221,13 @@ def _build_worker_for_loop_test() -> Worker:
 
 
 @pytest.mark.usefixtures("db")
-def test_worker_loop_emits_internal_span_per_iteration(
+def test_worker_loop_emits_consumer_span_per_iteration(
     otel_spans: InMemorySpanExporter,
 ) -> None:
     """Each worker loop iteration wraps the maintenance work in a `worker loop`
-    INTERNAL span so DB transients during maintenance land on a span."""
+    CONSUMER span — the worker is consuming a recurring maintenance schedule,
+    so its failures belong in the canonical entry-span error filter (SERVER /
+    CONSUMER / PRODUCER) alongside chores and jobs."""
     from opentelemetry.trace import StatusCode
 
     worker = _build_worker_for_loop_test()
@@ -206,7 +241,7 @@ def test_worker_loop_emits_internal_span_per_iteration(
     loop_spans = [s for s in otel_spans.get_finished_spans() if s.name == "worker loop"]
     assert len(loop_spans) == 1
     span = loop_spans[0]
-    assert span.kind == SpanKind.INTERNAL
+    assert span.kind == SpanKind.CONSUMER
     assert span.status.status_code == StatusCode.UNSET
 
 

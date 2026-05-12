@@ -81,11 +81,12 @@ If the exception propagates out of the span context, the SDK auto-records and se
 - HTTP requests — SERVER (`plain/internal/handlers/base.py`)
 - View 5xx attachment — `plain/views/base.py:_respond_to_exception` (records on the SERVER span via `_finalize_span`)
 - Job enqueue — PRODUCER (`plain-jobs/jobs/jobs.py`)
-- Job execute — CONSUMER (`plain-jobs/jobs/models.py`)
+- Job execute — CONSUMER (`plain-jobs/jobs/models.py`), plus a fallback CONSUMER span in `plain-jobs/jobs/workers.py:process_job` that catches lookup-time failures before `run()` is reached
+- Worker maintenance loop — CONSUMER (`plain-jobs/jobs/workers.py`)
 - Chore execution — CONSUMER (`plain/cli/chores.py`)
 - MCP RPC dispatch — SERVER (`plain-mcp/mcp/views.py`)
 
-INTERNAL spans that exist for trace context only (not error attribution): worker maintenance loop (`plain-jobs/jobs/workers.py`), template render (`plain-templates`), DB queries / email sends (CLIENT — same role).
+Trace-context-only (not error attribution): template render (`plain-templates`), DB queries / email sends (CLIENT — same role).
 
 ## Documentation
 
