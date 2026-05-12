@@ -1,5 +1,16 @@
 # plain-tailwind changelog
 
+## [0.23.1](https://github.com/dropseed/plain/releases/plain-tailwind@0.23.1) (2026-05-12)
+
+### What's changed
+
+- The `{% tailwind_css %}` template extension now imports from `plain.templates` (which is a separate package as of [`plain.templates` 0.1.0](../../../plain-templates/plain/templates/CHANGELOG.md)). The extension is still autoloaded when `plain.templates` is in `INSTALLED_PACKAGES` — plain.tailwind itself does **not** hard-depend on plain.templates so apps that use plain.tailwind only for CSS compilation don't pull in the templating stack. ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- Pins `plain>=0.143.0`.
+
+### Upgrade instructions
+
+- No changes required if you upgrade `plain` to 0.143.0 in the same step.
+
 ## [0.23.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.23.0) (2026-05-12)
 
 ### What's changed
