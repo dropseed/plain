@@ -1,0 +1,5 @@
+---
+attrs:
+  help: str
+---
+<p class="mt-2 text-sm text-admin-muted-foreground">{help}</p>
