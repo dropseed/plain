@@ -1,5 +1,15 @@
 # plain-esbuild changelog
 
+## [0.9.0](https://github.com/dropseed/plain/releases/plain-esbuild@0.9.0) (2026-05-12)
+
+### What's changed
+
+- Entry-point group renamed from `plain.build` to `plain.assets.build` to match the new `plain.assets.build` namespace (see [plain-assets 0.2.0](../../../plain-assets/plain/assets/CHANGELOG.md)). Pins `plain.assets>=0.2.0` since the new group is only iterated by that version. ([f698ec3436](https://github.com/dropseed/plain/commit/f698ec3436))
+
+### Upgrade instructions
+
+- No changes required if you upgrade `plain.assets` to 0.2.0+ in the same step.
+
 ## [0.8.3](https://github.com/dropseed/plain/releases/plain-esbuild@0.8.3) (2026-05-12)
 
 ### What's changed
