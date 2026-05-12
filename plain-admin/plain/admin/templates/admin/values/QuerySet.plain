@@ -1,0 +1,3 @@
+<div :for={item in value}>
+    <template :include="admin/values/Model" value={item} />
+</div>

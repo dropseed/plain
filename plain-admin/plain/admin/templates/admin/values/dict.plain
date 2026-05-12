@@ -1,0 +1,8 @@
+---
+imports:
+  - import json
+---
+<details>
+  <summary class="text-xs text-admin-muted-foreground">{len(value)} key{"s" if len(value) != 1 else ""}</summary>
+  <pre><code>{json.dumps(value, indent=2, default=str)}</code></pre>
+</details>

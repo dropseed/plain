@@ -20,12 +20,14 @@ class TemplateFileMissing(Exception):
 
 
 class Template:
-    """Render either a Jinja `.html` template or a `plain.html` `.plain` template.
+    """Render either a `plain.html` `.plain` template or a Jinja `.html` template.
 
-    The decision is filename-driven: anything ending in `.plain` goes through
-    `plain.html`; everything else routes to the existing Jinja environment.
-    During migration both engines coexist; a view can render `.html` or
-    `.plain` and views above don't care which.
+    Resolution order:
+      1. If the filename ends in `.plain`, route to plain.html.
+      2. If the filename ends in `.html`, first look for a same-named `.plain`
+         on disk — if present, route there (so migrating a single template
+         from .html to .plain doesn't require updating every caller).
+      3. Otherwise fall back to the Jinja environment.
     """
 
     def __init__(self, filename: str) -> None:
@@ -34,10 +36,16 @@ class Template:
         self._jinja_template = None
 
         if filename.endswith(".plain"):
-            self._plain_path = self._find_plain(filename)
+            self._plain_path = self._find_plain(filename.removesuffix(".plain"))
             if self._plain_path is None:
                 raise TemplateFileMissing(filename)
             return
+
+        if filename.endswith(".html"):
+            plain_path = self._find_plain(filename.removesuffix(".html"))
+            if plain_path is not None:
+                self._plain_path = plain_path
+                return
 
         try:
             self._jinja_template = environment.get_template(filename)
@@ -45,10 +53,9 @@ class Template:
             raise TemplateFileMissing(filename)
 
     @staticmethod
-    def _find_plain(filename: str) -> Path | None:
+    def _find_plain(name: str) -> Path | None:
         from plain.html.loader import TemplateNotFound, find_template
 
-        name = filename.removesuffix(".plain")
         try:
             return find_template(name)
         except TemplateNotFound:

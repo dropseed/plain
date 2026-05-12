@@ -1,0 +1,3 @@
+<span :if={value is None} class="text-admin-muted-foreground/80 font-mono text-sm">None</span>
+<span :if={value == ""} class="text-admin-muted-foreground/50">—</span>
+<template :if={value is not None and value != ""}>{value}</template>

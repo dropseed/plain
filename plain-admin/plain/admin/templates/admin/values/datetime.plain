@@ -1,0 +1,18 @@
+---
+imports:
+  - from plain.utils.timezone import localtime
+  - from plain.utils.timezone import now
+---
+<time
+    class="tabular-nums cursor-help"
+    datetime={value.isoformat()}
+>
+    <template :if={localtime(value).year == localtime(now()).year}>
+        <span class="sm:hidden">{localtime(value).strftime("%-m/%-d %-I:%M %p")}</span>
+        <span class="hidden sm:inline">{localtime(value).strftime("%b %-d at %-I:%M %p")}</span>
+    </template>
+    <template :if={localtime(value).year != localtime(now()).year}>
+        <span class="sm:hidden">{localtime(value).strftime("%-m/%-d/%y %-I:%M %p")}</span>
+        <span class="hidden sm:inline">{localtime(value).strftime("%b %-d, %Y at %-I:%M %p")}</span>
+    </template>
+</time>

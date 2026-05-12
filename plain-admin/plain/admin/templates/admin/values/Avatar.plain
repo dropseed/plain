@@ -1,0 +1,4 @@
+<span :if={value is None} class="text-admin-muted-foreground/80 font-mono text-sm">None</span>
+<span :if={value == ""} class="text-admin-muted-foreground/50">—</span>
+<img :if={isinstance(value, str) and value} src={value} alt="" class="rounded-full w-6 h-6 min-w-6 min-h-6 object-cover">
+<img :if={value and not isinstance(value, str)} src={value.src} alt={value.alt} class="rounded-full w-6 h-6 min-w-6 min-h-6 object-cover">
