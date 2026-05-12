@@ -193,7 +193,7 @@ def test_process_job_emits_consumer_span_when_lookup_fails(
     assert span.status.status_code == StatusCode.ERROR
     assert span.attributes is not None
     # JobProcess.DoesNotExist via plain-postgres' base manager.
-    assert "DoesNotExist" in span.attributes["error.type"]
+    assert "DoesNotExist" in str(span.attributes["error.type"])
     exception_events = [e for e in span.events if e.name == "exception"]
     assert exception_events
 
