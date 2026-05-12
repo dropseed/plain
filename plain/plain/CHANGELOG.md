@@ -1,5 +1,34 @@
 # plain changelog
 
+## [0.143.0](https://github.com/dropseed/plain/releases/plain@0.143.0) (2026-05-12)
+
+### What's changed
+
+- **`plain.templates` extracted to a sibling `plain.templates` package.** The Jinja engine, `Template`/`TemplateFileMissing`, `register_template_global`/`filter`/`extension`, `DefaultEnvironment`, the `TEMPLATES_JINJA_ENVIRONMENT` setting, and the template-touching view classes (`TemplateView`, `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) all moved out of `plain` core. `plain.views` slims to `View`, `RedirectView`, `ServerSentEventsView`; `jinja2` is no longer a `plain` dependency. ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- **Plain core's exception handler degrades to plain text when `plain.templates` isn't installed or registered.** The framework still tries to render `{status}.html` when `plain.templates` is in `INSTALLED_PACKAGES`; otherwise it returns a plain-text body. ([1d293be8fd](https://github.com/dropseed/plain/commit/1d293be8fd))
+- **`request.path_info` removed; use `request.path`.** SCRIPT_NAME handling is dropped entirely — Plain doesn't run as a mounted sub-app. The two attributes were always equal in practice. URL resolution, CSRF exemption matching, and OTel `url.path` all use `request.path` consistently now. ([69a6897723](https://github.com/dropseed/plain/commit/69a6897723), [7893013a98](https://github.com/dropseed/plain/commit/7893013a98))
+- **OTel boundary spans aligned with APM error-attribution conventions.** Entry spans (`SERVER`, `CONSUMER`, `PRODUCER`) are the only kinds that carry application errors. Chore execution is now a `CONSUMER` span (`plain/cli/chores.py`), with `error.type` + `record_exception` stamped on failure. ([144c3b4822](https://github.com/dropseed/plain/commit/144c3b4822), [05ea71d6d7](https://github.com/dropseed/plain/commit/05ea71d6d7))
+- **`View._respond_to_exception` is now the single 5xx logging/observability point.** Centralized so `log_exception` + `response.exception` attachment happens in one place per request. ([2634fd1d1c](https://github.com/dropseed/plain/commit/2634fd1d1c))
+- **Stopped emitting `exception.escaped` on framework spans.** The attribute is deprecated upstream and unreliable in the Python SDK. Status + `error.type` + recorded exception event is the canonical failure signal. ([bb9251f165](https://github.com/dropseed/plain/commit/bb9251f165))
+
+### Upgrade instructions
+
+- **Install `plain.templates`** if your app renders HTML (almost certainly yes):
+    ```
+    uv add plain.templates
+    ```
+- **Add it to `INSTALLED_PACKAGES`:**
+    ```python
+    INSTALLED_PACKAGES = [
+        ...
+        "plain.templates",
+    ]
+    ```
+- **Rewrite view imports**: anything that was `from plain.views import TemplateView` (or `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) is now `from plain.templates.views import ...`. The `/plain-upgrade` skill rewrites these automatically.
+- **Rewrite `from plain.templates import Template, register_template_*`** — the import path is unchanged, but you now need the `plain.templates` package installed for those imports to resolve at all.
+- **Drop any direct use of `request.path_info`** — replace with `request.path`. They've been equal in practice; there's no behavior change beyond the name.
+- **Custom subclasses of `Request`** that accepted a `path_info=` constructor kwarg must drop it.
+
 ## [0.142.0](https://github.com/dropseed/plain/releases/plain@0.142.0) (2026-05-12)
 
 ### What's changed
