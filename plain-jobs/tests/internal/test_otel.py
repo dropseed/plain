@@ -77,13 +77,14 @@ def test_enqueue_skipped_marks_span(otel_spans: InMemorySpanExporter) -> None:
 
 
 @pytest.mark.usefixtures("db")
-def test_failed_enqueue_marks_producer_span_exception_as_escaped(
+def test_failed_enqueue_marks_producer_span_as_errored(
     monkeypatch: pytest.MonkeyPatch,
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    """A failing enqueue's PRODUCER span must record the exception event with
-    `exception.escaped=True` — caller-side workflow boundary, same signal as
-    SERVER/CONSUMER."""
+    """A failing enqueue's PRODUCER span carries the canonical failure signal:
+    status=ERROR plus error.type. Don't branch on exception.escaped — it's
+    deprecated upstream and unreliable in the Python SDK."""
+    from opentelemetry.trace import StatusCode
 
     def _boom(*args, **kwargs):
         raise RuntimeError("save failed")
@@ -100,23 +101,25 @@ def test_failed_enqueue_marks_producer_span_exception_as_escaped(
     ]
     assert producer_spans, "expected PRODUCER span from run_in_worker()"
     span = producer_spans[-1]
-    exception_events = [e for e in span.events if e.name == "exception"]
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
     # Exactly one event — `record_exception=False` on start_as_current_span
-    # suppresses the SDK's escaped=False auto-record so the manual call is
-    # the sole event.
+    # suppresses the SDK's auto-record so the manual call is the sole event.
+    exception_events = [e for e in span.events if e.name == "exception"]
     assert len(exception_events) == 1
-    attrs = exception_events[0].attributes
-    assert attrs is not None
-    assert attrs["exception.escaped"] == "True"
 
 
 @pytest.mark.usefixtures("db")
-def test_failing_job_marks_consumer_span_exception_as_escaped(
+def test_failing_job_marks_consumer_span_as_errored(
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    """A failing job's CONSUMER span must record the exception event with
-    `exception.escaped=True` — the workflow-level failure signal that
-    downstream tools filter on."""
+    """A failing job's CONSUMER span carries the canonical failure signal:
+    status=ERROR plus error.type. The exception is caught inside the span's
+    with-block by JobProcess.run, so only the manual record_span_error event
+    fires."""
+    from opentelemetry.trace import StatusCode
+
     request = _BoomJob().run_in_worker()
     assert request is not None
     process = request.convert_to_job_process(worker_id=uuid.uuid4())
@@ -127,11 +130,11 @@ def test_failing_job_marks_consumer_span_exception_as_escaped(
     ]
     assert consumer_spans, "expected CONSUMER span from JobProcess.run()"
     span = consumer_spans[-1]
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
     exception_events = [e for e in span.events if e.name == "exception"]
     assert exception_events
-    attrs = exception_events[0].attributes
-    assert attrs is not None
-    assert attrs["exception.escaped"] == "True"
 
 
 @pytest.mark.usefixtures("db")
