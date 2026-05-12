@@ -38,10 +38,10 @@ attrs:
                 title="Preflight checks"
             >
                 <template :include="elements/admin/Icon" name="shield-check" />
-                <span :if={preflight_counts and (preflight_counts.errors + preflight_counts.warnings) > 0}
-                    data-status={"error" if preflight_counts.errors else "warning"}
+                <span :if={preflight_counts and (preflight_counts["errors"] + preflight_counts["warnings"]) > 0}
+                    data-status={"error" if preflight_counts["errors"] else "warning"}
                     class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 text-[10px] font-bold leading-4 text-center text-white rounded-full data-[status=error]:bg-admin-danger data-[status=warning]:bg-admin-warning"
-                >{preflight_counts.errors + preflight_counts.warnings if preflight_counts else 0}</span>
+                >{preflight_counts["errors"] + preflight_counts["warnings"] if preflight_counts else 0}</span>
             </a>
 
             <div class="admin-dropdown-menu">
