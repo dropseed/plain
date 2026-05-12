@@ -44,6 +44,21 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
             response.exception = exc
         return response
 
+    # `plain.templates` is on the Python path, but rendering needs the
+    # package registered in INSTALLED_PACKAGES (its settings, jinja env,
+    # template loaders, etc. all hang off package init). If it's not
+    # registered, fall back to plain text rather than crashing — this
+    # matches the ImportError branch above.
+    from plain.packages import packages_registry
+
+    try:
+        packages_registry.get_package_config("plaintemplates")
+    except LookupError:
+        response = _plain_text_response(status)
+        if status >= 500:
+            response.exception = exc
+        return response
+
     try:
         body = Template(f"{status}.html").render(
             {

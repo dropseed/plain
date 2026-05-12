@@ -215,6 +215,30 @@ class TestHandleExceptionLogging:
         ]
         assert len(server_errors) == 1
 
+    def test_falls_back_to_plain_text_when_templates_not_registered(self, monkeypatch):
+        """`plain.templates` importable but not in INSTALLED_PACKAGES → plain text.
+
+        Pins the registry-label guard added to handle the "monorepo dev mode"
+        case where the package is on the Python path but never registered.
+        Simulated here by stubbing the registry lookup directly so the test
+        works in any runner (isolated or dev).
+        """
+        from plain.packages import packages_registry
+
+        def _missing(label: str):
+            raise LookupError(label)
+
+        monkeypatch.setattr(packages_registry, "get_package_config", _missing)
+
+        request = RequestFactory().get("/")
+        response = response_for_exception(request, RuntimeError("boom"))
+
+        assert response.status_code == 500
+        assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
+        assert response.content == b"500 Internal Server Error"
+        # 5xx still carries the original exception for downstream tooling.
+        assert response.exception.args == ("boom",)  # ty: ignore[unresolved-attribute]
+
     def test_log_exception_is_idempotent(self, request_log):
         """If a view calls log_exception and the framework also tries,
         the sentinel keeps it to one record."""
