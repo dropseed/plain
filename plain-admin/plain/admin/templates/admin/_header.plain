@@ -98,15 +98,15 @@ attrs:
         <div class="absolute inset-x-0 bottom-0 h-px bg-admin-border z-0"></div>
         <div id="nav-tabs-container" class="relative z-10 flex items-center -ml-3 overflow-x-auto admin-scrollbar-hide" data-reorder-url={url('admin:reorder')}>
             <a :for={tab in nav_tabs}
-                href={tab.view.get_view_url()}
-                data-active={tab.view.get_slug() == slug or tab.view in parent_view_classes or None}
-                draggable={"true" if tab.pinned else None}
-                data-slug={tab.view.get_slug() if tab.pinned else None}
-                data-recent={None if tab.pinned else True}
+                href={tab["view"].get_view_url()}
+                data-active={tab["view"].get_slug() == slug or tab["view"] in parent_view_classes or None}
+                draggable={"true" if tab["pinned"] else None}
+                data-slug={tab["view"].get_slug() if tab["pinned"] else None}
+                data-recent={None if tab["pinned"] else True}
                 class="admin-nav-tab flex items-center gap-1.5 px-3 py-3 text-sm whitespace-nowrap text-admin-muted-foreground hover:text-admin-foreground border-b-2 border-transparent hover:border-admin-border data-[active]:text-admin-foreground data-[active]:font-medium data-[active]:border-admin-primary data-[recent]:text-admin-muted-foreground/80 data-[recent]:font-normal data-[recent]:italic"
             >
-                <template :if={tab.view.nav_icon}><template :include="elements/admin/Icon" name={tab.view.nav_icon} class="opacity-60" /></template>
-                {tab.view.get_nav_title()}
+                <template :if={tab["view"].nav_icon}><template :include="elements/admin/Icon" name={tab["view"].nav_icon} class="opacity-60" /></template>
+                {tab["view"].get_nav_title()}
             </a>
         </div>
 

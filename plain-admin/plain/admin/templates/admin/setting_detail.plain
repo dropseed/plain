@@ -1,0 +1,48 @@
+---
+attrs:
+  setting: Any
+  title: str = ""
+  app_name: str = "Plain"
+  admin_force_theme: str = ""
+  description: str = ""
+  image: Any = None
+  links: dict = {}
+  extra_links: dict = {}
+  parent_view_classes: list = []
+  object: Any = None
+  cards: list = []
+---
+<template :include="admin/base"
+    title={title} app_name={app_name} admin_force_theme={admin_force_theme}
+    description={description} image={image} links={links} extra_links={extra_links}
+    parent_view_classes={parent_view_classes} object={object} cards={cards}>
+<div class="admin-card p-6">
+    <section>
+        <dl>
+            <div class="flex gap-8 py-1.5">
+                <dt class="w-40 flex-shrink-0 text-admin-muted-foreground">Name</dt>
+                <dd class="min-w-0">
+                    <span class="font-mono text-sm">{setting["name"]}</span>
+                </dd>
+            </div>
+            <div class="flex gap-8 py-1.5">
+                <dt class="w-40 flex-shrink-0 text-admin-muted-foreground">Source</dt>
+                <dd class="min-w-0">
+                    <span :if={setting["source"] == 'env'} class="admin-badge admin-badge-warning font-mono">{setting["env_var_name"]}</span>
+                    <span :if={setting["source"] == 'explicit'} class="admin-badge admin-badge-outline">{setting["source"]}</span>
+                    <span :if={setting["source"] not in ('env', 'explicit')} class="admin-badge admin-badge-secondary">{setting["source"]}</span>
+                </dd>
+            </div>
+            <div class="flex gap-8 py-1.5">
+                <dt class="w-40 flex-shrink-0 text-admin-muted-foreground">Value</dt>
+                <dd class="min-w-0">
+                    <span
+                        data-secret={setting["is_secret"]}
+                        class="font-mono text-sm break-all whitespace-pre-wrap data-[secret=True]:text-admin-muted-foreground/80 data-[secret=True]:italic"
+                    >{setting["value"]}</span>
+                </dd>
+            </div>
+        </dl>
+    </section>
+</div>
+</template>
