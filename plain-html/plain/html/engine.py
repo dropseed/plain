@@ -144,7 +144,7 @@ def _emit_element(
     root_ctx: dict,
     out: list[str],
 ) -> None:
-    if node.include_path is not None:
+    if node.include_path is not None or node.include_path_code is not None:
         _render_include(node, scope, source_path, root_ctx, out)
         return
 
@@ -185,8 +185,12 @@ def _render_include(
     else collects in the `default` slot. `<template slot="name">` wrappers
     contribute their children (without the wrapper itself).
     """
-    assert node.include_path is not None
-    target_path = find_template(node.include_path, current_template=source_path)
+    path_name = (
+        node.include_path
+        if node.include_path is not None
+        else str(_eval(node.include_path_code, scope))
+    )
+    target_path = find_template(path_name, current_template=source_path)
 
     slots: dict[str, list[Node]] = {"default": []}
     for child in node.children:

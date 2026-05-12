@@ -48,6 +48,7 @@ class ElementNode:
     if_code: str | None = None
     for_clause: ForClause | None = None
     include_path: str | None = None  # `:include="..."` literal path
+    include_path_code: str | None = None  # `:include={expr}` dynamic path
     slot_name: str | None = None  # `slot="..."` routing attribute
 
 
@@ -124,6 +125,7 @@ def _make_element(tok: StartTagToken) -> ElementNode:
     if_code: str | None = None
     for_clause: ForClause | None = None
     include_path: str | None = None
+    include_path_code: str | None = None
     slot_name: str | None = None
 
     for attr in tok.attrs:
@@ -136,7 +138,7 @@ def _make_element(tok: StartTagToken) -> ElementNode:
                 raise ParseError(
                     f":include must be on a <template> element, not <{tok.name}>"
                 )
-            include_path = _expect_single_text(attr)
+            include_path, include_path_code = _split_include_value(attr)
         elif attr.name == "slot":
             slot_name = _expect_single_text(attr)
         elif attr.name.startswith(":"):
@@ -154,6 +156,7 @@ def _make_element(tok: StartTagToken) -> ElementNode:
         if_code=if_code,
         for_clause=for_clause,
         include_path=include_path,
+        include_path_code=include_path_code,
         slot_name=slot_name,
     )
 
@@ -165,6 +168,22 @@ def _expect_single_text(attr: Attribute) -> str:
     if not isinstance(seg, AttrText):
         raise ParseError(f"{attr.name} must be a literal string value")
     return seg.text
+
+
+def _split_include_value(attr: Attribute) -> tuple[str | None, str | None]:
+    """Resolve `:include="path"` vs `:include={expr}`.
+
+    Returns (literal_path, expression_code). Exactly one of the two will be
+    non-None; the renderer picks the active branch.
+    """
+    if attr.segments is None or len(attr.segments) != 1:
+        raise ParseError(":include must be a single value")
+    seg = attr.segments[0]
+    if isinstance(seg, AttrText):
+        return seg.text, None
+    if isinstance(seg, AttrExpr):
+        return None, seg.code
+    raise ParseError(":include must be a literal string or a single {expression}")
 
 
 def _expect_single_expr(attr: Attribute) -> str:

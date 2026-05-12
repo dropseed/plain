@@ -1,0 +1,16 @@
+---
+attrs:
+  success: bool = False
+  success_template_name: str = ""
+  form_template_name: str = ""
+---
+<html>
+    <head>
+        {tailwind_css()}
+        <script src={asset('support/iframe.js')} nonce={request.csp_nonce}></script>
+    </head>
+    <body>
+        <template :if={success} :include={success_template_name.removesuffix(".html")} />
+        <template :if={not success} :include={form_template_name.removesuffix(".html")} />
+    </body>
+</html>

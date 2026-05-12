@@ -1,0 +1,8 @@
+---
+attrs:
+  page: Any
+---
+<template :include="base">
+<template slot="title">{page.title}</template>
+{mark_safe(page.content)}
+</template>

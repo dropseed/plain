@@ -1,0 +1,10 @@
+---
+attrs:
+  success: bool = False
+  success_template_name: str = ""
+  form_template_name: str = ""
+---
+<template :include="base">
+<template :if={success} :include={success_template_name.removesuffix(".html")} />
+<template :if={not success} :include={form_template_name.removesuffix(".html")} />
+</template>
