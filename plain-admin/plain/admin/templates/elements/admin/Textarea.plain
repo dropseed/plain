@@ -1,0 +1,15 @@
+---
+attrs:
+  field: Any
+  rows: int = 3
+  spellcheck: str = "default"
+---
+<textarea
+    id={field.html_id}
+    class="admin-textarea"
+    name={field.html_name}
+    rows={rows}
+    spellcheck={spellcheck}
+    required={field.field.required}
+    aria-invalid={bool(field.errors) or None}
+    >{field.value() or ""}</textarea>

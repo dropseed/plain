@@ -16,8 +16,12 @@ from plain.utils.safestring import SafeString, mark_safe
 
 @pass_context
 def Element(ctx: Context, _element_name: str, **kwargs: Any) -> SafeString:
+    from plain.templates import Template
+
     element_path_name = _element_name.replace(".", os.sep)
-    template = ctx.environment.get_template(f"elements/{element_path_name}.html")
+    # Goes through plain.templates.Template so `.plain` versions are picked
+    # up via the same `.html` → `.plain` fallback that views use.
+    template = Template(f"elements/{element_path_name}.html")
 
     if "caller" in kwargs and "children" not in kwargs:
         # If we have a caller, we need to pass it as the children

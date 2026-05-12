@@ -1,0 +1,16 @@
+---
+attrs:
+  field: Any
+  type: str = "text"
+  list: str = ""
+---
+<input
+    id={field.html_id}
+    class="admin-input"
+    type={type}
+    name={field.html_name}
+    list={list or None}
+    value={field.value() if field.value() is not None else None}
+    required={field.field.required}
+    aria-invalid={bool(field.errors) or None}
+    >

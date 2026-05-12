@@ -1,0 +1,13 @@
+---
+attrs:
+  field: Any
+  label: str
+  type: str = "text"
+  help: str = ""
+---
+<div class="space-y-1">
+    <template :include="elements/admin/Label" field={field}>{label}</template>
+    <template :include="elements/admin/Input" field={field} type={type} />
+    <template :if={help} :include="elements/admin/Help" help={help} />
+    <template :include="elements/admin/FieldErrors" field={field} />
+</div>

@@ -1,0 +1,12 @@
+---
+attrs:
+  field: Any
+---
+<select
+    id={field.html_id}
+    name={field.html_name}
+    class="admin-select"
+    required={field.field.required}
+    >
+    <option :for={(value, label) in field.field.choices} value={value} selected={value == field.value()}>{label}</option>
+</select>

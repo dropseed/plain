@@ -1,0 +1,10 @@
+---
+attrs:
+  field: Any
+slots:
+  default: required
+---
+<label for={field.html_id} class="admin-label w-full">
+    {children}
+    <span :if={field.field.required} class="text-admin-danger">*</span>
+</label>

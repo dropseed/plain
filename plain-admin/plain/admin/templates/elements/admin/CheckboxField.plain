@@ -1,0 +1,14 @@
+---
+attrs:
+  field: Any
+  label: str
+  help: str = ""
+---
+<div>
+    <div class="flex items-center space-x-2">
+        <template :include="elements/admin/Checkbox" field={field} />
+        <template :include="elements/admin/Label" field={field}>{label}</template>
+        <template :if={help} :include="elements/admin/Help" help={help} />
+    </div>
+    <template :include="elements/admin/FieldErrors" field={field} />
+</div>
