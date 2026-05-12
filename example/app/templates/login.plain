@@ -1,0 +1,13 @@
+<template :include="base">
+<template slot="title">Log in</template>
+<div class="max-w-md mx-auto px-5 py-16">
+    <h1 class="page-h1">Log in</h1>
+
+    <form method="post" class="mt-6 flex flex-col gap-5">
+        <template :include="components/nonfield_errors" form={form} />
+        <template :include="components/field" bf={form.email} label="Email" type="email" autocomplete="email" autofocus={True} required={True} />
+        <template :include="components/field" bf={form.password} label="Password" type="password" autocomplete="current-password" required={True} />
+        <button type="submit" class="btn-primary self-start">Log in</button>
+    </form>
+</div>
+</template>

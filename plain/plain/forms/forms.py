@@ -146,6 +146,22 @@ class BaseForm:
             self._bound_fields_cache[name] = field.get_bound_field(self, name)
         return self._bound_fields_cache[name]
 
+    def __getattr__(self, name: str) -> BoundField:
+        """Allow `form.email` as shorthand for `form["email"]`.
+
+        Only fires when normal attribute lookup misses, so real attributes
+        (`fields`, `errors`, `is_bound`, etc.) keep their existing semantics.
+        """
+        if name.startswith("_") or name == "fields":
+            raise AttributeError(name)
+        try:
+            fields = object.__getattribute__(self, "fields")
+        except AttributeError:
+            raise AttributeError(name) from None
+        if name in fields:
+            return self[name]
+        raise AttributeError(name)
+
     @property
     def errors(self) -> dict[str, list[str]]:
         """Return an error dict for the data provided for the form."""

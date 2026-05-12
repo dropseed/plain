@@ -20,7 +20,7 @@ from .models import Project, Tag, Task
 
 
 class TaskListView(AuthView, ListView):
-    template_name = "tasks/list.html"
+    template_name = "tasks/list.plain"
     context_object_name = "tasks"
     login_required = True
 
@@ -38,7 +38,7 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
     plain-hx-action="rename" → htmx_post_rename swaps the rendered title.
     """
 
-    template_name = "tasks/detail.html"
+    template_name = "tasks/detail.plain"
     context_object_name = "task"
     login_required = True
 
@@ -61,7 +61,7 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
 
 
 class TaskCreateView(AuthView, CreateView):
-    template_name = "tasks/create.html"
+    template_name = "tasks/create.plain"
     form_class = TaskForm
     login_required = True
 
@@ -74,7 +74,7 @@ class TaskCreateView(AuthView, CreateView):
 
 
 class TaskUpdateView(AuthView, UpdateView):
-    template_name = "tasks/update.html"
+    template_name = "tasks/update.plain"
     form_class = TaskForm
     context_object_name = "task"
     login_required = True
@@ -90,7 +90,7 @@ class TaskUpdateView(AuthView, UpdateView):
 
 
 class TaskDeleteView(AuthView, DeleteView):
-    template_name = "tasks/delete.html"
+    template_name = "tasks/delete.plain"
     context_object_name = "task"
     login_required = True
     success_url = reverse_lazy("tasks:list")

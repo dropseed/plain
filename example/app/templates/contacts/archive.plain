@@ -1,0 +1,44 @@
+<template :include="base">
+<template slot="title">Contact archive</template>
+<div class="max-w-3xl mx-auto px-5 py-12">
+    <template :include="components/back_link" href={url('contacts:form')} label="Send a message" />
+
+    <h1 class="page-h1">Contact archive</h1>
+    <p class="mt-3 text-sm text-muted">
+        Two GET forms on one page — proves <span class="font-mono text-body">prefix</span>
+        keeps their fields disjoint.
+    </p>
+
+    <form method="get" class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+        <template :include="components/field" bf={search_form.text} label="Search message" placeholder="Contains…" />
+        <template :include="components/field" bf={filter_form.subject} label="Subject" type="select" />
+        <div class="flex items-center gap-3">
+            <label class="flex items-center gap-2 text-sm text-body">
+                <input
+                    type="checkbox"
+                    name={filter_form.subscribed_only.html_name}
+                    id={filter_form.subscribed_only.html_id}
+                    checked={filter_form.subscribed_only.value()}
+                >
+                Subscribed only
+            </label>
+            <button type="submit" class="btn-primary ml-auto">Apply</button>
+        </div>
+    </form>
+
+    <div class="list-card mt-6">
+        <div :for={s in submissions} class="px-4 py-3">
+            <div class="flex items-baseline justify-between gap-3">
+                <div class="text-sm font-semibold text-ink">
+                    {s.name} <span class="font-mono text-[12px] font-normal text-muted">&lt;{s.email}&gt;</span>
+                </div>
+                <div class="text-[12px] text-muted whitespace-nowrap">
+                    {s.subject} · <span class="font-mono">{s.created_at.strftime('%Y-%m-%d')}</span>
+                </div>
+            </div>
+            <div class="mt-1 text-sm text-body whitespace-pre-line">{s.message}</div>
+        </div>
+        <div :if={not submissions} class="px-4 py-6 text-sm text-muted">No submissions match.</div>
+    </div>
+</div>
+</template>

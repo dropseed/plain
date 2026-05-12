@@ -1,0 +1,9 @@
+<template :include="base">
+<template slot="title">Server error</template>
+<div class="flex py-24 justify-center">
+    <div class="text-center">
+        <div class="font-mono text-sm text-muted">500</div>
+        <h1 class="mt-3 page-h1">Server error</h1>
+    </div>
+</div>
+</template>

@@ -12,7 +12,7 @@ from .models import Note
 
 
 class NoteListView(AuthView, ListView):
-    template_name = "notes/list.html"
+    template_name = "notes/list.plain"
     context_object_name = "notes"
     login_required = True
 
@@ -21,7 +21,7 @@ class NoteListView(AuthView, ListView):
 
 
 class NoteDetailView(AuthView, DetailView):
-    template_name = "notes/detail.html"
+    template_name = "notes/detail.plain"
     context_object_name = "note"
     login_required = True
 
@@ -33,7 +33,7 @@ class NoteDetailView(AuthView, DetailView):
 
 
 class NoteCreateView(AuthView, CreateView):
-    template_name = "notes/create.html"
+    template_name = "notes/create.plain"
     form_class = NoteForm
     login_required = True
 
@@ -45,7 +45,7 @@ class NoteCreateView(AuthView, CreateView):
 
 
 class NoteUpdateView(AuthView, UpdateView):
-    template_name = "notes/update.html"
+    template_name = "notes/update.plain"
     form_class = NoteForm
     context_object_name = "note"
     login_required = True
@@ -58,7 +58,7 @@ class NoteUpdateView(AuthView, UpdateView):
 
 
 class NoteDeleteView(AuthView, DeleteView):
-    template_name = "notes/delete.html"
+    template_name = "notes/delete.plain"
     context_object_name = "note"
     login_required = True
     success_url = reverse_lazy("notes:list")

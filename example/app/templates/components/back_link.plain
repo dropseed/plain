@@ -1,0 +1,8 @@
+---
+attrs:
+  href: str
+  label: str
+---
+<div class="mb-2">
+    <a href={href} class="back-link">← {label}</a>
+</div>

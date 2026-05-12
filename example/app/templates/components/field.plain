@@ -1,0 +1,47 @@
+---
+attrs:
+  bf: Any
+  label: str
+  type: str = "text"
+  autofocus: bool = False
+  required: bool = False
+  autocomplete: str = ""
+  placeholder: str = ""
+  min_height: str = ""
+---
+<div>
+    <label class="field-label" for={bf.html_id}>{label}</label>
+    <template :if={type == "textarea"}>
+        <textarea
+            class={["field-input", f"min-h-[{min_height}]" if min_height else None]}
+            name={bf.html_name}
+            id={bf.html_id}
+            required={required}
+            autofocus={autofocus}
+        >{bf.value() or ''}</textarea>
+    </template>
+    <template :if={type == "select"}>
+        <select
+            class="field-input"
+            name={bf.html_name}
+            id={bf.html_id}
+            required={required}
+        >
+            <option :for={(value, choice_label) in bf.field.choices} value={value} selected={str(bf.value()) == str(value)}>{choice_label}</option>
+        </select>
+    </template>
+    <template :if={type not in ("textarea", "select")}>
+        <input
+            class="field-input"
+            type={type}
+            name={bf.html_name}
+            id={bf.html_id}
+            value={bf.value() or ''}
+            required={required}
+            autofocus={autofocus}
+            autocomplete={autocomplete or None}
+            placeholder={placeholder or None}
+        >
+    </template>
+    <template :include="./field_errors" bf={bf} />
+</div>

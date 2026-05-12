@@ -271,13 +271,19 @@ def _render_attribute(attr: Attribute, scope: dict) -> str | None:
     if attr.segments is None:
         return f" {attr.name}"
 
-    # `name={expr}` — single expression governs boolean / value rendering.
+    # `name={expr}` — single expression governs boolean / list / value rendering.
     if len(attr.segments) == 1 and isinstance(attr.segments[0], AttrExpr):
         value = _eval(attr.segments[0].code, scope)
         if value is False or value is None:
             return None
         if value is True:
             return f" {attr.name}"
+        if isinstance(value, list):
+            # Flatten, drop falsy, space-join — matches the spec's `class={[...]}` rule.
+            parts = [str(v) for v in _flatten(value) if v]
+            if not parts:
+                return None
+            return f' {attr.name}="{_escape_to_str(" ".join(parts))}"'
         return f' {attr.name}="{_escape_to_str(value)}"'
 
     parts: list[str] = []
@@ -302,6 +308,15 @@ def _eval(code: str, scope: dict) -> object:
         return eval(code, scope)  # noqa: S307 — Phase 0 interpreter
     except Exception as e:
         raise RenderError(f"Error evaluating {code!r}: {e}") from e
+
+
+def _flatten(value: object):
+    """Yield items from arbitrarily nested lists/tuples; pass-through scalars."""
+    if isinstance(value, list | tuple):
+        for item in value:
+            yield from _flatten(item)
+    else:
+        yield value
 
 
 def _bind_targets(scope: dict, names: list[str], item: object) -> None:

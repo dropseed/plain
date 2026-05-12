@@ -1,0 +1,17 @@
+<template :include="base">
+<template slot="title">Edit {task.title}</template>
+<div class="max-w-2xl mx-auto px-5 py-12">
+    <template :include="components/back_link" href={url('tasks:detail', id=task.id)} label="Back to task" />
+
+    <h1 class="page-h1">Edit task</h1>
+
+    <form method="post" class="mt-6 flex flex-col gap-5">
+        <template :include="tasks/_form_partial" form={form} />
+
+        <div class="flex items-center gap-2">
+            <button type="submit" class="btn-primary">Save</button>
+            <a href={url('tasks:delete', id=task.id)} class="btn-secondary">Delete</a>
+        </div>
+    </form>
+</div>
+</template>

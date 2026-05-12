@@ -1,0 +1,36 @@
+---
+attrs:
+  form: Any
+---
+<template :include="components/nonfield_errors" form={form} />
+<template :include="components/field" bf={form.title} label="Title" autofocus={True} required={True} />
+<template :include="components/field" bf={form.project} label="Project" type="select" />
+<template :include="components/field" bf={form.notes} label="Notes" type="textarea" min_height="120px" />
+
+<div class="grid grid-cols-2 gap-4">
+    <template :include="components/field" bf={form.due_date} label="Due date" type="date" />
+    <template :include="components/field" bf={form.priority} label="Priority" type="select" />
+</div>
+
+<label class="flex items-center gap-2 text-sm text-body">
+    <input
+        type="checkbox"
+        name={form.is_complete.html_name}
+        id={form.is_complete.html_id}
+        checked={form.is_complete.value()}
+    >
+    Complete
+</label>
+
+<div>
+    <label class="field-label" for={form.tags.html_id}>Tags</label>
+    <select
+        class="field-input h-32"
+        name={form.tags.html_name}
+        id={form.tags.html_id}
+        multiple
+    >
+        <option :for={(value, label) in form.tags.field.choices} value={value} selected={str(value) in [str(v) for v in (form.tags.value() or [])]}>{label}</option>
+    </select>
+    <template :include="components/field_errors" bf={form.tags} />
+</div>

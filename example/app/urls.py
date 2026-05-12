@@ -21,11 +21,11 @@ from plain.views import TemplateView
 
 
 class LoginView(PasswordLoginView):
-    template_name = "login.html"
+    template_name = "login.plain"
 
 
 class SSEDemoView(TemplateView):
-    template_name = "sse.html"
+    template_name = "sse.plain"
 
 
 class IndexView(TemplateView):

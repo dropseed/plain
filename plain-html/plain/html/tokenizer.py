@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+_OPAQUE_BODY_TAGS = frozenset({"script", "style"})
+
 VOID_ELEMENTS = frozenset(
     {
         "area",
@@ -169,6 +171,23 @@ def tokenize(source: str) -> list[Token]:
             tokens.append(tok)
             i = new_i
             text_start = i
+            # `<script>` and `<style>` bodies are opaque per spec: no `{expr}`
+            # recognition. Consume the entire body verbatim and emit it as a
+            # single text token, then synthesize the matching end tag.
+            if isinstance(tok, StartTagToken) and tok.name in _OPAQUE_BODY_TAGS:
+                close = f"</{tok.name}"
+                lower = source.lower()
+                end = lower.find(close, i)
+                if end == -1:
+                    raise TokenizeError(
+                        f"Unterminated <{tok.name}> body at offset {tok.offset}"
+                    )
+                body_text = source[i:end]
+                if body_text:
+                    tokens.append(TextToken(body_text, i))
+                # Consume the end tag normally on the next loop iteration.
+                i = end
+                text_start = i
             continue
 
         if source.startswith("{#", i):
