@@ -4,14 +4,16 @@ Internal because these tests pin the *value* of the path stored on OTel
 spans and exception logs — implementation surface that step #3 of the
 URL routing arc will change.
 
-Both observability reads use `request.path`:
-- OTel `url.path` span attribute (see `plain/internal/handlers/base.py:126`)
-- Exception log `path` field (see `plain/logs/exceptions.py:49` and
-  `internal/handlers/exception.py:64`)
+`request.path` is the single source of truth for the URL path: routing,
+middleware (CSRF / APPEND_SLASH), the OTel `url.path` span attribute
+(`plain/internal/handlers/base.py:126`), and the exception log `path`
+field (`plain/logs/exceptions.py:49`, `internal/handlers/exception.py:64`)
+all read from it.
 
 Step #3 normalizes the path *before* anything else runs, so `request.path`
-becomes the canonical normalized form and a new `request.raw_path` carries
-the original for forensics.
+becomes the canonical normalized form (and a `request.raw_path` carries
+the original for forensics). Both observability sites pick up the new
+value automatically because they already share a source.
 """
 
 from __future__ import annotations
@@ -67,43 +69,6 @@ def test_otel_url_path_is_unnormalized(app_router):
     Client().get("///")
     span = _request_span(app_router)
     assert span.attributes[url_attributes.URL_PATH] == "/"
-
-
-def test_request_path_and_path_info_are_equal_today():
-    """For typical requests (no SCRIPT_NAME), `request.path` and `request.path_info`
-    are the same value.
-
-    Step #3 changes this relationship: `request.path` becomes the normalized
-    canonical path (what middleware/views/logs should use), and a new
-    `request.raw_path` holds the original. Pinning the invariant today makes
-    that flip visible.
-    """
-    from plain.test import RequestFactory
-
-    factory = RequestFactory()
-    for path in ["/", "/users/", "/admin/users/42/", "/a/b/c"]:
-        request = factory.get(path)
-        assert request.path == request.path_info, (
-            f"Expected request.path == request.path_info for {path!r}, "
-            f"got {request.path!r} vs {request.path_info!r}"
-        )
-
-
-def test_csrf_middleware_reads_path_info():
-    """`CsrfViewMiddleware` matches `CSRF_EXEMPT_PATHS` against `request.path_info`.
-
-    Pinned at `plain/csrf/middleware.py:44`. Step #3 may switch path-based
-    middleware to read `request.path` (the normalized form). If that happens,
-    this test fails loudly — at which point CSRF exempt-pattern semantics
-    have shifted under double-slash / dot-segment requests.
-    """
-    import inspect
-
-    from plain.csrf.middleware import CsrfViewMiddleware
-
-    source = inspect.getsource(CsrfViewMiddleware.should_allow_request)
-    assert "request.path_info" in source
-    assert "request.path " not in source  # the bare attribute, not path_info
 
 
 def test_exception_log_records_request_path(error_client):

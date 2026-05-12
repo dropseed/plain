@@ -79,14 +79,12 @@ class Request:
         server_name: str = "",
         server_port: str = "",
         remote_addr: str = "",
-        path_info: str = "",
     ):
         self.unique_id = str(uuid.uuid4())
         self.resolver_match: ResolverMatch | None = None
 
         self.method = method
         self.path = path
-        self.path_info = path_info or path
         self.server_name = server_name
         self.server_port = server_port
         self.remote_addr = remote_addr

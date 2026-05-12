@@ -44,9 +44,9 @@ class RedirectSlashMiddleware(HttpMiddleware):
         Return True if settings.APPEND_SLASH is True and appending a slash to
         the request path turns an invalid path into a valid one.
         """
-        if settings.APPEND_SLASH and not request.path_info.endswith("/"):
-            if not self._is_valid_path(request.path_info):
-                return self._is_valid_path(f"{request.path_info}/")
+        if settings.APPEND_SLASH and not request.path.endswith("/"):
+            if not self._is_valid_path(request.path):
+                return self._is_valid_path(f"{request.path}/")
         return False
 
     def get_full_path_with_slash(self, request: Request) -> str:

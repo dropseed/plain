@@ -371,7 +371,7 @@ class BaseHandler:
             resolver_match = request.resolver_match
         else:
             resolver = get_resolver()
-            resolver_match = resolver.resolve(request.path_info)
+            resolver_match = resolver.resolve(request.path)
             request.resolver_match = resolver_match
 
         # Update span with route info

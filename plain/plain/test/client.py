@@ -602,7 +602,7 @@ class Client:
 
         def _resolve_or_none():
             try:
-                return resolver.resolve(http_request.path_info)
+                return resolver.resolve(http_request.path)
             except Exception:
                 return None
 
