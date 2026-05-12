@@ -1,5 +1,16 @@
 # plain-toolbar changelog
 
+## [0.12.7](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.7) (2026-05-12)
+
+### What's changed
+
+- `Template` and `register_template_extension` imports moved to the separate `plain.templates` package as part of the [`plain.templates` carve-out](../../../plain/plain/CHANGELOG.md). The user-visible toolbar API is unchanged. ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- Pins `plain>=0.143.0` and `plain.templates>=0.1.0`.
+
+### Upgrade instructions
+
+- No code changes required if you upgrade `plain` to 0.143.0 in the same step.
+
 ## [0.12.6](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.6) (2026-05-08)
 
 ### What's changed

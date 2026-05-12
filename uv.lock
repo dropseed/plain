@@ -1489,7 +1489,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-toolbar"
-version = "0.12.6"
+version = "0.12.7"
 source = { editable = "plain-toolbar" }
 dependencies = [
     { name = "plain" },
