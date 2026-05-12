@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.81.3](https://github.com/dropseed/plain/releases/plain-admin@0.81.3) (2026-05-12)
+
+### What's changed
+
+- Documents the recommended override path for admin styling — design tokens first, CSS class overrides next — in the admin README and the `plain-admin` agent rule. Also adds a UI gallery section listing the override hooks. ([b8ffcb6730](https://github.com/dropseed/plain/commit/b8ffcb6730))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.81.2](https://github.com/dropseed/plain/releases/plain-admin@0.81.2) (2026-05-05)
 
 ### What's changed
