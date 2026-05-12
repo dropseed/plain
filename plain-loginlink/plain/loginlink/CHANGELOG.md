@@ -1,5 +1,16 @@
 # plain-loginlink changelog
 
+## [0.21.4](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.4) (2026-05-12)
+
+### What's changed
+
+- `FormView` and `TemplateView` imports moved from `plain.views` to `plain.templates.views` to match the [`plain.templates` carve-out](../../../plain/plain/CHANGELOG.md). The end-user `LoginLinkView` API is unchanged. ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- Pins `plain>=0.143.0`, `plain.email>=0.19.3`, and `plain.templates>=0.1.0`.
+
+### Upgrade instructions
+
+- No code changes required if you upgrade `plain` to 0.143.0 in the same step.
+
 ## [0.21.3](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.3) (2026-05-05)
 
 ### What's changed
