@@ -29,11 +29,11 @@ class SSEDemoView(TemplateView):
 
 
 class IndexView(TemplateView):
-    template_name = "index.html"
+    template_name = "index.plain"
 
 
 class ErrorView(TemplateView):
-    template_name = "index.html"
+    template_name = "index.plain"
 
     def get(self) -> NoReturn:
         text = "This is a test exception to demonstrate the toolbar"

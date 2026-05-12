@@ -16,6 +16,7 @@ from .tokenizer import (
     VOID_ELEMENTS,
     AttrExpr,
     Attribute,
+    AttrText,
     DoctypeToken,
     EndTagToken,
     ExprToken,
@@ -46,6 +47,8 @@ class ElementNode:
     self_closing: bool = False
     if_code: str | None = None
     for_clause: ForClause | None = None
+    include_path: str | None = None  # `:include="..."` literal path
+    slot_name: str | None = None  # `slot="..."` routing attribute
 
 
 @dataclass
@@ -120,16 +123,26 @@ def _make_element(tok: StartTagToken) -> ElementNode:
     attrs: list[Attribute] = []
     if_code: str | None = None
     for_clause: ForClause | None = None
+    include_path: str | None = None
+    slot_name: str | None = None
 
     for attr in tok.attrs:
         if attr.name == ":if":
             if_code = _expect_single_expr(attr)
         elif attr.name == ":for":
             for_clause = _parse_for_clause(_expect_single_expr(attr))
+        elif attr.name == ":include":
+            if tok.name != "template":
+                raise ParseError(
+                    f":include must be on a <template> element, not <{tok.name}>"
+                )
+            include_path = _expect_single_text(attr)
+        elif attr.name == "slot":
+            slot_name = _expect_single_text(attr)
         elif attr.name.startswith(":"):
-            # Reserved for future directives (`:include`, `:as`). Phase 0 lets
-            # them through silently so prototype templates can be written
-            # against the spec ahead of implementation.
+            # Reserved for future directives (`:as`). Phase 0 lets them through
+            # silently so prototype templates can be written against the spec
+            # ahead of implementation.
             continue
         else:
             attrs.append(attr)
@@ -140,7 +153,18 @@ def _make_element(tok: StartTagToken) -> ElementNode:
         self_closing=tok.self_closing,
         if_code=if_code,
         for_clause=for_clause,
+        include_path=include_path,
+        slot_name=slot_name,
     )
+
+
+def _expect_single_text(attr: Attribute) -> str:
+    if attr.segments is None or len(attr.segments) != 1:
+        raise ParseError(f"{attr.name} must be a literal string value")
+    seg = attr.segments[0]
+    if not isinstance(seg, AttrText):
+        raise ParseError(f"{attr.name} must be a literal string value")
+    return seg.text
 
 
 def _expect_single_expr(attr: Attribute) -> str:
