@@ -1,0 +1,22 @@
+<section class="tasks">
+  <header>
+    <h1>Tasks for {{ owner.name }}</h1>
+    <p class="meta">{{ tasks|length }} task{% if tasks|length != 1 %}s{% endif %} · {{ done_count }} done</p>
+  </header>
+  {% if alert %}
+  <div class="alert" data-severity="{{ alert.severity }}">
+    <strong>{{ alert.title }}</strong>
+    <span>{{ alert.body }}</span>
+  </div>
+  {% endif %}
+  <ul class="task-list" data-owner="{{ owner.id }}">
+    {% for task in tasks %}<li class="task" data-id="{{ task.id }}" data-done="{{ task.done }}">
+      <a href="/tasks/{{ task.id }}/" class="title">{{ task.title }}</a>
+      <span class="due">{{ task.due }}</span>
+      {% if task.tags %}<span class="tags">{% for tag in task.tags %}<span class="tag">{{ tag }}</span>{% endfor %}</span>{% endif %}
+    </li>{% endfor %}
+  </ul>
+  {% if not tasks %}
+  <p class="empty">No tasks yet. Add one above.</p>
+  {% endif %}
+</section>

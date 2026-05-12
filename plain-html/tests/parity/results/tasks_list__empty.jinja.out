@@ -1,0 +1,13 @@
+<section class="tasks">
+  <header>
+    <h1>Tasks for Dave &amp; Co</h1>
+    <p class="meta">0 tasks · 0 done</p>
+  </header>
+  
+  <ul class="task-list" data-owner="42">
+    
+  </ul>
+  
+  <p class="empty">No tasks yet. Add one above.</p>
+  
+</section>

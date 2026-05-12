@@ -17,6 +17,7 @@ dev = [
   "plain-elements",
   "plain-esbuild",
   "plain-flags",
+  "plain-html",
   "plain-htmx",
   "plain-jobs",
   "plain-loginlink",
@@ -56,6 +57,7 @@ dev = [
 "plain-elements" = { workspace = true }
 "plain-esbuild" = { workspace = true }
 "plain-flags" = { workspace = true }
+"plain-html" = { workspace = true }
 "plain-htmx" = { workspace = true }
 "plain-jobs" = { workspace = true }
 "plain-loginlink" = { workspace = true }

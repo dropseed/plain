@@ -18,6 +18,7 @@ members = [
     "plain-email",
     "plain-esbuild",
     "plain-flags",
+    "plain-html",
     "plain-htmx",
     "plain-jobs",
     "plain-loginlink",
@@ -1032,6 +1033,29 @@ requires-dist = [
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
+name = "plain-html"
+version = "0.0.1"
+source = { editable = "plain-html" }
+dependencies = [
+    { name = "plain" },
+    { name = "pyyaml" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "pyyaml", specifier = ">=6.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+
+[[package]]
 name = "plain-htmx"
 version = "0.19.1"
 source = { editable = "plain-htmx" }
@@ -1468,6 +1492,7 @@ dev = [
     { name = "plain-email" },
     { name = "plain-esbuild" },
     { name = "plain-flags" },
+    { name = "plain-html" },
     { name = "plain-htmx" },
     { name = "plain-jobs" },
     { name = "plain-loginlink" },
@@ -1509,6 +1534,7 @@ dev = [
     { name = "plain-email", editable = "plain-email" },
     { name = "plain-esbuild", editable = "plain-esbuild" },
     { name = "plain-flags", editable = "plain-flags" },
+    { name = "plain-html", editable = "plain-html" },
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-jobs", editable = "plain-jobs" },
     { name = "plain-loginlink", editable = "plain-loginlink" },

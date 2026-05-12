@@ -1,6 +1,6 @@
 # Plain template language — design specification
 
-A consolidated specification of the template language design that emerged from the frontend-rethink research arc. This is the *what*; implementation strategy is a separate future.
+A consolidated specification of the template language design that emerged from the frontend-rethink research arc. This is the _what_; implementation strategy is a separate future.
 
 ## Goal
 
@@ -21,7 +21,7 @@ Plain's priority has shifted from human-familiarity-first to agent-authored-firs
 3. **Static checking is the verification layer.** `plain template check` runs structural validation + type checks against extracted expressions, with errors mapped back to template positions.
 4. **Contextual autoescape, no opt-out.** Where a value lands (text body, attribute, URL, JS, CSS) determines its escape policy. The engine knows; the author doesn't need to.
 5. **Align with HTML / Web Components specs where they exist.** `<template>`, `slot=`, attribute semantics — use what HTML already defines rather than invent parallels.
-6. **One way to do things.** No `<.component>` *and* `<my-component>` *and* `<template :include>`. Pick one. (We picked the third.)
+6. **One way to do things.** No `<.component>` _and_ `<my-component>` _and_ `<template :include>`. Pick one. (We picked the third.)
 
 ## File format
 
@@ -108,7 +108,7 @@ imports:
 
 Each item is a Python import statement. At compile time, these become real imports at the top of the generated render function's module. At check time, the same imports populate the synthesized checker module so expressions like `{format_date(user.created_at)}` resolve correctly.
 
-**This is the only place templates declare value-level dependencies.** Type references inside `attrs:` are auto-resolved by their fully-qualified path (no explicit import needed); `imports:` is specifically for *callable* and *value* names needed inside the template body.
+**This is the only place templates declare value-level dependencies.** Type references inside `attrs:` are auto-resolved by their fully-qualified path (no explicit import needed); `imports:` is specifically for _callable_ and _value_ names needed inside the template body.
 
 ### `slots:`
 
@@ -143,7 +143,7 @@ A Python expression inside `{}` is evaluated and interpolated at render time, wi
 
 Allowed in: text body, attribute values, attribute lists (`class={[...]}`), attribute splats (`{**kwargs}`), boolean attributes.
 
-The expression is *any* Python expression — including ternaries, comprehensions, method calls, attribute access, arithmetic. f-string-grade expressiveness.
+The expression is _any_ Python expression — including ternaries, comprehensions, method calls, attribute access, arithmetic. f-string-grade expressiveness.
 
 ### `:if={cond}` — element-level conditional
 
@@ -312,14 +312,14 @@ Standard Python `**` splat operator. The dict's keys become attribute names; val
 
 The engine knows where each expression sits and applies the correct escape policy automatically. No `|safe`, no `mark_safe()` calls in templates, no opt-out syntax.
 
-| Position | Escape policy |
-|---|---|
-| Text body (`<div>{x}</div>`) | HTML-escape |
-| Attribute value (`<a class={x}>`) | HTML-escape, attribute-safe |
-| `href`, `src`, `formaction` attributes | URL-validate (reject `javascript:`, `data:` text/html, etc.), then HTML-escape |
-| `<script>` body | Refuse (compile error — embedding values in scripts requires explicit opt-in via a helper) |
-| `<style>` body | Refuse (compile error — same reason) |
-| Boolean attribute value | Coerce to presence/absence |
+| Position                               | Escape policy                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Text body (`<div>{x}</div>`)           | HTML-escape                                                                                |
+| Attribute value (`<a class={x}>`)      | HTML-escape, attribute-safe                                                                |
+| `href`, `src`, `formaction` attributes | URL-validate (reject `javascript:`, `data:` text/html, etc.), then HTML-escape             |
+| `<script>` body                        | Refuse (compile error — embedding values in scripts requires explicit opt-in via a helper) |
+| `<style>` body                         | Refuse (compile error — same reason)                                                       |
+| Boolean attribute value                | Coerce to presence/absence                                                                 |
 
 If a value needs to bypass escaping, the Python side wraps in `Markup(...)` from `plain.utils.safestring` (or equivalent). The template engine has no in-template opt-out.
 
@@ -500,46 +500,46 @@ Decision: not in v1. Every call site shows its full path. The verbosity cost is 
 
 ## What this deliberately doesn't have
 
-| Feature | Why we don't have it |
-|---|---|
-| `{% endif %}`, `{% endfor %}` | No block forms — element-level directives only. The element's close tag is the natural terminator. |
-| Filters (`{{ x \| upper }}`) | Python methods do this already: `{x.upper()}`. The pipe syntax was a workaround for languages without method-call access. |
-| `else` / `elif` on `:if` | Use sibling `:if` directives with negated conditions, or Python ternaries inside `{}` when it's a value choice. |
-| Template inheritance (`{% extends %}` + `{% block %}`) | Layouts are components with slots. One concept covers both reuse cases. |
-| `{% set %}` for locals | Compute in the presenter. (Python's walrus operator covers the rare in-expression case.) |
-| `{% include %}` (separate from components) | `<template :include>` is the include. |
-| Macros (separate from components) | Components are the reusable unit. |
-| `\|safe`, autoescape toggles | Contextual autoescape only. To emit raw HTML, wrap in `Markup()` on the Python side. |
-| `<.component>` dot-syntax | Required name resolution (registry, import, or filesystem convention) that fights the "components are just files" model. |
-| Per-file aliases | Not in v1 — explicit path at every call site. Reconsider if verbosity proves painful. |
-| Web Components custom-element tags (`<my-card>`) | Implies runtime registration semantics that don't apply server-side. Borrowing the syntax without the semantics confuses readers. |
-| Python-side component classes | Components are template files. No `class Card(Component)` anywhere. |
-| Component registry (anywhere) | Files at paths; no name-to-thing mapping infrastructure. |
-| Indentation-significant body | HTML is whitespace-insensitive; forcing template-body indentation rules mixes two whitespace philosophies in one file. |
-| Logic inside components | Components are pure projections. Computation lives in presenters; presenters are passed as attrs. |
+| Feature                                                | Why we don't have it                                                                                                              |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `{% endif %}`, `{% endfor %}`                          | No block forms — element-level directives only. The element's close tag is the natural terminator.                                |
+| Filters (`{{ x \| upper }}`)                           | Python methods do this already: `{x.upper()}`. The pipe syntax was a workaround for languages without method-call access.         |
+| `else` / `elif` on `:if`                               | Use sibling `:if` directives with negated conditions, or Python ternaries inside `{}` when it's a value choice.                   |
+| Template inheritance (`{% extends %}` + `{% block %}`) | Layouts are components with slots. One concept covers both reuse cases.                                                           |
+| `{% set %}` for locals                                 | Compute in the presenter. (Python's walrus operator covers the rare in-expression case.)                                          |
+| `{% include %}` (separate from components)             | `<template :include>` is the include.                                                                                             |
+| Macros (separate from components)                      | Components are the reusable unit.                                                                                                 |
+| `\|safe`, autoescape toggles                           | Contextual autoescape only. To emit raw HTML, wrap in `Markup()` on the Python side.                                              |
+| `<.component>` dot-syntax                              | Required name resolution (registry, import, or filesystem convention) that fights the "components are just files" model.          |
+| Per-file aliases                                       | Not in v1 — explicit path at every call site. Reconsider if verbosity proves painful.                                             |
+| Web Components custom-element tags (`<my-card>`)       | Implies runtime registration semantics that don't apply server-side. Borrowing the syntax without the semantics confuses readers. |
+| Python-side component classes                          | Components are template files. No `class Card(Component)` anywhere.                                                               |
+| Component registry (anywhere)                          | Files at paths; no name-to-thing mapping infrastructure.                                                                          |
+| Indentation-significant body                           | HTML is whitespace-insensitive; forcing template-body indentation rules mixes two whitespace philosophies in one file.            |
+| Logic inside components                                | Components are pure projections. Computation lives in presenters; presenters are passed as attrs.                                 |
 
 ## Full syntax reference (one table)
 
-| Construct | Purpose |
-|---|---|
-| `---\n...\n---` | YAML frontmatter fence |
-| `attrs: { name: type }` | Declare typed inputs (inline or nested-with-metadata) |
-| `imports:` | Bring non-attr names (helpers, constants) into the expression scope |
-| `slots: { name: required\|optional }` | Declare accepted slots |
-| `{python_expr}` | Interpolate Python expression (contextually autoescaped) |
-| `:if={cond}` | Element-level conditional |
-| `:for={target in iterable}` | Element-level iteration |
-| `:as={name}` | Scoped slot binding — bind yielded value to `name` |
-| `<template :include="path" prop={v}>` | Invoke another template with attrs |
-| `slot="name"` (attribute) | Route element content to a named slot |
-| `<template slot="name">` | Wrap slot content without a natural element |
-| `<template>` (no attrs) | Fragment — group children without rendering wrapper |
-| `class={list}` | List-flatten, drop falsy |
-| `{**dict}` | Attribute splat |
-| `attr={bool}` | Boolean attribute presence |
-| `{# comment #}` | Template-only comment (stripped) |
-| `<!-- comment -->` | HTML comment (preserved verbatim) |
-| `Literal[...]` (in attrs) | Enum constraint via Python's typing module |
+| Construct                             | Purpose                                                             |
+| ------------------------------------- | ------------------------------------------------------------------- |
+| `---\n...\n---`                       | YAML frontmatter fence                                              |
+| `attrs: { name: type }`               | Declare typed inputs (inline or nested-with-metadata)               |
+| `imports:`                            | Bring non-attr names (helpers, constants) into the expression scope |
+| `slots: { name: required\|optional }` | Declare accepted slots                                              |
+| `{python_expr}`                       | Interpolate Python expression (contextually autoescaped)            |
+| `:if={cond}`                          | Element-level conditional                                           |
+| `:for={target in iterable}`           | Element-level iteration                                             |
+| `:as={name}`                          | Scoped slot binding — bind yielded value to `name`                  |
+| `<template :include="path" prop={v}>` | Invoke another template with attrs                                  |
+| `slot="name"` (attribute)             | Route element content to a named slot                               |
+| `<template slot="name">`              | Wrap slot content without a natural element                         |
+| `<template>` (no attrs)               | Fragment — group children without rendering wrapper                 |
+| `class={list}`                        | List-flatten, drop falsy                                            |
+| `{**dict}`                            | Attribute splat                                                     |
+| `attr={bool}`                         | Boolean attribute presence                                          |
+| `{# comment #}`                       | Template-only comment (stripped)                                    |
+| `<!-- comment -->`                    | HTML comment (preserved verbatim)                                   |
+| `Literal[...]` (in attrs)             | Enum constraint via Python's typing module                          |
 
 ## End-to-end example
 
@@ -604,24 +604,24 @@ Every Jinja feature we care about either maps directly, translates to a Python e
 
 ### Direct translations
 
-| Jinja | Plain | Notes |
-|---|---|---|
-| `{{ x }}` | `{x}` | Single-brace, contextually autoescaped |
-| `{% if x %}<a/>{% endif %}` | `<a :if={x} />` | Element-level directive |
-| `{% for x in xs %}<li>{{x}}</li>{% endfor %}` | `<li :for={x in xs}>{x}</li>` | Same shape |
-| `{% include "x.html" %}` | `<template :include="x" />` | Self-closing when no children |
-| `{% from "x" import macro %}` + `{{ macro(a=1) }}` | `<template :include="x" a={1} />` | Macros become component files |
-| `{% call macro(a=1) %}body{% endcall %}` | `<template :include="x" a={1}>body</template>` | Default slot is implicit |
-| `{# comment #}` | `{# comment #}` | Identical syntax |
-| `{{ x \| length }}` | `{len(x)}` | Python builtin |
-| `{{ x \| upper }}` | `{x.upper()}` | Python method |
-| `{{ x \| default('-') }}` | `{x or '-'}` | Or `x if x else '-'` |
-| `{{ x \| join(', ') }}` | `{', '.join(x)}` | Python method |
-| `{{ x \| capitalize }}` | `{x.capitalize()}` | Python method |
-| `{{ x \| date('Y-m-d') }}` | `{x.strftime('%Y-%m-%d')}` or push to presenter | Python's strftime |
-| `{% if x is defined %}` | n/a — undeclared names are check-time errors | Different model |
-| `{% if x is none %}` | `:if={x is None}` | Python comparison |
-| `{% raw %}{x}{% endraw %}` | `{{x}}` for literal `{`, `}}` for literal `}` | f-string-style escape |
+| Jinja                                              | Plain                                           | Notes                                  |
+| -------------------------------------------------- | ----------------------------------------------- | -------------------------------------- |
+| `{{ x }}`                                          | `{x}`                                           | Single-brace, contextually autoescaped |
+| `{% if x %}<a/>{% endif %}`                        | `<a :if={x} />`                                 | Element-level directive                |
+| `{% for x in xs %}<li>{{x}}</li>{% endfor %}`      | `<li :for={x in xs}>{x}</li>`                   | Same shape                             |
+| `{% include "x.html" %}`                           | `<template :include="x" />`                     | Self-closing when no children          |
+| `{% from "x" import macro %}` + `{{ macro(a=1) }}` | `<template :include="x" a={1} />`               | Macros become component files          |
+| `{% call macro(a=1) %}body{% endcall %}`           | `<template :include="x" a={1}>body</template>`  | Default slot is implicit               |
+| `{# comment #}`                                    | `{# comment #}`                                 | Identical syntax                       |
+| `{{ x \| length }}`                                | `{len(x)}`                                      | Python builtin                         |
+| `{{ x \| upper }}`                                 | `{x.upper()}`                                   | Python method                          |
+| `{{ x \| default('-') }}`                          | `{x or '-'}`                                    | Or `x if x else '-'`                   |
+| `{{ x \| join(', ') }}`                            | `{', '.join(x)}`                                | Python method                          |
+| `{{ x \| capitalize }}`                            | `{x.capitalize()}`                              | Python method                          |
+| `{{ x \| date('Y-m-d') }}`                         | `{x.strftime('%Y-%m-%d')}` or push to presenter | Python's strftime                      |
+| `{% if x is defined %}`                            | n/a — undeclared names are check-time errors    | Different model                        |
+| `{% if x is none %}`                               | `:if={x is None}`                               | Python comparison                      |
+| `{% raw %}{x}{% endraw %}`                         | `{{x}}` for literal `{`, `}}` for literal `}`   | f-string-style escape                  |
 
 ### Template inheritance
 
@@ -692,7 +692,7 @@ Multi-level inheritance falls out naturally — `layouts/marketing.plain` includ
 **What we lose**: `{{ super() }}` (accessing parent block's default content while overriding it) has no direct analog. The two workarounds:
 
 - Most cases of `{{ super() }} - extra` can be expressed by passing the augmented value: `<template slot="title">Default - extra</template>` (just write the full string).
-- For cases where the parent's content is genuinely dynamic, expose it via a *prop* on the layout rather than relying on slot defaults: `<template :include="layouts/base" title={f"{base_title} - extra"}>...`.
+- For cases where the parent's content is genuinely dynamic, expose it via a _prop_ on the layout rather than relying on slot defaults: `<template :include="layouts/base" title={f"{base_title} - extra"}>...`.
 
 `{{ super() }}` is rare in practice; the workaround is small.
 
@@ -797,13 +797,13 @@ This is slightly more verbose at the template level but dramatically more readab
 
 ### `{% autoescape %}`, `{% trans %}`, `{% spaceless %}`, `{% do %}`
 
-| Jinja feature | Plain answer |
-|---|---|
-| `{% autoescape %}` | Not supported. One escape policy (contextual). Use `Markup()` from Python side for opt-out. |
-| `{% trans %}` | Not in v1 spec. Will need an i18n story — likely a translation function imported via `imports:` and called as `{_("Hello")}`. |
+| Jinja feature                 | Plain answer                                                                                                                       |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `{% autoescape %}`            | Not supported. One escape policy (contextual). Use `Markup()` from Python side for opt-out.                                        |
+| `{% trans %}`                 | Not in v1 spec. Will need an i18n story — likely a translation function imported via `imports:` and called as `{_("Hello")}`.      |
 | `{% spaceless %}` / `{%- -%}` | Handled by the formatter, not as inline syntax. The compiler emits compact HTML; the formatter normalizes source-level whitespace. |
-| `{% do %}` | Not supported. Compute in the presenter. |
-| `{% with %}` | Use a presenter or walrus. |
+| `{% do %}`                    | Not supported. Compute in the presenter.                                                                                           |
+| `{% with %}`                  | Use a presenter or walrus.                                                                                                         |
 
 ### Variable scoping
 
@@ -854,5 +854,5 @@ These are corrections HEEx had to make, or unresolved issues they're still livin
 These are limitations that aren't worth solving in v1 but should be documented as known:
 
 - **No semantic HTML tree validation**. `<p><div></div></p>` is structurally invalid HTML but parses fine. HEEx has this on their roadmap; we'd inherit it. Validation would require porting WHATWG content-model rules.
-- **Type checking on `attr` literal-only is HEEx's behavior; we plan to do better**. Because we use pyright/ty over extracted expressions, *variable* values flowing into typed attrs get checked too — not just literals. This is a real upgrade vs HEEx's current state.
+- **Type checking on `attr` literal-only is HEEx's behavior; we plan to do better**. Because we use pyright/ty over extracted expressions, _variable_ values flowing into typed attrs get checked too — not just literals. This is a real upgrade vs HEEx's current state.
 - **Inline behavior in third-party JS libraries** (Alpine `x-data="..."`, framework-specific attribute conventions): mostly fine because we treat unknown attributes as pass-through strings; expression parsing is opt-in via `{...}`. HEEx's tokenizer is stricter and fights some of these patterns more.

@@ -35,31 +35,31 @@ The harness lives in the repo (e.g. `tests/parity/`) and runs under `./scripts/t
 
 These were left implicit in v1 of the plan. Pinning them now avoids mid-stream drift:
 
-| Decision | Resolution |
-|---|---|
-| **CLI name** | `plain html check` during migration (matches the new package name). The spec writes `plain template check` for the post-Jinja future; rename in Phase 16 if `plain.templates` is rescoped. |
-| **File extension** | `.plain` for the full migration. Possible rename to `.html` post-Phase-16, treated as a separate decision. |
-| **Compiled cache location** | Dedicated `.plain-html-cache/` at project root, gitignored. Do **not** use `__pycache__/` — collides with Python's own bytecode cache management and isn't always writable. |
-| **`Markup` type** | Reuse the existing `plain.utils.safestring.SafeString` / `mark_safe`. Re-export as `plain.html.Markup` for spec-aligned naming. No new type. |
-| **`plain.templates` fate in Phase 16** | Becomes a thin shim that re-exports `plain.html`. Preserves import paths for any user code that touched the package; no separate retirement story. |
-| **Presenters** | Documented convention, not a framework primitive. Plain pattern: a callable or dataclass in `app/presenters.py` (or `app/<feature>/presenters.py`) that returns the data shape the template's `attrs:` expects. Views construct presenters; templates only read attributes. No registration, no base class, no discovery — just Python. Document in `plain.html` README and link from migration phases. |
-| **Migration env var** | `PLAIN_HTML_RENDERER=new`. Read once at loader init. Removed in Phase 16. |
-| **Dual-engine cost during migration** | Both Jinja and `plain.html` are runtime dependencies of `plain` between Phase 7 and Phase 16. Acceptable; Jinja drops from `pyproject.toml` only at Phase 16. |
+| Decision                               | Resolution                                                                                                                                                                                                                                                                                                                                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CLI name**                           | `plain html check` during migration (matches the new package name). The spec writes `plain template check` for the post-Jinja future; rename in Phase 16 if `plain.templates` is rescoped.                                                                                                                                                                                                              |
+| **File extension**                     | `.plain` for the full migration. Possible rename to `.html` post-Phase-16, treated as a separate decision.                                                                                                                                                                                                                                                                                              |
+| **Compiled cache location**            | Dedicated `.plain-html-cache/` at project root, gitignored. Do **not** use `__pycache__/` — collides with Python's own bytecode cache management and isn't always writable.                                                                                                                                                                                                                             |
+| **`Markup` type**                      | Reuse the existing `plain.utils.safestring.SafeString` / `mark_safe`. Re-export as `plain.html.Markup` for spec-aligned naming. No new type.                                                                                                                                                                                                                                                            |
+| **`plain.templates` fate in Phase 16** | Becomes a thin shim that re-exports `plain.html`. Preserves import paths for any user code that touched the package; no separate retirement story.                                                                                                                                                                                                                                                      |
+| **Presenters**                         | Documented convention, not a framework primitive. Plain pattern: a callable or dataclass in `app/presenters.py` (or `app/<feature>/presenters.py`) that returns the data shape the template's `attrs:` expects. Views construct presenters; templates only read attributes. No registration, no base class, no discovery — just Python. Document in `plain.html` README and link from migration phases. |
+| **Migration env var**                  | `PLAIN_HTML_RENDERER=new`. Read once at loader init. Removed in Phase 16.                                                                                                                                                                                                                                                                                                                               |
+| **Dual-engine cost during migration**  | Both Jinja and `plain.html` are runtime dependencies of `plain` between Phase 7 and Phase 16. Acceptable; Jinja drops from `pyproject.toml` only at Phase 16.                                                                                                                                                                                                                                           |
 
 ## Open spec questions, mapped to phases
 
 The [spec](plain-template-language.md) lists open design questions; each gets pinned to the phase where it gets decided:
 
-| Spec open question | Decided in |
-|---|---|
-| Walrus support inside `{}` | Phase 5 (compiler). Lean yes (it's just Python; falls out for free). |
-| `{{ x }}` double-brace alias | Phase 3 (tokenizer). Lean no — single interpolation syntax. |
-| `:key={expr}` on `:for` | Deferred until hypermedia layer needs it. Not in v1 scope. |
-| `<template :include={expr}>` dynamic dispatch | Phase 4 + Phase 5. Lean yes (path-as-expression desugars cleanly). |
-| Slot `yields:` declaration form | Phase 2 (frontmatter) + Phase 4 (tree builder) + Phase 9 (type check). Use spec's proposed shape: `yields: Type` under the slot's frontmatter. |
-| `dict[str, str]` allowed-prefix validation | Phase 9. Punt to runtime check for v1; revisit when `Annotated[]` story is cleaner. |
-| Compiler IR static/dynamic split | Defer. Phase 5 emits a flat render function. Phase 17+ may revisit. |
-| File extension long-term (`.plain` vs `.html`) | Decided post-Phase-16. Not part of migration. |
+| Spec open question                             | Decided in                                                                                                                                     |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Walrus support inside `{}`                     | Phase 5 (compiler). Lean yes (it's just Python; falls out for free).                                                                           |
+| `{{ x }}` double-brace alias                   | Phase 3 (tokenizer). Lean no — single interpolation syntax.                                                                                    |
+| `:key={expr}` on `:for`                        | Deferred until hypermedia layer needs it. Not in v1 scope.                                                                                     |
+| `<template :include={expr}>` dynamic dispatch  | Phase 4 + Phase 5. Lean yes (path-as-expression desugars cleanly).                                                                             |
+| Slot `yields:` declaration form                | Phase 2 (frontmatter) + Phase 4 (tree builder) + Phase 9 (type check). Use spec's proposed shape: `yields: Type` under the slot's frontmatter. |
+| `dict[str, str]` allowed-prefix validation     | Phase 9. Punt to runtime check for v1; revisit when `Annotated[]` story is cleaner.                                                            |
+| Compiler IR static/dynamic split               | Defer. Phase 5 emits a flat render function. Phase 17+ may revisit.                                                                            |
+| File extension long-term (`.plain` vs `.html`) | Decided post-Phase-16. Not part of migration.                                                                                                  |
 
 ## Phased sequence
 
@@ -69,12 +69,12 @@ Each phase has: deliverables, success criteria, agent verification steps. Phases
 
 ### Phase 0 — Tracer bullet
 
-**Goal**: validate the spec end-to-end on the hardest realistic template *before* building broad infrastructure.
+**Goal**: validate the spec end-to-end on the hardest realistic template _before_ building broad infrastructure.
 
 Deliverables:
 
 - Pick one htmx-heaviest template in `plain.admin` (likely a data-browser fragment: row with inline-edit, OOB swap, or multi-target update). The fragment should exercise: slots, `:if`, `:for`, attribute splat, scoped slot binding (`:as`), URL-attribute escaping, htmx attribute pass-through.
-- Build a throwaway prototype that walks the *entire* pipeline for this one template: frontmatter parse → tokenize → tag tree → compile → render → produce HTML identical to the existing Jinja output.
+- Build a throwaway prototype that walks the _entire_ pipeline for this one template: frontmatter parse → tokenize → tag tree → compile → render → produce HTML identical to the existing Jinja output.
 - Capture any spec ambiguities, surface them to the user, and either get the spec updated or document the chosen interpretation as a decision.
 
 Success criteria:
@@ -92,6 +92,8 @@ diff /tmp/jinja.html /tmp/prototype.html
 ```
 
 The prototype is discarded after Phase 0; lessons inform Phases 1–7. Do not skip — this is the cheapest place to discover a fundamental design problem.
+
+**Status: in progress.** A first cut lives in [`plain-html/`](plain-html/) with the parity harness in [`plain-html/tests/parity/`](plain-html/tests/parity/) (see that directory's README for the current parity diff and what it validates). The current scope is narrower than the deliverables above — paired self-contained Jinja and `.plain` fixtures rather than a real `plain.admin` data-browser fragment — but the engine surface is plumbed end-to-end (frontmatter → tokenize → tree → render with `:if`, `:for`, attribute interpolation, fragment templates, contextual HTML escape) and exhibits the kind of intentional-difference catalog the spec anticipated. Real-template parity (with includes, slots, and htmx attribute pass-through) lands as we expand the engine in Phases 2–7 and bring more fixtures online.
 
 ---
 
@@ -201,28 +203,28 @@ Deliverables:
 - `imports:` block becomes top-of-module `from X import Y` / `import X` statements.
 - Slot values arrive as kwargs (`children=`, `header=`, etc., type `Markup`).
 - Tag tree walked recursively, emitting:
-  - Text nodes → string literals
-  - `{expr}` → escape-function call, chosen by position
-  - `<template :include="path" attr={v}>` → loaded-template-function call
-  - `<template :include={expr}>` → dynamic include via runtime path-resolution helper
-  - `:if={cond}` → wrap node emission in `if cond:`
-  - `:for={x in xs}` → wrap node emission in `for x in xs:`
-  - `:as={var}` on slot template → captured in slot definition as a 1-arg callable
-  - `<template>` fragment → emit children directly
+    - Text nodes → string literals
+    - `{expr}` → escape-function call, chosen by position
+    - `<template :include="path" attr={v}>` → loaded-template-function call
+    - `<template :include={expr}>` → dynamic include via runtime path-resolution helper
+    - `:if={cond}` → wrap node emission in `if cond:`
+    - `:for={x in xs}` → wrap node emission in `for x in xs:`
+    - `:as={var}` on slot template → captured in slot definition as a 1-arg callable
+    - `<template>` fragment → emit children directly
 - Walrus inside `{...}` works because it's just Python — confirm with a test.
 - Compiled output written to `.plain-html-cache/<hash>.py`; loaded via `importlib`.
 - **Cache invalidation graph** per spec: cache key includes
-  - source file content hash
-  - frontmatter-resolved type references (mtimes of modules referenced in `attrs:`)
-  - `imports:` modules' source mtimes
-  - **every `:include`d template's cache key**, transitively (rebuild a template when any descendant changes)
+    - source file content hash
+    - frontmatter-resolved type references (mtimes of modules referenced in `attrs:`)
+    - `imports:` modules' source mtimes
+    - **every `:include`d template's cache key**, transitively (rebuild a template when any descendant changes)
 - Cached modules invalidate atomically; stale entries are removed when a key is regenerated.
 
 Success criteria:
 
 - Given a simple `.plain` template, compiles and renders correctly with the right inputs.
 - Compiled output is readable Python (debuggable; positions in tracebacks map to template source via comments).
-- Cache works: unchanged template doesn't recompile; changed template *or any of its includes* does.
+- Cache works: unchanged template doesn't recompile; changed template _or any of its includes_ does.
 - Unit tests cover each tree construct + the transitive-include invalidation case.
 
 ---
@@ -282,10 +284,10 @@ Deliverables:
 
 - `plain html check <path>` CLI command (added in `plain.html.cli`). Accepts a file, a directory, or `--all`.
 - Walks one or more `.plain` files; for each:
-  - Parses frontmatter (Phase 2)
-  - Tokenizes (Phase 3)
-  - Builds tag tree (Phase 4)
-  - Validates: HTML balance, void-element children, `:include` paths resolve to existing files, slot routing matches included template's `slots:` declarations, attrs passed match the included template's `attrs:` declarations (required present, no unknown), `:if` / `:for` shape sanity.
+    - Parses frontmatter (Phase 2)
+    - Tokenizes (Phase 3)
+    - Builds tag tree (Phase 4)
+    - Validates: HTML balance, void-element children, `:include` paths resolve to existing files, slot routing matches included template's `slots:` declarations, attrs passed match the included template's `attrs:` declarations (required present, no unknown), `:if` / `:for` shape sanity.
 - Reports errors with `file:line:col`, human-readable messages.
 - Exit code 0 on success, non-zero on errors.
 - Integrated into `./scripts/check` as a step (off by default until Phase 10 begins porting templates; flips on when the first `.plain` file ships).
@@ -306,20 +308,20 @@ Deliverables:
 
 - Extended `plain html check` that runs type validation on every `{expr}` in the template.
 - Implementation:
-  - For each template, synthesize a Python module containing:
-    - The `imports:` block as real imports
-    - A function signature derived from `attrs:` declarations (real type hints)
-    - Inside the function body: each extracted expression appears as a typed statement (e.g., `_ = expr  # template <relpath>:<line>:<col>`)
-  - Write synthesized module to a temp file.
-  - Invoke `ty check <temp_file> --output-format gitlab` (or the structured format the pinned ty version supports).
-  - Parse the JSON output, map errors from synthesized-file positions back to template positions via the stored source map.
-  - Report errors in the Phase 8 style.
+    - For each template, synthesize a Python module containing:
+        - The `imports:` block as real imports
+        - A function signature derived from `attrs:` declarations (real type hints)
+        - Inside the function body: each extracted expression appears as a typed statement (e.g., `_ = expr  # template <relpath>:<line>:<col>`)
+    - Write synthesized module to a temp file.
+    - Invoke `ty check <temp_file> --output-format gitlab` (or the structured format the pinned ty version supports).
+    - Parse the JSON output, map errors from synthesized-file positions back to template positions via the stored source map.
+    - Report errors in the Phase 8 style.
 - **Result caching**: each template's check result cached keyed on
-  - template content hash
-  - resolved-type-reference module mtimes (from `attrs:`)
-  - `imports:` module mtimes
-  - ty version pin
-  Avoids re-running ty on unchanged templates; matters during full-repo checks.
+    - template content hash
+    - resolved-type-reference module mtimes (from `attrs:`)
+    - `imports:` module mtimes
+    - ty version pin
+      Avoids re-running ty on unchanged templates; matters during full-repo checks.
 - Backend abstraction (`plain.html.typecheck.backends`) so pyright can be plugged in as an alternative if ty is unavailable.
 - Pin ty to a specific version in `plain.html/pyproject.toml`. Alpha tools break; revisit the pin only deliberately.
 - Scoped-slot `yields:` declarations participate: a `:as={var}` binding gets the declared `yields:` type in the synthesized scope.
@@ -347,8 +349,8 @@ Each ported route gets a fixture entry added to `tests/parity/fixtures.yml`. The
 Success criteria:
 
 - For every route in `example/`:
-  - Parity harness asserts output equivalence under both renderers (whitespace-normalized).
-  - Intentional differences (if any) are recorded in `parity_allowlist.yml` with rationale.
+    - Parity harness asserts output equivalence under both renderers (whitespace-normalized).
+    - Intentional differences (if any) are recorded in `parity_allowlist.yml` with rationale.
 - `uv run plain html check example/app/html/` passes with no errors.
 - All example tests pass with the new renderer enabled.
 
@@ -413,12 +415,12 @@ Success criteria:
 Deliverables:
 
 - Any other package in the repo with a `templates/` directory ported to `html/`:
-  - `plain.toolbar`
-  - `plain.dev`
-  - `plain.observer` (if it has templates)
-  - `plain.pages`
-  - `plain.flags` (admin toolbar panel)
-  - Anything else found by `find plain* -type d -name templates`
+    - `plain.toolbar`
+    - `plain.dev`
+    - `plain.observer` (if it has templates)
+    - `plain.pages`
+    - `plain.flags` (admin toolbar panel)
+    - Anything else found by `find plain* -type d -name templates`
 - Each package: layouts first, then descendants. Old `templates/` remain for now.
 
 Success criteria:
