@@ -128,8 +128,10 @@ class TestAfterResponseChaining:
 
 
 class TestHandleExceptionLogging:
-    """handle_exception returning a response suppresses logging.
-    Re-raising defers to the framework error renderer, which logs.
+    """handle_exception returning a 4xx response suppresses logging and exception
+    attachment (the view handled it). Returning a 5xx is treated as a real
+    failure: the framework logs and attaches `response.exception` so subclasses
+    don't each have to. Re-raising defers to the framework error renderer.
     """
 
     def test_mapped_4xx_does_not_log_server_error(self, request_log):
@@ -148,9 +150,33 @@ class TestHandleExceptionLogging:
         response = MappedView(request=RequestFactory().get("/")).get_response()
 
         assert response.status_code == 400
+        assert response.exception is None
         assert not _has_server_error(request_log), (
             "handle_exception mapping to 4xx must not emit a Server error log"
         )
+
+    def test_mapped_5xx_logs_and_attaches_exception(self, request_log):
+        """A subclass that maps to a 5xx response gets logging and exception
+        attachment from the framework — no need to call log_exception or set
+        response.exception in the override."""
+
+        class AppError(Exception):
+            pass
+
+        class MappedView(View):
+            def get(self):
+                raise AppError("boom")
+
+            def handle_exception(self, exc: Exception) -> Response:
+                if isinstance(exc, AppError):
+                    return Response("oops", status_code=500)
+                return super().handle_exception(exc)
+
+        response = MappedView(request=RequestFactory().get("/")).get_response()
+
+        assert response.status_code == 500
+        assert isinstance(response.exception, AppError)
+        assert _has_server_error(request_log)
 
     def test_reraise_from_handle_exception_propagates(self):
         """Default handle_exception re-raises — exception escapes get_response."""

@@ -9,7 +9,7 @@ from plain.http import (
     Request,
     Response,
 )
-from plain.logs import get_framework_logger
+from plain.logs import get_framework_logger, log_exception
 
 from .exceptions import ResponseException
 
@@ -101,12 +101,13 @@ class View[HandlerResult = Response]:
     def handle_exception(self, exc: Exception) -> Response:
         """Translate a raised exception into a response. Re-raise to defer to the framework default.
 
-        Returning a response suppresses logging — the view has chosen to
-        map this exception to a handled outcome (e.g. ValidationError →
-        400). Re-raising escapes to the framework error renderer, which
-        logs via `log_exception` and renders `{status}.html`. Views that
-        want to log a handled branch (e.g. a self-mapped 500) must call
-        `log_exception(self.request, exc)` explicitly.
+        Returning a 4xx response treats the exception as a handled outcome
+        (e.g. ValidationError → 400) — no logging, no exception attachment.
+        Returning a 5xx response is treated as a real failure: the framework
+        attaches `response.exception` and calls `log_exception` for you, so
+        observability tooling can record it from the response. Re-raising
+        escapes to the framework error renderer, which logs and renders
+        `{status}.html`.
         """
         raise exc
 
@@ -147,7 +148,16 @@ class View[HandlerResult = Response]:
     def _respond_to_exception(self, exc: Exception) -> Response:
         if isinstance(exc, ResponseException):
             return exc.response
-        return self.handle_exception(exc)
+        response = self.handle_exception(exc)
+        # 5xx responses from handle_exception represent a real failure that
+        # the view chose to render itself. Stamp the response with the
+        # exception and log centrally so subclasses don't each have to
+        # remember (and so the canonical OTel SERVER span can record it via
+        # `_finalize_span`).
+        if response.status_code >= 500:
+            log_exception(self.request, exc)
+            response.exception = exc
+        return response
 
     def convert_result_to_response(self, result: HandlerResult) -> Response:
         """Hook for subclasses (e.g. `APIView`) to accept shorthand return types."""

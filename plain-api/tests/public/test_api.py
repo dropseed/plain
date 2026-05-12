@@ -99,6 +99,18 @@ def test_validation_error_is_returned_as_400_json():
     ]
 
 
+def test_unhandled_exception_attaches_response_exception():
+    """APIView 5xx responses carry the original exception so observability
+    tooling can record it from the response."""
+    client = Client(raise_request_exception=False)
+
+    response = client.get("/unhandled-exception")
+    assert response.status_code == 500
+    assert isinstance(response.exception, RuntimeError)
+    body = response.json()
+    assert body["id"] == "server_error"
+
+
 def test_unsupported_media_type_is_returned_as_415_json():
     """A non-JSON Content-Type on a json_data view must surface as 415, not 500.
 

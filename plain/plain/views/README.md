@@ -228,7 +228,7 @@ class MyView(View):
 
 The framework's default renders `{status}.html` ([`Error views`](#error-views)) — most views don't need to override this hook. Override when you want a non-HTML format: `APIView` emits JSON. The base `View.handle_exception` re-raises, so unhandled cases fall through to the framework default.
 
-`ResponseException` is unwrapped by `get_response` before `handle_exception` runs, so you don't need to handle it in overrides. The exception is logged once — before `handle_exception` is called — so overrides focus purely on response shape, not observability.
+`ResponseException` is unwrapped by `get_response` before `handle_exception` runs, so you don't need to handle it in overrides. Returning a **5xx** response is treated as a real failure: the framework logs the exception once (via `log_exception`) and attaches it to `response.exception` so observability tooling can record it. Returning a **4xx** response is silent — the view chose to render it as a handled outcome.
 
 Plain's HTTP exceptions (`NotFoundError404`, `ForbiddenError403`, `BadRequestError400`, etc.) inherit [`HTTPException`](../http/exceptions.py#HTTPException) and carry their own `status_code`. Subclass `HTTPException` to define your own:
 

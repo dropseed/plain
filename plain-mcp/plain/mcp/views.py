@@ -148,7 +148,6 @@ class MCPView(View):
 
         status = exc.status_code if isinstance(exc, HTTPException) else 500
         if status >= 500:
-            log_exception(self.request, exc)
             message = "Internal error"
         else:
             message = str(exc) or HTTPStatus(status).phrase

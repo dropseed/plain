@@ -62,6 +62,23 @@ class TestPublicEndpoint:
         assert response.status_code == 204
 
 
+class TestUnhandledException:
+    """MCPView 5xx responses carry the original exception so observability
+    tooling can record it from the response."""
+
+    def test_unhandled_exception_attaches_response_exception(self) -> None:
+        client = Client(raise_request_exception=False)
+        response = client.post(
+            "/boom/",
+            data=_jsonrpc("ping"),
+            content_type="application/json",
+        )
+        assert response.status_code == 500
+        assert isinstance(response.exception, RuntimeError)
+        body = json.loads(response.content)
+        assert body["error"]["code"] == -32603  # INTERNAL_ERROR
+
+
 class TestAuthedEndpoint:
     """MCP mounted with an inline BearerAuth (see tests/app/urls.py)."""
 
