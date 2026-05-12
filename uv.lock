@@ -840,7 +840,7 @@ dev = [
 
 [[package]]
 name = "plain-assets"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "plain-assets" }
 dependencies = [
     { name = "plain" },
@@ -962,12 +962,13 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-dev"
-version = "0.60.4"
+version = "0.61.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
     { name = "inotify" },
     { name = "plain" },
+    { name = "plain-assets" },
     { name = "requests" },
     { name = "rich" },
 ]
@@ -977,6 +978,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
     { name = "inotify" },
     { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "requests", specifier = ">=2.0.0" },
     { name = "rich" },
 ]
