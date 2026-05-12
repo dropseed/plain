@@ -1,5 +1,16 @@
 # plain-email changelog
 
+## [0.19.3](https://github.com/dropseed/plain/releases/plain-email@0.19.3) (2026-05-12)
+
+### What's changed
+
+- `plain.email.message` now imports `Template` and `TemplateFileMissing` from `plain.templates` (which is now a separate package, see the [`plain.templates` carve-out](../../../plain/plain/CHANGELOG.md)). The user-visible email message API is unchanged. ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- Pins `plain>=0.143.0` and `plain.templates>=0.1.0`.
+
+### Upgrade instructions
+
+- No code changes required if you upgrade `plain` to 0.143.0 in the same step — `plain.templates` is pulled in automatically.
+
 ## [0.19.2](https://github.com/dropseed/plain/releases/plain-email@0.19.2) (2026-05-05)
 
 ### What's changed
