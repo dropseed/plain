@@ -7,6 +7,7 @@ an AOT compile-to-Python step; output is byte-equivalent by construction.
 
 from __future__ import annotations
 
+import keyword
 import os
 from pathlib import Path
 
@@ -90,6 +91,12 @@ def _build_scope(fmdict: dict, context: dict, source_path: Path | None) -> dict:
                 f"Failed to execute import {stmt!r} in {label}: {e}"
             ) from e
     scope.update(context)
+    # Python keywords (`class`, `for`, `if`, ...) can't be referenced by name
+    # in expressions. Expose any keyword-named entry under `name_` so a
+    # template can write `{class_}` to read an attr passed as `class="x"`.
+    for name in list(scope.keys()):
+        if keyword.iskeyword(name):
+            scope.setdefault(f"{name}_", scope[name])
     return scope
 
 

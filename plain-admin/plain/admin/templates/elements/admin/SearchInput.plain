@@ -1,0 +1,24 @@
+---
+attrs:
+  id: str = ""
+  name: str = ""
+  value: str = ""
+  label: str = "Search"
+  placeholder: str = "Search"
+  class: str = ""
+  wrapper_class: str = ""
+  autofocus: bool = False
+---
+<label :if={id} for={id} class="sr-only">{label}</label>
+<div class={["relative", wrapper_class]}>
+    <input
+        type="text"
+        name={name or None}
+        id={id or None}
+        value={value or None}
+        placeholder={placeholder}
+        class={class_ or "admin-input pl-8"}
+        autofocus={autofocus}
+        >
+    <template :include="elements/admin/Icon" name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-admin-muted-foreground pointer-events-none" />
+</div>
