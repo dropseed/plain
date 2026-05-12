@@ -587,6 +587,32 @@ ADMIN_FORCE_THEME = "dark"
 
 You can also set it via the `PLAIN_ADMIN_FORCE_THEME` environment variable.
 
+### Beyond tokens
+
+When a token swap doesn't cover what you need, override the `.admin-*`
+classes directly — in the same stylesheet you put token overrides in:
+
+```css
+/* tailwind.css */
+.admin-card {
+  border-width: 2px;
+  box-shadow: 0 1px 0 var(--border) inset;
+}
+
+.admin-btn-primary {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+```
+
+The classes shown in the [catalog](#components) are a stable surface, and
+the admin's component rules live in `@layer components` — unlayered
+declarations in your stylesheet beat them automatically. No specificity
+gymnastics needed.
+
+Forking templates remains as an escape hatch ([FAQ](#faqs)) but should be
+the last resort: you take on keeping the fork in sync as the admin evolves.
+
 ### Fonts
 
 The admin ships [Inter](https://github.com/rsms/inter) (sans) and

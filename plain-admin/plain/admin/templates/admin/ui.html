@@ -121,6 +121,7 @@
 {% set _toc_groups = [
     ("Theme", [
         ("customizing", "Customizing"),
+        ("beyond-tokens", "Beyond tokens"),
         ("dark-mode", "Dark mode"),
         ("typography", "Typography"),
     ]),
@@ -298,6 +299,25 @@ document.addEventListener("DOMContentLoaded", () => {
 <p class="text-sm mt-3">
     Every <code>.btn-primary</code> and focus ring in the admin will pick
     that up — no template changes required.
+</p>
+{% endcall %}
+
+
+{% call section("beyond-tokens", "Beyond tokens",
+   "When a token swap doesn't cover what you need, override the `.admin-*` classes directly in your stylesheet. They're treated as a stable surface — every class shown on this page can be overridden. The admin's component rules live in `@layer components`, so unlayered declarations in your stylesheet beat them automatically.") %}
+<pre><code>/* tailwind.css */
+.admin-card {
+  border-width: 2px;
+  box-shadow: 0 1px 0 var(--border) inset;
+}
+
+.admin-btn-primary {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}</code></pre>
+<p class="text-sm mt-3">
+    Forking templates remains as an escape hatch but should be the last resort —
+    you take on keeping the fork in sync as the admin evolves.
 </p>
 {% endcall %}
 
