@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.19.5](https://github.com/dropseed/plain/releases/plain-pages@0.19.5) (2026-05-12)
+
+### What's changed
+
+- Adds explicit `plain.assets>=0.1.0,<1.0.0` dependency now that `plain.assets` is a separate package (extracted from `plain` core in 0.142.0). `plain.pages` uses `plain.assets.views.AssetView` to serve page assets. ([844f46e428](https://github.com/dropseed/plain/commit/844f46e428))
+
+### Upgrade instructions
+
+- No changes required if you're upgrading `plain` in the same step — `plain.assets` comes along as a transitive dependency.
+
 ## [0.19.4](https://github.com/dropseed/plain/releases/plain-pages@0.19.4) (2026-05-05)
 
 ### What's changed
