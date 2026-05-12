@@ -1,0 +1,43 @@
+---
+attrs:
+  slug: str
+  title: str = ""
+  description: str = ""
+  size: Any = None
+  filters: list = []
+  current_filter: str = ""
+slots:
+  header: optional
+  default: required
+---
+<aside
+    id={"card-" + slug}
+    hx-target="this"
+    hx-select={"#card-" + slug}
+    hx-swap="outerHTML"
+    class={"admin-card col-span-" + str(size.value if size else 1) + " flex flex-col gap-2 px-6 py-4"}
+    >
+    <template :if={header}>{header}</template>
+    <template :if={not header}>
+    <header class="flex justify-between items-center">
+        <div>
+            <h2 class="text-xs font-medium text-admin-muted-foreground">{title}</h2>
+            <p :if={description} class="mt-0.5 text-xs text-admin-muted-foreground/80">{description}</p>
+        </div>
+
+        <div :if={filters}>
+            <select
+                hx-get
+                name={slug + ".filter"}
+                class="admin-select admin-select-sm w-auto text-xs!">
+                <option value="">(Reset to default)</option>
+                <option :for={f in filters} value={f.value} selected={f.value == current_filter}>{f}</option>
+            </select>
+        </div>
+    </header>
+    </template>
+
+    <section>
+    {children}
+    </section>
+</aside>

@@ -65,4 +65,5 @@ def _load_defaults() -> None:
 
     _GLOBALS.setdefault("tailwind_css", _shims.tailwind_css)
     _GLOBALS.setdefault("pageviews_js", _shims.pageviews_js)
+    _GLOBALS.setdefault("htmx_js", _shims.htmx_js)
     _GLOBALS.setdefault("toolbar", _shims.toolbar)

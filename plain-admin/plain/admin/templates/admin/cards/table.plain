@@ -1,0 +1,40 @@
+---
+attrs:
+  slug: str
+  title: str = ""
+  description: str = ""
+  size: Any = None
+  filters: list = []
+  current_filter: str = ""
+  headers: list = []
+  rows: list = []
+  footers: list = []
+---
+<template :include="admin/cards/base" slug={slug} title={title} description={description} size={size} filters={filters} current_filter={current_filter}>
+    <div class="overflow-x-auto -mx-6">
+      <table class="admin-table w-full [&_th]:px-6 [&_td]:px-6 [&_th]:text-xs [&_th]:font-medium [&_th]:text-admin-muted-foreground">
+        <thead :if={headers}>
+          <tr>
+            <th :for={header in headers}>{header}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr :for={row in rows}>
+            <td :for={cell in row}>{cell}</td>
+          </tr>
+        </tbody>
+        <tfoot :if={footers}>
+          <template :if={footers and isinstance(footers[0], (list, tuple))}>
+            <tr :for={footer_row in footers}>
+              <td :for={cell in footer_row}>{cell}</td>
+            </tr>
+          </template>
+          <template :if={footers and not isinstance(footers[0], (list, tuple))}>
+            <tr>
+              <td :for={footer in footers}>{footer}</td>
+            </tr>
+          </template>
+        </tfoot>
+      </table>
+    </div>
+</template>

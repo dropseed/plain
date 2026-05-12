@@ -32,6 +32,24 @@ def tailwind_css() -> SafeString:
     return mark_safe(render(template, {"tailwind_css_path": path}))
 
 
+def htmx_js(request: Any, extensions: list[str] | None = None) -> SafeString:
+    from plain.html import render
+    from plain.html.loader import find_template
+    from plain.runtime import settings
+
+    template = find_template("htmx/js")
+    return mark_safe(
+        render(
+            template,
+            {
+                "DEBUG": settings.DEBUG,
+                "extensions": extensions or [],
+                "csp_nonce": request.csp_nonce,
+            },
+        )
+    )
+
+
 def pageviews_js(request: Any) -> SafeString:
     from plain.html import render
     from plain.html.loader import find_template
