@@ -8,6 +8,11 @@ from __future__ import annotations
 
 import json
 
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
+from opentelemetry.trace import SpanKind, StatusCode
+
 from plain.test import Client
 
 
@@ -77,6 +82,57 @@ class TestUnhandledException:
         assert isinstance(response.exception, RuntimeError)
         body = json.loads(response.content)
         assert body["error"]["code"] == -32603  # INTERNAL_ERROR
+
+
+class TestRPCMethodSpan:
+    """Each RPC method dispatch gets a `rpc {method}` SERVER span — JSON-RPC
+    is server-side request handling per OTel's RPC semconv. Without it,
+    `handle_message` swallows handler failures into a JSON-RPC error with
+    HTTP 200 — the outer HTTP SERVER span sees success and the failure is
+    invisible to OTel-based exception tooling."""
+
+    def test_rpc_method_emits_server_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        client = Client()
+        response = client.post(
+            "/mcp/",
+            data=_jsonrpc("initialize"),
+            content_type="application/json",
+        )
+        assert response.status_code == 200
+
+        rpc_spans = [
+            s for s in otel_spans.get_finished_spans() if s.name == "rpc initialize"
+        ]
+        assert len(rpc_spans) == 1
+        span = rpc_spans[0]
+        assert span.kind == SpanKind.SERVER
+        assert span.status.status_code == StatusCode.UNSET
+
+    def test_rpc_method_records_error_when_handler_fails(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        client = Client()
+        response = client.post(
+            "/rpc-boom/",
+            data=_jsonrpc("boom"),
+            content_type="application/json",
+        )
+        # handle_message swallows handler exceptions into a JSON-RPC error
+        # response with HTTP 200 — the failure surfaces on the span.
+        assert response.status_code == 200
+        body = json.loads(response.content)
+        assert body["error"]["code"] == -32603
+
+        rpc_spans = [s for s in otel_spans.get_finished_spans() if s.name == "rpc boom"]
+        assert len(rpc_spans) == 1
+        span = rpc_spans[0]
+        assert span.status.status_code == StatusCode.ERROR
+        assert span.attributes is not None
+        assert span.attributes["error.type"] == "RuntimeError"
+        exception_events = [e for e in span.events if e.name == "exception"]
+        assert exception_events
 
 
 class TestAuthedEndpoint:
