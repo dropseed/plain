@@ -1467,7 +1467,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-vendor"
-version = "0.11.5"
+version = "0.11.6"
 source = { editable = "plain-vendor" }
 dependencies = [
     { name = "plain" },
