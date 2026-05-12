@@ -21,19 +21,19 @@ from plain.views import TemplateView
 
 
 class LoginView(PasswordLoginView):
-    template_name = "login.plain"
+    template_name = "login.plain.html"
 
 
 class SSEDemoView(TemplateView):
-    template_name = "sse.plain"
+    template_name = "sse.plain.html"
 
 
 class IndexView(TemplateView):
-    template_name = "index.plain"
+    template_name = "index.plain.html"
 
 
 class ErrorView(TemplateView):
-    template_name = "index.plain"
+    template_name = "index.plain.html"
 
     def get(self) -> NoReturn:
         text = "This is a test exception to demonstrate the toolbar"

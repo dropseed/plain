@@ -16,7 +16,7 @@ MAX_MESSAGES = 20
 @register_toolbar_item
 class EmailToolbarItem(ToolbarItem):
     name = "Email"
-    panel_template_name = "toolbar/email.plain"
+    panel_template_name = "toolbar/email.plain.html"
 
     def is_enabled(self) -> bool:
         return settings.EMAIL_BACKEND == PREVIEW_BACKEND

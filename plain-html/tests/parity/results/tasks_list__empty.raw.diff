@@ -1,4 +1,4 @@
---- jinja:tasks_list.html [empty]+++ plain:tasks_list.plain [empty]@@ -7,7 +7,5 @@   <ul class="task-list" data-owner="42">
+--- jinja:tasks_list.html [empty]+++ plain:tasks_list.plain.html [empty]@@ -7,7 +7,5 @@   <ul class="task-list" data-owner="42">
      
    </ul>
 -  

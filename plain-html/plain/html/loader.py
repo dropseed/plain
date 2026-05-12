@@ -1,8 +1,8 @@
 """Template file resolution.
 
 Walks Plain's `get_template_dirs()` to map a template name like
-`layouts/base` to a `.plain` file on disk. Relative paths (`./x`, `../x`)
-resolve against the calling template's directory.
+`layouts/base` to a `.plain.html` file on disk. Relative paths (`./x`,
+`../x`) resolve against the calling template's directory.
 """
 
 from __future__ import annotations
@@ -17,12 +17,12 @@ class TemplateNotFound(FileNotFoundError):
 
 
 def find_template(name: str, *, current_template: Path | None = None) -> Path:
-    """Resolve a template name to a `.plain` file path.
+    """Resolve a template name to a `.plain.html` file path.
 
     Absolute names (no leading `./` or `../`) walk `get_template_dirs()` in
     order; first match wins. Relative names resolve against `current_template`.
     """
-    name_with_ext = name if name.endswith(".plain") else f"{name}.plain"
+    name_with_ext = name if name.endswith(".plain.html") else f"{name}.plain.html"
 
     if name.startswith("./") or name.startswith("../"):
         if current_template is None:

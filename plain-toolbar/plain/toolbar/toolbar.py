@@ -84,7 +84,7 @@ class ToolbarItem:
 class _ExceptionToolbarItem(ToolbarItem):
     name = "Exception"
     panel_template_name = "toolbar/exception.html"
-    button_template_name = "toolbar/exception_button.plain"
+    button_template_name = "toolbar/exception_button.plain.html"
 
     def __init__(self, context: Context) -> None:
         super().__init__(context)
@@ -110,4 +110,4 @@ class _ExceptionToolbarItem(ToolbarItem):
 @register_toolbar_item
 class _RequestToolbarItem(ToolbarItem):
     name = "Request"
-    panel_template_name = "toolbar/request.plain"
+    panel_template_name = "toolbar/request.plain.html"

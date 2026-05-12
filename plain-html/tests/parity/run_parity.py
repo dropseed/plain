@@ -105,7 +105,7 @@ def run() -> list[ParityResult]:
     for ctx_path in sorted(FIXTURES.glob("*.py")):
         stem = ctx_path.stem
         jinja_path = FIXTURES / f"{stem}.html"
-        plain_path = FIXTURES / f"{stem}.plain"
+        plain_path = FIXTURES / f"{stem}.plain.html"
         if not jinja_path.exists() or not plain_path.exists():
             continue
         ctx_module = _load_context_module(ctx_path)
@@ -118,13 +118,13 @@ def run() -> list[ParityResult]:
                 jinja_out,
                 plain_out,
                 label_a=f"jinja:{stem}.html [{scenario_name}]",
-                label_b=f"plain:{stem}.plain [{scenario_name}]",
+                label_b=f"plain:{stem}.plain.html [{scenario_name}]",
             )
             normalized_diff = _diff(
                 _normalize(jinja_out),
                 _normalize(plain_out),
                 label_a=f"jinja:{stem}.html [{scenario_name}] (normalized)",
-                label_b=f"plain:{stem}.plain [{scenario_name}] (normalized)",
+                label_b=f"plain:{stem}.plain.html [{scenario_name}] (normalized)",
             )
             result = ParityResult(
                 fixture=stem,

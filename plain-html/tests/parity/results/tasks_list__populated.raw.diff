@@ -1,4 +1,4 @@
---- jinja:tasks_list.html [populated]+++ plain:tasks_list.plain [populated]@@ -3,23 +3,21 @@     <h1>Tasks for Dave &amp; Co</h1>
+--- jinja:tasks_list.html [populated]+++ plain:tasks_list.plain.html [populated]@@ -3,23 +3,21 @@     <h1>Tasks for Dave &amp; Co</h1>
      <p class="meta">3 tasks · 1 done</p>
    </header>
 -  

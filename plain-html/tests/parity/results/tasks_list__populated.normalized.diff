@@ -1,4 +1,4 @@
---- jinja:tasks_list.html [populated] (normalized)+++ plain:tasks_list.plain [populated] (normalized)@@ -5,19 +5,19 @@ </header>
+--- jinja:tasks_list.html [populated] (normalized)+++ plain:tasks_list.plain.html [populated] (normalized)@@ -5,19 +5,19 @@ </header>
  <div class="alert" data-severity="info">
  <strong>Migration in progress</strong>
 -<span>Templates marked &#34;done&#34; run under the new engine.</span>

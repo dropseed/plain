@@ -11,7 +11,7 @@ from .models import ContactSubmission
 
 
 class ContactView(FormView):
-    template_name = "contacts/form.plain"
+    template_name = "contacts/form.plain.html"
     form_class = ContactForm
     success_url = reverse_lazy("contacts:success")
 
@@ -28,13 +28,13 @@ class ContactView(FormView):
 
 
 class ContactSuccessView(TemplateView):
-    template_name = "contacts/success.plain"
+    template_name = "contacts/success.plain.html"
 
 
 class ContactArchiveView(TemplateView):
     """Two forms (search + filter) on the same page, distinguished by prefix."""
 
-    template_name = "contacts/archive.plain"
+    template_name = "contacts/archive.plain.html"
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
