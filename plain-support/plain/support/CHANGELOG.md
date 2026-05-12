@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.34.7](https://github.com/dropseed/plain/releases/plain-support@0.34.7) (2026-05-12)
+
+### What's changed
+
+- Adds explicit `plain.assets>=0.1.0,<1.0.0` dependency now that `plain.assets` is a separate package (extracted from `plain` core in 0.142.0). `plain.support` uses `get_asset_url` to link attachments. ([844f46e428](https://github.com/dropseed/plain/commit/844f46e428))
+
+### Upgrade instructions
+
+- No changes required if you're upgrading `plain` in the same step — `plain.assets` comes along as a transitive dependency.
+
 ## [0.34.6](https://github.com/dropseed/plain/releases/plain-support@0.34.6) (2026-05-05)
 
 ### What's changed
