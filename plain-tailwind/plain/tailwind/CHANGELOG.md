@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.23.0) (2026-05-12)
+
+### What's changed
+
+- Entry-point group renamed from `plain.assets.build` to `plain.assets.compile` to match the renamed `plain assets compile` command (see [plain-assets 0.3.0](../../../plain-assets/plain/assets/CHANGELOG.md)). README updated to show `[tool.plain.assets.run]` for `plain tailwind build --minify`. Pins `plain.assets>=0.3.0`. ([3b30b62309](https://github.com/dropseed/plain/commit/3b30b62309))
+
+### Upgrade instructions
+
+- Rename `[tool.plain.assets.build.run]` to `[tool.plain.assets.run]` in your `pyproject.toml`.
+
 ## [0.22.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.22.0) (2026-05-12)
 
 ### What's changed
