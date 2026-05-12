@@ -205,7 +205,6 @@ Plain includes several built-in commands:
 | `plain settings`      | View current settings                    |
 | `plain urls`          | List all URL patterns                    |
 | `plain docs`          | View package documentation               |
-| `plain build`         | Run build commands                       |
 | `plain install`       | Install package dependencies             |
 | `plain upgrade`       | Upgrade Plain packages                   |
 | `plain memory`        | Memory profiling tools                   |

@@ -8,11 +8,19 @@ from pathlib import Path
 import click
 
 import plain.runtime
-from plain.assets.compile import compile_assets, get_compiled_path
+from plain.cli import register_cli
 from plain.cli.print import print_event
 
+from .compile import compile_assets, get_compiled_path
 
-@click.command()
+
+@register_cli("assets")
+@click.group()
+def cli() -> None:
+    """Asset management"""
+
+
+@cli.command()
 @click.option(
     "--keep-original/--no-keep-original",
     "keep_original",
@@ -35,7 +43,7 @@ from plain.cli.print import print_event
     help="Compress the assets",
 )
 def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
-    """Pre-deployment build step for assets and static files"""
+    """Pre-deployment build: run user commands, package build entry points, and compile assets."""
 
     if not keep_original and not fingerprint:
         raise click.UsageError(
@@ -61,12 +69,12 @@ def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
                 click.secho(f"Error in {name} (exit {result.returncode})", fg="red")
                 sys.exit(result.returncode)
 
-    # Then run installed package build steps (like tailwind, typically should run last...)
+    # Then run installed package build steps (like tailwind, esbuild)
     for entry_point in entry_points(group="plain.build"):
         print_event(f"{entry_point.name}...")
         entry_point.load()()
 
-    # Compile our assets
+    # Compile assets
     target_dir = get_compiled_path()
     click.secho(f"Compiling assets to {target_dir}", bold=True)
     if target_dir.exists():
@@ -98,6 +106,3 @@ def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
     click.secho(
         f"\nCompiled {total_files} assets into {total_compiled} files", fg="green"
     )
-
-    # TODO could do a jinja pre-compile here too?
-    # environment.compile_templates() but it needs a target, ignore_errors=False

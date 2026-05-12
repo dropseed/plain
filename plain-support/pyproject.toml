@@ -8,6 +8,7 @@ license = "BSD-3-Clause"
 requires-python = ">=3.13"
 dependencies = [
   "plain>=0.135.0,<1.0.0",
+  "plain.assets<1.0.0",
   "plain.postgres>=0.96.0,<1.0.0",
   "plain.auth>=0.29.0,<1.0.0",
 ]

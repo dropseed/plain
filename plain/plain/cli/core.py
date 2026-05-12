@@ -11,7 +11,6 @@ import plain.runtime
 from plain.exceptions import ImproperlyConfigured
 
 from .agent import agent
-from .build import build
 from .changelog import changelog
 from .check import check
 from .chores import chores
@@ -44,7 +43,6 @@ plain_cli.add_command(agent)
 plain_cli.add_command(preflight_cli)
 plain_cli.add_command(create)
 plain_cli.add_command(chores)
-plain_cli.add_command(build)
 plain_cli.add_command(utils)
 plain_cli.add_command(urls)
 plain_cli.add_command(changelog)

@@ -7,6 +7,7 @@ INSTALLED_PACKAGES = [
     "plain.connect",
     "plain.admin",
     "plain.api",
+    "plain.assets",
     "plain.auth",
     "plain.cache",
     "plain.elements",

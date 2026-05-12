@@ -10,13 +10,6 @@ def test_plain_cli_help():
     assert result.output.startswith("Usage: plain")
 
 
-def test_plain_cli_build():
-    runner = CliRunner()
-    result = runner.invoke(cli, ["build"], prog_name="plain")
-    assert result.exit_code == 0
-    assert "Compiled 0 assets into 0 files" in result.output
-
-
 def test_plain_changelog_plain():
     runner = CliRunner()
     result = runner.invoke(cli, ["changelog", "plain"], prog_name="plain")

@@ -21,6 +21,7 @@ export PLAIN_CLOUD_EXPORT_ENABLED=false
 ALL_PACKAGES="$(cat <<EOF
 plain
 plain-postgres
+plain-assets
 plain-sessions
 plain-jobs
 plain-flags

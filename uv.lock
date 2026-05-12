@@ -8,6 +8,7 @@ members = [
     "plain",
     "plain-admin",
     "plain-api",
+    "plain-assets",
     "plain-auth",
     "plain-cache",
     "plain-cloud",
@@ -214,6 +215,7 @@ dependencies = [
     { name = "plain" },
     { name = "plain-admin" },
     { name = "plain-api" },
+    { name = "plain-assets" },
     { name = "plain-auth" },
     { name = "plain-cache" },
     { name = "plain-code" },
@@ -250,6 +252,7 @@ requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-admin", editable = "plain-admin" },
     { name = "plain-api", editable = "plain-api" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-cache", editable = "plain-cache" },
     { name = "plain-code", editable = "plain-code" },
@@ -836,6 +839,25 @@ dev = [
 ]
 
 [[package]]
+name = "plain-assets"
+version = "0.0.0"
+source = { editable = "plain-assets" }
+dependencies = [
+    { name = "plain" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "plain", editable = "plain" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+
+[[package]]
 name = "plain-auth"
 version = "0.29.5"
 source = { editable = "plain-auth" }
@@ -1003,10 +1025,14 @@ version = "0.8.2"
 source = { editable = "plain-esbuild" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-assets" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
+]
 
 [[package]]
 name = "plain-flags"
@@ -1174,6 +1200,7 @@ source = { editable = "plain-pages" }
 dependencies = [
     { name = "mistune" },
     { name = "plain" },
+    { name = "plain-assets" },
     { name = "pygments" },
     { name = "python-frontmatter" },
 ]
@@ -1187,6 +1214,7 @@ dev = [
 requires-dist = [
     { name = "mistune", specifier = ">=3.0.0" },
     { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "pygments", specifier = ">=2.0.0" },
     { name = "python-frontmatter", specifier = ">=1.0.0" },
 ]
@@ -1371,6 +1399,7 @@ version = "0.34.6"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-assets" },
     { name = "plain-auth" },
     { name = "plain-postgres" },
 ]
@@ -1378,6 +1407,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-postgres", editable = "plain-postgres" },
 ]
@@ -1388,6 +1418,7 @@ version = "0.21.1"
 source = { editable = "plain-tailwind" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-assets" },
     { name = "requests" },
     { name = "tomlkit" },
 ]
@@ -1395,6 +1426,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "requests", specifier = ">=2.0.0" },
     { name = "tomlkit", specifier = ">=0.12.1" },
 ]
@@ -1437,6 +1469,7 @@ version = "0.11.5"
 source = { editable = "plain-vendor" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-assets" },
     { name = "requests" },
     { name = "tomlkit" },
 ]
@@ -1444,6 +1477,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "requests", specifier = ">=2.0.0" },
     { name = "tomlkit", specifier = ">=0.12.1" },
 ]
@@ -1458,6 +1492,7 @@ dev = [
     { name = "plain" },
     { name = "plain-admin" },
     { name = "plain-api" },
+    { name = "plain-assets" },
     { name = "plain-auth" },
     { name = "plain-cache" },
     { name = "plain-cloud" },
@@ -1499,6 +1534,7 @@ dev = [
     { name = "plain", editable = "plain" },
     { name = "plain-admin", editable = "plain-admin" },
     { name = "plain-api", editable = "plain-api" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-cache", editable = "plain-cache" },
     { name = "plain-cloud", editable = "plain-cloud" },

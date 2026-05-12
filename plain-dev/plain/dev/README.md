@@ -116,7 +116,7 @@ Runs:
 
 - `uv lock --check`, if using uv
 - `plain check` (custom commands, code linting, preflight, migrations, tests)
-- `plain build`
+- `plain assets build`
 
 Custom commands can be defined in `pyproject.toml` at `tool.plain.check.run` and will run as part of `plain check`:
 

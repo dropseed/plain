@@ -14,6 +14,7 @@ KNOWN_PACKAGES = {
     "plain": "Web framework core",
     "plain-admin": "Backend admin interface",
     "plain-api": "Class-based API views",
+    "plain-assets": "Serve static assets directly or from a CDN",
     "plain-auth": "User authentication and authorization",
     "plain-cache": "Database-backed cache with optional expiration",
     "plain-code": "Preconfigured code formatting and linting",

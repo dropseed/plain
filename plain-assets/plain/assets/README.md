@@ -1,4 +1,4 @@
-# Assets
+# plain.assets
 
 **Serve static assets (CSS, JS, images, etc.) directly or from a CDN.**
 
@@ -7,6 +7,7 @@
 - [Production deployment](#production-deployment)
 - [Using `AssetView` directly](#using-assetview-directly)
 - [FAQs](#faqs)
+- [Installation](#installation)
 
 ## Overview
 
@@ -36,14 +37,14 @@ Now in your template you can use the `asset()` function to get the URL, which wi
 
 ## Local development
 
-When you're working with `settings.DEBUG = True`, the assets will be served directly from their original location. You don't need to run `plain build` or configure anything else.
+When you're working with `settings.DEBUG = True`, the assets will be served directly from their original location. You don't need to run `plain assets build` or configure anything else.
 
 ## Production deployment
 
 In production, one of your deployment steps should be to compile the assets.
 
 ```bash
-plain build
+plain assets build
 ```
 
 By default, this [generates "fingerprinted" and compressed versions of the assets](./manifest.py#compute_fingerprint), which are then served by your app. This means that a file like `main.css` will result in two new files, like `main.d0db67b.css` and `main.d0db67b.css.gz`.
@@ -83,7 +84,7 @@ url = get_asset_url("css/style.css")
 The generated/copied files are stored in `{repo}/.plain/assets/compiled`. If you need them to be somewhere else, try simply moving them after compilation.
 
 ```bash
-plain build
+plain assets build
 mv .plain/assets/compiled /path/to/your/static
 ```
 
@@ -93,7 +94,7 @@ The steps for this will vary, but the general idea is to compile them, and then 
 
 ```bash
 # Compile the assets
-plain build
+plain assets build
 
 # List the newly compiled files
 ls .plain/assets/compiled
@@ -102,7 +103,7 @@ ls .plain/assets/compiled
 ./example-upload-to-cdn-script
 ```
 
-Use the [`ASSETS_CDN_URL`](../runtime/global_settings.py#ASSETS_CDN_URL) setting to tell the `{{ asset() }}` template function where to point.
+Use the [`ASSETS_CDN_URL`](./default_settings.py#ASSETS_CDN_URL) setting to tell the `{{ asset() }}` template function where to point.
 
 ```python
 # app/settings.py
@@ -126,6 +127,24 @@ By default, 304 Not Modified responses for assets are excluded from the server a
 
 The default behavior is to fingerprint assets, which is an exact copy of the original file but with a different filename. The originals aren't copied over because you should generally always use this fingerprinted path (that automatically uses longer-lived caching).
 
-If you need the originals for any reason, you can use `plain build --keep-original`, though this will typically be combined with `--no-fingerprint` otherwise the fingerprinted files will still get priority in `{{ asset() }}` template calls.
+If you need the originals for any reason, you can use `plain assets build --keep-original`, though this will typically be combined with `--no-fingerprint` otherwise the fingerprinted files will still get priority in `{{ asset() }}` template calls.
 
-Note that by default, the [`ASSETS_REDIRECT_ORIGINAL`](../runtime/global_settings.py#ASSETS_REDIRECT_ORIGINAL) setting is `True`, which will redirect requests for the original file to the fingerprinted file.
+Note that by default, the [`ASSETS_REDIRECT_ORIGINAL`](./default_settings.py#ASSETS_REDIRECT_ORIGINAL) setting is `True`, which will redirect requests for the original file to the fingerprinted file.
+
+## Installation
+
+Install the `plain.assets` package from [PyPI](https://pypi.org/project/plain.assets/):
+
+```bash
+uv add plain.assets
+```
+
+Add to your `INSTALLED_PACKAGES`:
+
+```python
+# app/settings.py
+INSTALLED_PACKAGES = [
+    ...
+    "plain.assets",
+]
+```
