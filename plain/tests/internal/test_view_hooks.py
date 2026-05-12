@@ -32,13 +32,7 @@ class _ListHandler(logging.Handler):
 
 @pytest.fixture
 def request_log():
-    # Import the exact logger instance used in `plain.logs.exceptions`.
-    # `logging.getLogger("plain.request")` is not sufficient — another
-    # test's cleanup may have removed the name from `loggerDict`, in
-    # which case a fresh logger is created while the module-level
-    # binding in `plain.logs.exceptions` still points at the old one.
-    from plain.logs.exceptions import request_logger as logger
-
+    logger = logging.getLogger("plain.request")
     handler = _ListHandler()
     previous_level = logger.level
     logger.addHandler(handler)

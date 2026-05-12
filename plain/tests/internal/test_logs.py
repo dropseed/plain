@@ -344,15 +344,26 @@ class TestLogLevels:
 
 @pytest.fixture(autouse=True)
 def cleanup_loggers():
-    """Clean up loggers after each test to avoid interference."""
+    """Clean up loggers after each test to avoid interference.
+
+    Only delete loggers tests in this file created (`test`, `test.*`,
+    `plain.test.*`). Framework-owned names like `plain.request`,
+    `plain.security.*`, and `plain.server.access` stay in the registry
+    so other tests — and framework code holding module-level Logger
+    references — keep agreeing with `logging.getLogger`.
+    """
     yield
 
-    # Remove custom loggers from the manager
     for logger_name in list(logging.root.manager.loggerDict.keys()):
-        if logger_name.startswith(("plain", "app", "test")):
+        if (
+            logger_name == "test"
+            or logger_name.startswith("test.")
+            or logger_name.startswith("plain.test")
+        ):
             del logging.root.manager.loggerDict[logger_name]
 
-    # Clear handlers from any remaining loggers
+    # Clear handlers from framework loggers that tests in this file
+    # attach to directly.
     for logger_name in ["plain", "app"]:
         logger = logging.getLogger(logger_name)
         for handler in logger.handlers[:]:

@@ -114,14 +114,11 @@ def test_exception_log_records_request_path(error_client):
     (and add `request.raw_path` for the original); both observability sites
     automatically pick up the new value because they already share a source.
 
-    Attach the capture handler to the framework's module-cached logger
-    instance (`plain.logs.exceptions.request_logger`) rather than fetching
-    via `logging.getLogger`, since other tests may have evicted that name
-    from the logger registry.
+    Attach via the canonical `logging.getLogger("plain.request")` lookup —
+    the framework fetches its logger the same way each request, so any
+    handler attached here reliably catches its records.
     """
     import logging
-
-    from plain.logs.exceptions import request_logger
 
     records: list[logging.LogRecord] = []
 
@@ -130,12 +127,13 @@ def test_exception_log_records_request_path(error_client):
             records.append(record)
 
     handler = _Capture(level=logging.ERROR)
+    request_logger = logging.getLogger("plain.request")
     request_logger.addHandler(handler)
     try:
         error_client.get("/plain-500/")
     finally:
         request_logger.removeHandler(handler)
 
-    server_errors = [r for r in records if r.message == "Server error"]
+    server_errors = [r for r in records if r.getMessage() == "Server error"]
     assert server_errors, "Expected a 'Server error' log record from plain.request"
     assert getattr(server_errors[-1], "path") == "/plain-500/"
