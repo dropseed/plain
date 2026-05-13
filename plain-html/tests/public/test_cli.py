@@ -111,3 +111,62 @@ def test_check_reports_multiple_errors_across_files(tmp_path: Path) -> None:
     assert str(a) in result.output
     assert str(b) in result.output
     assert "2 errors found" in result.output
+
+
+def test_format_writes_changes(tmp_path: Path) -> None:
+    path = _write(tmp_path, "f.html", "<div><p>hi</p></div>")
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["format", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "1 reformatted" in result.output
+    assert path.read_text() == "<div>\n    <p>hi</p>\n</div>\n"
+
+
+def test_format_leaves_already_formatted_files_untouched(tmp_path: Path) -> None:
+    formatted = "<div>\n    <p>hi</p>\n</div>\n"
+    path = _write(tmp_path, "f.html", formatted)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["format", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "0 reformatted" in result.output
+    assert path.read_text() == formatted
+
+
+def test_format_check_exits_nonzero_when_changes_pending(tmp_path: Path) -> None:
+    path = _write(tmp_path, "f.html", "<div><p>hi</p></div>")
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["format", "--check", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert "would reformat" in result.output
+    # --check must not write to disk
+    assert path.read_text() == "<div><p>hi</p></div>"
+
+
+def test_format_check_exits_zero_when_already_formatted(tmp_path: Path) -> None:
+    _write(tmp_path, "f.html", "<div>\n    <p>hi</p>\n</div>\n")
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["format", "--check", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "All templates already formatted" in result.output
+
+
+def test_format_skips_unparseable_files(tmp_path: Path) -> None:
+    bad = _write(tmp_path, "bad.html", "<div><p>hello\n</div>\n")
+    ok = _write(tmp_path, "ok.html", "<div><p>hi</p></div>")
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["format", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert "skipped" in result.output
+    assert str(bad) in result.output
+    # The valid file should still be reformatted.
+    assert ok.read_text() == "<div>\n    <p>hi</p>\n</div>\n"

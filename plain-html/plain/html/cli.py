@@ -9,6 +9,7 @@ import click
 from plain.cli import register_cli
 from plain.cli.print import print_event
 
+from .format import format_source
 from .frontmatter import split as split_frontmatter
 from .loader import get_html_dirs
 from .parser import ParseError, parse
@@ -47,6 +48,65 @@ def check(paths: tuple[Path, ...]) -> None:
         )
         sys.exit(1)
     click.secho("All templates checked", fg="green")
+
+
+@cli.command(name="format")
+@click.argument("paths", nargs=-1, type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--check",
+    "check_only",
+    is_flag=True,
+    help="Exit non-zero if files would change; do not write",
+)
+def format_cmd(paths: tuple[Path, ...], check_only: bool) -> None:
+    """Format .html templates in place"""
+    files = _collect_files(paths)
+    if not files:
+        click.secho("No .html templates found", fg="yellow")
+        return
+
+    print_event(f"Formatting {len(files)} template(s)...")
+
+    changed: list[Path] = []
+    skipped: list[tuple[Path, Exception]] = []
+    for path in files:
+        source = path.read_text(encoding="utf-8")
+        try:
+            out = format_source(source)
+        except (TokenizeError, ParseError) as e:
+            skipped.append((path, e))
+            continue
+        if out != source:
+            changed.append(path)
+            if not check_only:
+                path.write_text(out, encoding="utf-8")
+
+    for path, exc in skipped:
+        click.echo(f"{path}: skipped — {exc}", err=True)
+
+    verb = "would reformat" if check_only else "reformatted"
+    for path in changed:
+        click.echo(f"{verb}: {path}")
+
+    if check_only and changed:
+        click.secho(
+            f"\n{len(changed)} file{'s' if len(changed) != 1 else ''} would be reformatted",
+            fg="red",
+            err=True,
+        )
+        sys.exit(1)
+
+    if not check_only:
+        unchanged = len(files) - len(changed) - len(skipped)
+        click.secho(
+            f"\n{len(changed)} reformatted, {unchanged} unchanged"
+            + (f", {len(skipped)} skipped" if skipped else ""),
+            fg="green" if not skipped else "yellow",
+        )
+        if skipped:
+            sys.exit(1)
+    elif not changed:
+        click.secho("All templates already formatted", fg="green")
 
 
 def _collect_files(paths: tuple[Path, ...]) -> list[Path]:
