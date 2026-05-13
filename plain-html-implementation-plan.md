@@ -519,6 +519,70 @@ Plan complete when:
 - **Type-checker (ty) instability**. Mitigation: pin a specific ty version in `plain.html/pyproject.toml`; pyright fallback per Phase 9; result caching reduces dependency on subprocess speed.
 - **Cache invalidation bugs around `:include` graph**. Mitigation: tests in Phase 5 specifically exercise transitive-include invalidation. If it gets flaky, the agent can wipe `.plain-html-cache/` and re-run — no correctness lost, only recompile cost.
 
+## Rip-out plan (post-merge addendum)
+
+The migration above was designed to run two engines in parallel for a long
+window. Decision reversal: we're going option-3 instead — there is no
+permanent two-engine cohabitation. plain-templates exits as a package.
+
+End state:
+
+- **Extension** is `.html`, not `.plain.html`. Editors highlight as HTML
+  automatically; no infix needed once Jinja is gone.
+- **Directory** is `html/`, not `templates/`. Each package has a
+  `<pkg>/html/` directory containing only plain.html templates.
+- **No per-package `templates.py` / `html.py` registration file.**
+  plain.html templates declare what they use via frontmatter `imports:`.
+  The only persistent registry is plain.html-core defaults (`url`,
+  `asset`, request helpers) — small and stable.
+- **`TemplateView` family** (`TemplateView`, `FormView`, `DetailView`,
+  `ListView`, `UpdateView`, `DeleteView`) lives in
+  `plain-html/plain/html/views.py`. Core only ships `View` and
+  `Response`.
+- **Direct callers** (toolbar items, admin value rendering, htmx
+  fragments, error page) call `plain.html.render(path, ctx)` — the
+  `plain.templates.Template` shim goes away.
+- **Non-HTML rendering** (email subjects, plain-text bodies, any other
+  string templating) uses Python f-strings or t-strings. No template
+  engine indirection for non-HTML.
+
+Sequence (option-3 rip-out):
+
+1. **Loader standalone** — `plain.html.loader` owns its own
+   `get_html_dirs()` discovery (walks `<package>/html/`). Drop the
+   `from plain.templates.jinja.environments import get_template_dirs`
+   import. Lookup keys are `<name>.html` in `html/`; transitional
+   fallback to `<name>.plain.html` in `templates/` while packages
+   migrate.
+2. **Per-package migration recipe** — one package at a time,
+   smallest-surface first (plain-tailwind, plain-htmx, plain-pageviews,
+   plain-sessions, plain-email, plain-loginlink, plain-oauth,
+   plain-pages, plain-support, plain-passwords, plain-toolbar,
+   plain-admin, plain-observer, plain-flags, plain-jobs,
+   plain-redirection, example): - `mv templates/<pkg>/foo.plain.html html/<pkg>/foo.html` - Delete the old `.html` Jinja sibling - Audit the template's `{...}` expressions; add an `imports:`
+   frontmatter block for every helper that came from the global
+   registry - Move any Python-side helper functions out of `_shims.py` into the
+   package's normal module surface (so `from plain.tailwind import
+tailwind_css` works from a template's `imports:` block) - Delete the package's `templates.py` once nothing references it
+3. **Port the 14 remaining Jinja-only holdouts** (admin/ui.html,
+   admin/\_base.html, observer main UI, toolbar inject + exception, the
+   three admin model forms, the two card.html files,
+   example/\_macros.html — likely refactor macros to Python helpers).
+4. **Move `TemplateView` family** to `plain-html/plain/html/views.py`.
+   Update ~50 view imports across the repo.
+5. **Switch direct `Template(...)` callers** to `plain.html.render`.
+   Drop `plain.templates.Template`.
+6. **Build a plain.html fragment story** for the htmx
+   `{% htmxfragment %}` mechanism (currently stubbed with
+   `NotImplementedError` for `.plain.html`).
+7. **Delete `plain-templates`** — Jinja runtime, env, extensions,
+   filters, globals, registration APIs, views — all gone. Drop the
+   workspace member, drop the dep from every package.
+8. **`/plain-upgrade` rules** — rewrite `from plain.templates import …`
+   → `from plain.html import …`, rewrite template paths in `Template()`
+   / `TemplateView.template_name`, rewrite `.html` template-name
+   strings if needed.
+
 ## Agent execution notes
 
 - **One phase at a time.** Do not start Phase N+1 until Phase N's success criteria are met.
