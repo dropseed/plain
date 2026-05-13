@@ -1,5 +1,16 @@
 # plain-support changelog
 
+## [0.34.9](https://github.com/dropseed/plain/releases/plain-support@0.34.9) (2026-05-13)
+
+### What's changed
+
+- Updated route definitions to the no-slash convention introduced in `plain` 0.145.0. Canonical support form URLs now follow the project's `URLS_TRAILING_SLASH` setting. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- Fixed the support embed iframe URL — `embed.js` now builds `/form/<slug>/iframe` instead of `/form/<slug>/iframe/`, avoiding a 308 round-trip on every embed under the new `URLS_TRAILING_SLASH=False` default. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+
+### Upgrade instructions
+
+- Bust the cached `embed.js` if your embedded forms were going through the 308 redirect (clear CDN cache or re-deploy assets).
+
 ## [0.34.8](https://github.com/dropseed/plain/releases/plain-support@0.34.8) (2026-05-12)
 
 ### What's changed
