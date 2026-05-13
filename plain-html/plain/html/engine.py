@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import keyword
 import os
+from collections.abc import Iterable
 from pathlib import Path
+from typing import cast
 
 from plain.utils.html import conditional_escape
 from plain.utils.safestring import SafeString, mark_safe
@@ -136,7 +138,7 @@ def _render_element(
         _emit_element(node, scope, source_path, root_ctx, out)
         return
 
-    iterable = _eval(node.for_clause.iter_code, scope)
+    iterable = cast(Iterable[object], _eval(node.for_clause.iter_code, scope))
     names = node.for_clause.targets
     for item in iterable:
         inner = dict(scope)
@@ -192,11 +194,11 @@ def _render_include(
     else collects in the `default` slot. `<template slot="name">` wrappers
     contribute their children (without the wrapper itself).
     """
-    path_name = (
-        node.include_path
-        if node.include_path is not None
-        else str(_eval(node.include_path_code, scope))
-    )
+    if node.include_path is not None:
+        path_name = node.include_path
+    else:
+        assert node.include_path_code is not None
+        path_name = str(_eval(node.include_path_code, scope))
     target_path = find_template(path_name, current_template=source_path)
 
     slots: dict[str, list[Node]] = {"default": []}
@@ -325,7 +327,7 @@ def _eval(code: str, scope: dict) -> object:
         raise RenderError(f"Error evaluating {code!r}: {e}") from e
 
 
-def _flatten(value: object):
+def _flatten(value: object) -> Iterable[object]:
     """Yield items from arbitrarily nested lists/tuples; pass-through scalars."""
     if isinstance(value, list | tuple):
         for item in value:
@@ -339,7 +341,7 @@ def _bind_targets(scope: dict, names: list[str], item: object) -> None:
     if len(names) == 1:
         scope[names[0]] = item
         return
-    values = list(item)
+    values = list(cast(Iterable[object], item))
     if len(values) != len(names):
         raise RenderError(f"Cannot unpack {len(values)} values into {len(names)} names")
     for n, v in zip(names, values, strict=True):

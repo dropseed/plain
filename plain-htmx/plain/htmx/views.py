@@ -27,6 +27,15 @@ class HTMXView(TemplateView):
         context = self.get_template_context()
 
         if self.is_htmx_request() and self.get_htmx_fragment_name():
+            if template._jinja_template is None:
+                # The {% htmxfragment %} mechanism is a Jinja extension.
+                # plain.html fragment rendering is not yet implemented.
+                raise NotImplementedError(
+                    f"HTMX fragment rendering is not supported for plain.html "
+                    f"templates yet (template={template.filename!r}). Keep the "
+                    f"template on the Jinja .html engine until the plain.html "
+                    f"fragment story lands."
+                )
             return render_template_fragment(
                 template=template._jinja_template,
                 fragment_name=self.get_htmx_fragment_name(),

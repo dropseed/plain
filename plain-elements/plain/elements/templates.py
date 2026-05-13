@@ -16,26 +16,41 @@ from plain.utils.safestring import SafeString, mark_safe
 
 @pass_context
 def Element(ctx: Context, _element_name: str, **kwargs: Any) -> SafeString:
-    from plain.templates import Template
-
     element_path_name = _element_name.replace(".", os.sep)
-    # Goes through plain.templates.Template so `.plain` versions are picked
-    # up via the same `.html` → `.plain` fallback that views use.
-    template = Template(f"elements/{element_path_name}.html")
 
     if "caller" in kwargs and "children" not in kwargs:
         # If we have a caller, we need to pass it as the children
         kwargs["children"] = kwargs["caller"]()
 
-    output = template.render(
-        {
-            # Note that this passes globals, but not things like loop variables
-            # so for the most part you need to manually pass the kwargs you want
-            **ctx.get_all(),
-            **kwargs,
-        }
-    )
-    return mark_safe(output)
+    context = {
+        # Note that this passes globals, but not things like loop variables
+        # so for the most part you need to manually pass the kwargs you want
+        **ctx.get_all(),
+        **kwargs,
+    }
+
+    # Prefer a .plain.html element if plain.html is installed and a matching
+    # template exists on disk — this is what lets `<admin.X>` element tags in
+    # Jinja templates transparently pick up plain.html ports during migration.
+    try:
+        from plain.html import render as plain_render
+        from plain.html.loader import TemplateNotFound, find_template
+
+        try:
+            plain_path = find_template(f"elements/{element_path_name}")
+        except TemplateNotFound:
+            plain_path = None
+    except ImportError:
+        plain_path = None
+
+    if plain_path is not None:
+        return mark_safe(plain_render(plain_path, context))
+
+    # Fall back to the Jinja environment attached to the current context.
+    # Using `ctx.environment` (rather than the package-global environment)
+    # means tests with custom DictLoader envs continue to work.
+    template = ctx.environment.get_template(f"elements/{element_path_name}.html")
+    return mark_safe(template.render(context))
 
 
 @register_template_extension

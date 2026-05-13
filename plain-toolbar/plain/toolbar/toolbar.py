@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
-
-from jinja2.runtime import Context
 
 from plain.runtime import settings
 from plain.templates import Template
@@ -26,7 +25,7 @@ except ImportError:
 
 
 class Toolbar:
-    def __init__(self, context: Context) -> None:
+    def __init__(self, context: Mapping[str, Any]) -> None:
         self.context = context
         self.request: Request = context["request"]
         self.version: str = settings.VERSION
@@ -55,7 +54,7 @@ class ToolbarItem:
     panel_template_name: str = ""
     button_template_name: str = ""
 
-    def __init__(self, context: Context) -> None:
+    def __init__(self, context: Mapping[str, Any]) -> None:
         self.context = context
         self.request: Request = context["request"]
 
@@ -86,7 +85,7 @@ class _ExceptionToolbarItem(ToolbarItem):
     panel_template_name = "toolbar/exception.html"
     button_template_name = "toolbar/exception_button.plain.html"
 
-    def __init__(self, context: Context) -> None:
+    def __init__(self, context: Mapping[str, Any]) -> None:
         super().__init__(context)
         exception = sys.exception()
         if exception:

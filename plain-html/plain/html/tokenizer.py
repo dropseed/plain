@@ -12,6 +12,7 @@ Out of scope for Phase 0:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import cast
 
 _OPAQUE_BODY_TAGS = frozenset({"script", "style"})
 
@@ -312,11 +313,12 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
                 raise TokenizeError(f"Expected attribute value at offset {i}")
 
             ac = source[i]
+            segments: list[AttrText | AttrExpr]
             if ac == '"' or ac == "'":
                 segments, i = _consume_quoted_attr(source, i, ac)
             elif ac == "{":
                 expr, i = _consume_expr(source, i)
-                segments = [AttrExpr(expr)]
+                segments = cast("list[AttrText | AttrExpr]", [AttrExpr(expr)])
             else:
                 val_start = i
                 while (
@@ -325,7 +327,9 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
                     and not source.startswith("/>", i)
                 ):
                     i += 1
-                segments = [AttrText(source[val_start:i])]
+                segments = cast(
+                    "list[AttrText | AttrExpr]", [AttrText(source[val_start:i])]
+                )
             attrs.append(Attribute(name=attr_name, segments=segments))
         else:
             attrs.append(Attribute(name=attr_name, segments=None))

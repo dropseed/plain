@@ -55,8 +55,12 @@ class Template:
 
     @staticmethod
     def _find_plain(name: str) -> Path | None:
-        from plain.html.loader import TemplateNotFound, find_template
-
+        try:
+            from plain.html.loader import TemplateNotFound, find_template
+        except ImportError:
+            # plain.html is an optional companion during migration —
+            # without it, fall through to Jinja resolution.
+            return None
         try:
             return find_template(name)
         except TemplateNotFound:

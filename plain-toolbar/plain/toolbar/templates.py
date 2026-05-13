@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 
 from jinja2.runtime import Context
 
@@ -16,5 +17,7 @@ class ToolbarExtension(InclusionTagExtension):
     template_name = "toolbar/toolbar.html"
 
     def get_context(self, context: Context, *args: Any, **kwargs: Any) -> Context:
-        context.vars["toolbar"] = Toolbar(context=context)
+        # Jinja's Context behaves like a Mapping at runtime but doesn't
+        # declare so in its type stubs — cast to satisfy Toolbar's signature.
+        context.vars["toolbar"] = Toolbar(context=cast(Mapping[str, Any], context))
         return context

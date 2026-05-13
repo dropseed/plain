@@ -197,7 +197,7 @@ class CreateView(FormView):
 
     def form_valid(self, form: BaseForm) -> Response:
         """If the form is valid, save the associated model."""
-        self.object = form.save()  # ty: ignore[unresolved-attribute]
+        self.object = form.save()  # ty: ignore[call-non-callable]
         return super().form_valid(form)
 
 
@@ -261,7 +261,7 @@ class UpdateView(DetailView, FormView):
 
     def form_valid(self, form: BaseForm) -> Response:
         """If the form is valid, save the associated model."""
-        form.save()  # ty: ignore[unresolved-attribute]
+        form.save()  # ty: ignore[call-non-callable]
         return super().form_valid(form)
 
     def get_form_kwargs(self) -> dict[str, Any]:
@@ -295,7 +295,7 @@ class DeleteView(DetailView, FormView):
 
     def form_valid(self, form: BaseForm) -> Response:
         """If the form is valid, save the associated model."""
-        form.save()  # ty: ignore[unresolved-attribute]
+        form.save()  # ty: ignore[call-non-callable]
         return super().form_valid(form)
 
 
