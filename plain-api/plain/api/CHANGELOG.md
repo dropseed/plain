@@ -1,5 +1,16 @@
 # plain-api changelog
 
+## [0.33.5](https://github.com/dropseed/plain/releases/plain-api@0.33.5) (2026-05-13)
+
+### What's changed
+
+- **OpenAPI schema honors the canonical trailing slash.** `path_from_url_pattern` now appends `/` based on `url_pattern.trailing_slash` (driven by `URLS_TRAILING_SLASH` + per-route `force_trailing_slash`) instead of trusting the raw route string. Under the new `URLS_TRAILING_SLASH=False` default, schema paths render without trailing slashes; flip the setting to `True` to keep slashed paths in the spec. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- Switched the generator from `url_pattern.route.converters` to `url_pattern.converters` (the `Route` dataclass was removed in `plain` 0.145.0). ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+
+### Upgrade instructions
+
+- No changes required. Existing schema consumers will see paths without trailing slashes unless `URLS_TRAILING_SLASH = True` is set.
+
 ## [0.33.4](https://github.com/dropseed/plain/releases/plain-api@0.33.4) (2026-05-13)
 
 ### What's changed
