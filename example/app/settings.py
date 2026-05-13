@@ -13,6 +13,7 @@ INSTALLED_PACKAGES = [
     "plain.elements",
     "plain.email",
     "plain.flags",
+    "plain.html",
     "plain.htmx",
     "plain.jobs",
     "plain.loginlink",
