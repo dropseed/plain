@@ -18,6 +18,24 @@ class Router:
     urls: list
 
 
+def _normalize_include_route(route: str) -> str:
+    """Strip leading/trailing slashes; append a trailing slash if non-empty.
+
+    `include("admin")`, `include("admin/")`, and `include("/admin/")` all
+    collapse to `"admin/"`. The empty string stays empty (root include).
+
+    Routes that still look like regex residue after stripping (`^`, `$`,
+    `(?P<`) skip the trailing-slash append, so `RoutePattern.preflight()`
+    can still surface `urls.path_migration_warning`.
+    """
+    stripped = route.strip("/")
+    if not stripped:
+        return ""
+    if "(?P<" in stripped or stripped.startswith("^") or stripped.endswith("$"):
+        return stripped
+    return f"{stripped}/"
+
+
 def include(
     route: str | re.Pattern, router_or_urls: list | tuple | str | type[Router]
 ) -> URLResolver:
@@ -25,7 +43,7 @@ def include(
     Include URLs from another module or a nested list of URL patterns.
     """
     if isinstance(route, str):
-        pattern = RoutePattern(route, is_endpoint=False)
+        pattern = RoutePattern(_normalize_include_route(route), is_endpoint=False)
     elif isinstance(route, re.Pattern):
         pattern = RegexPattern(route.pattern, is_endpoint=False)
     else:
@@ -58,7 +76,10 @@ def path(route: str | re.Pattern, view_class: type, *, name: str = "") -> URLPat
     Map a URL pattern to a view class.
     """
     if isinstance(route, str):
-        pattern = RoutePattern(route, name=name, is_endpoint=True)
+        # Strip leading slashes; trailing slash is part of the route's
+        # canonical form (defining `path("users/")` vs `path("users")`
+        # determines the URL the framework redirects to).
+        pattern = RoutePattern(route.lstrip("/"), name=name, is_endpoint=True)
     elif isinstance(route, re.Pattern):
         pattern = RegexPattern(route.pattern, name=name, is_endpoint=True)
     else:

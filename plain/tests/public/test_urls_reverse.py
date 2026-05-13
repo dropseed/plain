@@ -65,12 +65,12 @@ def test_reverse_through_nested_include(boundary_router):
 
 
 def test_reverse_through_boundary_include_no_slash(boundary_router):
-    """`include("admin-boundary", ...)` (no trailing slash) — pin what reverse() does.
+    """`include("admin-boundary", ...)` is normalized to `include("admin-boundary/", ...)`.
 
-    Step #1 of the URL routing arc normalizes `include("admin-boundary")` to
-    `include("admin-boundary/")`. Today's behavior pinned here may flip then.
+    Constructors strip leading/trailing slashes and append `/` for
+    non-empty prefixes, so this is equivalent to the canonical form.
     """
-    assert reverse("admin-boundary:home") == "/admin-boundaryhome/"
+    assert reverse("admin-boundary:home") == "/admin-boundary/home/"
 
 
 def test_reverse_through_root_include(boundary_router):
@@ -79,15 +79,11 @@ def test_reverse_through_root_include(boundary_router):
 
 
 def test_reverse_through_leading_slash_include(boundary_router):
-    """`include("/admin-leading/", ...)` produces a broken URL via `reverse()`.
+    """`include("/admin-leading/", ...)` — leading slash is stripped.
 
-    `reverse()` joins `/` (root prefix) with the include pattern, then
-    `escape_leading_slashes` (a scheme-relative-URL safety pass) percent-encodes
-    the doubled leading slash → `/%2Fadmin-leading/home/`. Step #1 normalizes
-    leading slashes off include() arguments; after that this returns
-    `/admin-leading/home/` cleanly.
+    `reverse()` produces the same URL as `include("admin-leading/", ...)`.
     """
-    assert reverse("admin-leading:home") == "/%2Fadmin-leading/home/"
+    assert reverse("admin-leading:home") == "/admin-leading/home/"
 
 
 def test_reverse_unknown_name_raises(slash_router):

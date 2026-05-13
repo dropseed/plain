@@ -6,7 +6,6 @@ from typing import Any
 
 from plain.exceptions import ImproperlyConfigured
 from plain.preflight import PreflightResult
-from plain.runtime import settings
 from plain.utils.regex_helper import _lazy_re_compile
 
 from .converters import _get_converter
@@ -25,27 +24,6 @@ class CheckURLMixin:
         if self.name:
             description += f" [name='{self.name}']"
         return description
-
-    def _check_pattern_startswith_slash(self) -> list[PreflightResult]:
-        """
-        Check that the pattern does not begin with a forward slash.
-        """
-        regex_pattern = self.regex.pattern
-        if not settings.APPEND_SLASH:
-            # Skip check as it can be useful to start a URL pattern with a slash
-            # when APPEND_SLASH=False.
-            return []
-        if regex_pattern.startswith(("/", "^/", "^\\/")) and not regex_pattern.endswith(
-            "/"
-        ):
-            warning = PreflightResult(
-                fix=f"URL pattern {self.describe()} starts with unnecessary '/'. Remove the leading slash.",
-                warning=True,
-                id="urls.pattern_starts_with_slash",
-            )
-            return [warning]
-        else:
-            return []
 
 
 class RegexPattern(CheckURLMixin):
@@ -74,11 +52,30 @@ class RegexPattern(CheckURLMixin):
         return None
 
     def preflight(self) -> list[PreflightResult]:
-        warnings = []
+        warnings: list[PreflightResult] = []
         warnings.extend(self._check_pattern_startswith_slash())
         if not self._is_endpoint:
             warnings.extend(self._check_include_trailing_dollar())
         return warnings
+
+    def _check_pattern_startswith_slash(self) -> list[PreflightResult]:
+        """`path()` and `include()` normalize away leading slashes from string
+        routes, so this warning only fires for `re.Pattern` routes — the
+        only path through which a leading-slash pattern can still reach the
+        resolver and silently fail to match.
+        """
+        regex_pattern = self.regex.pattern
+        if regex_pattern.startswith(("/", "^/", "^\\/")) and not regex_pattern.endswith(
+            "/"
+        ):
+            return [
+                PreflightResult(
+                    fix=f"URL pattern {self.describe()} starts with unnecessary '/'. Remove the leading slash.",
+                    warning=True,
+                    id="urls.pattern_starts_with_slash",
+                )
+            ]
+        return []
 
     def _check_include_trailing_dollar(self) -> list[PreflightResult]:
         regex_pattern = self.regex.pattern
@@ -180,7 +177,7 @@ class RoutePattern(CheckURLMixin):
         return None
 
     def preflight(self) -> list[PreflightResult]:
-        warnings = self._check_pattern_startswith_slash()
+        warnings: list[PreflightResult] = []
         route = self._route
         if "(?P<" in route or route.startswith("^") or route.endswith("$"):
             warnings.append(

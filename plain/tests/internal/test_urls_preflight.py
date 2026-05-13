@@ -1,21 +1,23 @@
 """Pin URL preflight check behavior.
 
 Internal because these tests pin which checks fire for which patterns —
-implementation surface that will shift as the URL routing arc lands:
+implementation surface that will shift as the URL routing arc lands.
 
-- `urls.pattern_starts_with_slash` — currently scoped to `APPEND_SLASH=True`
-  (see `urls/patterns.py:34-37`). Step #1 makes leading slashes silently
-  normalize, so the check changes meaning (or goes away).
-- `urls.include_pattern_ends_with_dollar` — independent of slash changes,
-  but still pinned for completeness.
-- `urls.pattern_name_contains_colon` — same.
+- `urls.pattern_starts_with_slash` — fires for `re.Pattern` routes that
+  start with `/`. String routes are normalized at construction so the
+  check is unreachable for them, but regex routes bypass normalization
+  and can still trip the root resolver.
+- `urls.include_pattern_ends_with_dollar` — fires for regex includes
+  that anchor with `$`, which would prevent the resolver from
+  continuing to child patterns.
+- `urls.pattern_name_contains_colon` — names with `:` clash with the
+  namespace separator and break `reverse()`.
 """
 
 from __future__ import annotations
 
 import re
 
-from plain.runtime import settings
 from plain.urls import include, path
 from plain.views import View
 
@@ -29,37 +31,45 @@ def _pattern_ids(results):
     return {r.id for r in results}
 
 
-def test_pattern_starts_with_slash_fires_with_append_slash_on():
-    original = settings.APPEND_SLASH
-    settings.APPEND_SLASH = True
-    try:
-        url = path("/admin/", _View)
-        results = url.preflight()
-    finally:
-        settings.APPEND_SLASH = original
-    assert "urls.pattern_starts_with_slash" in _pattern_ids(results)
+def test_path_with_leading_slash_emits_no_warning():
+    """The constructor silently normalizes; no preflight noise.
 
-
-def test_pattern_starts_with_slash_silent_when_append_slash_off():
-    """`APPEND_SLASH=False` deliberately skips this check.
-
-    Reasoning at `urls/patterns.py:34-37`: when APPEND_SLASH is off, leading
-    slashes can be useful. Step #2 removes `APPEND_SLASH` entirely; this
-    check needs to be re-thought.
+    Before step #1 this fired `urls.pattern_starts_with_slash`. Now the
+    leading slash is stripped at construction time and there's nothing
+    to warn about.
     """
-    original = settings.APPEND_SLASH
-    settings.APPEND_SLASH = False
-    try:
-        url = path("/admin/", _View)
-        results = url.preflight()
-    finally:
-        settings.APPEND_SLASH = original
-    assert "urls.pattern_starts_with_slash" not in _pattern_ids(results)
+    url = path("/admin/", _View)
+    assert _pattern_ids(url.preflight()) == set()
 
 
-def test_pattern_starts_with_slash_silent_for_canonical_route():
-    """No leading slash → no warning."""
-    url = path("admin/", _View)
+def test_include_with_dollar_residue_still_fires_migration_warning():
+    """`include("admin/$", ...)` keeps the `$` so the migration warning fires.
+
+    The normalizer would otherwise append `/` and turn `admin/$` into
+    `admin/$/`, silencing `urls.path_migration_warning` even though the
+    route would match a literal `$` segment.
+    """
+    resolver = include("admin/$", [path("home/", _View)])
+    assert "urls.path_migration_warning" in _pattern_ids(resolver.pattern.preflight())
+
+
+def test_include_with_caret_residue_still_fires_migration_warning():
+    """`include("^admin", ...)` keeps the `^` for the same reason."""
+    resolver = include("^admin", [path("home/", _View)])
+    assert "urls.path_migration_warning" in _pattern_ids(resolver.pattern.preflight())
+
+
+def test_regex_pattern_with_leading_slash_fires():
+    """`re.Pattern` routes bypass `path()`/`include()` normalization, so a
+    leading slash silently fails to match against the resolver. The
+    preflight warning is the only place users get told.
+    """
+    url = path(re.compile(r"^/admin"), _View)
+    assert "urls.pattern_starts_with_slash" in _pattern_ids(url.preflight())
+
+
+def test_regex_pattern_without_leading_slash_is_silent():
+    url = path(re.compile(r"^admin"), _View)
     assert "urls.pattern_starts_with_slash" not in _pattern_ids(url.preflight())
 
 

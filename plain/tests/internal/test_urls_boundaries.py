@@ -1,16 +1,18 @@
-"""Pin current `include()` / `path()` slash-boundary behavior.
+"""Pin `include()` / `path()` slash-boundary normalization.
 
-Internal because these are change-detector tests — the assertions pin
-implementation quirks that step #1 of the URL routing arc is designed to
-fix. Won't survive the rewrite; that's the point.
+Internal because these tests cover implementation surface — how route
+strings are normalized inside the constructors before becoming regex
+patterns. The user-facing `reverse()` round-trips live in the public
+test file.
 
-Quirks pinned:
-- `include("admin-boundary")` (no trailing slash) is **broken**: GET requests
-  to `/admin-boundary/home/` don't resolve because the resolver passes
-  `/home/` to the child (with leading slash), and the child pattern expects
-  `home/` (no leading slash).
-- `path("/leading-slash/", ...)` works at request time (the leading slash
-  is incorporated into the regex), but fires a preflight warning.
+After step #1 of the URL routing arc:
+- `include()` strips leading/trailing slashes and forces a single
+  trailing slash on non-empty prefixes, so `include("admin")`,
+  `include("admin/")`, and `include("/admin/")` all produce the same
+  routes.
+- `path()` strips leading slashes, so `path("/users/")` is equivalent
+  to `path("users/")`. Trailing slashes are still meaningful (decided
+  by `urls-trailing-slash-convention`).
 """
 
 from __future__ import annotations
@@ -37,25 +39,27 @@ def test_canonical_include_nested_with_param(boundary_client):
     assert response.content == b"user-42"
 
 
-def test_boundary_include_without_slash_is_silently_broken(boundary_client):
-    """`include("admin-boundary", ...)` — no trailing slash → child routes don't resolve.
+def test_include_without_trailing_slash_resolves(boundary_client):
+    """`include("admin-boundary", ...)` — missing trailing slash is normalized.
 
-    Step #1 normalizes this to `include("admin-boundary/", ...)` and the
-    assertion flips to 200. Today: 404.
+    The constructor appends `/`, so `include("admin-boundary")` resolves
+    children at `/admin-boundary/...` just like `include("admin-boundary/")`
+    would.
     """
     response = boundary_client.get("/admin-boundary/home/")
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.content == b"hello"
 
 
-def test_boundary_include_concatenates_path(boundary_client):
-    """`include("admin-boundary")` + child `path("home/")` resolves at `/admin-boundaryhome/`.
+def test_include_without_slash_no_longer_concatenates(boundary_client):
+    """The old quirk (`/admin-boundaryhome/` resolving) is gone.
 
-    Demonstrates the silent corruption — there's no boundary between the
-    include prefix and the child route. Step #1 makes this resolve at the
-    expected `/admin-boundary/home/` instead.
+    Before step #1 the include prefix `admin-boundary` and child
+    `home/` joined without a separator. After normalization the include
+    pattern always ends with `/`, so the concatenated form is a 404.
     """
     response = boundary_client.get("/admin-boundaryhome/")
-    assert response.status_code == 200
+    assert response.status_code == 404
 
 
 def test_root_include_resolves(boundary_client):
@@ -65,25 +69,23 @@ def test_root_include_resolves(boundary_client):
     assert response.content == b"hello"
 
 
-def test_leading_slash_on_include_does_not_resolve(boundary_client):
-    """`include("/admin-leading/", ...)` — leading slash on the include argument.
+def test_include_with_leading_slash_resolves(boundary_client):
+    """`include("/admin-leading/", ...)` — leading slash is stripped.
 
-    Symmetric to `path("/leading-slash/", ...)`: the root resolver strips one
-    slash before matching children, so the include's pattern `^/admin-leading/`
-    sees `admin-leading/` (no leading slash) and 404s. Step #1 strips leading
-    slashes from include() arguments, after which this resolves.
+    The constructor normalizes the route to `admin-leading/`, so child
+    routes resolve under the expected `/admin-leading/...` prefix.
     """
     response = boundary_client.get("/admin-leading/home/")
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.content == b"hello"
 
 
-def test_leading_slash_in_path_route_does_not_resolve(boundary_client):
-    """`path("/leading-slash/", ...)` (leading slash in route) → does not resolve today.
+def test_path_with_leading_slash_resolves(boundary_client):
+    """`path("/leading-slash/", ...)` — leading slash is stripped.
 
-    The root resolver strips one leading slash before matching children, so
-    the child sees `leading-slash/` while the route pattern is `^/leading-slash/`
-    — no match → 404. Step #1 normalizes leading slashes off route strings;
-    after that, this resolves at `/leading-slash/`.
+    `path()` accepts the leading slash form; it's normalized to
+    `leading-slash/` before becoming a regex.
     """
     response = boundary_client.get("/leading-slash/")
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.content == b"hello"
