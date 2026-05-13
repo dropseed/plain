@@ -1,5 +1,17 @@
 # plain-api changelog
 
+## [0.33.4](https://github.com/dropseed/plain/releases/plain-api@0.33.4) (2026-05-13)
+
+### What's changed
+
+- Adapted the OpenAPI schema generator to plain 0.144.0's new URL converter API: reads `converter.keyword` and `url_pattern.raw_route` / `url_pattern.route.converters` instead of the removed `_get_converters()` registry and `isinstance(converter, IntConverter)` checks. ([5025de26be](https://github.com/dropseed/plain/commit/5025de26be))
+- The conformance fixture registers a one-off `<anything:_>` converter (regex `[\s\S]+`) so schemathesis's newline-bearing path inputs still reach the JSON 404 handler — the default `<path:>` converter's `.+` doesn't match `\n`. ([28dba1d2ed](https://github.com/dropseed/plain/commit/28dba1d2ed))
+- Centralized 5xx logging and exception attachment now happen in the framework's `View._respond_to_exception`, so `APIView` no longer needs to override `handle_exception` to keep responses observable. ([2634fd1d1c](https://github.com/dropseed/plain/commit/2634fd1d1c))
+
+### Upgrade instructions
+
+- No code changes required. Requires `plain>=0.144.0`.
+
 ## [0.33.3](https://github.com/dropseed/plain/releases/plain-api@0.33.3) (2026-05-12)
 
 ### What's changed
