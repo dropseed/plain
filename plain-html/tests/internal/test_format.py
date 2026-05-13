@@ -1,0 +1,151 @@
+from plain.html.engine import render_source
+from plain.html.format import format_source
+
+
+def test_format_single_element():
+    assert format_source("<p>hello</p>") == "<p>hello</p>\n"
+
+
+def test_format_preserves_inline_whitespace():
+    src = "<p>Hello <strong>world</strong>!</p>"
+    assert format_source(src) == "<p>Hello <strong>world</strong>!</p>\n"
+
+
+def test_format_breaks_block_children():
+    src = "<div><p>one</p><p>two</p></div>"
+    assert format_source(src) == "<div>\n    <p>one</p>\n    <p>two</p>\n</div>\n"
+
+
+def test_format_preserves_expression_bytes():
+    src = "<p>{user.name | x_or_y(  '  ' )}</p>"
+    # The bytes between { and } must be preserved exactly.
+    out = format_source(src)
+    assert "{user.name | x_or_y(  '  ' )}" in out
+
+
+def test_format_preserves_template_comments():
+    src = "<p>{# keep me #}hi</p>"
+    out = format_source(src)
+    assert "{# keep me #}" in out
+
+
+def test_format_preserves_html_comments():
+    src = "<!-- top --><p>hi</p>"
+    out = format_source(src)
+    assert "<!-- top -->" in out
+
+
+def test_format_verbatim_preserves_byte_for_byte():
+    src = "<pre>\n  one\n    two\n</pre>"
+    assert format_source(src) == "<pre>\n  one\n    two\n</pre>\n"
+
+
+def test_format_script_body_opaque():
+    src = "<script>\nconsole.log('{not an expr}');\n</script>"
+    assert format_source(src) == src + "\n"
+
+
+def test_format_preserves_frontmatter_byte_for_byte():
+    src = "---\nattrs:\n  name: str\n---\n<p>{name}</p>"
+    out = format_source(src)
+    assert out.startswith("---\nattrs:\n  name: str\n---\n")
+
+
+def test_format_void_element():
+    assert format_source('<img src="x.png">') == '<img src="x.png">\n'
+
+
+def test_format_self_closing_template():
+    src = '<template :include="layouts/base"></template>'
+    out = format_source(src)
+    assert ":include=" in out
+    assert "<template" in out
+
+
+def test_format_directive_if():
+    src = "<div :if={ok}>x</div>"
+    out = format_source(src)
+    assert ":if={ok}" in out
+
+
+def test_format_directive_for():
+    src = "<li :for={item in items}>{item}</li>"
+    out = format_source(src)
+    assert ":for={item in items}" in out
+
+
+def test_format_directive_for_tuple_target():
+    src = "<li :for={i, x in enumerate(items)}>{x}</li>"
+    out = format_source(src)
+    assert ":for={i, x in enumerate(items)}" in out
+
+
+def test_format_boolean_attribute():
+    src = "<input disabled>"
+    assert format_source(src) == "<input disabled>\n"
+
+
+def test_format_attribute_with_expression():
+    src = '<a href="/users/{user.id}/edit">edit</a>'
+    out = format_source(src)
+    assert 'href="/users/{user.id}/edit"' in out
+
+
+def test_idempotent_simple():
+    src = "<div><p>one</p><p>two</p></div>"
+    once = format_source(src)
+    twice = format_source(once)
+    assert once == twice
+
+
+def test_idempotent_inline():
+    src = "<p>Hello <strong>world</strong>!</p>"
+    once = format_source(src)
+    twice = format_source(once)
+    assert once == twice
+
+
+def test_idempotent_with_frontmatter_and_directives():
+    src = (
+        "---\nattrs:\n  items: list[str]\n---\n"
+        "<ul>\n"
+        '<li :for={item in items}><span class="row">{item}</span></li>\n'
+        "</ul>"
+    )
+    once = format_source(src)
+    twice = format_source(once)
+    assert once == twice
+
+
+def test_render_equivalence_inline_with_text():
+    src = "<p>Hello <strong>world</strong>!</p>"
+    assert render_source(format_source(src)) == render_source(src) + "\n"
+
+
+def test_render_equivalence_with_expression():
+    src = "<p>Hello, {name}!</p>"
+    ctx = {"name": "Dave"}
+    assert render_source(format_source(src), ctx) == render_source(src, ctx) + "\n"
+
+
+def _normalize_intertag_whitespace(html: str) -> str:
+    # Strip all whitespace that sits between adjacent tags — the relaxed
+    # render-equivalence contract permits the formatter to add or remove
+    # whitespace there. Text inside tags is left alone.
+    import re
+
+    return re.sub(r">\s+<", "><", html.strip())
+
+
+def test_render_equivalence_with_for_loop():
+    src = "<ul><li :for={x in items}>{x}</li></ul>"
+    ctx = {"items": ["a", "b", "c"]}
+    out_src = _normalize_intertag_whitespace(render_source(src, ctx))
+    out_fmt = _normalize_intertag_whitespace(render_source(format_source(src), ctx))
+    assert out_src == out_fmt
+
+
+def test_render_equivalence_pre_preserves_exactly():
+    src = "<pre>\n  a\n    b\n</pre>"
+    # Verbatim contents must render identically — no whitespace mutation.
+    assert render_source(format_source(src)) == render_source(src) + "\n"
