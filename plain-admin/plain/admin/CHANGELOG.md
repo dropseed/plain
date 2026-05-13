@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.82.1](https://github.com/dropseed/plain/releases/plain-admin@0.82.1) (2026-05-13)
+
+### What's changed
+
+- Updated route definitions to the no-slash convention introduced in `plain` 0.145.0. Canonical URLs now follow the project's `URLS_TRAILING_SLASH` setting; in-flight requests at the slashed form 308-redirect to canonical. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+
+### Upgrade instructions
+
+- No changes required. Set `URLS_TRAILING_SLASH = True` in `app/settings.py` to keep `/admin/` and friends served at their slashed form.
+
 ## [0.82.0](https://github.com/dropseed/plain/releases/plain-admin@0.82.0) (2026-05-12)
 
 ### What's changed
