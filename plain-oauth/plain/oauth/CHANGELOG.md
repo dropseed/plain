@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.49.6](https://github.com/dropseed/plain/releases/plain-oauth@0.49.6) (2026-05-13)
+
+### What's changed
+
+- Updated route definitions to the no-slash convention introduced in `plain` 0.145.0. Canonical OAuth callback URLs now follow the project's `URLS_TRAILING_SLASH` setting. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+
+### Upgrade instructions
+
+- If your OAuth provider has the callback URL hard-coded with a trailing slash (e.g., `/oauth/github/callback/`), either update the registered URL in the provider's dashboard to match the new canonical form or set `URLS_TRAILING_SLASH = True` in `app/settings.py` to keep the slashed form.
+
 ## [0.49.5](https://github.com/dropseed/plain/releases/plain-oauth@0.49.5) (2026-05-12)
 
 ### What's changed
