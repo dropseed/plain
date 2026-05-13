@@ -250,9 +250,11 @@ Named groups become keyword arguments accessible via `self.url_kwargs`.
 
 ## FAQs
 
-#### Why does my URL pattern need a trailing slash?
+#### Does my URL pattern need a trailing slash?
 
-By default, Plain's `APPEND_SLASH` setting redirects URLs without a trailing slash to URLs with one. Define your patterns with trailing slashes to match this behavior. If you prefer URLs without trailing slashes, set `APPEND_SLASH = False` in your settings.
+The route definition is the source of truth for the canonical URL. `path("users/", ...)` makes `/users/` canonical, and `/users` 308-redirects to it. `path("users", ...)` makes `/users` canonical, and `/users/` 308-redirects to it. Pick whichever style you prefer and the framework enforces it.
+
+308 preserves the HTTP method and body, so a POST to the non-canonical form completes correctly after the redirect — no silent body loss.
 
 #### How do I debug URL routing issues?
 

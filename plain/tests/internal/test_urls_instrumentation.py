@@ -5,10 +5,10 @@ spans and exception logs — implementation surface that step #3 of the
 URL routing arc will change.
 
 `request.path` is the single source of truth for the URL path: routing,
-middleware (CSRF / APPEND_SLASH), the OTel `url.path` span attribute
-(`plain/internal/handlers/base.py:126`), and the exception log `path`
-field (`plain/logs/exceptions.py:49`, `internal/handlers/exception.py:64`)
-all read from it.
+middleware (CSRF, trailing-slash redirect), the OTel `url.path` span
+attribute (`plain/internal/handlers/base.py:126`), and the exception log
+`path` field (`plain/logs/exceptions.py:49`,
+`internal/handlers/exception.py:64`) all read from it.
 
 Step #3 normalizes the path *before* anything else runs, so `request.path`
 becomes the canonical normalized form (and a `request.raw_path` carries

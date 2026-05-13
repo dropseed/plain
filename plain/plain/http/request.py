@@ -235,13 +235,8 @@ class Request:
         except (ValueError, TypeError):
             return 0
 
-    def get_full_path(self, force_append_slash: bool = False) -> str:
-        """
-        Return the full path for the request, including query string.
-
-        If force_append_slash is True, append a trailing slash if the path
-        doesn't already end with one.
-        """
+    def get_full_path(self) -> str:
+        """Return the full path for the request, including query string."""
         # RFC 3986 requires query string arguments to be in the ASCII range.
         # Rather than crash if this doesn't happen, we encode defensively.
 
@@ -261,9 +256,8 @@ class Request:
             # the entire path, not a path segment.
             return quote(path, safe="/:@&+$,-_.!~*'()")
 
-        return "{}{}{}".format(
+        return "{}{}".format(
             escape_uri_path(self.path),
-            "/" if force_append_slash and not self.path.endswith("/") else "",
             ("?" + (iri_to_uri(self.query_string) or "")) if self.query_string else "",
         )
 

@@ -102,9 +102,6 @@ TIME_ZONE: str = "UTC"
 # Should include scheme and host with no trailing slash (e.g. "https://example.com").
 BASE_URL: str = ""
 
-# Whether to append trailing slashes to URLs.
-APPEND_SLASH: bool = True
-
 # MARK: File Uploads
 
 # List of upload handler classes to be applied in order.

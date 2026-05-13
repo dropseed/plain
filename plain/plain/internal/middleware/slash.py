@@ -1,70 +1,70 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from urllib.parse import quote
 
 from plain.http import HttpMiddleware, RedirectResponse
-from plain.runtime import settings
 from plain.urls import Resolver404, get_resolver
+from plain.utils.encoding import iri_to_uri
 from plain.utils.http import escape_leading_slashes
 
 if TYPE_CHECKING:
     from plain.http import Request, Response
-    from plain.urls import ResolverMatch
 
 
 class RedirectSlashMiddleware(HttpMiddleware):
-    def after_response(self, request: Request, response: Response) -> Response:
-        """
-        When the status code of the response is 404, it may redirect to a path
-        with an appended slash if should_redirect_with_slash() returns True.
-        """
-        # If the given URL is "Not Found", then check if we should redirect to
-        # a path with a slash appended.
-        if response.status_code == 404 and self.should_redirect_with_slash(request):
-            return RedirectResponse(
-                self.get_full_path_with_slash(request), status_code=301
-            )
+    """Bidirectional 308 redirect to the route's canonical trailing-slash form.
 
-        return response
+    If a request 404s and the opposite trailing-slash form would have matched
+    a route, 308-redirect to that form. The route definition is the source of
+    truth: `path("users/", ...)` makes `/users` redirect to `/users/`, and
+    `path("users", ...)` makes `/users/` redirect to `/users`.
+
+    Status 308 preserves the request method and body, so POST/PUT/PATCH
+    survive intact — no more silent body loss like 301 caused.
+    """
+
+    def after_response(self, request: Request, response: Response) -> Response:
+        if response.status_code != 404:
+            return response
+
+        alternate = self._alternate_slash_form(request.path)
+        if alternate is None:
+            return response
+        if not self._path_resolves(alternate):
+            return response
+
+        # The view may have chosen to 404 from a route that did match (e.g.
+        # an explicit `JsonNotFoundView`). Don't intervene in that case.
+        if self._path_resolves(request.path):
+            return response
+
+        # Safe-char set matches `Request.get_full_path` (RFC 3986 §3.3, minus
+        # ";", "=", "?"). We don't reuse `get_full_path` because it always
+        # uses `request.path`, and we need the alternate path here.
+        escaped_path = quote(alternate, safe="/:@&+$,-_.!~*'()")
+        query = (
+            "?" + (iri_to_uri(request.query_string) or "")
+            if request.query_string
+            else ""
+        )
+        return RedirectResponse(
+            escape_leading_slashes(f"{escaped_path}{query}"),
+            status_code=308,
+        )
 
     @staticmethod
-    def _is_valid_path(path: str) -> ResolverMatch | bool:
-        """
-        Return the ResolverMatch if the given path resolves against the default URL
-        resolver, False otherwise. This is a convenience method to make working
-        with "is this a match?" cases easier, avoiding try...except blocks.
-        """
+    def _alternate_slash_form(path: str) -> str | None:
+        if path == "/":
+            return None
+        if path.endswith("/"):
+            return path[:-1]
+        return path + "/"
+
+    @staticmethod
+    def _path_resolves(path: str) -> bool:
         try:
-            return get_resolver().resolve(path)
+            get_resolver().resolve(path)
+            return True
         except Resolver404:
             return False
-
-    def should_redirect_with_slash(self, request: Request) -> ResolverMatch | bool:
-        """
-        Return True if settings.APPEND_SLASH is True and appending a slash to
-        the request path turns an invalid path into a valid one.
-        """
-        if settings.APPEND_SLASH and not request.path.endswith("/"):
-            if not self._is_valid_path(request.path):
-                return self._is_valid_path(f"{request.path}/")
-        return False
-
-    def get_full_path_with_slash(self, request: Request) -> str:
-        """
-        Return the full path of the request with a trailing slash appended.
-
-        Raise a RuntimeError if settings.DEBUG is True and request.method is
-        POST, PUT, or PATCH.
-        """
-        new_path = request.get_full_path(force_append_slash=True)
-        # Prevent construction of scheme relative urls.
-        new_path = escape_leading_slashes(new_path)
-        if settings.DEBUG and request.method in ("POST", "PUT", "PATCH"):
-            raise RuntimeError(
-                f"You called this URL via {request.method}, but the URL doesn't end "
-                "in a slash and you have APPEND_SLASH set. Plain can't "
-                f"redirect to the slash URL while maintaining {request.method} data. "
-                f"Change your form to point to {request.host + new_path} (note the trailing "
-                "slash), or set APPEND_SLASH=False in your Plain settings."
-            )
-        return new_path
