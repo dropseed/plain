@@ -27,24 +27,18 @@ class CheckURLMixin:
 
 
 class RegexPattern(CheckURLMixin):
-    def __init__(self, regex: str, name: str | None = None, is_endpoint: bool = False):
-        self._regex = regex
-        self._is_endpoint = is_endpoint
-        self.name = name
+    """Internal regex pattern used by the resolver for root and namespace
+    prefixes. Not exposed to user code — `path()` and `include()` accept
+    only string routes."""
+
+    name: str | None = None
+
+    def __init__(self, regex: str):
         self.converters: dict[str, Any] = {}
-        self.regex = self._compile(str(regex))
-        if self.regex.groups > len(self.regex.groupindex):
-            raise ImproperlyConfigured(
-                f"Regex pattern '{regex}' uses unnamed groups. "
-                "Use named groups (?P<name>...) instead."
-            )
+        self.regex = re.compile(regex)
 
     def match(self, path: str) -> tuple[str, dict[str, Any]] | None:
-        match = (
-            self.regex.fullmatch(path)
-            if self._is_endpoint and self.regex.pattern.endswith("$")
-            else self.regex.search(path)
-        )
+        match = self.regex.search(path)
         if match:
             kwargs = match.groupdict()
             kwargs = {k: v for k, v in kwargs.items() if v is not None}
@@ -52,55 +46,10 @@ class RegexPattern(CheckURLMixin):
         return None
 
     def preflight(self) -> list[PreflightResult]:
-        warnings: list[PreflightResult] = []
-        warnings.extend(self._check_pattern_startswith_slash())
-        if not self._is_endpoint:
-            warnings.extend(self._check_include_trailing_dollar())
-        return warnings
-
-    def _check_pattern_startswith_slash(self) -> list[PreflightResult]:
-        """`path()` and `include()` normalize away leading slashes from string
-        routes, so this warning only fires for `re.Pattern` routes — the
-        only path through which a leading-slash pattern can still reach the
-        resolver and silently fail to match.
-        """
-        regex_pattern = self.regex.pattern
-        if regex_pattern.startswith(("/", "^/", "^\\/")) and not regex_pattern.endswith(
-            "/"
-        ):
-            return [
-                PreflightResult(
-                    fix=f"URL pattern {self.describe()} starts with unnecessary '/'. Remove the leading slash.",
-                    warning=True,
-                    id="urls.pattern_starts_with_slash",
-                )
-            ]
         return []
 
-    def _check_include_trailing_dollar(self) -> list[PreflightResult]:
-        regex_pattern = self.regex.pattern
-        if regex_pattern.endswith("$") and not regex_pattern.endswith(r"\$"):
-            return [
-                PreflightResult(
-                    fix=f"Include pattern {self.describe()} ends with '$' which prevents URL inclusion. Remove the dollar sign.",
-                    warning=True,
-                    id="urls.include_pattern_ends_with_dollar",
-                )
-            ]
-        else:
-            return []
-
-    def _compile(self, regex: str) -> re.Pattern[str]:
-        """Compile and return the given regular expression."""
-        try:
-            return re.compile(regex)
-        except re.error as e:
-            raise ImproperlyConfigured(
-                f'"{regex}" is not a valid regular expression: {e}'
-            ) from e
-
     def __str__(self) -> str:
-        return str(self._regex)
+        return self.regex.pattern
 
 
 _PATH_PARAMETER_COMPONENT_RE = _lazy_re_compile(
@@ -202,13 +151,15 @@ class URLPattern:
     def __init__(
         self,
         *,
-        pattern: RegexPattern | RoutePattern,
+        pattern: RoutePattern,
         view_class: type,
-        name: str | None = None,
     ):
         self.pattern = pattern
         self.view_class = view_class
-        self.name = name
+
+    @property
+    def name(self) -> str | None:
+        return self.pattern.name
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.pattern.describe()}>"

@@ -1,22 +1,19 @@
 """Pin URL preflight check behavior.
 
-Internal because these tests pin which checks fire for which patterns —
-implementation surface that will shift as the URL routing arc lands.
+`path()` and `include()` accept only string routes, so the remaining
+checks live on `RoutePattern` and `URLPattern`:
 
-- `urls.pattern_starts_with_slash` — fires for `re.Pattern` routes that
-  start with `/`. String routes are normalized at construction so the
-  check is unreachable for them, but regex routes bypass normalization
-  and can still trip the root resolver.
-- `urls.include_pattern_ends_with_dollar` — fires for regex includes
-  that anchor with `$`, which would prevent the resolver from
-  continuing to child patterns.
+- `urls.path_migration_warning` — fires when a string route still looks
+  like a Django-style regex (`^`, `$`, `(?P<`), which would match as
+  literal characters rather than the user's intent.
 - `urls.pattern_name_contains_colon` — names with `:` clash with the
   namespace separator and break `reverse()`.
+
+Routes are normalized at construction time so leading slashes never
+reach the resolver — there's no preflight noise to assert against.
 """
 
 from __future__ import annotations
-
-import re
 
 from plain.urls import include, path
 from plain.views import View
@@ -32,62 +29,26 @@ def _pattern_ids(results):
 
 
 def test_path_with_leading_slash_emits_no_warning():
-    """The constructor silently normalizes; no preflight noise.
-
-    Before step #1 this fired `urls.pattern_starts_with_slash`. Now the
-    leading slash is stripped at construction time and there's nothing
-    to warn about.
-    """
+    """The constructor silently normalizes; no preflight noise."""
     url = path("/admin/", _View)
     assert _pattern_ids(url.preflight()) == set()
 
 
-def test_include_with_dollar_residue_still_fires_migration_warning():
+def test_include_with_dollar_residue_fires_migration_warning():
     """`include("admin/$", ...)` keeps the `$` so the migration warning fires.
 
     The normalizer would otherwise append `/` and turn `admin/$` into
-    `admin/$/`, silencing `urls.path_migration_warning` even though the
-    route would match a literal `$` segment.
+    `admin/$/`, silencing the warning even though the route would match
+    a literal `$` segment.
     """
     resolver = include("admin/$", [path("home/", _View)])
     assert "urls.path_migration_warning" in _pattern_ids(resolver.pattern.preflight())
 
 
-def test_include_with_caret_residue_still_fires_migration_warning():
+def test_include_with_caret_residue_fires_migration_warning():
     """`include("^admin", ...)` keeps the `^` for the same reason."""
     resolver = include("^admin", [path("home/", _View)])
     assert "urls.path_migration_warning" in _pattern_ids(resolver.pattern.preflight())
-
-
-def test_regex_pattern_with_leading_slash_fires():
-    """`re.Pattern` routes bypass `path()`/`include()` normalization, so a
-    leading slash silently fails to match against the resolver. The
-    preflight warning is the only place users get told.
-    """
-    url = path(re.compile(r"^/admin"), _View)
-    assert "urls.pattern_starts_with_slash" in _pattern_ids(url.preflight())
-
-
-def test_regex_pattern_without_leading_slash_is_silent():
-    url = path(re.compile(r"^admin"), _View)
-    assert "urls.pattern_starts_with_slash" not in _pattern_ids(url.preflight())
-
-
-def test_include_pattern_ends_with_dollar_fires():
-    """`include(re.compile(r"admin/$"), ...)` — the `$` anchor prevents continuation.
-
-    The check lives on `RegexPattern.preflight` (not `RoutePattern`), so it
-    only fires when an include is built from a compiled regex.
-    """
-    resolver = include(re.compile(r"admin/$"), [path("home/", _View)])
-    results = resolver.pattern.preflight()
-    assert "urls.include_pattern_ends_with_dollar" in _pattern_ids(results)
-
-
-def test_include_pattern_without_dollar_is_silent():
-    resolver = include(re.compile(r"admin/"), [path("home/", _View)])
-    results = resolver.pattern.preflight()
-    assert "urls.include_pattern_ends_with_dollar" not in _pattern_ids(results)
 
 
 def test_pattern_name_contains_colon_fires():

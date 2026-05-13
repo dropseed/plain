@@ -1,6 +1,4 @@
-import re
-
-from .patterns import RegexPattern, RoutePattern, URLPattern
+from .patterns import RoutePattern, URLPattern
 from .resolvers import (
     URLResolver,
 )
@@ -36,22 +34,17 @@ def _normalize_include_route(route: str) -> str:
     return f"{stripped}/"
 
 
-def include(
-    route: str | re.Pattern, router_or_urls: list | tuple | str | type[Router]
-) -> URLResolver:
+def include(route: str, router_or_urls: list | tuple | type[Router]) -> URLResolver:
     """
     Include URLs from another module or a nested list of URL patterns.
     """
-    if isinstance(route, str):
-        pattern = RoutePattern(_normalize_include_route(route), is_endpoint=False)
-    elif isinstance(route, re.Pattern):
-        pattern = RegexPattern(route.pattern, is_endpoint=False)
-    else:
-        raise TypeError("include() route must be a string or regex")
+    if not isinstance(route, str):
+        raise TypeError(f"include() route must be a string, not {type(route).__name__}")
+
+    pattern = RoutePattern(_normalize_include_route(route), is_endpoint=False)
 
     if isinstance(router_or_urls, list | tuple):
-        # We were given an explicit list of sub-patterns,
-        # so we generate a router for it
+
         class _IncludeRouter(Router):
             namespace = ""
             urls = router_or_urls
@@ -71,23 +64,20 @@ def include(
         )
 
 
-def path(route: str | re.Pattern, view_class: type, *, name: str = "") -> URLPattern:
+def path(route: str, view_class: type, *, name: str = "") -> URLPattern:
     """
     Map a URL pattern to a view class.
     """
-    if isinstance(route, str):
-        # Strip leading slashes; trailing slash is part of the route's
-        # canonical form (defining `path("users/")` vs `path("users")`
-        # determines the URL the framework redirects to).
-        pattern = RoutePattern(route.lstrip("/"), name=name, is_endpoint=True)
-    elif isinstance(route, re.Pattern):
-        pattern = RegexPattern(route.pattern, name=name, is_endpoint=True)
-    else:
-        raise TypeError("path() route must be a string or regex")
+    if not isinstance(route, str):
+        raise TypeError(f"path() route must be a string, not {type(route).__name__}")
 
     if not isinstance(view_class, type):
         raise TypeError(
             f"path() requires a class, not an instance or callable: {view_class!r}"
         )
 
-    return URLPattern(pattern=pattern, view_class=view_class, name=name)
+    # Strip leading slashes; trailing slash is part of the route's
+    # canonical form (defining `path("users/")` vs `path("users")`
+    # determines the URL the framework redirects to).
+    pattern = RoutePattern(route.lstrip("/"), name=name, is_endpoint=True)
+    return URLPattern(pattern=pattern, view_class=view_class)
