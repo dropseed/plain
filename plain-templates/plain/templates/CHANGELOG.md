@@ -1,5 +1,29 @@
 # plain-templates changelog
 
+## [0.2.0](https://github.com/dropseed/plain/releases/plain-templates@0.2.0) (2026-05-13)
+
+### What's changed
+
+- **`TemplateView.handle_exception` renders `{status}.html`.** The error-template handling that lived in `plain` core's exception handler now sits on `TemplateView` itself: `404.html` for `NotFoundError404`, `500.html` for unhandled errors, etc., with context `{request, status_code, exception, DEBUG}`. Falls through to plain-text rendering (via `raise exc from None`) on `TemplateFileMissing`; logs and returns a bare-status `Response` on any other render failure so `_respond_to_exception` can still attach `response.exception`. ([90d8fd983b](https://github.com/dropseed/plain/commit/90d8fd983b))
+- **New `NotFoundView` catchall view.** `before_request` raises `NotFoundError404` before method dispatch, so every HTTP method renders the styled 404 instead of falling through to a 405. Mount it as the last route — `path("<path:_>", NotFoundView)` — for a styled 404 on unmatched URLs. Pairs with the catchall route semantics added in `plain` 0.145.0. ([90d8fd983b](https://github.com/dropseed/plain/commit/90d8fd983b))
+
+### Upgrade instructions
+
+- To get a styled 404 for unmatched URLs, mount `NotFoundView` as the last route in your router:
+
+    ```python
+    from plain.templates.views import NotFoundView
+    from plain.urls import Router, path
+
+    class AppRouter(Router):
+        urls = [
+            # ... your routes ...
+            path("<path:_>", NotFoundView),
+        ]
+    ```
+
+- Apps that previously relied on plain core auto-rendering `{status}.html` will still see those templates render — the path is `TemplateView.handle_exception`, which fires whenever an exception escapes a `TemplateView` subclass. For pre-view failures (URL resolution, middleware) plain core stays in plain text; if you want styled responses there, your views should subclass `TemplateView`.
+
 ## [0.1.0](https://github.com/dropseed/plain/releases/plain-templates@0.1.0) (2026-05-12)
 
 ### What's changed
