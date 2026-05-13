@@ -1,5 +1,23 @@
 # plain changelog
 
+## [0.144.0](https://github.com/dropseed/plain/releases/plain@0.144.0) (2026-05-13)
+
+### What's changed
+
+- **URL routing rewritten as a segment-based resolver.** `plain.urls` splits into focused modules: `segments.py` parses route strings into `Literal`/`Capture`/`Pattern` tuples, `patterns.py` matches endpoints, `resolvers.py` walks a prefix tree and builds reverse/namespace lookup tables eagerly at `__init__`, `paths.py` normalizes request paths (RFC 3986 dot/slash collapse → 308/400), and `reverse.py` exposes `reverse()`/`_lazy`/`_absolute`. The regex-decompiler in `regex_helper.py` is gone; only `_lazy_re_compile` remains for the rest of the codebase. ([5025de26be](https://github.com/dropseed/plain/commit/5025de26be))
+- **`path()` and `include()` accept string routes only — raw `re.compile(...)` is no longer public API.** The `<converter:name>` syntax (`<int:>`, `<str:>`, `<uuid:>`, `<path:>`, `<slug:>`) plus `register_converter()` covers anything the raw-regex form did. `RegexPattern` and the converter classes (`IntConverter`, `UUIDConverter`, etc.) are now internal. `URLPattern.pattern` narrows to `RoutePattern`; the `_check_pattern_startswith_slash` and `_check_include_trailing_dollar` preflight checks are gone. ([28dba1d2ed](https://github.com/dropseed/plain/commit/28dba1d2ed))
+- **Bidirectional 308 trailing-slash redirects; `APPEND_SLASH` setting removed.** The route definition is the source of truth for the canonical URL — `path("users/", V)` makes `/users/` canonical and 308-redirects `/users`; `path("users", V)` does the reverse. 308 preserves the HTTP method and body, so POST/PUT/PATCH survive intact (no more silent body loss like 301 caused). `RedirectSlashMiddleware` is gone. `Request.get_full_path()` loses its `force_append_slash` parameter. ([db4ac49f72](https://github.com/dropseed/plain/commit/db4ac49f72))
+- **`path()` and `include()` normalize slash boundaries.** `include("admin")`, `include("admin/")`, and `include("/admin/")` all resolve to `"admin/"`. `path("/users/")` is equivalent to `path("users/")`. Fixes silent corruption where `include("admin")` (no trailing slash) built URLs like `/adminhome/` instead of `/admin/home/`. ([ba35b1f846](https://github.com/dropseed/plain/commit/ba35b1f846))
+- Test client follows 307/308 redirects with HTTP-correct semantics: GET/HEAD use the Location's query string instead of re-encoding the original `data`; POST/PUT/etc. with `data=None` no longer crashes the multipart encoder. ([db4ac49f72](https://github.com/dropseed/plain/commit/db4ac49f72))
+
+### Upgrade instructions
+
+- **Replace `path(re.compile(...), ...)` with converter syntax.** The `<converter:name>` form (`<int:>`, `<str:>`, `<uuid:>`, `<path:>`, `<slug:>`) plus a custom `register_converter()` covers anything raw regex did. The `/plain-upgrade` skill rewrites the common cases.
+- **Drop `APPEND_SLASH` from `app/settings.py`** — it has no effect. Trailing-slash behavior is now decided per-route by whether `path("…/")` or `path("…")` is registered.
+- **Remove `RedirectSlashMiddleware` from `MIDDLEWARE`** if you had it.
+- **Update `request.get_full_path()` callers** to drop `force_append_slash=`. There was only one such caller in the framework itself (the deleted middleware).
+- **Inline `IntConverter`/`UUIDConverter`/`_get_converters` imports** from `plain.urls.converters` were never public; if you reached into them, switch to `register_converter()` and check `converter.keyword` or `url_pattern.raw_route` / `url_pattern.route.converters` on the public side.
+
 ## [0.143.0](https://github.com/dropseed/plain/releases/plain@0.143.0) (2026-05-12)
 
 ### What's changed
