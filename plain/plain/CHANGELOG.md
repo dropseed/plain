@@ -1,5 +1,25 @@
 # plain changelog
 
+## [0.145.0](https://github.com/dropseed/plain/releases/plain@0.145.0) (2026-05-13)
+
+### What's changed
+
+- **Trailing slash is now an app-wide setting.** New `URLS_TRAILING_SLASH` setting (default `False`) decides the canonical form for every route in the project. `path("about")` and `path("about/")` produce identical routes — the slash on the route string is stripped silently. Requests at the non-canonical form 308-redirect to the canonical one. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- **`path(..., force_trailing_slash=True|False)` per-route override.** Lets file-extension routes (`sitemap.xml`, `robots.txt`) stay slash-less under a slashed app, or keep individual legacy URLs stable while flipping the rest. `None` (the default) follows the global setting. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- **Catchall route semantics.** `path("<path:NAME>")` — a sole-segment terminal multi-segment capture — is recognized structurally as a catchall: slash-agnostic at match time, yields to sibling `SlashMismatch` so a specific route's slash redirect isn't shadowed, and propagates through `include()` boundaries via `ResolverMatch.is_catchall`. ([90d8fd983b](https://github.com/dropseed/plain/commit/90d8fd983b), [48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- **Error template rendering moved into `plain.templates`.** Plain core's exception handler returns plain text (`404 Not Found`, `500 Internal Server Error`); the `{status}.html` rendering lives on `TemplateView.handle_exception` in `plain.templates` 0.2.0. View-level 5xx attribution still happens in core via `_respond_to_exception`. ([90d8fd983b](https://github.com/dropseed/plain/commit/90d8fd983b))
+- **URL routing internals refactor.** Dropped the `Route` dataclass — `URLPattern` and `URLResolver` hold `segments: tuple[Segment, ...]` directly, with `URLPattern.converters` as a `cached_property` for OpenAPI consumers. Resolver lookup-table construction (`_build_lookups`, `_collect_endpoint`, `_collect_resolver`, `_register_namespace`) and reverse-URL helpers (`_try_reverse`, `_reverse_segment`, `_reverse_capture`) are now methods on `URLResolver`. Removed `_effective_trailing_slash` and the `prefix_trailing_slash` parameter that threaded through `resolve`/`reverse`. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- **`include()` slashes are irrelevant.** `include("admin")` and `include("admin/")` are identical mounts. The separator between an include's prefix and its children is enforced structurally by segment matching — `/adminhome` collisions are impossible regardless of how the route string is spelled. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- **`plain urls list` renders canonical slashes from segment tuples.** Both `--flat` and the tree view now show the slash form `resolve()`/`reverse()` actually produce — `URLS_TRAILING_SLASH=True` makes endpoints render as `admin/home/` rather than `admin/home`. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+
+### Upgrade instructions
+
+- **Add `URLS_TRAILING_SLASH = True` to `app/settings.py`** to preserve existing slashed-route behavior. Without it, every route's canonical form flips to no-slash; in-flight requests still work via 308 redirects but the URLs you ship in HTML change.
+- **Drop trailing slashes from `path()`/`include()` route strings** as a cosmetic cleanup — they're stripped silently now. Optional but matches the new convention.
+- **Replace `path("…/")` + matching `path("…")` for the same view** with a single `path("…")` plus a `force_trailing_slash` decision. The slash form is no longer the discriminator.
+- **`url_pattern.route` is gone.** Reach for `url_pattern.segments` or `url_pattern.converters` (the latter replaces `url_pattern.route.converters`).
+- **Catchall routes (`path("<path:_>")`)** drop the slash check at registration. If you previously had `path("<path:_>/", ...)` to mean "slash-only catchall," it now behaves the same as `path("<path:_>", ...)`.
+
 ## [0.144.0](https://github.com/dropseed/plain/releases/plain@0.144.0) (2026-05-13)
 
 ### What's changed
