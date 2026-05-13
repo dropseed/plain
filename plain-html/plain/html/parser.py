@@ -22,6 +22,7 @@ from .tokenizer import (
     ExprToken,
     HtmlCommentToken,
     StartTagToken,
+    TemplateCommentToken,
     TextToken,
     Token,
 )
@@ -68,11 +69,23 @@ class HtmlCommentNode:
 
 
 @dataclass
+class TemplateCommentNode:
+    text: str
+
+
+@dataclass
 class DoctypeNode:
     text: str
 
 
-Node = ElementNode | TextNode | ExprNode | HtmlCommentNode | DoctypeNode
+Node = (
+    ElementNode
+    | TextNode
+    | ExprNode
+    | HtmlCommentNode
+    | TemplateCommentNode
+    | DoctypeNode
+)
 
 
 def parse(tokens: list[Token]) -> list[Node]:
@@ -90,6 +103,8 @@ def parse(tokens: list[Token]) -> list[Node]:
                 parent_children().append(ExprNode(tok.code))
             case HtmlCommentToken():
                 parent_children().append(HtmlCommentNode(tok.text))
+            case TemplateCommentToken():
+                parent_children().append(TemplateCommentNode(tok.text))
             case DoctypeToken():
                 parent_children().append(DoctypeNode(tok.text))
             case StartTagToken():

@@ -89,6 +89,12 @@ class HtmlCommentToken:
 
 
 @dataclass
+class TemplateCommentToken:
+    text: str
+    offset: int
+
+
+@dataclass
 class DoctypeToken:
     text: str
     offset: int
@@ -112,6 +118,7 @@ Token = (
     TextToken
     | ExprToken
     | HtmlCommentToken
+    | TemplateCommentToken
     | DoctypeToken
     | StartTagToken
     | EndTagToken
@@ -196,6 +203,7 @@ def tokenize(source: str) -> list[Token]:
             end = source.find("#}", i + 2)
             if end == -1:
                 raise TokenizeError(f"Unterminated template comment at offset {i}")
+            tokens.append(TemplateCommentToken(source[i + 2 : end], i))
             i = end + 2
             text_start = i
             continue

@@ -25,6 +25,7 @@ from .parser import (
     ExprNode,
     HtmlCommentNode,
     Node,
+    TemplateCommentNode,
     TextNode,
     parse,
 )
@@ -121,6 +122,8 @@ def _render_node(
             out.append(_escape_to_str(_eval(node.code, scope)))
         case HtmlCommentNode():
             out.append(f"<!--{node.text}-->")
+        case TemplateCommentNode():
+            pass
         case DoctypeNode():
             out.append(node.text)
         case ElementNode():
