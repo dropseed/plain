@@ -1,0 +1,13 @@
+---
+attrs:
+  swatches: list
+---
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+    <div :for={(name, cls) in swatches} class="rounded-admin-md border border-admin-border p-2 flex items-center gap-3">
+        <span class={[cls, "w-8 h-8 rounded border border-admin-border shrink-0"]} aria-hidden="true"></span>
+        <div class="min-w-0 flex-1">
+            <code class="text-xs text-admin-muted-foreground block truncate">{"--" + name}</code>
+            <code data-token-current={"--" + name} class="text-[10px] text-admin-foreground/60 block truncate"></code>
+        </div>
+    </div>
+</div>
