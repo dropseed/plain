@@ -3,15 +3,15 @@ from __future__ import annotations
 from typing import Any
 
 from plain.auth.views import AuthView
-from plain.htmx.views import HTMXView
-from plain.http import RedirectResponse, Response
-from plain.templates.views import (
+from plain.html.views import (
     CreateView,
     DeleteView,
     DetailView,
     ListView,
     UpdateView,
 )
+from plain.htmx.views import HTMXView
+from plain.http import RedirectResponse, Response
 from plain.urls import reverse, reverse_lazy
 from plain.views import View
 

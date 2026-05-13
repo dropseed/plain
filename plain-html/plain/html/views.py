@@ -14,7 +14,7 @@ from plain.views import View
 
 from .core import Template, TemplateFileMissing
 
-logger = get_framework_logger("plain.templates")
+logger = get_framework_logger("plain.html")
 
 try:
     from plain.postgres.exceptions import ObjectDoesNotExist

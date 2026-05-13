@@ -4,13 +4,13 @@ from functools import cached_property
 from typing import Any
 
 from plain.assets.views import AssetView
+from plain.html.views import TemplateView
 from plain.http import (
     NotFoundError404,
     RedirectResponse,
     Response,
 )
 from plain.runtime import settings
-from plain.templates.views import TemplateView
 from plain.utils.cache import patch_vary_headers
 from plain.views import View
 

@@ -85,12 +85,12 @@ class TestRenderFailureFallsBackToText:
     """
 
     def test_broken_500_template_falls_back_to_text(self, error_client, monkeypatch):
-        from plain.templates import Template
+        from plain.html import Template
 
         original_render = Template.render
 
         def boom_on_500(self, context=None):
-            if self.template_name == "500.html":
+            if self.name == "500.html":
                 raise RuntimeError("render blew up")
             return original_render(self, context or {})
 

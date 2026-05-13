@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from plain.html.views import NotFoundView, TemplateView
 from plain.http import ForbiddenError403, HTTPException, NotFoundError404
-from plain.templates.views import NotFoundView, TemplateView
 from plain.urls import Router, path
 from plain.views import View
 

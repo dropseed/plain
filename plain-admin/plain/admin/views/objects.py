@@ -1,16 +1,16 @@
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain.htmx.views import HTMXView
-from plain.http import RedirectResponse, Response
-from plain.paginator import Paginator
-from plain.postgres import QuerySet
-from plain.templates.views import (
+from plain.html.views import (
     CreateView,
     DeleteView,
     DetailView,
     UpdateView,
 )
+from plain.htmx.views import HTMXView
+from plain.http import RedirectResponse, Response
+from plain.paginator import Paginator
+from plain.postgres import QuerySet
 
 from .base import AdminView
 

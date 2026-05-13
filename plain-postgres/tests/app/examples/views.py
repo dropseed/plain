@@ -4,8 +4,8 @@ import json
 from typing import Any
 
 from plain.forms import BaseForm
+from plain.html.views import CreateView, UpdateView
 from plain.http import Response
-from plain.templates.views import CreateView, UpdateView
 
 from .forms import (
     ChildCascadeForm,

@@ -2,8 +2,8 @@ import logging
 
 from plain.auth.requests import get_request_user
 from plain.auth.views import AuthView
+from plain.html.views import TemplateView
 from plain.http import RedirectResponse, Response
-from plain.templates.views import TemplateView
 from plain.views import View
 
 from .exceptions import (

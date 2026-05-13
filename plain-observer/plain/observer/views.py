@@ -4,10 +4,10 @@ from typing import Any
 
 from plain import postgres
 from plain.auth.views import AuthView
+from plain.html.views import DetailView, ListView
 from plain.htmx.views import HTMXView
 from plain.http import JsonResponse, Response
 from plain.runtime import settings
-from plain.templates.views import DetailView, ListView
 from plain.urls import reverse
 from plain.views import RedirectView
 

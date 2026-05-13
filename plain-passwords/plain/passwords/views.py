@@ -10,12 +10,12 @@ from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthView
 from plain.forms import BaseForm
+from plain.html.views import CreateView, FormView
 from plain.http import (
     BadRequestError400,
     RedirectResponse,
 )
 from plain.signing import BadSignature, SignatureExpired, TimestampSigner
-from plain.templates.views import CreateView, FormView
 from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
 from plain.utils.encoding import force_bytes

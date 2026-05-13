@@ -4,7 +4,7 @@ from typing import Any
 
 from plain.auth.views import AuthView
 from plain.forms import BaseForm
-from plain.templates.views import (
+from plain.html.views import (
     CreateView,
     DeleteView,
     DetailView,

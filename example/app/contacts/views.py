@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from plain.html.views import FormView, TemplateView
 from plain.http import Response
-from plain.templates.views import FormView, TemplateView
 from plain.urls import reverse_lazy
 
 from .forms import ArchiveFilterForm, ArchiveSearchForm, ContactForm

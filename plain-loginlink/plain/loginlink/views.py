@@ -4,9 +4,9 @@ from typing import Any
 
 from plain.auth import login, logout
 from plain.auth.views import AuthView
+from plain.html.views import FormView, TemplateView
 from plain.http import RedirectResponse, Response
 from plain.runtime import settings
-from plain.templates.views import FormView, TemplateView
 from plain.urls import reverse, reverse_lazy
 from plain.views import View
 

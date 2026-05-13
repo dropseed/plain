@@ -1,0 +1,16 @@
+---
+attrs:
+  request: Any
+---
+<template :include="base">
+<h1>Login</h1>
+<form action={url('oauth:login', provider='github')} method="post">
+    <button type="submit">Login with GitHub</button>
+</form>
+<form action={url('oauth:login', provider='gitlab')} method="post">
+    <button type="submit">Login with GitLab</button>
+</form>
+<form action={url('oauth:login', provider='bitbucket')} method="post">
+    <button type="submit">Login with Bitbucket</button>
+</form>
+</template>

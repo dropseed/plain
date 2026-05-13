@@ -4,11 +4,9 @@ from collections.abc import Callable
 from http import HTTPMethod
 from typing import Any
 
+from plain.html.views import TemplateView
 from plain.http import Response
-from plain.templates.views import TemplateView
 from plain.utils.cache import patch_vary_headers
-
-from .templates import render_template_fragment
 
 __all__ = ["HTMXView"]
 
@@ -23,26 +21,21 @@ class HTMXView(TemplateView):
     """
 
     def render_template(self) -> str:
-        template = self.get_template()
-        context = self.get_template_context()
-
         if self.is_htmx_request() and self.get_htmx_fragment_name():
-            if template._jinja_template is None:
-                # The {% htmxfragment %} mechanism is a Jinja extension.
-                # plain.html fragment rendering is not yet implemented.
-                raise NotImplementedError(
-                    f"HTMX fragment rendering is not supported for plain.html "
-                    f"templates yet (template={template.filename!r}). Keep the "
-                    f"template on the Jinja .html engine until the plain.html "
-                    f"fragment story lands."
-                )
-            return render_template_fragment(
-                template=template._jinja_template,
-                fragment_name=self.get_htmx_fragment_name(),
-                context=context,
+            # The original `{% htmxfragment %}` mechanism was a Jinja
+            # extension that walked the template's AST to find a named
+            # fragment and render just that subtree. plain.html doesn't
+            # have an equivalent yet — see the rip-out plan, step 6.
+            # Templates that want fragment-style updates can hand-emit
+            # the same wrapper div the tag used to produce.
+            raise NotImplementedError(
+                "HTMX fragment rendering ({% htmxfragment %}) is not yet "
+                "implemented in plain.html. Hand-emit the "
+                "<div plain-hx-fragment=... hx-target=this hx-swap=innerHTML ...> "
+                "wrapper for now."
             )
 
-        return template.render(context)
+        return self.get_template().render(self.get_template_context())
 
     def convert_result_to_response(self, result: Response | None) -> Response:
         if result is None:
