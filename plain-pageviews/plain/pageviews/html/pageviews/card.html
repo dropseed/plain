@@ -1,0 +1,31 @@
+---
+imports:
+  - from plain.admin.templates import get_admin_model_detail_url
+  - from plain.utils.timesince import timesince
+attrs:
+  pageviews: Any
+  slug: str
+  title: str = ""
+  description: str = ""
+  size: Any = None
+  filters: list = []
+  current_filter: str = ""
+---
+<template :include="admin/cards/base" slug={slug} title={title} description={description} size={size} filters={filters} current_filter={current_filter}>
+    <div class="w-full space-y-2 overflow-auto max-h-60 flex-grow">
+        <div :for={pageview in pageviews} class="flex space-x-2 text-sm">
+            <a
+                class="flex-shrink-0 text-admin-muted-foreground tabular-nums hover:underline"
+                href={get_admin_model_detail_url(pageview)}
+                title={str(pageview.timestamp)}>
+                {timesince(pageview.timestamp, format="short", depth=1)}
+            </a>
+            <a
+                class="overflow-hidden hover:underline text-ellipsis whitespace-nowrap"
+                title={pageview.title + " (" + pageview.url + ")"}
+                href={pageview.url}>
+                {pageview.title}
+            </a>
+        </div>
+    </div>
+</template>

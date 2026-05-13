@@ -1,0 +1,24 @@
+---
+attrs:
+  form: Any
+  title: str = ""
+  app_name: str = "Plain"
+  admin_force_theme: str = ""
+  description: str = ""
+  image: Any = None
+  links: dict = {}
+  extra_links: dict = {}
+  parent_view_classes: list = []
+  object: Any = None
+  cards: list = []
+---
+<template :include="admin/base"
+    title={title} app_name={app_name} admin_force_theme={admin_force_theme}
+    description={description} image={image} links={links} extra_links={extra_links}
+    parent_view_classes={parent_view_classes} object={object} cards={cards}>
+<form method="post" class="space-y-4">
+    <template :include="elements/admin/InputField" label="Key" field={form.key} />
+    <template :include="elements/admin/InputField" label="Value" field={form.value} />
+    <template :include="elements/admin/Submit">Save</template>
+</form>
+</template>

@@ -63,6 +63,11 @@ def render_source(
     # truthy checks work without raising NameError.
     for attr_name in fmdict.get("attrs", {}) or {}:
         ctx.setdefault(attr_name, None)
+    # Declared slots default to empty so `{slot_name}` and `:if={slot_name}`
+    # don't raise NameError when the caller doesn't fill the slot. Matches
+    # the equivalent setdefault in _render_include for :include'd templates.
+    for slot_name in fmdict.get("slots", {}) or {}:
+        ctx.setdefault(slot_name, mark_safe(""))
     # The view-level context (request, DEBUG, etc.) flows down into every
     # `:include`d template so layouts and components don't have to thread it
     # explicitly. Caller-passed attrs override.

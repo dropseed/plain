@@ -11,11 +11,15 @@ attrs:
   extra_links: dict = {}
   parent_view_classes: list = []
   cards: list = []
+slots:
+  default: optional
+  actions: optional
 ---
 <template :include="admin/base"
     title={title} app_name={app_name} admin_force_theme={admin_force_theme}
     description={description} image={image} links={links} extra_links={extra_links}
     parent_view_classes={parent_view_classes} object={object} cards={cards}>
+<template :if={actions} slot="actions">{actions}</template>
 <details class="admin-card group" open>
     <summary class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4">
         <h3 class="text-lg font-semibold">{object.__class__.__name__} Details</h3>
