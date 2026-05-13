@@ -28,9 +28,31 @@ class WithoutSlashView(View):
         return Response("without-slash POST")
 
 
+class DualSlashView(View):
+    def get(self):
+        return Response("dual with slash")
+
+
+class DualNoSlashView(View):
+    def get(self):
+        return Response("dual without slash")
+
+
+class ItemView(View):
+    def get(self):
+        return Response(f"item {self.url_kwargs['id']}")
+
+
 class SlashRouter(Router):
     namespace = ""
     urls = [
         path("with-slash/", WithSlashView, name="with-slash"),
         path("without-slash", WithoutSlashView, name="without-slash"),
+        # Both forms of the same URL are explicitly defined — neither
+        # should trigger a redirect; both should resolve to their own view.
+        path("dual/", DualSlashView, name="dual-slash"),
+        path("dual", DualNoSlashView, name="dual-noslash"),
+        # Parameterized slashed route — used to verify the redirect
+        # carries converter-matched segments through correctly.
+        path("items/<int:id>/", ItemView, name="item-slash"),
     ]

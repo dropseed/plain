@@ -90,3 +90,46 @@ def test_post_body_is_lost_across_301_redirect(slash_client):
     assert response.redirect_chain == [("/with-slash/", 301)]
     assert response.request.method == "GET"
     assert response.content == b"with-slash GET"
+
+
+def test_both_slash_forms_explicit_no_redirect(slash_client):
+    """When both `path("dual/")` and `path("dual")` are defined, each form
+    resolves to its own view with no redirect. The redirect middleware
+    must not interfere when the requested form already matches a route.
+    """
+    response = slash_client.get("/dual/")
+    assert response.status_code == 200
+    assert response.content == b"dual with slash"
+
+    response = slash_client.get("/dual")
+    assert response.status_code == 200
+    assert response.content == b"dual without slash"
+
+
+def test_redirect_preserves_query_string(slash_client):
+    """The append-slash redirect must carry the query string through.
+
+    Step #2 will flip the status code to 308; the query-string preservation
+    is what we're pinning here.
+    """
+    response = slash_client.get("/with-slash?foo=bar&baz=qux")
+    assert response.status_code == 301
+    assert response.headers["Location"] == "/with-slash/?foo=bar&baz=qux"
+
+
+def test_redirect_works_for_parameterized_route(slash_client):
+    """`path("items/<int:id>/")` + request to `/items/42` → redirect to
+    `/items/42/`. The converter-matched segment must survive the redirect.
+    """
+    response = slash_client.get("/items/42")
+    assert response.status_code == 301
+    assert response.headers["Location"] == "/items/42/"
+
+
+def test_suffix_does_not_trigger_redirect(slash_client):
+    """`/with-slash.json` is a different URL from `/with-slash/`. The redirect
+    logic must not bridge the gap by stripping/munging arbitrary suffixes —
+    it should fall through to a normal 404.
+    """
+    response = slash_client.get("/with-slash.json")
+    assert response.status_code == 404
