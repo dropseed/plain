@@ -16,7 +16,7 @@ from plain.auth.views import LogoutView
 from plain.observer.urls import ObserverRouter
 from plain.pageviews.urls import PageviewsRouter
 from plain.passwords.views import PasswordLoginView
-from plain.templates.views import TemplateView
+from plain.templates.views import NotFoundView, TemplateView
 from plain.urls import Router, include, path
 
 
@@ -61,4 +61,5 @@ class AppRouter(Router):
         path("sse/ticker/", StockTickerView, name="sse_ticker"),
         path("jobs/run/", RunExampleJobView, name="run_example_job"),
         path("", IndexView, name="index"),
+        path("<path:_>", NotFoundView),
     ]

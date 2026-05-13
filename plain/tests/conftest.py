@@ -75,3 +75,22 @@ def boundary_client():
 def path_client():
     """Client routed to `path_routers.PathRouter` for raw-path edge case tests."""
     yield from _swap_router("path_routers.PathRouter")
+
+
+@pytest.fixture
+def catchall_client():
+    """Client routed to `catchall_routers.CatchallRouter` for catchall semantics."""
+    yield from _swap_router("catchall_routers.CatchallRouter")
+
+
+@pytest.fixture
+def slashed_catchall_client():
+    """Client for the slashed variant — `path("<path:_>/")` is NOT a catchall."""
+    yield from _swap_router("catchall_routers.SlashedCatchallRouter")
+
+
+@pytest.fixture
+def included_catchall_client():
+    """Catchall inside `include()` — pins that the catchall signal
+    propagates through include wrapping."""
+    yield from _swap_router("catchall_routers.IncludedCatchallRouter")

@@ -1,31 +1,35 @@
 """System tests for view exception handling.
 
-The framework default renders `{status}.html` for any exception — from a
-`TemplateView`, a plain `View` that re-raises, URL resolution failure,
-or middleware. Views that want a non-HTML format (like `APIView`)
-override `handle_exception` to opt out. Plain-text fallback kicks in
-only when the template is missing or fails to render.
+The framework default returns plain text for any exception. `TemplateView`
+overrides `handle_exception` to render `{status}.html`; subclasses
+inherit that. Plain `View` doesn't override the hook, so exceptions
+raised from a plain view fall through to the framework's plain-text
+default. For URL-resolution failures (no view ever runs), mount
+`NotFoundView` as a `path("<path:_>", ...)` catch-all to get the styled
+404 there too.
 """
 
 from __future__ import annotations
 
 
-class TestPlainViewRendersHtml:
-    """A plain `View` re-raises; the framework renders `{status}.html`."""
+class TestPlainViewFallsThroughToText:
+    """A plain `View` re-raises; the framework default returns plain text."""
 
-    def test_404_renders_404_html(self, error_client):
+    def test_404_renders_plain_text(self, error_client):
         response = error_client.get("/plain-404/")
         assert response.status_code == 404
-        assert b"Test 404 page" in response.content
+        assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
+        assert response.content == b"404 Not Found"
 
-    def test_500_renders_500_html(self, error_client):
+    def test_500_renders_plain_text(self, error_client):
         response = error_client.get("/plain-500/")
         assert response.status_code == 500
-        assert b"Test 500 page" in response.content
+        assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
+        assert response.content == b"500 Internal Server Error"
 
 
 class TestTemplateViewRendersHtml:
-    """Same as plain `View` — no separate handle_exception needed."""
+    """`TemplateView.handle_exception` renders `{status}.html`."""
 
     def test_404_renders_404_html(self, error_client):
         response = error_client.get("/template-404/")
@@ -45,11 +49,21 @@ class TestTemplateViewRendersHtml:
         assert response.content == b"403 Forbidden"
 
 
-class TestUnknownUrlRendersHtml:
-    """URL resolution failures happen before any view — still get `404.html`."""
+class TestNotFoundViewCatchAll:
+    """`NotFoundView` mounted as `path("<path:_>", ...)` renders `404.html`
+    for unmatched URLs — covering the URL-resolution-failure case that
+    never reaches a user view.
+    """
 
     def test_unknown_url_renders_404_html(self, error_client):
         response = error_client.get("/no-such-path/")
+        assert response.status_code == 404
+        assert b"Test 404 page" in response.content
+
+    def test_post_to_unknown_url_is_404_not_405(self, error_client):
+        """`before_request` raises before method dispatch, so non-GET methods
+        get the same 404 instead of a 405 Method Not Allowed."""
+        response = error_client.post("/no-such-path/", data={})
         assert response.status_code == 404
         assert b"Test 404 page" in response.content
 
@@ -57,7 +71,7 @@ class TestUnknownUrlRendersHtml:
 class TestCustomHTTPExceptionSubclass:
     """User-defined HTTPException subclasses carry their own status_code."""
 
-    def test_custom_402_falls_back_to_text(self, error_client):
+    def test_custom_402_renders_plain_text(self, error_client):
         response = error_client.get("/plain-402/")
         assert response.status_code == 402
         assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
@@ -65,7 +79,10 @@ class TestCustomHTTPExceptionSubclass:
 
 
 class TestRenderFailureFallsBackToText:
-    """If `{status}.html` itself raises, we fall back without recursing."""
+    """If `{status}.html` itself raises, the view returns a bare-status
+    response and `response.exception` is stamped by `_respond_to_exception`
+    so observability still records the original failure.
+    """
 
     def test_broken_500_template_falls_back_to_text(self, error_client, monkeypatch):
         from plain.templates import Template
@@ -81,7 +98,5 @@ class TestRenderFailureFallsBackToText:
 
         response = error_client.get("/template-500/")
         assert response.status_code == 500
-        # Template render raised (not TemplateFileMissing), so we get a
-        # bare-status Response with the original exception attached.
         assert response.content == b""
         assert response.exception is not None

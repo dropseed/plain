@@ -3,15 +3,18 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from functools import cached_property
-from typing import Any
+from typing import Any, NoReturn
 
 from plain.exceptions import ImproperlyConfigured
 from plain.forms import BaseForm, Form
-from plain.http import NotFoundError404, RedirectResponse, Response
+from plain.http import HTTPException, NotFoundError404, RedirectResponse, Response
+from plain.logs import get_framework_logger
 from plain.runtime import settings
 from plain.views import View
 
 from .core import Template, TemplateFileMissing
+
+logger = get_framework_logger("plain.templates")
 
 try:
     from plain.postgres.exceptions import ObjectDoesNotExist
@@ -69,6 +72,45 @@ class TemplateView(View):
 
     def get(self) -> Response:
         return Response(self.render_template())
+
+    def handle_exception(self, exc: Exception) -> Response:
+        """Render `{status}.html` for the exception, falling through on missing template."""
+        status = exc.status_code if isinstance(exc, HTTPException) else 500
+        try:
+            body = Template(f"{status}.html").render(
+                {
+                    "request": self.request,
+                    "status_code": status,
+                    "exception": exc,
+                    "DEBUG": settings.DEBUG,
+                }
+            )
+            return Response(body, status_code=status)
+        except TemplateFileMissing:
+            # Defer to the framework default for plain-text rendering.
+            # `from None` keeps observability tools from seeing
+            # `TemplateFileMissing` as the suppressed cause of `exc`.
+            raise exc from None
+        except Exception as render_exc:
+            if settings.DEBUG:
+                raise
+            logger.error(
+                "Error template render failed",
+                extra={
+                    "path": self.request.path,
+                    "status_code": status,
+                    "request": self.request,
+                },
+                exc_info=render_exc,
+            )
+            return Response(status_code=status)
+
+
+class NotFoundView(TemplateView):
+    """Catchall view: raises 404 before method dispatch, renders `404.html`."""
+
+    def before_request(self) -> NoReturn:
+        raise NotFoundError404
 
 
 class FormView[F: "BaseForm"](TemplateView):
@@ -283,6 +325,7 @@ class ListView(TemplateView, ABC):
 
 __all__ = [
     "TemplateView",
+    "NotFoundView",
     "FormView",
     "CreateView",
     "UpdateView",

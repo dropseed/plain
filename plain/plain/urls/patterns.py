@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cached_property
 from typing import Any
 
 from plain.preflight import PreflightResult
@@ -41,6 +42,18 @@ class URLPattern:
             description += f" [name='{self.name}']"
         return description
 
+    @cached_property
+    def is_catchall(self) -> bool:
+        """True for `path("<path:NAME>")` — sole-segment terminal multi-segment,
+        no trailing slash. The resolver gives these fallback semantics."""
+        segs = self.route.segments
+        return (
+            not self.route.trailing_slash
+            and len(segs) == 1
+            and isinstance(segs[0], Capture)
+            and segs[0].converter.multi_segment
+        )
+
     def preflight(self) -> list[PreflightResult]:
         if self.name and ":" in self.name:
             return [
@@ -65,36 +78,43 @@ class URLPattern:
     ) -> ResolverMatch | SlashMismatch | None:
         """Try matching the request against this endpoint.
 
-        Returns:
-            ResolverMatch — exact match (segments + trailing_slash agree)
-            SlashMismatch — segments matched, trailing_slash didn't
-            None — segments didn't match
+        Returns `ResolverMatch` on full match, `SlashMismatch` when
+        segments matched but the trailing slash didn't, or `None`. A
+        catchall (see `is_catchall`) absorbs the trailing slash into the
+        capture and never reports `SlashMismatch`; the yields-to-
+        SlashMismatch behavior lives in `URLResolver._resolve_segments`.
         """
-        match = _walk_segments(self.route.segments, segments, full_match=True)
+        match = _walk_segments(
+            self.route.segments,
+            segments,
+            full_match=True,
+            absorb_trailing_slash=self.is_catchall and trailing_slash,
+        )
         if match is None:
             return None
         _, captured = match
 
-        effective_trailing_slash = _effective_trailing_slash(
-            self.route.segments,
-            self.route.trailing_slash,
-            # Any non-empty prefix means we're under at least one `include()`,
-            # which always normalizes to a trailing slash separator.
-            ancestor_trailing_slash=bool(prefix_segments),
-        )
-
-        if trailing_slash == effective_trailing_slash:
-            kwargs = {**prefix_kwargs, **captured} if captured else prefix_kwargs
-            return ResolverMatch(
-                view_class=self.view_class,
-                kwargs=kwargs,
-                url_name=self.name,
-                route=_route_str(
-                    prefix_segments + self.route.segments, effective_trailing_slash
-                ),
+        if self.is_catchall:
+            route_ts = False
+        else:
+            route_ts = _effective_trailing_slash(
+                self.route.segments,
+                self.route.trailing_slash,
+                # A non-empty prefix means we're under an `include()`, which
+                # contributes its own slash separator.
+                ancestor_trailing_slash=bool(prefix_segments),
             )
+            if trailing_slash != route_ts:
+                return SlashMismatch()
 
-        return SlashMismatch()
+        kwargs = {**prefix_kwargs, **captured} if captured else prefix_kwargs
+        return ResolverMatch(
+            view_class=self.view_class,
+            kwargs=kwargs,
+            url_name=self.name,
+            route=_route_str(prefix_segments + self.route.segments, route_ts),
+            is_catchall=self.is_catchall,
+        )
 
 
 def _route_str(segments: tuple[Segment, ...], trailing_slash: bool) -> str:

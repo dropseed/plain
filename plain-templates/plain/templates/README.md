@@ -8,6 +8,7 @@
     - [TemplateView](#templateview)
     - [FormView](#formview)
     - [DetailView, CreateView, UpdateView, DeleteView, ListView](#object-views)
+- [Error views](#error-views)
 - [Template context](#template-context)
 - [Built-in globals](#built-in-globals)
 - [Built-in filters](#built-in-filters)
@@ -128,6 +129,29 @@ class ExampleDetailView(DetailView):
 ```
 
 The single object is exposed in templates as `object`; list views expose `objects`. Set `context_object_name` for a more descriptive name.
+
+## Error views
+
+`TemplateView` overrides `handle_exception` to render `{status}.html` for any exception that escapes the handler — `404.html` for `NotFoundError404`, `500.html` for unhandled errors, etc. The context is `{request, status_code, exception, DEBUG}`. On `TemplateFileMissing` the view returns a plain-text status response (`404 Not Found`, `500 Internal Server Error`); on any other render failure it logs and returns a bare-status `Response` so `_respond_to_exception` can still attach `response.exception` for observability.
+
+Plain core's exception handler — the one that catches pre-view failures like URL resolution and middleware errors — returns plain text. To get a styled 404 for unmatched URLs, mount [`NotFoundView`](./views.py#NotFoundView) as the last route:
+
+```python
+from plain.templates.views import NotFoundView
+from plain.urls import Router, path
+
+class AppRouter(Router):
+    urls = [
+        # ... your routes ...
+        path("<path:_>", NotFoundView),
+    ]
+```
+
+`NotFoundView.before_request` raises `NotFoundError404` before method dispatch, so every HTTP method produces a 404 instead of a 405.
+
+The resolver recognizes a sole-segment terminal `<path:>` as a **catchall**: it handles both `/missing` and `/missing/` from one mount, and it yields to trailing-slash redirects from specific routes. So `path("login/", LoginView)` followed by `path("<path:_>", NotFoundView)` still 308's `/login` to `/login/` rather than serving the 404 — the catchall only fires when nothing else came close.
+
+Your `500.html` template should be self-contained — avoid extending base templates or accessing the database/session, since 500s can fire during middleware or template-rendering errors. `404.html` and `403.html` can safely extend base templates since they happen after middleware runs.
 
 ## Template context
 

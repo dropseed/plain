@@ -226,7 +226,7 @@ class MyView(View):
         return super().handle_exception(exc)
 ```
 
-The framework's default renders `{status}.html` ([`Error views`](#error-views)) — most views don't need to override this hook. Override when you want a non-HTML format: `APIView` emits JSON. The base `View.handle_exception` re-raises, so unhandled cases fall through to the framework default.
+The base `View.handle_exception` re-raises, so unhandled cases fall through to the framework default — which returns a plain-text status line (`404 Not Found`, `500 Internal Server Error`, etc.). View subclasses that want a richer format override the hook: `TemplateView` renders [`{status}.html`](../../../../plain-templates/plain/templates/README.md#error-views), `APIView` emits JSON.
 
 `ResponseException` is unwrapped by `get_response` before `handle_exception` runs, so you don't need to handle it in overrides. Returning a **5xx** response is treated as a real failure: the framework logs the exception once (via `log_exception`) and attaches it to `response.exception` so observability tooling can record it. Returning a **4xx** response is silent — the view chose to render it as a handled outcome.
 
@@ -261,17 +261,21 @@ class ExampleView(View):
 
 ## Error views
 
-HTTP errors are rendered from templates named after the status code:
+Plain core's exception handler returns plain text — `404 Not Found`, `500 Internal Server Error`, etc. Styled error pages live in [`plain.templates`](../../../../plain-templates/plain/templates/README.md#error-views): `TemplateView.handle_exception` looks for `{status_code}.html` and renders it with `request`, `status_code`, `exception`, and `DEBUG` in context, falling back to plain text on `TemplateFileMissing`.
 
-- `templates/404.html` - Page not found
-- `templates/403.html` - Forbidden
-- `templates/500.html` - Server error
+To get a styled 404 for URL-resolution failures (where no view runs), mount [`NotFoundView`](../../../../plain-templates/plain/templates/views.py#NotFoundView) as the last route:
 
-Plain looks for `{status_code}.html` and renders it with `request`, `status_code`, and `exception` in context. If `plain.templates` isn't installed (or the template is missing or fails to render), a plain-text body is returned (`404 Not Found`, `500 Internal Server Error`, etc.). Most apps only need the three templates above.
+```python
+from plain.templates.views import NotFoundView
+from plain.urls import path
 
-This covers every error source — exceptions raised inside views, URL resolution failures, middleware errors — so `404.html` renders for any 404, not just ones raised from your own code. Views that want a different format (e.g. JSON for an API) override `handle_exception` to opt out.
+urls = [
+    # ... your routes ...
+    path("<path:_>", NotFoundView),
+]
+```
 
-Your `500.html` template should be self-contained. Avoid extending base templates or accessing the database/session, since server errors can occur during middleware or template rendering. `404.html` and `403.html` can safely extend base templates since they occur during view execution after middleware runs.
+The resolver treats a sole-segment terminal `<path:>` as a **catchall**: slash-agnostic, and yields to slash-mismatch redirects from specific routes. So you still get `/login` → 308 → `/login/` for `path("login/", LoginView)`, not a stray 404 from the catchall.
 
 ## View patterns
 

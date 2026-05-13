@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from plain.http import ForbiddenError403, HTTPException, NotFoundError404
-from plain.templates.views import TemplateView
+from plain.templates.views import NotFoundView, TemplateView
 from plain.urls import Router, path
 from plain.views import View
 
@@ -51,4 +51,5 @@ class ErrorRouter(Router):
         path("template-404/", TemplateViewRaises404, name="template-404"),
         path("template-403/", TemplateViewRaises403, name="template-403"),
         path("template-500/", TemplateViewRaises500, name="template-500"),
+        path("<path:_>", NotFoundView),
     ]

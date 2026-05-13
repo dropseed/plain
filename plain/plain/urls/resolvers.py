@@ -154,7 +154,24 @@ class URLResolver:
         remaining_segments = segments[consumed:]
         merged_prefix = prefix_segments + self.route.segments
 
+        def _wrap(rm: ResolverMatch) -> ResolverMatch:
+            return ResolverMatch(
+                view_class=rm.view_class,
+                kwargs=rm.kwargs,
+                url_name=rm.url_name,
+                namespaces=[self.namespace] + rm.namespaces,
+                route=rm.route,
+                is_catchall=rm.is_catchall,
+            )
+
+        # Priority:  specific ResolverMatch  >  SlashMismatch  >  catchall  >  None
+        # Catchalls are held aside so they don't eat slash redirects from
+        # specific siblings (the "shadow problem" — see `URLPattern.is_catchall`).
+        # `is_catchall` is preserved through `_wrap` so the signal survives
+        # arbitrary include nesting — a catchall inside `include("", X)`
+        # still yields to an outer SlashMismatch.
         pending: SlashMismatch | None = None
+        catchall: ResolverMatch | None = None
         for child in self.url_patterns:
             if isinstance(child, URLPattern):
                 result = child.resolve(
@@ -166,18 +183,17 @@ class URLResolver:
                 )
 
             if isinstance(result, ResolverMatch):
-                # ResolverMatch filters falsy namespaces, so the root's "" drops out.
-                return ResolverMatch(
-                    view_class=result.view_class,
-                    kwargs=result.kwargs,
-                    url_name=result.url_name,
-                    namespaces=[self.namespace] + result.namespaces,
-                    route=result.route,
-                )
-            if isinstance(result, SlashMismatch) and pending is None:
+                if result.is_catchall:
+                    if catchall is None:
+                        catchall = _wrap(result)
+                else:
+                    return _wrap(result)
+            elif isinstance(result, SlashMismatch) and pending is None:
                 pending = result
 
-        return pending
+        if pending is not None:
+            return pending
+        return catchall
 
     def reverse(
         self,
