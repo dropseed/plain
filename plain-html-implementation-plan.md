@@ -55,6 +55,7 @@ These were left implicit in v1 of the plan. Pinning them now avoids mid-stream d
 - **Astro's prettier plugin** (`prettier-plugin-astro`) — `.astro` files are frontmatter (`---`) + HTML + `{js}`. Same architecture as ours. The issue tracker is where the lessons live.
 - **djLint** — Python, template-aware (Django/Jinja/Nunjucks/Handlebars/Twig). Closest functional analog; long history of whitespace bugs to learn from.
 - **Prettier's HTML core** (`prettier/src/language-html/`) — reference implementation of whitespace-sensitivity. Specifically `clean.js`, `print/element.js`, `utils/is-whitespace-sensitive-node.js`.
+- **Prettier's test suite** (`prettier/tests/format/html/`) — the golden-file corpus that pins formatter output for every tricky shape. Worth studying both for what shapes they cover (whitespace edges, embedded scripts, void elements, nested inline/block) and for the snapshot infrastructure pattern. Strong reference for the corpus-test strategy below.
 - **Svelte formatter** — different syntax, same class of problem (frontmatter-ish + HTML + embedded expressions).
 - **Wadler, "A Prettier Printer"** (1998) — the doc-tree algorithm. ~12 pages; everyone descends from this.
 - **WHATWG content categories** (https://html.spec.whatwg.org/multipage/dom.html#content-categories) — normative source for phrasing-content (inline) vs flow-content (block) and content-model rules. Tier-2 lint rules are tables transcribed from here.
@@ -83,6 +84,17 @@ These two constrain every other decision below. Both gate the phase.
 | **Lint rule taxonomy**            | Ruff-style codes: `PH001`…`PH0xx` for syntax/structure (Phase 8), `PH1xx` for content-model (Phase 17 tier 2), `PH2xx` for a11y (Phase 17 tier 3). Configured under `[tool.plain.html]` in `pyproject.toml`, per-rule severity. |
 | **Performance budget**            | Format the entire monorepo's `.plain` corpus in under 2 seconds; format a single template in under 10 ms (warm). Set the budget now so we don't ship something glacial like early djLint.                                       |
 | **Editor integration**            | CLI-only in v1. LSP is a follow-up, not a blocker.                                                                                                                                                                              |
+
+### Conformance test strategy
+
+The two hard invariants above can't be exhaustively tested with hand-written cases. Layered conformance tests catch regressions automatically and document the corner cases the formatter has learned. Wire these up in roughly this order:
+
+1. **Repo corpus property test** (cheapest, highest signal). Walks every `.html` template in the repo, asserts: parses cleanly, `format(format(x)) == format(x)`, `render(format(x), ctx) == render(x, ctx)` with `>\s+<` normalization for flow-content whitespace. Real templates are the hardest corpus — no fixture maintenance, regressions surface the moment a template lands. Runs under `./scripts/test`.
+2. **html5lib DOM comparison** (pure-Python, small dep). Parse source and formatted output with `html5lib`, compare normalized parse trees. Catches structural divergence even when text rendering happens to match. Stronger than the regex normalizer for tricky inline/block boundaries.
+3. **Golden-snapshot corpus** (prettier-style). A fixture directory of `(input.html, expected.html)` pairs covering shapes the corpus doesn't naturally exercise — long attribute lists, deeply nested inline-in-block, `<pre>` with `{expr}`, comment-heavy templates, frontmatter edges. Each pair locks behavior; updates are explicit diffs in PRs. Mirrors Prettier's `tests/format/html/` layout. Grow incrementally as bugs surface.
+4. **Optional: Nu Html Checker (vnu.jar)** as a CI-only validator step. The W3C reference HTML5 validator. Authoritative "did we break HTML semantics" signal. Heavy (Java dep); skip locally, run on CI.
+
+Strategy: ship (1) with the formatter; add (2) when render-equivalence false positives start showing up; build out (3) as a regression net once the formatter stabilizes; (4) is opt-in if we hit a class of bugs DOM comparison misses.
 
 ## Open spec questions, mapped to phases
 
@@ -412,12 +424,14 @@ Deliverables:
 
 Success criteria (each gates the phase):
 
-1. **Idempotency property test**: `format(format(x)) == format(x)` holds across every `.plain` file in the repo's corpus, and across a hand-curated set of pathological inputs (deeply nested inline elements, mixed inline/block, long attribute lists, `<pre>` with embedded `{expr}`, `<script>` containing `{`-like JS, comment-heavy templates).
+1. **Idempotency property test**: `format(format(x)) == format(x)` holds across every `.html` file in the repo's corpus, and across a hand-curated set of pathological inputs (deeply nested inline elements, mixed inline/block, long attribute lists, `<pre>` with embedded `{expr}`, `<script>` containing `{`-like JS, comment-heavy templates).
 2. **Render-equivalence property test**: for every `(template, context)` fixture in the parity harness (Phase 7), `render(format(template), ctx) == render(template, ctx)`. The parity harness is reused here; this is the hard invariant.
 3. **Comment preservation**: `{# … #}` and `<!-- … -->` survive round-trip.
-4. **Performance**: format the entire monorepo's `.plain` corpus in under 2 seconds wall-clock; format a single typical template in under 10 ms (warm).
+4. **Performance**: format the entire monorepo's `.html` corpus in under 2 seconds wall-clock; format a single typical template in under 10 ms (warm).
 5. **No bytes-inside-`{}` changes**: assertion in tests that for every expression token, the bytes between its `{` and `}` are identical pre- and post-format.
 6. **Frontmatter untouched**: assertion in tests that the bytes from start-of-file to the end of the frontmatter delimiter are identical pre- and post-format.
+
+Conformance test layering (per the **Conformance test strategy** section above): success criteria 1, 2, 5, and 6 are implemented as the repo-corpus property test (tier 1). The hand-curated pathological inputs in criterion 1 live in the golden-snapshot corpus (tier 3) — grow it as bugs surface, mirroring Prettier's `tests/format/html/` layout. html5lib DOM comparison (tier 2) backs criterion 2 when regex normalization isn't strong enough.
 
 Non-deliverables (explicitly deferred):
 
