@@ -46,6 +46,44 @@ These were left implicit in v1 of the plan. Pinning them now avoids mid-stream d
 | **Migration env var**                  | `PLAIN_HTML_RENDERER=new`. Read once at loader init. Removed in Phase 16.                                                                                                                                                                                                                                                                                                                               |
 | **Dual-engine cost during migration**  | Both Jinja and `plain.html` are runtime dependencies of `plain` between Phase 7 and Phase 16. Acceptable; Jinja drops from `pyproject.toml` only at Phase 16.                                                                                                                                                                                                                                           |
 
+## Formatter & linter — decisions (resolve before Phase 9.5)
+
+`plain html format` ships before migration begins in earnest (Phase 10) so each ported template can be formatted as it lands. These decisions are scoped to that work; they are not yet resolved.
+
+**Prior art to study before writing code:**
+
+- **Astro's prettier plugin** (`prettier-plugin-astro`) — `.astro` files are frontmatter (`---`) + HTML + `{js}`. Same architecture as ours. The issue tracker is where the lessons live.
+- **djLint** — Python, template-aware (Django/Jinja/Nunjucks/Handlebars/Twig). Closest functional analog; long history of whitespace bugs to learn from.
+- **Prettier's HTML core** (`prettier/src/language-html/`) — reference implementation of whitespace-sensitivity. Specifically `clean.js`, `print/element.js`, `utils/is-whitespace-sensitive-node.js`.
+- **Svelte formatter** — different syntax, same class of problem (frontmatter-ish + HTML + embedded expressions).
+- **Wadler, "A Prettier Printer"** (1998) — the doc-tree algorithm. ~12 pages; everyone descends from this.
+- **WHATWG content categories** (https://html.spec.whatwg.org/multipage/dom.html#content-categories) — normative source for phrasing-content (inline) vs flow-content (block) and content-model rules. Tier-2 lint rules are tables transcribed from here.
+- **prettier-plugin-tailwindcss** — reference if/when class sorting ships. Idempotency under `tailwind.config.js` resolution is non-trivial.
+
+**Hard invariants the formatter must hold (table-stakes, not negotiable):**
+
+1. **Idempotency**: `format(format(x)) == format(x)` for every input.
+2. **Render equivalence**: `render(format(x), ctx) == render(x, ctx)` for every input and every context.
+
+These two constrain every other decision below. Both gate the phase.
+
+| Decision                          | Lean / status                                                                                                                                                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Whitespace sensitivity policy** | Cite WHATWG phrasing-content as the inline list; `<pre>`/`<textarea>`/`<script>`/`<style>` are verbatim; everything else is block. Document any departures in the README.                                                       |
+| **Expression interior handling**  | Formatter does **not** modify bytes inside `{...}`. Treat as opaque in v1. Python style is ruff's job elsewhere.                                                                                                                |
+| **Template comment preservation** | `{# … #}` is currently dropped at tokenize. **Blocker.** Phase 3 amended to emit a `TemplateCommentToken`/`Node` so the formatter can round-trip.                                                                               |
+| **Attribute order**               | Preserve author order. Match Prettier.                                                                                                                                                                                          |
+| **Attribute quoting**             | Normalize to double quotes; convert single only when no embedded `"` would force re-escaping.                                                                                                                                   |
+| **Boolean attribute form**        | Normalize `disabled="disabled"` → `disabled`; leave `disabled` alone.                                                                                                                                                           |
+| **Class attribute sorting**       | **Out of v1.** Idempotency under arbitrary CSS frameworks is non-trivial; revisit as an opt-in rule once Tailwind v4 integration story is locked.                                                                               |
+| **Directive layout**              | `:if`/`:for`/`:include` formatted as ordinary attributes; same wrapping rules apply when a tag exceeds print width.                                                                                                             |
+| **Frontmatter**                   | Preserved byte-for-byte in v1. Formatter never touches the YAML block.                                                                                                                                                          |
+| **Print width / indent**          | 88 columns, 4-space indent. Matches ruff and Python convention; consistent with Plain's existing tooling.                                                                                                                       |
+| **CLI surface**                   | `plain html format` (write) and `plain html format --check` (CI). Wired into `./scripts/fix` and `./scripts/check`. Not folded into `plain code` — kept distinct so the HTML formatter can be invoked standalone.               |
+| **Lint rule taxonomy**            | Ruff-style codes: `PH001`…`PH0xx` for syntax/structure (Phase 8), `PH1xx` for content-model (Phase 17 tier 2), `PH2xx` for a11y (Phase 17 tier 3). Configured under `[tool.plain.html]` in `pyproject.toml`, per-rule severity. |
+| **Performance budget**            | Format the entire monorepo's `.plain` corpus in under 2 seconds; format a single template in under 10 ms (warm). Set the budget now so we don't ship something glacial like early djLint.                                       |
+| **Editor integration**            | CLI-only in v1. LSP is a follow-up, not a blocker.                                                                                                                                                                              |
+
 ## Open spec questions, mapped to phases
 
 The [spec](plain-template-language.md) lists open design questions; each gets pinned to the phase where it gets decided:
@@ -169,6 +207,7 @@ Verification:
 Deliverables:
 
 - `plain.html.tokenizer` module that converts a template body string into a stream of tokens: tags (open/close/void/self-closing), attributes, text, expression spans (`{...}`), template comments (`{# #}`), HTML comments (`<!-- -->`).
+- Template comments are emitted as a typed `TemplateCommentToken` (not dropped). Required so Phase 9.5's formatter can round-trip them; renderer discards them at render time.
 - Strict mode — fails on unbalanced angle brackets, unterminated strings, etc.
 - Each token carries `(start_line, start_col, end_line, end_col)`.
 - `<script>` and `<style>` bodies tokenized as opaque text (no expression recognition); a `{...}` inside raises a `TokenizeError` per spec.
@@ -350,6 +389,45 @@ Success criteria:
 
 ---
 
+### Phase 9.5 — `plain html format`
+
+**Goal**: ship a formatter before migration begins in earnest (Phase 10), so each ported template gets formatted as it lands and the corpus stays consistent.
+
+Prereq: Phase 3 amendment landed — `TemplateCommentToken` is preserved through tokenize/parse. Without it, the formatter erases author comments.
+
+Deliverables:
+
+- `plain html format <path>` CLI command (write mode) and `plain html format --check <path>` (CI mode; nonzero exit if any file would change).
+- Walks one or more `.plain` files; for each:
+    - Parses frontmatter (Phase 2), tokenizes (Phase 3), builds tag tree (Phase 4).
+    - Pretty-prints the body using a doc-tree printer (Wadler-style) over the parsed nodes.
+    - Re-emits the frontmatter block **byte-for-byte unchanged**.
+- Whitespace-sensitivity model derived from WHATWG content categories. Inline (phrasing-content) elements never get newlines injected inside or around them; block elements wrap freely; `<pre>`/`<textarea>`/`<script>`/`<style>` bodies are verbatim. The classification table ships in `plain.html.format.whitespace`.
+- Attribute wrapping: single line until the tag exceeds 88 columns, then one attribute per line, aligned under the tag name; closing `>` on its own line.
+- Quote normalization, boolean-attribute normalization per the decisions table above.
+- `{...}` interiors are opaque — the formatter never edits Python source inside an expression.
+- Reads stdin / writes stdout when path is `-`, for editor integration.
+- Wired into `./scripts/fix` (format mode) and `./scripts/check` (check mode).
+- Prior art for implementation reference: `prettier-plugin-astro`, `djLint`, prettier's `language-html/`.
+
+Success criteria (each gates the phase):
+
+1. **Idempotency property test**: `format(format(x)) == format(x)` holds across every `.plain` file in the repo's corpus, and across a hand-curated set of pathological inputs (deeply nested inline elements, mixed inline/block, long attribute lists, `<pre>` with embedded `{expr}`, `<script>` containing `{`-like JS, comment-heavy templates).
+2. **Render-equivalence property test**: for every `(template, context)` fixture in the parity harness (Phase 7), `render(format(template), ctx) == render(template, ctx)`. The parity harness is reused here; this is the hard invariant.
+3. **Comment preservation**: `{# … #}` and `<!-- … -->` survive round-trip.
+4. **Performance**: format the entire monorepo's `.plain` corpus in under 2 seconds wall-clock; format a single typical template in under 10 ms (warm).
+5. **No bytes-inside-`{}` changes**: assertion in tests that for every expression token, the bytes between its `{` and `}` are identical pre- and post-format.
+6. **Frontmatter untouched**: assertion in tests that the bytes from start-of-file to the end of the frontmatter delimiter are identical pre- and post-format.
+
+Non-deliverables (explicitly deferred):
+
+- Class-attribute sorting (Tailwind-aware or otherwise). Tracked as a follow-up.
+- Expression-interior formatting (running ruff over `{...}` contents). Tracked as a follow-up.
+- LSP / editor protocol integration. CLI is the only entry point in v1.
+- Tier-2/Tier-3 lint rules (those stay in Phase 17).
+
+---
+
 ### Phase 10 — Port `example/` app
 
 Deliverables:
@@ -488,12 +566,22 @@ Success criteria:
 
 **Out of v1 migration scope** but explicitly on the roadmap per the spec's "HTML correctness" section.
 
+Rule-code scheme (decided in the formatter/linter decisions table above):
+
+- `PH0xx` — syntax & structure (Phase 8, already shipped).
+- `PH1xx` — content model (this phase, tier 2).
+- `PH2xx` — accessibility (this phase, tier 3).
+- Config under `[tool.plain.html]` in `pyproject.toml`, per-rule severity (`error` / `warning` / `off`).
+
 Deliverables (incremental):
 
-- **Tier 2 — content model**: WHATWG nesting rules (`<p>` content model, `<a>` non-nesting, `<button>` interactive content, `<table>` structure, `<ul>`/`<ol>` children, `<dl>`/`<head>` content), required attributes (`<a href>`, `<img alt>`, `<input type>`), attribute value validity (`<input type="...">`, `<meta charset>`, `<link rel>`), duplicate-id detection within a rendered template.
-- **Tier 3 — accessibility**: heading hierarchy, accessible names on `<button>`, ARIA attribute validity, form-label association. Warnings, off-able per rule.
-- **Configuration**: ruff-style `[tool.plain.template-check.rules]` in `pyproject.toml`, per-rule severity.
+- **Tier 2 (`PH1xx`) — content model**: WHATWG nesting rules (`<p>` content model, `<a>` non-nesting, `<button>` interactive content, `<table>` structure, `<ul>`/`<ol>` children, `<dl>`/`<head>` content), required attributes (`<a href>`, `<img alt>`, `<input type>`), attribute value validity (`<input type="...">`, `<meta charset>`, `<link rel>`), duplicate-id detection within a rendered template. Rules transcribed from WHATWG content-category tables.
+- **Tier 3 (`PH2xx`) — accessibility**: heading hierarchy, accessible names on `<button>`, ARIA attribute validity, form-label association. Warnings by default, off-able per rule.
 - **Optional Nu Html Checker backend** for CI deep-checks.
+- **Formatter follow-ups** (separate, opt-in features — not lint rules):
+    - Class-attribute sorting (Tailwind-aware initially; pluggable for other frameworks).
+    - Expression-interior formatting (run ruff over `{...}` bodies). Idempotency must still hold.
+    - LSP server so format/check work in-editor without invoking the CLI.
 
 Sequenced post-migration so the engine can stabilize first; users get a clean v1 without lint-rule churn. Promotes the "type checker for embedded Python" pitch into the spec-claimed "linter for HTML + Python."
 
@@ -509,7 +597,8 @@ Plan complete when:
 4. `./scripts/test`, `./scripts/check`, and `./scripts/pre-commit` all pass.
 5. The example app and `plain.admin` both work end-to-end.
 6. `plain html check` passes across all `.plain` files in the repo.
-7. The parity harness is either retired or repurposed as a snapshot suite; either way it is intentional, not lingering.
+7. `plain html format --check` passes across all `.plain` files in the repo (every template is in canonical form).
+8. The parity harness is either retired or repurposed as a snapshot suite; either way it is intentional, not lingering.
 
 ## Risk register
 
