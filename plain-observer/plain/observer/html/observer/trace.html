@@ -1,0 +1,112 @@
+---
+imports:
+  - from plain.utils.timezone import localtime
+attrs:
+  trace: Any
+---
+<header class="mb-2">
+    {# `htmxfragment` in the Jinja version emitted `<div plain-hx-fragment="header" ...>`; #}
+    {# plain.html doesn't have the fragment shorthand yet, so the attributes are inlined. #}
+    <div plain-hx-fragment="header" hx-swap="innerHTML" hx-target="this" hx-indicator="this" id="plain-hx-fragment-header">
+        <div class="flex items-start justify-between">
+            <h2 class="text-lg font-semibold text-white flex-1 min-w-0">{trace.root_span_name}</h2>
+            <div class="flex items-center gap-2">
+                <button
+                    data-copy-json
+                    data-json-url={trace.get_absolute_url() + "?format=json"}
+                    class="cursor-pointer px-2 py-1 text-xs bg-white/10 text-white/70 hover:bg-white/20 hover:text-white rounded transition-colors flex items-center gap-1.5"
+                    title="Copy trace as JSON">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                        <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                    </svg>
+                    <span>Copy JSON</span>
+                </button>
+                <div class="relative group">
+                    <div class="flex items-center gap-2 hover:bg-white/10 rounded-lg p-1 transition-colors cursor-pointer">
+                        <svg class="w-4 h-4 text-white/70" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+                        </svg>
+                    </div>
+                    <div class="absolute right-0 mt-3 w-64 bg-stone-900 rounded-lg shadow-lg border border-stone-700 py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                        <div class="py-1">
+                            <a
+                                href={trace.get_absolute_url() + "?format=json"}
+                                target="_blank"
+                                class="cursor-pointer w-full text-left px-4 py-3 text-sm text-stone-200 hover:bg-stone-800 transition-colors flex items-center gap-3">
+                                <svg class="w-4 h-4 text-stone-400" fill="currentColor" viewBox="0 0 16 16">
+                                    <path fill-rule="evenodd" d="M14 4.5V11h-1V4.5h-2A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v9H2V2a2 2 0 0 1 2-2h5.5zM4.151 15.29a1.2 1.2 0 0 1-.111-.449h.764a.58.58 0 0 0 .255.384q.105.073.25.114.142.041.319.041.245 0 .413-.07a.56.56 0 0 0 .255-.193.5.5 0 0 0 .084-.29.39.39 0 0 0-.152-.326q-.152-.12-.463-.193l-.618-.143a1.7 1.7 0 0 1-.539-.214 1 1 0 0 1-.352-.367 1.1 1.1 0 0 1-.123-.524q0-.366.19-.639.192-.272.528-.422.337-.15.777-.149.456 0 .779.152.326.153.5.41.18.255.2.566h-.75a.56.56 0 0 0-.12-.258.6.6 0 0 0-.246-.181.9.9 0 0 0-.37-.068q-.324 0-.512.152a.47.47 0 0 0-.185.384q0 .18.144.3a1 1 0 0 0 .404.175l.621.143q.326.075.566.211a1 1 0 0 1 .375.358q.135.222.135.56q0 .37-.188.656a1.2 1.2 0 0 1-.539.439q-.351.158-.858.158-.381 0-.665-.09a1.4 1.4 0 0 1-.478-.252 1.1 1.1 0 0 1-.29-.375m-3.104-.033a1.3 1.3 0 0 1-.082-.466h.764a.6.6 0 0 0 .074.27.5.5 0 0 0 .454.246q.285 0 .422-.164.137-.165.137-.466v-2.745h.791v2.725q0 .66-.357 1.005-.355.345-.985.345a1.6 1.6 0 0 1-.568-.094 1.15 1.15 0 0 1-.407-.266 1.1 1.1 0 0 1-.243-.39m9.091-1.585v.522q0 .384-.117.641a.86.86 0 0 1-.322.387.9.9 0 0 1-.47.126.9.9 0 0 1-.47-.126.87.87 0 0 1-.32-.387 1.55 1.55 0 0 1-.117-.641v-.522q0-.386.117-.641a.87.87 0 0 1 .32-.387.87.87 0 0 1 .47-.129q.265 0 .47.129a.86.86 0 0 1 .322.387q.117.255.117.641m.803.519v-.513q0-.565-.205-.973a1.46 1.46 0 0 0-.59-.63q-.38-.22-.916-.22-.534 0-.92.22a1.44 1.44 0 0 0-.589.628q-.205.407-.205.975v.513q0 .562.205.973.205.407.589.626.386.217.92.217.536 0 .917-.217.384-.22.589-.626.204-.41.205-.973m1.29-.935v2.675h-.746v-3.999h.662l1.752 2.66h.032v-2.66h.75v4h-.656l-1.761-2.676z"/>
+                                </svg>
+                                View as JSON
+                            </a>
+                            <a
+                                href={trace.get_absolute_url() + "?logs=true"}
+                                target="_blank"
+                                class="cursor-pointer w-full text-left px-4 py-3 text-sm text-stone-200 hover:bg-stone-800 transition-colors flex items-center gap-3">
+                                <svg class="w-4 h-4 text-stone-400" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z"/>
+                                </svg>
+                                View Logs
+                            </a>
+                            <button
+                                hx-delete={trace.get_absolute_url()}
+                                hx-swap="none"
+                                hx-confirm="Delete this trace?"
+                                class="cursor-pointer w-full text-left px-4 py-3 text-sm text-red-200 hover:bg-red-900/30 transition-colors flex items-center gap-3">
+                                <svg class="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+                                    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+                                </svg>
+                                Delete Trace
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+<div class="space-y-2">
+    <div class="flex items-center justify-between">
+        <span :if={trace.summary} class="text-xs inline-flex items-center px-2 py-0.5 bg-white/10 text-white/80 rounded-md border border-white/10">
+            {trace.summary}
+        </span>
+        <div :if={not trace.summary}></div>
+        <div class="text-xs text-white/40">
+            <span class="text-white/30">Trace ID:</span> <span class="font-mono">{trace.trace_id}</span>
+        </div>
+    </div>
+
+    <div :if={trace.request_id or trace.user_id or trace.session_id or trace.app_version} class="bg-white/5 rounded-lg border border-white/10 p-3">
+        <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/70">
+            <div :if={trace.request_id}>
+                <span class="text-white/50">Request:</span> {trace.request_id}
+            </div>
+            <div :if={trace.user_id}>
+                <span class="text-white/50">User:</span> {trace.user_id}
+            </div>
+            <div :if={trace.session_id}>
+                <span class="text-white/50">Session:</span> {trace.session_id}
+            </div>
+            <div :if={trace.app_version}>
+                <span class="text-white/50">App Version:</span> {trace.app_version}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-6">
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-medium text-white/80">Spans ({trace.spans.query.count()}) + Logs ({trace.logs.query.count()})</h3>
+        <div class="text-xs text-white/60">
+            <span class="text-white/50">Started:</span> {localtime(trace.start_time).strftime("%b %-d, %-I:%M %p")}
+        </div>
+    </div>
+    <div class="space-y-1 text-xs">
+        <template :for={event in trace.get_timeline_events()}>
+            <template :if={event["type"] == 'span'} :include="observer/partials/span" trace={trace} span={event["instance"]} event={event} />
+            <template :if={event["type"] == 'log'} :include="observer/partials/log" log={event["instance"]} event={event} />
+        </template>
+        <div :if={not trace.get_timeline_events()}>No spans or logs...</div>
+    </div>
+</div>
