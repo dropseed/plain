@@ -21,15 +21,15 @@ class Router:
 
 
 def _normalize_include_route(route: str) -> str:
-    """Strip leading/trailing slashes; append a trailing slash if non-empty.
+    """Strip leading slashes; preserve trailing slash as the source of truth
+    for the include's index URL.
 
-    `include("admin")`, `include("admin/")`, and `include("/admin/")` all
-    collapse to `"admin/"`. The empty string stays empty (root include).
+    `include("admin/")` declares `/admin/` as canonical; `include("admin")`
+    declares `/admin`. `/admin` vs `/admin/` separation between prefix and
+    child segments is enforced structurally by segment-based matching, so
+    the trailing slash is free to carry the canonical-form signal.
     """
-    stripped = route.strip("/")
-    if not stripped:
-        return ""
-    return f"{stripped}/"
+    return route.lstrip("/")
 
 
 def include(

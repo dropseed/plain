@@ -292,7 +292,6 @@ def _walk_segments(
     path_segments: tuple[str, ...],
     *,
     full_match: bool,
-    absorb_trailing_slash: bool = False,
 ) -> tuple[int, dict[str, Any]] | None:
     """Walk `route_segments` against `path_segments`, capturing converters.
 
@@ -305,10 +304,10 @@ def _walk_segments(
     Returns None on any mismatch.
 
     A multi-segment `Capture` is always terminal and consumes all
-    remaining path segments joined by `/`. When `absorb_trailing_slash`
-    is set, a trailing `/` is appended to the captured value — used by
-    catchall patterns (`URLPattern.is_catchall`) so a single declared
-    route handles both slash forms of the request.
+    remaining path segments joined by `/`. Catchall patterns (which
+    additionally absorb the request's trailing slash into the captured
+    value) do their own matching inline in `URLPattern.resolve` so the
+    catchall concern doesn't leak into this primitive.
     """
     captured: dict[str, Any] = {}
     si = 0
@@ -340,8 +339,6 @@ def _walk_segments(
         # Capture
         if seg.converter.multi_segment:
             value = "/".join(path_segments[si:])
-            if absorb_trailing_slash and value:
-                value += "/"
         elif si < len(path_segments):
             value = path_segments[si]
         else:

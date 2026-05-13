@@ -13,6 +13,7 @@ from .segments import (
     Route,
     Segment,
     _effective_trailing_slash,
+    _segment_value_matches,
     _walk_segments,
 )
 
@@ -74,38 +75,36 @@ class URLPattern:
         segments: tuple[str, ...],
         trailing_slash: bool,
         prefix_segments: tuple[Segment, ...],
+        prefix_trailing_slash: bool,
         prefix_kwargs: dict[str, Any],
     ) -> ResolverMatch | SlashMismatch | None:
         """Try matching the request against this endpoint.
 
         Returns `ResolverMatch` on full match, `SlashMismatch` when
-        segments matched but the trailing slash didn't, or `None`. A
-        catchall (see `is_catchall`) absorbs the trailing slash into the
-        capture and never reports `SlashMismatch`; the yields-to-
-        SlashMismatch behavior lives in `URLResolver._resolve_segments`.
+        segments matched but the trailing slash didn't, or `None`.
+
+        Catchalls take their own match path — slash-agnostic, absorb the
+        trailing slash into the captured value, never report
+        `SlashMismatch`. The yields-to-`SlashMismatch` behavior lives in
+        `URLResolver._resolve_segments`.
         """
-        match = _walk_segments(
-            self.route.segments,
-            segments,
-            full_match=True,
-            absorb_trailing_slash=self.is_catchall and trailing_slash,
-        )
+        if self.is_catchall:
+            return self._resolve_catchall(
+                segments, trailing_slash, prefix_segments, prefix_kwargs
+            )
+
+        match = _walk_segments(self.route.segments, segments, full_match=True)
         if match is None:
             return None
         _, captured = match
 
-        if self.is_catchall:
-            route_ts = False
-        else:
-            route_ts = _effective_trailing_slash(
-                self.route.segments,
-                self.route.trailing_slash,
-                # A non-empty prefix means we're under an `include()`, which
-                # contributes its own slash separator.
-                ancestor_trailing_slash=bool(prefix_segments),
-            )
-            if trailing_slash != route_ts:
-                return SlashMismatch()
+        route_ts = _effective_trailing_slash(
+            self.route.segments,
+            self.route.trailing_slash,
+            ancestor_trailing_slash=prefix_trailing_slash,
+        )
+        if trailing_slash != route_ts:
+            return SlashMismatch()
 
         kwargs = {**prefix_kwargs, **captured} if captured else prefix_kwargs
         return ResolverMatch(
@@ -113,7 +112,45 @@ class URLPattern:
             kwargs=kwargs,
             url_name=self.name,
             route=_route_str(prefix_segments + self.route.segments, route_ts),
-            is_catchall=self.is_catchall,
+        )
+
+    def _resolve_catchall(
+        self,
+        segments: tuple[str, ...],
+        trailing_slash: bool,
+        prefix_segments: tuple[Segment, ...],
+        prefix_kwargs: dict[str, Any],
+    ) -> ResolverMatch | None:
+        """Match a catchall (`path("<path:NAME>")`) against the request.
+
+        The route has exactly one segment — a multi-segment `Capture`
+        (guaranteed by `is_catchall`). Joins all request segments into
+        the captured value, appending the trailing slash if present so
+        a single declared route handles both `/missing` and `/missing/`.
+        """
+        cap = self.route.segments[0]
+        assert isinstance(cap, Capture)
+
+        value = "/".join(segments)
+        if not value:
+            return None
+        if trailing_slash:
+            value += "/"
+
+        if not _segment_value_matches(cap.converter, value):
+            return None
+        try:
+            captured_value = cap.converter.to_python(value)
+        except ValueError:
+            return None
+
+        kwargs = {**prefix_kwargs, cap.name: captured_value}
+        return ResolverMatch(
+            view_class=self.view_class,
+            kwargs=kwargs,
+            url_name=self.name,
+            route=_route_str(prefix_segments + self.route.segments, False),
+            is_catchall=True,
         )
 
 

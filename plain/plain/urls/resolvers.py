@@ -119,6 +119,7 @@ class URLResolver:
             parsed.segments,
             parsed.trailing_slash,
             prefix_segments=(),
+            prefix_trailing_slash=False,
             prefix_kwargs={},
         )
         if isinstance(result, ResolverMatch):
@@ -136,6 +137,7 @@ class URLResolver:
         segments: tuple[str, ...],
         trailing_slash: bool,
         prefix_segments: tuple[Segment, ...],
+        prefix_trailing_slash: bool,
         prefix_kwargs: dict[str, Any],
     ) -> ResolverMatch | SlashMismatch | None:
         """Match this resolver's prefix, then walk children.
@@ -153,6 +155,14 @@ class URLResolver:
         kwargs = {**prefix_kwargs, **captured} if captured else prefix_kwargs
         remaining_segments = segments[consumed:]
         merged_prefix = prefix_segments + self.route.segments
+        # This resolver's effective trailing slash becomes the ancestor flag
+        # for its children — `include("admin/", ...)` declares `/admin/` as
+        # the canonical index slash, `include("admin", ...)` declares `/admin`.
+        merged_prefix_ts = _effective_trailing_slash(
+            self.route.segments,
+            self.route.trailing_slash,
+            prefix_trailing_slash,
+        )
 
         def _wrap(rm: ResolverMatch) -> ResolverMatch:
             return ResolverMatch(
@@ -175,11 +185,19 @@ class URLResolver:
         for child in self.url_patterns:
             if isinstance(child, URLPattern):
                 result = child.resolve(
-                    remaining_segments, trailing_slash, merged_prefix, kwargs
+                    remaining_segments,
+                    trailing_slash,
+                    merged_prefix,
+                    merged_prefix_ts,
+                    kwargs,
                 )
             else:
                 result = child._resolve_segments(
-                    remaining_segments, trailing_slash, merged_prefix, kwargs
+                    remaining_segments,
+                    trailing_slash,
+                    merged_prefix,
+                    merged_prefix_ts,
+                    kwargs,
                 )
 
             if isinstance(result, ResolverMatch):

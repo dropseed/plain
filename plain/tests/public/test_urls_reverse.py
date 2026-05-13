@@ -102,10 +102,10 @@ def test_reverse_through_nested_include(boundary_router):
 
 
 def test_reverse_through_boundary_include_no_slash(boundary_router):
-    """`include("admin-boundary", ...)` is normalized to `include("admin-boundary/", ...)`.
-
-    Constructors strip leading/trailing slashes and append `/` for
-    non-empty prefixes, so this is equivalent to the canonical form.
+    """`include("admin-boundary", ...)` has no trailing slash on its prefix,
+    but the child `path("home/", ...)` has its own slash flag — so the
+    rendered URL has a slash because the leaf controls its own canonical
+    form. (The include's slash flag matters only for the include's index URL.)
     """
     assert reverse("admin-boundary:home") == "/admin-boundary/home/"
 
@@ -162,6 +162,98 @@ def test_reverse_included_index_keeps_trailing_slash(use_router):
 
     use_router(_Root)
     assert reverse("admin:index") == "/admin/"
+
+
+def test_reverse_unslashed_include_index_has_no_trailing_slash(use_router):
+    """`include("admin", ...)` (no trailing slash) declares `/admin` as the
+    canonical index URL. `path("")` inside it reverses to `/admin`, not
+    `/admin/` — the include's slash flag carries through to its index.
+    """
+
+    class _AdminRouter(Router):
+        namespace = "admin"
+        urls = [path("", _OkView, name="index")]
+
+    class _Root(Router):
+        namespace = ""
+        urls = [include("admin", _AdminRouter)]
+
+    use_router(_Root)
+    assert reverse("admin:index") == "/admin"
+
+
+def test_reverse_unslashed_include_child_still_uses_own_slash(use_router):
+    """Children inside an unslashed include keep their own slash semantics —
+    only the include's index URL (the `path("")` case) inherits the
+    include's slash flag.
+    """
+
+    class _AdminRouter(Router):
+        namespace = "admin"
+        urls = [path("users/", _OkView, name="users")]
+
+    class _Root(Router):
+        namespace = ""
+        urls = [include("admin", _AdminRouter)]
+
+    use_router(_Root)
+    assert reverse("admin:users") == "/admin/users/"
+
+
+def test_unslashed_include_request_resolves_and_redirects(use_router):
+    """The full request-side contract of an unslashed include's index URL:
+    `/admin` matches, `/admin/` 308's to `/admin`. Mirror of the slashed
+    form which canonicalizes the other way.
+    """
+    from plain.test import Client
+
+    class _AdminRouter(Router):
+        namespace = "admin"
+        urls = [path("", _OkView, name="index")]
+
+    class _Root(Router):
+        namespace = ""
+        urls = [include("admin", _AdminRouter)]
+
+    use_router(_Root)
+    client = Client(raise_request_exception=False)
+    client.handler._middleware_chain = None
+    client.handler.load_middleware()
+
+    response = client.get("/admin")
+    assert response.status_code == 200
+
+    response = client.get("/admin/")
+    assert response.status_code == 308
+    assert response.headers["Location"] == "/admin"
+
+
+def test_slashed_include_request_resolves_and_redirects(use_router):
+    """Mirror of the above for the slashed include — `/admin/` matches,
+    `/admin` 308's to `/admin/`. Pinned alongside its unslashed sibling
+    so the two canonical forms can't drift independently.
+    """
+    from plain.test import Client
+
+    class _AdminRouter(Router):
+        namespace = "admin"
+        urls = [path("", _OkView, name="index")]
+
+    class _Root(Router):
+        namespace = ""
+        urls = [include("admin/", _AdminRouter)]
+
+    use_router(_Root)
+    client = Client(raise_request_exception=False)
+    client.handler._middleware_chain = None
+    client.handler.load_middleware()
+
+    response = client.get("/admin/")
+    assert response.status_code == 200
+
+    response = client.get("/admin")
+    assert response.status_code == 308
+    assert response.headers["Location"] == "/admin/"
 
 
 def test_reverse_unnamespaced_included_index_keeps_trailing_slash(use_router):

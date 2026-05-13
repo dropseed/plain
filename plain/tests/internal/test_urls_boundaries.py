@@ -1,18 +1,15 @@
 """Pin `include()` / `path()` slash-boundary normalization.
 
 Internal because these tests cover implementation surface — how route
-strings are normalized inside the constructors before becoming regex
-patterns. The user-facing `reverse()` round-trips live in the public
-test file.
+strings are normalized inside the constructors before becoming routes.
 
-After step #1 of the URL routing arc:
-- `include()` strips leading/trailing slashes and forces a single
-  trailing slash on non-empty prefixes, so `include("admin")`,
-  `include("admin/")`, and `include("/admin/")` all produce the same
-  routes.
-- `path()` strips leading slashes, so `path("/users/")` is equivalent
-  to `path("users/")`. Trailing slashes are still meaningful (decided
-  by `urls-trailing-slash-convention`).
+- `include()` strips leading slashes (no scheme-relative URL hazard) but
+  preserves the trailing slash as the canonical-form signal for the
+  include's index URL. The separator between prefix and child segments
+  is enforced structurally by segment-based matching, not by string
+  manipulation, so `/adminhome` collisions are impossible regardless of
+  the user's trailing slash choice.
+- `path()` strips leading slashes; trailing slash is meaningful.
 """
 
 from __future__ import annotations
@@ -40,11 +37,9 @@ def test_canonical_include_nested_with_param(boundary_client):
 
 
 def test_include_without_trailing_slash_resolves(boundary_client):
-    """`include("admin-boundary", ...)` — missing trailing slash is normalized.
-
-    The constructor appends `/`, so `include("admin-boundary")` resolves
-    children at `/admin-boundary/...` just like `include("admin-boundary/")`
-    would.
+    """`include("admin-boundary", ...)` — no-slash include still resolves
+    its slashed children correctly. The child's own slash flag wins (it
+    has segments of its own), so `/admin-boundary/home/` matches.
     """
     response = boundary_client.get("/admin-boundary/home/")
     assert response.status_code == 200
@@ -52,11 +47,9 @@ def test_include_without_trailing_slash_resolves(boundary_client):
 
 
 def test_include_without_slash_no_longer_concatenates(boundary_client):
-    """The old quirk (`/admin-boundaryhome/` resolving) is gone.
-
-    Before step #1 the include prefix `admin-boundary` and child
-    `home/` joined without a separator. After normalization the include
-    pattern always ends with `/`, so the concatenated form is a 404.
+    """The `/adminhome/`-style collision is structurally impossible —
+    segments are split on `/` before matching, so the include prefix
+    and child's first segment can't merge regardless of slash choice.
     """
     response = boundary_client.get("/admin-boundaryhome/")
     assert response.status_code == 404
