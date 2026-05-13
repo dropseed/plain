@@ -16,7 +16,6 @@
     - [Setting up BASE_URL](#setting-up-base_url)
     - [In templates](#in-templates-1)
     - [In Python code](#in-python-code-1)
-- [Regex patterns](#regex-patterns)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -234,19 +233,6 @@ from plain.urls import absolute_url
 
 url = absolute_url(article.get_absolute_url())  # "https://example.com/articles/hello-world/"
 ```
-
-## Regex patterns
-
-For complex matching that path converters cannot handle, you can use regular expressions:
-
-```python
-import re
-from plain.urls import path
-
-path(re.compile(r"^articles/(?P<year>[0-9]{4})/$"), views.ArticleView, name="article")
-```
-
-Named groups become keyword arguments accessible via `self.url_kwargs`.
 
 ## FAQs
 
