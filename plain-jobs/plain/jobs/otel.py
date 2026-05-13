@@ -65,7 +65,7 @@ def record_span_error(
     metric attribute dict, and return the error.type string so the caller
     can forward it to other instruments."""
     error_type = format_exception_type(exc)
-    span.record_exception(exc, escaped=True)
+    span.record_exception(exc)
     span.set_status(trace.StatusCode.ERROR)
     span.set_attribute(ERROR_TYPE, error_type)
     metric_attributes[ERROR_TYPE] = error_type

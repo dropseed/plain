@@ -4,15 +4,9 @@
 
 - [Overview](#overview)
 - [HTTP methods map to class methods](#http-methods-map-to-class-methods)
-- [TemplateView](#templateview)
-- [FormView](#formview)
-- [Object views](#object-views)
-    - [DetailView](#detailview)
-    - [CreateView](#createview)
-    - [UpdateView](#updateview)
-    - [DeleteView](#deleteview)
-    - [ListView](#listview)
+- [Template-rendering views](#template-rendering-views)
 - [RedirectView](#redirectview)
+- [Async views](#async-views)
 - [ServerSentEventsView](#serversenteventsview)
 - [Lifecycle hooks](#lifecycle-hooks)
 - [ResponseException](#responseexception)
@@ -66,12 +60,12 @@ If a request comes in for a method your view doesn't implement, Plain returns a 
 
 The [base `View` class](./base.py#View) provides default `options` and `head` behavior, but you can override these too.
 
-## TemplateView
+## Template-rendering views
 
-For rendering templates, use [`TemplateView`](./templates.py#TemplateView). This is the base class for most other built-in view classes.
+Views that render Jinja templates (`TemplateView`, `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) live in the [`plain.templates`](../../../plain-templates/plain/templates/README.md) package. Install `plain.templates` and import them from `plain.templates.views`:
 
 ```python
-from plain.views import TemplateView
+from plain.templates.views import TemplateView
 
 
 class ExampleView(TemplateView):
@@ -82,169 +76,6 @@ class ExampleView(TemplateView):
         context["message"] = "Hello, world!"
         return context
 ```
-
-For simple pages that don't need custom context, you can configure `TemplateView` directly in your URL routes.
-
-```python
-from plain.views import TemplateView
-from plain.urls import path, Router
-
-
-class AppRouter(Router):
-    routes = [
-        path("/example/", TemplateView.as_view(template_name="example.html")),
-    ]
-```
-
-## FormView
-
-[`FormView`](./forms.py#FormView) handles displaying and processing [forms](/plain/plain/forms/README.md).
-
-```python
-from plain.views import FormView
-from .forms import ExampleForm
-
-
-class ExampleView(FormView):
-    template_name = "example.html"
-    form_class = ExampleForm
-    success_url = "."  # Redirect to the same page
-
-    def form_valid(self, form):
-        # Do additional processing here
-        return super().form_valid(form)
-```
-
-The form is automatically available in your template as `form`.
-
-```html
-{% extends "base.html" %}
-
-{% block content %}
-
-<form method="post">
-    <!-- Render general form errors -->
-    {% for error in form.non_field_errors %}
-    <div>{{ error }}</div>
-    {% endfor %}
-
-    <!-- Render form fields -->
-    <label for="{{ form.email.html_id }}">Email</label>
-    <input
-        type="email"
-        name="{{ form.email.html_name }}"
-        id="{{ form.email.html_id }}"
-        value="{{ form.email.value() or '' }}"
-        autocomplete="email"
-        autofocus
-        required>
-    {% if form.email.errors %}
-    <div>{{ form.email.errors|join(', ') }}</div>
-    {% endif %}
-
-    <button type="submit">Save</button>
-</form>
-
-{% endblock %}
-```
-
-## Object views
-
-Plain provides views for standard CRUD operations. Each requires you to implement `get_object()` or `get_objects()` to control what data is accessed.
-
-### DetailView
-
-[`DetailView`](./objects.py#DetailView) displays a single object.
-
-```python
-from plain.views import DetailView
-
-
-class ExampleDetailView(DetailView):
-    template_name = "detail.html"
-
-    def get_object(self):
-        return MyObjectClass.query.get(
-            id=self.url_kwargs["id"],
-            user=self.request.user,  # Limit access
-        )
-```
-
-The object is available in your template as `object`. You can also set `context_object_name` for a more descriptive name.
-
-### CreateView
-
-[`CreateView`](./objects.py#CreateView) displays a form and creates a new object on successful submission.
-
-```python
-from plain.views import CreateView
-from .forms import CustomCreateForm
-
-
-class ExampleCreateView(CreateView):
-    template_name = "create.html"
-    form_class = CustomCreateForm
-    success_url = "."
-```
-
-### UpdateView
-
-[`UpdateView`](./objects.py#UpdateView) displays a form pre-populated with an existing object and saves changes on submission.
-
-```python
-from plain.views import UpdateView
-from .forms import CustomUpdateForm
-
-
-class ExampleUpdateView(UpdateView):
-    template_name = "update.html"
-    form_class = CustomUpdateForm
-    success_url = "."
-
-    def get_object(self):
-        return MyObjectClass.query.get(
-            id=self.url_kwargs["id"],
-            user=self.request.user,
-        )
-```
-
-### DeleteView
-
-[`DeleteView`](./objects.py#DeleteView) confirms deletion of an object. POST to delete, no form class needed.
-
-```python
-from plain.views import DeleteView
-
-
-class ExampleDeleteView(DeleteView):
-    template_name = "delete.html"
-    success_url = "/list/"
-
-    def get_object(self):
-        return MyObjectClass.query.get(
-            id=self.url_kwargs["id"],
-            user=self.request.user,
-        )
-```
-
-### ListView
-
-[`ListView`](./objects.py#ListView) displays a collection of objects.
-
-```python
-from plain.views import ListView
-
-
-class ExampleListView(ListView):
-    template_name = "list.html"
-
-    def get_objects(self):
-        return MyObjectClass.query.filter(
-            user=self.request.user,
-        )
-```
-
-The objects are available in your template as `objects`.
 
 ## RedirectView
 
@@ -395,9 +226,9 @@ class MyView(View):
         return super().handle_exception(exc)
 ```
 
-The framework's default renders `{status}.html` ([`Error views`](#error-views)) — most views don't need to override this hook. Override when you want a non-HTML format: `APIView` emits JSON. The base `View.handle_exception` re-raises, so unhandled cases fall through to the framework default.
+The base `View.handle_exception` re-raises, so unhandled cases fall through to the framework default — which returns a plain-text status line (`404 Not Found`, `500 Internal Server Error`, etc.). View subclasses that want a richer format override the hook: `TemplateView` renders [`{status}.html`](../../../../plain-templates/plain/templates/README.md#error-views), `APIView` emits JSON.
 
-`ResponseException` is unwrapped by `get_response` before `handle_exception` runs, so you don't need to handle it in overrides. The exception is logged once — before `handle_exception` is called — so overrides focus purely on response shape, not observability.
+`ResponseException` is unwrapped by `get_response` before `handle_exception` runs, so you don't need to handle it in overrides. Returning a **5xx** response is treated as a real failure: the framework logs the exception once (via `log_exception`) and attaches it to `response.exception` so observability tooling can record it. Returning a **4xx** response is silent — the view chose to render it as a handled outcome.
 
 Plain's HTTP exceptions (`NotFoundError404`, `ForbiddenError403`, `BadRequestError400`, etc.) inherit [`HTTPException`](../http/exceptions.py#HTTPException) and carry their own `status_code`. Subclass `HTTPException` to define your own:
 
@@ -413,34 +244,38 @@ class PaymentRequiredError402(HTTPException):
 At any point during request handling, you can raise a [`ResponseException`](./exceptions.py#ResponseException) to immediately return a response. This is useful for authorization checks or rate limiting in nested helper functions.
 
 ```python
-from plain.views import DetailView
+from plain.views import View
 from plain.views.exceptions import ResponseException
 from plain.http import Response
 
 
-class ExampleView(DetailView):
-    def get_object(self):
+class ExampleView(View):
+    def get(self):
         if self.request.user and self.request.user.exceeds_rate_limit:
             raise ResponseException(
                 Response("Rate limit exceeded", status_code=429)
             )
 
-        return AnExpensiveObject()
+        return Response("ok")
 ```
 
 ## Error views
 
-HTTP errors are rendered from templates named after the status code:
+Plain core's exception handler returns plain text — `404 Not Found`, `500 Internal Server Error`, etc. Styled error pages live in [`plain.templates`](../../../../plain-templates/plain/templates/README.md#error-views): `TemplateView.handle_exception` looks for `{status_code}.html` and renders it with `request`, `status_code`, `exception`, and `DEBUG` in context, falling back to plain text on `TemplateFileMissing`.
 
-- `templates/404.html` - Page not found
-- `templates/403.html` - Forbidden
-- `templates/500.html` - Server error
+To get a styled 404 for URL-resolution failures (where no view runs), mount [`NotFoundView`](../../../../plain-templates/plain/templates/views.py#NotFoundView) as the last route:
 
-Plain looks for `{status_code}.html` and renders it with `request`, `status_code`, and `exception` in context. If the template is missing or fails to render, a plain-text body is returned (`404 Not Found`, `500 Internal Server Error`, etc.). Most apps only need the three templates above.
+```python
+from plain.templates.views import NotFoundView
+from plain.urls import path
 
-This covers every error source — exceptions raised inside views, URL resolution failures, middleware errors — so `404.html` renders for any 404, not just ones raised from your own code. Views that want a different format (e.g. JSON for an API) override `handle_exception` to opt out.
+urls = [
+    # ... your routes ...
+    path("<path:_>", NotFoundView),
+]
+```
 
-Your `500.html` template should be self-contained. Avoid extending base templates or accessing the database/session, since server errors can occur during middleware or template rendering. `404.html` and `403.html` can safely extend base templates since they occur during view execution after middleware runs.
+The resolver treats a sole-segment terminal `<path:>` as a **catchall**: slash-agnostic, and yields to slash-mismatch redirects from specific routes. So you still get `/login` → 308 → `/login/` for `path("login/", LoginView)`, not a stray 404 from the catchall.
 
 ## View patterns
 

@@ -1,4 +1,3 @@
-import re
 from typing import TypedDict
 
 from plain.api.versioning import APIVersionChange, VersionedAPIView
@@ -46,6 +45,13 @@ class ValidationErrorView(APIView):
         raise ValidationError(["List error"])
 
 
+class UnhandledExceptionView(APIView):
+    """Raises a generic exception so handle_exception's 5xx branch fires."""
+
+    def get(self):
+        raise RuntimeError("unhandled boom")
+
+
 class ChangeToName(APIVersionChange):
     description = "'to' changed to 'name'"
 
@@ -84,5 +90,6 @@ class AppRouter(Router):
         path("test-versioned", TestVersionedAPIView, name="test_versioned"),
         path("validation-error", ValidationErrorView, name="validation_error"),
         path("json-echo", JsonEchoView, name="json_echo"),
-        path(re.compile(r"^missing-.+$"), JsonNotFoundView, name="missing"),
+        path("unhandled-exception", UnhandledExceptionView, name="unhandled_exception"),
+        path("missing/<path:_>", JsonNotFoundView, name="missing"),
     ]

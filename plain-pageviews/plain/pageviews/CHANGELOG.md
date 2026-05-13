@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.35.8](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.8) (2026-05-13)
+
+### What's changed
+
+- Updated route definitions to the no-slash convention introduced in `plain` 0.145.0. Canonical URLs now follow the project's `URLS_TRAILING_SLASH` setting. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.35.7](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.7) (2026-05-05)
 
 ### What's changed

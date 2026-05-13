@@ -1,5 +1,15 @@
 # plain-vendor changelog
 
+## [0.11.6](https://github.com/dropseed/plain/releases/plain-vendor@0.11.6) (2026-05-12)
+
+### What's changed
+
+- Adds explicit `plain.assets>=0.1.0,<1.0.0` dependency now that `plain.assets` is a separate package (extracted from `plain` core in 0.142.0). `plain.vendor` uses `_APP_ASSETS_DIR` from `plain.assets.finders`. ([844f46e428](https://github.com/dropseed/plain/commit/844f46e428))
+
+### Upgrade instructions
+
+- No changes required if you're upgrading `plain` in the same step — `plain.assets` comes along as a transitive dependency.
+
 ## [0.11.5](https://github.com/dropseed/plain/releases/plain-vendor@0.11.5) (2026-05-05)
 
 ### What's changed

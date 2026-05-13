@@ -5,6 +5,9 @@ import json
 from http import HTTPStatus
 from typing import Any
 
+from opentelemetry import trace
+from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
+
 from plain.http import (
     HTTPException,
     JsonResponse,
@@ -12,11 +15,14 @@ from plain.http import (
 )
 from plain.logs import log_exception
 from plain.runtime import settings
+from plain.utils.otel import format_exception_type
 from plain.views.base import View
 
 from .exceptions import MCPInvalidParams, MCPUnauthorized
 from .resources import MCPResource
 from .tools import MCPTool
+
+tracer = trace.get_tracer("plain.mcp")
 
 PROTOCOL_VERSION = "2025-03-26"
 
@@ -148,7 +154,6 @@ class MCPView(View):
 
         status = exc.status_code if isinstance(exc, HTTPException) else 500
         if status >= 500:
-            log_exception(self.request, exc)
             message = "Internal error"
         else:
             message = str(exc) or HTTPStatus(status).phrase
@@ -218,14 +223,25 @@ class MCPView(View):
                 msg_id, METHOD_NOT_FOUND, f"Unknown method: {method}"
             )
 
-        try:
-            result = handler(params)
-            return _success_response(msg_id, result)
-        except MCPInvalidParams as e:
-            return _error_response(msg_id, INVALID_PARAMS, str(e))
-        except Exception as e:
-            log_exception(self.request, e)
-            return _error_response(msg_id, INTERNAL_ERROR, "Internal error")
+        with tracer.start_as_current_span(
+            f"rpc {method}", kind=trace.SpanKind.SERVER
+        ) as span:
+            try:
+                result = handler(params)
+                return _success_response(msg_id, result)
+            except MCPInvalidParams as e:
+                # Client-side validation failure — analogous to a 4xx,
+                # don't stamp the span with status=ERROR.
+                return _error_response(msg_id, INVALID_PARAMS, str(e))
+            except Exception as e:
+                # Real handler failure. handle_message swallows this into
+                # a JSON-RPC error with HTTP 200, so without the span the
+                # failure is invisible to OTel-based exception tooling.
+                span.record_exception(e)
+                span.set_status(trace.StatusCode.ERROR)
+                span.set_attribute(ERROR_TYPE, format_exception_type(e))
+                log_exception(self.request, e)
+                return _error_response(msg_id, INTERNAL_ERROR, "Internal error")
 
     def get_capabilities(self) -> dict[str, Any]:
         """Return the capabilities dict advertised to clients at `initialize`.

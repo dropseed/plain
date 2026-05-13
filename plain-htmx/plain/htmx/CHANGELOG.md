@@ -1,5 +1,16 @@
 # plain-htmx changelog
 
+## [0.19.2](https://github.com/dropseed/plain/releases/plain-htmx@0.19.2) (2026-05-12)
+
+### What's changed
+
+- `HTMXView` now subclasses `TemplateView` from `plain.templates.views` (which moved out of `plain` core in [`plain.templates` 0.1.0](../../../plain-templates/plain/templates/CHANGELOG.md)). `HTMXView` itself is still imported the same way: `from plain.htmx.views import HTMXView`. The `htmx_fragment` template extension is unchanged. ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- Pins `plain>=0.143.0` and `plain.templates>=0.1.0`.
+
+### Upgrade instructions
+
+- No code changes required if you upgrade `plain` to 0.143.0 in the same step — `plain.templates` is pulled in automatically.
+
 ## [0.19.1](https://github.com/dropseed/plain/releases/plain-htmx@0.19.1) (2026-05-05)
 
 ### What's changed

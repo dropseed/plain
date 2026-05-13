@@ -1,251 +1,206 @@
 from __future__ import annotations
 
-import re
-import string
+from functools import cached_property
 from typing import Any
 
-from plain.exceptions import ImproperlyConfigured
 from plain.preflight import PreflightResult
 from plain.runtime import settings
-from plain.utils.regex_helper import _lazy_re_compile
 
-from .converters import _get_converter
+from .converters import Converter
+from .matches import ResolverMatch
+from .paths import SlashMismatch
+from .segments import (
+    Capture,
+    Segment,
+    _captures_in,
+    _route_str,
+    _segment_value_matches,
+    _walk_segments,
+)
 
 
-class CheckURLMixin:
-    # Expected to be set by subclasses
-    regex: re.Pattern[str]
-    name: str | None
+class URLPattern:
+    """An endpoint: a parsed segment chain + view class + optional name.
 
-    def describe(self) -> str:
-        """
-        Format the URL pattern for display in warning messages.
-        """
-        description = f"'{self}'"
+    The canonical trailing slash for this endpoint is given by
+    `trailing_slash`, which reads `URLS_TRAILING_SLASH` unless the
+    endpoint declares `force_trailing_slash=True|False`.
+    """
+
+    def __init__(
+        self,
+        *,
+        segments: tuple[Segment, ...],
+        raw_route: str,
+        name: str,
+        view_class: type,
+        force_trailing_slash: bool | None = None,
+    ):
+        self.segments = segments
+        self.raw_route = raw_route
+        self.name = name
+        self.view_class = view_class
+        self.force_trailing_slash = force_trailing_slash
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {self._describe()}>"
+
+    def _describe(self) -> str:
+        description = f"'{self.raw_route}'"
         if self.name:
             description += f" [name='{self.name}']"
         return description
 
-    def _check_pattern_startswith_slash(self) -> list[PreflightResult]:
-        """
-        Check that the pattern does not begin with a forward slash.
-        """
-        regex_pattern = self.regex.pattern
-        if not settings.APPEND_SLASH:
-            # Skip check as it can be useful to start a URL pattern with a slash
-            # when APPEND_SLASH=False.
-            return []
-        if regex_pattern.startswith(("/", "^/", "^\\/")) and not regex_pattern.endswith(
-            "/"
-        ):
-            warning = PreflightResult(
-                fix=f"URL pattern {self.describe()} starts with unnecessary '/'. Remove the leading slash.",
-                warning=True,
-                id="urls.pattern_starts_with_slash",
-            )
-            return [warning]
-        else:
-            return []
+    @property
+    def trailing_slash(self) -> bool:
+        """Effective trailing-slash form for this endpoint.
 
+        Catchalls absorb the request slash into the captured value;
+        their canonical form has no trailing slash regardless of the
+        setting. Otherwise per-route `force_trailing_slash` wins, then
+        the app-wide `URLS_TRAILING_SLASH` setting. Reads live so a
+        settings swap takes effect on the next resolver rebuild (tests
+        clear `_get_cached_resolver.cache` to force one).
 
-class RegexPattern(CheckURLMixin):
-    def __init__(self, regex: str, name: str | None = None, is_endpoint: bool = False):
-        self._regex = regex
-        self._is_endpoint = is_endpoint
-        self.name = name
-        self.converters: dict[str, Any] = {}
-        self.regex = self._compile(str(regex))
-        if self.regex.groups > len(self.regex.groupindex):
-            raise ImproperlyConfigured(
-                f"Regex pattern '{regex}' uses unnamed groups. "
-                "Use named groups (?P<name>...) instead."
-            )
+        Note: an endpoint with `segments=()` (a `path("", ...)`) may
+        still report `True` here even though `/` itself has no
+        slash variant — the resolver special-cases the "full URL is
+        root" check at match time, since only then is the prefix
+        context available."""
+        if self.is_catchall:
+            return False
+        if self.force_trailing_slash is not None:
+            return self.force_trailing_slash
+        return settings.URLS_TRAILING_SLASH
 
-    def match(self, path: str) -> tuple[str, dict[str, Any]] | None:
-        match = (
-            self.regex.fullmatch(path)
-            if self._is_endpoint and self.regex.pattern.endswith("$")
-            else self.regex.search(path)
+    @cached_property
+    def is_catchall(self) -> bool:
+        """True for `path("<path:NAME>")` — sole-segment terminal
+        multi-segment Capture. The resolver gives these fallback
+        semantics (slash-agnostic match, yields to sibling
+        `SlashMismatch`)."""
+        return (
+            len(self.segments) == 1
+            and isinstance(self.segments[0], Capture)
+            and self.segments[0].converter.multi_segment
         )
-        if match:
-            kwargs = match.groupdict()
-            kwargs = {k: v for k, v in kwargs.items() if v is not None}
-            return path[match.end() :], kwargs
-        return None
+
+    @cached_property
+    def converters(self) -> dict[str, Converter]:
+        """Names → converter for every capture, including those inside Patterns."""
+        return {cap.name: cap.converter for cap in _captures_in(self.segments)}
 
     def preflight(self) -> list[PreflightResult]:
-        warnings = []
-        warnings.extend(self._check_pattern_startswith_slash())
-        if not self._is_endpoint:
-            warnings.extend(self._check_include_trailing_dollar())
-        return warnings
-
-    def _check_include_trailing_dollar(self) -> list[PreflightResult]:
-        regex_pattern = self.regex.pattern
-        if regex_pattern.endswith("$") and not regex_pattern.endswith(r"\$"):
-            return [
+        results: list[PreflightResult] = []
+        if self.name and ":" in self.name:
+            results.append(
                 PreflightResult(
-                    fix=f"Include pattern {self.describe()} ends with '$' which prevents URL inclusion. Remove the dollar sign.",
+                    fix=(
+                        f"Your URL pattern {self._describe()} has a name "
+                        "including a ':'. Remove the colon, to avoid ambiguous "
+                        "namespace references."
+                    ),
                     warning=True,
-                    id="urls.include_pattern_ends_with_dollar",
-                )
-            ]
-        else:
-            return []
-
-    def _compile(self, regex: str) -> re.Pattern[str]:
-        """Compile and return the given regular expression."""
-        try:
-            return re.compile(regex)
-        except re.error as e:
-            raise ImproperlyConfigured(
-                f'"{regex}" is not a valid regular expression: {e}'
-            ) from e
-
-    def __str__(self) -> str:
-        return str(self._regex)
-
-
-_PATH_PARAMETER_COMPONENT_RE = _lazy_re_compile(
-    r"<(?:(?P<converter>[^>:]+):)?(?P<parameter>[^>]+)>"
-)
-
-
-def _route_to_regex(
-    route: str, is_endpoint: bool = False
-) -> tuple[str, dict[str, Any]]:
-    """
-    Convert a path pattern into a regular expression. Return the regular
-    expression and a dictionary mapping the capture names to the converters.
-    For example, 'foo/<int:id>' returns '^foo\\/(?P<id>[0-9]+)'
-    and {'id': <plain.urls.converters.IntConverter>}.
-    """
-    original_route = route
-    parts = ["^"]
-    converters = {}
-    while True:
-        match = _PATH_PARAMETER_COMPONENT_RE.search(route)
-        if not match:
-            parts.append(re.escape(route))
-            break
-        elif not set(match.group()).isdisjoint(string.whitespace):
-            raise ImproperlyConfigured(
-                f"URL route '{original_route}' cannot contain whitespace in angle brackets "
-                "<…>."
-            )
-        parts.append(re.escape(route[: match.start()]))
-        route = route[match.end() :]
-        parameter = match["parameter"]
-        if not parameter.isidentifier():
-            raise ImproperlyConfigured(
-                f"URL route '{original_route}' uses parameter name {parameter!r} which isn't a valid "
-                "Python identifier."
-            )
-        raw_converter = match["converter"]
-        if raw_converter is None:
-            # If a converter isn't specified, the default is `str`.
-            raw_converter = "str"
-        try:
-            converter = _get_converter(raw_converter)
-        except KeyError as e:
-            raise ImproperlyConfigured(
-                f"URL route {original_route!r} uses invalid converter {raw_converter!r}."
-            ) from e
-        converters[parameter] = converter
-        parts.append("(?P<" + parameter + ">" + converter.regex + ")")
-    if is_endpoint:
-        parts.append(r"\Z")
-    return "".join(parts), converters
-
-
-class RoutePattern(CheckURLMixin):
-    def __init__(self, route: str, name: str | None = None, is_endpoint: bool = False):
-        self._route = route
-        self._is_endpoint = is_endpoint
-        self.name = name
-        self.converters = _route_to_regex(str(route), is_endpoint)[1]
-        self.regex = self._compile(str(route))
-
-    def match(self, path: str) -> tuple[str, dict[str, Any]] | None:
-        match = self.regex.search(path)
-        if match:
-            kwargs = match.groupdict()
-            for key, value in kwargs.items():
-                converter = self.converters[key]
-                try:
-                    kwargs[key] = converter.to_python(value)
-                except ValueError:
-                    return None
-            return path[match.end() :], kwargs
-        return None
-
-    def preflight(self) -> list[PreflightResult]:
-        warnings = self._check_pattern_startswith_slash()
-        route = self._route
-        if "(?P<" in route or route.startswith("^") or route.endswith("$"):
-            warnings.append(
-                PreflightResult(
-                    fix=f"Your URL pattern {self.describe()} has a route that contains '(?P<', begins "
-                    "with a '^', or ends with a '$'. This was likely an oversight "
-                    "when migrating to plain.urls.path().",
-                    warning=True,
-                    id="urls.path_migration_warning",
+                    id="urls.pattern_name_contains_colon",
                 )
             )
-        return warnings
+        if self.is_catchall and self.force_trailing_slash is not None:
+            results.append(
+                PreflightResult(
+                    fix=(
+                        f"Your URL pattern {self._describe()} is a catchall "
+                        "but sets `force_trailing_slash`. Catchalls absorb the "
+                        "trailing slash into the captured value and ignore the "
+                        "flag — remove `force_trailing_slash`."
+                    ),
+                    warning=True,
+                    id="urls.catchall_force_trailing_slash",
+                )
+            )
+        return results
 
-    def _compile(self, route: str) -> re.Pattern[str]:
-        return re.compile(_route_to_regex(route, self._is_endpoint)[0])
-
-    def __str__(self) -> str:
-        return str(self._route)
-
-
-class URLPattern:
-    def __init__(
+    def resolve(
         self,
-        *,
-        pattern: RegexPattern | RoutePattern,
-        view_class: type,
-        name: str | None = None,
-    ):
-        self.pattern = pattern
-        self.view_class = view_class
-        self.name = name
+        segments: tuple[str, ...],
+        trailing_slash: bool,
+        prefix_segments: tuple[Segment, ...],
+        prefix_kwargs: dict[str, Any],
+    ) -> ResolverMatch | SlashMismatch | None:
+        """Try matching the request against this endpoint.
 
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} {self.pattern.describe()}>"
+        Returns `ResolverMatch` on full match, `SlashMismatch` when
+        segments matched but the trailing slash didn't, or `None`.
 
-    def preflight(self) -> list[PreflightResult]:
-        warnings = self._check_pattern_name()
-        warnings.extend(self.pattern.preflight())
-        return warnings
-
-    def _check_pattern_name(self) -> list[PreflightResult]:
+        Catchalls take their own match path — slash-agnostic, absorb the
+        trailing slash into the captured value, never report
+        `SlashMismatch`. The yields-to-`SlashMismatch` behavior lives in
+        `URLResolver._resolve_segments`.
         """
-        Check that the pattern name does not contain a colon.
-        """
-        if self.pattern.name is not None and ":" in self.pattern.name:
-            warning = PreflightResult(
-                fix=f"Your URL pattern {self.pattern.describe()} has a name including a ':'. Remove the colon, to "
-                "avoid ambiguous namespace references.",
-                warning=True,
-                id="urls.pattern_name_contains_colon",
+        if self.is_catchall:
+            return self._resolve_catchall(
+                segments, trailing_slash, prefix_segments, prefix_kwargs
             )
-            return [warning]
+
+        match = _walk_segments(self.segments, segments, full_match=True)
+        if match is None:
+            return None
+        _, captured = match
+
+        full_segments = prefix_segments + self.segments
+        # Root URL (`/`) has no alternate slash form — `_parse_path("/")`
+        # always reports `trailing_slash=False`, so following the global
+        # `URLS_TRAILING_SLASH=True` would 308-redirect to the empty
+        # string. Skip the slash check when the full URL is root.
+        if full_segments:
+            route_ts = self.trailing_slash
+            if trailing_slash != route_ts:
+                return SlashMismatch()
         else:
-            return []
+            route_ts = False
 
-    def resolve(self, path: str) -> Any:
-        match = self.pattern.match(path)
-        if match:
-            new_path, captured_kwargs = match
-            from .resolvers import ResolverMatch
+        kwargs = {**prefix_kwargs, **captured} if captured else prefix_kwargs
+        return ResolverMatch(
+            view_class=self.view_class,
+            kwargs=kwargs,
+            url_name=self.name,
+            route=_route_str(full_segments, route_ts),
+        )
 
-            return ResolverMatch(
-                view_class=self.view_class,
-                kwargs=captured_kwargs,
-                url_name=self.pattern.name,
-                route=str(self.pattern),
-            )
-        return None
+    def _resolve_catchall(
+        self,
+        segments: tuple[str, ...],
+        trailing_slash: bool,
+        prefix_segments: tuple[Segment, ...],
+        prefix_kwargs: dict[str, Any],
+    ) -> ResolverMatch | None:
+        """Match a catchall (`path("<path:NAME>")`) against the request.
+
+        The route has exactly one segment — a multi-segment `Capture`
+        (guaranteed by `is_catchall`). Joins all request segments into
+        the captured value, appending the trailing slash if present so
+        a single declared route handles both `/missing` and `/missing/`.
+        """
+        cap = self.segments[0]
+        assert isinstance(cap, Capture)
+
+        value = "/".join(segments)
+        if not value:
+            return None
+        if trailing_slash:
+            value += "/"
+
+        if not _segment_value_matches(cap.converter, value):
+            return None
+        try:
+            captured_value = cap.converter.to_python(value)
+        except ValueError:
+            return None
+
+        kwargs = {**prefix_kwargs, cap.name: captured_value}
+        return ResolverMatch(
+            view_class=self.view_class,
+            kwargs=kwargs,
+            url_name=self.name,
+            route=_route_str(prefix_segments + self.segments, self.trailing_slash),
+            is_catchall=True,
+        )

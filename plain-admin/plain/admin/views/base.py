@@ -6,11 +6,9 @@ from plain.auth.views import AuthView
 from plain.http import ForbiddenError403
 from plain.preflight import get_check_counts
 from plain.runtime import settings
+from plain.templates.views import TemplateView
 from plain.urls import reverse
 from plain.utils import timezone
-from plain.views import (
-    TemplateView,
-)
 
 from ..models import PinnedNavItem
 from .registry import registry, track_recent_nav

@@ -6,7 +6,8 @@ from plain.runtime import settings
 from plain.utils.functional import lazy
 
 from .exceptions import NoReverseMatch
-from .resolvers import get_ns_resolver, get_resolver
+from .resolvers import get_resolver
+from .segments import Segment
 
 
 def reverse(url_name: str, **kwargs: Any) -> str:
@@ -14,35 +15,25 @@ def reverse(url_name: str, **kwargs: Any) -> str:
 
     *path, view = url_name.split(":")
 
-    current_path = None
-
-    resolved_path = []
-    ns_pattern = ""
-    ns_converters = {}
+    resolved_path: list[str] = []
+    prefix_segments: tuple[Segment, ...] = ()
     for ns in path:
-        current_ns = current_path.pop() if current_path else None
-
-        if ns != current_ns:
-            current_path = None
-
         try:
-            extra, resolver = resolver.namespace_dict[ns]
+            extra_segments, resolver = resolver.namespace_dict[ns]
             resolved_path.append(ns)
-            ns_pattern += extra
-            ns_converters.update(resolver.pattern.converters)
-        except KeyError as key:
+            prefix_segments = prefix_segments + extra_segments
+        except KeyError:
             if resolved_path:
                 raise NoReverseMatch(
-                    "{} is not a registered namespace inside '{}'".format(
-                        key, ":".join(resolved_path)
-                    )
+                    f"'{ns}' is not a registered namespace inside "
+                    f"'{':'.join(resolved_path)}'"
                 )
-            else:
-                raise NoReverseMatch(f"{key} is not a registered namespace")
-    if ns_pattern:
-        resolver = get_ns_resolver(ns_pattern, resolver, tuple(ns_converters.items()))
+            raise NoReverseMatch(f"'{ns}' is not a registered namespace")
 
-    return resolver.reverse(view, **kwargs)
+    # `prefix_segments` is positional-only on `URLResolver.reverse`
+    # specifically to avoid colliding with user-route kwargs of the same
+    # name — don't switch this call to keyword form.
+    return resolver.reverse(view, prefix_segments, **kwargs)
 
 
 reverse_lazy = lazy(reverse, str)

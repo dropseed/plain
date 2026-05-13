@@ -121,6 +121,7 @@
 {% set _toc_groups = [
     ("Theme", [
         ("customizing", "Customizing"),
+        ("beyond-tokens", "Beyond tokens"),
         ("dark-mode", "Dark mode"),
         ("typography", "Typography"),
     ]),
@@ -302,6 +303,25 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 
+{% call section("beyond-tokens", "Beyond tokens",
+   "When a token swap doesn't cover what you need, override the `.admin-*` classes directly in your stylesheet. They're treated as a stable surface — every class shown on this page can be overridden. The admin's component rules live in `@layer components`, so unlayered declarations in your stylesheet beat them automatically.") %}
+<pre><code>/* tailwind.css */
+.admin-card {
+  border-width: 2px;
+  box-shadow: 0 1px 0 var(--border) inset;
+}
+
+.admin-btn-primary {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}</code></pre>
+<p class="text-sm mt-3">
+    Forking templates remains as an escape hatch but should be the last resort —
+    you take on keeping the fork in sync as the admin evolves.
+</p>
+{% endcall %}
+
+
 {% call section("dark-mode", "Dark mode",
    "The admin ships with a built-in theme menu in the top-right with Light, Dark, and System options. The choice is stored in localStorage; `.dark` is set on `<html>`; the no-flash init in base.html resolves before paint. Wire your own picker by adding `data-theme-set=\"light|dark|system\"` to any element.") %}
 <div class="flex gap-2">
@@ -319,7 +339,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {% call section("typography", "Typography",
-   "Defaults: Inter (sans) and JetBrains Mono (mono), both vendored under `assets/admin/fonts/`. Override `--font-sans` / `--font-mono` on `.plain-admin` to retheme — Tailwind's `font-sans` / `font-mono` utilities pick those up automatically. To swap or drop the bundled `@font-face` declarations, override the `admin_fonts` block in `admin/base.html`.") %}
+   "Defaults: Inter (sans) and JetBrains Mono (mono), both vendored under `assets/admin/fonts/`. Override `--font-sans` / `--font-mono` on `.plain-admin` to retheme — Tailwind's `font-sans` / `font-mono` utilities pick those up automatically. To swap or drop the bundled `@font-face` declarations, shadow `admin/base.html` in your app (extending `admin/_base.html`) and override the `admin_fonts` block.") %}
 
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
     <div class="rounded-admin-md border border-admin-border p-2 flex items-center gap-3">

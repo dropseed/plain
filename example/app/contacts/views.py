@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from plain.http import Response
+from plain.templates.views import FormView, TemplateView
 from plain.urls import reverse_lazy
-from plain.views import FormView, TemplateView
 
 from .forms import ArchiveFilterForm, ArchiveSearchForm, ContactForm
 from .models import ContactSubmission

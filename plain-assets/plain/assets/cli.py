@@ -8,11 +8,19 @@ from pathlib import Path
 import click
 
 import plain.runtime
-from plain.assets.compile import compile_assets, get_compiled_path
+from plain.cli import register_cli
 from plain.cli.print import print_event
 
+from .compile import compile_assets, get_compiled_path
 
-@click.command()
+
+@register_cli("assets")
+@click.group()
+def cli() -> None:
+    """Asset management"""
+
+
+@cli.command(name="compile")
 @click.option(
     "--keep-original/--no-keep-original",
     "keep_original",
@@ -34,15 +42,15 @@ from plain.cli.print import print_event
     default=True,
     help="Compress the assets",
 )
-def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
-    """Pre-deployment build step for assets and static files"""
+def compile_cmd(keep_original: bool, fingerprint: bool, compress: bool) -> None:
+    """Run pre-compile hooks, then fingerprint and compress assets."""
 
     if not keep_original and not fingerprint:
         raise click.UsageError(
             "You must either keep the original assets or fingerprint them."
         )
 
-    # Run user-defined build commands first
+    # Run user-defined pre-compile shell commands first
     pyproject_path = plain.runtime.APP_PATH.parent / "pyproject.toml"
     if pyproject_path.exists():
         with pyproject_path.open("rb") as f:
@@ -51,7 +59,7 @@ def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
         for name, data in (
             pyproject.get("tool", {})
             .get("plain", {})
-            .get("build", {})
+            .get("assets", {})
             .get("run", {})
             .items()
         ):
@@ -61,12 +69,12 @@ def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
                 click.secho(f"Error in {name} (exit {result.returncode})", fg="red")
                 sys.exit(result.returncode)
 
-    # Then run installed package build steps (like tailwind, typically should run last...)
-    for entry_point in entry_points(group="plain.build"):
+    # Then run installed package pre-compile hooks (like tailwind, esbuild)
+    for entry_point in entry_points(group="plain.assets.compile"):
         print_event(f"{entry_point.name}...")
         entry_point.load()()
 
-    # Compile our assets
+    # Compile assets
     target_dir = get_compiled_path()
     click.secho(f"Compiling assets to {target_dir}", bold=True)
     if target_dir.exists():
@@ -98,6 +106,3 @@ def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
     click.secho(
         f"\nCompiled {total_files} assets into {total_compiled} files", fg="green"
     )
-
-    # TODO could do a jinja pre-compile here too?
-    # environment.compile_templates() but it needs a target, ignore_errors=False

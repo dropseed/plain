@@ -44,9 +44,33 @@ class AuthedMCP(MCPView):
             raise MCPUnauthorized("Invalid auth token")
 
 
+class BoomMCP(MCPView):
+    """Raises a generic exception in before_request so handle_exception's
+    5xx branch is exercised end to end."""
+
+    name = "boom"
+    tools: list[type[MCPTool]] = []
+
+    def before_request(self) -> None:
+        raise RuntimeError("mcp boom")
+
+
+class RPCBoomMCP(MCPView):
+    """Custom RPC method that raises so the `rpc {method}` span error path
+    is exercised."""
+
+    name = "rpc_boom"
+    tools: list[type[MCPTool]] = []
+
+    def rpc_boom(self, params: dict) -> dict:
+        raise RuntimeError("rpc handler boom")
+
+
 class AppRouter(Router):
     namespace = ""
     urls = [
-        path("mcp/", PublicMCP, name="public_mcp"),
-        path("authed/", AuthedMCP, name="authed_mcp"),
+        path("mcp", PublicMCP, name="public_mcp"),
+        path("authed", AuthedMCP, name="authed_mcp"),
+        path("boom", BoomMCP, name="boom_mcp"),
+        path("rpc-boom", RPCBoomMCP, name="rpc_boom_mcp"),
     ]

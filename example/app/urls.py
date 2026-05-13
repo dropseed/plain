@@ -16,8 +16,8 @@ from plain.auth.views import LogoutView
 from plain.observer.urls import ObserverRouter
 from plain.pageviews.urls import PageviewsRouter
 from plain.passwords.views import PasswordLoginView
+from plain.templates.views import NotFoundView, TemplateView
 from plain.urls import Router, include, path
-from plain.views import TemplateView
 
 
 class LoginView(PasswordLoginView):
@@ -43,22 +43,23 @@ class ErrorView(TemplateView):
 class AppRouter(Router):
     namespace = ""
     urls = [
-        include("admin/", AdminRouter),
-        include("assets/", AssetsRouter),
-        include("observer/", ObserverRouter),
-        include("pageviews/", PageviewsRouter),
-        include("notes/", NotesRouter),
-        include("contacts/", ContactsRouter),
-        include("tasks/", TasksRouter),
-        include("api/", APIRouter),
-        include("tasks-api/", TasksAPIRouter),
-        path("mcp/", NotesMCP, name="mcp"),
-        path("login/", LoginView, name="login"),
-        path("logout/", LogoutView, name="logout"),
-        path("error/", ErrorView, name="error"),
-        path("sse/", SSEDemoView, name="sse_demo"),
-        path("sse/clock/", ClockView, name="sse_clock"),
-        path("sse/ticker/", StockTickerView, name="sse_ticker"),
-        path("jobs/run/", RunExampleJobView, name="run_example_job"),
+        include("admin", AdminRouter),
+        include("assets", AssetsRouter),
+        include("observer", ObserverRouter),
+        include("pageviews", PageviewsRouter),
+        include("notes", NotesRouter),
+        include("contacts", ContactsRouter),
+        include("tasks", TasksRouter),
+        include("api", APIRouter),
+        include("tasks-api", TasksAPIRouter),
+        path("mcp", NotesMCP, name="mcp"),
+        path("login", LoginView, name="login"),
+        path("logout", LogoutView, name="logout"),
+        path("error", ErrorView, name="error"),
+        path("sse", SSEDemoView, name="sse_demo"),
+        path("sse/clock", ClockView, name="sse_clock"),
+        path("sse/ticker", StockTickerView, name="sse_ticker"),
+        path("jobs/run", RunExampleJobView, name="run_example_job"),
         path("", IndexView, name="index"),
+        path("<path:_>", NotFoundView),
     ]

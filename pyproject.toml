@@ -8,6 +8,7 @@ dev = [
   "plain",
   "plain-admin",
   "plain-api",
+  "plain-assets",
   "plain-auth",
   "plain-cache",
   "plain-cloud",
@@ -36,6 +37,7 @@ dev = [
   "plain-sessions",
   "plain-support",
   "plain-tailwind",
+  "plain-templates",
   "plain-toolbar",
   "plain-tunnel",
   "plain-vendor",
@@ -48,6 +50,7 @@ dev = [
 "plain" = { workspace = true }
 "plain-admin" = { workspace = true }
 "plain-api" = { workspace = true }
+"plain-assets" = { workspace = true }
 "plain-auth" = { workspace = true }
 "plain-cache" = { workspace = true }
 "plain-cloud" = { workspace = true }
@@ -76,6 +79,7 @@ dev = [
 "plain-sessions" = { workspace = true }
 "plain-support" = { workspace = true }
 "plain-tailwind" = { workspace = true }
+"plain-templates" = { workspace = true }
 "plain-toolbar" = { workspace = true }
 "plain-tunnel" = { workspace = true }
 "plain-vendor" = { workspace = true }

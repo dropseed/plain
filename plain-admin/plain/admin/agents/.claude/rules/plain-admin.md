@@ -16,6 +16,12 @@ Admin styles are a per-component CSS layer with Plain's brand palette. Component
 - `uv run plain docs admin` — full theming and component reference
 - `plain-admin/plain/admin/styles/` — source of truth (`tokens.css`, `components/*.css`)
 
+**Customize via CSS, not template forks.** Order of escalation:
+
+1. **Token overrides** on `.plain-admin` cover most retoning (colors, radius, fonts).
+2. **Class overrides** for `.admin-*` classes — admin component rules live in `@layer components`, so unlayered user CSS wins automatically. No `!important` or specificity hacks.
+3. **Template overrides** exist as an escape hatch but put the user on the hook for keeping the fork in sync — point users away from this unless steps 1–2 truly can't reach.
+
 ## Use tokens, not hardcoded colors
 
 The admin runs in light or dark mode via `.dark` on `<html>`. Always reference design tokens — never literal stone/black/white.

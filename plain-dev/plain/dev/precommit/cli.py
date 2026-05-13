@@ -49,4 +49,4 @@ def run_checks() -> None:
 
     run_core_checks(skip_test=False)
 
-    check_short("plain build", "plain", "build")
+    check_short("plain assets compile", "plain", "assets", "compile")

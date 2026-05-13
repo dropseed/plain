@@ -1,5 +1,26 @@
 # plain-observer changelog
 
+## [0.34.12](https://github.com/dropseed/plain/releases/plain-observer@0.34.12) (2026-05-13)
+
+### What's changed
+
+- Updated route definitions to the no-slash convention introduced in `plain` 0.145.0. Canonical URLs now follow the project's `URLS_TRAILING_SLASH` setting. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.34.11](https://github.com/dropseed/plain/releases/plain-observer@0.34.11) (2026-05-12)
+
+### What's changed
+
+- `DetailView` and `ListView` imports moved from `plain.views` to `plain.templates.views` to match the [`plain.templates` carve-out](../../../plain/plain/CHANGELOG.md). ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- Pins `plain>=0.143.0`, `plain.admin>=0.82.0`, and `plain.templates>=0.1.0`.
+
+### Upgrade instructions
+
+- No code changes required if you upgrade `plain` to 0.143.0 in the same step.
+
 ## [0.34.10](https://github.com/dropseed/plain/releases/plain-observer@0.34.10) (2026-05-06)
 
 ### What's changed

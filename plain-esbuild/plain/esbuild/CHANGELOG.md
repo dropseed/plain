@@ -1,5 +1,35 @@
 # plain-esbuild changelog
 
+## [0.10.0](https://github.com/dropseed/plain/releases/plain-esbuild@0.10.0) (2026-05-12)
+
+### What's changed
+
+- Entry-point group renamed from `plain.assets.build` to `plain.assets.compile` to match the renamed `plain assets compile` command (see [plain-assets 0.3.0](../../../plain-assets/plain/assets/CHANGELOG.md)). README updated to reference the new command. Pins `plain.assets>=0.3.0`. ([3b30b62309](https://github.com/dropseed/plain/commit/3b30b62309))
+
+### Upgrade instructions
+
+- No changes required if you upgrade `plain.assets` to 0.3.0+ in the same step.
+
+## [0.9.0](https://github.com/dropseed/plain/releases/plain-esbuild@0.9.0) (2026-05-12)
+
+### What's changed
+
+- Entry-point group renamed from `plain.build` to `plain.assets.build` to match the new `plain.assets.build` namespace (see [plain-assets 0.2.0](../../../plain-assets/plain/assets/CHANGELOG.md)). Pins `plain.assets>=0.2.0` since the new group is only iterated by that version. ([f698ec3436](https://github.com/dropseed/plain/commit/f698ec3436))
+
+### Upgrade instructions
+
+- No changes required if you upgrade `plain.assets` to 0.2.0+ in the same step.
+
+## [0.8.3](https://github.com/dropseed/plain/releases/plain-esbuild@0.8.3) (2026-05-12)
+
+### What's changed
+
+- Adds explicit `plain.assets>=0.1.0,<1.0.0` dependency now that `plain.assets` is a separate package (extracted from `plain` core in 0.142.0). README updated to reference `plain assets build` instead of the retired `plain build`. ([844f46e428](https://github.com/dropseed/plain/commit/844f46e428))
+
+### Upgrade instructions
+
+- No changes required if you're upgrading `plain` in the same step — `plain.assets` comes along as a transitive dependency.
+
 ## [0.8.2](https://github.com/dropseed/plain/releases/plain-esbuild@0.8.2) (2026-05-05)
 
 ### What's changed

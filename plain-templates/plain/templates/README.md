@@ -1,9 +1,14 @@
-# Templates
+# plain.templates
 
 **Render HTML templates using Jinja2.**
 
 - [Overview](#overview)
 - [Template files](#template-files)
+- [Template-rendering views](#template-rendering-views)
+    - [TemplateView](#templateview)
+    - [FormView](#formview)
+    - [DetailView, CreateView, UpdateView, DeleteView, ListView](#object-views)
+- [Error views](#error-views)
 - [Template context](#template-context)
 - [Built-in globals](#built-in-globals)
 - [Built-in filters](#built-in-filters)
@@ -11,19 +16,19 @@
 - [Custom template extensions](#custom-template-extensions)
 - [Rendering templates manually](#rendering-templates-manually)
 - [Custom Jinja environment](#custom-jinja-environment)
-- [FAQs](#faqs)
 - [Forms](#forms)
+- [FAQs](#faqs)
 - [Installation](#installation)
 
 ## Overview
 
 Plain uses Jinja2 for template rendering. You can refer to the [Jinja documentation](https://jinja.palletsprojects.com/en/stable/) for all of the features available.
 
-Templates are typically used with `TemplateView` or one of its subclasses.
+Templates are typically used with [`TemplateView`](./views.py#TemplateView) or one of its subclasses (see [Template-rendering views](#template-rendering-views)).
 
 ```python
 # app/views.py
-from plain.views import TemplateView
+from plain.templates.views import TemplateView
 
 
 class ExampleView(TemplateView):
@@ -53,11 +58,109 @@ Template files can live in two locations:
 
 All template directories are merged together, so you can override templates from installed packages by creating a file with the same name in `app/templates/`.
 
-## Template context
+## Template-rendering views
 
-When using `TemplateView`, you pass data to templates by overriding `get_template_context()`.
+`plain.templates.views` ships the view classes that render templates. The base [`View`](../../../plain/plain/views/README.md) class lives in core `plain.views` and doesn't know about templates — install `plain.templates` to use any of these.
+
+### TemplateView
+
+[`TemplateView`](./views.py#TemplateView) renders a Jinja template:
 
 ```python
+from plain.templates.views import TemplateView
+
+
+class ExampleView(TemplateView):
+    template_name = "example.html"
+
+    def get_template_context(self):
+        context = super().get_template_context()
+        context["message"] = "Hello, world!"
+        return context
+```
+
+For simple pages that don't need custom context, configure `TemplateView` directly in your URL routes:
+
+```python
+from plain.templates.views import TemplateView
+from plain.urls import path, Router
+
+
+class AppRouter(Router):
+    routes = [
+        path("/example/", TemplateView.as_view(template_name="example.html")),
+    ]
+```
+
+### FormView
+
+[`FormView`](./views.py#FormView) handles displaying and processing [forms](../../../plain/plain/forms/README.md). The form is automatically available in your template as `form`:
+
+```python
+from plain.templates.views import FormView
+from .forms import ExampleForm
+
+
+class ExampleView(FormView):
+    template_name = "example.html"
+    form_class = ExampleForm
+    success_url = "."
+
+    def form_valid(self, form):
+        return super().form_valid(form)
+```
+
+### Object views
+
+[`DetailView`](./views.py#DetailView), [`CreateView`](./views.py#CreateView), [`UpdateView`](./views.py#UpdateView), [`DeleteView`](./views.py#DeleteView), and [`ListView`](./views.py#ListView) provide standard CRUD scaffolding. Each requires you to implement `get_object()` or `get_objects()`:
+
+```python
+from plain.templates.views import DetailView
+
+
+class ExampleDetailView(DetailView):
+    template_name = "detail.html"
+
+    def get_object(self):
+        return MyObjectClass.query.get(
+            id=self.url_kwargs["id"],
+            user=self.request.user,
+        )
+```
+
+The single object is exposed in templates as `object`; list views expose `objects`. Set `context_object_name` for a more descriptive name.
+
+## Error views
+
+`TemplateView` overrides `handle_exception` to render `{status}.html` for any exception that escapes the handler — `404.html` for `NotFoundError404`, `500.html` for unhandled errors, etc. The context is `{request, status_code, exception, DEBUG}`. On `TemplateFileMissing` the view returns a plain-text status response (`404 Not Found`, `500 Internal Server Error`); on any other render failure it logs and returns a bare-status `Response` so `_respond_to_exception` can still attach `response.exception` for observability.
+
+Plain core's exception handler — the one that catches pre-view failures like URL resolution and middleware errors — returns plain text. To get a styled 404 for unmatched URLs, mount [`NotFoundView`](./views.py#NotFoundView) as the last route:
+
+```python
+from plain.templates.views import NotFoundView
+from plain.urls import Router, path
+
+class AppRouter(Router):
+    urls = [
+        # ... your routes ...
+        path("<path:_>", NotFoundView),
+    ]
+```
+
+`NotFoundView.before_request` raises `NotFoundError404` before method dispatch, so every HTTP method produces a 404 instead of a 405.
+
+The resolver recognizes a sole-segment terminal `<path:>` as a **catchall**: it handles both `/missing` and `/missing/` from one mount, and it yields to trailing-slash redirects from specific routes. So `path("login/", LoginView)` followed by `path("<path:_>", NotFoundView)` still 308's `/login` to `/login/` rather than serving the 404 — the catchall only fires when nothing else came close.
+
+Your `500.html` template should be self-contained — avoid extending base templates or accessing the database/session, since 500s can fire during middleware or template-rendering errors. `404.html` and `403.html` can safely extend base templates since they happen after middleware runs.
+
+## Template context
+
+When using `TemplateView`, you pass data to templates by overriding `get_template_context()`:
+
+```python
+from plain.templates.views import TemplateView
+
+
 class ProductView(TemplateView):
     template_name = "product.html"
 
@@ -299,4 +402,18 @@ Each bound field provides: `html_name`, `html_id`, `value`, `errors`, `field`, `
 
 ## Installation
 
-The `plain.templates` module is included with Plain by default. No additional installation is required.
+Install the `plain.templates` package:
+
+```bash
+uv add plain.templates
+```
+
+Then add it to `INSTALLED_PACKAGES`:
+
+```python
+# app/settings.py
+INSTALLED_PACKAGES = [
+    "plain.templates",
+    # ...
+]
+```

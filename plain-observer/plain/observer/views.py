@@ -7,8 +7,9 @@ from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
 from plain.http import JsonResponse, Response
 from plain.runtime import settings
+from plain.templates.views import DetailView, ListView
 from plain.urls import reverse
-from plain.views import DetailView, ListView, RedirectView
+from plain.views import RedirectView
 
 from .core import Observer
 from .models import Trace

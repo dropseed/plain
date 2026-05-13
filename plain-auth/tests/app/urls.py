@@ -41,9 +41,9 @@ class NoLoginUrlView(AuthView):
 class AppRouter(Router):
     namespace = ""
     urls = [
-        path("login/", LoginView, name="login"),
-        path("protected/", ProtectedView, name="protected"),
-        path("open/", OpenView, name="open"),
-        path("admin/", AdminView, name="admin"),
-        path("nolink/", NoLoginUrlView, name="nolink"),
+        path("login", LoginView, name="login"),
+        path("protected", ProtectedView, name="protected"),
+        path("open", OpenView, name="open"),
+        path("admin", AdminView, name="admin"),
+        path("nolink", NoLoginUrlView, name="nolink"),
     ]

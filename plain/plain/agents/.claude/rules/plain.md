@@ -44,6 +44,50 @@ When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 
 Run `uv run plain docs logs` for full examples and anti-patterns.
 
+## OTel exception observability
+
+OTel-based exception tooling (Datadog/NR/Honeycomb-style) attributes application errors to **entry spans** — the topmost span belonging to the service for a given unit of work. The convention across APM backends is:
+
+```
+span_kind IN (SERVER, CONSUMER, PRODUCER) AND status_code = 'ERROR' AND has(events.name, 'exception')
+```
+
+Only those three span kinds count for error attribution. `INTERNAL` and `CLIENT` are trace context — they explain what was happening, but they're not where the failure is recorded.
+
+**Pick the right `SpanKind` when adding instrumentation:**
+
+- `SERVER` — incoming requests (HTTP, RPC handlers, etc.)
+- `CONSUMER` — discrete background units of work (jobs, chores, scheduled tasks)
+- `PRODUCER` — emitting work to a queue/broker
+- `CLIENT` — outgoing calls (DB, HTTP, SMTP) — never an error-attribution boundary
+- `INTERNAL` — sub-operations and inner loop cycles (worker tick, template render) — useful for trace context, not error attribution
+
+If a failure inside an `INTERNAL`/`CLIENT` span is a real application error, the surrounding entry span should carry the failure. If there's no entry span and the failure matters, you probably need to add one.
+
+The canonical failure signal on an entry span is `status_code=ERROR` + `error.type` attribute + a recorded exception event. Don't branch on `exception.escaped` — deprecated upstream, unreliable in the Python SDK.
+
+If the surrounding code catches the exception inside the `with span:` block, the SDK's auto-record on context exit won't fire — stamp the canonical signal explicitly:
+
+```python
+span.record_exception(exc)
+span.set_status(trace.StatusCode.ERROR)
+span.set_attribute(ERROR_TYPE, format_exception_type(exc))
+```
+
+If the exception propagates out of the span context, the SDK auto-records and sets status — only `error.type` needs to be set explicitly.
+
+**Already wired entry spans:**
+
+- HTTP requests — SERVER (`plain/internal/handlers/base.py`)
+- View 5xx attachment — `plain/views/base.py:_respond_to_exception` (records on the SERVER span via `_finalize_span`)
+- Job enqueue — PRODUCER (`plain-jobs/jobs/jobs.py`)
+- Job execute — CONSUMER (`plain-jobs/jobs/models.py`), plus a fallback CONSUMER span in `plain-jobs/jobs/workers.py:process_job` that catches lookup-time failures before `run()` is reached
+- Worker maintenance loop — CONSUMER (`plain-jobs/jobs/workers.py`)
+- Chore execution — CONSUMER (`plain/cli/chores.py`)
+- MCP RPC dispatch — SERVER (`plain-mcp/mcp/views.py`)
+
+Trace-context-only (not error attribution): template render (`plain-templates`), DB queries / email sends (CLIENT — same role).
+
 ## Documentation
 
 **Discovery** — find what's available and where things are:
@@ -59,9 +103,9 @@ Run `uv run plain docs logs` for full examples and anti-patterns.
 
 **Workflow**: Use `--search <term>` to find which module has what you need, then read the full doc, or run `<name> --search <term>` to print just the matching sections.
 
-Packages: plain, plain-admin, plain-api, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-observer, plain-pages, plain-pageviews, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-support, plain-tailwind, plain-toolbar, plain-tunnel, plain-vendor
+Packages: plain, plain-admin, plain-api, plain-assets, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-observer, plain-pages, plain-pageviews, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-support, plain-tailwind, plain-templates, plain-toolbar, plain-tunnel, plain-vendor
 
-Core modules: agents, assets, chores, cli, csrf, forms, http, logs, packages, preflight, runtime, server, templates, test, urls, utils, views
+Core modules: agents, chores, cli, csrf, forms, http, logs, packages, preflight, runtime, server, test, urls, utils, views
 
 Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/path>/README.md`
 

@@ -10,8 +10,9 @@ from plain.http import (
     Response,
 )
 from plain.runtime import settings
+from plain.templates.views import TemplateView
 from plain.utils.cache import patch_vary_headers
-from plain.views import TemplateView, View
+from plain.views import View
 
 from .exceptions import PageNotFoundError, RedirectPageError
 from .pages import Page

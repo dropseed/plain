@@ -5,8 +5,8 @@ from http import HTTPMethod
 from typing import Any
 
 from plain.http import Response
+from plain.templates.views import TemplateView
 from plain.utils.cache import patch_vary_headers
-from plain.views import TemplateView
 
 from .templates import render_template_fragment
 

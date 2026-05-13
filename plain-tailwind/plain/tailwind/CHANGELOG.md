@@ -1,5 +1,46 @@
 # plain-tailwind changelog
 
+## [0.23.1](https://github.com/dropseed/plain/releases/plain-tailwind@0.23.1) (2026-05-12)
+
+### What's changed
+
+- The `{% tailwind_css %}` template extension now imports from `plain.templates` (which is a separate package as of [`plain.templates` 0.1.0](../../../plain-templates/plain/templates/CHANGELOG.md)). The extension is still autoloaded when `plain.templates` is in `INSTALLED_PACKAGES` — plain.tailwind itself does **not** hard-depend on plain.templates so apps that use plain.tailwind only for CSS compilation don't pull in the templating stack. ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- Pins `plain>=0.143.0`.
+
+### Upgrade instructions
+
+- No changes required if you upgrade `plain` to 0.143.0 in the same step.
+
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.23.0) (2026-05-12)
+
+### What's changed
+
+- Entry-point group renamed from `plain.assets.build` to `plain.assets.compile` to match the renamed `plain assets compile` command (see [plain-assets 0.3.0](../../../plain-assets/plain/assets/CHANGELOG.md)). README updated to show `[tool.plain.assets.run]` for `plain tailwind build --minify`. Pins `plain.assets>=0.3.0`. ([3b30b62309](https://github.com/dropseed/plain/commit/3b30b62309))
+
+### Upgrade instructions
+
+- Rename `[tool.plain.assets.build.run]` to `[tool.plain.assets.run]` in your `pyproject.toml`.
+
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.22.0) (2026-05-12)
+
+### What's changed
+
+- Entry-point group renamed from `plain.build` to `plain.assets.build` to match the new `plain.assets.build` namespace (see [plain-assets 0.2.0](../../../plain-assets/plain/assets/CHANGELOG.md)). README updated to show `[tool.plain.assets.build.run]` for users adding `plain tailwind build --minify` as a build step. Pins `plain.assets>=0.2.0`. ([f698ec3436](https://github.com/dropseed/plain/commit/f698ec3436))
+
+### Upgrade instructions
+
+- If you wrote `[tool.plain.build.run]` in your project's `pyproject.toml`, rename it to `[tool.plain.assets.build.run]`.
+
+## [0.21.2](https://github.com/dropseed/plain/releases/plain-tailwind@0.21.2) (2026-05-12)
+
+### What's changed
+
+- Adds explicit `plain.assets>=0.1.0,<1.0.0` dependency now that `plain.assets` is a separate package (extracted from `plain` core in 0.142.0). `plain.tailwind` uses `_APP_ASSETS_DIR` from `plain.assets.finders`. ([844f46e428](https://github.com/dropseed/plain/commit/844f46e428))
+
+### Upgrade instructions
+
+- No changes required if you're upgrading `plain` in the same step — `plain.assets` comes along as a transitive dependency.
+
 ## [0.21.1](https://github.com/dropseed/plain/releases/plain-tailwind@0.21.1) (2026-05-05)
 
 ### What's changed

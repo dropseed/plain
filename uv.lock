@@ -8,6 +8,7 @@ members = [
     "plain",
     "plain-admin",
     "plain-api",
+    "plain-assets",
     "plain-auth",
     "plain-cache",
     "plain-cloud",
@@ -37,6 +38,7 @@ members = [
     "plain-start",
     "plain-support",
     "plain-tailwind",
+    "plain-templates",
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
@@ -215,6 +217,7 @@ dependencies = [
     { name = "plain" },
     { name = "plain-admin" },
     { name = "plain-api" },
+    { name = "plain-assets" },
     { name = "plain-auth" },
     { name = "plain-cache" },
     { name = "plain-code" },
@@ -242,6 +245,7 @@ dependencies = [
     { name = "plain-sessions" },
     { name = "plain-support" },
     { name = "plain-tailwind" },
+    { name = "plain-templates" },
     { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
@@ -252,6 +256,7 @@ requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-admin", editable = "plain-admin" },
     { name = "plain-api", editable = "plain-api" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-cache", editable = "plain-cache" },
     { name = "plain-code", editable = "plain-code" },
@@ -279,6 +284,7 @@ requires-dist = [
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-support", editable = "plain-support" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
+    { name = "plain-templates", editable = "plain-templates" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },
@@ -753,12 +759,11 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.141.1"
+version = "0.145.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
     { name = "h2" },
-    { name = "jinja2" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-semantic-conventions" },
     { name = "watchfiles" },
@@ -774,7 +779,6 @@ dev = [
 requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
     { name = "h2", specifier = ">=4.0.0" },
-    { name = "jinja2", specifier = ">=3.1.2" },
     { name = "opentelemetry-api", specifier = ">=1.34.1" },
     { name = "opentelemetry-semantic-conventions", specifier = ">=0.55b1" },
     { name = "watchfiles", specifier = ">=0.18.0" },
@@ -788,7 +792,7 @@ dev = [
 
 [[package]]
 name = "plain-admin"
-version = "0.81.2"
+version = "0.82.1"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -796,6 +800,7 @@ dependencies = [
     { name = "plain-elements" },
     { name = "plain-htmx" },
     { name = "plain-tailwind" },
+    { name = "plain-templates" },
 ]
 
 [package.dev-dependencies]
@@ -810,6 +815,7 @@ requires-dist = [
     { name = "plain-elements", editable = "plain-elements" },
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
+    { name = "plain-templates", editable = "plain-templates" },
 ]
 
 [package.metadata.requires-dev]
@@ -817,7 +823,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-api"
-version = "0.33.1"
+version = "0.33.5"
 source = { editable = "plain-api" }
 dependencies = [
     { name = "plain" },
@@ -837,6 +843,25 @@ dev = [
     { name = "openapi-spec-validator", specifier = ">=0.7.1" },
     { name = "plain-pytest", editable = "plain-pytest" },
 ]
+
+[[package]]
+name = "plain-assets"
+version = "0.3.0"
+source = { editable = "plain-assets" }
+dependencies = [
+    { name = "plain" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "plain", editable = "plain" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-auth"
@@ -943,12 +968,13 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-dev"
-version = "0.60.4"
+version = "0.62.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
     { name = "inotify" },
     { name = "plain" },
+    { name = "plain-assets" },
     { name = "requests" },
     { name = "rich" },
 ]
@@ -958,16 +984,18 @@ requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
     { name = "inotify" },
     { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "requests", specifier = ">=2.0.0" },
     { name = "rich" },
 ]
 
 [[package]]
 name = "plain-elements"
-version = "0.11.4"
+version = "0.11.5"
 source = { editable = "plain-elements" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-templates" },
 ]
 
 [package.dev-dependencies]
@@ -976,17 +1004,21 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-templates", editable = "plain-templates" },
+]
 
 [package.metadata.requires-dev]
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-email"
-version = "0.19.2"
+version = "0.19.3"
 source = { editable = "plain-email" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-templates" },
 ]
 
 [package.dev-dependencies]
@@ -995,21 +1027,28 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-templates", editable = "plain-templates" },
+]
 
 [package.metadata.requires-dev]
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-esbuild"
-version = "0.8.2"
+version = "0.10.0"
 source = { editable = "plain-esbuild" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-assets" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
+]
 
 [[package]]
 name = "plain-flags"
@@ -1059,10 +1098,11 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-htmx"
-version = "0.19.1"
+version = "0.19.2"
 source = { editable = "plain-htmx" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-templates" },
 ]
 
 [package.dev-dependencies]
@@ -1071,14 +1111,17 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-templates", editable = "plain-templates" },
+]
 
 [package.metadata.requires-dev]
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-jobs"
-version = "0.52.2"
+version = "0.53.0"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
@@ -1105,17 +1148,19 @@ dev = [
 
 [[package]]
 name = "plain-loginlink"
-version = "0.21.3"
+version = "0.21.5"
 source = { editable = "plain-loginlink" }
 dependencies = [
     { name = "plain" },
     { name = "plain-email" },
+    { name = "plain-templates" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-email", editable = "plain-email" },
+    { name = "plain-templates", editable = "plain-templates" },
 ]
 
 [[package]]
@@ -1139,12 +1184,13 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-oauth"
-version = "0.49.4"
+version = "0.49.6"
 source = { editable = "plain-oauth" }
 dependencies = [
     { name = "plain" },
     { name = "plain-auth" },
     { name = "plain-postgres" },
+    { name = "plain-templates" },
     { name = "requests" },
 ]
 
@@ -1158,6 +1204,7 @@ requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-postgres", editable = "plain-postgres" },
+    { name = "plain-templates", editable = "plain-templates" },
     { name = "requests", specifier = ">=2.0.0" },
 ]
 
@@ -1166,13 +1213,14 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-observer"
-version = "0.34.10"
+version = "0.34.12"
 source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "plain" },
     { name = "plain-admin" },
     { name = "plain-postgres" },
+    { name = "plain-templates" },
     { name = "sqlparse" },
 ]
 
@@ -1187,6 +1235,7 @@ requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-admin", editable = "plain-admin" },
     { name = "plain-postgres", editable = "plain-postgres" },
+    { name = "plain-templates", editable = "plain-templates" },
     { name = "sqlparse", specifier = ">=0.3.1" },
 ]
 
@@ -1195,11 +1244,13 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-pages"
-version = "0.19.4"
+version = "0.19.6"
 source = { editable = "plain-pages" }
 dependencies = [
     { name = "mistune" },
     { name = "plain" },
+    { name = "plain-assets" },
+    { name = "plain-templates" },
     { name = "pygments" },
     { name = "python-frontmatter" },
 ]
@@ -1213,6 +1264,8 @@ dev = [
 requires-dist = [
     { name = "mistune", specifier = ">=3.0.0" },
     { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
+    { name = "plain-templates", editable = "plain-templates" },
     { name = "pygments", specifier = ">=2.0.0" },
     { name = "python-frontmatter", specifier = ">=1.0.0" },
 ]
@@ -1222,7 +1275,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-pageviews"
-version = "0.35.7"
+version = "0.35.8"
 source = { editable = "plain-pageviews" }
 dependencies = [
     { name = "plain" },
@@ -1237,14 +1290,18 @@ requires-dist = [
 
 [[package]]
 name = "plain-passwords"
-version = "0.26.0"
+version = "0.26.1"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-templates" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-templates", editable = "plain-templates" },
+]
 
 [[package]]
 name = "plain-portal"
@@ -1267,7 +1324,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-postgres"
-version = "0.103.3"
+version = "0.103.4"
 source = { editable = "plain-postgres" }
 dependencies = [
     { name = "plain" },
@@ -1279,6 +1336,7 @@ dependencies = [
 dev = [
     { name = "opentelemetry-sdk" },
     { name = "plain-pytest" },
+    { name = "plain-templates" },
 ]
 
 [package.metadata]
@@ -1292,6 +1350,7 @@ requires-dist = [
 dev = [
     { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
     { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-templates", editable = "plain-templates" },
 ]
 
 [[package]]
@@ -1393,27 +1452,32 @@ requires-dist = [{ name = "click", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-support"
-version = "0.34.6"
+version = "0.34.9"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-assets" },
     { name = "plain-auth" },
     { name = "plain-postgres" },
+    { name = "plain-templates" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-postgres", editable = "plain-postgres" },
+    { name = "plain-templates", editable = "plain-templates" },
 ]
 
 [[package]]
 name = "plain-tailwind"
-version = "0.21.1"
+version = "0.23.1"
 source = { editable = "plain-tailwind" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-assets" },
     { name = "requests" },
     { name = "tomlkit" },
 ]
@@ -1421,23 +1485,49 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "requests", specifier = ">=2.0.0" },
     { name = "tomlkit", specifier = ">=0.12.1" },
 ]
 
 [[package]]
+name = "plain-templates"
+version = "0.2.0"
+source = { editable = "plain-templates" }
+dependencies = [
+    { name = "jinja2" },
+    { name = "plain" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jinja2", specifier = ">=3.1.2" },
+    { name = "plain", editable = "plain" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+
+[[package]]
 name = "plain-toolbar"
-version = "0.12.6"
+version = "0.12.7"
 source = { editable = "plain-toolbar" }
 dependencies = [
     { name = "plain" },
     { name = "plain-tailwind" },
+    { name = "plain-templates" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
+    { name = "plain-templates", editable = "plain-templates" },
 ]
 
 [[package]]
@@ -1459,10 +1549,11 @@ requires-dist = [
 
 [[package]]
 name = "plain-vendor"
-version = "0.11.5"
+version = "0.11.6"
 source = { editable = "plain-vendor" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-assets" },
     { name = "requests" },
     { name = "tomlkit" },
 ]
@@ -1470,6 +1561,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "requests", specifier = ">=2.0.0" },
     { name = "tomlkit", specifier = ">=0.12.1" },
 ]
@@ -1484,6 +1576,7 @@ dev = [
     { name = "plain" },
     { name = "plain-admin" },
     { name = "plain-api" },
+    { name = "plain-assets" },
     { name = "plain-auth" },
     { name = "plain-cache" },
     { name = "plain-cloud" },
@@ -1512,6 +1605,7 @@ dev = [
     { name = "plain-sessions" },
     { name = "plain-support" },
     { name = "plain-tailwind" },
+    { name = "plain-templates" },
     { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
@@ -1526,6 +1620,7 @@ dev = [
     { name = "plain", editable = "plain" },
     { name = "plain-admin", editable = "plain-admin" },
     { name = "plain-api", editable = "plain-api" },
+    { name = "plain-assets", editable = "plain-assets" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-cache", editable = "plain-cache" },
     { name = "plain-cloud", editable = "plain-cloud" },
@@ -1554,6 +1649,7 @@ dev = [
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-support", editable = "plain-support" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
+    { name = "plain-templates", editable = "plain-templates" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },

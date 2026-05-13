@@ -6,5 +6,5 @@ from . import views
 class PageviewsRouter(Router):
     namespace = "pageviews"
     urls = [
-        path("track/", views.TrackView, name="track"),
+        path("track", views.TrackView, name="track"),
     ]

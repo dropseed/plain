@@ -170,7 +170,7 @@ def _build_http_request(
     headers_dict = _merge_headers(raw_headers)
     remote_addr = _resolve_remote_addr(client)
     server_name, server_port = _resolve_h2_server_address(server, authority, scheme)
-    path, path_info = _resolve_path(raw_path)
+    path = _resolve_path(raw_path)
 
     return HttpRequest(
         method=method,
@@ -181,7 +181,6 @@ def _build_http_request(
         server_name=server_name,
         server_port=server_port,
         remote_addr=remote_addr,
-        path_info=path_info,
     )
 
 
@@ -206,7 +205,7 @@ def _prepare_stream_request(
 
     h2_req = H2Request(
         method=method,
-        path=http_request.path_info,
+        path=http_request.path,
         query=query,
         headers=raw_headers,
         peer_addr=client,
@@ -597,7 +596,7 @@ async def _async_handle_stream_inner(
     except Exception:
         log.exception(
             "Error handling HTTP/2 request",
-            extra={"path": http_request.path_info},
+            extra={"path": http_request.path},
         )
         if stream.stream_id not in state.reset_streams:
             if h2_resp.headers_sent:

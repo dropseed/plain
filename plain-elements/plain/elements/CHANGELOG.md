@@ -1,5 +1,15 @@
 # plain-elements changelog
 
+## [0.11.5](https://github.com/dropseed/plain/releases/plain-elements@0.11.5) (2026-05-12)
+
+### What's changed
+
+- Now depends on `plain.templates>=0.1.0` and `plain>=0.143.0` to match the [`plain.templates` carve-out](../../../plain/plain/CHANGELOG.md). ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+
+### Upgrade instructions
+
+- No code changes required if you upgrade `plain` to 0.143.0 in the same step — `plain.templates` is pulled in automatically.
+
 ## [0.11.4](https://github.com/dropseed/plain/releases/plain-elements@0.11.4) (2026-05-05)
 
 ### What's changed

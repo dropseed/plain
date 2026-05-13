@@ -7,8 +7,9 @@ from plain.auth.views import AuthView
 from plain.forms import Form
 from plain.http import RedirectResponse, Response
 from plain.runtime import settings
+from plain.templates.views import FormView
 from plain.utils.module_loading import import_string
-from plain.views import FormView, View
+from plain.views import View
 
 
 class SupportFormView(AuthView, FormView):

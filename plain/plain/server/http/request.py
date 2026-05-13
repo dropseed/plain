@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote_to_bytes
 
 from plain.http import Request as HttpRequest
-
-from .errors import ConfigurationProblem
 
 if TYPE_CHECKING:
     from .message import Request as ServerRequest
@@ -39,26 +36,10 @@ def _resolve_remote_addr(client: str | bytes | tuple[str, int] | Any) -> str:
     return str(client)
 
 
-def _resolve_path(raw_path: str) -> tuple[str, str]:
-    """Decode a raw request path and apply SCRIPT_NAME handling.
-
-    Returns (path, path_info). Raises ConfigurationProblem if SCRIPT_NAME
-    is set but the path doesn't start with it.
-    """
-    script_name = os.environ.get("SCRIPT_NAME", "")
-
-    if script_name:
-        if not raw_path.startswith(script_name):
-            raise ConfigurationProblem(
-                f"Request path {raw_path!r} does not start with SCRIPT_NAME {script_name!r}"
-            )
-        raw_path = raw_path[len(script_name) :]
-
+def _resolve_path(raw_path: str) -> str:
+    """Decode a raw request path to a UTF-8 string, defaulting to '/'."""
     path_bytes = unquote_to_bytes(raw_path)
-    path_info = _decode_path(path_bytes) or "/"
-    path = "{}/{}".format(script_name.rstrip("/"), path_info.replace("/", "", 1))
-
-    return path, path_info
+    return _decode_path(path_bytes) or "/"
 
 
 def create_request(
@@ -77,7 +58,7 @@ def create_request(
     headers = _merge_headers(req.headers)
     remote_addr = _resolve_remote_addr(client)
     server_name, server_port = _resolve_server_address(server, host, req.scheme)
-    path, path_info = _resolve_path(req.path or "")
+    path = _resolve_path(req.path or "")
 
     request = HttpRequest(
         method=(req.method or "GET").upper(),
@@ -88,7 +69,6 @@ def create_request(
         server_name=server_name,
         server_port=server_port,
         remote_addr=remote_addr,
-        path_info=path_info,
     )
 
     # Body stream — set by the message parser before this point.

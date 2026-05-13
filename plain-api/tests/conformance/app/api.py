@@ -9,7 +9,6 @@ in-memory dict store so the fixture runs with zero environment setup.
 
 from __future__ import annotations
 
-import re
 import uuid
 from itertools import count
 from typing import Any
@@ -504,7 +503,5 @@ class APIRouter(Router):
         path("header-echo/", HeaderEchoAPIView, name="header_echo"),
         path("secret/", SecretAPIView, name="secret"),
         path("greeting/", GreetingAPIView, name="greeting"),
-        # `[\s\S]+` (vs the `path` converter's `.+`) matches control
-        # characters too, so newline-bearing paths still hit a JSON 404.
-        path(re.compile(r"^[\s\S]+$"), JsonNotFoundView, name="not_found"),
+        path("<path:_>", JsonNotFoundView, name="not_found"),
     ]

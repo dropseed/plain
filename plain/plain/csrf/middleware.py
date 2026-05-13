@@ -41,10 +41,10 @@ class CsrfViewMiddleware(HttpMiddleware):
 
         # 2. Path-based exemption (regex patterns)
         for pattern in self.csrf_exempt_patterns:
-            if pattern.search(request.path_info):
+            if pattern.search(request.path):
                 return (
                     True,
-                    f"CSRF allowed: Path {request.path_info} matches exempt pattern {pattern.pattern}",
+                    f"CSRF allowed: Path {request.path} matches exempt pattern {pattern.pattern}",
                 )
 
         origin = request.headers.get("Origin")

@@ -38,18 +38,18 @@ def test_github_provider(db, settings):
     # Login required for this view
     response = client.get("/")
     assert response.status_code == 302
-    assert response.url == "/login/?next=/"
+    assert response.url == "/login?next=/"
 
     # User clicks the login link (form submit)
-    response = client.post("/oauth/github/login/")
+    response = client.post("/oauth/github/login")
     assert response.status_code == 302
     assert (
         response.url
-        == "https://github.com/login/oauth/authorize?client_id=test_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fgithub%2Fcallback%2F&response_type=code&scope=user&state=dummy_state"
+        == "https://github.com/login/oauth/authorize?client_id=test_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fgithub%2Fcallback&response_type=code&scope=user&state=dummy_state"
     )
 
     # GitHub redirects to the callback url
-    response = client.get("/oauth/github/callback/?code=test_code&state=dummy_state")
+    response = client.get("/oauth/github/callback?code=test_code&state=dummy_state")
     assert response.status_code == 302
     assert response.url == "/"
 

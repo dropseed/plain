@@ -5,7 +5,7 @@ from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
 from plain.paginator import Paginator
 from plain.postgres import QuerySet
-from plain.views import (
+from plain.templates.views import (
     CreateView,
     DeleteView,
     DetailView,

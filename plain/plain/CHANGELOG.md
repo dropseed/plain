@@ -1,5 +1,95 @@
 # plain changelog
 
+## [0.145.0](https://github.com/dropseed/plain/releases/plain@0.145.0) (2026-05-13)
+
+### What's changed
+
+- **Trailing slash is now an app-wide setting.** New `URLS_TRAILING_SLASH` setting (default `False`) decides the canonical form for every route in the project. `path("about")` and `path("about/")` produce identical routes — the slash on the route string is stripped silently. Requests at the non-canonical form 308-redirect to the canonical one. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- **`path(..., force_trailing_slash=True|False)` per-route override.** Lets file-extension routes (`sitemap.xml`, `robots.txt`) stay slash-less under a slashed app, or keep individual legacy URLs stable while flipping the rest. `None` (the default) follows the global setting. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- **Catchall route semantics.** `path("<path:NAME>")` — a sole-segment terminal multi-segment capture — is recognized structurally as a catchall: slash-agnostic at match time, yields to sibling `SlashMismatch` so a specific route's slash redirect isn't shadowed, and propagates through `include()` boundaries via `ResolverMatch.is_catchall`. ([90d8fd983b](https://github.com/dropseed/plain/commit/90d8fd983b), [48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- **Error template rendering moved into `plain.templates`.** Plain core's exception handler returns plain text (`404 Not Found`, `500 Internal Server Error`); the `{status}.html` rendering lives on `TemplateView.handle_exception` in `plain.templates` 0.2.0. View-level 5xx attribution still happens in core via `_respond_to_exception`. ([90d8fd983b](https://github.com/dropseed/plain/commit/90d8fd983b))
+- **URL routing internals refactor.** Dropped the `Route` dataclass — `URLPattern` and `URLResolver` hold `segments: tuple[Segment, ...]` directly, with `URLPattern.converters` as a `cached_property` for OpenAPI consumers. Resolver lookup-table construction (`_build_lookups`, `_collect_endpoint`, `_collect_resolver`, `_register_namespace`) and reverse-URL helpers (`_try_reverse`, `_reverse_segment`, `_reverse_capture`) are now methods on `URLResolver`. Removed `_effective_trailing_slash` and the `prefix_trailing_slash` parameter that threaded through `resolve`/`reverse`. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- **`include()` slashes are irrelevant.** `include("admin")` and `include("admin/")` are identical mounts. The separator between an include's prefix and its children is enforced structurally by segment matching — `/adminhome` collisions are impossible regardless of how the route string is spelled. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- **`plain urls list` renders canonical slashes from segment tuples.** Both `--flat` and the tree view now show the slash form `resolve()`/`reverse()` actually produce — `URLS_TRAILING_SLASH=True` makes endpoints render as `admin/home/` rather than `admin/home`. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+
+### Upgrade instructions
+
+- **Add `URLS_TRAILING_SLASH = True` to `app/settings.py`** to preserve existing slashed-route behavior. Without it, every route's canonical form flips to no-slash; in-flight requests still work via 308 redirects but the URLs you ship in HTML change. **Watch for relative URLs in templates** — `<form action=".">`, `<a href=".">`, `<a href="./next">` resolve against the request URL's last slash, so flipping `/login/` → `/login` makes `action="."` POST to `/` instead of `/login`. Either keep `URLS_TRAILING_SLASH = True`, or grep templates for `action="\."`/`href="\."` and replace with `action=""` (empty action submits to the current URL — slash-agnostic) or an explicit `{{ url('name') }}`.
+- **Drop trailing slashes from `path()`/`include()` route strings** as a cosmetic cleanup — they're stripped silently now. Optional but matches the new convention.
+- **Replace `path("…/")` + matching `path("…")` for the same view** with a single `path("…")` plus a `force_trailing_slash` decision. The slash form is no longer the discriminator.
+- **`url_pattern.route` is gone.** Reach for `url_pattern.segments` or `url_pattern.converters` (the latter replaces `url_pattern.route.converters`).
+- **Catchall routes (`path("<path:_>")`)** drop the slash check at registration. If you previously had `path("<path:_>/", ...)` to mean "slash-only catchall," it now behaves the same as `path("<path:_>", ...)`.
+
+## [0.144.0](https://github.com/dropseed/plain/releases/plain@0.144.0) (2026-05-13)
+
+### What's changed
+
+- **URL routing rewritten as a segment-based resolver.** `plain.urls` splits into focused modules: `segments.py` parses route strings into `Literal`/`Capture`/`Pattern` tuples, `patterns.py` matches endpoints, `resolvers.py` walks a prefix tree and builds reverse/namespace lookup tables eagerly at `__init__`, `paths.py` normalizes request paths (RFC 3986 dot/slash collapse → 308/400), and `reverse.py` exposes `reverse()`/`_lazy`/`_absolute`. The regex-decompiler in `regex_helper.py` is gone; only `_lazy_re_compile` remains for the rest of the codebase. ([5025de26be](https://github.com/dropseed/plain/commit/5025de26be))
+- **`path()` and `include()` accept string routes only — raw `re.compile(...)` is no longer public API.** The `<converter:name>` syntax (`<int:>`, `<str:>`, `<uuid:>`, `<path:>`, `<slug:>`) plus `register_converter()` covers anything the raw-regex form did. `RegexPattern` and the converter classes (`IntConverter`, `UUIDConverter`, etc.) are now internal. `URLPattern.pattern` narrows to `RoutePattern`; the `_check_pattern_startswith_slash` and `_check_include_trailing_dollar` preflight checks are gone. ([28dba1d2ed](https://github.com/dropseed/plain/commit/28dba1d2ed))
+- **Bidirectional 308 trailing-slash redirects; `APPEND_SLASH` setting removed.** The route definition is the source of truth for the canonical URL — `path("users/", V)` makes `/users/` canonical and 308-redirects `/users`; `path("users", V)` does the reverse. 308 preserves the HTTP method and body, so POST/PUT/PATCH survive intact (no more silent body loss like 301 caused). `RedirectSlashMiddleware` is gone. `Request.get_full_path()` loses its `force_append_slash` parameter. ([db4ac49f72](https://github.com/dropseed/plain/commit/db4ac49f72))
+- **`path()` and `include()` normalize slash boundaries.** `include("admin")`, `include("admin/")`, and `include("/admin/")` all resolve to `"admin/"`. `path("/users/")` is equivalent to `path("users/")`. Fixes silent corruption where `include("admin")` (no trailing slash) built URLs like `/adminhome/` instead of `/admin/home/`. ([ba35b1f846](https://github.com/dropseed/plain/commit/ba35b1f846))
+- Test client follows 307/308 redirects with HTTP-correct semantics: GET/HEAD use the Location's query string instead of re-encoding the original `data`; POST/PUT/etc. with `data=None` no longer crashes the multipart encoder. ([db4ac49f72](https://github.com/dropseed/plain/commit/db4ac49f72))
+
+### Upgrade instructions
+
+- **Replace `path(re.compile(...), ...)` with converter syntax.** The `<converter:name>` form (`<int:>`, `<str:>`, `<uuid:>`, `<path:>`, `<slug:>`) plus a custom `register_converter()` covers anything raw regex did. The `/plain-upgrade` skill rewrites the common cases.
+- **Drop `APPEND_SLASH` from `app/settings.py`** — it has no effect. Trailing-slash behavior is now decided per-route by whether `path("…/")` or `path("…")` is registered.
+- **Remove `RedirectSlashMiddleware` from `MIDDLEWARE`** if you had it.
+- **Update `request.get_full_path()` callers** to drop `force_append_slash=`. There was only one such caller in the framework itself (the deleted middleware).
+- **Inline `IntConverter`/`UUIDConverter`/`_get_converters` imports** from `plain.urls.converters` were never public; if you reached into them, switch to `register_converter()` and check `converter.keyword` or `url_pattern.raw_route` / `url_pattern.route.converters` on the public side.
+
+## [0.143.0](https://github.com/dropseed/plain/releases/plain@0.143.0) (2026-05-12)
+
+### What's changed
+
+- **`plain.templates` extracted to a sibling `plain.templates` package.** The Jinja engine, `Template`/`TemplateFileMissing`, `register_template_global`/`filter`/`extension`, `DefaultEnvironment`, the `TEMPLATES_JINJA_ENVIRONMENT` setting, and the template-touching view classes (`TemplateView`, `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) all moved out of `plain` core. `plain.views` slims to `View`, `RedirectView`, `ServerSentEventsView`; `jinja2` is no longer a `plain` dependency. ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- **Plain core's exception handler degrades to plain text when `plain.templates` isn't installed or registered.** The framework still tries to render `{status}.html` when `plain.templates` is in `INSTALLED_PACKAGES`; otherwise it returns a plain-text body. ([1d293be8fd](https://github.com/dropseed/plain/commit/1d293be8fd))
+- **`request.path_info` removed; use `request.path`.** SCRIPT_NAME handling is dropped entirely — Plain doesn't run as a mounted sub-app. The two attributes were always equal in practice. URL resolution, CSRF exemption matching, and OTel `url.path` all use `request.path` consistently now. ([69a6897723](https://github.com/dropseed/plain/commit/69a6897723), [7893013a98](https://github.com/dropseed/plain/commit/7893013a98))
+- **OTel boundary spans aligned with APM error-attribution conventions.** Entry spans (`SERVER`, `CONSUMER`, `PRODUCER`) are the only kinds that carry application errors. Chore execution is now a `CONSUMER` span (`plain/cli/chores.py`), with `error.type` + `record_exception` stamped on failure. ([144c3b4822](https://github.com/dropseed/plain/commit/144c3b4822), [05ea71d6d7](https://github.com/dropseed/plain/commit/05ea71d6d7))
+- **`View._respond_to_exception` is now the single 5xx logging/observability point.** Centralized so `log_exception` + `response.exception` attachment happens in one place per request. ([2634fd1d1c](https://github.com/dropseed/plain/commit/2634fd1d1c))
+- **Stopped emitting `exception.escaped` on framework spans.** The attribute is deprecated upstream and unreliable in the Python SDK. Status + `error.type` + recorded exception event is the canonical failure signal. ([bb9251f165](https://github.com/dropseed/plain/commit/bb9251f165))
+
+### Upgrade instructions
+
+- **Install `plain.templates`** if your app renders HTML (almost certainly yes):
+    ```
+    uv add plain.templates
+    ```
+- **Add it to `INSTALLED_PACKAGES`:**
+    ```python
+    INSTALLED_PACKAGES = [
+        ...
+        "plain.templates",
+    ]
+    ```
+- **Rewrite view imports**: anything that was `from plain.views import TemplateView` (or `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) is now `from plain.templates.views import ...`. The `/plain-upgrade` skill rewrites these automatically.
+- **Rewrite `from plain.templates import Template, register_template_*`** — the import path is unchanged, but you now need the `plain.templates` package installed for those imports to resolve at all.
+- **Drop any direct use of `request.path_info`** — replace with `request.path`. They've been equal in practice; there's no behavior change beyond the name.
+- **Custom subclasses of `Request`** that accepted a `path_info=` constructor kwarg must drop it.
+
+## [0.142.0](https://github.com/dropseed/plain/releases/plain@0.142.0) (2026-05-12)
+
+### What's changed
+
+- **`plain.assets` extracted to a sibling `plain.assets` package.** The asset finder, manifest, compile pipeline, URL routing, view, settings (`ASSETS_REDIRECT_ORIGINAL`, `ASSETS_CDN_URL`, `ASSETS_LOG_304`), and the `asset()` template global all moved out of `plain` core into a dedicated `plain.assets` package. Core no longer carries any HTML-asset-serving code or settings. This fixes a layering inversion (core templates previously imported from `plain.assets.urls`) and lets REST-only services skip installing it entirely. ([844f46e428](https://github.com/dropseed/plain/commit/844f46e428))
+- **`plain build` removed; use `plain assets build` instead.** The build orchestrator (user `[tool.plain.build.run]` commands + `plain.build` entry points + asset compile) lives in `plain.assets` now. `plain.tailwind` and `plain.esbuild` keep registering `plain.build` entry points; the runner that iterates them just moved.
+
+### Upgrade instructions
+
+- Install `plain.assets`:
+    ```
+    uv add plain.assets
+    ```
+- Add it to `INSTALLED_PACKAGES`:
+    ```python
+    INSTALLED_PACKAGES = [
+        ...
+        "plain.assets",
+    ]
+    ```
+- Replace `plain build` with `plain assets build` in deploy scripts, Procfiles, and CI.
+- `from plain.assets import ...` continues to work as a namespace import, but you must have `plain.assets` installed for the package's `INSTALLED_PACKAGES` registration (CLI command, template global, default settings) to take effect.
+
 ## [0.141.1](https://github.com/dropseed/plain/releases/plain@0.141.1) (2026-05-08)
 
 ### What's changed

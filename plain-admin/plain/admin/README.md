@@ -587,13 +587,39 @@ ADMIN_FORCE_THEME = "dark"
 
 You can also set it via the `PLAIN_ADMIN_FORCE_THEME` environment variable.
 
+### Beyond tokens
+
+When a token swap doesn't cover what you need, override the `.admin-*`
+classes directly — in the same stylesheet you put token overrides in:
+
+```css
+/* tailwind.css */
+.admin-card {
+  border-width: 2px;
+  box-shadow: 0 1px 0 var(--border) inset;
+}
+
+.admin-btn-primary {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+```
+
+The classes shown in the [catalog](#components) are a stable surface, and
+the admin's component rules live in `@layer components` — unlayered
+declarations in your stylesheet beat them automatically. No specificity
+gymnastics needed.
+
+Forking templates remains as an escape hatch ([FAQ](#faqs)) but should be
+the last resort: you take on keeping the fork in sync as the admin evolves.
+
 ### Fonts
 
 The admin ships [Inter](https://github.com/rsms/inter) (sans) and
 [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (mono), vendored
 under `plain.admin`'s assets and licensed under the SIL Open Font License 1.1.
 Their `@font-face` declarations live in an overridable `admin_fonts` block
-of `admin/base.html`; the defaults of `--font-sans` and `--font-mono` lead
+of `admin/_base.html`; the defaults of `--font-sans` and `--font-mono` lead
 with these families and fall back to the system stack.
 
 Three override patterns:
@@ -607,8 +633,9 @@ Three override patterns:
 ```
 
 ```jinja
-{# 2. Replace the bundled fonts with your own. #}
-{% extends "admin/base.html" %}
+{# 2. Replace the bundled fonts with your own.
+   In app/templates/admin/base.html: #}
+{% extends "admin/_base.html" %}
 {% block admin_fonts %}
 <style nonce="{{ request.csp_nonce }}">
 @font-face {
@@ -800,6 +827,17 @@ The callable should return `True` to allow access, `False` to deny it. Views can
 #### How do I customize the admin templates?
 
 Override any admin template by creating a file with the same path in your app's templates directory. For example, to customize the list view, create `app/templates/admin/list.html`.
+
+For project-wide hooks (extra `<head>` scripts, swapping fonts, wrapping `content`), shadow `admin/base.html` and extend `admin/_base.html` from it. The thin `admin/base.html` exists as a user-overridable layer; `admin/_base.html` is the structural template — don't override it directly.
+
+```jinja
+{# app/templates/admin/base.html #}
+{% extends "admin/_base.html" %}
+
+{% block header_scripts %}
+<script src="{{ asset('analytics.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+{% endblock %}
+```
 
 #### How do I add a standalone admin page without a viewset?
 

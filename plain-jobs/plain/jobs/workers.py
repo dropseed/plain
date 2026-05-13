@@ -14,6 +14,9 @@ from concurrent.futures.process import BrokenProcessPool
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
+from opentelemetry import trace
+from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
+
 from plain.logs import get_framework_logger
 from plain.postgres import transaction
 from plain.postgres.db import return_database_connection
@@ -21,8 +24,9 @@ from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.module_loading import import_string
 from plain.utils.os import get_cpu_count
+from plain.utils.otel import format_exception_type
 
-from .otel import WorkerMetrics
+from .otel import WorkerMetrics, tracer
 from .registry import jobs_registry
 
 if TYPE_CHECKING:
@@ -184,15 +188,23 @@ class Worker:
         from .models import JobRequest
 
         while not self._is_shutting_down:
-            try:
-                self.maybe_heartbeat()
-                self.maybe_log_stats()
-                self.maybe_check_job_results()
-                self.maybe_schedule_jobs()
-            except Exception as e:
-                # Log the issue, but don't stop the worker
-                # (these tasks are kind of ancilarry to the main job processing)
-                logger.exception(e)
+            with tracer.start_as_current_span(
+                "worker loop", kind=trace.SpanKind.CONSUMER
+            ) as span:
+                try:
+                    self.maybe_heartbeat()
+                    self.maybe_log_stats()
+                    self.maybe_check_job_results()
+                    self.maybe_schedule_jobs()
+                except Exception as e:
+                    # The catch is inside the span, so the SDK's auto-record
+                    # on context exit won't fire — stamp the canonical
+                    # failure signal explicitly. Log and continue: these
+                    # tasks are ancillary to the main job processing.
+                    span.record_exception(e)
+                    span.set_status(trace.StatusCode.ERROR)
+                    span.set_attribute(ERROR_TYPE, format_exception_type(e))
+                    logger.exception(e)
 
             # Re-check shutdown after maintenance — a signal may have arrived
             # between the loop condition and now. Don't pick up new work.
@@ -604,7 +616,22 @@ def process_job(job_process_uuid: str) -> None:
     try:
         worker_pid = os.getpid()
 
-        job_process = JobProcess.query.get(uuid=job_process_uuid)
+        try:
+            job_process = JobProcess.query.get(uuid=job_process_uuid)
+        except Exception as e:
+            # The CONSUMER span inside JobProcess.run() is never reached if
+            # the lookup itself fails. Emit one here so the failure has an
+            # entry-span home in OTel (e.g. a psycopg transient on this read
+            # would otherwise leave only a CLIENT span, which entry-span
+            # filtering excludes).
+            with tracer.start_as_current_span(
+                "process job",
+                kind=trace.SpanKind.CONSUMER,
+            ) as span:
+                span.record_exception(e)
+                span.set_status(trace.StatusCode.ERROR)
+                span.set_attribute(ERROR_TYPE, format_exception_type(e))
+            raise
 
         logger.info(
             "Executing job",

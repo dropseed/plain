@@ -8,6 +8,7 @@ hottest user-facing path.
 
 from __future__ import annotations
 
+import threading
 import uuid
 
 import pytest
@@ -77,13 +78,14 @@ def test_enqueue_skipped_marks_span(otel_spans: InMemorySpanExporter) -> None:
 
 
 @pytest.mark.usefixtures("db")
-def test_failed_enqueue_marks_producer_span_exception_as_escaped(
+def test_failed_enqueue_marks_producer_span_as_errored(
     monkeypatch: pytest.MonkeyPatch,
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    """A failing enqueue's PRODUCER span must record the exception event with
-    `exception.escaped=True` — caller-side workflow boundary, same signal as
-    SERVER/CONSUMER."""
+    """A failing enqueue's PRODUCER span carries the canonical failure signal:
+    status=ERROR plus error.type. Don't branch on exception.escaped — it's
+    deprecated upstream and unreliable in the Python SDK."""
+    from opentelemetry.trace import StatusCode
 
     def _boom(*args, **kwargs):
         raise RuntimeError("save failed")
@@ -100,23 +102,25 @@ def test_failed_enqueue_marks_producer_span_exception_as_escaped(
     ]
     assert producer_spans, "expected PRODUCER span from run_in_worker()"
     span = producer_spans[-1]
-    exception_events = [e for e in span.events if e.name == "exception"]
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
     # Exactly one event — `record_exception=False` on start_as_current_span
-    # suppresses the SDK's escaped=False auto-record so the manual call is
-    # the sole event.
+    # suppresses the SDK's auto-record so the manual call is the sole event.
+    exception_events = [e for e in span.events if e.name == "exception"]
     assert len(exception_events) == 1
-    attrs = exception_events[0].attributes
-    assert attrs is not None
-    assert attrs["exception.escaped"] == "True"
 
 
 @pytest.mark.usefixtures("db")
-def test_failing_job_marks_consumer_span_exception_as_escaped(
+def test_failing_job_marks_consumer_span_as_errored(
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    """A failing job's CONSUMER span must record the exception event with
-    `exception.escaped=True` — the workflow-level failure signal that
-    downstream tools filter on."""
+    """A failing job's CONSUMER span carries the canonical failure signal:
+    status=ERROR plus error.type. The exception is caught inside the span's
+    with-block by JobProcess.run, so only the manual record_span_error event
+    fires."""
+    from opentelemetry.trace import StatusCode
+
     request = _BoomJob().run_in_worker()
     assert request is not None
     process = request.convert_to_job_process(worker_id=uuid.uuid4())
@@ -127,11 +131,11 @@ def test_failing_job_marks_consumer_span_exception_as_escaped(
     ]
     assert consumer_spans, "expected CONSUMER span from JobProcess.run()"
     span = consumer_spans[-1]
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
     exception_events = [e for e in span.events if e.name == "exception"]
     assert exception_events
-    attrs = exception_events[0].attributes
-    assert attrs is not None
-    assert attrs["exception.escaped"] == "True"
 
 
 @pytest.mark.usefixtures("db")
@@ -159,6 +163,116 @@ def test_enqueue_failure_records_error_type_on_metric(
     assert all(
         p.attributes.get("messaging.system") == "plain.jobs" for p in sent_points
     )
+
+
+# --- process_job lookup failure ---------------------------------------------
+
+
+@pytest.mark.usefixtures("db")
+def test_process_job_emits_consumer_span_when_lookup_fails(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """JobProcess.run() creates the CONSUMER span — but `process_job` does the
+    JobProcess row lookup first. A DB transient on that lookup leaves only a
+    CLIENT span, which entry-span filtering correctly excludes. The fallback
+    CONSUMER span at the top of process_job ensures lookup failures still
+    surface."""
+    from opentelemetry.trace import StatusCode
+
+    from plain.jobs.workers import process_job
+
+    # A random UUID won't match any row — JobProcess.query.get raises
+    # DoesNotExist, which is the simplest way to exercise the lookup-failure
+    # path without monkey-patching the DB.
+    process_job(str(uuid.uuid4()))
+
+    spans = [s for s in otel_spans.get_finished_spans() if s.name == "process job"]
+    assert len(spans) == 1
+    span = spans[0]
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    # JobProcess.DoesNotExist via plain-postgres' base manager.
+    assert "DoesNotExist" in str(span.attributes["error.type"])
+    exception_events = [e for e in span.events if e.name == "exception"]
+    assert exception_events
+
+
+# --- Worker run-loop span -----------------------------------------------
+
+
+def _build_worker_for_loop_test() -> Worker:
+    """Construct a Worker bypassing __init__ so `_run_loop` can run a single
+    iteration without a real ProcessPoolExecutor. Tests override the maintenance
+    methods to control when the loop exits."""
+    worker = Worker.__new__(Worker)
+    worker.queues = ["default"]
+    worker._is_shutting_down = False
+    worker._heartbeat_registered = True
+    worker._inflight_futures = {}
+    worker._inflight_lock = threading.Lock()
+    worker.max_processes = 1
+    worker.max_pending_per_process = 1
+    worker.maybe_heartbeat = lambda: None
+    worker.maybe_log_stats = lambda: None
+    worker.maybe_check_job_results = lambda: None
+    worker.maybe_schedule_jobs = lambda: None
+    return worker
+
+
+@pytest.mark.usefixtures("db")
+def test_worker_loop_emits_consumer_span_per_iteration(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """Each worker loop iteration wraps the maintenance work in a `worker loop`
+    CONSUMER span — the worker is consuming a recurring maintenance schedule,
+    so its failures belong in the canonical entry-span error filter (SERVER /
+    CONSUMER / PRODUCER) alongside chores and jobs."""
+    from opentelemetry.trace import StatusCode
+
+    worker = _build_worker_for_loop_test()
+
+    def shutdown_during_heartbeat() -> None:
+        worker._is_shutting_down = True
+
+    worker.maybe_heartbeat = shutdown_during_heartbeat  # ty: ignore[invalid-assignment]
+    worker._run_loop()
+
+    loop_spans = [s for s in otel_spans.get_finished_spans() if s.name == "worker loop"]
+    assert len(loop_spans) == 1
+    span = loop_spans[0]
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.UNSET
+
+
+@pytest.mark.usefixtures("db")
+def test_worker_loop_records_error_when_maintenance_fails(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """A maintenance exception leaves the loop running and stamps the canonical
+    failure signal (status=ERROR + error.type) on the `worker loop` span. This
+    is the path that previously swallowed DB transients like the production
+    `psycopg.OperationalError` we saw escaping `rescue_job_results`."""
+    from opentelemetry.trace import StatusCode
+
+    worker = _build_worker_for_loop_test()
+
+    def boom_then_shutdown() -> None:
+        worker._is_shutting_down = True
+        raise RuntimeError("db transient")
+
+    worker.maybe_heartbeat = boom_then_shutdown  # ty: ignore[invalid-assignment]
+    # Must NOT raise — the loop catches and continues, just like in production.
+    worker._run_loop()
+
+    loop_spans = [s for s in otel_spans.get_finished_spans() if s.name == "worker loop"]
+    assert len(loop_spans) == 1
+    span = loop_spans[0]
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    exception_events = [e for e in span.events if e.name == "exception"]
+    assert exception_events
 
 
 # --- Worker-state observable gauges -------------------------------------

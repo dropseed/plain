@@ -32,13 +32,7 @@ class _ListHandler(logging.Handler):
 
 @pytest.fixture
 def request_log():
-    # Import the exact logger instance used in `plain.logs.exceptions`.
-    # `logging.getLogger("plain.request")` is not sufficient — another
-    # test's cleanup may have removed the name from `loggerDict`, in
-    # which case a fresh logger is created while the module-level
-    # binding in `plain.logs.exceptions` still points at the old one.
-    from plain.logs.exceptions import request_logger as logger
-
+    logger = logging.getLogger("plain.request")
     handler = _ListHandler()
     previous_level = logger.level
     logger.addHandler(handler)
@@ -128,8 +122,10 @@ class TestAfterResponseChaining:
 
 
 class TestHandleExceptionLogging:
-    """handle_exception returning a response suppresses logging.
-    Re-raising defers to the framework error renderer, which logs.
+    """handle_exception returning a 4xx response suppresses logging and exception
+    attachment (the view handled it). Returning a 5xx is treated as a real
+    failure: the framework logs and attaches `response.exception` so subclasses
+    don't each have to. Re-raising defers to the framework error renderer.
     """
 
     def test_mapped_4xx_does_not_log_server_error(self, request_log):
@@ -148,9 +144,33 @@ class TestHandleExceptionLogging:
         response = MappedView(request=RequestFactory().get("/")).get_response()
 
         assert response.status_code == 400
+        assert response.exception is None
         assert not _has_server_error(request_log), (
             "handle_exception mapping to 4xx must not emit a Server error log"
         )
+
+    def test_mapped_5xx_logs_and_attaches_exception(self, request_log):
+        """A subclass that maps to a 5xx response gets logging and exception
+        attachment from the framework — no need to call log_exception or set
+        response.exception in the override."""
+
+        class AppError(Exception):
+            pass
+
+        class MappedView(View):
+            def get(self):
+                raise AppError("boom")
+
+            def handle_exception(self, exc: Exception) -> Response:
+                if isinstance(exc, AppError):
+                    return Response("oops", status_code=500)
+                return super().handle_exception(exc)
+
+        response = MappedView(request=RequestFactory().get("/")).get_response()
+
+        assert response.status_code == 500
+        assert isinstance(response.exception, AppError)
+        assert _has_server_error(request_log)
 
     def test_reraise_from_handle_exception_propagates(self):
         """Default handle_exception re-raises — exception escapes get_response."""
@@ -188,6 +208,30 @@ class TestHandleExceptionLogging:
             r for r in request_log.records if "Server error" in r.getMessage()
         ]
         assert len(server_errors) == 1
+
+    def test_falls_back_to_plain_text_when_templates_not_registered(self, monkeypatch):
+        """`plain.templates` importable but not in INSTALLED_PACKAGES → plain text.
+
+        Pins the registry-label guard added to handle the "monorepo dev mode"
+        case where the package is on the Python path but never registered.
+        Simulated here by stubbing the registry lookup directly so the test
+        works in any runner (isolated or dev).
+        """
+        from plain.packages import packages_registry
+
+        def _missing(label: str):
+            raise LookupError(label)
+
+        monkeypatch.setattr(packages_registry, "get_package_config", _missing)
+
+        request = RequestFactory().get("/")
+        response = response_for_exception(request, RuntimeError("boom"))
+
+        assert response.status_code == 500
+        assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
+        assert response.content == b"500 Internal Server Error"
+        # 5xx still carries the original exception for downstream tooling.
+        assert response.exception.args == ("boom",)  # ty: ignore[unresolved-attribute]
 
     def test_log_exception_is_idempotent(self, request_log):
         """If a view calls log_exception and the framework also tries,

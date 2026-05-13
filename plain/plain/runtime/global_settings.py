@@ -21,6 +21,11 @@ INSTALLED_PACKAGES: list[str] = []
 
 URLS_ROUTER: str
 
+# Whether routes have trailing slashes by default. Routes can override
+# per-endpoint with `path(..., force_slash=True|False)`. Requests that
+# disagree with a route's effective form are 308-redirected to it.
+URLS_TRAILING_SLASH: bool = False
+
 # List of environment variable prefixes to check for settings.
 # Settings can be configured via environment variables using these prefixes.
 # Example: ENV_SETTINGS_PREFIXES = ["PLAIN_", "MYAPP_"]
@@ -102,9 +107,6 @@ TIME_ZONE: str = "UTC"
 # Should include scheme and host with no trailing slash (e.g. "https://example.com").
 BASE_URL: str = ""
 
-# Whether to append trailing slashes to URLs.
-APPEND_SLASH: bool = True
-
 # MARK: File Uploads
 
 # List of upload handler classes to be applied in order.
@@ -159,19 +161,6 @@ LOG_LEVEL: str = "INFO"
 LOG_FORMAT: str = "keyvalue"
 LOG_STREAM: str = "split"  # "split", "stdout", or "stderr"
 
-# MARK: Assets
-
-# Whether to redirect the original asset path to the fingerprinted path.
-ASSETS_REDIRECT_ORIGINAL: bool = True
-
-# If assets are served by a CDN, use this URL to prefix asset paths.
-# Ex. "https://cdn.example.com/assets/"
-ASSETS_CDN_URL: str = ""
-
-# Whether to log 304 Not Modified responses for assets in the access log.
-# Disabled by default to reduce noise from conditional requests.
-ASSETS_LOG_304: bool = False
-
 # MARK: Server
 
 SERVER_WORKERS: int = int(os.environ.get("WEB_CONCURRENCY", 0))  # 0 = auto (CPU count)
@@ -203,10 +192,6 @@ PREFLIGHT_SILENCED_CHECKS: list[str] = []
 
 # Silence specific check results by id
 PREFLIGHT_SILENCED_RESULTS: list[str] = []
-
-# MARK: Templates
-
-TEMPLATES_JINJA_ENVIRONMENT: str = "plain.templates.jinja.DefaultEnvironment"
 
 # MARK: Shell
 

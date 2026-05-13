@@ -1,5 +1,37 @@
 # plain-support changelog
 
+## [0.34.9](https://github.com/dropseed/plain/releases/plain-support@0.34.9) (2026-05-13)
+
+### What's changed
+
+- Updated route definitions to the no-slash convention introduced in `plain` 0.145.0. Canonical support form URLs now follow the project's `URLS_TRAILING_SLASH` setting. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- Fixed the support embed iframe URL — `embed.js` now builds `/form/<slug>/iframe` instead of `/form/<slug>/iframe/`, avoiding a 308 round-trip on every embed under the new `URLS_TRAILING_SLASH=False` default. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+
+### Upgrade instructions
+
+- Bust the cached `embed.js` if your embedded forms were going through the 308 redirect (clear CDN cache or re-deploy assets).
+
+## [0.34.8](https://github.com/dropseed/plain/releases/plain-support@0.34.8) (2026-05-12)
+
+### What's changed
+
+- `FormView` import moved from `plain.views` to `plain.templates.views` to match the [`plain.templates` carve-out](../../../plain/plain/CHANGELOG.md). The user-visible `SupportFormView` API is unchanged. ([19b622a7ca](https://github.com/dropseed/plain/commit/19b622a7ca))
+- Pins `plain>=0.143.0` and `plain.templates>=0.1.0`.
+
+### Upgrade instructions
+
+- No code changes required if you upgrade `plain` to 0.143.0 in the same step.
+
+## [0.34.7](https://github.com/dropseed/plain/releases/plain-support@0.34.7) (2026-05-12)
+
+### What's changed
+
+- Adds explicit `plain.assets>=0.1.0,<1.0.0` dependency now that `plain.assets` is a separate package (extracted from `plain` core in 0.142.0). `plain.support` uses `get_asset_url` to link attachments. ([844f46e428](https://github.com/dropseed/plain/commit/844f46e428))
+
+### Upgrade instructions
+
+- No changes required if you're upgrading `plain` in the same step — `plain.assets` comes along as a transitive dependency.
+
 ## [0.34.6](https://github.com/dropseed/plain/releases/plain-support@0.34.6) (2026-05-05)
 
 ### What's changed

@@ -195,7 +195,7 @@ The build command automatically installs the Tailwind CLI if it is not present, 
 You can automate this by adding a build command to your `pyproject.toml`:
 
 ```toml
-[tool.plain.build.run]
+[tool.plain.assets.run]
 tailwind = {cmd = "plain tailwind build --minify"}
 ```
 

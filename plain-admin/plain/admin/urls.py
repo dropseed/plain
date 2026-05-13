@@ -21,16 +21,16 @@ __all__ = ["AdminRouter"]
 class AdminRouter(Router):
     namespace = "admin"
     urls = [
-        path("search/", AdminSearchView, name="search"),
-        path("ui/", UIView, name="ui"),
-        path("settings/", SettingsView, name="settings"),
-        path("settings/<name>/", SettingDetailView, name="setting_detail"),
-        path("preflight/", PreflightView, name="preflight"),
-        path("logout/", LogoutView, name="logout"),
-        path("_/pin/", PinNavView, name="pin"),
-        path("_/unpin/", UnpinNavView, name="unpin"),
-        path("_/reorder/", ReorderPinnedView, name="reorder"),
-        include("impersonate/", ImpersonateRouter),
+        path("search", AdminSearchView, name="search"),
+        path("ui", UIView, name="ui"),
+        path("settings", SettingsView, name="settings"),
+        path("settings/<name>", SettingDetailView, name="setting_detail"),
+        path("preflight", PreflightView, name="preflight"),
+        path("logout", LogoutView, name="logout"),
+        path("_/pin", PinNavView, name="pin"),
+        path("_/unpin", UnpinNavView, name="unpin"),
+        path("_/reorder", ReorderPinnedView, name="reorder"),
+        include("impersonate", ImpersonateRouter),
         include("", registry.get_urls()),
         path("", AdminIndexView, name="index"),
     ]

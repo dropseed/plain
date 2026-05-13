@@ -1,0 +1,19 @@
+[project]
+name = "plain.templates"
+version = "0.2.0"
+description = "Render HTML templates using Jinja2."
+authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.13"
+dependencies = ["plain>=0.145.0,<1.0.0", "jinja2>=3.1.2"]
+
+[dependency-groups]
+dev = ["plain.pytest<1.0.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

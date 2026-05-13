@@ -27,16 +27,23 @@ def _get_app_models() -> list[Any]:
 
 
 def _collect_model_indexes(model: Any) -> list[tuple[str, list[str], bool]]:
-    """Collect all index field-lists for a model as (name, fields, is_unique) tuples."""
+    """Collect (name, fields, is_unique) for non-partial indexes/constraints.
+
+    Partials are skipped for the same reason as in ``_fk_covered_field_names``.
+    """
     all_indexes: list[tuple[str, list[str], bool]] = []
 
     for index in model.model_options.indexes:
-        if index.fields:
+        if index.fields and not index.is_partial:
             fields = [f.lstrip("-") for f in index.fields]
             all_indexes.append((index.name, fields, False))
 
     for constraint in model.model_options.constraints:
-        if isinstance(constraint, UniqueConstraint) and constraint.fields:
+        if (
+            isinstance(constraint, UniqueConstraint)
+            and constraint.fields
+            and not constraint.is_partial
+        ):
             all_indexes.append((constraint.name, list(constraint.fields), True))
 
     return all_indexes

@@ -64,11 +64,11 @@ def test_500_records_exception_and_error_status(error_client) -> None:
     assert span.attributes["http.response.status_code"] == 500
     assert span.status.status_code == trace.StatusCode.ERROR
     assert span.attributes["error.type"] == "RuntimeError"
+    # status=ERROR + error.type is the canonical failure signal. The exception
+    # event itself is recorded but we don't branch on exception.escaped —
+    # deprecated upstream and unreliable in the Python SDK.
     exception_events = [e for e in span.events if e.name == "exception"]
     assert exception_events
-    attrs = exception_events[0].attributes
-    assert attrs is not None
-    assert attrs["exception.escaped"] == "True"
 
 
 def _invoke_handler(router_path: str) -> None:

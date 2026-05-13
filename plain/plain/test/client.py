@@ -602,7 +602,7 @@ class Client:
 
         def _resolve_or_none():
             try:
-                return resolver.resolve(http_request.path_info)
+                return resolver.resolve(http_request.path)
             except Exception:
                 return None
 
@@ -843,24 +843,27 @@ class Client:
                 method = response.request.method
 
                 if method in ("GET", "HEAD"):
-                    # GET/HEAD: re-encode data as query string
-                    if isinstance(data, QueryDict):
-                        qs = data.urlencode()
-                    elif isinstance(data, dict):
-                        qs = urlencode(data, doseq=True)
-                    else:
-                        qs = ""
+                    # GET/HEAD: the Location URL is the new URL; its query
+                    # string wins. (The original request's `data` was already
+                    # encoded into the first URL; the redirect's Location is
+                    # what the server told us to follow.)
                     request = self._request_factory._build_request(
                         method=method,
                         path=path,
-                        query_string=qs,
+                        query_string=url.query,
                         secure=secure,
                         server_name=server_name,
                         server_port=server_port,
                         headers=headers,
                     )
+                    data = QueryDict(url.query)
                 else:
-                    # POST/PUT/etc: preserve body and add redirect URL's query
+                    # POST/PUT/etc: preserve body and add redirect URL's
+                    # query. Mirror `RequestFactory.post()`'s None→{}
+                    # normalization so the followed request is byte-identical
+                    # to the initial one — same body, same content headers.
+                    if data is None:
+                        data = {}
                     encoded_data = self._request_factory._encode_json(
                         data, content_type
                     )

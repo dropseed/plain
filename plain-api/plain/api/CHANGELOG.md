@@ -1,5 +1,48 @@
 # plain-api changelog
 
+## [0.33.5](https://github.com/dropseed/plain/releases/plain-api@0.33.5) (2026-05-13)
+
+### What's changed
+
+- **OpenAPI schema honors the canonical trailing slash.** `path_from_url_pattern` now appends `/` based on `url_pattern.trailing_slash` (driven by `URLS_TRAILING_SLASH` + per-route `force_trailing_slash`) instead of trusting the raw route string. Under the new `URLS_TRAILING_SLASH=False` default, schema paths render without trailing slashes; flip the setting to `True` to keep slashed paths in the spec. ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+- Switched the generator from `url_pattern.route.converters` to `url_pattern.converters` (the `Route` dataclass was removed in `plain` 0.145.0). ([48ca69bafa](https://github.com/dropseed/plain/commit/48ca69bafa))
+
+### Upgrade instructions
+
+- No changes required. Existing schema consumers will see paths without trailing slashes unless `URLS_TRAILING_SLASH = True` is set.
+
+## [0.33.4](https://github.com/dropseed/plain/releases/plain-api@0.33.4) (2026-05-13)
+
+### What's changed
+
+- Adapted the OpenAPI schema generator to plain 0.144.0's new URL converter API: reads `converter.keyword` and `url_pattern.raw_route` / `url_pattern.route.converters` instead of the removed `_get_converters()` registry and `isinstance(converter, IntConverter)` checks. ([5025de26be](https://github.com/dropseed/plain/commit/5025de26be))
+- The conformance fixture registers a one-off `<anything:_>` converter (regex `[\s\S]+`) so schemathesis's newline-bearing path inputs still reach the JSON 404 handler — the default `<path:>` converter's `.+` doesn't match `\n`. ([28dba1d2ed](https://github.com/dropseed/plain/commit/28dba1d2ed))
+- Centralized 5xx logging and exception attachment now happen in the framework's `View._respond_to_exception`, so `APIView` no longer needs to override `handle_exception` to keep responses observable. ([2634fd1d1c](https://github.com/dropseed/plain/commit/2634fd1d1c))
+
+### Upgrade instructions
+
+- No code changes required. Requires `plain>=0.144.0`.
+
+## [0.33.3](https://github.com/dropseed/plain/releases/plain-api@0.33.3) (2026-05-12)
+
+### What's changed
+
+- README updated for the renamed asset compile namespace: `[tool.plain.assets.run]` (was `[tool.plain.assets.build.run]`). See [plain-assets 0.3.0](../../../plain-assets/plain/assets/CHANGELOG.md). ([3b30b62309](https://github.com/dropseed/plain/commit/3b30b62309))
+
+### Upgrade instructions
+
+- No code changes required. If you copied the OpenAPI build snippet into your `pyproject.toml`, rename its section header to `[tool.plain.assets.run]`.
+
+## [0.33.2](https://github.com/dropseed/plain/releases/plain-api@0.33.2) (2026-05-12)
+
+### What's changed
+
+- README updated to reference the new `[tool.plain.assets.build.run]` namespace (was `[tool.plain.build.run]`) for the OpenAPI build step. See [plain-assets 0.2.0](../../../plain-assets/plain/assets/CHANGELOG.md). ([f698ec3436](https://github.com/dropseed/plain/commit/f698ec3436))
+
+### Upgrade instructions
+
+- No code changes required. If you copy-pasted the OpenAPI build snippet into your `pyproject.toml`, update its section header from `[tool.plain.build.run]` to `[tool.plain.assets.build.run]`.
+
 ## [0.33.1](https://github.com/dropseed/plain/releases/plain-api@0.33.1) (2026-05-08)
 
 ### What's changed
