@@ -1,25 +1,23 @@
-from .converters import register_converter
 from .exceptions import NoReverseMatch, Resolver404
+from .matches import ResolverMatch
 from .patterns import URLPattern
 from .resolvers import (
-    ResolverMatch,
     URLResolver,
     get_resolver,
 )
-from .routers import Router, include, path
-from .utils import (
+from .reverse import (
     absolute_url,
     reverse,
     reverse_absolute,
     reverse_lazy,
 )
+from .routers import Router, include, path
 
 __all__ = [
     # Routing
     "Router",
     "include",
     "path",
-    "register_converter",
     # Reversing
     "reverse",
     "reverse_lazy",

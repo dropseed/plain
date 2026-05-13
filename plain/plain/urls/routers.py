@@ -1,7 +1,6 @@
-from .patterns import RoutePattern, URLPattern
-from .resolvers import (
-    URLResolver,
-)
+from .patterns import URLPattern
+from .resolvers import URLResolver
+from .segments import _route_to_segments
 
 
 class Router:
@@ -10,10 +9,15 @@ class Router:
 
     A namespace is required, and generally recommended,
     except for the root router in app.urls where it is typically "".
+
+    `urls` is read once at `URLResolver.__init__` time, when the reverse
+    and namespace lookup tables are built. Mutating `urls` afterward will
+    not refresh those tables — treat the list as immutable once the app
+    is running.
     """
 
     namespace: str
-    urls: list
+    urls: list[URLPattern | URLResolver]
 
 
 def _normalize_include_route(route: str) -> str:
@@ -21,43 +25,39 @@ def _normalize_include_route(route: str) -> str:
 
     `include("admin")`, `include("admin/")`, and `include("/admin/")` all
     collapse to `"admin/"`. The empty string stays empty (root include).
-
-    Routes that still look like regex residue after stripping (`^`, `$`,
-    `(?P<`) skip the trailing-slash append, so `RoutePattern.preflight()`
-    can still surface `urls.path_migration_warning`.
     """
     stripped = route.strip("/")
     if not stripped:
         return ""
-    if "(?P<" in stripped or stripped.startswith("^") or stripped.endswith("$"):
-        return stripped
     return f"{stripped}/"
 
 
-def include(route: str, router_or_urls: list | tuple | type[Router]) -> URLResolver:
+def include(
+    route: str,
+    router_or_urls: (
+        list[URLPattern | URLResolver]
+        | tuple[URLPattern | URLResolver, ...]
+        | type[Router]
+    ),
+) -> URLResolver:
     """
     Include URLs from another module or a nested list of URL patterns.
     """
     if not isinstance(route, str):
         raise TypeError(f"include() route must be a string, not {type(route).__name__}")
 
-    pattern = RoutePattern(_normalize_include_route(route), is_endpoint=False)
+    raw_route = _normalize_include_route(route)
+    parsed = _route_to_segments(raw_route)
 
     if isinstance(router_or_urls, list | tuple):
 
         class _IncludeRouter(Router):
             namespace = ""
-            urls = router_or_urls
+            urls = list(router_or_urls)
 
-        return URLResolver(pattern=pattern, router=_IncludeRouter())
+        return URLResolver(route=parsed, raw_route=raw_route, router=_IncludeRouter())
     elif isinstance(router_or_urls, type) and issubclass(router_or_urls, Router):
-        router_class = router_or_urls
-        router = router_class()
-
-        return URLResolver(
-            pattern=pattern,
-            router=router,
-        )
+        return URLResolver(route=parsed, raw_route=raw_route, router=router_or_urls())
     else:
         raise TypeError(
             f"include() urls must be a list, tuple, or Router class (not a Router() instance): {router_or_urls}"
@@ -79,5 +79,10 @@ def path(route: str, view_class: type, *, name: str = "") -> URLPattern:
     # Strip leading slashes; trailing slash is part of the route's
     # canonical form (defining `path("users/")` vs `path("users")`
     # determines the URL the framework redirects to).
-    pattern = RoutePattern(route.lstrip("/"), name=name, is_endpoint=True)
-    return URLPattern(pattern=pattern, view_class=view_class)
+    raw_route = route.lstrip("/")
+    return URLPattern(
+        route=_route_to_segments(raw_route),
+        raw_route=raw_route,
+        name=name,
+        view_class=view_class,
+    )

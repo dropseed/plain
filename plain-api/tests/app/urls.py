@@ -91,5 +91,5 @@ class AppRouter(Router):
         path("validation-error", ValidationErrorView, name="validation_error"),
         path("json-echo", JsonEchoView, name="json_echo"),
         path("unhandled-exception", UnhandledExceptionView, name="unhandled_exception"),
-        path("missing-<path:_>", JsonNotFoundView, name="missing"),
+        path("missing/<path:_>", JsonNotFoundView, name="missing"),
     ]

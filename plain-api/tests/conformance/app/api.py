@@ -17,28 +17,7 @@ from plain.api import openapi
 from plain.api.versioning import APIVersionChange, VersionedAPIView
 from plain.api.views import APIKeyView, APIView, JsonNotFoundView
 from plain.http import BadRequestError400, JsonResponse, NotFoundError404, Response
-from plain.urls import Router, path, register_converter
-
-
-class _AnythingConverter:
-    """Matches any non-empty path including control characters.
-
-    Schemathesis fuzzes with newline-bearing paths; the default `path`
-    converter's `.+` doesn't match `\\n`, so a dedicated converter keeps
-    those requests routed to the JSON 404 handler instead of falling
-    through to the framework's default text response.
-    """
-
-    regex = r"[\s\S]+"
-
-    def to_python(self, value: str) -> str:
-        return value
-
-    def to_url(self, value: str) -> str:
-        return value
-
-
-register_converter(_AnythingConverter, "anything")
+from plain.urls import Router, path
 
 # ---------------------------------------------------------------------------
 # Auth
@@ -524,5 +503,5 @@ class APIRouter(Router):
         path("header-echo/", HeaderEchoAPIView, name="header_echo"),
         path("secret/", SecretAPIView, name="secret"),
         path("greeting/", GreetingAPIView, name="greeting"),
-        path("<anything:_>", JsonNotFoundView, name="not_found"),
+        path("<path:_>", JsonNotFoundView, name="not_found"),
     ]

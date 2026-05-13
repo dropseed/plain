@@ -6,8 +6,6 @@
 - [Defining paths](#defining-paths)
 - [Including sub-routers](#including-sub-routers)
 - [Path converters](#path-converters)
-    - [Built-in converters](#built-in-converters)
-    - [Custom converters](#custom-converters)
 - [Reversing URLs](#reversing-urls)
     - [In templates](#in-templates)
     - [In Python code](#in-python-code)
@@ -55,10 +53,14 @@ Use `path()` to map a URL pattern to a view class:
 path("about/", views.AboutView, name="about")
 ```
 
-The `name` parameter is optional but required if you want to reverse the URL later. You can pass the view class directly (Plain calls `as_view()` for you) or call `as_view()` yourself to pass arguments:
+The `name` parameter is optional but required if you want to reverse the URL later. Plain instantiates the view class per request — to customize a view for a specific route, subclass it and set class attributes:
 
 ```python
-path("dashboard/", views.DashboardView.as_view(template_name="custom.html"), name="dashboard")
+class CustomDashboardView(views.DashboardView):
+    template_name = "custom.html"
+
+
+path("dashboard/", CustomDashboardView, name="dashboard")
 ```
 
 ## Including sub-routers
@@ -109,7 +111,7 @@ class UserView(View):
         # ...
 ```
 
-### Built-in converters
+The available converters are:
 
 | Converter | Matches                                                 | Python type |
 | --------- | ------------------------------------------------------- | ----------- |
@@ -123,33 +125,6 @@ When no converter is specified, `str` is used:
 
 ```python
 path("search/<query>/", views.SearchView)  # Same as <str:query>
-```
-
-### Custom converters
-
-You can register your own converters using [`register_converter()`](./converters.py#register_converter). A converter class needs a `regex` attribute and `to_python()` / `to_url()` methods:
-
-```python
-from plain.urls import register_converter
-
-
-class YearConverter:
-    regex = "[0-9]{4}"
-
-    def to_python(self, value):
-        return int(value)
-
-    def to_url(self, value):
-        return str(value)
-
-
-register_converter(YearConverter, "year")
-```
-
-Then use it in your patterns:
-
-```python
-path("archive/<year:year>/", views.ArchiveView, name="archive")
 ```
 
 ## Reversing URLs
@@ -241,6 +216,17 @@ url = absolute_url(article.get_absolute_url())  # "https://example.com/articles/
 The route definition is the source of truth for the canonical URL. `path("users/", ...)` makes `/users/` canonical, and `/users` 308-redirects to it. `path("users", ...)` makes `/users` canonical, and `/users/` 308-redirects to it. Pick whichever style you prefer and the framework enforces it.
 
 308 preserves the HTTP method and body, so a POST to the non-canonical form completes correctly after the redirect — no silent body loss.
+
+#### What happens to `//`, `.`, or `..` in request paths?
+
+Plain normalizes them before route matching, per RFC 3986:
+
+- `/foo//bar` collapses to `/foo/bar` (308 redirect)
+- `/foo/./bar` resolves to `/foo/bar` (308 redirect)
+- `/foo/../bar` resolves to `/bar` (308 redirect)
+- `/../foo` returns 400 — `..` can't resolve below the root
+
+Your URL patterns never see non-canonical paths.
 
 #### How do I debug URL routing issues?
 

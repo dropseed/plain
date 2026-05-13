@@ -4,11 +4,6 @@ import re
 from typing import Any, get_type_hints
 
 from plain.urls import Router, URLPattern, URLResolver
-from plain.urls.converters import (
-    IntConverter,
-    UUIDConverter,
-    _get_converters,
-)
 
 from .helpers import json_content
 from .utils import merge_data, schema_from_type, typed_dict_from_annotation
@@ -35,9 +30,9 @@ def _build_operation_id(view_class: type, method: str) -> str:
 
 
 def _schema_for_converter(converter: Any) -> dict[str, Any]:
-    if isinstance(converter, IntConverter):
+    if converter.keyword == "int":
         return {"type": "integer"}
-    if isinstance(converter, UUIDConverter):
+    if converter.keyword == "uuid":
         return {"type": "string", "format": "uuid"}
     return {"type": "string", "pattern": converter.regex}
 
@@ -89,11 +84,6 @@ def _docstring_summary_description(
 
 class OpenAPISchemaGenerator:
     def __init__(self, router: Router):
-        self.url_converters = {
-            class_instance.__class__: key
-            for key, class_instance in _get_converters().items()
-        }
-
         # Get initial schema from the router
         self.schema = getattr(router, "openapi_schema", {}).copy()
         self.components = getattr(router, "openapi_components", {}).copy()
@@ -133,12 +123,11 @@ class OpenAPISchemaGenerator:
         return paths
 
     def path_from_url_pattern(self, url_pattern: URLPattern, root_path: str) -> str:
-        path = root_path + str(url_pattern.pattern)
+        path = root_path + url_pattern.raw_route
 
-        for name, converter in url_pattern.pattern.converters.items():
-            key = self.url_converters[converter.__class__]
+        for name, converter in url_pattern.route.converters.items():
             # Handle both `<type:name>` and the `<name>` shorthand for the default `str` converter.
-            path = path.replace(f"<{key}:{name}>", f"{{{name}}}")
+            path = path.replace(f"<{converter.keyword}:{name}>", f"{{{name}}}")
             path = path.replace(f"<{name}>", f"{{{name}}}")
         return path
 
@@ -277,7 +266,7 @@ class OpenAPISchemaGenerator:
         parameters = []
 
         for url_pattern in url_patterns:
-            for name, converter in url_pattern.pattern.converters.items():
+            for name, converter in url_pattern.route.converters.items():
                 parameters.append(
                     {
                         "name": name,

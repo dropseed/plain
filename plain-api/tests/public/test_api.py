@@ -299,13 +299,13 @@ def test_json_not_found_view_returns_json_404_for_any_method():
     """`JsonNotFoundView` is a catch-all that yields a JSON ErrorSchema 404."""
     client = Client()
 
-    response = client.get("/missing-anything")
+    response = client.get("/missing/anything")
     assert response.status_code == 404
     assert response.headers["Content-Type"].startswith("application/json")
     assert response.json()["id"] == "not_found"
 
     response = client.post(
-        "/missing-anything", data="{}", content_type="application/json"
+        "/missing/anything", data="{}", content_type="application/json"
     )
     assert response.status_code == 404
     assert response.json()["id"] == "not_found"

@@ -43,6 +43,16 @@ class ItemView(View):
         return Response(f"item {self.url_kwargs['id']}")
 
 
+class NoteView(View):
+    def get(self):
+        return Response(f"note {self.url_kwargs['title']}")
+
+
+class DocsView(View):
+    def get(self):
+        return Response(f"docs {self.url_kwargs['rest']}")
+
+
 class SlashRouter(Router):
     namespace = ""
     urls = [
@@ -55,4 +65,11 @@ class SlashRouter(Router):
         # Parameterized slashed route — used to verify the redirect
         # carries converter-matched segments through correctly.
         path("items/<int:id>/", ItemView, name="item-slash"),
+        # String capture — used to verify the canonical-redirect Location
+        # header percent-encodes captured values that contain reserved chars.
+        path("notes/<str:title>/", NoteView, name="note-slash"),
+        # Multi-segment `<path:...>` capture — used to verify the route's
+        # trailing-slash flag drives the canonical form (the capture itself
+        # doesn't swallow the slash).
+        path("docs/<path:rest>", DocsView, name="docs-noslash"),
     ]

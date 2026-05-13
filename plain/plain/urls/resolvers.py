@@ -2,60 +2,50 @@
 This module converts requested URLs to callback view functions.
 
 URLResolver is the main class here. Its resolve() method takes a URL (as
-a string) and returns a ResolverMatch object which provides access to all
-attributes of the resolved URL match.
+a string), parses it into segments, and returns a ResolverMatch object
+which provides access to all attributes of the resolved URL match.
 """
 
 from __future__ import annotations
 
 import functools
-import re
-from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
+from plain.exceptions import ImproperlyConfigured
+from plain.preflight import PreflightResult
 from plain.runtime import settings
-from plain.utils.datastructures import MultiValueDict
 from plain.utils.http import RFC3986_SUBDELIMS, escape_leading_slashes
 from plain.utils.module_loading import import_string
-from plain.utils.regex_helper import _normalize
 
-from .exceptions import NoReverseMatch, Resolver404
-from .patterns import RegexPattern, RoutePattern, URLPattern
-
-# Tracks which URLResolver instances are currently inside _populate(),
-# to prevent infinite recursion when resolvers reference each other.
-_populating: ContextVar[frozenset[int]] = ContextVar("_populating", default=frozenset())
+from .exceptions import NoReverseMatch, Resolver308, Resolver400, Resolver404
+from .matches import ResolverMatch
+from .paths import BadPath, ParsedPath, RedirectToCanonical, SlashMismatch, _parse_path
+from .patterns import URLPattern
+from .segments import (
+    Capture,
+    Literal,
+    Route,
+    Segment,
+    _captures_in,
+    _effective_trailing_slash,
+    _route_to_segments,
+    _segment_value_matches,
+    _walk_segments,
+)
 
 if TYPE_CHECKING:
-    from plain.preflight import PreflightResult
-
     from .routers import Router
 
 
-class ResolverMatch:
-    def __init__(
-        self,
-        *,
-        view_class: type,
-        kwargs: dict[str, Any],
-        url_name: str | None = None,
-        namespaces: list[str] | None = None,
-        route: str | None = None,
-    ):
-        self.view_class = view_class
-        self.kwargs = kwargs
-        self.url_name = url_name
-        self.route = route
-
-        # If a URLRegexResolver doesn't have a namespace or namespace, it passes
-        # in an empty value.
-        self.namespaces = [x for x in namespaces if x] if namespaces else []
-        self.namespace = ":".join(self.namespaces)
-
-        self.namespaced_url_name = (
-            ":".join(self.namespaces + [url_name]) if url_name else None
-        )
+# Reverse-lookup entries map a key (view class or name string) to a list
+# of candidate segment chains + their trailing-slash flag.
+_ReverseEntry = tuple[tuple[Segment, ...], bool]
+_ReverseLookups = dict[type | str, list[_ReverseEntry]]
+# Namespace entries map a namespace string to its prefix segments,
+# prefix trailing-slash flag, and the resolver that owns it.
+_NamespaceEntry = tuple[tuple[Segment, ...], bool, "URLResolver"]
+_NamespaceLookups = dict[str, _NamespaceEntry]
 
 
 def get_resolver(router: str | Router | None = None) -> URLResolver:
@@ -68,258 +58,334 @@ def get_resolver(router: str | Router | None = None) -> URLResolver:
 @functools.cache
 def _get_cached_resolver(router: str | Router) -> URLResolver:
     if isinstance(router, str):
-        # Do this inside the cached call, primarily for the URLS_ROUTER
         router_class = import_string(router)
         router = router_class()
 
-    return URLResolver(pattern=RegexPattern(r"^/"), router=router)
-
-
-@functools.cache
-def get_ns_resolver(
-    ns_pattern: str, resolver: URLResolver, converters: tuple[tuple[str, Any], ...]
-) -> URLResolver:
-    from .routers import Router
-
-    # Build a namespaced resolver for the given parent urls_module pattern.
-    # This makes it possible to have captured parameters in the parent
-    # urls_module pattern.
-    pattern = RegexPattern(ns_pattern)
-    pattern.converters = dict(converters)
-
-    class _NestedRouter(Router):
-        namespace = ""
-        urls = resolver.url_patterns
-
-    ns_resolver = URLResolver(pattern=pattern, router=_NestedRouter())
-
-    class _NamespacedRouter(Router):
-        namespace = ""
-        urls = [ns_resolver]
-
-    return URLResolver(
-        pattern=RegexPattern(r"^/"),
-        router=_NamespacedRouter(),
-    )
+    return URLResolver(route=_route_to_segments(""), raw_route="", router=router)
 
 
 class URLResolver:
+    """A prefix-matcher: matches a `Route` prefix against incoming segments,
+    then dispatches to its children (URLPatterns or nested URLResolvers).
+    """
+
     def __init__(
         self,
         *,
-        pattern: RegexPattern | RoutePattern,
+        route: Route,
+        raw_route: str,
         router: Router,
     ):
-        self.pattern = pattern
+        self.route = route
+        self.raw_route = raw_route
         self.router = router
-        self._reverse_dict: MultiValueDict = MultiValueDict()
-        self._namespace_dict: dict[str, tuple[str, URLResolver]] = {}
-        self._populated = False
+        self.namespace = router.namespace
+        self.url_patterns = router.urls
 
-        # Set these immediately, in part so we can find routers
-        # where the attributes weren't set correctly.
-        self.namespace = self.router.namespace
-        self.url_patterns = self.router.urls
+        # Eager merge: each child URLResolver already built its own dicts
+        # during its own __init__. The URL graph is a DAG constructed
+        # bottom-up at include() time, so a child never references its
+        # parent — no recursion, no cycle handling needed.
+        self.reverse_dict, self.namespace_dict = _build_lookups(self.url_patterns)
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} {repr(self.router)} ({self.namespace}) {self.pattern.describe()}>"
+        return (
+            f"<{self.__class__.__name__} {repr(self.router)} "
+            f"({self.namespace}) '{self.raw_route}'>"
+        )
 
     def preflight(self) -> list[PreflightResult]:
-        messages = []
-        messages.extend(self.pattern.preflight())
+        messages: list[PreflightResult] = []
         for pattern in self.url_patterns:
             messages.extend(pattern.preflight())
         return messages
 
-    def _populate(self) -> None:
-        # Short-circuit if called recursively in this context to prevent
-        # infinite recursion. Concurrent contexts may call this at the same
-        # time and will need to continue, so track populating resolvers in a
-        # context variable.
-        current = _populating.get()
-        if id(self) in current:
-            return
-        token = _populating.set(current | {id(self)})
-        try:
-            lookups = MultiValueDict()
-            namespaces = {}
-            for url_pattern in reversed(self.url_patterns):
-                p_pattern = url_pattern.pattern.regex.pattern
-                p_pattern = p_pattern.removeprefix("^")
-                if isinstance(url_pattern, URLPattern):
-                    bits = _normalize(url_pattern.pattern.regex.pattern)
-                    lookups.appendlist(
-                        url_pattern.view_class,
-                        (
-                            bits,
-                            p_pattern,
-                            url_pattern.pattern.converters,
-                        ),
-                    )
-                    if url_pattern.name is not None:
-                        lookups.appendlist(
-                            url_pattern.name,
-                            (
-                                bits,
-                                p_pattern,
-                                url_pattern.pattern.converters,
-                            ),
-                        )
-                else:  # url_pattern is a URLResolver.
-                    url_pattern._populate()
-                    if url_pattern.namespace:
-                        namespaces[url_pattern.namespace] = (p_pattern, url_pattern)
-                    else:
-                        for name in url_pattern.reverse_dict:
-                            for (
-                                _,
-                                pat,
-                                converters,
-                            ) in url_pattern.reverse_dict.getlist(name):
-                                new_matches = _normalize(p_pattern + pat)
-                                lookups.appendlist(
-                                    name,
-                                    (
-                                        new_matches,
-                                        p_pattern + pat,
-                                        {
-                                            **self.pattern.converters,
-                                            **url_pattern.pattern.converters,
-                                            **converters,
-                                        },
-                                    ),
-                                )
-                        for namespace, (
-                            prefix,
-                            sub_pattern,
-                        ) in url_pattern.namespace_dict.items():
-                            current_converters = url_pattern.pattern.converters
-                            sub_pattern.pattern.converters.update(current_converters)
-                            namespaces[namespace] = (p_pattern + prefix, sub_pattern)
-            self._namespace_dict = namespaces
-            self._reverse_dict = lookups
-            self._populated = True
-        finally:
-            _populating.reset(token)
-
-    @property
-    def reverse_dict(self) -> MultiValueDict:
-        if not self._reverse_dict:
-            self._populate()
-        return self._reverse_dict
-
-    @property
-    def namespace_dict(self) -> dict[str, tuple[str, URLResolver]]:
-        if not self._namespace_dict:
-            self._populate()
-        return self._namespace_dict
-
-    @staticmethod
-    def _join_route(route1: str, route2: str) -> str:
-        """Join two routes, without the starting ^ in the second route."""
-        if not route1:
-            return route2
-        route2 = route2.removeprefix("^")
-        return route1 + route2
-
     def resolve(self, path: str) -> ResolverMatch:
+        """Entry point for resolving a request URL.
+
+        Parses `path`, raises `Resolver400`/`Resolver308` for malformed or
+        non-canonical paths, then walks the route tree. Raises
+        `Resolver404` if no route matches.
+        """
         path = str(path)  # path may be a reverse_lazy object
-        match = self.pattern.match(path)
-        if match:
-            new_path, kwargs = match
-            for pattern in self.url_patterns:
-                try:
-                    sub_match = pattern.resolve(new_path)
-                except Resolver404:
-                    pass
-                else:
-                    if sub_match:
-                        current_route = (
-                            ""
-                            if isinstance(pattern, URLPattern)
-                            else str(pattern.pattern)
-                        )
-                        return ResolverMatch(
-                            view_class=sub_match.view_class,
-                            kwargs={**kwargs, **sub_match.kwargs},
-                            url_name=sub_match.url_name,
-                            namespaces=[self.namespace] + sub_match.namespaces,
-                            route=self._join_route(current_route, sub_match.route),
-                        )
-            raise Resolver404({"path": new_path})
+        parsed = _parse_path(path)
+        if isinstance(parsed, BadPath):
+            raise Resolver400(parsed.reason)
+        if isinstance(parsed, RedirectToCanonical):
+            raise Resolver308(parsed.canonical)
+        assert isinstance(parsed, ParsedPath)
+
+        result = self._resolve_segments(
+            parsed.segments,
+            parsed.trailing_slash,
+            prefix_segments=(),
+            prefix_kwargs={},
+        )
+        if isinstance(result, ResolverMatch):
+            return result
+        if isinstance(result, SlashMismatch):
+            # Toggle the slash on the *original* request path — don't rebuild
+            # from rendered kwargs, which would normalize opaque captured
+            # values (e.g. `<int:id>` rendering `001` → `1`).
+            toggled = path[:-1] if path.endswith("/") else path + "/"
+            raise Resolver308(toggled)
         raise Resolver404({"path": path})
 
-    def reverse(self, lookup_view: Any, **kwargs: Any) -> str:
-        if not self._populated:
-            self._populate()
+    def _resolve_segments(
+        self,
+        segments: tuple[str, ...],
+        trailing_slash: bool,
+        prefix_segments: tuple[Segment, ...],
+        prefix_kwargs: dict[str, Any],
+    ) -> ResolverMatch | SlashMismatch | None:
+        """Match this resolver's prefix, then walk children.
 
-        possibilities = self.reverse_dict.getlist(lookup_view)
+        Returns:
+            ResolverMatch — a child returned an exact match
+            SlashMismatch — no exact match, but a child reported a
+                trailing-slash mismatch (sibling priority preserved)
+            None — neither this resolver's prefix nor any child matched
+        """
+        match = _walk_segments(self.route.segments, segments, full_match=False)
+        if match is None:
+            return None
+        consumed, captured = match
+        kwargs = {**prefix_kwargs, **captured} if captured else prefix_kwargs
+        remaining_segments = segments[consumed:]
+        merged_prefix = prefix_segments + self.route.segments
 
-        for possibility, pattern, converters in possibilities:
-            for result, params in possibility:
-                if set(kwargs).symmetric_difference(params):
-                    continue
-                candidate_subs = kwargs
-                # Convert the candidate subs to text using Converter.to_url().
-                text_candidate_subs = {}
-                match = True
-                for k, v in candidate_subs.items():
-                    if k in converters:
-                        try:
-                            text_candidate_subs[k] = converters[k].to_url(v)
-                        except ValueError:
-                            match = False
-                            break
-                    else:
-                        text_candidate_subs[k] = str(v)
-                if not match:
-                    continue
-                # The server provides decoded URLs, without %xx escapes, and the URL
-                # resolver operates on such URLs. First substitute arguments
-                # without quoting to build a decoded URL and look for a match.
-                # Then, if we have a match, redo the substitution with quoted
-                # arguments in order to return a properly encoded URL.
+        pending: SlashMismatch | None = None
+        for child in self.url_patterns:
+            if isinstance(child, URLPattern):
+                result = child.resolve(
+                    remaining_segments, trailing_slash, merged_prefix, kwargs
+                )
+            else:
+                result = child._resolve_segments(
+                    remaining_segments, trailing_slash, merged_prefix, kwargs
+                )
 
-                # There was a lot of script_prefix handling code before,
-                # so this is a crutch to leave the below as-is for now.
-                _prefix = "/"
+            if isinstance(result, ResolverMatch):
+                # ResolverMatch filters falsy namespaces, so the root's "" drops out.
+                return ResolverMatch(
+                    view_class=result.view_class,
+                    kwargs=result.kwargs,
+                    url_name=result.url_name,
+                    namespaces=[self.namespace] + result.namespaces,
+                    route=result.route,
+                )
+            if isinstance(result, SlashMismatch) and pending is None:
+                pending = result
 
-                candidate_pat = _prefix.replace("%", "%%") + result
-                if re.search(
-                    f"^{re.escape(_prefix)}{pattern}",
-                    candidate_pat % text_candidate_subs,
-                ):
-                    # safe characters from `pchar` definition of RFC 3986
-                    url = quote(
-                        candidate_pat % text_candidate_subs,
-                        safe=RFC3986_SUBDELIMS + "/~:@",
-                    )
-                    # Don't allow construction of scheme relative urls.
-                    return escape_leading_slashes(url)
-        # lookup_view can be URL name or callable, but callables are not
-        # friendly in error messages.
+        return pending
+
+    def reverse(
+        self,
+        lookup_view: type | str,
+        prefix_segments: tuple[Segment, ...] = (),
+        prefix_trailing_slash: bool = False,
+        /,
+        **kwargs: Any,
+    ) -> str:
+        """Build the URL for `lookup_view`.
+
+        `prefix_segments` is prepended to each candidate's segment chain
+        — used by `reverse()` during namespace walks, where the
+        accumulated namespace prefix needs to land on the final URL.
+        `prefix_trailing_slash` is the trailing-slash flag of that
+        accumulated prefix; it's used as the canonical trailing slash
+        when the endpoint contributes no segments of its own (the
+        `path("")` inside `include("admin/", ...)` case).
+
+        Both leading positional args are positional-only so a URL with
+        `<str:prefix_segments>` / `<bool:prefix_trailing_slash>` can
+        still pass kwargs without colliding with these parameters.
+        """
+        possibilities = self.reverse_dict.get(lookup_view, [])
+        for full_segments, trailing_slash in possibilities:
+            effective_ts = _effective_trailing_slash(
+                full_segments, trailing_slash, prefix_trailing_slash
+            )
+            url = _try_reverse(prefix_segments + full_segments, effective_ts, kwargs)
+            if url is not None:
+                return url
+
         m = getattr(lookup_view, "__module__", None)
         n = getattr(lookup_view, "__name__", None)
-        if m is not None and n is not None:
-            lookup_view_s = f"{m}.{n}"
-        else:
-            lookup_view_s = lookup_view
+        lookup_view_s = f"{m}.{n}" if m and n else lookup_view
 
-        patterns = [pos[1] for pos in possibilities]
-        if patterns:
-            if kwargs:
-                arg_msg = f"keyword arguments '{kwargs}'"
-            else:
-                arg_msg = "no arguments"
-            msg = "Reverse for '%s' with %s not found. %d pattern(s) tried: %s" % (  # noqa: UP031
-                lookup_view_s,
-                arg_msg,
-                len(patterns),
-                patterns,
+        if possibilities:
+            arg_msg = f"keyword arguments '{kwargs}'" if kwargs else "no arguments"
+            msg = (
+                f"Reverse for '{lookup_view_s}' with {arg_msg} not found. "
+                f"{len(possibilities)} pattern(s) tried."
             )
         else:
             msg = (
-                f"Reverse for '{lookup_view_s}' not found. '{lookup_view_s}' is not "
-                "a valid view function or pattern name."
+                f"Reverse for '{lookup_view_s}' not found. "
+                f"'{lookup_view_s}' is not a valid view function or pattern name."
             )
         raise NoReverseMatch(msg)
+
+
+def _build_lookups(
+    url_patterns: list[URLPattern | URLResolver],
+) -> tuple[_ReverseLookups, _NamespaceLookups]:
+    """Build reverse/namespace dicts from a list of children.
+
+    Children that are `URLResolver`s must already have their own
+    `reverse_dict`/`namespace_dict` populated — they did so in their own
+    `__init__`. This is just a single-level merge.
+
+    Reverse iteration of `url_patterns` puts the latest-defined entry at
+    the front of each list, so `reverse()` (which returns the first
+    kwargs-matching entry) prefers the latest definition when multiple
+    patterns share a name — matching Django's conventional reverse
+    priority.
+    """
+    lookups: _ReverseLookups = {}
+    namespaces: _NamespaceLookups = {}
+    for url_pattern in reversed(url_patterns):
+        if isinstance(url_pattern, URLPattern):
+            _collect_endpoint(url_pattern, lookups)
+        else:
+            _collect_resolver(url_pattern, lookups, namespaces)
+    return lookups, namespaces
+
+
+def _collect_endpoint(url_pattern: URLPattern, lookups: _ReverseLookups) -> None:
+    """Add a URLPattern's reverse data to `lookups`, keyed by view class and name.
+
+    `reverse()` accepts either a view class or a name string, so the same
+    dict serves both lookups — hence the heterogeneous key types.
+    """
+    entry: _ReverseEntry = (
+        url_pattern.route.segments,
+        url_pattern.route.trailing_slash,
+    )
+    lookups.setdefault(url_pattern.view_class, []).append(entry)
+    if url_pattern.name:
+        lookups.setdefault(url_pattern.name, []).append(entry)
+
+
+def _collect_resolver(
+    url_pattern: URLResolver,
+    lookups: _ReverseLookups,
+    namespaces: _NamespaceLookups,
+) -> None:
+    """Merge a child URLResolver's pre-built reverse data into the parent's lookups.
+
+    Namespaced children become entries in `namespaces` keyed by namespace;
+    un-namespaced children's entries are folded into `lookups` with the
+    child's prefix prepended.
+    """
+    child_prefix = url_pattern.route.segments
+    child_trailing_slash = url_pattern.route.trailing_slash
+    if url_pattern.namespace:
+        _register_namespace(
+            namespaces,
+            url_pattern.namespace,
+            child_prefix,
+            child_trailing_slash,
+            url_pattern,
+        )
+        return
+
+    for name, entries in url_pattern.reverse_dict.items():
+        for sub_segments, sub_trailing_slash in entries:
+            effective_ts = _effective_trailing_slash(
+                sub_segments, sub_trailing_slash, child_trailing_slash
+            )
+            lookups.setdefault(name, []).append(
+                (child_prefix + sub_segments, effective_ts)
+            )
+    for ns_name, (ns_prefix, ns_ts, ns_resolver) in url_pattern.namespace_dict.items():
+        # The merged-prefix's trailing slash: inner wins if it contributed
+        # segments, otherwise inherit the outer's. Same rule as endpoint
+        # merging above — without this, reverse() would read the inner
+        # resolver's own route slash and miss the outer's.
+        merged_ts = _effective_trailing_slash(ns_prefix, ns_ts, child_trailing_slash)
+        _register_namespace(
+            namespaces, ns_name, child_prefix + ns_prefix, merged_ts, ns_resolver
+        )
+
+
+def _register_namespace(
+    namespaces: _NamespaceLookups,
+    ns_name: str,
+    prefix_segments: tuple[Segment, ...],
+    prefix_trailing_slash: bool,
+    resolver: URLResolver,
+) -> None:
+    """Assign a namespace entry, refusing to overwrite an existing one.
+
+    Two `include()`s exposing the same namespace under one parent is
+    always a mistake — one is unreachable via `reverse()` no matter
+    which precedence we pick. Fail loudly at registration so the
+    typo/copy-paste surfaces in the diff that introduced it.
+    """
+    if ns_name in namespaces:
+        raise ImproperlyConfigured(
+            f"Namespace '{ns_name}' is registered by more than one include() "
+            "under the same parent router. Give each include() a unique namespace."
+        )
+    namespaces[ns_name] = (prefix_segments, prefix_trailing_slash, resolver)
+
+
+def _try_reverse(
+    full_segments: tuple[Segment, ...],
+    trailing_slash: bool,
+    kwargs: dict[str, Any],
+) -> str | None:
+    """Try to build a URL from a full segment chain and kwargs.
+
+    Returns None if kwargs don't match the parameter names or if a
+    converter's `to_url` produces a value that doesn't match the
+    converter's own regex.
+    """
+    param_names = {cap.name for cap in _captures_in(full_segments)}
+    if set(kwargs) != param_names:
+        return None
+
+    parts: list[str] = []
+    for seg in full_segments:
+        rendered = _reverse_segment(seg, kwargs)
+        if rendered is None:
+            return None
+        parts.append(rendered)
+
+    body = "/".join(parts)
+    url = f"/{body}" if body else "/"
+    if trailing_slash and body:
+        url += "/"
+    return escape_leading_slashes(quote(url, safe=RFC3986_SUBDELIMS + "/~:@"))
+
+
+def _reverse_segment(seg: Segment, kwargs: dict[str, Any]) -> str | None:
+    """Render one segment for reverse(). Returns None on validation failure."""
+    if isinstance(seg, Literal):
+        return seg.value
+    if isinstance(seg, Capture):
+        return _reverse_capture(seg, kwargs)
+    # Pattern — render each part inline
+    rendered_parts: list[str] = []
+    for part in seg.parts:
+        if isinstance(part, Literal):
+            rendered_parts.append(part.value)
+            continue
+        rendered = _reverse_capture(part, kwargs)
+        if rendered is None:
+            return None
+        rendered_parts.append(rendered)
+    return "".join(rendered_parts)
+
+
+def _reverse_capture(cap: Capture, kwargs: dict[str, Any]) -> str | None:
+    """Convert + validate one captured value for reverse()."""
+    try:
+        url_value = cap.converter.to_url(kwargs[cap.name])
+    except (ValueError, TypeError):
+        return None
+    if not _segment_value_matches(cap.converter, url_value):
+        return None
+    return url_value

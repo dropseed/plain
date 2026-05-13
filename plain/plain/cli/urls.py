@@ -15,7 +15,7 @@ def urls() -> None:
 def list_urls(flat: bool) -> None:
     """List all URL patterns"""
     from plain.runtime import settings
-    from plain.urls import URLResolver, get_resolver
+    from plain.urls import URLPattern, URLResolver, get_resolver
 
     if not settings.URLS_ROUTER:
         raise click.UsageError("URLS_ROUTER is not set")
@@ -24,10 +24,12 @@ def list_urls(flat: bool) -> None:
     if flat:
 
         def flat_list(
-            patterns: list, prefix: str = "", curr_ns: str = ""
+            patterns: list[URLPattern | URLResolver],
+            prefix: str = "",
+            curr_ns: str = "",
         ) -> Iterator[str]:
             for pattern in patterns:
-                full_pattern = f"{prefix}{pattern.pattern}"
+                full_pattern = f"{prefix}{pattern.raw_route}"
                 if isinstance(pattern, URLResolver):
                     # Update current namespace
                     new_ns = (
@@ -55,13 +57,17 @@ def list_urls(flat: bool) -> None:
             click.echo(p)
     else:
 
-        def print_tree(patterns: list, prefix: str = "", curr_ns: str = "") -> None:
+        def print_tree(
+            patterns: list[URLPattern | URLResolver],
+            prefix: str = "",
+            curr_ns: str = "",
+        ) -> None:
             count = len(patterns)
             for idx, pattern in enumerate(patterns):
                 is_last = idx == (count - 1)
                 connector = "└── " if is_last else "├── "
                 styled_connector = click.style(connector)
-                styled_pattern = click.style(pattern.pattern)
+                styled_pattern = click.style(pattern.raw_route)
                 if isinstance(pattern, URLResolver):
                     if pattern.namespace:
                         new_ns = (

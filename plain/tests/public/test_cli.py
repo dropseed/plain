@@ -1,6 +1,8 @@
 from click.testing import CliRunner
 
 from plain.cli.core import cli
+from plain.runtime import settings
+from plain.urls.resolvers import _get_cached_resolver
 
 
 def test_plain_cli_help():
@@ -8,6 +10,37 @@ def test_plain_cli_help():
     result = runner.invoke(cli, ["--help"], prog_name="plain")
     assert result.exit_code == 0
     assert result.output.startswith("Usage: plain")
+
+
+def test_plain_urls_list_renders_both_modes():
+    """`plain urls list` must render every URLPattern and URLResolver in the
+    configured router without crashing. Pins both `--flat` and the default
+    tree mode against `boundary_routers.BoundaryRouter`, which exercises
+    both kinds (nested includes + endpoint patterns).
+
+    Regression test: this used to AttributeError because the rendering loop
+    read `pattern.pattern` after the resolver was rewritten to expose
+    `raw_route`. ty couldn't catch the access because the parameter was
+    annotated as bare `list`; both call sites are now typed
+    `list[URLPattern | URLResolver]` so future renames blow up at
+    type-check time.
+    """
+    original = settings.URLS_ROUTER
+    settings.URLS_ROUTER = "boundary_routers.BoundaryRouter"
+    _get_cached_resolver.cache_clear()
+    try:
+        runner = CliRunner()
+
+        tree = runner.invoke(cli, ["urls", "list"], prog_name="plain")
+        assert tree.exit_code == 0, tree.output
+        assert "admin-canonical" in tree.output
+
+        flat = runner.invoke(cli, ["urls", "list", "--flat"], prog_name="plain")
+        assert flat.exit_code == 0, flat.output
+        assert "admin-canonical" in flat.output
+    finally:
+        settings.URLS_ROUTER = original
+        _get_cached_resolver.cache_clear()
 
 
 def test_plain_changelog_plain():

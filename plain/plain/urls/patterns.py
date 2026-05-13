@@ -1,199 +1,124 @@
 from __future__ import annotations
 
-import re
-import string
 from typing import Any
 
-from plain.exceptions import ImproperlyConfigured
 from plain.preflight import PreflightResult
-from plain.utils.regex_helper import _lazy_re_compile
 
-from .converters import _get_converter
+from .matches import ResolverMatch
+from .paths import SlashMismatch
+from .segments import (
+    Capture,
+    Literal,
+    Route,
+    Segment,
+    _effective_trailing_slash,
+    _walk_segments,
+)
 
 
-class CheckURLMixin:
-    # Expected to be set by subclasses
-    regex: re.Pattern[str]
-    name: str | None
+class URLPattern:
+    """An endpoint: a parsed route + view class + optional name."""
 
-    def describe(self) -> str:
-        """
-        Format the URL pattern for display in warning messages.
-        """
-        description = f"'{self}'"
+    def __init__(
+        self,
+        *,
+        route: Route,
+        raw_route: str,
+        name: str,
+        view_class: type,
+    ):
+        self.route = route
+        self.raw_route = raw_route
+        self.name = name
+        self.view_class = view_class
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {self._describe()}>"
+
+    def _describe(self) -> str:
+        description = f"'{self.raw_route}'"
         if self.name:
             description += f" [name='{self.name}']"
         return description
 
-
-class RegexPattern(CheckURLMixin):
-    """Internal regex pattern used by the resolver for root and namespace
-    prefixes. Not exposed to user code — `path()` and `include()` accept
-    only string routes."""
-
-    name: str | None = None
-
-    def __init__(self, regex: str):
-        self.converters: dict[str, Any] = {}
-        self.regex = re.compile(regex)
-
-    def match(self, path: str) -> tuple[str, dict[str, Any]] | None:
-        match = self.regex.search(path)
-        if match:
-            kwargs = match.groupdict()
-            kwargs = {k: v for k, v in kwargs.items() if v is not None}
-            return path[match.end() :], kwargs
-        return None
-
     def preflight(self) -> list[PreflightResult]:
+        if self.name and ":" in self.name:
+            return [
+                PreflightResult(
+                    fix=(
+                        f"Your URL pattern {self._describe()} has a name "
+                        "including a ':'. Remove the colon, to avoid ambiguous "
+                        "namespace references."
+                    ),
+                    warning=True,
+                    id="urls.pattern_name_contains_colon",
+                )
+            ]
         return []
 
-    def __str__(self) -> str:
-        return self.regex.pattern
-
-
-_PATH_PARAMETER_COMPONENT_RE = _lazy_re_compile(
-    r"<(?:(?P<converter>[^>:]+):)?(?P<parameter>[^>]+)>"
-)
-
-
-def _route_to_regex(
-    route: str, is_endpoint: bool = False
-) -> tuple[str, dict[str, Any]]:
-    """
-    Convert a path pattern into a regular expression. Return the regular
-    expression and a dictionary mapping the capture names to the converters.
-    For example, 'foo/<int:id>' returns '^foo\\/(?P<id>[0-9]+)'
-    and {'id': <plain.urls.converters.IntConverter>}.
-    """
-    original_route = route
-    parts = ["^"]
-    converters = {}
-    while True:
-        match = _PATH_PARAMETER_COMPONENT_RE.search(route)
-        if not match:
-            parts.append(re.escape(route))
-            break
-        elif not set(match.group()).isdisjoint(string.whitespace):
-            raise ImproperlyConfigured(
-                f"URL route '{original_route}' cannot contain whitespace in angle brackets "
-                "<…>."
-            )
-        parts.append(re.escape(route[: match.start()]))
-        route = route[match.end() :]
-        parameter = match["parameter"]
-        if not parameter.isidentifier():
-            raise ImproperlyConfigured(
-                f"URL route '{original_route}' uses parameter name {parameter!r} which isn't a valid "
-                "Python identifier."
-            )
-        raw_converter = match["converter"]
-        if raw_converter is None:
-            # If a converter isn't specified, the default is `str`.
-            raw_converter = "str"
-        try:
-            converter = _get_converter(raw_converter)
-        except KeyError as e:
-            raise ImproperlyConfigured(
-                f"URL route {original_route!r} uses invalid converter {raw_converter!r}."
-            ) from e
-        converters[parameter] = converter
-        parts.append("(?P<" + parameter + ">" + converter.regex + ")")
-    if is_endpoint:
-        parts.append(r"\Z")
-    return "".join(parts), converters
-
-
-class RoutePattern(CheckURLMixin):
-    def __init__(self, route: str, name: str | None = None, is_endpoint: bool = False):
-        self._route = route
-        self._is_endpoint = is_endpoint
-        self.name = name
-        self.converters = _route_to_regex(str(route), is_endpoint)[1]
-        self.regex = self._compile(str(route))
-
-    def match(self, path: str) -> tuple[str, dict[str, Any]] | None:
-        match = self.regex.search(path)
-        if match:
-            kwargs = match.groupdict()
-            for key, value in kwargs.items():
-                converter = self.converters[key]
-                try:
-                    kwargs[key] = converter.to_python(value)
-                except ValueError:
-                    return None
-            return path[match.end() :], kwargs
-        return None
-
-    def preflight(self) -> list[PreflightResult]:
-        warnings: list[PreflightResult] = []
-        route = self._route
-        if "(?P<" in route or route.startswith("^") or route.endswith("$"):
-            warnings.append(
-                PreflightResult(
-                    fix=f"Your URL pattern {self.describe()} has a route that contains '(?P<', begins "
-                    "with a '^', or ends with a '$'. This was likely an oversight "
-                    "when migrating to plain.urls.path().",
-                    warning=True,
-                    id="urls.path_migration_warning",
-                )
-            )
-        return warnings
-
-    def _compile(self, route: str) -> re.Pattern[str]:
-        return re.compile(_route_to_regex(route, self._is_endpoint)[0])
-
-    def __str__(self) -> str:
-        return str(self._route)
-
-
-class URLPattern:
-    def __init__(
+    def resolve(
         self,
-        *,
-        pattern: RoutePattern,
-        view_class: type,
-    ):
-        self.pattern = pattern
-        self.view_class = view_class
+        segments: tuple[str, ...],
+        trailing_slash: bool,
+        prefix_segments: tuple[Segment, ...],
+        prefix_kwargs: dict[str, Any],
+    ) -> ResolverMatch | SlashMismatch | None:
+        """Try matching the request against this endpoint.
 
-    @property
-    def name(self) -> str | None:
-        return self.pattern.name
-
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} {self.pattern.describe()}>"
-
-    def preflight(self) -> list[PreflightResult]:
-        warnings = self._check_pattern_name()
-        warnings.extend(self.pattern.preflight())
-        return warnings
-
-    def _check_pattern_name(self) -> list[PreflightResult]:
+        Returns:
+            ResolverMatch — exact match (segments + trailing_slash agree)
+            SlashMismatch — segments matched, trailing_slash didn't
+            None — segments didn't match
         """
-        Check that the pattern name does not contain a colon.
-        """
-        if self.pattern.name is not None and ":" in self.pattern.name:
-            warning = PreflightResult(
-                fix=f"Your URL pattern {self.pattern.describe()} has a name including a ':'. Remove the colon, to "
-                "avoid ambiguous namespace references.",
-                warning=True,
-                id="urls.pattern_name_contains_colon",
-            )
-            return [warning]
-        else:
-            return []
+        match = _walk_segments(self.route.segments, segments, full_match=True)
+        if match is None:
+            return None
+        _, captured = match
 
-    def resolve(self, path: str) -> Any:
-        match = self.pattern.match(path)
-        if match:
-            new_path, captured_kwargs = match
-            from .resolvers import ResolverMatch
+        effective_trailing_slash = _effective_trailing_slash(
+            self.route.segments,
+            self.route.trailing_slash,
+            # Any non-empty prefix means we're under at least one `include()`,
+            # which always normalizes to a trailing slash separator.
+            ancestor_trailing_slash=bool(prefix_segments),
+        )
 
+        if trailing_slash == effective_trailing_slash:
+            kwargs = {**prefix_kwargs, **captured} if captured else prefix_kwargs
             return ResolverMatch(
                 view_class=self.view_class,
-                kwargs=captured_kwargs,
-                url_name=self.pattern.name,
-                route=str(self.pattern),
+                kwargs=kwargs,
+                url_name=self.name,
+                route=_route_str(
+                    prefix_segments + self.route.segments, effective_trailing_slash
+                ),
             )
-        return None
+
+        return SlashMismatch()
+
+
+def _route_str(segments: tuple[Segment, ...], trailing_slash: bool) -> str:
+    """Render a full segment chain as a route string for span attributes.
+
+    Literals appear verbatim; captures appear as `<keyword:name>` so the
+    span value is stable across requests with different captured values.
+    Pattern segments render their parts inline.
+    """
+    body = "/".join(_route_str_segment(seg) for seg in segments)
+    if trailing_slash and body:
+        body += "/"
+    return body
+
+
+def _route_str_segment(seg: Segment) -> str:
+    if isinstance(seg, Literal):
+        return seg.value
+    if isinstance(seg, Capture):
+        return f"<{seg.converter.keyword}:{seg.name}>"
+    # Pattern
+    return "".join(
+        part.value
+        if isinstance(part, Literal)
+        else f"<{part.converter.keyword}:{part.name}>"
+        for part in seg.parts
+    )

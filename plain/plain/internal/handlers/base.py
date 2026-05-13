@@ -8,6 +8,7 @@ import dataclasses
 import inspect
 import time
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote
 
 from opentelemetry import context, metrics, trace
 from opentelemetry.semconv._incubating.attributes.http_attributes import (
@@ -24,8 +25,12 @@ from opentelemetry.semconv.attributes import (
 )
 from opentelemetry.semconv.metrics.http_metrics import HTTP_SERVER_REQUEST_DURATION
 
+from plain.http import RedirectResponse
 from plain.runtime import settings
 from plain.urls import get_resolver
+from plain.urls.exceptions import Resolver308
+from plain.utils.encoding import iri_to_uri
+from plain.utils.http import escape_leading_slashes
 from plain.utils.module_loading import import_string
 from plain.utils.otel import format_exception_type
 
@@ -44,13 +49,6 @@ BUILTIN_BEFORE_MIDDLEWARE = [
     "plain.internal.middleware.hosts.HostValidationMiddleware",
     "plain.internal.middleware.https.HttpsRedirectMiddleware",
     "plain.csrf.middleware.CsrfViewMiddleware",
-]
-
-# Builtin middleware that runs after user middleware (closest to the view).
-# after_response runs first, so replacements (e.g. slash redirect) happen
-# before user middleware modifies the response (e.g. session cookies).
-BUILTIN_AFTER_MIDDLEWARE = [
-    "plain.internal.middleware.slash.RedirectSlashMiddleware",
 ]
 
 
@@ -87,6 +85,24 @@ class _AsyncViewPending:
     ran_before: list[HttpMiddleware]
 
 
+def _redirect_to_canonical(request: Request, canonical: str) -> Response:
+    """Build a 308 redirect to `canonical`, carrying the query string through.
+
+    The canonical may contain decoded converter values, so it must be
+    percent-encoded before going into the `Location` header. Without
+    this, a literal `%`, `?`, or `#` from a captured value would be
+    re-interpreted by the client as encoded chars or query/fragment
+    separators. `escape_leading_slashes` defends against `//evil.com`
+    style scheme-relative URL hazards.
+    """
+    escaped_path = quote(canonical, safe="/:@&+$,-_.!~*'()")
+    if request.query_string:
+        location = f"{escaped_path}?{iri_to_uri(request.query_string)}"
+    else:
+        location = escaped_path
+    return RedirectResponse(escape_leading_slashes(location), status_code=308)
+
+
 class BaseHandler:
     _middleware_chain: list[HttpMiddleware] | None = None
 
@@ -96,9 +112,7 @@ class BaseHandler:
 
         Must be called after the environment is fixed (see __call__ in subclasses).
         """
-        middleware_paths = (
-            BUILTIN_BEFORE_MIDDLEWARE + settings.MIDDLEWARE + BUILTIN_AFTER_MIDDLEWARE
-        )
+        middleware_paths = BUILTIN_BEFORE_MIDDLEWARE + settings.MIDDLEWARE
 
         chain: list[HttpMiddleware] = []
         for middleware_path in middleware_paths:
@@ -344,6 +358,8 @@ class BaseHandler:
                     )
 
                 self._check_response(response, view_class)
+            except Resolver308 as exc:
+                response = _redirect_to_canonical(request, exc.canonical)
             except Exception as exc:
                 response = response_for_exception(request, exc)
 

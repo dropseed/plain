@@ -96,10 +96,71 @@ def test_redirect_works_for_parameterized_route(slash_client):
     assert response.headers["Location"] == "/items/42/"
 
 
+def test_slash_redirect_preserves_opaque_captured_value(slash_client):
+    """`/items/001` (no slash) on `path("items/<int:id>/", ...)` must 308 to
+    `/items/001/`, not `/items/1/`.
+
+    The slash redirect's job is to canonicalize the slash form, not to
+    normalize captured values. INT's `to_url(to_python("001")) == "1"`
+    would otherwise silently collapse leading zeros on every such
+    redirect — opaque URL components should round-trip unchanged.
+    """
+    response = slash_client.get("/items/001")
+    assert response.status_code == 308
+    assert response.headers["Location"] == "/items/001/"
+
+
 def test_suffix_does_not_trigger_redirect(slash_client):
     """`/with-slash.json` is a different URL from `/with-slash/`. The redirect
     logic must not bridge the gap by stripping/munging arbitrary suffixes —
     it should fall through to a normal 404.
     """
     response = slash_client.get("/with-slash.json")
+    assert response.status_code == 404
+
+
+def test_redirect_percent_encodes_captured_value(slash_client):
+    """A captured value containing reserved characters must be percent-
+    encoded in the Location header — otherwise a literal space, `?`, or
+    `#` from the captured value would corrupt the URL.
+
+    The test client passes the raw path through verbatim, so the
+    captured `title` is the literal string `hello world` (with a real
+    space). The 308 builder must percent-encode that before putting it
+    in `Location`, otherwise the URL would be invalid.
+    """
+    response = slash_client.get("/notes/hello world")
+    assert response.status_code == 308
+    assert response.headers["Location"] == "/notes/hello%20world/"
+
+
+def test_path_converter_obeys_route_trailing_slash(slash_client):
+    """A `<path:...>` route's trailing-slash flag still drives the canonical
+    form — the multi-segment capture doesn't absorb the slash. `slash_router`
+    defines `path("docs/<path:rest>", DocsView)` (no slash); a request to
+    `/docs/a/b/c/` 308s to `/docs/a/b/c`.
+    """
+    response = slash_client.get("/docs/a/b/c/")
+    assert response.status_code == 308
+    assert response.headers["Location"] == "/docs/a/b/c"
+
+    response = slash_client.get("/docs/a/b/c")
+    assert response.status_code == 200
+    assert response.content == b"docs a/b/c"
+
+
+def test_path_converter_requires_at_least_one_segment(slash_client):
+    """`path("docs/<path:rest>", ...)` — the `<path:...>` capture's regex
+    is `.+`, so the converter requires at least one remaining segment.
+    Requests to the bare prefix `/docs` (or `/docs/`) must fall through
+    to 404 rather than silently matching with `rest=""`.
+
+    Pinning this so a future tweak to `_walk_segments`' multi-segment
+    branch — e.g. allowing empty `"/".join(())` through — surfaces as a
+    test failure instead of a silent reachability change for the prefix.
+    """
+    response = slash_client.get("/docs")
+    assert response.status_code == 404
+
+    response = slash_client.get("/docs/")
     assert response.status_code == 404
