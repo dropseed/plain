@@ -9,7 +9,7 @@
 
 ### Upgrade instructions
 
-- To get a styled 404 for unmatched URLs, mount `NotFoundView` as the last route in your router:
+- **If you have a `404.html` template, mount `NotFoundView` as the last route** — otherwise unmatched URLs now return plain-text `404 Not Found` instead of rendering your template. URL-resolution failures happen before any view runs, so plain core's exception handler can't reach `TemplateView.handle_exception`; the catchall route is what gives those requests a `TemplateView` to render through.
 
     ```python
     from plain.templates.views import NotFoundView
@@ -22,7 +22,7 @@
         ]
     ```
 
-- Apps that previously relied on plain core auto-rendering `{status}.html` will still see those templates render — the path is `TemplateView.handle_exception`, which fires whenever an exception escapes a `TemplateView` subclass. For pre-view failures (URL resolution, middleware) plain core stays in plain text; if you want styled responses there, your views should subclass `TemplateView`.
+- Apps that previously relied on plain core auto-rendering `{status}.html` will still see those templates render for exceptions raised _inside_ a view — `TemplateView.handle_exception` fires whenever an exception escapes a `TemplateView` subclass. For pre-view failures (URL resolution, middleware) plain core stays in plain text unless you mount `NotFoundView` (above) or otherwise route through a `TemplateView`.
 
 ## [0.1.0](https://github.com/dropseed/plain/releases/plain-templates@0.1.0) (2026-05-12)
 

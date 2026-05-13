@@ -14,7 +14,7 @@
 
 ### Upgrade instructions
 
-- **Add `URLS_TRAILING_SLASH = True` to `app/settings.py`** to preserve existing slashed-route behavior. Without it, every route's canonical form flips to no-slash; in-flight requests still work via 308 redirects but the URLs you ship in HTML change.
+- **Add `URLS_TRAILING_SLASH = True` to `app/settings.py`** to preserve existing slashed-route behavior. Without it, every route's canonical form flips to no-slash; in-flight requests still work via 308 redirects but the URLs you ship in HTML change. **Watch for relative URLs in templates** — `<form action=".">`, `<a href=".">`, `<a href="./next">` resolve against the request URL's last slash, so flipping `/login/` → `/login` makes `action="."` POST to `/` instead of `/login`. Either keep `URLS_TRAILING_SLASH = True`, or grep templates for `action="\."`/`href="\."` and replace with `action=""` (empty action submits to the current URL — slash-agnostic) or an explicit `{{ url('name') }}`.
 - **Drop trailing slashes from `path()`/`include()` route strings** as a cosmetic cleanup — they're stripped silently now. Optional but matches the new convention.
 - **Replace `path("…/")` + matching `path("…")` for the same view** with a single `path("…")` plus a `force_trailing_slash` decision. The slash form is no longer the discriminator.
 - **`url_pattern.route` is gone.** Reach for `url_pattern.segments` or `url_pattern.converters` (the latter replaces `url_pattern.route.converters`).
