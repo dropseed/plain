@@ -65,16 +65,18 @@ def pageviews_js(request: Any) -> SafeString:
 
 
 def toolbar(request: Any) -> SafeString:
-    """Render the dev toolbar.
+    """Render the dev toolbar, or empty string if plain.toolbar isn't installed.
 
-    The outer toolbar template (`toolbar/toolbar.plain`) now renders through
-    plain.html. Individual panels still resolve through `Template(name)`, so
-    their engine is decided per-file by extension — `.plain` goes through
-    plain.html, `.html` falls back to Jinja during migration.
+    Mirrors the original `{% include "toolbar/inject.html" ignore missing %}`
+    semantics — templates that interpolate `{toolbar(request)}` keep working
+    in projects that haven't installed the toolbar package.
     """
+    try:
+        from plain.toolbar.toolbar import Toolbar
+    except ImportError:
+        return mark_safe("")
     from plain.html import render
     from plain.html.loader import find_template
-    from plain.toolbar.toolbar import Toolbar
 
     context = {"request": request}
     context["toolbar"] = Toolbar(context)
