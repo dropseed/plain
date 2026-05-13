@@ -33,7 +33,7 @@ class TestPublicEndpoint:
     def test_post_initialize(self) -> None:
         client = Client()
         response = client.post(
-            "/mcp/",
+            "/mcp",
             data=_jsonrpc("initialize"),
             content_type="application/json",
         )
@@ -46,7 +46,7 @@ class TestPublicEndpoint:
     def test_post_tools_call(self) -> None:
         client = Client()
         response = client.post(
-            "/mcp/",
+            "/mcp",
             data=_jsonrpc("tools/call", {"name": "Echo", "arguments": {"text": "hi"}}),
             content_type="application/json",
         )
@@ -58,7 +58,7 @@ class TestPublicEndpoint:
         """A JSON-RPC notification (no id) has no response body."""
         client = Client()
         response = client.post(
-            "/mcp/",
+            "/mcp",
             data=json.dumps(
                 {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}
             ),
@@ -74,7 +74,7 @@ class TestUnhandledException:
     def test_unhandled_exception_attaches_response_exception(self) -> None:
         client = Client(raise_request_exception=False)
         response = client.post(
-            "/boom/",
+            "/boom",
             data=_jsonrpc("ping"),
             content_type="application/json",
         )
@@ -96,7 +96,7 @@ class TestRPCMethodSpan:
     ) -> None:
         client = Client()
         response = client.post(
-            "/mcp/",
+            "/mcp",
             data=_jsonrpc("initialize"),
             content_type="application/json",
         )
@@ -115,7 +115,7 @@ class TestRPCMethodSpan:
     ) -> None:
         client = Client()
         response = client.post(
-            "/rpc-boom/",
+            "/rpc-boom",
             data=_jsonrpc("boom"),
             content_type="application/json",
         )
@@ -141,7 +141,7 @@ class TestAuthedEndpoint:
     def test_missing_bearer_rejected(self) -> None:
         client = Client()
         response = client.post(
-            "/authed/",
+            "/authed",
             data=_jsonrpc("ping"),
             content_type="application/json",
         )
@@ -152,7 +152,7 @@ class TestAuthedEndpoint:
     def test_wrong_bearer_rejected(self) -> None:
         client = Client(headers={"Authorization": "Bearer wrong-token"})
         response = client.post(
-            "/authed/",
+            "/authed",
             data=_jsonrpc("ping"),
             content_type="application/json",
         )
@@ -161,7 +161,7 @@ class TestAuthedEndpoint:
     def test_correct_bearer_allowed(self) -> None:
         client = Client(headers={"Authorization": "Bearer topsecret"})
         response = client.post(
-            "/authed/",
+            "/authed",
             data=_jsonrpc("tools/call", {"name": "Secret", "arguments": {}}),
             content_type="application/json",
         )
@@ -173,7 +173,7 @@ class TestAuthedEndpoint:
         """Tools registered on one instance are not callable on another."""
         client = Client(headers={"Authorization": "Bearer topsecret"})
         response = client.post(
-            "/authed/",
+            "/authed",
             data=_jsonrpc("tools/call", {"name": "Echo", "arguments": {"text": "hi"}}),
             content_type="application/json",
         )

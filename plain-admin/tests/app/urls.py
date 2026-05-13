@@ -17,8 +17,8 @@ class LogoutView(View):
 class AppRouter(Router):
     namespace = ""
     urls = [
-        include("admin/", AdminRouter),
-        include("assets/", AssetsRouter),
-        path("login/", LoginView, name="login"),
-        path("logout/", LogoutView, name="logout"),
+        include("admin", AdminRouter),
+        include("assets", AssetsRouter),
+        path("login", LoginView, name="login"),
+        path("logout", LogoutView, name="logout"),
     ]

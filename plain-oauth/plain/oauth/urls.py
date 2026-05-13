@@ -9,17 +9,17 @@ class OAuthRouter(Router):
     namespace = "oauth"
     urls = [
         include(
-            "<str:provider>/",
+            "<str:provider>",
             [
                 # Login and Signup are both handled here, because the intent is the same
-                path("login/", views.OAuthLoginView, name="login"),
-                path("connect/", views.OAuthConnectView, name="connect"),
+                path("login", views.OAuthLoginView, name="login"),
+                path("connect", views.OAuthConnectView, name="connect"),
                 path(
-                    "disconnect/",
+                    "disconnect",
                     views.OAuthDisconnectView,
                     name="disconnect",
                 ),
-                path("callback/", views.OAuthCallbackView, name="callback"),
+                path("callback", views.OAuthCallbackView, name="callback"),
             ],
         ),
     ]

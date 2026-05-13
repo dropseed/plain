@@ -69,8 +69,8 @@ class RPCBoomMCP(MCPView):
 class AppRouter(Router):
     namespace = ""
     urls = [
-        path("mcp/", PublicMCP, name="public_mcp"),
-        path("authed/", AuthedMCP, name="authed_mcp"),
-        path("boom/", BoomMCP, name="boom_mcp"),
-        path("rpc-boom/", RPCBoomMCP, name="rpc_boom_mcp"),
+        path("mcp", PublicMCP, name="public_mcp"),
+        path("authed", AuthedMCP, name="authed_mcp"),
+        path("boom", BoomMCP, name="boom_mcp"),
+        path("rpc-boom", RPCBoomMCP, name="rpc_boom_mcp"),
     ]

@@ -21,6 +21,11 @@ INSTALLED_PACKAGES: list[str] = []
 
 URLS_ROUTER: str
 
+# Whether routes have trailing slashes by default. Routes can override
+# per-endpoint with `path(..., force_slash=True|False)`. Requests that
+# disagree with a route's effective form are 308-redirected to it.
+URLS_TRAILING_SLASH: bool = False
+
 # List of environment variable prefixes to check for settings.
 # Settings can be configured via environment variables using these prefixes.
 # Example: ENV_SETTINGS_PREFIXES = ["PLAIN_", "MYAPP_"]

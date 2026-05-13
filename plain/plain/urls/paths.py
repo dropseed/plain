@@ -10,10 +10,12 @@ path reaches the resolver in. It:
   flag) for the resolver to walk.
 
 `URLPattern.resolve` separately reports `SlashMismatch` when the request
-matches a route's segments but disagrees on the trailing-slash form. The
-resolver answers that by toggling the slash on the *original* request
-path — not by re-rendering the matched route — so that opaque captured
-values (e.g. `<int:id>` matching `001`) round-trip unchanged.
+matches an endpoint's segments but disagrees on the trailing-slash form
+that endpoint should have (driven by `URLS_TRAILING_SLASH` plus the
+endpoint's `force_trailing_slash` override). The resolver answers that
+by toggling the slash on the *original* request path — not by
+re-rendering the matched route — so that opaque captured values (e.g.
+`<int:id>` matching `001`) round-trip unchanged.
 """
 
 from __future__ import annotations
@@ -48,11 +50,13 @@ class RedirectToCanonical:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class SlashMismatch:
-    """The request matched a route's segments but disagreed on the
-    trailing slash. No canonical form is carried — the resolver toggles
-    the slash on the original request path text, preserving the user's
-    exact characters (so `/items/001` redirects to `/items/001/`, not
-    to `/items/1/` as `<int:id>.to_url()` would render).
+    """The request matched an endpoint's segments but disagreed on
+    its canonical trailing-slash form (driven by `URLS_TRAILING_SLASH`
+    plus the endpoint's `force_trailing_slash` override). No canonical
+    form is carried — the resolver toggles the slash on the original
+    request path text, preserving the user's exact characters (so
+    `/items/001` redirects to `/items/001/`, not to `/items/1/` as
+    `<int:id>.to_url()` would render).
     """
 
 

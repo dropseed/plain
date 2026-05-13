@@ -1,8 +1,8 @@
 """Minimal URL routes for exercising trailing-slash behavior.
 
-Used by the `slash_client` fixture in conftest.py. The point of these
-tests is to pin current behavior so the trailing-slash convention
-future can flip the assertions in a legible diff.
+The fixture sets `URLS_TRAILING_SLASH=True`; routes that want to keep
+the no-slash form (regardless of the global setting) declare it with
+`force_trailing_slash=False`.
 """
 
 from __future__ import annotations
@@ -56,20 +56,35 @@ class DocsView(View):
 class SlashRouter(Router):
     namespace = ""
     urls = [
-        path("with-slash/", WithSlashView, name="with-slash"),
-        path("without-slash", WithoutSlashView, name="without-slash"),
+        path("with-slash", WithSlashView, name="with-slash"),
+        path(
+            "without-slash",
+            WithoutSlashView,
+            name="without-slash",
+            force_trailing_slash=False,
+        ),
         # Both forms of the same URL are explicitly defined — neither
         # should trigger a redirect; both should resolve to their own view.
-        path("dual/", DualSlashView, name="dual-slash"),
-        path("dual", DualNoSlashView, name="dual-noslash"),
+        path("dual", DualSlashView, name="dual-slash"),
+        path(
+            "dual",
+            DualNoSlashView,
+            name="dual-noslash",
+            force_trailing_slash=False,
+        ),
         # Parameterized slashed route — used to verify the redirect
         # carries converter-matched segments through correctly.
-        path("items/<int:id>/", ItemView, name="item-slash"),
+        path("items/<int:id>", ItemView, name="item-slash"),
         # String capture — used to verify the canonical-redirect Location
         # header percent-encodes captured values that contain reserved chars.
-        path("notes/<str:title>/", NoteView, name="note-slash"),
+        path("notes/<str:title>", NoteView, name="note-slash"),
         # Multi-segment `<path:...>` capture — used to verify the route's
         # trailing-slash flag drives the canonical form (the capture itself
         # doesn't swallow the slash).
-        path("docs/<path:rest>", DocsView, name="docs-noslash"),
+        path(
+            "docs/<path:rest>",
+            DocsView,
+            name="docs-noslash",
+            force_trailing_slash=False,
+        ),
     ]

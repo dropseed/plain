@@ -9,27 +9,27 @@ class ExamplesRouter(Router):
     namespace = "examples"
     urls = [
         path(
-            "forms/create/",
+            "forms/create",
             views.FormsExampleCreateView,
             name="forms_create",
         ),
         path(
-            "forms/<int:pk>/update/",
+            "forms/<int:pk>/update",
             views.FormsExampleUpdateView,
             name="forms_update",
         ),
         path(
-            "child-cascade/create/",
+            "child-cascade/create",
             views.ChildCascadeCreateView,
             name="child_cascade_create",
         ),
         path(
-            "db-defaults/create/",
+            "db-defaults/create",
             views.DBDefaultsExampleCreateView,
             name="db_defaults_create",
         ),
         path(
-            "secret-store/create/",
+            "secret-store/create",
             views.SecretStoreCreateView,
             name="secret_store_create",
         ),

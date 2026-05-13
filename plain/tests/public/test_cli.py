@@ -26,7 +26,9 @@ def test_plain_urls_list_renders_both_modes():
     type-check time.
     """
     original = settings.URLS_ROUTER
+    original_ts = settings.URLS_TRAILING_SLASH
     settings.URLS_ROUTER = "boundary_routers.BoundaryRouter"
+    settings.URLS_TRAILING_SLASH = True
     _get_cached_resolver.cache_clear()
     try:
         runner = CliRunner()
@@ -34,12 +36,23 @@ def test_plain_urls_list_renders_both_modes():
         tree = runner.invoke(cli, ["urls", "list"], prog_name="plain")
         assert tree.exit_code == 0, tree.output
         assert "admin-canonical" in tree.output
+        # Tree mode should append the trailing slash on endpoint labels
+        # so the displayed URL matches what `resolve()` accepts.
+        assert "home/" in tree.output
 
         flat = runner.invoke(cli, ["urls", "list", "--flat"], prog_name="plain")
         assert flat.exit_code == 0, flat.output
         assert "admin-canonical" in flat.output
+        # Under `URLS_TRAILING_SLASH=True`, canonical URLs end in `/`.
+        # Flat rendering must produce `admin-canonical/home/` — not
+        # `admin-canonicalhome/` (missing separator) and not
+        # `admin-canonical/home` (missing trailing slash). Both were
+        # regressions of the global-trailing-slash refactor.
+        assert "admin-canonical/home/" in flat.output
+        assert "admin-canonicalhome" not in flat.output
     finally:
         settings.URLS_ROUTER = original
+        settings.URLS_TRAILING_SLASH = original_ts
         _get_cached_resolver.cache_clear()
 
 

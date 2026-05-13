@@ -99,7 +99,9 @@ def test_duplicate_namespace_among_includes_raises():
     from plain.urls.segments import _route_to_segments
 
     with pytest.raises(ImproperlyConfigured, match="Namespace 'shared'"):
-        URLResolver(route=_route_to_segments(""), raw_route="", router=_ParentRouter())
+        URLResolver(
+            segments=_route_to_segments(""), raw_route="", router=_ParentRouter()
+        )
 
 
 def test_duplicate_namespace_through_unnamespaced_include_raises():
@@ -126,7 +128,9 @@ def test_duplicate_namespace_through_unnamespaced_include_raises():
     from plain.urls.segments import _route_to_segments
 
     with pytest.raises(ImproperlyConfigured, match="Namespace 'shared'"):
-        URLResolver(route=_route_to_segments(""), raw_route="", router=_ParentRouter())
+        URLResolver(
+            segments=_route_to_segments(""), raw_route="", router=_ParentRouter()
+        )
 
 
 def test_distinct_namespaces_silent():
@@ -146,4 +150,4 @@ def test_distinct_namespaces_silent():
     from plain.urls.segments import _route_to_segments
 
     # Construction succeeds with no collision.
-    URLResolver(route=_route_to_segments(""), raw_route="", router=_ParentRouter())
+    URLResolver(segments=_route_to_segments(""), raw_route="", router=_ParentRouter())

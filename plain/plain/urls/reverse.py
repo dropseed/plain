@@ -7,7 +7,7 @@ from plain.utils.functional import lazy
 
 from .exceptions import NoReverseMatch
 from .resolvers import get_resolver
-from .segments import Segment, _effective_trailing_slash
+from .segments import Segment
 
 
 def reverse(url_name: str, **kwargs: Any) -> str:
@@ -17,31 +17,23 @@ def reverse(url_name: str, **kwargs: Any) -> str:
 
     resolved_path: list[str] = []
     prefix_segments: tuple[Segment, ...] = ()
-    # Tracks the trailing-slash flag of the accumulated namespace prefix.
-    # Used as the canonical trailing slash when the endpoint contributes no
-    # segments of its own — so `reverse("admin:index")` for a `path("")`
-    # inside `include("admin/", ...)` returns `/admin/`, not `/admin`.
-    prefix_trailing_slash = False
     for ns in path:
         try:
-            extra_segments, extra_ts, resolver = resolver.namespace_dict[ns]
+            extra_segments, resolver = resolver.namespace_dict[ns]
             resolved_path.append(ns)
             prefix_segments = prefix_segments + extra_segments
-            prefix_trailing_slash = _effective_trailing_slash(
-                extra_segments, extra_ts, prefix_trailing_slash
-            )
-        except KeyError as key:
+        except KeyError:
             if resolved_path:
                 raise NoReverseMatch(
-                    f"{key} is not a registered namespace inside "
+                    f"'{ns}' is not a registered namespace inside "
                     f"'{':'.join(resolved_path)}'"
                 )
-            raise NoReverseMatch(f"{key} is not a registered namespace")
+            raise NoReverseMatch(f"'{ns}' is not a registered namespace")
 
-    # `prefix_segments` and `prefix_trailing_slash` are positional-only on
-    # `URLResolver.reverse` specifically to avoid colliding with user-route
-    # kwargs of the same name — don't switch this call to keyword form.
-    return resolver.reverse(view, prefix_segments, prefix_trailing_slash, **kwargs)
+    # `prefix_segments` is positional-only on `URLResolver.reverse`
+    # specifically to avoid colliding with user-route kwargs of the same
+    # name — don't switch this call to keyword form.
+    return resolver.reverse(view, prefix_segments, **kwargs)
 
 
 reverse_lazy = lazy(reverse, str)

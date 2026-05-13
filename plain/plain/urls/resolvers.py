@@ -25,10 +25,8 @@ from .patterns import URLPattern
 from .segments import (
     Capture,
     Literal,
-    Route,
     Segment,
     _captures_in,
-    _effective_trailing_slash,
     _route_to_segments,
     _segment_value_matches,
     _walk_segments,
@@ -39,12 +37,16 @@ if TYPE_CHECKING:
 
 
 # Reverse-lookup entries map a key (view class or name string) to a list
-# of candidate segment chains + their trailing-slash flag.
-_ReverseEntry = tuple[tuple[Segment, ...], bool]
+# of candidate (segments, endpoint) pairs. The endpoint's `trailing_slash`
+# property (which reads `URLS_TRAILING_SLASH` + per-route override) is
+# queried at reverse() time so a settings flip is observed without a
+# rebuild of the lookup tuple.
+_ReverseEntry = tuple[tuple[Segment, ...], URLPattern]
 _ReverseLookups = dict[type | str, list[_ReverseEntry]]
-# Namespace entries map a namespace string to its prefix segments,
-# prefix trailing-slash flag, and the resolver that owns it.
-_NamespaceEntry = tuple[tuple[Segment, ...], bool, "URLResolver"]
+# Namespace entries map a namespace string to its prefix segments and
+# the resolver that owns them. No prefix slash flag — includes don't
+# carry one in the new model.
+_NamespaceEntry = tuple[tuple[Segment, ...], "URLResolver"]
 _NamespaceLookups = dict[str, _NamespaceEntry]
 
 
@@ -61,22 +63,23 @@ def _get_cached_resolver(router: str | Router) -> URLResolver:
         router_class = import_string(router)
         router = router_class()
 
-    return URLResolver(route=_route_to_segments(""), raw_route="", router=router)
+    return URLResolver(segments=_route_to_segments(""), raw_route="", router=router)
 
 
 class URLResolver:
-    """A prefix-matcher: matches a `Route` prefix against incoming segments,
-    then dispatches to its children (URLPatterns or nested URLResolvers).
+    """A prefix-matcher: matches a segment prefix against incoming
+    request segments, then dispatches to its children (URLPatterns or
+    nested URLResolvers).
     """
 
     def __init__(
         self,
         *,
-        route: Route,
+        segments: tuple[Segment, ...],
         raw_route: str,
         router: Router,
     ):
-        self.route = route
+        self.segments = segments
         self.raw_route = raw_route
         self.router = router
         self.namespace = router.namespace
@@ -86,7 +89,9 @@ class URLResolver:
         # during its own __init__. The URL graph is a DAG constructed
         # bottom-up at include() time, so a child never references its
         # parent — no recursion, no cycle handling needed.
-        self.reverse_dict, self.namespace_dict = _build_lookups(self.url_patterns)
+        self.reverse_dict: _ReverseLookups = {}
+        self.namespace_dict: _NamespaceLookups = {}
+        self._build_lookups()
 
     def __repr__(self) -> str:
         return (
@@ -119,7 +124,6 @@ class URLResolver:
             parsed.segments,
             parsed.trailing_slash,
             prefix_segments=(),
-            prefix_trailing_slash=False,
             prefix_kwargs={},
         )
         if isinstance(result, ResolverMatch):
@@ -137,7 +141,6 @@ class URLResolver:
         segments: tuple[str, ...],
         trailing_slash: bool,
         prefix_segments: tuple[Segment, ...],
-        prefix_trailing_slash: bool,
         prefix_kwargs: dict[str, Any],
     ) -> ResolverMatch | SlashMismatch | None:
         """Match this resolver's prefix, then walk children.
@@ -148,21 +151,13 @@ class URLResolver:
                 trailing-slash mismatch (sibling priority preserved)
             None — neither this resolver's prefix nor any child matched
         """
-        match = _walk_segments(self.route.segments, segments, full_match=False)
+        match = _walk_segments(self.segments, segments, full_match=False)
         if match is None:
             return None
         consumed, captured = match
         kwargs = {**prefix_kwargs, **captured} if captured else prefix_kwargs
         remaining_segments = segments[consumed:]
-        merged_prefix = prefix_segments + self.route.segments
-        # This resolver's effective trailing slash becomes the ancestor flag
-        # for its children — `include("admin/", ...)` declares `/admin/` as
-        # the canonical index slash, `include("admin", ...)` declares `/admin`.
-        merged_prefix_ts = _effective_trailing_slash(
-            self.route.segments,
-            self.route.trailing_slash,
-            prefix_trailing_slash,
-        )
+        merged_prefix = prefix_segments + self.segments
 
         def _wrap(rm: ResolverMatch) -> ResolverMatch:
             return ResolverMatch(
@@ -188,7 +183,6 @@ class URLResolver:
                     remaining_segments,
                     trailing_slash,
                     merged_prefix,
-                    merged_prefix_ts,
                     kwargs,
                 )
             else:
@@ -196,7 +190,6 @@ class URLResolver:
                     remaining_segments,
                     trailing_slash,
                     merged_prefix,
-                    merged_prefix_ts,
                     kwargs,
                 )
 
@@ -217,7 +210,6 @@ class URLResolver:
         self,
         lookup_view: type | str,
         prefix_segments: tuple[Segment, ...] = (),
-        prefix_trailing_slash: bool = False,
         /,
         **kwargs: Any,
     ) -> str:
@@ -226,21 +218,14 @@ class URLResolver:
         `prefix_segments` is prepended to each candidate's segment chain
         — used by `reverse()` during namespace walks, where the
         accumulated namespace prefix needs to land on the final URL.
-        `prefix_trailing_slash` is the trailing-slash flag of that
-        accumulated prefix; it's used as the canonical trailing slash
-        when the endpoint contributes no segments of its own (the
-        `path("")` inside `include("admin/", ...)` case).
-
-        Both leading positional args are positional-only so a URL with
-        `<str:prefix_segments>` / `<bool:prefix_trailing_slash>` can
-        still pass kwargs without colliding with these parameters.
+        Positional-only so a URL with `<str:prefix_segments>` can still
+        pass kwargs without colliding.
         """
         possibilities = self.reverse_dict.get(lookup_view, [])
-        for full_segments, trailing_slash in possibilities:
-            effective_ts = _effective_trailing_slash(
-                full_segments, trailing_slash, prefix_trailing_slash
+        for full_segments, endpoint in possibilities:
+            url = self._try_reverse(
+                prefix_segments + full_segments, endpoint.trailing_slash, kwargs
             )
-            url = _try_reverse(prefix_segments + full_segments, effective_ts, kwargs)
             if url is not None:
                 return url
 
@@ -261,165 +246,140 @@ class URLResolver:
             )
         raise NoReverseMatch(msg)
 
+    # ------------------------------------------------------------------
+    # Lookup table construction
+    # ------------------------------------------------------------------
 
-def _build_lookups(
-    url_patterns: list[URLPattern | URLResolver],
-) -> tuple[_ReverseLookups, _NamespaceLookups]:
-    """Build reverse/namespace dicts from a list of children.
+    def _build_lookups(self) -> None:
+        """Populate `self.reverse_dict` and `self.namespace_dict` from
+        `self.url_patterns`.
 
-    Children that are `URLResolver`s must already have their own
-    `reverse_dict`/`namespace_dict` populated — they did so in their own
-    `__init__`. This is just a single-level merge.
+        Children that are `URLResolver`s must already have their own
+        `reverse_dict`/`namespace_dict` populated — they did so in their
+        own `__init__`. This is a single-level merge.
 
-    Reverse iteration of `url_patterns` puts the latest-defined entry at
-    the front of each list, so `reverse()` (which returns the first
-    kwargs-matching entry) prefers the latest definition when multiple
-    patterns share a name — matching Django's conventional reverse
-    priority.
-    """
-    lookups: _ReverseLookups = {}
-    namespaces: _NamespaceLookups = {}
-    for url_pattern in reversed(url_patterns):
-        if isinstance(url_pattern, URLPattern):
-            _collect_endpoint(url_pattern, lookups)
-        else:
-            _collect_resolver(url_pattern, lookups, namespaces)
-    return lookups, namespaces
+        Reverse iteration of `url_patterns` puts the latest-defined entry
+        at the front of each list, so `reverse()` (which returns the first
+        kwargs-matching entry) prefers the latest definition when multiple
+        patterns share a name — matching Django's conventional reverse
+        priority.
+        """
+        for url_pattern in reversed(self.url_patterns):
+            if isinstance(url_pattern, URLPattern):
+                self._collect_endpoint(url_pattern)
+            else:
+                self._collect_resolver(url_pattern)
 
+    def _collect_endpoint(self, url_pattern: URLPattern) -> None:
+        """Add a URLPattern's reverse data, keyed by view class and name.
 
-def _collect_endpoint(url_pattern: URLPattern, lookups: _ReverseLookups) -> None:
-    """Add a URLPattern's reverse data to `lookups`, keyed by view class and name.
+        `reverse()` accepts either a view class or a name string, so the
+        same dict serves both lookups — hence the heterogeneous key types.
+        """
+        entry: _ReverseEntry = (url_pattern.segments, url_pattern)
+        self.reverse_dict.setdefault(url_pattern.view_class, []).append(entry)
+        if url_pattern.name:
+            self.reverse_dict.setdefault(url_pattern.name, []).append(entry)
 
-    `reverse()` accepts either a view class or a name string, so the same
-    dict serves both lookups — hence the heterogeneous key types.
-    """
-    entry: _ReverseEntry = (
-        url_pattern.route.segments,
-        url_pattern.route.trailing_slash,
-    )
-    lookups.setdefault(url_pattern.view_class, []).append(entry)
-    if url_pattern.name:
-        lookups.setdefault(url_pattern.name, []).append(entry)
+    def _collect_resolver(self, url_pattern: URLResolver) -> None:
+        """Merge a child URLResolver's pre-built reverse data.
 
+        Namespaced children become entries in `namespace_dict`;
+        un-namespaced children's entries are folded into `reverse_dict`
+        with the child's prefix prepended.
+        """
+        child_prefix = url_pattern.segments
+        if url_pattern.namespace:
+            self._register_namespace(url_pattern.namespace, child_prefix, url_pattern)
+            return
 
-def _collect_resolver(
-    url_pattern: URLResolver,
-    lookups: _ReverseLookups,
-    namespaces: _NamespaceLookups,
-) -> None:
-    """Merge a child URLResolver's pre-built reverse data into the parent's lookups.
+        for name, entries in url_pattern.reverse_dict.items():
+            for sub_segments, sub_endpoint in entries:
+                self.reverse_dict.setdefault(name, []).append(
+                    (child_prefix + sub_segments, sub_endpoint)
+                )
+        for ns_name, (ns_prefix, ns_resolver) in url_pattern.namespace_dict.items():
+            self._register_namespace(ns_name, child_prefix + ns_prefix, ns_resolver)
 
-    Namespaced children become entries in `namespaces` keyed by namespace;
-    un-namespaced children's entries are folded into `lookups` with the
-    child's prefix prepended.
-    """
-    child_prefix = url_pattern.route.segments
-    child_trailing_slash = url_pattern.route.trailing_slash
-    if url_pattern.namespace:
-        _register_namespace(
-            namespaces,
-            url_pattern.namespace,
-            child_prefix,
-            child_trailing_slash,
-            url_pattern,
-        )
-        return
+    def _register_namespace(
+        self,
+        ns_name: str,
+        prefix_segments: tuple[Segment, ...],
+        resolver: URLResolver,
+    ) -> None:
+        """Assign a namespace entry, refusing to overwrite an existing one.
 
-    for name, entries in url_pattern.reverse_dict.items():
-        for sub_segments, sub_trailing_slash in entries:
-            effective_ts = _effective_trailing_slash(
-                sub_segments, sub_trailing_slash, child_trailing_slash
+        Two `include()`s exposing the same namespace under one parent is
+        always a mistake — one is unreachable via `reverse()` no matter
+        which precedence we pick. Fail loudly at registration so the
+        typo/copy-paste surfaces in the diff that introduced it.
+        """
+        if ns_name in self.namespace_dict:
+            raise ImproperlyConfigured(
+                f"Namespace '{ns_name}' is registered by more than one include() "
+                "under the same parent router. Give each include() a unique namespace."
             )
-            lookups.setdefault(name, []).append(
-                (child_prefix + sub_segments, effective_ts)
-            )
-    for ns_name, (ns_prefix, ns_ts, ns_resolver) in url_pattern.namespace_dict.items():
-        # The merged-prefix's trailing slash: inner wins if it contributed
-        # segments, otherwise inherit the outer's. Same rule as endpoint
-        # merging above — without this, reverse() would read the inner
-        # resolver's own route slash and miss the outer's.
-        merged_ts = _effective_trailing_slash(ns_prefix, ns_ts, child_trailing_slash)
-        _register_namespace(
-            namespaces, ns_name, child_prefix + ns_prefix, merged_ts, ns_resolver
-        )
+        self.namespace_dict[ns_name] = (prefix_segments, resolver)
 
+    # ------------------------------------------------------------------
+    # Reverse URL construction
+    # ------------------------------------------------------------------
 
-def _register_namespace(
-    namespaces: _NamespaceLookups,
-    ns_name: str,
-    prefix_segments: tuple[Segment, ...],
-    prefix_trailing_slash: bool,
-    resolver: URLResolver,
-) -> None:
-    """Assign a namespace entry, refusing to overwrite an existing one.
+    @staticmethod
+    def _try_reverse(
+        full_segments: tuple[Segment, ...],
+        trailing_slash: bool,
+        kwargs: dict[str, Any],
+    ) -> str | None:
+        """Try to build a URL from a full segment chain and kwargs.
 
-    Two `include()`s exposing the same namespace under one parent is
-    always a mistake — one is unreachable via `reverse()` no matter
-    which precedence we pick. Fail loudly at registration so the
-    typo/copy-paste surfaces in the diff that introduced it.
-    """
-    if ns_name in namespaces:
-        raise ImproperlyConfigured(
-            f"Namespace '{ns_name}' is registered by more than one include() "
-            "under the same parent router. Give each include() a unique namespace."
-        )
-    namespaces[ns_name] = (prefix_segments, prefix_trailing_slash, resolver)
-
-
-def _try_reverse(
-    full_segments: tuple[Segment, ...],
-    trailing_slash: bool,
-    kwargs: dict[str, Any],
-) -> str | None:
-    """Try to build a URL from a full segment chain and kwargs.
-
-    Returns None if kwargs don't match the parameter names or if a
-    converter's `to_url` produces a value that doesn't match the
-    converter's own regex.
-    """
-    param_names = {cap.name for cap in _captures_in(full_segments)}
-    if set(kwargs) != param_names:
-        return None
-
-    parts: list[str] = []
-    for seg in full_segments:
-        rendered = _reverse_segment(seg, kwargs)
-        if rendered is None:
+        Returns None if kwargs don't match the parameter names or if a
+        converter's `to_url` produces a value that doesn't match the
+        converter's own regex.
+        """
+        param_names = {cap.name for cap in _captures_in(full_segments)}
+        if set(kwargs) != param_names:
             return None
-        parts.append(rendered)
 
-    body = "/".join(parts)
-    url = f"/{body}" if body else "/"
-    if trailing_slash and body:
-        url += "/"
-    return escape_leading_slashes(quote(url, safe=RFC3986_SUBDELIMS + "/~:@"))
+        parts: list[str] = []
+        for seg in full_segments:
+            rendered = URLResolver._reverse_segment(seg, kwargs)
+            if rendered is None:
+                return None
+            parts.append(rendered)
 
+        body = "/".join(parts)
+        url = f"/{body}" if body else "/"
+        if trailing_slash and body:
+            url += "/"
+        return escape_leading_slashes(quote(url, safe=RFC3986_SUBDELIMS + "/~:@"))
 
-def _reverse_segment(seg: Segment, kwargs: dict[str, Any]) -> str | None:
-    """Render one segment for reverse(). Returns None on validation failure."""
-    if isinstance(seg, Literal):
-        return seg.value
-    if isinstance(seg, Capture):
-        return _reverse_capture(seg, kwargs)
-    # Pattern — render each part inline
-    rendered_parts: list[str] = []
-    for part in seg.parts:
-        if isinstance(part, Literal):
-            rendered_parts.append(part.value)
-            continue
-        rendered = _reverse_capture(part, kwargs)
-        if rendered is None:
+    @staticmethod
+    def _reverse_segment(seg: Segment, kwargs: dict[str, Any]) -> str | None:
+        """Render one segment for reverse(). Returns None on validation failure."""
+        if isinstance(seg, Literal):
+            return seg.value
+        if isinstance(seg, Capture):
+            return URLResolver._reverse_capture(seg, kwargs)
+        # Pattern — render each part inline
+        rendered_parts: list[str] = []
+        for part in seg.parts:
+            if isinstance(part, Literal):
+                rendered_parts.append(part.value)
+                continue
+            rendered = URLResolver._reverse_capture(part, kwargs)
+            if rendered is None:
+                return None
+            rendered_parts.append(rendered)
+        return "".join(rendered_parts)
+
+    @staticmethod
+    def _reverse_capture(cap: Capture, kwargs: dict[str, Any]) -> str | None:
+        """Convert + validate one captured value for reverse()."""
+        try:
+            url_value = cap.converter.to_url(kwargs[cap.name])
+        except (ValueError, TypeError):
             return None
-        rendered_parts.append(rendered)
-    return "".join(rendered_parts)
-
-
-def _reverse_capture(cap: Capture, kwargs: dict[str, Any]) -> str | None:
-    """Convert + validate one captured value for reverse()."""
-    try:
-        url_value = cap.converter.to_url(kwargs[cap.name])
-    except (ValueError, TypeError):
-        return None
-    if not _segment_value_matches(cap.converter, url_value):
-        return None
-    return url_value
+        if not _segment_value_matches(cap.converter, url_value):
+            return None
+        return url_value

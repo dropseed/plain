@@ -9,6 +9,6 @@ class ContactsRouter(Router):
     namespace = "contacts"
     urls = [
         path("", views.ContactView, name="form"),
-        path("success/", views.ContactSuccessView, name="success"),
-        path("archive/", views.ContactArchiveView, name="archive"),
+        path("success", views.ContactSuccessView, name="success"),
+        path("archive", views.ContactArchiveView, name="archive"),
     ]

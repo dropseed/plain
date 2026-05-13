@@ -25,8 +25,10 @@ def error_client():
     """Client routed to the error-raising views in `error_routers.py`."""
     original = settings.URLS_ROUTER
     original_debug = settings.DEBUG
+    original_ts = settings.URLS_TRAILING_SLASH
     settings.URLS_ROUTER = "error_routers.ErrorRouter"
     settings.DEBUG = False
+    settings.URLS_TRAILING_SLASH = True
     _get_cached_resolver.cache_clear()
     try:
         client = Client(raise_request_exception=False)
@@ -38,15 +40,26 @@ def error_client():
     finally:
         settings.URLS_ROUTER = original
         settings.DEBUG = original_debug
+        settings.URLS_TRAILING_SLASH = original_ts
         _get_cached_resolver.cache_clear()
 
 
-def _swap_router(router_path: str, *, debug: bool = False):
-    """Yield a Client routed at `router_path`, restoring settings on teardown."""
+def _swap_router(
+    router_path: str, *, debug: bool = False, urls_trailing_slash: bool = True
+):
+    """Yield a Client routed at `router_path`, restoring settings on teardown.
+
+    `urls_trailing_slash` defaults to True so legacy fixtures whose
+    routers spell slashed routes continue to behave as before. New
+    fixtures that exercise the global default explicitly pass
+    `urls_trailing_slash=False`.
+    """
     original = settings.URLS_ROUTER
     original_debug = settings.DEBUG
+    original_ts = settings.URLS_TRAILING_SLASH
     settings.URLS_ROUTER = router_path
     settings.DEBUG = debug
+    settings.URLS_TRAILING_SLASH = urls_trailing_slash
     _get_cached_resolver.cache_clear()
     try:
         client = Client(raise_request_exception=False)
@@ -56,6 +69,7 @@ def _swap_router(router_path: str, *, debug: bool = False):
     finally:
         settings.URLS_ROUTER = original
         settings.DEBUG = original_debug
+        settings.URLS_TRAILING_SLASH = original_ts
         _get_cached_resolver.cache_clear()
 
 
@@ -81,12 +95,6 @@ def path_client():
 def catchall_client():
     """Client routed to `catchall_routers.CatchallRouter` for catchall semantics."""
     yield from _swap_router("catchall_routers.CatchallRouter")
-
-
-@pytest.fixture
-def slashed_catchall_client():
-    """Client for the slashed variant — `path("<path:_>/")` is NOT a catchall."""
-    yield from _swap_router("catchall_routers.SlashedCatchallRouter")
 
 
 @pytest.fixture

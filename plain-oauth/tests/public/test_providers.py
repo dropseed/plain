@@ -67,18 +67,18 @@ def test_dummy_signup(db, settings):
     # Login required for this view
     response = client.get("/")
     assert response.status_code == 302
-    assert response.url == "/login/?next=/"
+    assert response.url == "/login?next=/"
 
     # User clicks the login link (form submit)
-    response = client.post("/oauth/dummy/login/")
+    response = client.post("/oauth/dummy/login")
     assert response.status_code == 302
     assert (
         response.url
-        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
+        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback&response_type=code&scope=dummy_scope&state=dummy_state"
     )
 
     # Provider redirects to the callback url
-    response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
+    response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
     assert response.status_code == 302
     assert response.url == "/"
 
@@ -147,18 +147,18 @@ def test_dummy_login_connection(db, settings):
     # Login required for this view
     response = client.get("/")
     assert response.status_code == 302
-    assert response.url == "/login/?next=/"
+    assert response.url == "/login?next=/"
 
     # User clicks the login link (form submit)
-    response = client.post("/oauth/dummy/login/")
+    response = client.post("/oauth/dummy/login")
     assert response.status_code == 302
     assert (
         response.url
-        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
+        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback&response_type=code&scope=dummy_scope&state=dummy_state"
     )
 
     # Provider redirects to the callback url
-    response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
+    response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
     assert response.status_code == 302
     assert response.url == "/"
 
@@ -214,18 +214,18 @@ def test_dummy_login_without_connection(db, settings):
     # Login required for this view
     response = client.get("/")
     assert response.status_code == 302
-    assert response.url == "/login/?next=/"
+    assert response.url == "/login?next=/"
 
     # User clicks the login link (form submit)
-    response = client.post("/oauth/dummy/login/")
+    response = client.post("/oauth/dummy/login")
     assert response.status_code == 302
     assert (
         response.url
-        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
+        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback&response_type=code&scope=dummy_scope&state=dummy_state"
     )
 
     # Provider redirects to the callback url
-    response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
+    response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
     assert response.status_code == 400
     assert b"OAuth Error" in response.content
 
@@ -255,15 +255,15 @@ def test_dummy_connect(db, settings):
 
     client.force_login(user)
 
-    response = client.post("/oauth/dummy/connect/")
+    response = client.post("/oauth/dummy/connect")
     assert response.status_code == 302
     assert (
         response.url
-        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback%2F&response_type=code&scope=dummy_scope&state=dummy_state"
+        == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback&response_type=code&scope=dummy_scope&state=dummy_state"
     )
 
     # Provider redirects to the callback url
-    response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
+    response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
     assert response.status_code == 302
     assert response.url == "/"
 

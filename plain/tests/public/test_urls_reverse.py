@@ -21,24 +21,30 @@ from plain.views import View
 @pytest.fixture
 def slash_router():
     original = settings.URLS_ROUTER
+    original_ts = settings.URLS_TRAILING_SLASH
     settings.URLS_ROUTER = "slash_routers.SlashRouter"
+    settings.URLS_TRAILING_SLASH = True
     _get_cached_resolver.cache_clear()
     try:
         yield
     finally:
         settings.URLS_ROUTER = original
+        settings.URLS_TRAILING_SLASH = original_ts
         _get_cached_resolver.cache_clear()
 
 
 @pytest.fixture
 def boundary_router():
     original = settings.URLS_ROUTER
+    original_ts = settings.URLS_TRAILING_SLASH
     settings.URLS_ROUTER = "boundary_routers.BoundaryRouter"
+    settings.URLS_TRAILING_SLASH = True
     _get_cached_resolver.cache_clear()
     try:
         yield
     finally:
         settings.URLS_ROUTER = original
+        settings.URLS_TRAILING_SLASH = original_ts
         _get_cached_resolver.cache_clear()
 
 
@@ -50,9 +56,12 @@ def use_router(request):
     `slash_router`/`boundary_router` shapes) call `use_router(MyRouter)`
     to install it; the fixture restores `URLS_ROUTER` and clears the
     resolver cache on teardown. Stashes the class in the test module's
-    globals so `import_string` can resolve it.
+    globals so `import_string` can resolve it. Sets
+    `URLS_TRAILING_SLASH=True` for the duration of the test so slashed
+    route strings keep their slash semantics.
     """
     original = settings.URLS_ROUTER
+    original_ts = settings.URLS_TRAILING_SLASH
     installed_attr: str | None = None
 
     def _install(router_class: type[Router]) -> None:
@@ -61,12 +70,14 @@ def use_router(request):
         request.module.__dict__[attr] = router_class
         installed_attr = attr
         settings.URLS_ROUTER = f"{request.module.__name__}.{attr}"
+        settings.URLS_TRAILING_SLASH = True
         _get_cached_resolver.cache_clear()
 
     try:
         yield _install
     finally:
         settings.URLS_ROUTER = original
+        settings.URLS_TRAILING_SLASH = original_ts
         if installed_attr is not None:
             request.module.__dict__.pop(installed_attr, None)
         _get_cached_resolver.cache_clear()
@@ -144,13 +155,11 @@ def test_reverse_coerces_non_string_value_for_str_converter(use_router):
     assert reverse("user", name=42) == "/user/42/"
 
 
-def test_reverse_included_index_keeps_trailing_slash(use_router):
-    """`path("")` inside `include("admin/", AdminRouter)` is canonically
-    served at `/admin/` (the include prefix's trailing slash applies).
-    `reverse()` must return `/admin/`, not `/admin` — otherwise links
-    would immediately 308 to the canonical form. Regression test for
-    the codex P2 finding.
-    """
+def test_reverse_included_index_follows_global_setting(use_router):
+    """`path("")` inside `include("admin", AdminRouter)` reverses to
+    `/admin/` when `URLS_TRAILING_SLASH=True` (the fixture default).
+    The include's slash flag isn't part of the routing model — the
+    setting (plus any `force_trailing_slash` on the endpoint) is."""
 
     class _AdminRouter(Router):
         namespace = "admin"
@@ -158,21 +167,19 @@ def test_reverse_included_index_keeps_trailing_slash(use_router):
 
     class _Root(Router):
         namespace = ""
-        urls = [include("admin/", _AdminRouter)]
+        urls = [include("admin", _AdminRouter)]
 
     use_router(_Root)
     assert reverse("admin:index") == "/admin/"
 
 
-def test_reverse_unslashed_include_index_has_no_trailing_slash(use_router):
-    """`include("admin", ...)` (no trailing slash) declares `/admin` as the
-    canonical index URL. `path("")` inside it reverses to `/admin`, not
-    `/admin/` — the include's slash flag carries through to its index.
-    """
+def test_reverse_included_index_force_trailing_slash_false(use_router):
+    """`force_trailing_slash=False` on the included index suppresses the
+    slash even under `URLS_TRAILING_SLASH=True`."""
 
     class _AdminRouter(Router):
         namespace = "admin"
-        urls = [path("", _OkView, name="index")]
+        urls = [path("", _OkView, name="index", force_trailing_slash=False)]
 
     class _Root(Router):
         namespace = ""
@@ -182,84 +189,9 @@ def test_reverse_unslashed_include_index_has_no_trailing_slash(use_router):
     assert reverse("admin:index") == "/admin"
 
 
-def test_reverse_unslashed_include_child_still_uses_own_slash(use_router):
-    """Children inside an unslashed include keep their own slash semantics —
-    only the include's index URL (the `path("")` case) inherits the
-    include's slash flag.
-    """
-
-    class _AdminRouter(Router):
-        namespace = "admin"
-        urls = [path("users/", _OkView, name="users")]
-
-    class _Root(Router):
-        namespace = ""
-        urls = [include("admin", _AdminRouter)]
-
-    use_router(_Root)
-    assert reverse("admin:users") == "/admin/users/"
-
-
-def test_unslashed_include_request_resolves_and_redirects(use_router):
-    """The full request-side contract of an unslashed include's index URL:
-    `/admin` matches, `/admin/` 308's to `/admin`. Mirror of the slashed
-    form which canonicalizes the other way.
-    """
-    from plain.test import Client
-
-    class _AdminRouter(Router):
-        namespace = "admin"
-        urls = [path("", _OkView, name="index")]
-
-    class _Root(Router):
-        namespace = ""
-        urls = [include("admin", _AdminRouter)]
-
-    use_router(_Root)
-    client = Client(raise_request_exception=False)
-    client.handler._middleware_chain = None
-    client.handler.load_middleware()
-
-    response = client.get("/admin")
-    assert response.status_code == 200
-
-    response = client.get("/admin/")
-    assert response.status_code == 308
-    assert response.headers["Location"] == "/admin"
-
-
-def test_slashed_include_request_resolves_and_redirects(use_router):
-    """Mirror of the above for the slashed include — `/admin/` matches,
-    `/admin` 308's to `/admin/`. Pinned alongside its unslashed sibling
-    so the two canonical forms can't drift independently.
-    """
-    from plain.test import Client
-
-    class _AdminRouter(Router):
-        namespace = "admin"
-        urls = [path("", _OkView, name="index")]
-
-    class _Root(Router):
-        namespace = ""
-        urls = [include("admin/", _AdminRouter)]
-
-    use_router(_Root)
-    client = Client(raise_request_exception=False)
-    client.handler._middleware_chain = None
-    client.handler.load_middleware()
-
-    response = client.get("/admin/")
-    assert response.status_code == 200
-
-    response = client.get("/admin")
-    assert response.status_code == 308
-    assert response.headers["Location"] == "/admin/"
-
-
-def test_reverse_unnamespaced_included_index_keeps_trailing_slash(use_router):
-    """Same as above but with an un-namespaced include — the prefix flag
-    must propagate through `_collect_resolver`'s un-namespaced merge path.
-    """
+def test_reverse_unnamespaced_included_index_follows_global_setting(use_router):
+    """Same as above but for an un-namespaced include — exercises the
+    un-namespaced merge path in `_collect_resolver`."""
 
     class _AdminRouter(Router):
         namespace = ""
@@ -267,7 +199,7 @@ def test_reverse_unnamespaced_included_index_keeps_trailing_slash(use_router):
 
     class _Root(Router):
         namespace = ""
-        urls = [include("admin/", _AdminRouter)]
+        urls = [include("admin", _AdminRouter)]
 
     use_router(_Root)
     assert reverse("dashboard") == "/admin/"
@@ -282,7 +214,14 @@ def test_reverse_suffix_capture_round_trips(use_router):
 
     class _Router(Router):
         namespace = ""
-        urls = [path("form/<slug:slug>.js", _OkView, name="form-js")]
+        urls = [
+            path(
+                "form/<slug:slug>.js",
+                _OkView,
+                name="form-js",
+                force_trailing_slash=False,
+            )
+        ]
 
     use_router(_Router)
     assert reverse("form-js", slug="contact") == "/form/contact.js"
@@ -352,7 +291,14 @@ def test_reverse_does_not_normalize_caller_supplied_values(use_router):
         namespace = ""
         urls = [
             path("file/<str:name>/", _OkView, name="file"),
-            path("doc/<path:rest>", _OkView, name="doc"),
+            # `doc/<path:rest>` is not a catchall (has a literal prefix);
+            # opt out of the slash so the test's assertion is stable.
+            path(
+                "doc/<path:rest>",
+                _OkView,
+                name="doc",
+                force_trailing_slash=False,
+            ),
         ]
 
     use_router(_Router)

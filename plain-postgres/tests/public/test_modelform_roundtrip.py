@@ -42,7 +42,7 @@ def _valid_post_data() -> dict[str, str]:
 class TestFormsExampleCreate:
     def test_create_roundtrip_all_field_types(self, db):
         client = Client()
-        response = client.post("/examples/forms/create/", data=_valid_post_data())
+        response = client.post("/examples/forms/create", data=_valid_post_data())
 
         assert response.status_code == 302, response.content
         assert response.headers["Location"] == "/ok/"
@@ -69,7 +69,7 @@ class TestFormsExampleCreate:
         client = Client()
         data = _valid_post_data()
         del data["is_active"]  # unchecked checkboxes aren't posted
-        response = client.post("/examples/forms/create/", data=data)
+        response = client.post("/examples/forms/create", data=data)
 
         assert response.status_code == 302, response.content
         assert FormsExample.query.get().is_active is False
@@ -78,7 +78,7 @@ class TestFormsExampleCreate:
         client = Client()
         data = _valid_post_data()
         data["count"] = "not-an-int"
-        response = client.post("/examples/forms/create/", data=data)
+        response = client.post("/examples/forms/create", data=data)
 
         assert response.status_code == 400
         errors = json.loads(response.content)
@@ -88,7 +88,7 @@ class TestFormsExampleCreate:
         client = Client()
         data = _valid_post_data()
         data["status"] = "archived"  # not in the declared choices
-        response = client.post("/examples/forms/create/", data=data)
+        response = client.post("/examples/forms/create", data=data)
 
         assert response.status_code == 400
         errors = json.loads(response.content)
@@ -98,7 +98,7 @@ class TestFormsExampleCreate:
         client = Client()
         data = _valid_post_data()
         data["external_id"] = "not-a-uuid"
-        response = client.post("/examples/forms/create/", data=data)
+        response = client.post("/examples/forms/create", data=data)
 
         assert response.status_code == 400
         errors = json.loads(response.content)
@@ -108,7 +108,7 @@ class TestFormsExampleCreate:
         client = Client()
         data = _valid_post_data()
         data["event_date"] = "not-a-date"
-        response = client.post("/examples/forms/create/", data=data)
+        response = client.post("/examples/forms/create", data=data)
 
         assert response.status_code == 400
         errors = json.loads(response.content)
@@ -119,7 +119,7 @@ class TestFormsExampleCreate:
         client = Client()
         data = _valid_post_data()
         data["name"] = ""
-        response = client.post("/examples/forms/create/", data=data)
+        response = client.post("/examples/forms/create", data=data)
 
         assert response.status_code == 400
         errors = json.loads(response.content)
@@ -130,7 +130,7 @@ class TestFormsExampleCreate:
         client = Client()
         data = _valid_post_data()
         del data["name"]
-        response = client.post("/examples/forms/create/", data=data)
+        response = client.post("/examples/forms/create", data=data)
 
         assert response.status_code == 400
 
@@ -157,7 +157,7 @@ class TestFormsExampleUpdate:
         data["name"] = "After"
         data["count"] = "100"
 
-        response = client.post(f"/examples/forms/{existing.id}/update/", data=data)
+        response = client.post(f"/examples/forms/{existing.id}/update", data=data)
 
         assert response.status_code == 302, response.content
 
@@ -173,7 +173,7 @@ class TestFormsExampleUpdate:
         data = _valid_post_data()
         data["count"] = "not-an-int"
 
-        response = client.post(f"/examples/forms/{existing.id}/update/", data=data)
+        response = client.post(f"/examples/forms/{existing.id}/update", data=data)
 
         assert response.status_code == 400
         existing.refresh_from_db()
@@ -188,7 +188,7 @@ class TestForeignKeyRoundTrip:
         parent = DeleteParent.query.create(name="parent-1")
         client = Client()
         response = client.post(
-            "/examples/child-cascade/create/", data={"parent": str(parent.id)}
+            "/examples/child-cascade/create", data={"parent": str(parent.id)}
         )
 
         assert response.status_code == 302, response.content
@@ -198,7 +198,7 @@ class TestForeignKeyRoundTrip:
     def test_create_with_nonexistent_fk_returns_400(self, db):
         client = Client()
         response = client.post(
-            "/examples/child-cascade/create/", data={"parent": "999999"}
+            "/examples/child-cascade/create", data={"parent": "999999"}
         )
 
         assert response.status_code == 400
@@ -207,7 +207,7 @@ class TestForeignKeyRoundTrip:
 
     def test_create_with_blank_required_fk_returns_400(self, db):
         client = Client()
-        response = client.post("/examples/child-cascade/create/", data={"parent": ""})
+        response = client.post("/examples/child-cascade/create", data={"parent": ""})
 
         assert response.status_code == 400
         errors = json.loads(response.content)
@@ -222,7 +222,7 @@ class TestDBExpressionDefaultsRoundTrip:
     def test_blank_db_default_fields_are_filled_by_database(self, db):
         client = Client()
         response = client.post(
-            "/examples/db-defaults/create/",
+            "/examples/db-defaults/create",
             data={"name": "sample", "db_uuid": "", "created_at": ""},
         )
 
@@ -236,7 +236,7 @@ class TestDBExpressionDefaultsRoundTrip:
         supplied = "11111111-1111-1111-1111-111111111111"
         client = Client()
         response = client.post(
-            "/examples/db-defaults/create/",
+            "/examples/db-defaults/create",
             data={
                 "name": "sample",
                 "db_uuid": supplied,
@@ -259,7 +259,7 @@ class TestEncryptedFieldsRoundTrip:
     def test_create_roundtrip_with_encrypted_text(self, db):
         client = Client()
         response = client.post(
-            "/examples/secret-store/create/",
+            "/examples/secret-store/create",
             data={
                 "name": "prod-key",
                 "api_key": "sk-live-abc123",
@@ -278,7 +278,7 @@ class TestEncryptedFieldsRoundTrip:
     def test_blank_optional_encrypted_text_accepted(self, db):
         client = Client()
         response = client.post(
-            "/examples/secret-store/create/",
+            "/examples/secret-store/create",
             data={
                 "name": "minimal",
                 "api_key": "sk-test",

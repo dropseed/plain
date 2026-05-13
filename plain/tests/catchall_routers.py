@@ -24,11 +24,6 @@ class CatchallRouter(Router):
     ]
 
 
-class SlashedCatchallRouter(Router):
-    namespace = ""
-    urls = [path("<path:_>/", _NotFoundView, name="catchall-slashed")]
-
-
 class _CatchallOnlyRouter(Router):
     namespace = ""
     urls = [path("<path:_>", _NotFoundView)]

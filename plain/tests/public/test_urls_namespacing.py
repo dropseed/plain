@@ -19,12 +19,15 @@ from plain.urls.resolvers import _get_cached_resolver
 @pytest.fixture
 def boundary_resolver():
     original = settings.URLS_ROUTER
+    original_ts = settings.URLS_TRAILING_SLASH
     settings.URLS_ROUTER = "boundary_routers.BoundaryRouter"
+    settings.URLS_TRAILING_SLASH = True
     _get_cached_resolver.cache_clear()
     try:
         yield get_resolver()
     finally:
         settings.URLS_ROUTER = original
+        settings.URLS_TRAILING_SLASH = original_ts
         _get_cached_resolver.cache_clear()
 
 

@@ -124,8 +124,10 @@ class OpenAPISchemaGenerator:
 
     def path_from_url_pattern(self, url_pattern: URLPattern, root_path: str) -> str:
         path = root_path + url_pattern.raw_route
+        if url_pattern.trailing_slash and url_pattern.raw_route:
+            path += "/"
 
-        for name, converter in url_pattern.route.converters.items():
+        for name, converter in url_pattern.converters.items():
             # Handle both `<type:name>` and the `<name>` shorthand for the default `str` converter.
             path = path.replace(f"<{converter.keyword}:{name}>", f"{{{name}}}")
             path = path.replace(f"<{name}>", f"{{{name}}}")
@@ -266,7 +268,7 @@ class OpenAPISchemaGenerator:
         parameters = []
 
         for url_pattern in url_patterns:
-            for name, converter in url_pattern.route.converters.items():
+            for name, converter in url_pattern.converters.items():
                 parameters.append(
                     {
                         "name": name,

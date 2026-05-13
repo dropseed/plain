@@ -3,13 +3,16 @@
 Internal because these tests cover implementation surface — how route
 strings are normalized inside the constructors before becoming routes.
 
-- `include()` strips leading slashes (no scheme-relative URL hazard) but
-  preserves the trailing slash as the canonical-form signal for the
-  include's index URL. The separator between prefix and child segments
-  is enforced structurally by segment-based matching, not by string
-  manipulation, so `/adminhome` collisions are impossible regardless of
-  the user's trailing slash choice.
-- `path()` strips leading slashes; trailing slash is meaningful.
+Both `include()` and `path()` strip leading and trailing slashes from
+the route string; slashes carry no per-route signal. The separator
+between an include's prefix and its child segments is enforced
+structurally by segment-based matching (not by string concatenation),
+so `/adminhome` collisions are impossible regardless of how the user
+spells the route.
+
+The `boundary_client` fixture installs `URLS_TRAILING_SLASH=True` so
+the slashed routes in `boundary_routers.py` keep their canonical
+slashed form.
 """
 
 from __future__ import annotations
@@ -38,8 +41,9 @@ def test_canonical_include_nested_with_param(boundary_client):
 
 def test_include_without_trailing_slash_resolves(boundary_client):
     """`include("admin-boundary", ...)` — no-slash include still resolves
-    its slashed children correctly. The child's own slash flag wins (it
-    has segments of its own), so `/admin-boundary/home/` matches.
+    its slashed children correctly. Include slash is irrelevant — the
+    child route's own slash form (set by `URLS_TRAILING_SLASH=True` in
+    this fixture) drives the canonical URL.
     """
     response = boundary_client.get("/admin-boundary/home/")
     assert response.status_code == 200

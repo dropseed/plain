@@ -20,54 +20,46 @@ from plain.urls.segments import (
 
 
 def test_empty_route_has_no_segments():
-    route = _route_to_segments("")
-    assert route.segments == ()
-    assert route.trailing_slash is False
+    """Empty route → no segments (the `path("", ...)` index case)."""
+    assert _route_to_segments("") == ()
 
 
 def test_root_slash_only_route():
-    """`path("/")` is normalized to `path("")` by `path()` before parsing,
-    but parsing a literal `/` directly still produces empty segments with
-    trailing_slash=True (the root case is irrelevant in practice)."""
-    route = _route_to_segments("/")
-    assert route.segments == ()
-    assert route.trailing_slash is True
+    """A literal `/` parses the same as an empty route — slashes carry no
+    signal in the new model, the trailing slash is stripped silently."""
+    assert _route_to_segments("/") == ()
 
 
-def test_single_literal_segment_no_trailing_slash():
-    route = _route_to_segments("users")
-    assert route.segments == (Literal(value="users"),)
-    assert route.trailing_slash is False
-
-
-def test_single_literal_segment_with_trailing_slash():
-    route = _route_to_segments("users/")
-    assert route.segments == (Literal(value="users"),)
-    assert route.trailing_slash is True
+def test_single_literal_segment_strips_slash():
+    """Trailing slash on the route string is stripped silently."""
+    assert _route_to_segments("users") == (Literal(value="users"),)
+    assert _route_to_segments("users/") == (Literal(value="users"),)
 
 
 def test_int_converter_segment():
-    route = _route_to_segments("users/<int:id>/")
-    assert route.segments == (Literal(value="users"), Capture(name="id", converter=INT))
-    assert route.trailing_slash is True
+    """`users/<int:id>/` parses to literal + int capture."""
+    assert _route_to_segments("users/<int:id>/") == (
+        Literal(value="users"),
+        Capture(name="id", converter=INT),
+    )
 
 
 def test_default_converter_is_str():
     """`<name>` without an explicit converter defaults to `str`."""
-    route = _route_to_segments("users/<name>/")
-    assert route.segments[1] == Capture(name="name", converter=STR)
+    segments = _route_to_segments("users/<name>/")
+    assert segments[1] == Capture(name="name", converter=STR)
 
 
 def test_uuid_converter_segment():
-    route = _route_to_segments("items/<uuid:id>/")
-    assert route.segments[1] == Capture(name="id", converter=UUID)
+    segments = _route_to_segments("items/<uuid:id>/")
+    assert segments[1] == Capture(name="id", converter=UUID)
 
 
 def test_path_converter_is_multi_segment():
     """`<path:rest>` parses as a `Capture` whose converter is multi-segment —
     the segment consumes all remaining path components."""
-    route = _route_to_segments("docs/<path:rest>")
-    cap = route.segments[1]
+    segments = _route_to_segments("docs/<path:rest>")
+    cap = segments[1]
     assert isinstance(cap, Capture)
     assert cap == Capture(name="rest", converter=PATH)
     assert cap.converter.multi_segment is True
@@ -107,9 +99,9 @@ def test_mixed_segment_parses_as_pattern():
     """
     from plain.urls.segments import Pattern
 
-    route = _route_to_segments("items/prefix-<int:id>")
-    assert isinstance(route.segments[1], Pattern)
-    assert route.segments[1].parts == (
+    segments = _route_to_segments("items/prefix-<int:id>")
+    assert isinstance(segments[1], Pattern)
+    assert segments[1].parts == (
         Literal(value="prefix-"),
         Capture(name="id", converter=INT),
     )
@@ -119,8 +111,8 @@ def test_suffix_capture_parses_as_pattern():
     """`<slug:slug>.js` — capture followed by literal suffix is the common case."""
     from plain.urls.segments import Pattern
 
-    route = _route_to_segments("form/<slug:form_slug>.js")
-    assert isinstance(route.segments[1], Pattern)
+    segments = _route_to_segments("form/<slug:form_slug>.js")
+    assert isinstance(segments[1], Pattern)
 
 
 def test_multi_segment_capture_cannot_mix_with_literal():
@@ -132,19 +124,10 @@ def test_multi_segment_capture_cannot_mix_with_literal():
         _route_to_segments("docs/<path:rest>.js")
 
 
-def test_route_converters_accessor():
-    route = _route_to_segments("users/<int:id>/posts/<slug:title>")
-    converters = route.converters
-    assert set(converters) == {"id", "title"}
-    assert converters["id"] is INT
-
-
 def test_include_prefix_parses_same_as_endpoint():
-    """Include prefixes use the same parser; trailing_slash is captured
-    but ignored by the matcher (include() always normalizes to `prefix/`)."""
-    route = _route_to_segments("admin/")
-    assert route.segments == (Literal(value="admin"),)
-    assert route.trailing_slash is True
+    """Include prefixes use the same parser; the trailing slash on the
+    string is stripped silently (slashes aren't a per-route signal)."""
+    assert _route_to_segments("admin/") == (Literal(value="admin"),)
 
 
 def test_consecutive_slashes_are_rejected():

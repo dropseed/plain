@@ -1,8 +1,10 @@
 """Contract tests for catchall route semantics.
 
-`path("<path:NAME>")` (sole-segment terminal `<path:>`, no slash) is a
-catchall: slash-agnostic, yields to sibling SlashMismatch, loses to
-specific matches. The slashed form `path("<path:_>/")` is not.
+A catchall is structurally a sole-segment terminal multi-segment
+Capture (`path("<path:NAME>")`). Catchalls are slash-agnostic at match
+time, yield to sibling `SlashMismatch`, and lose to specific matches.
+The slash on the route string is irrelevant — `path("<path:_>/")` and
+`path("<path:_>")` produce the same catchall route.
 """
 
 from __future__ import annotations
@@ -44,15 +46,6 @@ def test_catchall_does_not_match_root(catchall_client):
     response = catchall_client.get("/")
     assert response.status_code == 404
     assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-
-
-def test_slashed_catchall_is_not_a_catchall(slashed_catchall_client):
-    response = slashed_catchall_client.get("/missing")
-    assert response.status_code == 308
-    assert response.headers["Location"] == "/missing/"
-
-    response = slashed_catchall_client.get("/missing/")
-    assert response.status_code == 404
 
 
 def test_catchall_inside_include_still_yields_to_outer_slash_mismatch(

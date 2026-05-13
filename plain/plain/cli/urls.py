@@ -16,6 +16,7 @@ def list_urls(flat: bool) -> None:
     """List all URL patterns"""
     from plain.runtime import settings
     from plain.urls import URLPattern, URLResolver, get_resolver
+    from plain.urls.segments import Segment, _route_str
 
     if not settings.URLS_ROUTER:
         raise click.UsageError("URLS_ROUTER is not set")
@@ -25,22 +26,28 @@ def list_urls(flat: bool) -> None:
 
         def flat_list(
             patterns: list[URLPattern | URLResolver],
-            prefix: str = "",
+            prefix_segments: tuple[Segment, ...] = (),
             curr_ns: str = "",
         ) -> Iterator[str]:
             for pattern in patterns:
-                full_pattern = f"{prefix}{pattern.raw_route}"
                 if isinstance(pattern, URLResolver):
-                    # Update current namespace
                     new_ns = (
                         f"{curr_ns}:{pattern.namespace}"
                         if curr_ns and pattern.namespace
                         else (pattern.namespace or curr_ns)
                     )
                     yield from flat_list(
-                        pattern.url_patterns, prefix=full_pattern, curr_ns=new_ns
+                        pattern.url_patterns,
+                        prefix_segments=prefix_segments + pattern.segments,
+                        curr_ns=new_ns,
                     )
                 else:
+                    full_segments = prefix_segments + pattern.segments
+                    # Root URL (`path("")` at top level) has no slash variant.
+                    if not full_segments:
+                        full_pattern = "/"
+                    else:
+                        full_pattern = _route_str(full_segments, pattern.trailing_slash)
                     if pattern.name:
                         if curr_ns:
                             styled_namespace = click.style(f"{curr_ns}:", fg="yellow")
@@ -67,7 +74,15 @@ def list_urls(flat: bool) -> None:
                 is_last = idx == (count - 1)
                 connector = "└── " if is_last else "├── "
                 styled_connector = click.style(connector)
-                styled_pattern = click.style(pattern.raw_route)
+                # Show the endpoint's own canonical slash so the tree
+                # reflects what `resolve()`/`reverse()` actually produce.
+                # Includes show their bare prefix — the tree's hierarchy
+                # already implies the separator to children.
+                if isinstance(pattern, URLPattern) and pattern.trailing_slash:
+                    label = f"{pattern.raw_route}/"
+                else:
+                    label = pattern.raw_route
+                styled_pattern = click.style(label)
                 if isinstance(pattern, URLResolver):
                     if pattern.namespace:
                         new_ns = (

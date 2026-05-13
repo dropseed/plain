@@ -1,8 +1,11 @@
 """Segment-based route representation and matcher.
 
-Routes are parsed into ordered tuples of `Literal | Capture` segments.
-`_walk_segments` walks a route's segments against a request's path
-segments (produced by `paths._parse_path`), capturing converter values.
+Routes are parsed into ordered tuples of `Literal | Capture | Pattern`
+segments. `_walk_segments` walks a route's segments against a request's
+path segments (produced by `paths._parse_path`), capturing converter
+values. Trailing-slash semantics live on `URLPattern` (driven by the
+`URLS_TRAILING_SLASH` setting + `force_trailing_slash` override) and
+don't appear in the segment chain itself.
 
 Converters still expose a `regex` attribute, which is used to validate
 the *value* within a single segment — not as a slice of the URL.
@@ -66,24 +69,6 @@ class Pattern:
 Segment = Literal | Capture | Pattern
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class Route:
-    """Parsed route from `path()` or `include()`.
-
-    `trailing_slash` is meaningful for endpoints (from `path()`); for
-    include prefixes it always describes whether there's a separator
-    before the child segments and is enforced by the parser/constructor.
-    """
-
-    segments: tuple[Segment, ...]
-    trailing_slash: bool
-
-    @property
-    def converters(self) -> dict[str, Converter]:
-        """Names → converter for every capture, including those inside Patterns."""
-        return {cap.name: cap.converter for cap in _captures_in(self.segments)}
-
-
 def _captures_in(segments: tuple[Segment, ...]) -> Iterator[Capture]:
     """Yield every `Capture` in a segment chain, descending into Patterns."""
     for seg in segments:
@@ -95,37 +80,25 @@ def _captures_in(segments: tuple[Segment, ...]) -> Iterator[Capture]:
                     yield part
 
 
-def _effective_trailing_slash(
-    endpoint_segments: tuple[Segment, ...],
-    endpoint_trailing_slash: bool,
-    ancestor_trailing_slash: bool,
-) -> bool:
-    """Whether the canonical URL for this match ends with `/`.
-
-    Rule: if the endpoint contributed any segments of its own, its
-    trailing-slash flag wins. Otherwise (e.g. `path("")` inside
-    `include("admin/", ...)`), inherit the ancestor's flag — so the
-    canonical URL is the include's `/admin/`, not the endpoint's `/admin`.
-    Applies at match time (`URLPattern.resolve`), at `reverse()` build
-    time, and at lookup-table merge time (`_collect_resolver`).
-    """
-    return endpoint_trailing_slash if endpoint_segments else ancestor_trailing_slash
-
-
 _PATH_PARAMETER_COMPONENT_RE = _lazy_re_compile(
     r"<(?:(?P<converter>[^>:]+):)?(?P<parameter>[^>]+)>"
 )
 
 
-def _route_to_segments(route: str) -> Route:
-    """Parse a route string into a `Route`.
+def _route_to_segments(route: str) -> tuple[Segment, ...]:
+    """Parse a route string into a tuple of segments.
+
+    The route's body is the part between (optional) leading and trailing
+    slashes — slashes are stripped silently. Whether the resolved route
+    has a trailing slash is decided per-endpoint by `URLPattern`, not
+    here, since the answer depends on `settings.URLS_TRAILING_SLASH`
+    and the endpoint's `force_trailing_slash` override.
 
     Examples:
-        `users/<int:id>/` → segments=(Literal("users"), Capture("id", INT)),
-                            trailing_slash=True
-        `admin` (include prefix) → segments=(Literal("admin"),), trailing_slash=False
-        `<path:rest>` → segments=(Capture("rest", PATH),), trailing_slash=False
-        `""` (root) → segments=(), trailing_slash=False
+        `users/<int:id>/` → (Literal("users"), Capture("id", INT))
+        `admin`           → (Literal("admin"),)
+        `<path:rest>`     → (Capture("rest", PATH),)
+        `""`              → ()
     """
     original_route = route
 
@@ -136,12 +109,11 @@ def _route_to_segments(route: str) -> Route:
             "fragment in URLs and can't appear in route patterns."
         )
 
-    trailing_slash = route.endswith("/")
-    if trailing_slash:
+    if route.endswith("/"):
         route = route[:-1]
 
     if route == "":
-        return Route(segments=(), trailing_slash=trailing_slash)
+        return ()
 
     segments: list[Segment] = [
         _parse_segment(raw, original_route) for raw in route.split("/")
@@ -169,7 +141,34 @@ def _route_to_segments(route: str) -> Route:
             )
         seen_names.add(cap.name)
 
-    return Route(segments=tuple(segments), trailing_slash=trailing_slash)
+    return tuple(segments)
+
+
+def _route_str(segments: tuple[Segment, ...], trailing_slash: bool) -> str:
+    """Render a segment chain as a route string for telemetry (span attributes).
+
+    Literals appear verbatim; captures appear as `<keyword:name>` so the
+    span value is stable across requests with different captured values.
+    Pattern segments render their parts inline.
+    """
+    body = "/".join(_route_str_segment(seg) for seg in segments)
+    if trailing_slash and body:
+        body += "/"
+    return body
+
+
+def _route_str_segment(seg: Segment) -> str:
+    if isinstance(seg, Literal):
+        return seg.value
+    if isinstance(seg, Capture):
+        return f"<{seg.converter.keyword}:{seg.name}>"
+    # Pattern
+    return "".join(
+        part.value
+        if isinstance(part, Literal)
+        else f"<{part.converter.keyword}:{part.name}>"
+        for part in seg.parts
+    )
 
 
 def _parse_segment(raw: str, original_route: str) -> Segment:

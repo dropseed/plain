@@ -92,10 +92,10 @@ class StreamingDBQueryView(View):
 class TestRouter(Router):
     namespace = ""
     urls = [
-        path("db-query/", DBQueryView, name="db_query"),
-        path("async-db-query/", AsyncDBQueryView, name="async_db_query"),
-        path("sse-db-query/", DBQuerySSEView, name="sse_db_query"),
-        path("streaming-db-query/", StreamingDBQueryView, name="streaming_db_query"),
+        path("db-query", DBQueryView, name="db_query"),
+        path("async-db-query", AsyncDBQueryView, name="async_db_query"),
+        path("sse-db-query", DBQuerySSEView, name="sse_db_query"),
+        path("streaming-db-query", StreamingDBQueryView, name="streaming_db_query"),
     ]
 
 
@@ -192,7 +192,7 @@ class TestConnectionLifecycle:
 
         with _patched_init_counter() as count:
             client = _fresh_client()
-            response = client.get("/db-query/")
+            response = client.get("/db-query")
 
         assert response.status_code == 200
         assert response.content == b"1"
@@ -205,14 +205,14 @@ class TestConnectionLifecycle:
         with _patched_init_counter() as count:
             client = _fresh_client()
 
-            response1 = client.get("/db-query/")
+            response1 = client.get("/db-query")
             assert response1.status_code == 200
             first_conn_id = id(_db_conn.get())
 
-            response2 = client.get("/db-query/")
+            response2 = client.get("/db-query")
             assert response2.status_code == 200
 
-            response3 = client.get("/db-query/")
+            response3 = client.get("/db-query")
             assert response3.status_code == 200
 
         assert count[0] == 1, f"Expected 1 connection for 3 requests, got {count[0]}"
@@ -235,7 +235,7 @@ class TestConnectionLifecycle:
         with _patched_init_counter() as count:
             client = _fresh_client()
 
-            response1 = client.get("/db-query/")
+            response1 = client.get("/db-query")
             assert response1.status_code == 200
 
             # Wrapper persists; inner connection was returned to the pool.
@@ -246,7 +246,7 @@ class TestConnectionLifecycle:
             )
 
             # Second request: same wrapper, checks out a connection, returns it.
-            response2 = client.get("/db-query/")
+            response2 = client.get("/db-query")
             assert response2.status_code == 200
             assert conn is _db_conn.get()
 
@@ -265,7 +265,7 @@ class TestConnectionLifecycle:
         ] + original
         try:
             client = _fresh_client()
-            response = client.get("/db-query/")
+            response = client.get("/db-query")
             assert response.status_code == 200
 
             assert len(_tracking_seen) == 1
@@ -286,7 +286,7 @@ class TestAsyncViewConnectionLifecycle:
         """
         with _patched_init_counter() as count:
             client = _fresh_client()
-            response = client.get("/async-db-query/")
+            response = client.get("/async-db-query")
 
         assert response.status_code == 200
         assert response.content == b"1"
@@ -302,7 +302,7 @@ class TestAsyncViewConnectionLifecycle:
         """
         with _patched_init_counter() as count:
             client = _fresh_client()
-            response = client.get("/sse-db-query/")
+            response = client.get("/sse-db-query")
 
         assert response.status_code == 200
         assert "text/event-stream" in response.headers["Content-Type"]
@@ -349,7 +349,7 @@ class TestStreamingResponseCleanup:
             ):
                 handler = BaseHandler()
                 handler.load_middleware()
-                request = RequestFactory().get("/streaming-db-query/")
+                request = RequestFactory().get("/streaming-db-query")
 
                 async def run() -> Response:
                     with concurrent.futures.ThreadPoolExecutor(

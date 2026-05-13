@@ -41,7 +41,7 @@ def test_single_backend(db, settings):
 
     client = Client()
 
-    response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
+    response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
     assert response.status_code == 302
     assert response.url == "/"
 
@@ -64,7 +64,7 @@ def test_multiple_backends(db, settings):
 
     client = Client()
 
-    response = client.get("/oauth/dummy/callback/?code=test_code&state=dummy_state")
+    response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
     assert response.status_code == 302
     assert response.url == "/"
 
