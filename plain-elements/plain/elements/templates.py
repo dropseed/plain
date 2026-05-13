@@ -29,7 +29,7 @@ def Element(ctx: Context, _element_name: str, **kwargs: Any) -> SafeString:
         **kwargs,
     }
 
-    # Prefer a .plain.html element if plain.html is installed and a matching
+    # Prefer a plain.html element if plain.html is installed and a matching
     # template exists on disk — this is what lets `<admin.X>` element tags in
     # Jinja templates transparently pick up plain.html ports during migration.
     try:

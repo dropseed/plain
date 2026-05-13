@@ -21,19 +21,19 @@ from plain.urls import Router, include, path
 
 
 class LoginView(PasswordLoginView):
-    template_name = "login.plain.html"
+    template_name = "login.html"
 
 
 class SSEDemoView(TemplateView):
-    template_name = "sse.plain.html"
+    template_name = "sse.html"
 
 
 class IndexView(TemplateView):
-    template_name = "index.plain.html"
+    template_name = "index.html"
 
 
 class ErrorView(TemplateView):
-    template_name = "index.plain.html"
+    template_name = "index.html"
 
     def get(self) -> NoReturn:
         text = "This is a test exception to demonstrate the toolbar"

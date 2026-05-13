@@ -20,27 +20,19 @@ class TemplateFileMissing(Exception):
 
 
 class Template:
-    """Render either a `plain.html` `.plain.html` template or a Jinja `.html` template.
+    """Render either a plain.html template or a Jinja template, picking based
+    on disk presence.
 
-    Resolution order:
-      1. If the filename ends in `.plain.html`, route to plain.html.
-      2. If the filename ends in `.html`, first look for a same-named
-         `.plain.html` on disk — if present, route there (so migrating a
-         single template from .html to .plain.html doesn't require updating
-         every caller).
-      3. Otherwise fall back to the Jinja environment.
+    Resolution order: for any `.html` name, check whether plain.html can
+    resolve it (via its `html/` discovery, with a transitional fallback to
+    `.plain.html` under `templates/`). If yes, render through plain.html.
+    Otherwise fall back to the Jinja environment.
     """
 
     def __init__(self, filename: str) -> None:
         self.filename = filename
         self._plain_path: Path | None = None
         self._jinja_template = None
-
-        if filename.endswith(".plain.html"):
-            self._plain_path = self._find_plain(filename.removesuffix(".plain.html"))
-            if self._plain_path is None:
-                raise TemplateFileMissing(filename)
-            return
 
         if filename.endswith(".html"):
             plain_path = self._find_plain(filename.removesuffix(".html"))

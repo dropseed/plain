@@ -83,7 +83,7 @@ def _get_trace_stats(observer: Observer) -> dict[str, Any] | None:
 @register_toolbar_item
 class ObserverToolbarItem(ToolbarItem):
     name = "Observer"
-    panel_template_name = "toolbar/observer.plain.html"
+    panel_template_name = "toolbar/observer.html"
     button_template_name = "toolbar/observer_button.html"
 
     @cached_property
