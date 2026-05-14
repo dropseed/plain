@@ -9,6 +9,8 @@ import click
 from plain.cli import register_cli
 from plain.cli.print import print_event
 
+from . import _cache
+from .compiler import CompileError, CompileSession, clear_process_cache
 from .format import format_source
 from .frontmatter import split as split_frontmatter
 from .loader import get_html_dirs
@@ -294,6 +296,70 @@ def format_cmd(
             sys.exit(1)
     elif not changed:
         click.secho("All templates already formatted", fg="green")
+
+
+@cli.command(name="compile")
+@click.argument("paths", nargs=-1)
+@click.option(
+    "--include-installed-packages",
+    "include_installed_packages",
+    is_flag=True,
+    hidden=True,
+    help=(
+        "Also compile templates shipped by installed Plain packages. "
+        "For framework / package development only."
+    ),
+)
+def compile_cmd(paths: tuple[str, ...], include_installed_packages: bool) -> None:
+    """Pre-compile .html templates into the on-disk cache
+
+    Warms `<project>/.plain/html/` (or `$PLAIN_HTML_CACHE_DIR`) so the
+    first render of each template in production doesn't pay codegen
+    cost. Run during deploy after templates are in place.
+    """
+    files = _collect_files(
+        _paths_to_paths(paths),
+        include_installed_packages=include_installed_packages,
+    )
+    if not files:
+        click.secho("No .html templates found", fg="yellow")
+        return
+
+    cache_dir = _cache.cache_root()
+    if cache_dir is None:
+        click.secho(
+            "Cache is disabled (PLAIN_HTML_CACHE_DIR is empty). "
+            "Set the env var or unset it to use the default location.",
+            fg="red",
+            err=True,
+        )
+        sys.exit(2)
+
+    print_event(f"Compiling {len(files)} template(s) to {cache_dir}...")
+
+    # Don't share the in-memory process cache across runs of this command —
+    # we want every template to write its disk file even if a previous
+    # invocation populated the in-memory cache for it.
+    clear_process_cache()
+
+    ok = 0
+    skipped: list[tuple[Path, Exception]] = []
+    for path in files:
+        try:
+            CompileSession(use_disk_cache=True).compile_path(path)
+            ok += 1
+        except (CompileError, ParseError, TokenizeError) as e:
+            skipped.append((path, e))
+
+    for path, exc in skipped:
+        click.echo(f"{path}: skipped — {exc}", err=True)
+
+    click.secho(
+        f"\n{ok} compiled, {len(skipped)} skipped",
+        fg="green" if not skipped else "yellow",
+    )
+    if skipped:
+        sys.exit(1)
 
 
 def _format_stdin(*, check_only: bool) -> None:

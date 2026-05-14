@@ -15,11 +15,18 @@ from __future__ import annotations
 
 import types
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from plain.html import render_source
-from plain.html.compiler import CompileError, compile_path, compile_source
+from plain.html.compiler import (
+    CompileError,
+    CompileSession,
+    clear_process_cache,
+    compile_path,
+    compile_source,
+)
 from plain.html.engine import render as engine_render
 
 
@@ -575,13 +582,76 @@ def test_include_cycle_detected(tmp_path):
         compile_path(paths["A"])
 
 
-def test_dynamic_include_raises(tmp_path):
+def test_process_cache_returns_same_function(tmp_path):
+    from plain.html.compiler import clear_process_cache
+
+    clear_process_cache()
+    paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
+    first = compile_path(paths["x"])
+    second = compile_path(paths["x"])
+    # Same identity → second call hit the process cache.
+    assert first is second
+
+
+def test_dynamic_include_basic(tmp_path):
     paths = _write_templates(
         tmp_path,
-        {"parent": "<template :include={path} />"},
+        {
+            "parent": "<template :include={component} />",
+            "card": "<p>card body</p>",
+            "alert": "<div>alert!</div>",
+        },
     )
-    with pytest.raises(CompileError, match="dynamic"):
-        compile_path(paths["parent"])
+    render = compile_path(paths["parent"])
+    assert render(component="./card") == "<p>card body</p>"
+    # Same parent module, different runtime target — dispatch works.
+    assert render(component="./alert") == "<div>alert!</div>"
+
+
+def test_dynamic_include_with_attrs(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": "<template :include={component} title={t} />",
+            "card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
+        },
+    )
+    render = compile_path(paths["parent"])
+    assert render(component="./card", t="Hi") == "<h1>Hi</h1>"
+
+
+def test_dynamic_include_with_default_slot(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": "<template :include={component}><p>body</p></template>",
+            "card": ("---\nslots:\n  default: Markup\n---\n<div>{children}</div>"),
+        },
+    )
+    assert compile_path(paths["parent"])(component="./card") == (
+        "<div><p>body</p></div>"
+    )
+
+
+def test_dynamic_include_inside_for(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": (
+                "<template :for={item in items} "
+                ':include={item["type"]} text={item["text"]} />'
+            ),
+            "card": "---\nattrs:\n  text: str\n---\n<p>{text}</p>",
+            "alert": "---\nattrs:\n  text: str\n---\n<b>{text}</b>",
+        },
+    )
+    render = compile_path(paths["parent"])
+    items = [
+        {"type": "./card", "text": "one"},
+        {"type": "./alert", "text": "two"},
+        {"type": "./card", "text": "three"},
+    ]
+    assert render(items=items) == "<p>one</p><b>two</b><p>three</p>"
 
 
 def test_compile_source_rejects_static_include():
@@ -589,6 +659,91 @@ def test_compile_source_rejects_static_include():
     # resolved. Tells the caller to use compile_path() instead.
     with pytest.raises(CompileError):
         compile_source('<template :include="x"></template>')
+
+
+# --- disk cache --------------------------------------------------------------
+
+
+def _compile_with_disk_cache(path: Path) -> Any:
+    """Compile via a fresh session that uses the disk cache, bypassing the
+    process-wide in-memory cache so the cache write/load paths get exercised.
+    """
+    clear_process_cache()
+    return CompileSession(use_disk_cache=True).compile_path(path)
+
+
+def test_disk_cache_writes_file(tmp_path, monkeypatch):
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", str(cache_dir))
+    paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
+    _compile_with_disk_cache(paths["x"])
+    cached = list(cache_dir.glob("*__x.html.py"))
+    assert len(cached) == 1
+    assert "def render" in cached[0].read_text()
+
+
+def test_disk_cache_hit_skips_codegen(tmp_path, monkeypatch):
+    # Source unchanged → same cache key → second compile should pull from
+    # disk without re-running codegen. Verify by tampering with the cache
+    # file directly: if the cache is consulted, the tamper shows up in
+    # output; if codegen runs again, the original source wins.
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", str(cache_dir))
+    paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
+    _compile_with_disk_cache(paths["x"])
+    cached = next(iter(cache_dir.glob("*__x.html.py")))
+    cached.write_text(cached.read_text().replace("hi", "TAMPERED"))
+    r = _compile_with_disk_cache(paths["x"])
+    assert r() == "<p>TAMPERED</p>"
+
+
+def test_disk_cache_invalidates_on_source_change(tmp_path, monkeypatch):
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", str(cache_dir))
+    paths = _write_templates(tmp_path, {"x": "<p>{name}</p>"})
+    r1 = _compile_with_disk_cache(paths["x"])
+    assert r1(name="Dave") == "<p>Dave</p>"
+    # Same path, different *content* — the source hash flips, so a new
+    # cache file is written; the old one stays (no GC in this phase) but
+    # the new render reflects the new source.
+    paths["x"].write_text("<b>{name}</b>")
+    r2 = _compile_with_disk_cache(paths["x"])
+    assert r2(name="Dave") == "<b>Dave</b>"
+
+
+def test_disk_cache_invalidates_transitively(tmp_path, monkeypatch):
+    # Modify the LEAF (`child`) and confirm the PARENT recompiles. The
+    # parent's source is unchanged but its cache key folds in the child's
+    # key, so editing the child shifts both keys upward.
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", str(cache_dir))
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": '<template :include="./child" />',
+            "child": "<p>v1</p>",
+        },
+    )
+    assert _compile_with_disk_cache(paths["parent"])() == "<p>v1</p>"
+    parent_files_v1 = list(cache_dir.glob("*__parent.html.py"))
+
+    paths["child"].write_text("<p>v2</p>")
+    assert _compile_with_disk_cache(paths["parent"])() == "<p>v2</p>"
+    parent_files_v2 = list(cache_dir.glob("*__parent.html.py"))
+
+    # The parent has a NEW cache file (different key); the old one
+    # stays around (no GC yet).
+    assert len(parent_files_v2) > len(parent_files_v1)
+
+
+def test_disk_cache_disabled_when_env_empty(tmp_path, monkeypatch):
+    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", "")
+    paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
+    clear_process_cache()
+    # With cache dir disabled, compile still works — just no on-disk artifact.
+    CompileSession(use_disk_cache=True).compile_path(paths["x"])
+    # Nothing was written anywhere we could check, but the compile completed,
+    # which is what we wanted.
 
 
 # --- :include parity with interpreter ----------------------------------------

@@ -29,12 +29,14 @@ from __future__ import annotations
 import ast
 import builtins as _builtins_module
 import keyword
+import threading
 import types
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from . import _cache
 from . import frontmatter as fm
 from .loader import find_template
 from .parser import (
@@ -215,58 +217,121 @@ def compile_path(
 # --- CompileSession ---------------------------------------------------------
 
 
-class CompileSession:
-    """Caches compiled templates within one build pass.
-
-    Walks the `:include` graph depth-first: a parent is compiled only
-    after every leaf it depends on has its own compiled module ready.
-    Each compiled `render` is injected into the parent's module globals
-    as `_inc_0`, `_inc_1`, … before the parent module is exec'd.
-
-    A session is single-use and not thread-safe. For long-lived
-    rendering, build a session once at startup and call `compile_path`
-    on each entry-point template; cached results survive subsequent
-    calls within the same session.
+@dataclass
+class _CompiledEntry:
+    """One process-cache slot: the callable + the cache key that
+    produced it. The key is what a parent uses to compute its own key
+    (so an edit anywhere in the include graph invalidates upward).
     """
 
-    def __init__(self, *, resolver: PathResolver | None = None) -> None:
+    render: Callable[..., str]
+    key: str
+
+
+# Process-wide compiled-template cache. Shared across CompileSessions so a
+# template reached via the dynamic `:include={expr}` resolver at render time
+# can hit a module that was already compiled by a startup pass. The lock is
+# coarse — under contention multiple threads may compile the same template
+# concurrently; whoever finishes first wins the cache slot, the others' work
+# is discarded. Acceptable: compile output is deterministic, the loss is
+# only the extra compile cycles.
+_PROCESS_CACHE: dict[Path, _CompiledEntry] = {}
+_PROCESS_LOCK = threading.Lock()
+
+
+def _process_cache_get(path: Path) -> _CompiledEntry | None:
+    with _PROCESS_LOCK:
+        return _PROCESS_CACHE.get(path)
+
+
+def _process_cache_set(path: Path, entry: _CompiledEntry) -> None:
+    with _PROCESS_LOCK:
+        _PROCESS_CACHE[path] = entry
+
+
+def clear_process_cache() -> None:
+    """Empty the process-wide compiled-template cache.
+
+    Mostly useful in tests; production callers don't need this — disk
+    cache invalidation happens via cache-key changes, not by clearing.
+    """
+    with _PROCESS_LOCK:
+        _PROCESS_CACHE.clear()
+
+
+def get_or_compile(path: Path) -> Callable[..., str]:
+    """Return a compiled `render` for `path`, hitting the process cache
+    if available. Used by the dynamic `:include={expr}` resolver so
+    runtime-resolved targets share cache with startup-compiled ones.
+
+    Defaults to disk caching ON — at render time we want compile cost
+    paid only once across processes, not on every cold start.
+    """
+    path = path.resolve()
+    cached = _process_cache_get(path)
+    if cached is not None:
+        return cached.render
+    return CompileSession(use_disk_cache=True).compile_path(path)
+
+
+class CompileSession:
+    """One compile pass over the `:include` graph.
+
+    Walks depth-first: a parent is compiled only after every leaf it
+    depends on has its own compiled module ready. Each compiled
+    `render` is injected into the parent's module globals as `_inc_0`,
+    `_inc_1`, … before the parent module is exec'd.
+
+    Cycle detection is instance-local (`_in_progress`); the
+    already-compiled cache is process-wide so dynamic includes at
+    render time reuse work from startup.
+    """
+
+    def __init__(
+        self,
+        *,
+        resolver: PathResolver | None = None,
+        use_disk_cache: bool = False,
+    ) -> None:
         self.resolver: PathResolver = resolver or find_template
-        self._compiled: dict[Path, Callable[..., str]] = {}
+        self.use_disk_cache = use_disk_cache
         self._in_progress: set[Path] = set()
 
     def compile_path(self, path: Path) -> Callable[..., str]:
         path = path.resolve()
-        if path in self._compiled:
-            return self._compiled[path]
+        cached = _process_cache_get(path)
+        if cached is not None:
+            return cached.render
         if path in self._in_progress:
             raise CompileError(f"`:include` cycle detected involving {path}")
         self._in_progress.add(path)
         try:
-            render_fn = self._compile_one(path)
+            entry = self._compile_one(path)
         finally:
             self._in_progress.discard(path)
-        self._compiled[path] = render_fn
-        return render_fn
+        _process_cache_set(path, entry)
+        return entry.render
 
-    def _compile_one(self, path: Path) -> Callable[..., str]:
+    def _compile_one(self, path: Path) -> _CompiledEntry:
         source = path.read_text(encoding="utf-8")
         fmdict, body = fm.split(source)
         tokens = tokenize(body)
         tree = parse(tokens)
 
         # Walk the tree, find every literal `:include`, recursively compile its
-        # target, and assign each include site a unique `_inc_N` slot. The
-        # mapping is keyed by `id(node)` so the emitter can find the right
-        # slot during traversal.
+        # target, and assign each include site a unique `_inc_N` slot. Dynamic
+        # `:include={expr}` sites stay unresolved here — they're handled by a
+        # runtime helper that looks up + compiles on demand.
         include_renders: dict[int, str] = {}
         include_funcs: dict[str, Callable[..., str]] = {}
+        child_keys: list[str] = []
         idx = 0
         for inc_node in _walk_includes(tree):
             if inc_node.include_path_code is not None:
-                raise CompileError(
-                    "dynamic `<template :include={expr}>` is not yet supported "
-                    "(deferred to Phase 5e)"
-                )
+                # Dynamic include — resolver runs at render time. Doesn't
+                # contribute to this template's cache key, since the target
+                # is unknowable at compile time.
+                continue
             assert inc_node.include_path is not None
             child_path = self.resolver(inc_node.include_path, current_template=path)
             child_render = self.compile_path(child_path)
@@ -274,8 +339,26 @@ class CompileSession:
             include_renders[id(inc_node)] = slot_name
             include_funcs[slot_name] = child_render
             idx += 1
+            # The child's entry has a key — pick it up so this template's key
+            # transitively reflects child changes.
+            child_entry = _process_cache_get(child_path.resolve())
+            if child_entry is not None:
+                child_keys.append(child_entry.key)
 
-        src = _emit_module(tree, fmdict, str(path), include_renders=include_renders)
+        imports = list(fmdict.get("imports") or [])
+        mtimes = _cache.imports_mtimes(imports) if self.use_disk_cache else {}
+        key = _cache.compute_cache_key(source, child_keys, mtimes)
+
+        cached_file = _cache.cache_file_for(key, path) if self.use_disk_cache else None
+
+        if cached_file is not None and cached_file.exists():
+            # Disk-cache hit: skip codegen, exec the cached `.py` with the
+            # same `_inc_N` injection a fresh compile would have done.
+            src = cached_file.read_text(encoding="utf-8")
+        else:
+            src = _emit_module(tree, fmdict, str(path), include_renders=include_renders)
+            if cached_file is not None:
+                _cache.write_atomic(cached_file, src)
 
         mod = types.ModuleType(f"_plain_html_compiled_{abs(hash(str(path)))}")
         mod.__file__ = str(path)
@@ -284,7 +367,7 @@ class CompileSession:
         mod.__dict__.update(include_funcs)
         code = compile(src, str(path), "exec")
         exec(code, mod.__dict__)
-        return mod.render
+        return _CompiledEntry(render=mod.render, key=key)
 
 
 def _walk_includes(nodes: list[Node]) -> Iterator[ElementNode]:
@@ -341,7 +424,8 @@ def _emit_module(
     header.append(
         "from plain.html._runtime import "
         "escape_html, escape_attr, escape_url, "
-        "render_dyn_attr, render_dyn_url_attr, normalize_keywords"
+        "render_dyn_attr, render_dyn_url_attr, normalize_keywords, "
+        "resolve_dynamic_include as _resolve_dynamic_include"
     )
     header.append(
         "from plain.utils.safestring import "
@@ -489,13 +573,22 @@ def _emit_static_include(node: ElementNode, e: _Emit) -> None:
     child as kwargs, alongside the include's explicit attrs and the
     propagated `_root_ctx`.
     """
-    slot_name_var = e.include_renders.get(id(node))
-    if slot_name_var is None:
-        raise CompileError(
-            "internal: `:include` site missing from compile session — "
-            "this shouldn't happen unless compile_source() was used on a "
-            "template that needs CompileSession"
-        )
+    # Static include sites have a pre-assigned `_inc_N` slot in module globals
+    # populated by the CompileSession; dynamic sites resolve at render time.
+    is_dynamic = node.include_path_code is not None
+    if is_dynamic:
+        dyn_path_expr = e.rewrite_expr(node.include_path_code)  # type: ignore[arg-type]
+        # Each dynamic site needs its own local to hold the resolved render
+        # fn — `id(node)` makes the name unique across nested includes.
+        slot_name_var = f"_inc_dyn_{abs(id(node))}"
+    else:
+        slot_name_var = e.include_renders.get(id(node))
+        if slot_name_var is None:
+            raise CompileError(
+                "internal: `:include` site missing from compile session — "
+                "this shouldn't happen unless compile_source() was used on a "
+                "template that needs CompileSession"
+            )
 
     default_children: list[Node] = []
     named_slots: dict[str, list[Node]] = {}
@@ -539,6 +632,13 @@ def _emit_static_include(node: ElementNode, e: _Emit) -> None:
     parts = ["_root_ctx=_root_ctx", *direct]
     if dict_items:
         parts.append("**{" + ", ".join(dict_items) + "}")
+
+    if is_dynamic:
+        # Resolve the target template once per render of this site, then call.
+        e.line(
+            f"{slot_name_var} = _resolve_dynamic_include("
+            f"{dyn_path_expr}, current_template=__template_source__)"
+        )
     e.line(f"{e.append_name}({slot_name_var}({', '.join(parts)}))")
 
 

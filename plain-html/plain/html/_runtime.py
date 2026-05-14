@@ -117,6 +117,24 @@ def render_dyn_url_attr(name: str, value: object) -> str:
     return f' {name}="{safe}"'
 
 
+def resolve_dynamic_include(name: str, *, current_template: str):
+    """Resolve a `<template :include={expr}>` site at render time.
+
+    Looks the name up via `loader.find_template` (relative to the
+    calling template, matching the static-include resolver), then asks
+    the compiler for a cached compiled `render` function. Imports are
+    deferred to avoid an import cycle — this module is the one every
+    compiled template imports from.
+    """
+    from pathlib import Path
+
+    from .compiler import get_or_compile
+    from .loader import find_template
+
+    target = find_template(name, current_template=Path(current_template))
+    return get_or_compile(target)
+
+
 def normalize_keywords(scope: dict) -> None:
     """Alias Python-keyword-named entries under a trailing-underscore name.
 
