@@ -401,7 +401,10 @@ def _format_attr_value(segments: list[AttrText | AttrExpr]) -> str:
     out: list[str] = []
     for seg in segments:
         if isinstance(seg, AttrText):
-            out.append(seg.text)
+            # Re-encode literal braces — the tokenizer decoded `{{`/`}}` into
+            # single `{`/`}` on the way in, so they need re-escaping on the
+            # way out or the next pass parses them as a live `{...}` expr.
+            out.append(seg.text.replace("{", "{{").replace("}", "}}"))
         else:
             out.append("{" + seg.code + "}")
     return "".join(out)
