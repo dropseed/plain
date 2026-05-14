@@ -55,6 +55,24 @@ def test_format_void_element():
     assert format_source('<img src="x.png">') == '<img src="x.png">\n'
 
 
+def test_format_void_element_drops_self_closing_slash():
+    # Per HTML5 spec, the trailing slash on void elements has no effect.
+    # Canonical form is bare `<img>`; we normalize source's `<img/>` and
+    # `<img />` down to it.
+    assert format_source("<img/>") == "<img>\n"
+    assert format_source("<img />") == "<img>\n"
+    assert format_source("<br/>") == "<br>\n"
+    assert format_source('<input type="text"/>') == '<input type="text">\n'
+
+
+def test_format_non_void_self_closing_preserved():
+    # Non-void elements that the parser saw as self-closing keep the
+    # `/>` form — useful as a "no children" marker for component-style
+    # uses of <template :include="x" />.
+    out = format_source('<template :include="x"/>')
+    assert "/>" in out
+
+
 def test_format_self_closing_template():
     src = '<template :include="layouts/base"></template>'
     out = format_source(src)

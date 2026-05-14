@@ -207,8 +207,14 @@ def _format_inline(node: ElementNode) -> bool:
 def _format_open_tag(
     node: ElementNode, *, indent: int, indent_size: int, width: int
 ) -> str:
+    # Per the HTML5 spec, void elements (img, br, hr, input, …) always
+    # use the bare `<tag>` form. The trailing `/` is "permitted but has
+    # no effect" — a legacy XHTML accommodation we don't emit. Drop the
+    # source's self-closing flag for void tags so output is canonical.
+    self_closing = node.self_closing and node.tag not in VOID_ELEMENTS
+
     attrs = _directive_attrs(node) + [_format_attribute(a) for a in node.attrs]
-    flat = _open_tag_flat(node.tag, attrs, self_closing=node.self_closing)
+    flat = _open_tag_flat(node.tag, attrs, self_closing=self_closing)
 
     if not attrs or indent + len(flat) <= width:
         return flat
@@ -216,7 +222,7 @@ def _format_open_tag(
     return _open_tag_wrapped(
         node.tag,
         attrs,
-        self_closing=node.self_closing,
+        self_closing=self_closing,
         indent=indent,
         indent_size=indent_size,
     )
