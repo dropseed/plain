@@ -12,6 +12,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from plain.runtime import PLAIN_TEMP_PATH
+
 from .. import frontmatter as fm
 from . import cache
 from .backends import Backend, BackendDiagnostic, BackendError, resolve
@@ -108,11 +110,19 @@ def check_source(
 
 
 def _run_backend(backend: Backend, synth: Synthesis) -> list[BackendDiagnostic]:
+    # Write the synth file inside the project tree (under `.plain/`) so the
+    # backend's project / Python-environment discovery picks up the right
+    # pyproject.toml and `.venv`. A tempfile in `/var/folders/...` makes ty
+    # fall back to the system Python and silently degrade resolved types
+    # (`app.tasks.models.Task` → `Unknown` → spurious diagnostics).
+    workdir = PLAIN_TEMP_PATH / "html" / "typecheck-work"
+    workdir.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         mode="w",
         encoding="utf-8",
         suffix=".py",
         prefix="plain_html_typecheck_",
+        dir=workdir,
         delete=False,
     ) as tmp:
         tmp.write(synth.source)

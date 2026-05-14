@@ -2,7 +2,7 @@
 imports:
   - from plain.urls import reverse as url
 attrs:
-  note: Any = None
+  note: app.notes.models.Note
 ---
 <template :include="base">
 <template slot="title">{note.title}</template>

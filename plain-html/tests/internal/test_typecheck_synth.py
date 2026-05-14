@@ -58,10 +58,13 @@ def test_for_directive_opens_scope_for_body_expressions():
 
 
 def test_if_directive_emits_truthiness_check():
+    """`:if` opens a real `if`-block so ty narrows the condition's type
+    within the element body. `<template :if={x}>{x.field}</template>` no
+    longer requires a second guard."""
     decls = _decls(attrs={"show": "bool"})
     body = "<span :if={show}>hi</span>"
     synth = synthesize(body, decls)
-    assert "_ = (show)" in synth.source
+    assert "if (show):" in synth.source
 
 
 def test_dynamic_include_path_typed_as_str():

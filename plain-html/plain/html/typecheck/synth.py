@@ -58,7 +58,7 @@ class Synthesis:
 
 # Bumped whenever the synthesized layout changes — invalidates cached
 # results without the user touching anything else.
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 
 def synthesize(body: str, declarations: Declarations) -> Synthesis:
@@ -180,6 +180,7 @@ class _Builder:
                     regular_attrs.append(attr)
 
         opened_for = False
+        opened_if = False
         if for_clause is not None:
             try:
                 clause = _parse_for_clause(for_clause)
@@ -199,7 +200,17 @@ class _Builder:
             opened_for = True
 
         if if_code is not None:
-            self._emit_expr(if_code, tok.offset, kind="if")
+            # Emit a real `if (cond):` block (rather than a flat
+            # `_ = (cond)`) so ty narrows `cond`'s type within the
+            # element's body — `<template :if={task.project}>` makes
+            # `task.project.name` inside the body checkable without a
+            # second guard.
+            wrapped = self._safe_expr(if_code)
+            self._record_line(tok.offset, "if")
+            self._lines.append(self._ind() + f"if ({wrapped}):")
+            self._indent += 1
+            self._lines.append(self._ind() + "_unused = None")
+            opened_if = True
 
         if include_path_expr is not None:
             # Dynamic `:include={path_expr}` must be str-compatible.
@@ -210,12 +221,14 @@ class _Builder:
         for attr in regular_attrs:
             self._emit_attr_expressions(attr, tok.offset)
 
-        scope = _Scope(opened_for=opened_for, tag=tok.name)
+        scope = _Scope(opened_for=opened_for, opened_if=opened_if, tag=tok.name)
 
         # Self-closing or void tags don't open a child scope.
         from ..tokenizer import VOID_ELEMENTS
 
         if tok.self_closing or tok.name in VOID_ELEMENTS:
+            if scope.opened_if:
+                self._indent -= 1
             if scope.opened_for:
                 self._indent -= 1
             return
@@ -226,6 +239,8 @@ class _Builder:
         if not self._scope_stack:
             return
         scope = self._scope_stack.pop()
+        if scope.opened_if:
+            self._indent -= 1
         if scope.opened_for:
             self._indent -= 1
 
@@ -354,6 +369,7 @@ class _Scope:
     """One element nesting level in the synthesized walk."""
 
     opened_for: bool
+    opened_if: bool
     tag: str
 
 

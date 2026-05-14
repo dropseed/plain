@@ -2,8 +2,8 @@
 imports:
   - from plain.urls import reverse as url
 attrs:
-  form: Any = None
-  task: Any = None
+  form: Any
+  task: app.tasks.models.Task
 ---
 <template :include="base">
 <template slot="title">Edit {task.title}</template>

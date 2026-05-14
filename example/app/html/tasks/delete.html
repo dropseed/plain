@@ -2,7 +2,7 @@
 imports:
   - from plain.urls import reverse as url
 attrs:
-  task: Any = None
+  task: app.tasks.models.Task
 ---
 <template :include="base">
 <template slot="title">Delete {task.title}</template>

@@ -2,10 +2,10 @@
 imports:
   - from plain.urls import reverse as url
 attrs:
-  form: Any = None
-  search_form: Any = None
-  filter_form: Any = None
-  submissions: Any = None
+  form: Any
+  search_form: Any
+  filter_form: Any
+  submissions: list[app.contacts.models.ContactSubmission]
 ---
 <template :include="base">
 <template slot="title">Contact archive</template>

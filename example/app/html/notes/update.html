@@ -2,8 +2,8 @@
 imports:
   - from plain.urls import reverse as url
 attrs:
-  form: Any = None
-  note: Any = None
+  form: Any
+  note: app.notes.models.Note
 ---
 <template :include="base">
 <template slot="title">Edit {note.title}</template>
