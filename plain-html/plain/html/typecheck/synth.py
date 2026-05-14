@@ -185,7 +185,8 @@ class _Builder:
             try:
                 clause = _parse_for_clause(for_clause)
             except Exception:
-                # Phase 8 surfaces this as a structural error; skip here.
+                # Malformed :for clause — `plain html check` surfaces this as
+                # a structural error elsewhere; skip in the type-synth pass.
                 return
             self._emit_typed_expr(
                 clause.iter_code,

@@ -1,11 +1,10 @@
 """Tag tree builder.
 
 Consumes the tokenizer's flat stream and produces a tree of nodes. Lifts
-`:if` / `:for` directive attributes onto their host element so the renderer
-doesn't have to rediscover them.
-
-Out of scope for Phase 0: `:include` resolution, `:as` scoped slot binding,
-slot composition, and full source-position propagation through every error.
+the recognized directive attributes (`:if`, `:for`, `:include`, `slot`)
+onto their host `ElementNode` so the compiler doesn't have to rediscover
+them. Any other `:`-prefixed attribute is kept under
+`reserved_directives` so the formatter can round-trip it.
 """
 
 from __future__ import annotations

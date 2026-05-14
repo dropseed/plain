@@ -1,12 +1,10 @@
 """HTML-aware tokenizer.
 
-Phase 0 scope: emit a flat token stream from a template body string. Attribute
-values are split into typed segments (`AttrText` / `AttrExpr`) so the
-compiler/renderer can apply contextual escape without sniffing strings.
-
-Out of scope for Phase 0:
-- `<script>` / `<style>` opaque body handling (treated as regular text)
-- Source positions plumbed into every error path
+Emits a flat token stream from a template body string: tags, text,
+comments, doctype, and `{expr}` segments. Attribute values are split
+into typed segments (`AttrText` / `AttrExpr`) so the compiler can apply
+contextual escape without sniffing strings. `<script>` and `<style>`
+bodies are tokenized opaquely — no `{expr}` recognition inside them.
 """
 
 from __future__ import annotations

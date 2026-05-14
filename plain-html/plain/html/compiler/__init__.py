@@ -6,23 +6,23 @@ Module split:
   - `emit`        — codegen for the tag tree
   - `session`     — `:include`-graph walker + process-wide compiled-template cache
 
-Scope (phases 5a–5d):
-  - Text (constant-folded), `{expr}`, elements, attributes.
-  - `:if` / `:for` (real Python control flow).
-  - `<template>` fragments + comments + doctype.
-  - Frontmatter `attrs:` / `slots:` defaulting + `imports:` at module load.
-  - `<template :include="literal/path">` with attr passing.
-  - Slot composition: default slot + named (`slot="..."`) routing.
+Supported template features: text (constant-folded), `{expr}` in text
+and attribute values, real elements + `<template>` fragments, comments
+and doctype, `:if` / `:for` control flow, frontmatter `attrs:` /
+`slots:` / `imports:`, `<template :include="...">` with attr passing,
+and slot composition (default slot plus named `slot="..."` routing).
 
 Expressions are inlined as real Python sub-expressions: free `Name`
 loads are AST-rewritten to `_ctx['name']` except for names bound by
 `:for` targets, names imported via frontmatter, Python builtins, and
 names locally bound by the expression itself (comp/lambda/walrus).
 
-Includes are resolved at compile time. A `CompileSession` walks the
-template graph depth-first and compiles each leaf before its parent,
-so when the parent module is exec'd its `_inc_N` references already
-point at compiled child render functions injected into module globals.
+Literal-path includes are resolved at compile time. A `CompileSession`
+walks the template graph depth-first and compiles each leaf before its
+parent, so when the parent module is exec'd its `_inc_N` references
+already point at compiled child render functions injected into module
+globals. Expression-form includes (`:include={...}`) resolve at render
+time and reuse the process-wide compiled-template cache.
 """
 
 from __future__ import annotations

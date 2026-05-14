@@ -1,11 +1,4 @@
-"""plain.html — HTML-aware template engine.
-
-Phase 0 tracer bullet: minimal end-to-end render path used to validate the
-spec against real templates and produce a parity diff against Jinja output.
-Eventually replaced by the full pipeline described in the implementation
-plan (frontmatter parser → tokenizer → tag tree builder → compile-to-Python
-→ contextual autoescape → loader → static checker).
-"""
+"""plain.html — HTML-aware template engine with contextual autoescape."""
 
 from __future__ import annotations
 

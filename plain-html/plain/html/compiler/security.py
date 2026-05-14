@@ -15,8 +15,7 @@ import ast
 from ..tokenizer import AttrExpr, Attribute, AttrText
 
 # URLs in these attributes go through `escape_url` so an attacker can't slip a
-# `javascript:` or `data:text/html` value into the rendered document. Phase 6
-# may expand this list.
+# `javascript:` or `data:text/html` value into the rendered document.
 URL_ATTRS: frozenset[str] = frozenset(
     {
         "href",

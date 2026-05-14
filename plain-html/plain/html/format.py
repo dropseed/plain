@@ -1,4 +1,4 @@
-"""Formatter for `.html` templates (Phase 9.5).
+"""Formatter for `.html` templates.
 
 Public API:
 

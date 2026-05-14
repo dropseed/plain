@@ -1,12 +1,9 @@
 """Runtime helpers called by compiled template modules.
 
-Phase 5 codegen emits calls into this module. The functions here match
-the interpreter's behavior byte-for-byte so the compiler's output stays
-equivalent to `engine.render_source(...)` across the entire corpus.
-
-Phase 6 will introduce position-aware escape variants. The names
-(`escape_html`, `escape_attr`) stay stable so that's a function-body
-swap, not a codegen change.
+Each compiled template imports from this module. The helpers handle the
+work the codegen doesn't inline: contextual escaping, boolean / list
+attribute rendering, dynamic `:include` resolution, and Python-keyword
+aliasing of attr names.
 """
 
 from __future__ import annotations
@@ -37,8 +34,7 @@ def escape_attr(value: object) -> str:
 
 # URL schemes considered safe for href/src/action/etc. Anything else (notably
 # `javascript:` and `data:`) becomes an empty string so the resulting markup
-# can't navigate to or execute attacker-controlled code. Phase 6 may expand
-# this list or add more nuanced validation.
+# can't navigate to or execute attacker-controlled code.
 SAFE_URL_SCHEMES: frozenset[str] = frozenset(
     {"http", "https", "mailto", "tel", "ftp", "ftps"}
 )
