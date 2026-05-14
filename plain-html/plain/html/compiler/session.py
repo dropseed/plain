@@ -32,47 +32,6 @@ from .emit import emit_module
 PathResolver = Callable[..., Path]
 
 
-# --- top-level entry points -------------------------------------------------
-
-
-def compile_source(source: str, *, source_label: str = "<source>") -> str:
-    """Tokenize + parse + emit Python source for a standalone template.
-
-    Use this for templates with no `:include` (the include path needs a
-    `CompileSession` to resolve and recursively compile children). The
-    generated module's `render` won't reference any `_inc_N` slots.
-    """
-    fmdict, body = fm.split(source)
-    tokens = tokenize(body)
-    tree = parse(tokens)
-    return emit_module(tree, fmdict, source_label, include_renders={})
-
-
-def compile_tree(
-    tree: list[Node],
-    fmdict: dict | None = None,
-    *,
-    source_label: str = "<source>",
-) -> str:
-    """Lower-level: skip frontmatter parsing if the caller already has the tree."""
-    return emit_module(tree, fmdict or {}, source_label, include_renders={})
-
-
-def compile_path(
-    path: Path,
-    *,
-    resolver: PathResolver | None = None,
-) -> Callable[..., str]:
-    """Compile a template file and return its `render` function.
-
-    Resolves and recursively compiles every `:include` along the way.
-    Pass a custom `resolver` to short-circuit `loader.find_template` —
-    handy for tests that want to keep template files in a tmpdir.
-    """
-    session = CompileSession(resolver=resolver)
-    return session.compile_path(path)
-
-
 # --- process cache ----------------------------------------------------------
 
 
@@ -158,6 +117,20 @@ class CompileSession:
         self.resolver: PathResolver = resolver or find_template
         self.use_disk_cache = use_disk_cache
         self._in_progress: set[Path] = set()
+
+    def compile_string(self, source: str, *, label: str = "<source>") -> str:
+        """Tokenize + parse + emit Python source for a standalone template.
+
+        Returns the generated module source as a string — the caller is
+        responsible for compiling/exec'ing it. Use this when there's no
+        backing file (in-memory templates, tests, the bench). Templates
+        with a literal `:include` raise `CompileError` at emit time since
+        there's no `:include` graph for the session to walk.
+        """
+        fmdict, body = fm.split(source)
+        tokens = tokenize(body)
+        tree = parse(tokens)
+        return emit_module(tree, fmdict, label, include_renders={})
 
     def compile_path(
         self,

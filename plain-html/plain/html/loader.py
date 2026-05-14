@@ -15,8 +15,18 @@ from plain.packages import packages_registry
 from plain.runtime import settings
 
 
-class TemplateNotFound(FileNotFoundError):
-    pass
+class TemplateFileMissing(FileNotFoundError):
+    """Raised by `find_template` when a template name can't be resolved
+    to a `.html` file. Exported from `plain.html` as the public-facing
+    exception; views and callers catch this to fall back to a default
+    or surface a 404.
+    """
+
+    def __str__(self) -> str:
+        if self.args:
+            return f"Template file {self.args[0]} not found"
+        else:
+            return "Template file not found"
 
 
 def get_html_dirs() -> tuple[Path, ...]:
@@ -49,17 +59,17 @@ def find_template(name: str, *, current_template: Path | None = None) -> Path:
 
     if name.startswith("./") or name.startswith("../"):
         if current_template is None:
-            raise TemplateNotFound(
+            raise TemplateFileMissing(
                 f"Relative template path {name!r} requires a calling template"
             )
         candidate = (current_template.parent / filename).resolve()
         if candidate.exists():
             return candidate
-        raise TemplateNotFound(name)
+        raise TemplateFileMissing(name)
 
     for directory in get_html_dirs():
         candidate = Path(directory) / filename
         if candidate.exists():
             return candidate
 
-    raise TemplateNotFound(name)
+    raise TemplateFileMissing(name)

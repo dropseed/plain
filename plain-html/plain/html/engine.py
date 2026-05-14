@@ -55,9 +55,7 @@ def render_source(
     # No path → no static-include resolution possible. One-shot in-memory
     # compile of just this source; dynamic includes still work because
     # the resolver lives in the runtime layer.
-    from .compiler import compile_source as _compile_source
-
-    src = _compile_source(source, source_label="<source>")
+    src = CompileSession().compile_string(source)
     mod = types.ModuleType(f"_plain_html_inline_{abs(hash(source))}")
     mod.__file__ = "<source>"
     code = compile(src, "<source>", "exec")

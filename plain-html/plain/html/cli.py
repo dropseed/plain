@@ -165,17 +165,13 @@ def _check_stdin(
     try:
         tokens = tokenize(body)
     except TokenizeError as e:
-        click.echo(
-            _format_error_with_label("<stdin>", source, body_start, e), err=True
-        )
+        click.echo(_format_error_with_label("<stdin>", source, body_start, e), err=True)
         sys.exit(1)
 
     try:
         parse(tokens)
     except ParseError as e:
-        click.echo(
-            _format_error_with_label("<stdin>", source, body_start, e), err=True
-        )
+        click.echo(_format_error_with_label("<stdin>", source, body_start, e), err=True)
         sys.exit(1)
 
     if run_typecheck:

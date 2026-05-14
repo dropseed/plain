@@ -24,14 +24,20 @@ from plain.html.compiler import (
     CompileError,
     CompileSession,
     clear_process_cache,
-    compile_path,
-    compile_source,
 )
 from plain.html.engine import render as engine_render
 
 
+def _compile_string(source: str, *, label: str = "<test>") -> str:
+    return CompileSession().compile_string(source, label=label)
+
+
+def _compile_path(path: Path):
+    return CompileSession().compile_path(path)
+
+
 def _load(source: str, *, label: str = "<test>"):
-    src = compile_source(source, source_label=label)
+    src = _compile_string(source, label=label)
     mod = types.ModuleType(f"_plain_html_test_{abs(hash(source))}")
     mod.__file__ = label
     code = compile(src, label, "exec")
@@ -61,7 +67,7 @@ def test_none_renders_empty():
 def test_adjacent_text_runs_constant_fold():
     # Two text nodes around an expression should fold into single literal append
     # before and after, plus one expression append.
-    src = compile_source("<p>before {x} after</p>")
+    src = _compile_string("<p>before {x} after</p>")
     # Generated should have exactly one `_append('before ')` chunk and one
     # `_append(' after')` chunk — quick sanity grep on the generated source.
     assert "before " in src
@@ -287,7 +293,7 @@ def test_attribute_access_on_ctx_name():
 def test_no_eval_in_generated_source():
     # 5b inlines every expression — the generated module should not contain
     # an `eval(` call. Guard against regressing back to the 5a runtime.
-    src = compile_source("<p :if={x}>{x.upper()}</p>")
+    src = _compile_string("<p :if={x}>{x.upper()}</p>")
     assert "eval(" not in src
 
 
@@ -351,7 +357,7 @@ def test_action_attr_also_validated():
 
 def test_event_handler_with_dynamic_value_rejected():
     with pytest.raises(CompileError, match="event-handler"):
-        compile_source("<a onclick={handler}>x</a>")
+        _compile_string("<a onclick={handler}>x</a>")
 
 
 def test_event_handler_with_mark_safe_allowed():
@@ -370,7 +376,7 @@ def test_event_handler_with_mixed_segments_rejected():
     # Even with one mark_safe segment, the surrounding text could leak —
     # safer to refuse the whole mixed shape.
     with pytest.raises(CompileError, match="event-handler"):
-        compile_source('<a onclick="x={val}">x</a>')
+        _compile_string('<a onclick="x={val}">x</a>')
 
 
 def test_static_event_handler_allowed():
@@ -384,7 +390,7 @@ def test_static_event_handler_allowed():
 def test_event_handler_case_insensitive():
     # HTML attr names are case-insensitive; check `ONCLICK=` is caught too.
     with pytest.raises(CompileError, match="event-handler"):
-        compile_source("<a ONCLICK={handler}>x</a>")
+        _compile_string("<a ONCLICK={handler}>x</a>")
 
 
 def test_expr_inside_script_is_literal_text():
@@ -448,7 +454,7 @@ def test_include_no_attrs(tmp_path):
             "child": "<p>hi</p>",
         },
     )
-    assert compile_path(paths["parent"])() == "<p>hi</p>"
+    assert _compile_path(paths["parent"])() == "<p>hi</p>"
 
 
 def test_include_with_attrs(tmp_path):
@@ -459,7 +465,7 @@ def test_include_with_attrs(tmp_path):
             "card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
         },
     )
-    assert compile_path(paths["parent"])() == "<h1>Hello</h1>"
+    assert _compile_path(paths["parent"])() == "<h1>Hello</h1>"
 
 
 def test_include_with_expr_attr(tmp_path):
@@ -470,7 +476,7 @@ def test_include_with_expr_attr(tmp_path):
             "card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
         },
     )
-    assert compile_path(paths["parent"])(name="Dave") == "<h1>Dave</h1>"
+    assert _compile_path(paths["parent"])(name="Dave") == "<h1>Dave</h1>"
 
 
 def test_include_default_slot(tmp_path):
@@ -481,7 +487,7 @@ def test_include_default_slot(tmp_path):
             "card": ("---\nslots:\n  default: Markup\n---\n<div>{children}</div>"),
         },
     )
-    assert compile_path(paths["parent"])() == "<div><p>body</p></div>"
+    assert _compile_path(paths["parent"])() == "<div><p>body</p></div>"
 
 
 def test_include_named_slot(tmp_path):
@@ -500,7 +506,7 @@ def test_include_named_slot(tmp_path):
             ),
         },
     )
-    assert compile_path(paths["parent"])() == "<div>H|<p>body</p></div>"
+    assert _compile_path(paths["parent"])() == "<div>H|<p>body</p></div>"
 
 
 def test_include_named_slot_on_element(tmp_path):
@@ -514,7 +520,7 @@ def test_include_named_slot_on_element(tmp_path):
             "card": ("---\nslots:\n  header: Markup\n---\n<section>{header}</section>"),
         },
     )
-    assert compile_path(paths["parent"])() == "<section><div>H</div></section>"
+    assert _compile_path(paths["parent"])() == "<section><div>H</div></section>"
 
 
 def test_include_root_ctx_propagates(tmp_path):
@@ -525,7 +531,7 @@ def test_include_root_ctx_propagates(tmp_path):
             "inner": "<p>{name}</p>",
         },
     )
-    assert compile_path(paths["parent"])(name="Dave") == "<p>Dave</p>"
+    assert _compile_path(paths["parent"])(name="Dave") == "<p>Dave</p>"
 
 
 def test_include_explicit_attr_wins_over_root_ctx(tmp_path):
@@ -536,7 +542,7 @@ def test_include_explicit_attr_wins_over_root_ctx(tmp_path):
             "inner": "<p>{name}</p>",
         },
     )
-    assert compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
+    assert _compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
 
 
 def test_include_promoted_attr_inherits_from_root_ctx(tmp_path):
@@ -550,7 +556,7 @@ def test_include_promoted_attr_inherits_from_root_ctx(tmp_path):
             "inner": "---\nattrs:\n  name: str\n---\n<p>{name}</p>",
         },
     )
-    assert compile_path(paths["parent"])(name="Dave") == "<p>Dave</p>"
+    assert _compile_path(paths["parent"])(name="Dave") == "<p>Dave</p>"
 
 
 def test_include_promoted_attr_explicit_pass_wins(tmp_path):
@@ -563,7 +569,7 @@ def test_include_promoted_attr_explicit_pass_wins(tmp_path):
             "inner": "---\nattrs:\n  name: str\n---\n<p>{name}</p>",
         },
     )
-    assert compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
+    assert _compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
 
 
 def test_include_inside_for(tmp_path):
@@ -575,7 +581,7 @@ def test_include_inside_for(tmp_path):
         },
     )
     assert (
-        compile_path(paths["parent"])(items=["a", "b", "c"])
+        _compile_path(paths["parent"])(items=["a", "b", "c"])
         == "<h1>a</h1><h1>b</h1><h1>c</h1>"
     )
 
@@ -588,7 +594,7 @@ def test_include_inside_if(tmp_path):
             "card": "<p>shown</p>",
         },
     )
-    render = compile_path(paths["parent"])
+    render = _compile_path(paths["parent"])
     assert render(show=True) == "<p>shown</p>"
     assert render(show=False) == ""
 
@@ -602,7 +608,7 @@ def test_include_chain(tmp_path):
             "C": "<p>leaf</p>",
         },
     )
-    assert compile_path(paths["A"])() == "<p>leaf</p>"
+    assert _compile_path(paths["A"])() == "<p>leaf</p>"
 
 
 def test_include_cycle_detected(tmp_path):
@@ -614,7 +620,7 @@ def test_include_cycle_detected(tmp_path):
         },
     )
     with pytest.raises(CompileError, match="cycle"):
-        compile_path(paths["A"])
+        _compile_path(paths["A"])
 
 
 def test_process_cache_returns_same_function(tmp_path):
@@ -622,8 +628,8 @@ def test_process_cache_returns_same_function(tmp_path):
 
     clear_process_cache()
     paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
-    first = compile_path(paths["x"])
-    second = compile_path(paths["x"])
+    first = _compile_path(paths["x"])
+    second = _compile_path(paths["x"])
     # Same identity → second call hit the process cache.
     assert first is second
 
@@ -637,7 +643,7 @@ def test_dynamic_include_basic(tmp_path):
             "alert": "<div>alert!</div>",
         },
     )
-    render = compile_path(paths["parent"])
+    render = _compile_path(paths["parent"])
     assert render(component="./card") == "<p>card body</p>"
     # Same parent module, different runtime target — dispatch works.
     assert render(component="./alert") == "<div>alert!</div>"
@@ -651,7 +657,7 @@ def test_dynamic_include_with_attrs(tmp_path):
             "card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
         },
     )
-    render = compile_path(paths["parent"])
+    render = _compile_path(paths["parent"])
     assert render(component="./card", t="Hi") == "<h1>Hi</h1>"
 
 
@@ -663,7 +669,7 @@ def test_dynamic_include_with_default_slot(tmp_path):
             "card": ("---\nslots:\n  default: Markup\n---\n<div>{children}</div>"),
         },
     )
-    assert compile_path(paths["parent"])(component="./card") == (
+    assert _compile_path(paths["parent"])(component="./card") == (
         "<div><p>body</p></div>"
     )
 
@@ -680,7 +686,7 @@ def test_dynamic_include_inside_for(tmp_path):
             "alert": "---\nattrs:\n  text: str\n---\n<b>{text}</b>",
         },
     )
-    render = compile_path(paths["parent"])
+    render = _compile_path(paths["parent"])
     items = [
         {"type": "./card", "text": "one"},
         {"type": "./alert", "text": "two"},
@@ -689,11 +695,12 @@ def test_dynamic_include_inside_for(tmp_path):
     assert render(items=items) == "<p>one</p><b>two</b><p>three</p>"
 
 
-def test_compile_source_rejects_static_include():
-    # compile_source has no CompileSession, so a literal `:include` can't be
-    # resolved. Tells the caller to use compile_path() instead.
+def test_compile_string_rejects_static_include():
+    # compile_string emits a standalone module — a literal `:include` site
+    # has no `_inc_N` slot wired up, so emit() raises. Tells the caller to
+    # use compile_path() instead.
     with pytest.raises(CompileError):
-        compile_source('<template :include="x"></template>')
+        _compile_string('<template :include="x"></template>')
 
 
 # --- disk cache --------------------------------------------------------------
@@ -834,7 +841,7 @@ def test_include_parity_with_interpreter(tmp_path, templates, ctx):
     paths = _write_templates(tmp_path, templates)
     entry = next(iter(paths.values()))  # the first template in the set is the entry
     interp = engine_render(entry, ctx)
-    compiled = compile_path(entry)(**ctx)
+    compiled = _compile_path(entry)(**ctx)
     assert compiled == interp
 
 

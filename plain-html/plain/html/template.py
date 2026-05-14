@@ -1,8 +1,9 @@
-"""Template-by-name convenience wrapper.
+"""Named-template convenience over `render()`.
 
-`render()` takes a file path; `Template(name)` lets callers (`TemplateView`,
-the admin's per-field value rendering, toolbar items) work with template
-names and look up the path lazily.
+`render()` takes a file path; `Template(name)` lets callers
+(`TemplateView`, the admin's per-field value rendering, toolbar items)
+work with template names and look up the path lazily — and detect
+missing files eagerly via `TemplateFileMissing`.
 """
 
 from __future__ import annotations
@@ -13,17 +14,9 @@ from opentelemetry import trace
 from opentelemetry.semconv.attributes.code_attributes import CODE_FUNCTION_NAME
 
 from .engine import render
-from .loader import TemplateNotFound
+from .loader import find_template
 
 tracer = trace.get_tracer("plain.html")
-
-
-class TemplateFileMissing(Exception):
-    def __str__(self) -> str:
-        if self.args:
-            return f"Template file {self.args[0]} not found"
-        else:
-            return "Template file not found"
 
 
 class Template:
@@ -36,12 +29,7 @@ class Template:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        try:
-            from .loader import find_template
-
-            self.path: Path = find_template(name)
-        except TemplateNotFound:
-            raise TemplateFileMissing(name)
+        self.path: Path = find_template(name)
 
     def render(self, context: dict) -> str:
         with tracer.start_as_current_span(

@@ -333,8 +333,8 @@ def _emit_static_include(node: ElementNode, e: _Emit) -> None:
         if slot_name_var is None:
             raise CompileError(
                 "internal: `:include` site missing from compile session — "
-                "this shouldn't happen unless compile_source() was used on a "
-                "template that needs CompileSession"
+                "this shouldn't happen unless CompileSession.compile_string() "
+                "was used on a template that needs compile_path()"
             )
 
     default_children: list[Node] = []

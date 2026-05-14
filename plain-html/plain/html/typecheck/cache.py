@@ -127,8 +127,6 @@ def _modules_in_type_expr(source: str) -> set[str]:
     return out
 
 
-
-
 def _module_mtime(name: str) -> int:
     """Return the mtime of `name`'s source file, or 0 if not resolvable.
 

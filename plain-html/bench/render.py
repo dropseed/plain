@@ -25,13 +25,12 @@ from typing import Any
 
 import jinja2
 
-from plain.html.compiler import compile_path as _compile_path
-from plain.html.compiler import compile_source as _compile_source
+from plain.html.compiler import CompileSession, get_or_compile
 
 
 def _load_compiled(plain_source: str) -> Any:
     """Compile a plain.html source string and return its render fn."""
-    src = _compile_source(plain_source, source_label="<bench>")
+    src = CompileSession().compile_string(plain_source, label="<bench>")
     mod = types.ModuleType(f"_bench_{abs(hash(plain_source))}")
     code = compile(src, "<bench>", "exec")
     exec(code, mod.__dict__)
@@ -296,7 +295,7 @@ def _run_file_cases() -> None:
         root = Path(td)
         for label, setup, ctx, iters in FILE_CASES:
             plain_entry, jinja_tpl = setup(root / label)
-            compiled_render = _compile_path(plain_entry)
+            compiled_render = get_or_compile(plain_entry)
             c = time_callable(lambda: compiled_render(**ctx), iters)
             j = time_callable(lambda: jinja_tpl.render(**ctx), iters)
             ratio = c["median_us"] / j["median_us"] if j["median_us"] > 0 else 0
@@ -319,7 +318,7 @@ def _run_corpus() -> None:
     # warm
     for f in files:
         try:
-            _compile_path(f)
+            get_or_compile(f)
         except Exception:
             pass
 
@@ -327,7 +326,7 @@ def _run_corpus() -> None:
     ok = err = 0
     for f in files:
         try:
-            _compile_path(f)
+            get_or_compile(f)
             ok += 1
         except Exception:
             err += 1

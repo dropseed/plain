@@ -15,11 +15,11 @@ from pathlib import Path
 from plain.runtime import PLAIN_TEMP_PATH
 
 from .. import frontmatter as fm
+from ..positions import body_offset, offset_to_line_col
 from . import cache
 from .backends import Backend, BackendDiagnostic, BackendError, resolve
 from .declarations import DeclarationError
 from .declarations import parse as parse_declarations
-from ..positions import body_offset, offset_to_line_col
 from .synth import SourceMapEntry, Synthesis, synthesize
 
 

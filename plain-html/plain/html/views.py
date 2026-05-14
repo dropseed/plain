@@ -12,7 +12,8 @@ from plain.logs import get_framework_logger
 from plain.runtime import settings
 from plain.views import View
 
-from .core import Template, TemplateFileMissing
+from .loader import TemplateFileMissing
+from .template import Template
 
 logger = get_framework_logger("plain.html")
 

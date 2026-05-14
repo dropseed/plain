@@ -39,9 +39,6 @@ from .session import (  # noqa: E402
     CompileSession,
     PathResolver,
     clear_process_cache,
-    compile_path,
-    compile_source,
-    compile_tree,
     get_or_compile,
 )
 
@@ -50,8 +47,5 @@ __all__ = [
     "CompileSession",
     "PathResolver",
     "clear_process_cache",
-    "compile_path",
-    "compile_source",
-    "compile_tree",
     "get_or_compile",
 ]
