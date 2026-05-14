@@ -38,6 +38,7 @@ class ForClause:
 
     targets: list[str]
     iter_code: str
+    raw_target: str = ""
 
 
 @dataclass
@@ -229,7 +230,11 @@ def _parse_for_clause(clause: str) -> ForClause:
         elif depth == 0 and clause.startswith(" in ", i):
             target = clause[:i].strip()
             iter_code = clause[i + 4 :].strip()
-            return ForClause(targets=_parse_target_names(target), iter_code=iter_code)
+            return ForClause(
+                targets=_parse_target_names(target),
+                iter_code=iter_code,
+                raw_target=target,
+            )
         i += 1
     raise ParseError(f":for clause missing ' in ' separator: {clause!r}")
 

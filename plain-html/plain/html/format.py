@@ -125,9 +125,14 @@ def _format_element(node: ElementNode, *, indent: int, indent_size: int) -> str:
     close_tag = f"</{node.tag}>"
 
     if is_verbatim(node.tag):
-        # Per the tokenizer's opaque-body rule, verbatim children are a
-        # single text node. Emit it raw.
-        body = "".join(c.text for c in node.children if isinstance(c, TextNode))
+        # `<script>`/`<style>` bodies are a single opaque text node per the
+        # tokenizer's opaque-body rule. `<pre>`/`<textarea>` bodies tokenize
+        # normally, so expression nodes can appear — emit every child
+        # byte-for-byte preserving original whitespace.
+        body = "".join(
+            _format_node(c, indent=indent, indent_size=indent_size)
+            for c in node.children
+        )
         return f"{open_tag}{body}{close_tag}"
 
     if not node.children:
@@ -209,7 +214,10 @@ def _directive_attrs(node: ElementNode) -> list[str]:
 
 
 def _format_for_clause(clause: ForClause) -> str:
-    target = (
+    # Prefer the original target source when available so tuple-unpack
+    # parens like `(a, b) in xs` survive round-trip — the parser strips
+    # them into a flat name list otherwise.
+    target = clause.raw_target or (
         clause.targets[0] if len(clause.targets) == 1 else ", ".join(clause.targets)
     )
     return f"{target} in {clause.iter_code}"
