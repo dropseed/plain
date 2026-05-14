@@ -12,7 +12,7 @@ swap, not a codegen change.
 from __future__ import annotations
 
 import keyword
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from plain.utils.html import conditional_escape
 
@@ -117,7 +117,7 @@ def render_dyn_url_attr(name: str, value: object) -> str:
     return f' {name}="{safe}"'
 
 
-def resolve_dynamic_include(name: str, *, current_template: str):
+def resolve_dynamic_include(name: str, *, current_template: str) -> Callable[..., str]:
     """Resolve a `<template :include={expr}>` site at render time.
 
     Looks the name up via `loader.find_template` (relative to the

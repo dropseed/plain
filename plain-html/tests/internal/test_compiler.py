@@ -531,6 +531,33 @@ def test_include_explicit_attr_wins_over_root_ctx(tmp_path):
     assert compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
 
 
+def test_include_promoted_attr_inherits_from_root_ctx(tmp_path):
+    """A child promotes `name` via `attrs:`, but parent omits it on the
+    include site. The child must still see the entry caller's value via
+    `_root_ctx` instead of the parameter default."""
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": '<template :include="./inner" />',
+            "inner": "---\nattrs:\n  name: str\n---\n<p>{name}</p>",
+        },
+    )
+    assert compile_path(paths["parent"])(name="Dave") == "<p>Dave</p>"
+
+
+def test_include_promoted_attr_explicit_pass_wins(tmp_path):
+    """If the parent passes the promoted attr explicitly, the explicit value
+    must beat the ambient `_root_ctx` value."""
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": '<template :include="./inner" name="LOCAL" />',
+            "inner": "---\nattrs:\n  name: str\n---\n<p>{name}</p>",
+        },
+    )
+    assert compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
+
+
 def test_include_inside_for(tmp_path):
     paths = _write_templates(
         tmp_path,
