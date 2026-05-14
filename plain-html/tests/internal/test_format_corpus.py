@@ -20,8 +20,9 @@ from pathlib import Path
 
 import pytest
 
-from plain.html.format import _body_offset, format_source
+from plain.html.format import format_source
 from plain.html.parser import ParseError
+from plain.html.positions import body_offset
 from plain.html.tokenizer import TokenizeError, tokenize
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -85,8 +86,8 @@ def test_template_preserves_expression_bytes(path: Path) -> None:
 def test_template_preserves_frontmatter(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
     out = format_source(source)
-    src_fm = source[: _body_offset(source)]
-    out_fm = out[: _body_offset(out)]
+    src_fm = source[: body_offset(source)]
+    out_fm = out[: body_offset(out)]
     assert src_fm == out_fm, f"frontmatter mutated in {path}"
 
 
@@ -96,7 +97,7 @@ def test_corpus_is_nonempty() -> None:
 
 
 def _body(source: str) -> str:
-    return source[_body_offset(source) :]
+    return source[body_offset(source) :]
 
 
 def _expr_bytes(tokens) -> list[str]:

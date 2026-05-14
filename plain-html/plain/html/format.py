@@ -52,6 +52,7 @@ from .parser import (
     TextNode,
     parse,
 )
+from .positions import body_offset
 from .tokenizer import (
     VOID_ELEMENTS,
     AttrExpr,
@@ -73,7 +74,7 @@ def format_source(
     source: str, *, indent_size: int = 4, width: int = DEFAULT_WIDTH
 ) -> str:
     """Format a `.html` template source string."""
-    body_start = _body_offset(source)
+    body_start = body_offset(source)
     frontmatter_block = _format_frontmatter(source[:body_start])
 
     _, body = split_frontmatter(source)
@@ -84,20 +85,6 @@ def format_source(
     if not body_out.endswith("\n"):
         body_out += "\n"
     return frontmatter_block + body_out
-
-
-def _body_offset(source: str) -> int:
-    if not source.startswith("---\n"):
-        return 0
-    i = 4
-    while i < len(source):
-        end = source.find("\n", i)
-        if end == -1:
-            return 0
-        if source[i:end].strip() == "---":
-            return end + 1
-        i = end + 1
-    return 0
 
 
 def _format_frontmatter(block: str) -> str:

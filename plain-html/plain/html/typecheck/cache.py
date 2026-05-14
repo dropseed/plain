@@ -23,6 +23,7 @@ from pathlib import Path
 
 from plain.runtime import PLAIN_TEMP_PATH
 
+from ._ast_utils import dotted_chain
 from .declarations import Declarations
 from .synth import FORMAT_VERSION
 
@@ -120,23 +121,12 @@ def _modules_in_type_expr(source: str) -> set[str]:
     out: set[str] = set()
     for node in ast.walk(tree.body):
         if isinstance(node, ast.Attribute):
-            chain = _dotted(node)
+            chain = dotted_chain(node)
             if chain and len(chain) >= 2:
                 out.add(".".join(chain[:-1]))
     return out
 
 
-def _dotted(node: ast.Attribute) -> list[str] | None:
-    parts: list[str] = []
-    current: ast.AST = node
-    while isinstance(current, ast.Attribute):
-        parts.append(current.attr)
-        current = current.value
-    if not isinstance(current, ast.Name):
-        return None
-    parts.append(current.id)
-    parts.reverse()
-    return parts
 
 
 def _module_mtime(name: str) -> int:

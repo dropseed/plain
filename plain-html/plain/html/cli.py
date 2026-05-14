@@ -15,6 +15,7 @@ from .format import format_source
 from .frontmatter import split as split_frontmatter
 from .loader import get_html_dirs
 from .parser import ParseError, parse
+from .positions import body_offset, offset_to_line_col
 from .tokenizer import TokenizeError, tokenize
 from .typecheck import check_path as typecheck_path
 from .typecheck import check_source as typecheck_source
@@ -147,7 +148,7 @@ def _check_stdin(
     use_cache: bool = True,
 ) -> None:
     source = sys.stdin.read()
-    body_offset = _body_offset(source)
+    body_start = body_offset(source)
 
     try:
         fmdict, body = split_frontmatter(source)
@@ -165,7 +166,7 @@ def _check_stdin(
         tokens = tokenize(body)
     except TokenizeError as e:
         click.echo(
-            _format_error_with_label("<stdin>", source, body_offset, e), err=True
+            _format_error_with_label("<stdin>", source, body_start, e), err=True
         )
         sys.exit(1)
 
@@ -173,7 +174,7 @@ def _check_stdin(
         parse(tokens)
     except ParseError as e:
         click.echo(
-            _format_error_with_label("<stdin>", source, body_offset, e), err=True
+            _format_error_with_label("<stdin>", source, body_start, e), err=True
         )
         sys.exit(1)
 
@@ -415,17 +416,17 @@ def _check_file(path: Path) -> list[str]:
     except DeclarationError as e:
         return [f"{path}:1:1: {e}"]
 
-    body_offset = _body_offset(source)
+    body_start = body_offset(source)
 
     try:
         tokens = tokenize(body)
     except TokenizeError as e:
-        return [_format_error_with_label(str(path), source, body_offset, e)]
+        return [_format_error_with_label(str(path), source, body_start, e)]
 
     try:
         parse(tokens)
     except ParseError as e:
-        return [_format_error_with_label(str(path), source, body_offset, e)]
+        return [_format_error_with_label(str(path), source, body_start, e)]
 
     return []
 
@@ -434,40 +435,11 @@ _OFFSET_RE = re.compile(r"\bat offset (\d+)\b")
 
 
 def _format_error_with_label(
-    label: str, source: str, body_offset: int, exc: Exception
+    label: str, source: str, body_start: int, exc: Exception
 ) -> str:
     match = _OFFSET_RE.search(str(exc))
     if match:
-        line, col = _offset_to_line_col(source, body_offset + int(match.group(1)))
+        line, col = offset_to_line_col(source, body_start + int(match.group(1)))
     else:
         line, col = 1, 1
     return f"{label}:{line}:{col}: {exc}"
-
-
-def _offset_to_line_col(source: str, offset: int) -> tuple[int, int]:
-    """Convert a byte offset into (1-based line, 1-based column)."""
-    head = source[: max(offset, 0)]
-    line = head.count("\n") + 1
-    last_newline = head.rfind("\n")
-    col = offset - last_newline if last_newline >= 0 else offset + 1
-    return line, col
-
-
-def _body_offset(source: str) -> int:
-    """Return the offset within source where the template body starts.
-
-    Mirrors python-frontmatter's `---\\n…\\n---\\n` delimiter handling so error
-    positions can be mapped back to file positions even when frontmatter is
-    present.
-    """
-    if not source.startswith("---\n"):
-        return 0
-    i = 4
-    while i < len(source):
-        end = source.find("\n", i)
-        if end == -1:
-            return 0
-        if source[i:end].strip() == "---":
-            return end + 1
-        i = end + 1
-    return 0

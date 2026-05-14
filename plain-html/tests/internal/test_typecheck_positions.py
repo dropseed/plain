@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from plain.html.typecheck.positions import body_offset, offset_to_line_col
+from plain.html.positions import body_offset, offset_to_line_col
 
 
 def test_body_offset_with_frontmatter():

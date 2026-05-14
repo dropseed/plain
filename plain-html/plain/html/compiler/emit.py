@@ -165,10 +165,12 @@ def emit_module(
         "render_dyn_attr, render_dyn_url_attr, normalize_keywords, "
         "resolve_dynamic_include as _resolve_dynamic_include"
     )
-    header.append(
-        "from plain.utils.safestring import "
-        "mark_safe, mark_safe as Markup, mark_safe as _mark_safe"
-    )
+    header.append("from plain.utils.safestring import mark_safe")
+    # `Markup` is the spec-named alias users reach for; `_mark_safe` is the
+    # codegen's private alias — `mark_safe` and `Markup` get re-bound from
+    # `_ctx` per render call, so internal call sites use `_mark_safe` to
+    # avoid the user-shadowing path.
+    header.append("Markup = _mark_safe = mark_safe")
     header.append("")
     header.append(f"__template_source__ = {source_label!r}")
     header.append("")

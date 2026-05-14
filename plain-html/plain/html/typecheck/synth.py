@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import ast
 import keyword
-import re
 from dataclasses import dataclass, field
 
 from ..parser import _parse_for_clause
@@ -33,6 +32,7 @@ from ..tokenizer import (
     Token,
     tokenize,
 )
+from ._ast_utils import dotted_chain
 from .declarations import (
     AttrDeclaration,
     Declarations,
@@ -175,7 +175,7 @@ class _Builder:
                     if raw is not None:
                         for_clause = raw
                 case ":include":
-                    include_path_expr = _expr_value_or_none(attr)
+                    include_path_expr = _single_expr_value(attr)
                 case _:
                     regular_attrs.append(attr)
 
@@ -386,7 +386,7 @@ def _attribute_chains(node: ast.AST) -> list[list[str]]:
             case ast.Name(id=name):
                 chains.append([name])
             case ast.Attribute():
-                chain = _dotted_chain(n)
+                chain = dotted_chain(n)
                 if chain is not None:
                     chains.append(chain)
                 else:
@@ -401,33 +401,8 @@ def _attribute_chains(node: ast.AST) -> list[list[str]]:
     return chains
 
 
-def _dotted_chain(node: ast.AST) -> list[str] | None:
-    """Return `["a", "b", "c"]` for `a.b.c`, or None if the chain isn't
-    rooted at a plain Name (e.g. `func().attr`)."""
-    parts: list[str] = []
-    current: ast.AST = node
-    while isinstance(current, ast.Attribute):
-        parts.append(current.attr)
-        current = current.value
-    if not isinstance(current, ast.Name):
-        return None
-    parts.append(current.id)
-    parts.reverse()
-    return parts
-
-
 def _single_expr_value(attr: Attribute) -> str | None:
     """For `:if={code}` / `:for={code}` — return the expression code or None."""
-    if attr.segments is None or len(attr.segments) != 1:
-        return None
-    seg = attr.segments[0]
-    if isinstance(seg, AttrExpr):
-        return seg.code
-    return None
-
-
-def _expr_value_or_none(attr: Attribute) -> str | None:
-    """Like `_single_expr_value`, but returns None for literal-text values."""
     if attr.segments is None or len(attr.segments) != 1:
         return None
     seg = attr.segments[0]
@@ -456,7 +431,3 @@ _PYTHON_BUILTINS = frozenset(
         "Exception",
     }
 )
-
-
-# Unused — kept for future precision when source maps need column-level info.
-_SAFE_EXPR_RE = re.compile(r"\s*\Z")

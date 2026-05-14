@@ -33,8 +33,9 @@ from typing import Any
 import html5lib
 import pytest
 
-from plain.html.format import _body_offset, format_source
+from plain.html.format import format_source
 from plain.html.parser import ParseError
+from plain.html.positions import body_offset
 from plain.html.tokenizer import TokenizeError
 from plain.html.whitespace import is_verbatim
 
@@ -70,8 +71,8 @@ def test_dom_equivalence(path: Path) -> None:
     except (TokenizeError, ParseError) as e:
         pytest.xfail(f"engine cannot parse {path.name}: {e}")  # ty: ignore[too-many-positional-arguments]
 
-    src_body = _mask(source[_body_offset(source) :])
-    fmt_body = _mask(formatted[_body_offset(formatted) :])
+    src_body = _mask(source[body_offset(source) :])
+    fmt_body = _mask(formatted[body_offset(formatted) :])
 
     src_tree = _normalize(_parse_fragment(src_body))
     fmt_tree = _normalize(_parse_fragment(fmt_body))

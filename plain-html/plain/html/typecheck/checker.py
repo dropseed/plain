@@ -19,7 +19,7 @@ from . import cache
 from .backends import Backend, BackendDiagnostic, BackendError, resolve
 from .declarations import DeclarationError
 from .declarations import parse as parse_declarations
-from .positions import body_offset, offset_to_line_col
+from ..positions import body_offset, offset_to_line_col
 from .synth import SourceMapEntry, Synthesis, synthesize
 
 
