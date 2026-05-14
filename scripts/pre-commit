@@ -22,6 +22,10 @@ echo "${BOLD}Validating type annotations${NORMAL}"
 ./scripts/type-validate
 
 echo ""
+echo "${BOLD}Type-checking .html templates${NORMAL}"
+./scripts/html-check
+
+echo ""
 echo "${BOLD}Running tests${NORMAL}"
 ./scripts/test
 

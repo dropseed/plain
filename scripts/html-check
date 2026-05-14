@@ -1,0 +1,11 @@
+#!/bin/sh -e
+# Run `plain html check --typecheck` across the entire repo template corpus.
+#
+# Operates from `example/` because plain.runtime needs an `app/` directory;
+# the example app is the canonical place for that. The
+# `--include-installed-packages` flag (hidden from end-user `--help`)
+# expands the walk to cover every shipped Plain package's `html/` dir, so
+# this single invocation gates the whole monorepo's `.html` files.
+
+cd "$(dirname "$0")/../example"
+uv run plain html check --typecheck --include-installed-packages "$@"
