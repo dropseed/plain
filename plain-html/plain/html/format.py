@@ -4,10 +4,11 @@ Public API:
 
     format_source(source: str, *, indent_size: int = 4) -> str
 
-Walks the parsed tree and emits canonical bytes. Frontmatter is preserved
-byte-for-byte; expression interiors (`{...}`) are never modified; verbatim
-elements (`<pre>`, `<textarea>`, `<script>`, `<style>`) preserve their text
-content exactly.
+Walks the parsed tree and emits canonical bytes. Frontmatter values are
+preserved byte-for-byte; only the **top-level key order** is canonicalized
+to `imports → attrs → slots → (others, original order)`. Expression
+interiors (`{...}`) are never modified; verbatim elements (`<pre>`,
+`<textarea>`, `<script>`, `<style>`) preserve their text content exactly.
 
 The walker is context-aware rather than a Wadler doc tree: each element
 picks **inline** mode (single line, text whitespace preserved exactly) or
@@ -37,6 +38,8 @@ Deliberate canonical-form choices (not bugs):
 
 from __future__ import annotations
 
+import re
+
 from .frontmatter import split as split_frontmatter
 from .parser import (
     DoctypeNode,
@@ -60,13 +63,18 @@ from .whitespace import is_inline, is_verbatim
 
 DEFAULT_WIDTH = 88
 
+# Top-level frontmatter keys, in the order the formatter emits them. Any
+# key not listed keeps its original relative position (stable-sorted) and
+# sorts after the canonical block.
+_CANONICAL_FRONTMATTER_KEYS = ("imports", "attrs", "slots")
+
 
 def format_source(
     source: str, *, indent_size: int = 4, width: int = DEFAULT_WIDTH
 ) -> str:
     """Format a `.html` template source string."""
     body_start = _body_offset(source)
-    frontmatter_block = source[:body_start]
+    frontmatter_block = _format_frontmatter(source[:body_start])
 
     _, body = split_frontmatter(source)
     tokens = tokenize(body)
@@ -90,6 +98,91 @@ def _body_offset(source: str) -> int:
             return end + 1
         i = end + 1
     return 0
+
+
+def _format_frontmatter(block: str) -> str:
+    """Canonicalize the order of top-level keys in a `---`-delimited block.
+
+    Values are preserved byte-for-byte. Only the order of the top-level
+    sections (each `key:` line and its indented continuation) is changed.
+    Keys not in the canonical list keep their relative position.
+    """
+    match = re.match(r"\A---\n(.*?\n)---\n", block, re.DOTALL)
+    if match is None:
+        return block
+
+    inner = match.group(1)
+    sections, leading = _parse_frontmatter_sections(inner)
+    if not sections:
+        return block
+
+    reordered = sorted(
+        enumerate(sections),
+        key=lambda x: (_canonical_index(x[1][0]), x[0]),
+    )
+    new_inner = leading + "".join(text for _, (_, text) in reordered)
+    if not new_inner.endswith("\n"):
+        new_inner += "\n"
+    return f"---\n{new_inner}---\n"
+
+
+def _parse_frontmatter_sections(inner: str) -> tuple[list[tuple[str, str]], str]:
+    """Split frontmatter text into (key, raw-block) pairs.
+
+    Each section keeps its original `key:` line, its indented continuation,
+    and any trailing blank lines that belong to it. Returns `(sections,
+    leading_blanks)` so leading blank lines before the first key don't get
+    swallowed.
+    """
+    lines = inner.split("\n")
+    # `split` on a trailing `\n` produces an empty final element; trim it
+    # so we don't emit a phantom blank.
+    if lines and lines[-1] == "":
+        lines.pop()
+
+    sections: list[tuple[str, list[str]]] = []
+    leading: list[str] = []
+    i = 0
+    n = len(lines)
+    while i < n and lines[i] == "":
+        leading.append(lines[i])
+        i += 1
+
+    while i < n:
+        line = lines[i]
+        match = re.match(r"^([A-Za-z_][\w-]*)\s*:", line)
+        if not match:
+            # Unrecognized shape (a stray comment, say). Attach to the
+            # previous section so it travels with it, or to `leading` if
+            # nothing's been seen yet.
+            if sections:
+                sections[-1][1].append(line)
+            else:
+                leading.append(line)
+            i += 1
+            continue
+
+        key = match.group(1)
+        block_lines: list[str] = [line]
+        i += 1
+        while i < n:
+            nxt = lines[i]
+            if nxt == "" or nxt.startswith(" ") or nxt.startswith("\t"):
+                block_lines.append(nxt)
+                i += 1
+                continue
+            break
+        sections.append((key, block_lines))
+
+    pairs = [(key, "\n".join(block_lines) + "\n") for key, block_lines in sections]
+    leading_text = ("\n".join(leading) + "\n") if leading else ""
+    return pairs, leading_text
+
+
+def _canonical_index(key: str) -> int:
+    if key in _CANONICAL_FRONTMATTER_KEYS:
+        return _CANONICAL_FRONTMATTER_KEYS.index(key)
+    return len(_CANONICAL_FRONTMATTER_KEYS)
 
 
 def _format_root(nodes: list[Node], *, indent_size: int, width: int) -> str:

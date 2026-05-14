@@ -81,6 +81,51 @@ def test_check_reports_directive_shape_error(tmp_path: Path) -> None:
     assert ":include" in result.output
 
 
+def test_check_reports_invalid_attr_declaration(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path,
+        "bad.html",
+        "---\nattrs:\n  bad-name: str\n---\n<p>hi</p>\n",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert f"{path}:1:1:" in result.output
+    assert "bad-name" in result.output
+
+
+def test_check_reports_invalid_import_statement(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path,
+        "bad.html",
+        "---\nimports:\n  - x = 1\n---\n<p>hi</p>\n",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert f"{path}:1:1:" in result.output
+    assert "import" in result.output.lower()
+
+
+def test_check_reports_invalid_slot_form(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path,
+        "bad.html",
+        "---\nslots:\n  header: whatever\n---\n<p>hi</p>\n",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert f"{path}:1:1:" in result.output
+    assert "header" in result.output
+
+
 def test_check_accepts_single_file(tmp_path: Path) -> None:
     path = _write(tmp_path, "ok.html", "<p>hi</p>\n")
 
@@ -88,6 +133,55 @@ def test_check_accepts_single_file(tmp_path: Path) -> None:
     result = runner.invoke(cli, ["check", str(path)])
 
     assert result.exit_code == 0
+
+
+def test_collect_files_default_excludes_installed_packages(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The default walk only touches the project's own `app/html/`."""
+    from plain.html import cli as cli_mod
+
+    app_dir = tmp_path / "app" / "html"
+    pkg_dir = tmp_path / "site-packages" / "plain" / "admin" / "html"
+    (app_dir / "ok.html").parent.mkdir(parents=True)
+    (app_dir / "ok.html").write_text("<p>hi</p>\n")
+    (pkg_dir / "x.html").parent.mkdir(parents=True)
+    (pkg_dir / "x.html").write_text("<p>hi</p>\n")
+
+    monkeypatch.setattr(cli_mod, "get_html_dirs", lambda: (app_dir, pkg_dir))
+
+    default = cli_mod._collect_files(())
+    assert default == [app_dir / "ok.html"]
+
+    opted_in = cli_mod._collect_files((), include_installed_packages=True)
+    assert opted_in == sorted([app_dir / "ok.html", pkg_dir / "x.html"])
+
+
+def test_check_include_installed_packages_warning(monkeypatch, tmp_path: Path) -> None:
+    """Opting in prints a warning explaining the implication."""
+    from plain.html import cli as cli_mod
+
+    app_dir = tmp_path / "app" / "html"
+    pkg_dir = tmp_path / "site-packages" / "plain" / "admin" / "html"
+    (app_dir).mkdir(parents=True)
+    (pkg_dir).mkdir(parents=True)
+    (app_dir / "ok.html").write_text("<p>hi</p>\n")
+
+    monkeypatch.setattr(cli_mod, "get_html_dirs", lambda: (app_dir, pkg_dir))
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", "--include-installed-packages"])
+
+    assert result.exit_code == 0
+    assert "owned by their packages" in result.output
+
+
+def test_check_flag_hidden_from_help() -> None:
+    """The opt-in flag must not appear in --help."""
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", "--help"])
+    assert result.exit_code == 0
+    assert "--include-installed-packages" not in result.output
 
 
 def test_check_skips_non_html_files(tmp_path: Path) -> None:

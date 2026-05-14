@@ -18,6 +18,8 @@ from .typecheck import check_path as typecheck_path
 from .typecheck import check_source as typecheck_source
 from .typecheck.backends import BackendError
 from .typecheck.backends import resolve as resolve_backend
+from .typecheck.declarations import DeclarationError
+from .typecheck.declarations import parse as parse_declarations
 
 
 @register_cli("html")
@@ -48,11 +50,23 @@ def cli() -> None:
     is_flag=True,
     help="Skip the typecheck result cache (full subprocess run every file)",
 )
+@click.option(
+    "--include-installed-packages",
+    "include_installed_packages",
+    is_flag=True,
+    hidden=True,
+    help=(
+        "Also check templates shipped by installed Plain packages "
+        "(plain.admin, plain.toolbar, …). For framework / package "
+        "development only — end-user projects should leave this off."
+    ),
+)
 def check(
     paths: tuple[str, ...],
     run_typecheck: bool,
     backend_name: str | None,
     no_cache: bool,
+    include_installed_packages: bool,
 ) -> None:
     """Check .html templates for syntax and structural errors
 
@@ -71,10 +85,22 @@ def check(
         )
         return
 
-    files = _collect_files(_paths_to_paths(paths))
+    files = _collect_files(
+        _paths_to_paths(paths),
+        include_installed_packages=include_installed_packages,
+    )
     if not files:
         click.secho("No .html templates found", fg="yellow")
         return
+
+    if include_installed_packages and not paths:
+        click.secho(
+            "Note: also checking templates shipped by installed Plain packages. "
+            "Those are owned by their packages — report problems upstream rather "
+            "than editing locally.",
+            fg="yellow",
+            err=True,
+        )
 
     print_event(f"Checking {len(files)} template(s)...")
 
@@ -122,9 +148,15 @@ def _check_stdin(
     body_offset = _body_offset(source)
 
     try:
-        _, body = split_frontmatter(source)
+        fmdict, body = split_frontmatter(source)
     except Exception as e:
         click.echo(f"<stdin>:1:1: frontmatter parse error: {e}", err=True)
+        sys.exit(1)
+
+    try:
+        parse_declarations(fmdict)
+    except DeclarationError as e:
+        click.echo(f"<stdin>:1:1: {e}", err=True)
         sys.exit(1)
 
     try:
@@ -177,7 +209,21 @@ def _paths_to_paths(paths: tuple[str, ...]) -> tuple[Path, ...]:
     is_flag=True,
     help="Exit non-zero if files would change; do not write",
 )
-def format_cmd(paths: tuple[str, ...], check_only: bool) -> None:
+@click.option(
+    "--include-installed-packages",
+    "include_installed_packages",
+    is_flag=True,
+    hidden=True,
+    help=(
+        "Also format templates shipped by installed Plain packages. "
+        "For framework / package development only."
+    ),
+)
+def format_cmd(
+    paths: tuple[str, ...],
+    check_only: bool,
+    include_installed_packages: bool,
+) -> None:
     """Format .html templates in place
 
     Pass `-` to read source from stdin and write the formatted output to
@@ -189,10 +235,22 @@ def format_cmd(paths: tuple[str, ...], check_only: bool) -> None:
         _format_stdin(check_only=check_only)
         return
 
-    files = _collect_files(_paths_to_paths(paths))
+    files = _collect_files(
+        _paths_to_paths(paths),
+        include_installed_packages=include_installed_packages,
+    )
     if not files:
         click.secho("No .html templates found", fg="yellow")
         return
+
+    if include_installed_packages and not paths:
+        click.secho(
+            "Note: also formatting templates shipped by installed Plain packages. "
+            "Those are owned by their packages — changes will be lost on the "
+            "next package upgrade.",
+            fg="yellow",
+            err=True,
+        )
 
     print_event(f"Formatting {len(files)} template(s)...")
 
@@ -252,11 +310,21 @@ def _format_stdin(*, check_only: bool) -> None:
     sys.stdout.write(out)
 
 
-def _collect_files(paths: tuple[Path, ...]) -> list[Path]:
+def _collect_files(
+    paths: tuple[Path, ...], *, include_installed_packages: bool = False
+) -> list[Path]:
     if not paths:
-        return sorted(
-            {f for d in get_html_dirs() if d.is_dir() for f in d.rglob("*.html")}
-        )
+        # Default: only the project's own `app/html/`. Installed-package
+        # templates are owned by their packages — checking them produces
+        # diagnostics the end user can't act on. The
+        # `--include-installed-packages` flag opts in for framework /
+        # package development.
+        if include_installed_packages:
+            dirs = [d for d in get_html_dirs() if d.is_dir()]
+        else:
+            app_html, *_ = get_html_dirs()
+            dirs = [app_html] if app_html.is_dir() else []
+        return sorted({f for d in dirs for f in d.rglob("*.html")})
 
     files: set[Path] = set()
     for p in paths:
@@ -272,9 +340,14 @@ def _check_file(path: Path) -> list[str]:
     source = path.read_text(encoding="utf-8")
 
     try:
-        _, body = split_frontmatter(source)
+        fmdict, body = split_frontmatter(source)
     except Exception as e:
         return [f"{path}:1:1: frontmatter parse error: {e}"]
+
+    try:
+        parse_declarations(fmdict)
+    except DeclarationError as e:
+        return [f"{path}:1:1: {e}"]
 
     body_offset = _body_offset(source)
 
