@@ -97,9 +97,60 @@ def test_format_preserves_unknown_colon_directive():
     assert ":something={value}" in out
 
 
+def test_format_reescapes_literal_braces_in_text():
+    # Source uses `{{`/`}}` to mean a literal `{`/`}`. Tokenizer decodes
+    # them on the way in; formatter must re-encode on the way out or the
+    # re-parsed output mistakes them for an expression.
+    src = "<pre>{{ literal }}</pre>"
+    out = format_source(src)
+    assert "{{ literal }}" in out
+    # And it must be idempotent.
+    assert format_source(out) == out
+
+
+def test_format_does_not_reescape_braces_in_script_body():
+    # Script bodies are opaque to the tokenizer — `{` stays `{`, no
+    # escape was applied, so the formatter must not double up.
+    src = "<script>function f() { return 1; }</script>"
+    out = format_source(src)
+    assert "function f() { return 1; }" in out
+    assert format_source(out) == out
+
+
 def test_format_boolean_attribute():
     src = "<input disabled>"
     assert format_source(src) == "<input disabled>\n"
+
+
+def test_format_collapses_boolean_attribute_value():
+    src = '<input disabled="disabled">'
+    assert format_source(src) == "<input disabled>\n"
+
+
+def test_format_does_not_collapse_non_matching_value():
+    # Only `attr="attr"` collapses. Different content stays.
+    src = '<input data-state="data-state-other">'
+    out = format_source(src)
+    assert 'data-state="data-state-other"' in out
+
+
+def test_format_uses_single_quotes_when_value_contains_double():
+    # Compose a value that contains a literal `"`. We hand-build via
+    # attribute segments rather than parsing source so we test the
+    # emitter directly.
+    from plain.html.format import _format_attribute
+    from plain.html.tokenizer import Attribute, AttrText
+
+    attr = Attribute(name="data-json", segments=[AttrText('a "quoted" value')])
+    assert _format_attribute(attr) == "data-json='a \"quoted\" value'"
+
+
+def test_format_keeps_double_quotes_when_no_conflict():
+    from plain.html.format import _format_attribute
+    from plain.html.tokenizer import Attribute, AttrText
+
+    attr = Attribute(name="title", segments=[AttrText("plain value")])
+    assert _format_attribute(attr) == 'title="plain value"'
 
 
 def test_format_attribute_with_expression():

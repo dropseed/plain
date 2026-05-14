@@ -25,11 +25,14 @@ Hard invariants:
    content), the formatter may add or remove newlines and indentation —
    the rendered HTML remains equivalent under browser parsing.
 
-Known v0 limitations:
+Deliberate canonical-form choices (not bugs):
 
-- Directives (`:if`, `:for`, `:include`, `slot`) emit before user
-  attributes in a fixed order. The parser doesn't preserve their original
-  position; idempotency still holds.
+- Directives (`:if`, `:for`, `:include`, `slot`, plus reserved `:`-prefixed
+  attrs like `:as`) emit before user attributes in a fixed order, not in
+  the author's original position. Rationale: in plain.html, directives are
+  control flow (the engine acts on them), distinct from data attributes.
+  Putting them first makes them scan-readable like an if-statement header
+  and groups them away from HTML output attributes.
 """
 
 from __future__ import annotations
@@ -103,7 +106,12 @@ def _format_node(node: Node, *, indent: int, indent_size: int, width: int) -> st
     """Render one node as a string. Caller controls surrounding whitespace."""
     match node:
         case TextNode():
-            return node.text
+            # Re-encode literal braces — the tokenizer decoded `{{`/`}}` into
+            # single `{`/`}` on the way in, so on the way out we restore the
+            # escape or the re-parsed bytes become a live `{...}` expression.
+            # The script/style path below bypasses this; their bodies are
+            # opaque and the tokenizer never decoded them.
+            return node.text.replace("{", "{{").replace("}", "}}")
         case ExprNode():
             return "{" + node.code + "}"
         case HtmlCommentNode():
@@ -133,14 +141,18 @@ def _format_element(
     close_tag = f"</{node.tag}>"
 
     if is_verbatim(node.tag):
-        # `<script>`/`<style>` bodies are a single opaque text node per the
-        # tokenizer's opaque-body rule. `<pre>`/`<textarea>` bodies tokenize
-        # normally, so expression nodes can appear — emit every child
-        # byte-for-byte preserving original whitespace.
-        body = "".join(
-            _format_node(c, indent=indent, indent_size=indent_size, width=width)
-            for c in node.children
-        )
+        if node.tag in ("script", "style"):
+            # Opaque body: tokenizer captured the full text verbatim without
+            # decoding brace escapes. Emit byte-for-byte; do not re-escape.
+            body = "".join(c.text for c in node.children if isinstance(c, TextNode))
+        else:
+            # `<pre>`/`<textarea>` bodies tokenize normally — text and
+            # expression nodes both appear, brace escapes were decoded on
+            # the way in, and `_format_node` re-encodes them on the way out.
+            body = "".join(
+                _format_node(c, indent=indent, indent_size=indent_size, width=width)
+                for c in node.children
+            )
         return f"{open_tag}{body}{close_tag}"
 
     if not node.children:
@@ -274,8 +286,16 @@ def _format_attribute(attr: Attribute) -> str:
     # already canonicalize to.
     if len(attr.segments) == 1 and isinstance(attr.segments[0], AttrExpr):
         return f"{attr.name}={{{attr.segments[0].code}}}"
+    # HTML5 boolean attribute: `disabled="disabled"` collapses to `disabled`.
+    if (
+        len(attr.segments) == 1
+        and isinstance(attr.segments[0], AttrText)
+        and attr.segments[0].text == attr.name
+    ):
+        return attr.name
     rendered = _format_attr_value(attr.segments)
-    return f'{attr.name}="{rendered}"'
+    quote = '"' if '"' not in rendered or "'" in rendered else "'"
+    return f"{attr.name}={quote}{rendered}{quote}"
 
 
 def _format_attr_value(segments: list[AttrText | AttrExpr]) -> str:
