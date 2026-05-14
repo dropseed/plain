@@ -74,19 +74,12 @@ CASES: list[tuple[str, str, str, dict, int]] = [
             </li>
             {% endfor %}
         </ul>""",
-        {
-            "items": [
-                {"id": i, "name": f"Item {i}", "count": i * 7}
-                for i in range(50)
-            ]
-        },
+        {"items": [{"id": i, "name": f"Item {i}", "count": i * 7} for i in range(50)]},
         1_000,
     ),
     (
         "expression_heavy",
-        "<div>"
-        + "".join(f"<span>{{f_{i}}}</span>" for i in range(50))
-        + "</div>",
+        "<div>" + "".join(f"<span>{{f_{i}}}</span>" for i in range(50)) + "</div>",
         "<div>"
         + "".join(f"<span>{{{{ f_{i} }}}}</span>" for i in range(50))
         + "</div>",
@@ -122,12 +115,7 @@ CASES: list[tuple[str, str, str, dict, int]] = [
                 {% if not u['active'] %}<span>(inactive: {{ u['name'] }})</span>{% endif %}
             </p>{% endfor %}
         </div>""",
-        {
-            "users": [
-                {"name": f"User {i}", "active": i % 2 == 0}
-                for i in range(50)
-            ]
-        },
+        {"users": [{"name": f"User {i}", "active": i % 2 == 0} for i in range(50)]},
         1_000,
     ),
 ]
@@ -228,16 +216,12 @@ def main() -> None:
         # 2) + tree cache
         _restore_eval()
         _cached_parse.cache_clear()
-        tree_cached = time_callable(
-            lambda: render_with_tree_cache(p_src, ctx), iters
-        )
+        tree_cached = time_callable(lambda: render_with_tree_cache(p_src, ctx), iters)
 
         # 3) + tree cache + compiled-expression cache
         _install_expression_cache()
         _cached_parse.cache_clear()
-        both_cached = time_callable(
-            lambda: render_with_tree_cache(p_src, ctx), iters
-        )
+        both_cached = time_callable(lambda: render_with_tree_cache(p_src, ctx), iters)
         _restore_eval()
 
         # 4) Jinja — compile once, then call .render(**ctx).

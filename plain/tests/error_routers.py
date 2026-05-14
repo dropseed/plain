@@ -1,9 +1,9 @@
 """Minimal error-raising views for plain core tests.
 
 The template-using error fixtures (and the `{status}.html` rendering
-integration tests) live in plain-templates. This module keeps only what
+integration tests) live in plain-html. This module keeps only what
 plain core needs: a plain `View` that raises a 500 so OTel exception
-recording can be exercised without depending on the templates package.
+recording can be exercised without depending on plain.html.
 """
 
 from __future__ import annotations

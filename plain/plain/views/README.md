@@ -62,10 +62,10 @@ The [base `View` class](./base.py#View) provides default `options` and `head` be
 
 ## Template-rendering views
 
-Views that render Jinja templates (`TemplateView`, `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) live in the [`plain.templates`](../../../plain-templates/plain/templates/README.md) package. Install `plain.templates` and import them from `plain.templates.views`:
+Views that render HTML templates (`TemplateView`, `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) live in the [`plain.html`](../../../plain-html/plain/html/README.md) package. Install `plain.html` and import them from `plain.html.views`:
 
 ```python
-from plain.templates.views import TemplateView
+from plain.html.views import TemplateView
 
 
 class ExampleView(TemplateView):
@@ -226,7 +226,7 @@ class MyView(View):
         return super().handle_exception(exc)
 ```
 
-The base `View.handle_exception` re-raises, so unhandled cases fall through to the framework default — which returns a plain-text status line (`404 Not Found`, `500 Internal Server Error`, etc.). View subclasses that want a richer format override the hook: `TemplateView` renders [`{status}.html`](../../../../plain-templates/plain/templates/README.md#error-views), `APIView` emits JSON.
+The base `View.handle_exception` re-raises, so unhandled cases fall through to the framework default — which returns a plain-text status line (`404 Not Found`, `500 Internal Server Error`, etc.). View subclasses that want a richer format override the hook: `TemplateView` renders [`{status}.html`](../../../../plain-html/plain/html/README.md#error-views), `APIView` emits JSON.
 
 `ResponseException` is unwrapped by `get_response` before `handle_exception` runs, so you don't need to handle it in overrides. Returning a **5xx** response is treated as a real failure: the framework logs the exception once (via `log_exception`) and attaches it to `response.exception` so observability tooling can record it. Returning a **4xx** response is silent — the view chose to render it as a handled outcome.
 
@@ -261,12 +261,12 @@ class ExampleView(View):
 
 ## Error views
 
-Plain core's exception handler returns plain text — `404 Not Found`, `500 Internal Server Error`, etc. Styled error pages live in [`plain.templates`](../../../../plain-templates/plain/templates/README.md#error-views): `TemplateView.handle_exception` looks for `{status_code}.html` and renders it with `request`, `status_code`, `exception`, and `DEBUG` in context, falling back to plain text on `TemplateFileMissing`.
+Plain core's exception handler returns plain text — `404 Not Found`, `500 Internal Server Error`, etc. Styled error pages live in [`plain.html`](../../../../plain-html/plain/html/README.md#error-views): `TemplateView.handle_exception` looks for `{status_code}.html` and renders it with `request`, `status_code`, `exception`, and `DEBUG` in context, falling back to plain text on `TemplateFileMissing`.
 
-To get a styled 404 for URL-resolution failures (where no view runs), mount [`NotFoundView`](../../../../plain-templates/plain/templates/views.py#NotFoundView) as the last route:
+To get a styled 404 for URL-resolution failures (where no view runs), mount [`NotFoundView`](../../../../plain-html/plain/html/views.py#NotFoundView) as the last route:
 
 ```python
-from plain.templates.views import NotFoundView
+from plain.html.views import NotFoundView
 from plain.urls import path
 
 urls = [

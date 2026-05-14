@@ -1,10 +1,11 @@
-"""Bridges to existing Jinja-rendered package templates.
+"""Package-helper shims exposed as plain.html globals.
 
-The migration plan ports package templates to `.plain` over many phases. In
-the meantime, templates that already render through `plain.html` need a way
-to invoke package helpers (`tailwind_css`, `pageviews_js`, `toolbar`) whose
-internals are still Jinja. These shims render the underlying Jinja template
-on demand and return `Markup` so plain.html doesn't re-escape the HTML.
+Templates interpolate `{tailwind_css()}` / `{htmx_js(request)}` /
+`{pageviews_js(request)}` / `{toolbar(request)}` to render the
+corresponding fragment. Each one finds the package's template
+(`tailwind/css`, `htmx/js`, etc.) via the plain.html loader and
+renders it inline. Eventually these can move into their home
+packages and become regular template-side `imports:`.
 """
 
 from __future__ import annotations
@@ -12,13 +13,6 @@ from __future__ import annotations
 from typing import Any
 
 from plain.utils.safestring import SafeString, mark_safe
-
-
-def _render_jinja(template_name: str, context: dict[str, Any]) -> SafeString:
-    from plain.templates.jinja import environment
-
-    template = environment.get_template(template_name)
-    return mark_safe(template.render(context))
 
 
 def tailwind_css() -> SafeString:

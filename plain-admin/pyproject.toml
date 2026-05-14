@@ -11,7 +11,7 @@ dependencies = [
   "plain.auth>=0.29.0,<1.0.0",
   "plain.htmx<1.0.0",
   "plain.tailwind>=0.21.0,<1.0.0",
-  "plain.templates>=0.1.0,<1.0.0",
+  "plain.html<1.0.0",
 ]
 
 [dependency-groups]

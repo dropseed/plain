@@ -9,7 +9,9 @@ requires-python = ">=3.13"
 dependencies = ["plain<1.0.0", "python-frontmatter>=1.1.0"]
 
 [dependency-groups]
-dev = ["plain.pytest<1.0.0", "html5lib>=1.1"]
+# `ty` is pinned in dev — Phase 9 (`plain html check --typecheck`) shells out
+# to it. Alpha tool: bump deliberately, not by lockfile drift.
+dev = ["plain.pytest<1.0.0", "html5lib>=1.1", "ty==0.0.34"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

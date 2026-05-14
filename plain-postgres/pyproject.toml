@@ -16,7 +16,7 @@ dependencies = ["plain>=0.134.0,<1.0.0", "psycopg>=3.2", "psycopg-pool>=3.2"]
 "plain.postgres" = "plain.postgres.test.pytest"
 
 [dependency-groups]
-dev = ["plain.pytest<1.0.0", "plain.templates>=0.1.0,<1.0.0", "opentelemetry-sdk>=1.34.1"]
+dev = ["plain.pytest<1.0.0", "plain.html<1.0.0", "opentelemetry-sdk>=1.34.1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

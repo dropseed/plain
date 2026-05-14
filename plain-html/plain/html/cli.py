@@ -14,6 +14,10 @@ from .frontmatter import split as split_frontmatter
 from .loader import get_html_dirs
 from .parser import ParseError, parse
 from .tokenizer import TokenizeError, tokenize
+from .typecheck import check_path as typecheck_path
+from .typecheck import check_source as typecheck_source
+from .typecheck.backends import BackendError
+from .typecheck.backends import resolve as resolve_backend
 
 
 @register_cli("html")
@@ -25,16 +29,46 @@ def cli() -> None:
 
 @cli.command()
 @click.argument("paths", nargs=-1)
-def check(paths: tuple[str, ...]) -> None:
+@click.option(
+    "--typecheck",
+    "-t",
+    "run_typecheck",
+    is_flag=True,
+    help="Also type-check `{expr}` against the template's `attrs:` / `imports:`",
+)
+@click.option(
+    "--backend",
+    "backend_name",
+    default=None,
+    help="Typecheck backend to use (default: ty; pyright also supported).",
+)
+@click.option(
+    "--no-cache",
+    "no_cache",
+    is_flag=True,
+    help="Skip the typecheck result cache (full subprocess run every file)",
+)
+def check(
+    paths: tuple[str, ...],
+    run_typecheck: bool,
+    backend_name: str | None,
+    no_cache: bool,
+) -> None:
     """Check .html templates for syntax and structural errors
 
     Pass `-` to read source from stdin; errors print to stderr as
-    `<stdin>:line:col: message`.
+    `<stdin>:line:col: message`. Add `--typecheck` to also run the
+    template's `{expr}` content through the configured Python type
+    checker (ty by default).
     """
     if "-" in paths:
         if len(paths) != 1:
             raise click.UsageError("Cannot mix `-` with other paths")
-        _check_stdin()
+        _check_stdin(
+            run_typecheck=run_typecheck,
+            backend_name=backend_name,
+            use_cache=not no_cache,
+        )
         return
 
     files = _collect_files(_paths_to_paths(paths))
@@ -44,11 +78,29 @@ def check(paths: tuple[str, ...]) -> None:
 
     print_event(f"Checking {len(files)} template(s)...")
 
+    backend = None
+    if run_typecheck:
+        try:
+            backend = resolve_backend(backend_name)
+        except BackendError as e:
+            click.secho(str(e), fg="red", err=True)
+            sys.exit(2)
+
     error_count = 0
     for path in files:
         for line in _check_file(path):
             click.echo(line)
             error_count += 1
+        if run_typecheck and backend is not None:
+            try:
+                results = typecheck_path(path, backend=backend, use_cache=not no_cache)
+            except BackendError as e:
+                click.echo(f"{path}: typecheck error: {e}", err=True)
+                error_count += 1
+                continue
+            for err in results:
+                click.echo(err.format())
+                error_count += 1
 
     if error_count:
         click.secho(
@@ -60,7 +112,12 @@ def check(paths: tuple[str, ...]) -> None:
     click.secho("All templates checked", fg="green")
 
 
-def _check_stdin() -> None:
+def _check_stdin(
+    *,
+    run_typecheck: bool = False,
+    backend_name: str | None = None,
+    use_cache: bool = True,
+) -> None:
     source = sys.stdin.read()
     body_offset = _body_offset(source)
 
@@ -85,6 +142,18 @@ def _check_stdin() -> None:
             _format_error_with_label("<stdin>", source, body_offset, e), err=True
         )
         sys.exit(1)
+
+    if run_typecheck:
+        try:
+            backend = resolve_backend(backend_name)
+            results = typecheck_source(source, backend=backend, use_cache=use_cache)
+        except BackendError as e:
+            click.echo(f"<stdin>: typecheck error: {e}", err=True)
+            sys.exit(1)
+        if results:
+            for err in results:
+                click.echo(err.format(), err=True)
+            sys.exit(1)
 
 
 def _paths_to_paths(paths: tuple[str, ...]) -> tuple[Path, ...]:

@@ -22,7 +22,6 @@ ALL_PACKAGES="$(cat <<EOF
 plain
 plain-postgres
 plain-assets
-plain-templates
 plain-sessions
 plain-jobs
 plain-flags

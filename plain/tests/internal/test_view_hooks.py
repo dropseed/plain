@@ -210,7 +210,7 @@ class TestHandleExceptionLogging:
         assert len(server_errors) == 1
 
     def test_falls_back_to_plain_text_when_templates_not_registered(self, monkeypatch):
-        """`plain.templates` importable but not in INSTALLED_PACKAGES → plain text.
+        """`plain.html` importable but not in INSTALLED_PACKAGES → plain text.
 
         Pins the registry-label guard added to handle the "monorepo dev mode"
         case where the package is on the Python path but never registered.

@@ -10,7 +10,7 @@ dependencies = [
   "plain>=0.145.0,<1.0.0",
   "plain.auth>=0.29.0,<1.0.0",
   "plain.postgres>=0.96.0,<1.0.0",
-  "plain.templates>=0.1.0,<1.0.0",
+  "plain.html<1.0.0",
   "requests>=2.0.0",
 ]
 

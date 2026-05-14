@@ -6,7 +6,7 @@ authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["plain>=0.143.0,<1.0.0", "plain.templates>=0.1.0,<1.0.0"]
+dependencies = ["plain>=0.143.0,<1.0.0", "plain.html<1.0.0"]
 
 [dependency-groups]
 dev = ["plain.pytest<1.0.0"]

@@ -28,7 +28,7 @@ Run `uv run plain docs runtime` for full details on env var syntax, `.env` files
 
 ## Key Differences from Django
 
-Plain is a Django fork but has different APIs. Package-specific differences are in their respective rules (plain-postgres, plain-templates, plain-test). These are the core framework differences:
+Plain is a Django fork but has different APIs. Package-specific differences are in their respective rules (plain-postgres, plain-test). These are the core framework differences:
 
 - **URLs**: Use `Router` with `urls` list, not Django's `urlpatterns`
 - **Request data**: Use `request.query_params` not `request.GET`, `request.form_data` not `request.POST`, `request.json_data` not `json.loads(request.body)`, `request.files` not `request.FILES`
@@ -86,7 +86,7 @@ If the exception propagates out of the span context, the SDK auto-records and se
 - Chore execution — CONSUMER (`plain/cli/chores.py`)
 - MCP RPC dispatch — SERVER (`plain-mcp/mcp/views.py`)
 
-Trace-context-only (not error attribution): template render (`plain-templates`), DB queries / email sends (CLIENT — same role).
+Trace-context-only (not error attribution): template render (`plain-html`), DB queries / email sends (CLIENT — same role).
 
 ## Documentation
 
@@ -103,7 +103,7 @@ Trace-context-only (not error attribution): template render (`plain-templates`),
 
 **Workflow**: Use `--search <term>` to find which module has what you need, then read the full doc, or run `<name> --search <term>` to print just the matching sections.
 
-Packages: plain, plain-admin, plain-api, plain-assets, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-observer, plain-pages, plain-pageviews, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-support, plain-tailwind, plain-templates, plain-toolbar, plain-tunnel, plain-vendor
+Packages: plain, plain-admin, plain-api, plain-assets, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-email, plain-esbuild, plain-flags, plain-html, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-observer, plain-pages, plain-pageviews, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-support, plain-tailwind, plain-toolbar, plain-tunnel, plain-vendor
 
 Core modules: agents, chores, cli, csrf, forms, http, logs, packages, preflight, runtime, server, test, urls, utils, views
 

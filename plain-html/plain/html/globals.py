@@ -2,10 +2,8 @@
 
 Templates have URL helpers, time helpers, `mark_safe`/`Markup`, and the
 package-shim helpers (`tailwind_css`, `htmx_js`, etc.) available without
-declaring them in their `imports:` block. Packages can add their own
-globals via `register()`; transitionally we also pull in anything
-plain.templates.jinja registered via `@register_template_global` so
-existing callers keep working.
+declaring them in their `imports:` block. Packages add their own globals
+via `register()` / `@register_global`.
 """
 
 from __future__ import annotations
@@ -65,23 +63,15 @@ def all_globals() -> dict[str, Any]:
 
 
 def _load_defaults() -> None:
-    """Pick up Jinja-side `@register_template_global` entries and bind the
-    package-helper shims (`tailwind_css`, `htmx_js`, `pageviews_js`,
-    `toolbar`) onto the plain.html scope. Both halves are transitional —
-    the Jinja scan goes away once every package switches to plain.html
-    registration; the shims move into their home packages once templates
+    """Bind the package-helper shims (`tailwind_css`, `htmx_js`,
+    `pageviews_js`, `toolbar`) onto the plain.html scope and trigger
+    autodiscovery of each installed package's `templates.py` module so
+    its `@register_global` calls fire.
+
+    Transitional: the shims move into their home packages once templates
     learn to `imports:` them.
     """
-    try:
-        from plain.templates.jinja import environment
-    except ImportError:
-        pass
-    else:
-        try:
-            for name, value in environment.globals.items():  # type: ignore[attr-defined]
-                _GLOBALS.setdefault(name, value)
-        except Exception:
-            pass
+    from plain.packages import packages_registry
 
     from . import _shims
 
@@ -89,3 +79,9 @@ def _load_defaults() -> None:
     _GLOBALS.setdefault("pageviews_js", _shims.pageviews_js)
     _GLOBALS.setdefault("htmx_js", _shims.htmx_js)
     _GLOBALS.setdefault("toolbar", _shims.toolbar)
+
+    # Import each installed package's `templates` submodule so any
+    # `@register_global` / `register()` calls run. Side-effect imports,
+    # but matches the pattern Jinja used and keeps package authors from
+    # having to manage import order by hand.
+    packages_registry.autodiscover_modules("templates", include_app=True)
