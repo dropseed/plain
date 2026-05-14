@@ -55,31 +55,37 @@ class ElementNode:
     # `:as` and any other `:`-prefixed attr the engine doesn't recognize.
     # Held on the node so the formatter can round-trip them; the renderer
     # ignores them.
+    offset: int = 0  # body offset of the start tag, for source mapping
 
 
 @dataclass
 class TextNode:
     text: str
+    offset: int = 0
 
 
 @dataclass
 class ExprNode:
     code: str
+    offset: int = 0
 
 
 @dataclass
 class HtmlCommentNode:
     text: str
+    offset: int = 0
 
 
 @dataclass
 class TemplateCommentNode:
     text: str
+    offset: int = 0
 
 
 @dataclass
 class DoctypeNode:
     text: str
+    offset: int = 0
 
 
 Node = (
@@ -102,15 +108,17 @@ def parse(tokens: list[Token]) -> list[Node]:
     for tok in tokens:
         match tok:
             case TextToken():
-                parent_children().append(TextNode(tok.text))
+                parent_children().append(TextNode(tok.text, offset=tok.offset))
             case ExprToken():
-                parent_children().append(ExprNode(tok.code))
+                parent_children().append(ExprNode(tok.code, offset=tok.offset))
             case HtmlCommentToken():
-                parent_children().append(HtmlCommentNode(tok.text))
+                parent_children().append(HtmlCommentNode(tok.text, offset=tok.offset))
             case TemplateCommentToken():
-                parent_children().append(TemplateCommentNode(tok.text))
+                parent_children().append(
+                    TemplateCommentNode(tok.text, offset=tok.offset)
+                )
             case DoctypeToken():
-                parent_children().append(DoctypeNode(tok.text))
+                parent_children().append(DoctypeNode(tok.text, offset=tok.offset))
             case StartTagToken():
                 node = _make_element(tok)
                 parent_children().append(node)
@@ -178,6 +186,7 @@ def _make_element(tok: StartTagToken) -> ElementNode:
         include_path_code=include_path_code,
         slot_name=slot_name,
         reserved_directives=reserved_directives,
+        offset=tok.offset,
     )
 
 

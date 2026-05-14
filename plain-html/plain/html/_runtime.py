@@ -8,20 +8,51 @@ aliasing of attr names.
 
 from __future__ import annotations
 
+import html as _html
 import keyword
 from collections.abc import Callable, Iterable
+from typing import cast
 
 from plain.utils.html import conditional_escape
+from plain.utils.safestring import SafeString
+
+# Module-local alias kept hot in the closure — `html.escape` is by far the
+# common case and we want to skip the LOAD_GLOBAL chain `_html.escape`.
+_html_escape = _html.escape
+
+
+# Built-in numeric/bool types whose `str(...)` form is guaranteed to contain
+# no HTML-special characters — skipping `html.escape` on them is correct and
+# saves a real chunk of time in expression-heavy templates.
+_NUMERIC_TYPES = (int, float, bool)
 
 
 def escape_html(value: object) -> str:
     """Render a value for HTML text content.
 
-    Mirrors `engine._escape_to_str`: `None` → `""`, everything else runs
-    through `conditional_escape` (which respects `SafeString`).
+    Hot paths:
+      - `str` → `html.escape(value)` directly
+      - `SafeString` → returned as-is (already escaped)
+      - `None` → `""`
+      - `int` / `float` / `bool` → `str(value)` (no HTML specials possible)
+
+    Anything else falls back to the general `conditional_escape` path
+    (lazy promises, objects with `__html__`, custom types). The fast
+    paths cover the 95% case and skip the per-call overhead
+    `conditional_escape` adds.
     """
     if value is None:
         return ""
+    # `type is X` checks (not `isinstance`) — SafeString subclasses str
+    # but we want it on a separate branch so raw str hits `html.escape`
+    # without an extra dispatch.
+    t = type(value)
+    if t is str:
+        return _html_escape(cast(str, value))
+    if t is SafeString:
+        return cast(str, value)
+    if t in _NUMERIC_TYPES:
+        return str(value)
     return str(conditional_escape(value))
 
 
@@ -29,6 +60,13 @@ def escape_attr(value: object) -> str:
     """Render a value for an HTML attribute value (between quotes)."""
     if value is None:
         return ""
+    t = type(value)
+    if t is str:
+        return _html_escape(cast(str, value))
+    if t is SafeString:
+        return cast(str, value)
+    if t in _NUMERIC_TYPES:
+        return str(value)
     return str(conditional_escape(value))
 
 
@@ -51,7 +89,20 @@ def escape_url(value: object) -> str:
     """
     if value is None:
         return ""
-    text = str(value).lstrip()
+    if type(value) is str:
+        text = value
+    else:
+        text = str(value)
+    # Strip leading whitespace only if there's any — common-case relative
+    # URLs (`/foo`, `bar`) don't have any and the check is faster than
+    # always calling `.lstrip()`.
+    if text and text[0] in " \t\n\r\f\v":
+        text = text.lstrip()
+    # Hot path: relative URL — first non-special char is `/`, `?`, `#`, or
+    # the string starts with `\`. Skip the scheme loop entirely. This is
+    # by far the most common shape for `href=` / `src=` in app templates.
+    if text and text[0] in "/?#\\":
+        return _html_escape(text)
     # Locate the scheme separator without picking up colons that belong to
     # a path/query/fragment: stop at the first `/`, `?`, `#`, or `\`.
     colon = -1
@@ -63,7 +114,7 @@ def escape_url(value: object) -> str:
             break
     if colon > 0 and text[:colon].lower() not in SAFE_URL_SCHEMES:
         return ""
-    return escape_attr(text)
+    return _html_escape(text)
 
 
 def render_dyn_attr(name: str, value: object) -> str:

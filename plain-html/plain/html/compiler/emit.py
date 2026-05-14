@@ -1,15 +1,23 @@
 """Codegen — walk a parsed tag tree and emit a Python `render()` module.
 
-Each emitted module's `render()` returns a single str. Adjacent literal
-text is constant-folded into one `_append(...)` call per run. `:if` /
-`:for` become real Python control flow. `:include` sites call the
-resolved child `_inc_N` render function injected into module globals by
-`CompileSession`.
+Each emitted module's `render()` returns a single str.
 
-Expression interiors are rewritten by `.expressions.rewrite_expression`
-so free names load from `_ctx`. Attribute names are classified by
-`.security` so URL attrs route through `escape_url` and event-handler
-attrs refuse unmarked dynamic data.
+**Fragment coalescing.** Adjacent text and dynamic expressions accumulate
+in a fragment buffer and flush as a single `_append('text' + expr + ...)`
+call — collapses N calls per run into one. This is the difference between
+6.5× and roughly 1× of Jinja's perf on inline-loop bodies.
+
+**Source mapping.** Each emitted Python line carries the template body
+offset of the node that produced it. `emit_module` returns the source +
+a `gen_line → tpl_offset` map; the session uses it to remap AST line
+numbers so tracebacks point at the template, not the generated `.py`.
+
+`:if` / `:for` become real Python control flow. `:include` sites call
+the resolved child `_inc_N` render function injected into module globals
+by `CompileSession`. Expression interiors are rewritten by
+`.expressions.rewrite_expression` so free names load from `_ctx`.
+Attribute names are classified by `.security` so URL attrs route through
+`escape_url` and event-handler attrs refuse unmarked dynamic data.
 """
 
 from __future__ import annotations
@@ -40,47 +48,76 @@ from .expressions import (
 from .security import URL_ATTRS, attr_has_unsafe_expr, is_event_handler_attr
 
 
+# A fragment is either a literal text chunk or a Python expression whose
+# runtime value is a string. Each frag carries the template body offset of
+# the node that produced it, so the flushed `_append(...)` line gets stamped
+# with a useful offset for source mapping.
+@dataclass
+class _Frag:
+    kind: str  # "text" or "expr"
+    content: str  # raw text for "text", Python expr source for "expr"
+    offset: int  # body offset in the template source
+
+
 @dataclass
 class _Emit:
     """Codegen state for a single `render()` function body.
 
-    Adjacent literal text accumulates in `pending` and flushes as one
-    append call when something dynamic arrives or a block boundary
-    forces it — the constant-fold pass.
+    Fragment buffer (`pending`) accumulates adjacent text and expression
+    fragments. They flush as ONE `_append(...)` call when control flow,
+    a slot boundary, or a non-append statement forces the boundary —
+    constant folding plus dynamic coalescing.
 
     `local_stack` tracks names that are real Python locals at each
     nesting level. Imports are at the base; each `:for` pushes a frame.
 
-    `append_name` is the Python identifier we're currently appending
-    to. It defaults to `_append` (the main output buffer) and switches
-    to per-slot accumulator names while rendering an include's slot
-    children — that's how the same emission machinery can produce
-    sub-buffers without copying.
+    `target_list` is the Python identifier of the buffer (a `list[str]`)
+    we're currently appending to. It defaults to `_out` (the function's
+    output buffer) and switches to per-slot accumulator names while
+    rendering an include's slot children — that's how the same emission
+    machinery can produce sub-buffers without copying.
 
     `include_renders` maps each `:include` node (by id) to the Python
     name (`_inc_0`, `_inc_1`, …) that the CompileSession will inject
     into module globals before exec.
+
+    `line_offsets` records the template body offset for every emitted
+    Python line (parallel to `lines`). The session uses this to map AST
+    line numbers back into template positions for tracebacks.
     """
 
     lines: list[str] = field(default_factory=list)
+    line_offsets: list[int] = field(default_factory=list)
     indent: int = 1
-    pending: list[str] = field(default_factory=list)
+    pending: list[_Frag] = field(default_factory=list)
     local_stack: list[set[str]] = field(default_factory=lambda: [set()])
-    append_name: str = "_append"
+    target_list: str = "_out"
     include_renders: dict[int, str] = field(default_factory=dict)
+    current_offset: int = 0
     _acc_counter: int = 0
 
     def text(self, s: str) -> None:
         if s:
-            self.pending.append(s)
+            self.pending.append(_Frag("text", s, self.current_offset))
 
-    def line(self, body: str) -> None:
+    def expr_frag(self, code: str) -> None:
+        """Append a dynamic expression to the fragment buffer.
+
+        `code` must be a Python expression whose runtime value is a
+        `str` (raw, already escaped for its position). The output is
+        concatenated directly into the buffer's flushed `_append` call.
+        """
+        self.pending.append(_Frag("expr", code, self.current_offset))
+
+    def line(self, body: str, *, offset: int | None = None) -> None:
         self._flush()
         self.lines.append("    " * self.indent + body)
+        self.line_offsets.append(self.current_offset if offset is None else offset)
 
-    def block_start(self, header: str) -> None:
+    def block_start(self, header: str, *, offset: int | None = None) -> None:
         self._flush()
         self.lines.append("    " * self.indent + header)
+        self.line_offsets.append(self.current_offset if offset is None else offset)
         self.indent += 1
 
     def block_end(self) -> None:
@@ -102,21 +139,75 @@ class _Emit:
     def rewrite_expr(self, code: str) -> str:
         return rewrite_expression(code, locals_outer=self.known_locals())
 
-    def fresh_acc(self) -> tuple[str, str, str]:
+    def fresh_acc(self) -> tuple[str, str]:
         """Allocate fresh accumulator var names for a slot sub-buffer.
 
-        Returns (list_var, append_var, value_var).
+        Returns (list_var, value_var) — the buffer name and the materialized
+        slot-value name. No cached `.append` shortcut here: emit uses
+        `{list}.append(x)` for single fragments and `{list} += (...)` for
+        multi, so the list itself is all the codegen needs.
         """
         idx = self._acc_counter
         self._acc_counter += 1
-        return f"_slot_acc_{idx}", f"_slot_app_{idx}", f"_slot_val_{idx}"
+        return f"_slot_acc_{idx}", f"_slot_val_{idx}"
 
     def _flush(self) -> None:
         if not self.pending:
             return
-        chunk = "".join(self.pending)
-        self.pending.clear()
-        self.lines.append("    " * self.indent + f"{self.append_name}({chunk!r})")
+        frags = self.pending
+        self.pending = []
+
+        # Coalesce runs of text into single text frags so a 3-fragment run
+        # that's actually all literal collapses cleanly to one append.
+        coalesced: list[_Frag] = []
+        for f in frags:
+            if f.kind == "text" and coalesced and coalesced[-1].kind == "text":
+                last = coalesced[-1]
+                coalesced[-1] = _Frag("text", last.content + f.content, last.offset)
+            else:
+                coalesced.append(f)
+
+        # Stamp the emitted line with the offset of the first expression
+        # frag (or the first text frag if there are no expressions). An
+        # error during expression eval points at the line of the first
+        # expression in the run — close enough for the traceback line.
+        line_offset = next((f.offset for f in coalesced if f.kind == "expr"), 0)
+        if not line_offset:
+            line_offset = coalesced[0].offset
+
+        if len(coalesced) == 1:
+            # Single-fragment runs: one `list.append(x)` call. Cheap, and
+            # avoids the tuple-build that `+=` would do for free.
+            f = coalesced[0]
+            payload = repr(f.content) if f.kind == "text" else f.content
+            body = f"{self.target_list}.append({payload})"
+        else:
+            # Multi-fragment runs: build one tuple, push it in one go via
+            # `list += (...)` (i.e. `list.__iadd__`, the in-place extend).
+            # No intermediate string allocations — what `_append(a + b + c)`
+            # used to cost. Trailing comma keeps a 2-frag tuple unambiguous.
+            parts: list[str] = []
+            for f in coalesced:
+                parts.append(repr(f.content) if f.kind == "text" else f.content)
+            body = f"{self.target_list} += ({', '.join(parts)},)"
+
+        self.lines.append("    " * self.indent + body)
+        self.line_offsets.append(line_offset)
+
+
+@dataclass
+class EmittedModule:
+    """Output of `emit_module` — Python source plus the line→offset map.
+
+    `source` is the full generated module text. `line_offsets[k]` is
+    the template body offset that produced generated line `k + 1`
+    (1-based gen line, 0-indexed list). Entries are `0` for boilerplate
+    lines that don't correspond to a template node — the session's
+    AST-remap step treats those as "no mapping" and skips them.
+    """
+
+    source: str
+    line_offsets: list[int]
 
 
 def emit_module(
@@ -125,8 +216,8 @@ def emit_module(
     source_label: str,
     *,
     include_renders: dict[int, str],
-) -> str:
-    """Emit a complete Python module source string for one template."""
+) -> EmittedModule:
+    """Emit a complete Python module + per-line template offset map."""
     declared_attrs = list((fmdict.get("attrs") or {}).keys())
     declared_slots = list((fmdict.get("slots") or {}).keys())
     imports = list(fmdict.get("imports") or [])
@@ -237,32 +328,57 @@ def emit_module(
         for name in sorted(module_globals):
             body_lines.append(f"    {name} = _ctx.get({name!r}, _G[{name!r}])")
     body_lines.append("    _out: list[str] = []")
-    body_lines.append("    _append = _out.append")
+    # Track where the emitted lines start in body_lines so we can stitch
+    # their per-line offsets back into the final source-wide offset list.
+    emit_start_idx = len(body_lines)
     body_lines.extend(e.lines)
     body_lines.append("    return ''.join(_out)")
 
-    return "\n".join(header + body_lines) + "\n"
+    source = "\n".join(header + body_lines) + "\n"
+
+    # Build a per-generated-line offset list. Header and setup lines get `0`
+    # (no template mapping); body lines that came from emission get their
+    # recorded template offset. The final length is exactly the number of
+    # lines in `source`.
+    line_offsets: list[int] = [0] * len(header)
+    line_offsets.extend([0] * emit_start_idx)
+    line_offsets.extend(e.line_offsets)
+    line_offsets.append(0)  # trailing `return` statement
+    # The source ends with a trailing newline; `splitlines()` won't count it,
+    # so `line_offsets` already matches the line count.
+    assert len(line_offsets) == source.count("\n"), (
+        f"line_offsets ({len(line_offsets)}) does not match generated line "
+        f"count ({source.count(chr(10))})"
+    )
+    return EmittedModule(source=source, line_offsets=line_offsets)
 
 
 # --- per-node emission ------------------------------------------------------
 
 
 def _emit_node(node: Node, e: _Emit) -> None:
-    match node:
-        case TextNode():
-            e.text(node.text)
-        case ExprNode():
-            e.line(f"{e.append_name}(escape_html({e.rewrite_expr(node.code)}))")
-        case HtmlCommentNode():
-            e.text(f"<!--{node.text}-->")
-        case TemplateCommentNode():
-            pass
-        case DoctypeNode():
-            e.text(node.text)
-        case ElementNode():
-            _emit_element(node, e)
-        case _:
-            raise CompileError(f"Unknown node type: {type(node).__name__}")
+    # Stamp every text/expr fragment emitted from this node with the node's
+    # body offset so flushed `_append(...)` lines map back to the template.
+    saved_offset = e.current_offset
+    e.current_offset = node.offset or saved_offset
+    try:
+        match node:
+            case TextNode():
+                e.text(node.text)
+            case ExprNode():
+                e.expr_frag(f"escape_html({e.rewrite_expr(node.code)})")
+            case HtmlCommentNode():
+                e.text(f"<!--{node.text}-->")
+            case TemplateCommentNode():
+                pass
+            case DoctypeNode():
+                e.text(node.text)
+            case ElementNode():
+                _emit_element(node, e)
+            case _:
+                raise CompileError(f"Unknown node type: {type(node).__name__}")
+    finally:
+        e.current_offset = saved_offset
 
 
 def _emit_element(node: ElementNode, e: _Emit) -> None:
@@ -386,7 +502,12 @@ def _emit_static_include(node: ElementNode, e: _Emit) -> None:
             f"{slot_name_var} = _resolve_dynamic_include("
             f"{dyn_path_expr}, current_template=__template_source__)"
         )
-    e.line(f"{e.append_name}({slot_name_var}({', '.join(parts)}))")
+    # Include call result is a `str` — feed into the fragment buffer so the
+    # call coalesces with surrounding text rather than emitting a standalone
+    # `_append(...)`. In an `:include`-in-loop body that matters: the loop
+    # iteration drops from "3 calls + the include" to "1 call wrapping
+    # everything in the run".
+    e.expr_frag(f"{slot_name_var}({', '.join(parts)})")
 
 
 def _render_slot_to_var(children: list[Node], e: _Emit) -> str:
@@ -400,16 +521,15 @@ def _render_slot_to_var(children: list[Node], e: _Emit) -> str:
     if not children:
         return "_mark_safe('')"
 
-    acc_var, app_var, value_var = e.fresh_acc()
+    acc_var, value_var = e.fresh_acc()
     e.line(f"{acc_var} = []")
-    e.line(f"{app_var} = {acc_var}.append")
 
-    saved = e.append_name
-    e.append_name = app_var
+    saved = e.target_list
+    e.target_list = acc_var
     for child in children:
         _emit_node(child, e)
     e._flush()
-    e.append_name = saved
+    e.target_list = saved
 
     e.line(f"{value_var} = _mark_safe(''.join({acc_var}))")
     return value_var
@@ -474,10 +594,7 @@ def _emit_attribute(attr: Attribute, e: _Emit) -> None:
 
     if len(attr.segments) == 1 and isinstance(attr.segments[0], AttrExpr):
         helper = "render_dyn_url_attr" if is_url_attr else "render_dyn_attr"
-        e.line(
-            f"{e.append_name}({helper}({attr.name!r}, "
-            f"{e.rewrite_expr(attr.segments[0].code)}))"
-        )
+        e.expr_frag(f"{helper}({attr.name!r}, {e.rewrite_expr(attr.segments[0].code)})")
         return
 
     # Mixed text + expr segments. For URL attrs we have to compose the full
@@ -492,7 +609,7 @@ def _emit_attribute(attr: Attribute, e: _Emit) -> None:
                 case AttrExpr():
                     parts.append(f"str({e.rewrite_expr(seg.code)})")
         e.text(f' {attr.name}="')
-        e.line(f"{e.append_name}(escape_url({' + '.join(parts)}))")
+        e.expr_frag(f"escape_url({' + '.join(parts)})")
         e.text('"')
         return
 
@@ -502,5 +619,5 @@ def _emit_attribute(attr: Attribute, e: _Emit) -> None:
             case AttrText():
                 e.text(seg.text)
             case AttrExpr():
-                e.line(f"{e.append_name}(escape_html({e.rewrite_expr(seg.code)}))")
+                e.expr_frag(f"escape_html({e.rewrite_expr(seg.code)})")
     e.text('"')

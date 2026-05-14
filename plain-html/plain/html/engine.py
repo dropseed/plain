@@ -54,7 +54,8 @@ def render_source(
 
     # No path → no static-include resolution possible. One-shot in-memory
     # compile of just this source; dynamic includes still work because
-    # the resolver lives in the runtime layer.
+    # the resolver lives in the runtime layer. No source mapping either —
+    # there's no file for `linecache` to read.
     src = CompileSession().compile_string(source)
     mod = types.ModuleType(f"_plain_html_inline_{abs(hash(source))}")
     mod.__file__ = "<source>"
