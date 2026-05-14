@@ -4,8 +4,8 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from plain.html import Template
 from plain.http import Request
-from plain.templates import Template
 
 if TYPE_CHECKING:
     from plain.admin.views import AdminView

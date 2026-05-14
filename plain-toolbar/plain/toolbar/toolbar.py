@@ -4,8 +4,8 @@ import sys
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
+from plain.html import Template
 from plain.runtime import settings
-from plain.templates import Template
 from plain.utils.safestring import SafeString, mark_safe
 
 from .registry import register_toolbar_item, registry

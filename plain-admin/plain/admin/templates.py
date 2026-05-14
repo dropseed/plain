@@ -1,12 +1,8 @@
 from typing import Any
 
+from plain.html import Template, TemplateFileMissing
 from plain.packages import packages_registry
-from plain.templates import (
-    Template,
-    TemplateFileMissing,
-    register_template_filter,
-    register_template_global,
-)
+from plain.templates import register_template_filter, register_template_global
 from plain.utils.safestring import SafeString, mark_safe
 
 from .views.registry import registry

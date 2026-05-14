@@ -20,8 +20,8 @@ from io import BytesIO, StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from plain.html import Template, TemplateFileMissing
 from plain.runtime import settings
-from plain.templates import Template, TemplateFileMissing
 from plain.utils.encoding import force_str, punycode
 from plain.utils.html import strip_tags
 
