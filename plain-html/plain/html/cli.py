@@ -310,8 +310,8 @@ def format_cmd(
 def compile_cmd(paths: tuple[str, ...], include_installed_packages: bool) -> None:
     """Pre-compile .html templates into the on-disk cache
 
-    Warms `<project>/.plain/html/` (or `$PLAIN_HTML_CACHE_DIR`) so the
-    first render of each template in production doesn't pay codegen
+    Warms `<project>/.plain/html/` (or the `HTML_CACHE_DIR` setting) so
+    the first render of each template in production doesn't pay codegen
     cost. Run during deploy after templates are in place.
     """
     files = _collect_files(
@@ -325,9 +325,9 @@ def compile_cmd(paths: tuple[str, ...], include_installed_packages: bool) -> Non
     cache_dir = _cache.cache_root()
     if cache_dir is None:
         click.secho(
-            "Cache is disabled (PLAIN_HTML_CACHE_DISABLED is set). "
-            "Unset it to compile to the default location, or set "
-            "PLAIN_HTML_CACHE_DIR to override the path.",
+            "Cache is disabled (HTML_CACHE_DISABLED is true). "
+            "Set it to False to compile to the default location, or set "
+            "HTML_CACHE_DIR to override the path.",
             fg="red",
             err=True,
         )
@@ -341,16 +341,22 @@ def compile_cmd(paths: tuple[str, ...], include_installed_packages: bool) -> Non
     clear_process_cache()
 
     ok = 0
-    skipped: list[tuple[Path, Exception]] = []
+    skipped: list[tuple[Path, str]] = []
     for path in files:
+        source = path.read_text(encoding="utf-8")
+        try:
+            split_frontmatter(source)
+        except Exception as e:
+            skipped.append((path, f"frontmatter parse error: {e}"))
+            continue
         try:
             CompileSession(use_disk_cache=True).compile_path(path)
             ok += 1
         except (CompileError, ParseError, TokenizeError) as e:
-            skipped.append((path, e))
+            skipped.append((path, str(e)))
 
-    for path, exc in skipped:
-        click.echo(f"{path}: skipped — {exc}", err=True)
+    for path, msg in skipped:
+        click.echo(f"{path}: skipped — {msg}", err=True)
 
     click.secho(
         f"\n{ok} compiled, {len(skipped)} skipped",

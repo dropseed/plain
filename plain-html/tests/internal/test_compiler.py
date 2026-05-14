@@ -714,34 +714,57 @@ def _compile_with_disk_cache(path: Path) -> Any:
     return CompileSession(use_disk_cache=True).compile_path(path)
 
 
+def _set_cache_dir(monkeypatch, cache_dir):
+    from plain.runtime import settings
+
+    monkeypatch.setattr(settings, "HTML_CACHE_DIR", str(cache_dir))
+    monkeypatch.setattr(settings, "HTML_CACHE_DISABLED", False)
+
+
+def _disable_cache(monkeypatch):
+    from plain.runtime import settings
+
+    monkeypatch.setattr(settings, "HTML_CACHE_DISABLED", True)
+
+
 def test_disk_cache_writes_file(tmp_path, monkeypatch):
     cache_dir = tmp_path / "cache"
-    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", str(cache_dir))
+    _set_cache_dir(monkeypatch, cache_dir)
     paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
     _compile_with_disk_cache(paths["x"])
-    cached = list(cache_dir.glob("*__x.html.py"))
+    cached = list(cache_dir.glob("*__x.html.pyc"))
     assert len(cached) == 1
-    assert "def render" in cached[0].read_text()
+    # Marshalled code object — non-empty, opaque, not the .py source we
+    # used to write. The cache being consulted is exercised by the
+    # tamper test below.
+    assert cached[0].stat().st_size > 0
 
 
 def test_disk_cache_hit_skips_codegen(tmp_path, monkeypatch):
     # Source unchanged → same cache key → second compile should pull from
-    # disk without re-running codegen. Verify by tampering with the cache
-    # file directly: if the cache is consulted, the tamper shows up in
-    # output; if codegen runs again, the original source wins.
+    # disk without re-running codegen. Verify by truncating the cache file:
+    # if the cache is consulted, the corrupt load triggers a recompile
+    # path (still succeeds, fresh codegen overwrites). If it's NOT
+    # consulted, we'd never read the bad file.
+    import marshal
+
     cache_dir = tmp_path / "cache"
-    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", str(cache_dir))
+    _set_cache_dir(monkeypatch, cache_dir)
     paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
     _compile_with_disk_cache(paths["x"])
-    cached = next(iter(cache_dir.glob("*__x.html.py")))
-    cached.write_text(cached.read_text().replace("hi", "TAMPERED"))
+    cached = next(iter(cache_dir.glob("*__x.html.pyc")))
+    # Swap the file's bytecode for a code object that produces TAMPERED
+    # output — a successful round-trip proves the cache hit path runs.
+    tampered = compile("def render(**_): return '<p>TAMPERED</p>'", "<x>", "exec")
+    cached.write_bytes(marshal.dumps(tampered))
+    clear_process_cache()
     r = _compile_with_disk_cache(paths["x"])
     assert r() == "<p>TAMPERED</p>"
 
 
 def test_disk_cache_invalidates_on_source_change(tmp_path, monkeypatch):
     cache_dir = tmp_path / "cache"
-    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", str(cache_dir))
+    _set_cache_dir(monkeypatch, cache_dir)
     paths = _write_templates(tmp_path, {"x": "<p>{name}</p>"})
     r1 = _compile_with_disk_cache(paths["x"])
     assert r1(name="Dave") == "<p>Dave</p>"
@@ -758,7 +781,7 @@ def test_disk_cache_invalidates_transitively(tmp_path, monkeypatch):
     # parent's source is unchanged but its cache key folds in the child's
     # key, so editing the child shifts both keys upward.
     cache_dir = tmp_path / "cache"
-    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", str(cache_dir))
+    _set_cache_dir(monkeypatch, cache_dir)
     paths = _write_templates(
         tmp_path,
         {
@@ -767,19 +790,19 @@ def test_disk_cache_invalidates_transitively(tmp_path, monkeypatch):
         },
     )
     assert _compile_with_disk_cache(paths["parent"])() == "<p>v1</p>"
-    parent_files_v1 = list(cache_dir.glob("*__parent.html.py"))
+    parent_files_v1 = list(cache_dir.glob("*__parent.html.pyc"))
 
     paths["child"].write_text("<p>v2</p>")
     assert _compile_with_disk_cache(paths["parent"])() == "<p>v2</p>"
-    parent_files_v2 = list(cache_dir.glob("*__parent.html.py"))
+    parent_files_v2 = list(cache_dir.glob("*__parent.html.pyc"))
 
     # The parent has a NEW cache file (different key); the old one
     # stays around (no GC yet).
     assert len(parent_files_v2) > len(parent_files_v1)
 
 
-def test_disk_cache_disabled_via_env(tmp_path, monkeypatch):
-    monkeypatch.setenv("PLAIN_HTML_CACHE_DISABLED", "1")
+def test_disk_cache_disabled_via_settings(tmp_path, monkeypatch):
+    _disable_cache(monkeypatch)
     paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
     clear_process_cache()
     # With the disk cache disabled, compile still works — just no on-disk
@@ -791,11 +814,11 @@ def test_disk_cache_disabled_via_env(tmp_path, monkeypatch):
 
 
 def test_disk_cache_disabled_flag_takes_precedence_over_dir(tmp_path, monkeypatch):
-    # Explicit disable wins even if a path is also set — the two env vars
+    # Explicit disable wins even if a path is also set — the two settings
     # have independent roles, and "disabled" is the safer default to honor.
     cache_dir = tmp_path / "cache"
-    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", str(cache_dir))
-    monkeypatch.setenv("PLAIN_HTML_CACHE_DISABLED", "yes")
+    _set_cache_dir(monkeypatch, cache_dir)
+    _disable_cache(monkeypatch)
     from plain.html import _cache
 
     assert _cache.cache_root() is None
@@ -991,3 +1014,107 @@ def test_parity_with_interpreter(source, ctx):
     interp = render_source(source, ctx)
     compiled = _load(source)(**ctx)
     assert compiled == interp
+
+
+# --- source-mapped tracebacks ------------------------------------------------
+
+
+def test_traceback_points_at_template_line(tmp_path):
+    """A render-time AttributeError must surface as `template.html:LINE`,
+    not as a frame inside the generated `.py` cache file."""
+    import traceback as _tb
+
+    tpl = tmp_path / "broken.html"
+    tpl.write_text(
+        "<div>\n"  # line 1
+        "  <p>hello</p>\n"  # line 2
+        "  <p>broken: {user.no_such_attr}</p>\n"  # line 3 — error here
+        "  <p>goodbye</p>\n"  # line 4
+        "</div>\n"
+    )
+
+    clear_process_cache()
+    render_fn = _compile_path(tpl)
+
+    class _Stub:
+        pass
+
+    try:
+        render_fn(user=_Stub())
+    except AttributeError as exc:
+        frames = _tb.extract_tb(exc.__traceback__)
+    else:
+        raise AssertionError("expected AttributeError")
+
+    # The bottom-of-stack frame should be inside our compiled `render`,
+    # pointing at the template file at the right line.
+    last = frames[-1]
+    assert last.filename == str(tpl)
+    assert last.lineno == 3
+
+
+def test_traceback_with_frontmatter_offsets_correctly(tmp_path):
+    """Frontmatter shifts the body offset — make sure the line number
+    accounts for it. An error on body line N should land at file line
+    (frontmatter_lines + N).
+    """
+    import traceback as _tb
+
+    tpl = tmp_path / "fm.html"
+    tpl.write_text(
+        "---\n"  # line 1
+        "imports:\n"  # line 2
+        "  - import os\n"  # line 3
+        "---\n"  # line 4 (frontmatter end)
+        "<p>{user.no_such_attr}</p>\n"  # line 5 — error here
+    )
+
+    clear_process_cache()
+    render_fn = _compile_path(tpl)
+
+    class _Stub:
+        pass
+
+    try:
+        render_fn(user=_Stub())
+    except AttributeError as exc:
+        frames = _tb.extract_tb(exc.__traceback__)
+    else:
+        raise AssertionError("expected AttributeError")
+
+    last = frames[-1]
+    assert last.filename == str(tpl)
+    assert last.lineno == 5
+
+
+# --- fragment coalescing -----------------------------------------------------
+
+
+def test_coalesces_adjacent_fragments_into_single_append():
+    """A loop body that mixes text + expr + text should emit ONE buffer
+    operation per iteration, not three separate `_append(...)` calls.
+    """
+    src = _compile_string("<ul><li :for={x in items}>before {x} after</li></ul>")
+    # The loop body has 3 fragments → should be `_out += (...)` for
+    # multi-frag runs.
+    assert "_out +=" in src
+    # And no leftover per-fragment `_append` calls inside the loop body
+    # (we'd see at least 2 if coalescing failed).
+    body_appends = src.count("_out.append(")
+    # `_out.append('<ul>')` and `_out.append('</ul>')` outside the loop
+    # are legitimate single-fragment runs — at most 2.
+    assert body_appends <= 2, f"expected ≤2 appends, got {body_appends}:\n{src}"
+
+
+def test_coalesces_through_include_call():
+    """An include call inside a fragment run should fold into the same
+    `_out += (...)` tuple as the surrounding text — not break the run
+    into separate appends.
+    """
+    src = _compile_string(
+        '<div>before<template :include={"row"} item={x} />after</div>',
+        label="<test>",
+    )
+    # The dynamic include doesn't make the run break — we should still
+    # see a multi-fragment buffer push.
+    assert "_out +=" in src

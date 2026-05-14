@@ -1,10 +1,11 @@
 """Disk cache for compiled `.html` templates.
 
-Lives at `<project>/.plain/html/` by default; override the location
-with `PLAIN_HTML_CACHE_DIR`, or disable the disk cache entirely with
-`PLAIN_HTML_CACHE_DISABLED=1`. Files are named `<key>__<source-name>.py`
-— the hash makes the cache content-addressable, the human-readable
-suffix makes the dir greppable.
+Lives at `<project>/.plain/html/` by default; override the location with
+the `HTML_CACHE_DIR` setting, or disable the disk cache entirely with
+`HTML_CACHE_DISABLED = True`. Both can also be set via Plain's standard
+`PLAIN_*` env-var prefix (`PLAIN_HTML_CACHE_DIR`, `PLAIN_HTML_CACHE_DISABLED`).
+Files are named `<key>__<source-name>.py` — the hash makes the cache
+content-addressable, the human-readable suffix makes the dir greppable.
 
 Cache key inputs:
   - Source SHA-256
@@ -26,42 +27,34 @@ import importlib.util
 import os
 from pathlib import Path
 
+from plain.runtime import settings
+
 # Bump on codegen changes so stale cache entries get rebuilt automatically.
-COMPILER_VERSION = 2
+# v3: cache file format switched from `.py` source to marshalled bytecode.
+#     Codegen also changed to coalesce adjacent fragments into a single
+#     `_append(...)` call and to remap AST lineno to template lines.
+COMPILER_VERSION = 3
 
 
 def cache_root() -> Path | None:
     """Return the disk cache root, or `None` if disabled.
 
-    Defaults to `<cwd>/.plain/html/` via Plain's `PLAIN_TEMP_PATH`
-    convention (same dir-shape as `.plain/assets/compiled`,
-    `.plain/dev/logs`, etc.). Override the location with
-    `PLAIN_HTML_CACHE_DIR`. Disable the disk cache entirely with
-    `PLAIN_HTML_CACHE_DISABLED=1` (also accepts `true` / `yes`,
-    case-insensitive).
+    Reads `HTML_CACHE_DISABLED` and `HTML_CACHE_DIR` from Plain settings
+    (overridable via `PLAIN_HTML_CACHE_DISABLED` / `PLAIN_HTML_CACHE_DIR`
+    environment variables). When `HTML_CACHE_DIR` is unset, defaults to
+    `<project>/.plain/html/` via Plain's `PLAIN_TEMP_PATH` convention
+    (same dir-shape as `.plain/assets/compiled`, `.plain/dev/logs`, etc.).
     """
-    if _env_truthy(os.environ.get("PLAIN_HTML_CACHE_DISABLED")):
+    if settings.HTML_CACHE_DISABLED:
         return None
-    env_dir = os.environ.get("PLAIN_HTML_CACHE_DIR")
-    if env_dir:
-        return Path(env_dir)
+    if settings.HTML_CACHE_DIR is not None:
+        return Path(settings.HTML_CACHE_DIR)
     try:
         from plain.runtime import PLAIN_TEMP_PATH
 
         return Path(PLAIN_TEMP_PATH) / "html"
     except Exception:
         return None
-
-
-def _env_truthy(value: str | None) -> bool:
-    """Return True if `value` is one of the documented truthy markers.
-
-    Recognized: `1`, `true`, `yes`, `on` (case-insensitive). Anything
-    else — including an empty string and `0` / `false` — is falsy.
-    """
-    if value is None:
-        return False
-    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def ensure_cache_dir(root: Path) -> Path:
@@ -77,13 +70,19 @@ def ensure_cache_dir(root: Path) -> Path:
 def cache_file_for(key: str, source_path: Path) -> Path | None:
     """Return the on-disk path for a cache entry, or `None` if caching
     is disabled.
+
+    Cache entries are marshalled Python code objects (`.pyc`-style),
+    not source — load is one `marshal.load(f)` instead of parse +
+    compile. The naming pattern is `<key>__<source-name>.pyc` so the
+    hash makes the cache content-addressable and the human-readable
+    suffix makes the dir greppable.
     """
     root = cache_root()
     if root is None:
         return None
     ensure_cache_dir(root)
     safe_name = source_path.name.replace(os.sep, "_")
-    return root / f"{key}__{safe_name}.py"
+    return root / f"{key}__{safe_name}.pyc"
 
 
 def compute_cache_key(
@@ -114,6 +113,16 @@ def write_atomic(path: Path, content: str) -> None:
     """
     tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
     with open(tmp, "w", encoding="utf-8") as f:
+        f.write(content)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def write_atomic_bytes(path: Path, content: bytes) -> None:
+    """Binary counterpart to `write_atomic` for the marshalled-bytecode cache."""
+    tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
+    with open(tmp, "wb") as f:
         f.write(content)
         f.flush()
         os.fsync(f.fileno())
