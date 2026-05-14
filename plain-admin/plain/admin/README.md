@@ -329,7 +329,7 @@ class UpdateView(AdminModelUpdateView):
     template_name = "admin/users/user_form.html"  # Optional custom template
 ```
 
-The form template extends the admin base and renders fields with the admin's [Plain elements](/plain/plain/elements/README.md):
+The form template extends the admin base and renders fields with the admin's elements:
 
 ```html
 {% extends "admin/base.html" %}
@@ -351,7 +351,7 @@ CSRF is automatic (no `{{ csrf_input }}` needed). Plain forms are headless — t
 
 ### Elements
 
-The admin ships these [Plain elements](/plain/plain/elements/README.md) for building admin templates. Paired field elements (label + input + help + errors) cover the common case; unwrapped primitives are there when you need custom layouts.
+The admin ships these elements for building admin templates. Paired field elements (label + input + help + errors) cover the common case; unwrapped primitives are there when you need custom layouts.
 
 | Element                 | Renders                                                                                                                |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -888,7 +888,6 @@ INSTALLED_PACKAGES = [
     "plain.sessions",
     "plain.htmx",
     "plain.admin",
-    "plain.elements",
     # other packages...
 ]
 

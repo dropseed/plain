@@ -15,7 +15,6 @@ members = [
     "plain-code",
     "plain-connect",
     "plain-dev",
-    "plain-elements",
     "plain-email",
     "plain-esbuild",
     "plain-flags",
@@ -223,7 +222,6 @@ dependencies = [
     { name = "plain-code" },
     { name = "plain-connect" },
     { name = "plain-dev" },
-    { name = "plain-elements" },
     { name = "plain-email" },
     { name = "plain-esbuild" },
     { name = "plain-flags" },
@@ -262,7 +260,6 @@ requires-dist = [
     { name = "plain-code", editable = "plain-code" },
     { name = "plain-connect", editable = "plain-connect" },
     { name = "plain-dev", editable = "plain-dev" },
-    { name = "plain-elements", editable = "plain-elements" },
     { name = "plain-email", editable = "plain-email" },
     { name = "plain-esbuild", editable = "plain-esbuild" },
     { name = "plain-flags", editable = "plain-flags" },
@@ -331,6 +328,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/2c/48/71de9ed269fdae9c8057e5a4c0aa7402e8bb16f2c6e90b3aa53327b113f8/hpack-4.1.0.tar.gz", hash = "sha256:ec5eca154f7056aa06f196a557655c5b009b382873ac8d1e66e79e87535f1dca", size = 51276, upload-time = "2025-01-22T21:44:58.347Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/07/c6/80c95b1b2b94682a72cbdbfb85b81ae2daffa4291fbfa1b1464502ede10d/hpack-4.1.0-py3-none-any.whl", hash = "sha256:157ac792668d995c657d93111f46b4535ed114f0c9c8d672271bbec7eae1b496", size = 34357, upload-time = "2025-01-22T21:44:56.92Z" },
+]
+
+[[package]]
+name = "html5lib"
+version = "1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+    { name = "webencodings" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ac/b6/b55c3f49042f1df3dcd422b7f224f939892ee94f22abcf503a9b7339eaf2/html5lib-1.1.tar.gz", hash = "sha256:b2e5b40261e20f354d198eae92afc10d750afb487ed5e50f9c4eaf07c184146f", size = 272215, upload-time = "2020-06-22T23:32:38.834Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6c/dd/a834df6482147d48e225a49515aabc28974ad5a4ca3215c18a882565b028/html5lib-1.1-py2.py3-none-any.whl", hash = "sha256:0d78f8fde1c230e99fe37986a60526d7049ed4bf8a9fadbad5f00e22e58e041d", size = 112173, upload-time = "2020-06-22T23:32:36.781Z" },
 ]
 
 [[package]]
@@ -797,7 +807,6 @@ source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
     { name = "plain-auth" },
-    { name = "plain-elements" },
     { name = "plain-htmx" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
@@ -812,7 +821,6 @@ dev = [
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-elements", editable = "plain-elements" },
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-templates", editable = "plain-templates" },
@@ -990,29 +998,6 @@ requires-dist = [
 ]
 
 [[package]]
-name = "plain-elements"
-version = "0.11.5"
-source = { editable = "plain-elements" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-templates" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "plain-pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-templates", editable = "plain-templates" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
-
-[[package]]
 name = "plain-email"
 version = "0.19.3"
 source = { editable = "plain-email" }
@@ -1084,6 +1069,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "html5lib" },
     { name = "plain-pytest" },
 ]
 
@@ -1094,7 +1080,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [
+    { name = "html5lib", specifier = ">=1.1" },
+    { name = "plain-pytest", editable = "plain-pytest" },
+]
 
 [[package]]
 name = "plain-htmx"
@@ -1585,7 +1574,6 @@ dev = [
     { name = "plain-code" },
     { name = "plain-connect" },
     { name = "plain-dev" },
-    { name = "plain-elements" },
     { name = "plain-email" },
     { name = "plain-esbuild" },
     { name = "plain-flags" },
@@ -1629,7 +1617,6 @@ dev = [
     { name = "plain-code", editable = "plain-code" },
     { name = "plain-connect", editable = "plain-connect" },
     { name = "plain-dev", editable = "plain-dev" },
-    { name = "plain-elements", editable = "plain-elements" },
     { name = "plain-email", editable = "plain-email" },
     { name = "plain-esbuild", editable = "plain-esbuild" },
     { name = "plain-flags", editable = "plain-flags" },
@@ -2263,6 +2250,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/69/c4/088825b75489cb5b6a761a4542645718893d395d8c530b38734f19da44d2/watchfiles-1.1.0-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d05686b5487cfa2e2c28ff1aa370ea3e6c5accfe6435944ddea1e10d93872147", size = 452240, upload-time = "2025-06-15T19:06:26.552Z" },
     { url = "https://files.pythonhosted.org/packages/10/8c/22b074814970eeef43b7c44df98c3e9667c1f7bf5b83e0ff0201b0bd43f9/watchfiles-1.1.0-cp314-cp314t-musllinux_1_1_aarch64.whl", hash = "sha256:d0e10e6f8f6dc5762adee7dece33b722282e1f59aa6a55da5d493a97282fedd8", size = 625607, upload-time = "2025-06-15T19:06:27.606Z" },
     { url = "https://files.pythonhosted.org/packages/32/fa/a4f5c2046385492b2273213ef815bf71a0d4c1943b784fb904e184e30201/watchfiles-1.1.0-cp314-cp314t-musllinux_1_1_x86_64.whl", hash = "sha256:af06c863f152005c7592df1d6a7009c836a247c9d8adb78fef8575a5a98699db", size = 623315, upload-time = "2025-06-15T19:06:29.076Z" },
+]
+
+[[package]]
+name = "webencodings"
+version = "0.5.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/02/ae6ceac1baeda530866a85075641cec12989bd8d31af6d5ab4a3e8c92f47/webencodings-0.5.1.tar.gz", hash = "sha256:b36a1c245f2d304965eb4e0a82848379241dc04b865afcc4aab16748587e1923", size = 9721, upload-time = "2017-04-05T20:21:34.189Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f4/24/2a3e3df732393fed8b3ebf2ec078f05546de641fe1b667ee316ec1dcf3b7/webencodings-0.5.1-py2.py3-none-any.whl", hash = "sha256:a0af1213f3c2226497a97e2b3aa01a7e4bee4f403f95be16fc9acd2947514a78", size = 11774, upload-time = "2017-04-05T20:21:32.581Z" },
 ]
 
 [[package]]

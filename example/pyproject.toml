@@ -13,7 +13,6 @@ dependencies = [
   "plain-connect",
   "plain-code",
   "plain-dev",
-  "plain-elements",
   "plain-esbuild",
   "plain-flags",
   "plain-html",

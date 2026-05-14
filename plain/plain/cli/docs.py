@@ -20,7 +20,6 @@ KNOWN_PACKAGES = {
     "plain-code": "Preconfigured code formatting and linting",
     "plain-connect": "Connect your Plain app to Plain Cloud via OTLP export",
     "plain-dev": "Local development server with auto-reload",
-    "plain-elements": "HTML template components",
     "plain-email": "Send email",
     "plain-esbuild": "Build JavaScript with esbuild",
     "plain-flags": "Feature flags via database models",

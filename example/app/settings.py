@@ -10,7 +10,6 @@ INSTALLED_PACKAGES = [
     "plain.assets",
     "plain.auth",
     "plain.cache",
-    "plain.elements",
     "plain.email",
     "plain.flags",
     "plain.html",
