@@ -19,6 +19,7 @@ so backend diagnostics can be re-anchored to the template later.
 from __future__ import annotations
 
 import ast
+import keyword
 import re
 from dataclasses import dataclass, field
 
@@ -156,13 +157,14 @@ class _Builder:
                     pass
 
     def _handle_start_tag(self, tok: StartTagToken) -> None:
-        # First: emit expression checks for every `{expr}` reachable from
-        # this tag (attribute values + directive expressions). Directives
-        # need special handling because they affect scope.
-        for_clause = None
-        for_clause_offset = tok.offset
+        # Order matters: a `:for` on the same tag binds the loop variable
+        # *before* the other attributes are evaluated, since attributes
+        # like `href={tab["view"]...}` reference the loop var. So we open
+        # the for-block first, then emit attribute checks inside it.
+        for_clause: str | None = None
         if_code: str | None = None
         include_path_expr: str | None = None
+        regular_attrs: list[Attribute] = []
 
         for attr in tok.attrs:
             match attr.name:
@@ -172,11 +174,32 @@ class _Builder:
                     raw = _single_expr_value(attr)
                     if raw is not None:
                         for_clause = raw
-                        for_clause_offset = tok.offset
                 case ":include":
                     include_path_expr = _expr_value_or_none(attr)
                 case _:
-                    self._emit_attr_expressions(attr, tok.offset)
+                    regular_attrs.append(attr)
+
+        opened_for = False
+        if for_clause is not None:
+            try:
+                clause = _parse_for_clause(for_clause)
+            except Exception:
+                # Phase 8 surfaces this as a structural error; skip here.
+                return
+            self._emit_typed_expr(
+                clause.iter_code,
+                tok.offset,
+                kind="for-iter",
+                typ="Iterable[Any]",
+            )
+            target = clause.raw_target or ", ".join(clause.targets)
+            self._lines.append(self._ind() + f"for {target} in ({clause.iter_code}):")
+            self._indent += 1
+            self._lines.append(self._ind() + "_unused = None")
+            opened_for = True
+
+        if if_code is not None:
+            self._emit_expr(if_code, tok.offset, kind="if")
 
         if include_path_expr is not None:
             # Dynamic `:include={path_expr}` must be str-compatible.
@@ -184,39 +207,15 @@ class _Builder:
                 include_path_expr, tok.offset, kind="include-path", typ="str"
             )
 
-        if if_code is not None:
-            self._emit_expr(if_code, tok.offset, kind="if")
+        for attr in regular_attrs:
+            self._emit_attr_expressions(attr, tok.offset)
 
-        if for_clause is not None:
-            try:
-                clause = _parse_for_clause(for_clause)
-            except Exception:
-                # Phase 8 surfaces this as a structural error; skip here.
-                return
-            # Check the iterable.
-            self._emit_typed_expr(
-                clause.iter_code,
-                for_clause_offset,
-                kind="for-iter",
-                typ="Iterable[Any]",
-            )
-            # Open a real for-block so subsequent expressions inside this
-            # element see the loop variable(s) bound.
-            target = clause.raw_target or ", ".join(clause.targets)
-            self._lines.append(self._ind() + f"for {target} in ({clause.iter_code}):")
-            self._indent += 1
-            self._lines.append(self._ind() + "_unused = None")
-
-            scope = _Scope(opened_for=True, tag=tok.name)
-        else:
-            scope = _Scope(opened_for=False, tag=tok.name)
+        scope = _Scope(opened_for=opened_for, tag=tok.name)
 
         # Self-closing or void tags don't open a child scope.
         from ..tokenizer import VOID_ELEMENTS
 
         if tok.self_closing or tok.name in VOID_ELEMENTS:
-            # If we opened a for-block for a self-closing element, close it
-            # immediately.
             if scope.opened_for:
                 self._indent -= 1
             return
@@ -302,14 +301,15 @@ class _Builder:
             self._lines.append(f'    {name}: SafeString = SafeString(""),')
 
     def _format_attr_param(self, attr: AttrDeclaration) -> str:
-        # Strings live in `"..."` quoted form to keep them legal as
-        # parameter annotations (PEP 604 unions are fine bare). We let the
-        # type checker parse the annotation lazily — `from __future__
-        # import annotations` is in the prelude so everything is deferred.
+        # Python-keyword attr names (`class`, `for`, `if`, ...) can't appear
+        # as parameter names — emit them with a trailing underscore, which
+        # matches the engine's render-time alias (a template that declares
+        # `class:` references it as `{class_}`).
+        name = f"{attr.name}_" if keyword.iskeyword(attr.name) else attr.name
         annotation = attr.type_source
         if attr.default_source is not None:
-            return f"    {attr.name}: {annotation} = {attr.default_source},"
-        return f"    {attr.name}: {annotation},"
+            return f"    {name}: {annotation} = {attr.default_source},"
+        return f"    {name}: {annotation},"
 
     def _emit_import(self, imp: ImportDeclaration) -> None:
         self._lines.append(imp.statement)
