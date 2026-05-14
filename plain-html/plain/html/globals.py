@@ -46,6 +46,15 @@ def register_many(values: dict[str, Any]) -> None:
     _GLOBALS.update(values)
 
 
+def register_global[T](func: T, *, name: str | None = None) -> T:
+    """Decorator form: register a callable as a template global.
+
+    The name defaults to the callable's `__name__`.
+    """
+    _GLOBALS[name or func.__name__] = func  # ty: ignore[unresolved-attribute]
+    return func
+
+
 def all_globals() -> dict[str, Any]:
     """Return a copy of the global registry, loading Plain defaults on first call."""
     global _DEFAULTS_LOADED

@@ -14,12 +14,14 @@ from plain.utils.safestring import mark_safe
 
 from .core import Template, TemplateFileMissing
 from .engine import render, render_source
+from .globals import register_global
 
 __all__ = [
     "Markup",
     "Template",
     "TemplateFileMissing",
     "mark_safe",
+    "register_global",
     "render",
     "render_source",
 ]
