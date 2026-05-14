@@ -24,10 +24,20 @@ def cli() -> None:
 
 
 @cli.command()
-@click.argument("paths", nargs=-1, type=click.Path(exists=True, path_type=Path))
-def check(paths: tuple[Path, ...]) -> None:
-    """Check .html templates for syntax and structural errors"""
-    files = _collect_files(paths)
+@click.argument("paths", nargs=-1)
+def check(paths: tuple[str, ...]) -> None:
+    """Check .html templates for syntax and structural errors
+
+    Pass `-` to read source from stdin; errors print to stderr as
+    `<stdin>:line:col: message`.
+    """
+    if "-" in paths:
+        if len(paths) != 1:
+            raise click.UsageError("Cannot mix `-` with other paths")
+        _check_stdin()
+        return
+
+    files = _collect_files(_paths_to_paths(paths))
     if not files:
         click.secho("No .html templates found", fg="yellow")
         return
@@ -50,17 +60,67 @@ def check(paths: tuple[Path, ...]) -> None:
     click.secho("All templates checked", fg="green")
 
 
+def _check_stdin() -> None:
+    source = sys.stdin.read()
+    body_offset = _body_offset(source)
+
+    try:
+        _, body = split_frontmatter(source)
+    except Exception as e:
+        click.echo(f"<stdin>:1:1: frontmatter parse error: {e}", err=True)
+        sys.exit(1)
+
+    try:
+        tokens = tokenize(body)
+    except TokenizeError as e:
+        click.echo(
+            _format_error_with_label("<stdin>", source, body_offset, e), err=True
+        )
+        sys.exit(1)
+
+    try:
+        parse(tokens)
+    except ParseError as e:
+        click.echo(
+            _format_error_with_label("<stdin>", source, body_offset, e), err=True
+        )
+        sys.exit(1)
+
+
+def _paths_to_paths(paths: tuple[str, ...]) -> tuple[Path, ...]:
+    """Validate string paths exist and convert to Path. Mirrors click's
+    `Path(exists=True)` behavior — moved into the command so we can
+    handle `-` (stdin) before validation kicks in."""
+    out: list[Path] = []
+    for p in paths:
+        path = Path(p)
+        if not path.exists():
+            raise click.BadParameter(f"Path {p!r} does not exist")
+        out.append(path)
+    return tuple(out)
+
+
 @cli.command(name="format")
-@click.argument("paths", nargs=-1, type=click.Path(exists=True, path_type=Path))
+@click.argument("paths", nargs=-1)
 @click.option(
     "--check",
     "check_only",
     is_flag=True,
     help="Exit non-zero if files would change; do not write",
 )
-def format_cmd(paths: tuple[Path, ...], check_only: bool) -> None:
-    """Format .html templates in place"""
-    files = _collect_files(paths)
+def format_cmd(paths: tuple[str, ...], check_only: bool) -> None:
+    """Format .html templates in place
+
+    Pass `-` to read source from stdin and write the formatted output to
+    stdout. With `--check`, exit 0 if no change, 1 if would change.
+    """
+    if "-" in paths:
+        if len(paths) != 1:
+            raise click.UsageError("Cannot mix `-` with other paths")
+        _format_stdin(check_only=check_only)
+        return
+
+    files = _collect_files(_paths_to_paths(paths))
     if not files:
         click.secho("No .html templates found", fg="yellow")
         return
@@ -109,6 +169,20 @@ def format_cmd(paths: tuple[Path, ...], check_only: bool) -> None:
         click.secho("All templates already formatted", fg="green")
 
 
+def _format_stdin(*, check_only: bool) -> None:
+    source = sys.stdin.read()
+    try:
+        out = format_source(source)
+    except (TokenizeError, ParseError) as e:
+        click.echo(f"<stdin>: {e}", err=True)
+        sys.exit(1)
+
+    if check_only:
+        sys.exit(0 if out == source else 1)
+
+    sys.stdout.write(out)
+
+
 def _collect_files(paths: tuple[Path, ...]) -> list[Path]:
     if not paths:
         return sorted(
@@ -138,12 +212,12 @@ def _check_file(path: Path) -> list[str]:
     try:
         tokens = tokenize(body)
     except TokenizeError as e:
-        return [_format_error(path, source, body_offset, e)]
+        return [_format_error_with_label(str(path), source, body_offset, e)]
 
     try:
         parse(tokens)
     except ParseError as e:
-        return [_format_error(path, source, body_offset, e)]
+        return [_format_error_with_label(str(path), source, body_offset, e)]
 
     return []
 
@@ -151,13 +225,15 @@ def _check_file(path: Path) -> list[str]:
 _OFFSET_RE = re.compile(r"\bat offset (\d+)\b")
 
 
-def _format_error(path: Path, source: str, body_offset: int, exc: Exception) -> str:
+def _format_error_with_label(
+    label: str, source: str, body_offset: int, exc: Exception
+) -> str:
     match = _OFFSET_RE.search(str(exc))
     if match:
         line, col = _offset_to_line_col(source, body_offset + int(match.group(1)))
     else:
         line, col = 1, 1
-    return f"{path}:{line}:{col}: {exc}"
+    return f"{label}:{line}:{col}: {exc}"
 
 
 def _offset_to_line_col(source: str, offset: int) -> tuple[int, int]:

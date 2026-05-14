@@ -170,3 +170,64 @@ def test_format_skips_unparseable_files(tmp_path: Path) -> None:
     assert str(bad) in result.output
     # The valid file should still be reformatted.
     assert ok.read_text() == "<div>\n    <p>hi</p>\n</div>\n"
+
+
+def test_format_stdin_writes_to_stdout() -> None:
+    runner = CliRunner()
+    result = runner.invoke(cli, ["format", "-"], input="<div><p>hi</p></div>")
+
+    assert result.exit_code == 0
+    assert result.output == "<div>\n    <p>hi</p>\n</div>\n"
+
+
+def test_format_check_stdin_exits_nonzero_when_changes() -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["format", "--check", "-"], input="<div><p>hi</p></div>"
+    )
+
+    assert result.exit_code == 1
+    # --check mode is silent on stdout; no formatted output written.
+    assert result.output == ""
+
+
+def test_format_check_stdin_exits_zero_when_already_formatted() -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["format", "--check", "-"], input="<div>\n    <p>hi</p>\n</div>\n"
+    )
+
+    assert result.exit_code == 0
+
+
+def test_format_stdin_error_to_stderr() -> None:
+    runner = CliRunner()
+    result = runner.invoke(cli, ["format", "-"], input="<div><p>oops")
+
+    assert result.exit_code == 1
+    assert "<stdin>:" in result.output or "<stdin>" in result.stderr
+
+
+def test_format_dash_with_other_paths_errors(tmp_path: Path) -> None:
+    _write(tmp_path, "x.html", "<p>hi</p>")
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["format", "-", str(tmp_path)], input="<p>x</p>")
+
+    assert result.exit_code != 0
+    assert "Cannot mix" in result.output
+
+
+def test_check_stdin_reports_error() -> None:
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", "-"], input="<div><unclosed")
+
+    assert result.exit_code == 1
+    assert "<stdin>:" in result.output or "<stdin>" in result.stderr
+
+
+def test_check_stdin_clean_template_exits_zero() -> None:
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", "-"], input="<p>hi</p>")
+
+    assert result.exit_code == 0
