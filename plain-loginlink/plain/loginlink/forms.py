@@ -47,6 +47,7 @@ class LoginLinkForm(forms.Form):
     ) -> TemplateEmail:
         return TemplateEmail(
             template="loginlink",
+            subject="Your link to log in",
             to=[email],
             context=context,
         )

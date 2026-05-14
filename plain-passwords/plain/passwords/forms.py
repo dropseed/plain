@@ -21,6 +21,7 @@ class PasswordResetForm(forms.Form):
         self,
         *,
         template_name: str,
+        subject: str,
         context: dict[str, Any],
         from_email: str,
         to_email: str,
@@ -29,6 +30,7 @@ class PasswordResetForm(forms.Form):
 
         email = TemplateEmail(
             template=template_name,
+            subject=subject,
             context=context,
             from_email=from_email,
             to=[to_email],
@@ -54,6 +56,7 @@ class PasswordResetForm(forms.Form):
         *,
         generate_reset_url: Callable[[User], str],
         email_template_name: str = "password_reset",
+        email_subject: str = "Password reset",
         from_email: str = "",
         extra_email_context: dict[str, Any] | None = None,
     ) -> None:
@@ -71,6 +74,7 @@ class PasswordResetForm(forms.Form):
             }
             self.send_mail(
                 template_name=email_template_name,
+                subject=email_subject,
                 context=context,
                 from_email=from_email,
                 to_email=user.email,
