@@ -11,9 +11,9 @@ class Config(PackageConfig):
     package_label = "plainpages"
 
     def ready(self) -> None:
-        for pacakge_config in packages_registry.get_package_configs():
+        for package_config in packages_registry.get_package_configs():
             pages_registry.discover_pages(
-                os.path.join(pacakge_config.path, "templates", "pages")
+                os.path.join(package_config.path, "html", "pages")
             )
 
-        pages_registry.discover_pages(os.path.join(APP_PATH, "templates", "pages"))
+        pages_registry.discover_pages(os.path.join(APP_PATH, "html", "pages"))

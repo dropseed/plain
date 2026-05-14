@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import os
 from functools import cached_property
+from pathlib import Path
 from typing import Any
 
 import frontmatter
 
+from plain.html import render_source
 from plain.runtime import settings
-from plain.templates import Template
 from plain.urls import URLPattern, path
 
 from .markdown import render_markdown
@@ -44,23 +45,31 @@ class Page:
         return self.vars.get("title", default_title)
 
     def rendered_source(self, context: dict[str, Any] | None = None) -> str:
-        """Render Jinja templates and strip frontmatter, but don't convert markdown to HTML."""
-        content = self._frontmatter.content
+        """Apply plain.html `{expr}` interpolation to the content body.
 
-        if not self.vars.get("render_plain", False):
-            template = Template(os.path.join("pages", self.relative_path))
-            render_context = context if context is not None else self._template_context
+        For markdown pages this returns the post-substitution markdown
+        (still markdown, not HTML); markdown→HTML conversion happens in
+        `content` below. `render_plain: true` in frontmatter skips
+        interpolation entirely — the body is served as-authored.
+        """
+        if self.vars.get("render_plain", False):
+            return self._frontmatter.content
 
-            try:
-                content = template.render(render_context)
-            except Exception as e:
-                # Throw our own error so we don't get shadowed by the Jinja error
-                raise PageRenderError(f"Error rendering page {self.relative_path}: {e}")
+        render_context = context if context is not None else self._template_context
 
-            # Strip the frontmatter again, since it was in the template file itself
-            _, content = frontmatter.parse(content)
+        with open(self.absolute_path) as f:
+            source = f.read()
 
-        return content
+        try:
+            return render_source(
+                source,
+                render_context,
+                source_path=Path(self.absolute_path),
+            )
+        except Exception as e:
+            raise PageRenderError(
+                f"Error rendering page {self.relative_path}: {e}"
+            ) from e
 
     @cached_property
     def content(self) -> str:

@@ -1,7 +1,7 @@
 [project]
 name = "plain.pages"
 version = "0.19.6"
-description = "Serve static pages, markdown, and assets from templates/pages directories."
+description = "Serve static pages, markdown, and assets from html/pages directories."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
@@ -9,7 +9,7 @@ requires-python = ">=3.13"
 dependencies = [
   "plain>=0.143.0,<1.0.0",
   "plain.assets>=0.1.0,<1.0.0",
-  "plain.templates>=0.1.0,<1.0.0",
+  "plain.html<1.0.0",
   "mistune>=3.0.0",
   "python-frontmatter>=1.0.0",
   "pygments>=2.0.0",
