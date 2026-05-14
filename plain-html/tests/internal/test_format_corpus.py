@@ -1,6 +1,6 @@
 """Corpus property test for the formatter.
 
-Walks every `.html` template under any `html/` directory in the repo
+Walks every `.html` template under any `templates/` directory in the repo
 checkout and asserts the formatter's hard invariants:
 
 - The template parses cleanly.
@@ -39,7 +39,7 @@ pytestmark = pytest.mark.skipif(
 
 def _discover_templates() -> list[Path]:
     files: list[Path] = []
-    for path in REPO_ROOT.rglob("html/*"):
+    for path in REPO_ROOT.rglob("templates/*"):
         if not path.is_dir():
             continue
         files.extend(path.rglob("*.html"))
@@ -93,7 +93,7 @@ def test_template_preserves_frontmatter(path: Path) -> None:
 
 def test_corpus_is_nonempty() -> None:
     # Guard against the discovery glob silently breaking.
-    assert _TEMPLATES, "no templates discovered under any html/ directory"
+    assert _TEMPLATES, "no templates discovered under any templates/ directory"
 
 
 def _body(source: str) -> str:

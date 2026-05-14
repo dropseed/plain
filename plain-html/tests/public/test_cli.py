@@ -138,17 +138,17 @@ def test_check_accepts_single_file(tmp_path: Path) -> None:
 def test_collect_files_default_excludes_installed_packages(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """The default walk only touches the project's own `app/html/`."""
+    """The default walk only touches the project's own `app/templates/`."""
     from plain.html import cli as cli_mod
 
-    app_dir = tmp_path / "app" / "html"
-    pkg_dir = tmp_path / "site-packages" / "plain" / "admin" / "html"
+    app_dir = tmp_path / "app" / "templates"
+    pkg_dir = tmp_path / "site-packages" / "plain" / "admin" / "templates"
     (app_dir / "ok.html").parent.mkdir(parents=True)
     (app_dir / "ok.html").write_text("<p>hi</p>\n")
     (pkg_dir / "x.html").parent.mkdir(parents=True)
     (pkg_dir / "x.html").write_text("<p>hi</p>\n")
 
-    monkeypatch.setattr(cli_mod, "get_html_dirs", lambda: (app_dir, pkg_dir))
+    monkeypatch.setattr(cli_mod, "get_template_dirs", lambda: (app_dir, pkg_dir))
 
     default = cli_mod._collect_files(())
     assert default == [app_dir / "ok.html"]
@@ -161,13 +161,13 @@ def test_check_include_installed_packages_warning(monkeypatch, tmp_path: Path) -
     """Opting in prints a warning explaining the implication."""
     from plain.html import cli as cli_mod
 
-    app_dir = tmp_path / "app" / "html"
-    pkg_dir = tmp_path / "site-packages" / "plain" / "admin" / "html"
+    app_dir = tmp_path / "app" / "templates"
+    pkg_dir = tmp_path / "site-packages" / "plain" / "admin" / "templates"
     (app_dir).mkdir(parents=True)
     (pkg_dir).mkdir(parents=True)
     (app_dir / "ok.html").write_text("<p>hi</p>\n")
 
-    monkeypatch.setattr(cli_mod, "get_html_dirs", lambda: (app_dir, pkg_dir))
+    monkeypatch.setattr(cli_mod, "get_template_dirs", lambda: (app_dir, pkg_dir))
 
     runner = CliRunner()
     result = runner.invoke(cli, ["check", "--include-installed-packages"])

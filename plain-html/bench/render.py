@@ -310,7 +310,7 @@ def _run_file_cases() -> None:
 def _run_corpus() -> None:
     """How long does it take to compile every template in the repo?"""
     files: list[Path] = []
-    for d in REPO.rglob("html/*"):
+    for d in REPO.rglob("templates/*"):
         if d.is_dir():
             files.extend(d.rglob("*.html"))
     files = sorted(set(files))

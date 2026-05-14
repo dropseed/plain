@@ -13,7 +13,7 @@ class Config(PackageConfig):
     def ready(self) -> None:
         for package_config in packages_registry.get_package_configs():
             pages_registry.discover_pages(
-                os.path.join(package_config.path, "html", "pages")
+                os.path.join(package_config.path, "templates", "pages")
             )
 
-        pages_registry.discover_pages(os.path.join(APP_PATH, "html", "pages"))
+        pages_registry.discover_pages(os.path.join(APP_PATH, "templates", "pages"))

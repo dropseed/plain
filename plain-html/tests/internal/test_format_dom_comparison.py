@@ -50,7 +50,7 @@ pytestmark = pytest.mark.skipif(
 
 def _discover_templates() -> list[Path]:
     files: list[Path] = []
-    for path in REPO_ROOT.rglob("html/*"):
+    for path in REPO_ROOT.rglob("templates/*"):
         if not path.is_dir():
             continue
         files.extend(path.rglob("*.html"))

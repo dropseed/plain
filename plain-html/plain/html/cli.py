@@ -13,7 +13,7 @@ from . import _cache
 from .compiler import CompileError, CompileSession, clear_process_cache
 from .format import format_source
 from .frontmatter import split as split_frontmatter
-from .loader import get_html_dirs
+from .loader import get_template_dirs
 from .parser import ParseError, parse
 from .positions import body_offset, offset_to_line_col
 from .tokenizer import TokenizeError, tokenize
@@ -378,16 +378,16 @@ def _collect_files(
     paths: tuple[Path, ...], *, include_installed_packages: bool = False
 ) -> list[Path]:
     if not paths:
-        # Default: only the project's own `app/html/`. Installed-package
+        # Default: only the project's own `app/templates/`. Installed-package
         # templates are owned by their packages — checking them produces
         # diagnostics the end user can't act on. The
         # `--include-installed-packages` flag opts in for framework /
         # package development.
         if include_installed_packages:
-            dirs = [d for d in get_html_dirs() if d.is_dir()]
+            dirs = [d for d in get_template_dirs() if d.is_dir()]
         else:
-            app_html, *_ = get_html_dirs()
-            dirs = [app_html] if app_html.is_dir() else []
+            app_templates, *_ = get_template_dirs()
+            dirs = [app_templates] if app_templates.is_dir() else []
         return sorted({f for d in dirs for f in d.rglob("*.html")})
 
     files: set[Path] = set()

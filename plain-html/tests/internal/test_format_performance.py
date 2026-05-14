@@ -32,7 +32,7 @@ CORPUS_BUDGET_SECONDS = 1.0
 
 def _discover_sources() -> list[str]:
     files: list[Path] = []
-    for path in REPO_ROOT.rglob("html/*"):
+    for path in REPO_ROOT.rglob("templates/*"):
         if not path.is_dir():
             continue
         files.extend(path.rglob("*.html"))

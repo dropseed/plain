@@ -1,9 +1,8 @@
 """Template file resolution.
 
-Walks plain.html's own `get_html_dirs()` to map a template name like
-`layouts/base` to a `.html` file on disk inside an `html/` directory.
-Relative paths (`./x`, `../x`) resolve against the calling template's
-directory.
+Walks `get_template_dirs()` to map a template name like `layouts/base` to
+a `.html` file on disk inside a `templates/` directory. Relative paths
+(`./x`, `../x`) resolve against the calling template's directory.
 """
 
 from __future__ import annotations
@@ -29,29 +28,29 @@ class TemplateFileMissing(FileNotFoundError):
             return "Template file not found"
 
 
-def get_html_dirs() -> tuple[Path, ...]:
+def get_template_dirs() -> tuple[Path, ...]:
     """Return the ordered list of directories to search for plain.html templates.
 
-    First the app's own `html/` directory, then each installed package's
-    `html/` directory.
+    First the app's own `templates/` directory, then each installed
+    package's `templates/` directory.
     """
-    app_html = settings.path.parent / "html"
-    return (app_html,) + _get_package_html_dirs()
+    app_templates = settings.path.parent / "templates"
+    return (app_templates,) + _get_package_template_dirs()
 
 
 @functools.lru_cache
-def _get_package_html_dirs() -> tuple[Path, ...]:
+def _get_package_template_dirs() -> tuple[Path, ...]:
     return tuple(
-        Path(package_config.path) / "html"
+        Path(package_config.path) / "templates"
         for package_config in packages_registry.get_package_configs()
-        if package_config.path and (Path(package_config.path) / "html").is_dir()
+        if package_config.path and (Path(package_config.path) / "templates").is_dir()
     )
 
 
 def find_template(name: str, *, current_template: Path | None = None) -> Path:
-    """Resolve a template name to a `.html` file path under an `html/` dir.
+    """Resolve a template name to a `.html` file path under a `templates/` dir.
 
-    Absolute names (no leading `./` or `../`) walk `get_html_dirs()` in
+    Absolute names (no leading `./` or `../`) walk `get_template_dirs()` in
     order; first match wins. Relative names resolve against `current_template`.
     """
     base_name = name.removesuffix(".html") if name.endswith(".html") else name
@@ -67,7 +66,7 @@ def find_template(name: str, *, current_template: Path | None = None) -> Path:
             return candidate
         raise TemplateFileMissing(name)
 
-    for directory in get_html_dirs():
+    for directory in get_template_dirs():
         candidate = Path(directory) / filename
         if candidate.exists():
             return candidate

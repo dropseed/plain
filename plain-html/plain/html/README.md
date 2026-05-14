@@ -19,9 +19,9 @@
 
 ## Overview
 
-Templates are `.html` files under your app's `html/` directory. Expressions are real Python wrapped in `{ ... }`. Components are just templates you include from other templates.
+Templates are `.html` files under your app's `templates/` directory. Expressions are real Python wrapped in `{ ... }`. Components are just templates you include from other templates.
 
-Here's a complete template at `app/html/hello.html`:
+Here's a complete template at `app/templates/hello.html`:
 
 ```html
 <p>Hello, {name}!</p>
@@ -42,18 +42,18 @@ Or render a file path directly:
 from pathlib import Path
 from plain.html import render
 
-html = render(Path("app/html/hello.html"), {"name": "Dave"})
+html = render(Path("app/templates/hello.html"), {"name": "Dave"})
 ```
 
 `Template(name)` is the path-by-name wrapper used by `TemplateView`, the admin, and the toolbar. `render(path)` is the lower-level entry point — both go through the same compiler.
 
 ## Templates
 
-Templates live under an `html/` directory, either in your app or in an installed package. The loader walks `app/html/` first, then each installed package's `html/`.
+Templates live under a `templates/` directory, either in your app or in an installed package. The loader walks `app/templates/` first, then each installed package's `templates/`.
 
 ```
 app/
-  html/
+  templates/
     base.html
     layouts/
       page.html
@@ -68,7 +68,7 @@ Template("layouts/page")
 Template("components/Card")
 ```
 
-Names that begin with `./` or `../` are relative to the calling template (used inside `:include`). Everything else is an absolute lookup across the configured `html/` directories.
+Names that begin with `./` or `../` are relative to the calling template (used inside `:include`). Everything else is an absolute lookup across the configured `templates/` directories.
 
 See [`find_template`](./loader.py#find_template) for the full resolution rules.
 
@@ -125,14 +125,14 @@ Includes another template at this position. The literal-string form (`:include="
 <template :include={card_or_panel} title="Hello" />
 ```
 
-Absolute paths walk the configured `html/` directories. Relative paths (`./Card`, `../layouts/Page`) resolve against the calling template. See [`find_template`](./loader.py#find_template).
+Absolute paths walk the configured `templates/` directories. Relative paths (`./Card`, `../layouts/Page`) resolve against the calling template. See [`find_template`](./loader.py#find_template).
 
 ## Slots
 
 When you include a component, the body of the `<template :include="...">` tag becomes its **default slot** (also reachable as `children`). The component renders it wherever it references `{children}`:
 
 ```html
-<!-- app/html/components/Card.html -->
+<!-- app/templates/components/Card.html -->
 ---
 slots:
     default: Markup
@@ -150,7 +150,7 @@ slots:
 Add named slots by giving children a `slot="..."` attribute. The component references each by name:
 
 ```html
-<!-- app/html/components/Card.html -->
+<!-- app/templates/components/Card.html -->
 ---
 slots:
     header: Markup
@@ -207,7 +207,7 @@ Frontmatter is parsed via the `python-frontmatter` package (the same loader `pla
 A component is just a template designed to be included. There's no registry and no separate file type — write a regular `.html` file, declare its inputs in frontmatter, and `:include` it.
 
 ```html
-<!-- app/html/components/Button.html -->
+<!-- app/templates/components/Button.html -->
 ---
 attrs:
     href: str
@@ -260,7 +260,7 @@ plain.html treats two things very differently.
 Three commands under `plain html`:
 
 ```bash
-plain html check        # parse + validate every template under app/html/
+plain html check        # parse + validate every template under app/templates/
 plain html format       # canonicalize whitespace and attribute order in place
 plain html compile      # pre-compile every template into the on-disk cache
 ```
@@ -291,7 +291,7 @@ Double it: `{{` renders as `{`, `}}` renders as `}`. The same escape works in at
 
 #### How does `:include` resolve paths?
 
-Absolute names (`components/Card`) walk the configured `html/` directories — the app's own `html/` first, then each installed package's `html/`. Relative names (`./Card`, `../layouts/Page`) resolve against the directory of the calling template. See [`find_template`](./loader.py#find_template).
+Absolute names (`components/Card`) walk the configured `templates/` directories — the app's own `templates/` first, then each installed package's `templates/`. Relative names (`./Card`, `../layouts/Page`) resolve against the directory of the calling template. See [`find_template`](./loader.py#find_template).
 
 #### How does this interact with `plain.htmx`?
 
@@ -321,7 +321,7 @@ INSTALLED_PACKAGES = [
 ]
 ```
 
-Create your first template at `app/html/hello.html`:
+Create your first template at `app/templates/hello.html`:
 
 ```html
 <p>Hello, {name}!</p>
