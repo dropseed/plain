@@ -3,9 +3,8 @@
 Each emitted module's `render()` returns a single str.
 
 **Fragment coalescing.** Adjacent text and dynamic expressions accumulate
-in a fragment buffer and flush as a single `_append('text' + expr + ...)`
-call — collapses N calls per run into one. This is the difference between
-6.5× and roughly 1× of Jinja's perf on inline-loop bodies.
+in a fragment buffer and flush as a single `list += (...)` call — collapses
+N appends per run into one.
 
 **Source mapping.** Each emitted Python line carries the template body
 offset of the node that produced it. `emit_module` returns the source +
@@ -184,8 +183,7 @@ class _Emit:
         else:
             # Multi-fragment runs: build one tuple, push it in one go via
             # `list += (...)` (i.e. `list.__iadd__`, the in-place extend).
-            # No intermediate string allocations — what `_append(a + b + c)`
-            # used to cost. Trailing comma keeps a 2-frag tuple unambiguous.
+            # Trailing comma keeps a 2-frag tuple unambiguous.
             parts: list[str] = []
             for f in coalesced:
                 parts.append(repr(f.content) if f.kind == "text" else f.content)
@@ -252,7 +250,7 @@ def emit_module(
     header.append("")
     header.append(
         "from plain.html._runtime import "
-        "escape_html, escape_attr, escape_url, "
+        "escape_html, escape_url, "
         "render_dyn_attr, render_dyn_url_attr, normalize_keywords, "
         "resolve_dynamic_include as _resolve_dynamic_include"
     )
@@ -472,10 +470,8 @@ def _emit_static_include(node: ElementNode, e: _Emit) -> None:
 
     # Direct kwargs where the name is a valid Python identifier; fall back
     # to dict expansion only for keyword-named attrs like `class` or `for`.
-    # The previous `**{**_root_ctx, ...}` form built a fresh merged dict on
-    # every call — costly inside `:include`-in-loop. `_root_ctx` now travels
-    # as a single parameter and merges into the child's `_ctx` once, at the
-    # child's function entry.
+    # `_root_ctx` travels as a single parameter and merges into the child's
+    # `_ctx` once, at the child's function entry.
     direct: list[str] = []
     dict_items: list[str] = []
 

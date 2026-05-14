@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import importlib.util
 import json
 import os
 from dataclasses import asdict
@@ -23,6 +22,7 @@ from pathlib import Path
 
 from plain.runtime import PLAIN_TEMP_PATH
 
+from .._cache import module_mtime_ns
 from ._ast_utils import dotted_chain
 from .declarations import Declarations
 from .synth import FORMAT_VERSION
@@ -58,7 +58,7 @@ def cache_key(
     h.update(b"\n")
 
     for module_name in sorted(_referenced_modules(declarations)):
-        h.update(f"module={module_name}:{_module_mtime(module_name)}\n".encode())
+        h.update(f"module={module_name}:{module_mtime_ns(module_name)}\n".encode())
 
     return h.hexdigest()
 
@@ -125,26 +125,3 @@ def _modules_in_type_expr(source: str) -> set[str]:
             if chain and len(chain) >= 2:
                 out.add(".".join(chain[:-1]))
     return out
-
-
-def _module_mtime(name: str) -> int:
-    """Return the mtime of `name`'s source file, or 0 if not resolvable.
-
-    Walks the dotted name from the right, so `app.users.User` falls back to
-    `app.users` and then `app`. Failure is silent on purpose: missing
-    modules will surface as ty errors during the check.
-    """
-    parts = name.split(".")
-    while parts:
-        candidate = ".".join(parts)
-        try:
-            spec = importlib.util.find_spec(candidate)
-        except (ImportError, ValueError):
-            spec = None
-        if spec is not None and spec.origin and spec.origin != "built-in":
-            try:
-                return int(Path(spec.origin).stat().st_mtime_ns)
-            except OSError:
-                return 0
-        parts.pop()
-    return 0

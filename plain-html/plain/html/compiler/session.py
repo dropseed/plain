@@ -154,7 +154,6 @@ class CompileSession:
 
         Note: in-memory compiles via this entry point don't get source
         mapping (no template path → nothing for `linecache` to read).
-        Use `_compile_to_code` if you want the remapped code object.
         """
         fmdict, body = fm.split(source)
         tokens = tokenize(body)

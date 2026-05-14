@@ -391,7 +391,6 @@ def _attribute_chains(node: ast.AST) -> list[list[str]]:
                 if chain is not None:
                     chains.append(chain)
                 else:
-                    ast.iter_fields(n)
                     for child in ast.iter_child_nodes(n):
                         visit(child)
             case _:

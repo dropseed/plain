@@ -1,7 +1,6 @@
 from plain.html.whitespace import (
     INLINE_ELEMENTS,
     VERBATIM_ELEMENTS,
-    is_block,
     is_inline,
     is_verbatim,
 )
@@ -15,7 +14,6 @@ def test_verbatim_recognizes_pre_textarea_script_style():
     for tag in ("pre", "textarea", "script", "style"):
         assert is_verbatim(tag)
         assert not is_inline(tag)
-        assert not is_block(tag)
 
 
 def test_inline_recognizes_phrasing_content():
@@ -23,14 +21,12 @@ def test_inline_recognizes_phrasing_content():
     for tag in ("a", "span", "strong", "em", "code", "img", "br"):
         assert is_inline(tag)
         assert not is_verbatim(tag)
-        assert not is_block(tag)
 
 
-def test_block_recognizes_flow_content():
-    # Anything not inline and not verbatim defaults to block — this is
-    # how unknown tags (custom elements, framework tags) get treated.
+def test_flow_content_is_neither_inline_nor_verbatim():
+    # Unknown tags (custom elements, framework tags) default to block —
+    # they are not in either set.
     for tag in ("div", "section", "article", "p", "main", "form", "x-custom"):
-        assert is_block(tag)
         assert not is_inline(tag)
         assert not is_verbatim(tag)
 

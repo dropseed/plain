@@ -2,12 +2,8 @@
 
 `render(path)` reads + compiles + renders a `.html` file.
 `render_source(source, *, source_path)` renders a source string,
-optionally resolving `:include`s relative to a known path.
-
-Both delegate to `plain.html.compiler` — the tree-walking interpreter
-this module used to host has been removed. If you need to revert that
-decision, the last commit on `plain-html` before the interpreter was
-deleted has the implementation.
+optionally resolving `:include`s relative to a known path. Both
+delegate to `plain.html.compiler`.
 """
 
 from __future__ import annotations

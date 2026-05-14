@@ -11,10 +11,14 @@ from __future__ import annotations
 import html as _html
 import keyword
 from collections.abc import Callable, Iterable
+from pathlib import Path
 from typing import cast
 
 from plain.utils.html import conditional_escape
 from plain.utils.safestring import SafeString
+
+from .compiler import get_or_compile
+from .loader import find_template
 
 # Module-local alias kept hot in the closure — `html.escape` is by far the
 # common case and we want to skip the LOAD_GLOBAL chain `_html.escape`.
@@ -28,7 +32,10 @@ _NUMERIC_TYPES = (int, float, bool)
 
 
 def escape_html(value: object) -> str:
-    """Render a value for HTML text content.
+    """Render a value for HTML text content or a quoted attribute value.
+
+    `html.escape()` defaults to `quote=True`, so the same call is correct
+    in both positions — text and `name="..."` segments.
 
     Hot paths:
       - `str` → `html.escape(value)` directly
@@ -46,20 +53,6 @@ def escape_html(value: object) -> str:
     # `type is X` checks (not `isinstance`) — SafeString subclasses str
     # but we want it on a separate branch so raw str hits `html.escape`
     # without an extra dispatch.
-    t = type(value)
-    if t is str:
-        return _html_escape(cast(str, value))
-    if t is SafeString:
-        return cast(str, value)
-    if t in _NUMERIC_TYPES:
-        return str(value)
-    return str(conditional_escape(value))
-
-
-def escape_attr(value: object) -> str:
-    """Render a value for an HTML attribute value (between quotes)."""
-    if value is None:
-        return ""
     t = type(value)
     if t is str:
         return _html_escape(cast(str, value))
@@ -124,27 +117,26 @@ def render_dyn_attr(name: str, value: object) -> str:
     empty string to omit the attribute. Matches `engine._render_attribute`
     for the single-expression case.
     """
-    if value is False or value is None:
-        return ""
-    if value is True:
-        return f" {name}"
-    if isinstance(value, list):
-        parts = [str(v) for v in _flatten(value) if v]
-        if not parts:
-            return ""
-        return f' {name}="{escape_attr(" ".join(parts))}"'
-    return f' {name}="{escape_attr(value)}"'
+    return _render_dyn(name, value, escape_html, drop_on_empty=False)
 
 
 def render_dyn_url_attr(name: str, value: object) -> str:
     """Same shape as `render_dyn_attr` but routes through `escape_url`.
 
-    Used for URL-bearing attributes (`href`, `src`, …). Boolean / `None`
-    values still omit the attribute. List values are rejected (URL attrs
-    don't have the multi-class join shape that HTML class lists do) —
-    they collapse to the joined string and run through `escape_url`,
-    which will probably refuse the result.
+    Used for URL-bearing attributes (`href`, `src`, …). A value whose
+    scheme is rejected by `escape_url` (empty result) drops the
+    attribute entirely rather than emitting `name=""`.
     """
+    return _render_dyn(name, value, escape_url, drop_on_empty=True)
+
+
+def _render_dyn(
+    name: str,
+    value: object,
+    escape: Callable[[object], str],
+    *,
+    drop_on_empty: bool,
+) -> str:
     if value is False or value is None:
         return ""
     if value is True:
@@ -153,13 +145,9 @@ def render_dyn_url_attr(name: str, value: object) -> str:
         parts = [str(v) for v in _flatten(value) if v]
         if not parts:
             return ""
-        joined = " ".join(parts)
-        safe = escape_url(joined)
-        if not safe:
-            return ""
-        return f' {name}="{safe}"'
-    safe = escape_url(value)
-    if not safe:
+        value = " ".join(parts)
+    safe = escape(value)
+    if drop_on_empty and not safe:
         return ""
     return f' {name}="{safe}"'
 
@@ -169,15 +157,8 @@ def resolve_dynamic_include(name: str, *, current_template: str) -> Callable[...
 
     Looks the name up via `loader.find_template` (relative to the
     calling template, matching the static-include resolver), then asks
-    the compiler for a cached compiled `render` function. Imports are
-    deferred to avoid an import cycle — this module is the one every
-    compiled template imports from.
+    the compiler for a cached compiled `render` function.
     """
-    from pathlib import Path
-
-    from .compiler import get_or_compile
-    from .loader import find_template
-
     target = find_template(name, current_template=Path(current_template))
     return get_or_compile(target)
 

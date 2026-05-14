@@ -98,8 +98,3 @@ def is_verbatim(tag: str) -> bool:
 def is_inline(tag: str) -> bool:
     """Element participates in inline (phrasing) layout."""
     return tag in INLINE_ELEMENTS
-
-
-def is_block(tag: str) -> bool:
-    """Element is a flow/block container — safe to wrap children."""
-    return tag not in INLINE_ELEMENTS and tag not in VERBATIM_ELEMENTS

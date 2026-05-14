@@ -30,10 +30,12 @@ from pathlib import Path
 from plain.runtime import settings
 
 # Bump on codegen changes so stale cache entries get rebuilt automatically.
-# v3: cache file format switched from `.py` source to marshalled bytecode.
-#     Codegen also changed to coalesce adjacent fragments into a single
-#     `_append(...)` call and to remap AST lineno to template lines.
-COMPILER_VERSION = 3
+COMPILER_VERSION = 4
+
+# Tracks which cache roots this process has already `mkdir`'d, so we skip
+# the syscall on every subsequent compile. Settings reads in `cache_root()`
+# are cheap; the `mkdir` is what dominates per-template compile cost.
+_ensured_dirs: set[Path] = set()
 
 
 def cache_root() -> Path | None:
@@ -61,9 +63,12 @@ def ensure_cache_dir(root: Path) -> Path:
     """Create the cache root with restrictive permissions.
 
     Existing dirs aren't re-chmodded — that's the operator's call, not
-    something a library should silently change.
+    something a library should silently change. The `mkdir` syscall is
+    skipped on repeat calls for the same root.
     """
-    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if root not in _ensured_dirs:
+        root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        _ensured_dirs.add(root)
     return root
 
 
@@ -71,11 +76,10 @@ def cache_file_for(key: str, source_path: Path) -> Path | None:
     """Return the on-disk path for a cache entry, or `None` if caching
     is disabled.
 
-    Cache entries are marshalled Python code objects (`.pyc`-style),
-    not source — load is one `marshal.load(f)` instead of parse +
-    compile. The naming pattern is `<key>__<source-name>.pyc` so the
-    hash makes the cache content-addressable and the human-readable
-    suffix makes the dir greppable.
+    Cache entries are marshalled Python code objects (`.pyc`-style).
+    The naming pattern is `<key>__<source-name>.pyc` so the hash makes
+    the cache content-addressable and the human-readable suffix makes
+    the dir greppable.
     """
     root = cache_root()
     if root is None:
@@ -88,7 +92,7 @@ def cache_file_for(key: str, source_path: Path) -> Path | None:
 def compute_cache_key(
     source: str,
     child_keys: list[str],
-    imports_mtimes_map: dict[str, float],
+    imports_mtimes_map: dict[str, int],
 ) -> str:
     """Hash all the inputs that should invalidate the compiled output."""
     h = hashlib.sha256()
@@ -104,23 +108,13 @@ def compute_cache_key(
     return h.hexdigest()[:16]
 
 
-def write_atomic(path: Path, content: str) -> None:
+def write_atomic_bytes(path: Path, content: bytes) -> None:
     """Write `content` to `path` without leaving a half-written file.
 
     Tmp file in the same directory + fsync + atomic rename. The
     per-PID suffix keeps two parallel workers from clobbering each
     other's tmp file mid-write.
     """
-    tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(content)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, path)
-
-
-def write_atomic_bytes(path: Path, content: bytes) -> None:
-    """Binary counterpart to `write_atomic` for the marshalled-bytecode cache."""
     tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
     with open(tmp, "wb") as f:
         f.write(content)
@@ -129,22 +123,22 @@ def write_atomic_bytes(path: Path, content: bytes) -> None:
     os.replace(tmp, path)
 
 
-def imports_mtimes(stmts: list[str]) -> dict[str, float]:
+def imports_mtimes(stmts: list[str]) -> dict[str, int]:
     """Resolve each `imports:` statement to file mtimes so a Python-side
     edit invalidates downstream cache entries.
 
     For each import, the *most-specific* dotted candidate is recorded —
     e.g. `from app.users.models import Task` records `app.users.models`,
-    not just `app`. `_module_mtime` then walks the dotted path from the
-    right, so a candidate that doesn't resolve falls back to the nearest
-    package that does.
+    not just `app`. `module_mtime_ns` then walks the dotted path from
+    the right, so a candidate that doesn't resolve falls back to the
+    nearest package that does.
 
     Modules whose source can't be located (builtins, frozen, namespace
-    packages, anything `importlib` can't `find_spec` for) get `0.0` —
+    packages, anything `importlib` can't `find_spec` for) get `0` —
     same value every time, so the key stays stable rather than
     chasing import-resolution noise.
     """
-    out: dict[str, float] = {}
+    out: dict[str, int] = {}
     for stmt in stmts:
         try:
             tree = ast.parse(stmt, mode="exec")
@@ -161,7 +155,7 @@ def imports_mtimes(stmts: list[str]) -> dict[str, float]:
                     # The from-target itself, plus each imported name as a
                     # potential submodule (`from a.b import c` may import
                     # the submodule `a.b.c` — record that and let
-                    # `_module_mtime` walk back to `a.b` on failure).
+                    # `module_mtime_ns` walk back to `a.b` on failure).
                     candidates.append(node.module)
                     for alias in node.names:
                         if alias.name == "*":
@@ -170,15 +164,15 @@ def imports_mtimes(stmts: list[str]) -> dict[str, float]:
             for candidate in candidates:
                 if candidate in out:
                     continue
-                out[candidate] = _module_mtime(candidate)
+                out[candidate] = module_mtime_ns(candidate)
     return out
 
 
-def _module_mtime(mod_name: str) -> float:
-    """Return the mtime of `mod_name`'s source, walking the dotted path
-    from the right so `app.users.models` falls back to `app.users` and
-    then `app` if the more-specific candidate isn't importable on its
-    own. Returns `0.0` if nothing in the chain resolves.
+def module_mtime_ns(mod_name: str) -> int:
+    """Return the mtime (nanoseconds) of `mod_name`'s source, walking the
+    dotted path from the right so `app.users.models` falls back to
+    `app.users` and then `app` if the more-specific candidate isn't
+    importable on its own. Returns `0` if nothing in the chain resolves.
     """
     parts = mod_name.split(".")
     while parts:
@@ -189,8 +183,8 @@ def _module_mtime(mod_name: str) -> float:
             spec = None
         if spec is not None and spec.origin and spec.origin != "built-in":
             try:
-                return os.path.getmtime(spec.origin)
+                return os.stat(spec.origin).st_mtime_ns
             except OSError:
-                return 0.0
+                return 0
         parts.pop()
-    return 0.0
+    return 0
