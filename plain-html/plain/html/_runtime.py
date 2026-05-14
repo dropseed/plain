@@ -35,6 +35,41 @@ def escape_attr(value: object) -> str:
     return str(conditional_escape(value))
 
 
+# URL schemes considered safe for href/src/action/etc. Anything else (notably
+# `javascript:` and `data:`) becomes an empty string so the resulting markup
+# can't navigate to or execute attacker-controlled code. Phase 6 may expand
+# this list or add more nuanced validation.
+SAFE_URL_SCHEMES: frozenset[str] = frozenset(
+    {"http", "https", "mailto", "tel", "ftp", "ftps"}
+)
+
+
+def escape_url(value: object) -> str:
+    """Render a value for a URL-bearing attribute (`href`, `src`, …).
+
+    Validates the scheme against `SAFE_URL_SCHEMES`. A value whose
+    scheme is not on the allow-list is replaced with the empty string —
+    better an empty link than an XSS sink. Relative URLs (no scheme)
+    pass through; the value is finally HTML-escaped for attribute
+    context.
+    """
+    if value is None:
+        return ""
+    text = str(value).lstrip()
+    # Locate the scheme separator without picking up colons that belong to
+    # a path/query/fragment: stop at the first `/`, `?`, `#`, or `\`.
+    colon = -1
+    for idx, ch in enumerate(text):
+        if ch == ":":
+            colon = idx
+            break
+        if ch in "/?#\\":
+            break
+    if colon > 0 and text[:colon].lower() not in SAFE_URL_SCHEMES:
+        return ""
+    return escape_attr(text)
+
+
 def render_dyn_attr(name: str, value: object) -> str:
     """Render a `name={expr}` attribute with boolean/list/None semantics.
 
@@ -52,6 +87,34 @@ def render_dyn_attr(name: str, value: object) -> str:
             return ""
         return f' {name}="{escape_attr(" ".join(parts))}"'
     return f' {name}="{escape_attr(value)}"'
+
+
+def render_dyn_url_attr(name: str, value: object) -> str:
+    """Same shape as `render_dyn_attr` but routes through `escape_url`.
+
+    Used for URL-bearing attributes (`href`, `src`, …). Boolean / `None`
+    values still omit the attribute. List values are rejected (URL attrs
+    don't have the multi-class join shape that HTML class lists do) —
+    they collapse to the joined string and run through `escape_url`,
+    which will probably refuse the result.
+    """
+    if value is False or value is None:
+        return ""
+    if value is True:
+        return f" {name}"
+    if isinstance(value, list):
+        parts = [str(v) for v in _flatten(value) if v]
+        if not parts:
+            return ""
+        joined = " ".join(parts)
+        safe = escape_url(joined)
+        if not safe:
+            return ""
+        return f' {name}="{safe}"'
+    safe = escape_url(value)
+    if not safe:
+        return ""
+    return f' {name}="{safe}"'
 
 
 def normalize_keywords(scope: dict) -> None:

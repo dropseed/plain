@@ -276,6 +276,141 @@ def test_no_eval_in_generated_source():
     assert "eval(" not in src
 
 
+# --- security: URL scheme, on* attrs, opaque bodies, YAML safety -----------
+
+
+def test_safe_url_scheme_passes():
+    out = _load("<a href={url}>x</a>")(url="https://example.com/page")
+    assert out == '<a href="https://example.com/page">x</a>'
+
+
+def test_relative_url_passes():
+    assert _load("<a href={url}>x</a>")(url="/path?q=1") == '<a href="/path?q=1">x</a>'
+
+
+def test_javascript_url_rejected():
+    # `escape_url` returns "" for non-safe schemes; `render_dyn_url_attr`
+    # then omits the attribute entirely — cleaner DOM than `href=""`.
+    out = _load("<a href={url}>x</a>")(url="javascript:alert(1)")
+    assert "javascript" not in out
+    assert "alert" not in out
+    assert out == "<a>x</a>"
+
+
+def test_data_text_html_url_rejected():
+    out = _load("<a href={url}>x</a>")(url="data:text/html,<script>x</script>")
+    assert "<script>" not in out
+    assert out == "<a>x</a>"
+
+
+def test_url_scheme_case_insensitive():
+    # `JaVaScRiPt:` is the same scheme — reject it.
+    out = _load("<a href={url}>x</a>")(url="JaVaScRiPt:alert(1)")
+    assert "alert" not in out
+
+
+def test_mixed_segment_url_attr_validates_full():
+    # Static prefix + dynamic suffix — full URL is validated.
+    src = '<a href="/{path}">x</a>'
+    out = _load(src)(path="search?q=1")
+    assert out == '<a href="/search?q=1">x</a>'
+
+
+def test_mixed_segment_url_with_evil_scheme():
+    # Author wrote `<a href="{scheme}:..."` and `scheme=javascript` — composed
+    # URL has an unsafe scheme. escape_url rejects.
+    src = '<a href="{scheme}:alert(1)">x</a>'
+    out = _load(src)(scheme="javascript")
+    assert "alert" not in out
+
+
+def test_src_attr_also_validated():
+    out = _load("<img src={u} />")(u="javascript:alert(1)")
+    assert "alert" not in out
+
+
+def test_action_attr_also_validated():
+    out = _load("<form action={u}></form>")(u="javascript:alert(1)")
+    assert "alert" not in out
+
+
+def test_event_handler_with_dynamic_value_rejected():
+    with pytest.raises(CompileError, match="event-handler"):
+        compile_source("<a onclick={handler}>x</a>")
+
+
+def test_event_handler_with_mark_safe_allowed():
+    out = _load('<a onclick={mark_safe("alert(1)")}>x</a>')()
+    assert out == '<a onclick="alert(1)">x</a>'
+
+
+def test_event_handler_with_markup_allowed():
+    # `Markup(...)` is the spec-named alias for `mark_safe`; both are
+    # auto-available in every compiled module, no `imports:` needed.
+    src = "<a onclick={Markup(handler)}>x</a>"
+    assert _load(src)(handler="alert(1)") == '<a onclick="alert(1)">x</a>'
+
+
+def test_event_handler_with_mixed_segments_rejected():
+    # Even with one mark_safe segment, the surrounding text could leak —
+    # safer to refuse the whole mixed shape.
+    with pytest.raises(CompileError, match="event-handler"):
+        compile_source('<a onclick="x={val}">x</a>')
+
+
+def test_static_event_handler_allowed():
+    # Literal handler in source — author wrote it, no dynamic data.
+    assert (
+        _load("<a onclick=\"alert('hi')\">x</a>")()
+        == "<a onclick=\"alert('hi')\">x</a>"
+    )
+
+
+def test_event_handler_case_insensitive():
+    # HTML attr names are case-insensitive; check `ONCLICK=` is caught too.
+    with pytest.raises(CompileError, match="event-handler"):
+        compile_source("<a ONCLICK={handler}>x</a>")
+
+
+def test_expr_inside_script_is_literal_text():
+    # Tokenizer treats <script> body as opaque — `{x}` doesn't interpolate.
+    # The risk we're guarding against: a future regression that starts parsing
+    # ExprNodes inside script body would create a JS-context injection sink.
+    src = "<script>const x = {user_data};</script>"
+    out = _load(src)(user_data="EVIL")
+    assert out == "<script>const x = {user_data};</script>"
+    assert "EVIL" not in out
+
+
+def test_expr_inside_style_is_literal_text():
+    src = "<style>.x { color: {user_color}; }</style>"
+    out = _load(src)(user_color="red")
+    assert out == "<style>.x { color: {user_color}; }</style>"
+    assert "red" not in out
+
+
+def test_yaml_frontmatter_does_not_execute_unsafe_tags(tmp_path):
+    # `python-frontmatter` must use a safe YAML loader. A malicious frontmatter
+    # with `!!python/object/apply:os.system [...]` would be RCE-on-render if
+    # the loader were `yaml.load`. We assert the side effect never happens.
+    from plain.html.frontmatter import split
+
+    marker = tmp_path / "yaml_unsafe_marker"
+    assert not marker.exists()
+    payload = (
+        f"---\n"
+        f"bomb: !!python/object/apply:os.system ['touch {marker}']\n"
+        f"---\n"
+        f"<p>body</p>\n"
+    )
+    try:
+        split(payload)
+    except Exception:
+        # safe_load raises ConstructorError on unknown tags — that's fine.
+        pass
+    assert not marker.exists(), "YAML loader executed os.system — UNSAFE"
+
+
 # --- :include + slot composition --------------------------------------------
 
 

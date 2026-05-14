@@ -425,6 +425,47 @@ If the gate trips after a future change, it's a real regression — investigate 
 
 ---
 
+### Phase 5.5 — Security hardening (before 5f cutover)
+
+Sits between Phase 5's compiler work and Phase 5f's cutover. The full contextual-autoescape design lives in Phase 6, but a few sharp edges shouldn't ship to the compiler default with stub escape functions. These are small, mostly compile-time checks that fail loud rather than silently producing exploitable output.
+
+#### Threat model
+
+| Boundary                                                       | Trust                        | Notes                                                                                                           |
+| -------------------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| User data flowing into `{expr}`                                | Hostile by default           | Escape every `{expr}` per position. Phase 6 lands the full per-context table; 5.5 closes the worst sharp edges. |
+| Template author code (`imports:`, `{python expr}`, `:include`) | Trusted (same as `views.py`) | No sandbox. Out of scope.                                                                                       |
+
+Plain.html does **not** support running untrusted templates. The trust model matches Django/Jinja: template authors are application code authors. Documented in `plain-html/README` as part of this phase so users aren't surprised.
+
+#### Deliverables
+
+1. **Reject `{expr}` inside `<script>` / `<style>` bodies at compile time.** One-line check in `_emit_element`. Authors who genuinely need to inject data into JS use `Markup(json.dumps(value))` and document the call site. The error message points there.
+2. **Reject `on*={expr}` event-handler attributes** with the default escape policy. JS execution context; HTML-escape does nothing. Author must explicitly wrap the value in `mark_safe(...)` (which the spec already treats as a deliberate opt-out for any escape).
+3. **Stub `escape_url` for known-URL attributes** (`href`, `src`, `action`, `formaction`, `xlink:href`). 5.5 doesn't have to land the full URL validator — even a thin stub that rejects `javascript:` and `data:text/html` scheme prefixes closes the cheap exploit. Phase 6 expands it.
+4. **Verify YAML safety.** Confirm `python-frontmatter` uses `yaml.safe_load`. If not, force-route through `safe_load`. Unsafe YAML loading anywhere on the compile path is RCE-on-package-install.
+5. **Trust-model section in `plain-html/README`.** Explicit "we don't sandbox templates; don't render user-uploaded templates with this engine; here's what attacker-controlled DATA gets escaped vs. what doesn't."
+
+Cache permissions (mode `0700` + atomic rename) and dynamic-include path-traversal refusal (`:include={expr}` must stay under configured `html/` roots) belong to Phase 5e itself — call them out there in the deliverables.
+
+#### Success criteria
+
+- `<script>{x}</script>` and `<style>{x}</style>` are compile errors with a message pointing at the `Markup(json.dumps(...))` workaround.
+- `<a onclick={handler}>` is a compile error unless `handler` is statically `mark_safe(...)` at the call site (compile-time check, not runtime).
+- `<a href={url}>` with `url = "javascript:alert(1)"` renders the attribute as empty (or raises) — not as a clickable XSS.
+- README has a "Security" section covering the trust model and the per-position escape table.
+- `python-frontmatter` is confirmed (in code or via pinned version note) to use safe YAML loading; a regression test asserts that a YAML payload containing `!!python/object/apply:os.system [...]` fails to parse.
+
+#### Risks + mitigations
+
+| Risk                                                              | Mitigation                                                                                                                                                                 |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `escape_url` stub is too permissive — misses some scheme variant. | Whitelist-by-scheme, not blacklist. Allow `http`, `https`, `mailto`, relative paths; everything else routes through a small `is_safe_url(s)` helper. Phase 6 hardens this. |
+| Author can't legitimately put dynamic data into `<script>`.       | Document the `Markup(json.dumps(...))` pattern in the README and the compile-error message. Real use cases (CSRF token, feature flags) are well-handled by this.           |
+| Tighter checks break templates already in `example/`.             | Phase 10 migration grep will surface these; fix per-template as we go. Bound — the example corpus is small.                                                                |
+
+---
+
 ### Phase 6 — Contextual autoescape
 
 Deliverables:

@@ -33,6 +33,7 @@ import types
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from . import frontmatter as fm
 from .loader import find_template
@@ -308,7 +309,10 @@ def _emit_module(
     declared_attrs = list((fmdict.get("attrs") or {}).keys())
     declared_slots = list((fmdict.get("slots") or {}).keys())
     imports = list(fmdict.get("imports") or [])
-    module_globals = _parse_import_bindings(imports)
+    # Always-available names in compiled modules: `mark_safe` / `Markup` are
+    # the spec-named escape-opt-in primitives. Authors should be able to
+    # write `<a onclick={mark_safe(handler)}>` without an `imports:` block.
+    module_globals = _parse_import_bindings(imports) | {"mark_safe", "Markup"}
 
     # Declared attrs/slots split into:
     #   - promoted: become real Python kwargs → faster bare-name access in
@@ -336,9 +340,13 @@ def _emit_module(
     header.append("")
     header.append(
         "from plain.html._runtime import "
-        "escape_html, escape_attr, render_dyn_attr, normalize_keywords"
+        "escape_html, escape_attr, escape_url, "
+        "render_dyn_attr, render_dyn_url_attr, normalize_keywords"
     )
-    header.append("from plain.utils.safestring import mark_safe as _mark_safe")
+    header.append(
+        "from plain.utils.safestring import "
+        "mark_safe, mark_safe as Markup, mark_safe as _mark_safe"
+    )
     header.append("")
     header.append(f"__template_source__ = {source_label!r}")
     header.append("")
@@ -588,16 +596,48 @@ def _emit_attribute(attr: Attribute, e: _Emit) -> None:
         e.text(f" {attr.name}")
         return
 
+    # Event-handler attrs (`onclick=`, `onload=`, …) execute the value as JS
+    # in the browser. HTML-escape does NOT protect that context — the browser
+    # decodes entities before parsing the value as code. Refuse dynamic data
+    # here at compile time; authors who genuinely need it must wrap the value
+    # in `mark_safe(...)` or `Markup(...)` to make the opt-in explicit and
+    # greppable in their template.
+    if _is_event_handler_attr(attr.name) and _attr_has_unsafe_expr(attr):
+        raise CompileError(
+            f"`<...{attr.name}={{expr}}>`: event-handler attributes can't take "
+            f"dynamic data — HTML escape doesn't protect a JS context. If the "
+            f"value is genuinely safe, wrap it in `mark_safe(...)` to opt in."
+        )
+
+    is_url_attr = attr.name in _URL_ATTRS
+
     if all(isinstance(s, AttrText) for s in attr.segments):
         value = "".join(s.text for s in attr.segments if isinstance(s, AttrText))
         e.text(f' {attr.name}="{value}"')
         return
 
     if len(attr.segments) == 1 and isinstance(attr.segments[0], AttrExpr):
+        helper = "render_dyn_url_attr" if is_url_attr else "render_dyn_attr"
         e.line(
-            f"{e.append_name}(render_dyn_attr({attr.name!r}, "
+            f"{e.append_name}({helper}({attr.name!r}, "
             f"{e.rewrite_expr(attr.segments[0].code)}))"
         )
+        return
+
+    # Mixed text + expr segments. For URL attrs we have to compose the full
+    # value before scheme validation, so we route the whole concatenation
+    # through `escape_url` at the end.
+    if is_url_attr:
+        parts: list[str] = []
+        for seg in attr.segments:
+            match seg:
+                case AttrText():
+                    parts.append(repr(seg.text))
+                case AttrExpr():
+                    parts.append(f"str({e.rewrite_expr(seg.code)})")
+        e.text(f' {attr.name}="')
+        e.line(f"{e.append_name}(escape_url({' + '.join(parts)}))")
+        e.text('"')
         return
 
     e.text(f' {attr.name}="')
@@ -608,6 +648,67 @@ def _emit_attribute(attr: Attribute, e: _Emit) -> None:
             case AttrExpr():
                 e.line(f"{e.append_name}(escape_html({e.rewrite_expr(seg.code)}))")
     e.text('"')
+
+
+# Attributes whose value is a URL — routed through `escape_url` so an attacker
+# can't slip a `javascript:` or `data:text/html` value into the rendered
+# document. Phase 6 may expand this list.
+_URL_ATTRS: frozenset[str] = frozenset(
+    {
+        "href",
+        "src",
+        "action",
+        "formaction",
+        "xlink:href",
+        "data",
+        "poster",
+        "cite",
+    }
+)
+
+
+def _is_event_handler_attr(name: str) -> bool:
+    """Whether `name` is a DOM event-handler attribute (`onclick`, `onload`, …).
+
+    Lowercased prefix check — HTML attribute names are case-insensitive.
+    """
+    return name.lower().startswith("on") and len(name) > 2
+
+
+def _attr_has_unsafe_expr(attr: Attribute) -> bool:
+    """Whether `attr` has a dynamic value that wasn't explicitly opted in.
+
+    A single-expression value counts as opted-in only when the expression is
+    a literal `mark_safe(...)` or `Markup(...)` call. Anything else, plus any
+    mixed text + expr segments, is unsafe.
+    """
+    if attr.segments is None:
+        return False
+    if all(isinstance(s, AttrText) for s in attr.segments):
+        return False
+    if len(attr.segments) == 1 and isinstance(attr.segments[0], AttrExpr):
+        return not _is_static_safe_call(attr.segments[0].code)
+    # Mixed text + expr: even if every expr were mark_safe, the static
+    # bits could still be unsafe under JS parsing rules. Refuse.
+    return True
+
+
+def _is_static_safe_call(code: str) -> bool:
+    """Whether `code` parses as a `mark_safe(...)` or `Markup(...)` call.
+
+    Greppable opt-in at the source level: the author wrote those names
+    literally, so they're documenting the trust decision in the template.
+    """
+    try:
+        tree = ast.parse(code, mode="eval")
+    except SyntaxError:
+        return False
+    expr = tree.body
+    return (
+        isinstance(expr, ast.Call)
+        and isinstance(expr.func, ast.Name)
+        and expr.func.id in {"mark_safe", "Markup"}
+    )
 
 
 # --- expression AST rewriting -----------------------------------------------
@@ -684,7 +785,7 @@ class _ExprRewriter(ast.NodeTransformer):
         ]
         return node
 
-    def _visit_comp(self, node):  # type: ignore[no-untyped-def]
+    def _visit_comp(self, node: Any) -> Any:
         first = node.generators[0]
         first.iter = self.visit(first.iter)
         self.scope_stack.append(set())
