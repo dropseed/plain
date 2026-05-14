@@ -343,7 +343,7 @@ Key emission rules:
 def render(*, _ctx: dict, **attrs) -> str: ...
 ```
 
-- `attrs` come from `**kwargs` so an undeclared keyword raises `TypeError` only when frontmatter declares `attrs:` *and* the call uses unknown keys. In practice, codegen emits a typed signature when `attrs:` is present, and a permissive `**attrs` signature when it isn't.
+- `attrs` come from `**kwargs` so an undeclared keyword raises `TypeError` only when frontmatter declares `attrs:` _and_ the call uses unknown keys. In practice, codegen emits a typed signature when `attrs:` is present, and a permissive `**attrs` signature when it isn't.
 - `_ctx` carries view-level context (request, DEBUG, etc.) — the same dict that flows through `_render_include` today. Inside the function, attribute lookups for un-declared names fall through `_ctx`.
 - Slot kwargs (`default`, named slots) arrive as `Markup`.
 
@@ -354,7 +354,7 @@ def render(*, _ctx: dict, **attrs) -> str: ...
 - Cache key inputs (any change invalidates):
     1. Source file SHA-256.
     2. Compiler version (a module-level constant bumped on codegen changes).
-    3. For each `:include` *literal* path that resolves at compile time: the resolved file's cache key, transitively.
+    3. For each `:include` _literal_ path that resolves at compile time: the resolved file's cache key, transitively.
     4. For modules referenced in `imports:`: source mtime. (Type references in `attrs:` annotations are checked separately by Phase 9's typecheck pipeline — Phase 5 does not need them in its key.)
 - Atomic write: write to `<name>.py.tmp` + fsync + rename. Stale tmp files get cleaned on the next compile.
 - Loader: `importlib.util.spec_from_file_location` with a stable module name like `_plain_html_cached_<hash>` so `importlib` caches the loaded module in `sys.modules` for the process lifetime.
@@ -368,9 +368,7 @@ Sub-phases are ordered so each lands behind the `PLAIN_HTML_ENGINE` env-var swit
 
 **5b — Frontmatter `attrs:` + `imports:` in the emitted module.** Typed `def render(*, name: T, ...)` signature when `attrs:` is present; `imports:` block emitted at module top. Walrus / arbitrary Python expressions in `{...}` confirmed working via test.
 
-**5c — Static includes.** Resolve `:include="literal/path"` at compile time. Emit a top-of-module sub-import: `from _plain_html_cached_<child_hash> import render as _inc_<n>`. The child must be compiled first → topological compile order via a per-build `CompileSession` that memoizes hashed modules.
-
-**5d — Slot composition.** Slot children render to `Markup` strings in the parent's emission, passed to the child as kwargs. Matches interpreter's eager-slot semantics.
+**5c/5d — Static includes + slot composition (landed together).** Resolve `:include="literal/path"` at compile time. A `CompileSession` walks the include graph depth-first; each child is compiled before its parent, and child `render` functions are injected into the parent module's globals as `_inc_0`, `_inc_1`, … before exec. Slot children render to `Markup` strings in the parent's scope via per-slot sub-buffer accumulators, then pass to the child as kwargs (default → `children=` + `default=`; named slots route by `slot="..."`). `_root_ctx` threads through every include boundary so the view's original context (request, DEBUG, …) flows down without explicit re-passing. The 5c/5d split in earlier drafts was arbitrary — you can't exercise includes without slots, so they shipped as one merge.
 
 **5e — Dynamic includes (`:include={expr}`) + cache to disk.** Runtime helper `_resolve_include(name, *, _current)` calls `loader.find_template(...)` + `_get_or_compile(path)` and returns the cached module. Cache moves from in-memory to `.plain-html-cache/`. Atomic write + load. Dev-mode mtime check.
 
@@ -390,7 +388,7 @@ If the gate trips after a future change, it's a real regression — investigate 
 
 #### Test strategy
 
-1. **Unit tests per construct** (`tests/internal/test_compiler.py`): for each emission rule above, assert the generated Python source contains the expected fragment *and* `exec()`s to produce the expected output. Source-fragment assertions are coarse (substring matches) so cosmetic codegen changes don't churn the suite.
+1. **Unit tests per construct** (`tests/internal/test_compiler.py`): for each emission rule above, assert the generated Python source contains the expected fragment _and_ `exec()`s to produce the expected output. Source-fragment assertions are coarse (substring matches) so cosmetic codegen changes don't churn the suite.
 
 2. **Corpus byte-equivalence** (`tests/internal/test_compiler_parity.py`): for every `.html` in the repo, render via interpreter and compiler with a shared fixture context (`{name: "Dave", items: [...], request: <fake>}`, etc.), assert `interp_out == compiled_out`. Templates that need richer context get per-template overrides in a small YAML sidecar. This is the hard invariant — landing 5a through 5d without this would be reckless.
 
@@ -408,14 +406,14 @@ If the gate trips after a future change, it's a real regression — investigate 
 
 #### Risks + mitigations
 
-| Risk | Mitigation |
-| --- | --- |
-| Compiled output diverges silently from interpreter on edge cases. | Corpus parity test (test #2) runs in CI; covers every template in the repo with a real fixture context. Drift is loud. |
-| Cache invalidation bug → stale render. | Hash-based key + transitive include keys make this hard to hit. Dev mode mtime-checks on every render. Add a `plain html cache clear` subcommand for the panic case. |
-| `imports:` runs arbitrary Python at compile time. | Same trust model as today — `imports:` runs at render time in the interpreter. No new attack surface. |
-| Slow first request (compile-on-demand). | Provide `plain html compile` to precompile everything ahead of time; document for production deploys. Cold compile time is bounded — the corpus is small. |
-| Traceback frames are unreadable. | Test #4 enforces source-mapping. Generated comments + `compile(..., filename=template_path, ...)` give Python what it needs. |
-| Compiler becomes a maintenance hot spot. | Sub-phase 5g deletes the interpreter once parity is durable. Two engines is a temporary cost, not a permanent one. |
+| Risk                                                              | Mitigation                                                                                                                                                           |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Compiled output diverges silently from interpreter on edge cases. | Corpus parity test (test #2) runs in CI; covers every template in the repo with a real fixture context. Drift is loud.                                               |
+| Cache invalidation bug → stale render.                            | Hash-based key + transitive include keys make this hard to hit. Dev mode mtime-checks on every render. Add a `plain html cache clear` subcommand for the panic case. |
+| `imports:` runs arbitrary Python at compile time.                 | Same trust model as today — `imports:` runs at render time in the interpreter. No new attack surface.                                                                |
+| Slow first request (compile-on-demand).                           | Provide `plain html compile` to precompile everything ahead of time; document for production deploys. Cold compile time is bounded — the corpus is small.            |
+| Traceback frames are unreadable.                                  | Test #4 enforces source-mapping. Generated comments + `compile(..., filename=template_path, ...)` give Python what it needs.                                         |
+| Compiler becomes a maintenance hot spot.                          | Sub-phase 5g deletes the interpreter once parity is durable. Two engines is a temporary cost, not a permanent one.                                                   |
 
 #### Success criteria
 
