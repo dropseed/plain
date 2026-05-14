@@ -297,7 +297,20 @@ class CompileSession:
         self.use_disk_cache = use_disk_cache
         self._in_progress: set[Path] = set()
 
-    def compile_path(self, path: Path) -> Callable[..., str]:
+    def compile_path(
+        self,
+        path: Path,
+        *,
+        source_override: str | None = None,
+    ) -> Callable[..., str]:
+        """Compile the template at `path`. Returns its `render` callable.
+
+        Pass `source_override` when the caller has the template source
+        in memory and just wants includes resolved relative to the
+        given path (e.g. `plain.pages` rendering Markdown-prefixed
+        templates). Process-cache hits ignore source_override — they
+        assume the path's content is stable.
+        """
         path = path.resolve()
         cached = _process_cache_get(path)
         if cached is not None:
@@ -306,14 +319,20 @@ class CompileSession:
             raise CompileError(f"`:include` cycle detected involving {path}")
         self._in_progress.add(path)
         try:
-            entry = self._compile_one(path)
+            entry = self._compile_one(path, source_override=source_override)
         finally:
             self._in_progress.discard(path)
         _process_cache_set(path, entry)
         return entry.render
 
-    def _compile_one(self, path: Path) -> _CompiledEntry:
-        source = path.read_text(encoding="utf-8")
+    def _compile_one(
+        self, path: Path, *, source_override: str | None = None
+    ) -> _CompiledEntry:
+        source = (
+            source_override
+            if source_override is not None
+            else path.read_text(encoding="utf-8")
+        )
         fmdict, body = fm.split(source)
         tokens = tokenize(body)
         tree = parse(tokens)
