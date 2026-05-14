@@ -63,21 +63,24 @@ def all_globals() -> dict[str, Any]:
 
 
 def _load_defaults() -> None:
-    """Bind the package-helper shims (`tailwind_css`, `htmx_js`,
-    `pageviews_js`, `toolbar`) onto the plain.html scope and trigger
-    autodiscovery of each installed package's `templates.py` module so
-    its `@register_global` calls fire.
+    """Register the no-op fallback for the optional `toolbar()` global and
+    autodiscover each installed package's `templates.py` so its
+    `@register_global` calls fire.
 
-    Transitional: the shims move into their home packages once templates
-    learn to `imports:` them.
+    The package-helper globals (`tailwind_css`, `htmx_js`, `pageviews_js`,
+    `toolbar`) live in their home packages now — `plain.tailwind`,
+    `plain.htmx`, etc. Autodiscovery imports the module, the decorator
+    runs, the global is registered.
     """
     from plain.packages import packages_registry
 
     from . import _shims
 
-    _GLOBALS.setdefault("tailwind_css", _shims.tailwind_css)
-    _GLOBALS.setdefault("pageviews_js", _shims.pageviews_js)
-    _GLOBALS.setdefault("htmx_js", _shims.htmx_js)
+    # `toolbar()` is genuinely optional — admin works with or without
+    # `plain.toolbar`. Set a no-op default before autodiscovery so that
+    # `{toolbar(request)}` in a template doesn't NameError when
+    # plain.toolbar isn't installed. plain.toolbar's `templates.py`
+    # overrides this with the real implementation when present.
     _GLOBALS.setdefault("toolbar", _shims.toolbar)
 
     # Import each installed package's `templates` submodule so any

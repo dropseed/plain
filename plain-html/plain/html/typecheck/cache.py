@@ -5,10 +5,10 @@ deterministic in a small set of inputs. We hash those inputs into a
 cache key; a hit returns the previously recorded diagnostics, a miss
 runs the backend and stores the result.
 
-Cache lives under `.plain-html-cache/typecheck/` at the repo root,
-gitignored, mirrors the existing cache convention. Each entry is a
-small JSON file named by the key. The structure is intentionally
-disposable — wiping the directory is always safe.
+Cache lives under `.plain/html/typecheck/` — the framework-wide temp
+directory other tools (assets manifest, email previews, dev services)
+already use. Each entry is a small JSON file named by the key. Wiping
+the directory is always safe.
 """
 
 from __future__ import annotations
@@ -21,10 +21,14 @@ import os
 from dataclasses import asdict
 from pathlib import Path
 
+from plain.runtime import PLAIN_TEMP_PATH
+
 from .declarations import Declarations
 from .synth import FORMAT_VERSION
 
-CACHE_ROOT = Path(".plain-html-cache") / "typecheck"
+
+def _default_cache_root() -> Path:
+    return PLAIN_TEMP_PATH / "html" / "typecheck"
 
 
 def cache_key(
@@ -80,7 +84,7 @@ def store(key: str, diagnostics, *, root: Path | None = None) -> None:
 
 
 def _entry_path(key: str, root: Path | None) -> Path:
-    base = root if root is not None else CACHE_ROOT
+    base = root if root is not None else _default_cache_root()
     return base / f"{key}.json"
 
 

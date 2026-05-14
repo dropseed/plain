@@ -261,36 +261,169 @@ Success criteria:
 
 ### Phase 5 — Compile to Python render function
 
-Deliverables:
+The interpreter (`engine.py`) gets the semantics right but is 6–14× slower than Jinja on realistic templates (see `plain-html/bench/render.py`). The walk and the per-`{expr}` `eval(code, scope)` dominate. AOT codegen replaces both with real Python: no walk, expressions inlined as Python sub-expressions, locals instead of dict lookups. That's the only path to Jinja-class steady-state per-call cost — caches alone can't close the gap.
 
-- `plain.html.compiler` module that converts a tag tree into a Python source file containing a `render(...)` function.
-- Generated function signature derived from frontmatter `attrs:` (typed kwargs).
-- `imports:` block becomes top-of-module `from X import Y` / `import X` statements.
-- Slot values arrive as kwargs (`children=`, `header=`, etc., type `Markup`).
-- Tag tree walked recursively, emitting:
-    - Text nodes → string literals
-    - `{expr}` → escape-function call, chosen by position
-    - `<template :include="path" attr={v}>` → loaded-template-function call
-    - `<template :include={expr}>` → dynamic include via runtime path-resolution helper
-    - `:if={cond}` → wrap node emission in `if cond:`
-    - `:for={x in xs}` → wrap node emission in `for x in xs:`
-    - `:as={var}` on slot template → captured in slot definition as a 1-arg callable
-    - `<template>` fragment → emit children directly
-- Walrus inside `{...}` works because it's just Python — confirm with a test.
-- Compiled output written to `.plain-html-cache/<hash>.py`; loaded via `importlib`.
-- **Cache invalidation graph** per spec: cache key includes
-    - source file content hash
-    - frontmatter-resolved type references (mtimes of modules referenced in `attrs:`)
-    - `imports:` modules' source mtimes
-    - **every `:include`d template's cache key**, transitively (rebuild a template when any descendant changes)
-- Cached modules invalidate atomically; stale entries are removed when a key is regenerated.
+#### Goals
 
-Success criteria:
+- **Per-render cost ≤ 2× Jinja** on the existing bench cases (`tiny`, `medium_list`, `expression_heavy`, `nested_loops`, `conditionals`). Stretch: ≤ 1.5×.
+- **Byte-equivalent output** to the interpreter for every template in the repo across a fixed context fixture (corpus parity test, runs in CI).
+- **Debuggable**: tracebacks point to the original `template.html:line:col`, not to a hash-named cache file.
+- **Transparent**: `render_source(...)` / `render(...)` keep their current signatures. Migration is a runtime switch, not an API change.
 
-- Given a simple `.plain` template, compiles and renders correctly with the right inputs.
-- Compiled output is readable Python (debuggable; positions in tracebacks map to template source via comments).
-- Cache works: unchanged template doesn't recompile; changed template _or any of its includes_ does.
-- Unit tests cover each tree construct + the transitive-include invalidation case.
+#### Non-goals
+
+- Sandboxing / restricted execution. Frontmatter `imports:` already runs arbitrary Python; templates are trusted code. Compiled output gets the same trust.
+- Deferred / lazy slots. Slots render eagerly to `Markup` strings exactly like the interpreter; rich callable slots can come later if a real use case shows up.
+- Statically resolving every name. Names not declared in `attrs:` / `imports:` fall through to a runtime context lookup — same behavior as today.
+
+#### Output shape
+
+Each `.html` file compiles to one Python module. Concrete example for `html/components/card.html`:
+
+```html
+---
+attrs:
+    title: str
+    href: str | None = None
+slots:
+    default: Markup
+imports:
+    - from myapp.utils import truncate
+---
+<a class="card" href={href or '#'}>
+    <h2>{title}</h2>
+    <p>{truncate(children, 200)}</p>
+</a>
+```
+
+Compiles to roughly (illustrative — exact emission is a Phase 5a deliverable):
+
+```python
+# Compiled from html/components/card.html
+# DO NOT EDIT — regenerate with `plain html compile`.
+from __future__ import annotations
+from plain.html._runtime import escape_html, escape_attr, Markup
+from myapp.utils import truncate
+
+__template_source__ = "html/components/card.html"
+
+def render(*, title: str, href: str | None = None, children: Markup = Markup(""), _ctx: dict) -> str:
+    _out: list[str] = []
+    _append = _out.append
+    # line 9 col 1
+    _append('<a class="card" href="')
+    _append(escape_attr(href or '#'))
+    _append('">\n    <h2>')
+    # line 10 col 9
+    _append(escape_html(title))
+    _append('</h2>\n    <p>')
+    # line 11 col 8
+    _append(escape_html(truncate(children, 200)))
+    _append('</p>\n</a>')
+    return "".join(_out)
+```
+
+Key emission rules:
+
+- **Text nodes** → string literals concatenated into adjacent `_append(...)` calls. Constant-fold runs of text together.
+- **`{expr}` in text body** → `_append(escape_html(<expr>))`.
+- **`{expr}` in attribute value** → `_append(escape_attr(<expr>))`; mixed segments emit a single concat. (Phase 6 picks the right escape per position; Phase 5 lands a pass-through `escape_html` / `escape_attr` that matches the interpreter's behavior byte-for-byte.)
+- **Attribute with single `{expr}`** preserves the interpreter's boolean / list / `False` / `None` semantics via a runtime helper `_render_dyn_attr(name, value, _out)`.
+- **`:if={cond}`** → wrap the node's emission in `if <cond>:`.
+- **`:for={x in xs}`** → wrap in `for <targets> in <xs>:` with real Python unpacking.
+- **`<template>` fragment** → emit children inline, no wrapper.
+- **`<template :include="path">`** with literal path → call into the compiled child module: `_out.append(_inc_<n>.render(**_attrs, _ctx=_ctx, default=<slot_default>, header=<slot_header>))`.
+- **`<template :include={expr}>`** dynamic path → runtime resolver: `_resolve_include(<expr>, _current=__template_source__).render(...)`.
+- **Slot composition** → each slot's children render to a `Markup` string in the parent's frame, then get passed as kwargs to the child module.
+- **`{# … #}` template comments** → skipped at emit (already preserved by parser for the formatter).
+
+#### Module signature
+
+```python
+def render(*, _ctx: dict, **attrs) -> str: ...
+```
+
+- `attrs` come from `**kwargs` so an undeclared keyword raises `TypeError` only when frontmatter declares `attrs:` *and* the call uses unknown keys. In practice, codegen emits a typed signature when `attrs:` is present, and a permissive `**attrs` signature when it isn't.
+- `_ctx` carries view-level context (request, DEBUG, etc.) — the same dict that flows through `_render_include` today. Inside the function, attribute lookups for un-declared names fall through `_ctx`.
+- Slot kwargs (`default`, named slots) arrive as `Markup`.
+
+#### Cache
+
+- Cache root: `<settings.path.parent>/.plain-html-cache/` by default; override via `PLAIN_HTML_CACHE_DIR` env var.
+- Filename: `<sha256(source)[:16]>__<safe-template-name>.py`. Embed the template name for grep-ability; the hash is the cache key.
+- Cache key inputs (any change invalidates):
+    1. Source file SHA-256.
+    2. Compiler version (a module-level constant bumped on codegen changes).
+    3. For each `:include` *literal* path that resolves at compile time: the resolved file's cache key, transitively.
+    4. For modules referenced in `imports:`: source mtime. (Type references in `attrs:` annotations are checked separately by Phase 9's typecheck pipeline — Phase 5 does not need them in its key.)
+- Atomic write: write to `<name>.py.tmp` + fsync + rename. Stale tmp files get cleaned on the next compile.
+- Loader: `importlib.util.spec_from_file_location` with a stable module name like `_plain_html_cached_<hash>` so `importlib` caches the loaded module in `sys.modules` for the process lifetime.
+- Dev-time invalidation: on `find_template()`, compare source mtime to cache mtime; recompile if newer. Production assumes precompiled.
+
+#### Sub-phases
+
+Sub-phases are ordered so each lands behind the `PLAIN_HTML_ENGINE` env-var switch and leaves the interpreter untouched until 5f.
+
+**5a — Static codegen, no includes, no cache.** `plain.html.compiler.compile_tree(tree, fmdict, source_label) -> str` returns Python source. Function emits an in-memory `exec`'d module via `compile()`. No file IO. `engine.render_source(...)` gets a `use_compiler: bool = False` kwarg; tests flip it. Lands: text, `{expr}`, elements, attributes, `:if`, `:for`, `<template>` fragments, `HtmlComment` / `Doctype`. Defers: `:include`, slots, dynamic include, frontmatter `attrs:` typed signature.
+
+**5b — Frontmatter `attrs:` + `imports:` in the emitted module.** Typed `def render(*, name: T, ...)` signature when `attrs:` is present; `imports:` block emitted at module top. Walrus / arbitrary Python expressions in `{...}` confirmed working via test.
+
+**5c — Static includes.** Resolve `:include="literal/path"` at compile time. Emit a top-of-module sub-import: `from _plain_html_cached_<child_hash> import render as _inc_<n>`. The child must be compiled first → topological compile order via a per-build `CompileSession` that memoizes hashed modules.
+
+**5d — Slot composition.** Slot children render to `Markup` strings in the parent's emission, passed to the child as kwargs. Matches interpreter's eager-slot semantics.
+
+**5e — Dynamic includes (`:include={expr}`) + cache to disk.** Runtime helper `_resolve_include(name, *, _current)` calls `loader.find_template(...)` + `_get_or_compile(path)` and returns the cached module. Cache moves from in-memory to `.plain-html-cache/`. Atomic write + load. Dev-mode mtime check.
+
+**5f — Cutover.** Flip the default of `PLAIN_HTML_ENGINE` to `compiler`. Interpreter stays in the tree, gated by `PLAIN_HTML_ENGINE=interpreter`, as the byte-equivalence oracle for parity tests.
+
+**5g — Delete the interpreter.** After ≥ one release with the compiler as default, the parity test is dead weight and the interpreter is unmaintained code. Delete `engine.py`'s `_render_*` helpers; keep only the thin entry that delegates to the compiler.
+
+#### Performance gate
+
+Add `plain-html/tests/internal/test_compiler_perf.py`, runs in CI:
+
+- Compiles all 5 bench cases.
+- Asserts compiled median per-case ≤ 2× Jinja median, with a generous absolute floor (no flakes on tiny cases where everything is sub-microsecond).
+- The same bench cases run via `bench/render.py` for ad-hoc human inspection. Both share fixture data so CI numbers are reproducible locally.
+
+If the gate trips after a future change, it's a real regression — investigate before merging.
+
+#### Test strategy
+
+1. **Unit tests per construct** (`tests/internal/test_compiler.py`): for each emission rule above, assert the generated Python source contains the expected fragment *and* `exec()`s to produce the expected output. Source-fragment assertions are coarse (substring matches) so cosmetic codegen changes don't churn the suite.
+
+2. **Corpus byte-equivalence** (`tests/internal/test_compiler_parity.py`): for every `.html` in the repo, render via interpreter and compiler with a shared fixture context (`{name: "Dave", items: [...], request: <fake>}`, etc.), assert `interp_out == compiled_out`. Templates that need richer context get per-template overrides in a small YAML sidecar. This is the hard invariant — landing 5a through 5d without this would be reckless.
+
+3. **Include-graph invalidation** (`tests/internal/test_compiler_cache.py`): write three templates A → B → C in a temp dir, compile, modify C, recompile, assert A's cache was rebuilt.
+
+4. **Traceback mapping** (`tests/internal/test_compiler_traceback.py`): compile a template whose `{expr}` raises at runtime; assert the traceback frame's filename + line point at the original `.html` source. Achieved via `# line N col M` comments + `compile(src, "html/foo.html", "exec")` filename.
+
+#### Open questions
+
+- **Codegen target — string emit or AST?** String-template emission is simpler, easier to debug visually, and Python's `compile()` swallows the parse cost trivially. AST builder (`ast.Module(...)`) is hygienic but heavier. Lean toward string emission; revisit if string escaping bugs accrete.
+- **Constant-folding text runs.** Adjacent text nodes collapse into one literal at compile time. Cheap, big win on whitespace-heavy templates. Land it in 5a.
+- **Single big `_out.append(...)` vs `_append = _out.append` local alias.** The local alias is a known micro-trick (saves an attribute lookup per call). Plain string-concat with `+=` is slower than `.append` + `"".join` for long sequences. Benchmark in 5a; pick whichever wins.
+- **`Markup` arrives where?** Phase 6 introduces real per-position escape functions; Phase 5 emits placeholders (`escape_html`, `escape_attr`) that match interpreter behavior byte-for-byte. Keep the names stable so Phase 6 is a function-body swap, not a codegen change.
+- **`{x}` in `<script>` / `<style>`.** Compile-time error per spec. Already parse-rejected? Verify in 5a; raise `CompileError` if not.
+
+#### Risks + mitigations
+
+| Risk | Mitigation |
+| --- | --- |
+| Compiled output diverges silently from interpreter on edge cases. | Corpus parity test (test #2) runs in CI; covers every template in the repo with a real fixture context. Drift is loud. |
+| Cache invalidation bug → stale render. | Hash-based key + transitive include keys make this hard to hit. Dev mode mtime-checks on every render. Add a `plain html cache clear` subcommand for the panic case. |
+| `imports:` runs arbitrary Python at compile time. | Same trust model as today — `imports:` runs at render time in the interpreter. No new attack surface. |
+| Slow first request (compile-on-demand). | Provide `plain html compile` to precompile everything ahead of time; document for production deploys. Cold compile time is bounded — the corpus is small. |
+| Traceback frames are unreadable. | Test #4 enforces source-mapping. Generated comments + `compile(..., filename=template_path, ...)` give Python what it needs. |
+| Compiler becomes a maintenance hot spot. | Sub-phase 5g deletes the interpreter once parity is durable. Two engines is a temporary cost, not a permanent one. |
+
+#### Success criteria
+
+- All five sub-phases land. Each is independently mergeable behind `PLAIN_HTML_ENGINE`.
+- Corpus parity test green: every repo template renders identically under both engines.
+- Perf gate met: compiled median ≤ 2× Jinja on every bench case.
+- Tracebacks from `{expr}` exceptions point at `template.html:line:col`.
+- `bench/render.py` shows the closed gap; the `+tree+expr` columns become uninteresting and can be removed once the interpreter is deleted.
 
 ---
 
