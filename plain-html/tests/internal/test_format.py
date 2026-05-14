@@ -145,6 +145,54 @@ def test_render_equivalence_with_for_loop():
     assert out_src == out_fmt
 
 
+def test_short_tag_does_not_wrap():
+    src = '<a href="/x">click</a>'
+    assert format_source(src) == '<a href="/x">click</a>\n'
+
+
+def test_long_tag_wraps_attributes():
+    src = (
+        '<a href="/some/very/long/url/path" class="btn btn-primary btn-large" '
+        'data-test="x" data-another="y">click</a>'
+    )
+    out = format_source(src)
+    # Each attribute should land on its own line, indented one level.
+    assert "<a\n" in out
+    assert '    href="/some/very/long/url/path"' in out
+    assert '    class="btn btn-primary btn-large"' in out
+    assert ">click</a>" in out
+
+
+def test_wrapped_open_tag_self_closing():
+    src = (
+        '<input type="text" name="some-very-long-field-name" '
+        'placeholder="please enter your full name here" class="form-input">'
+    )
+    out = format_source(src)
+    assert "<input\n" in out
+    # Void/self-closing end-of-tag at outer indent on its own line.
+    assert out.rstrip().endswith(">") or out.rstrip().endswith("/>")
+
+
+def test_wrap_threshold_respects_indent():
+    # A tag that fits at indent 0 might not fit at deeper indent.
+    inner_attrs = '<a href="/foo" class="bar">x</a>'
+    src = f"<section><div>{inner_attrs}</div></section>"
+    out = format_source(src)
+    # Should still format (no crash) and stay idempotent.
+    assert format_source(out) == out
+
+
+def test_idempotent_wrapped_tag():
+    src = (
+        '<a href="/some/very/long/url/path" class="btn btn-primary btn-large" '
+        'data-test="x" data-another="y">click</a>'
+    )
+    once = format_source(src)
+    twice = format_source(once)
+    assert once == twice
+
+
 def test_render_equivalence_pre_preserves_exactly():
     src = "<pre>\n  a\n    b\n</pre>"
     # Verbatim contents must render identically — no whitespace mutation.

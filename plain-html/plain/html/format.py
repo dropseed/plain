@@ -30,8 +30,6 @@ Known v0 limitations:
 - Directives (`:if`, `:for`, `:include`, `slot`) emit before user
   attributes in a fixed order. The parser doesn't preserve their original
   position; idempotency still holds.
-- No attribute wrapping when a tag exceeds the print width. All
-  attributes stay on the open-tag line.
 """
 
 from __future__ import annotations
@@ -57,8 +55,12 @@ from .tokenizer import (
 )
 from .whitespace import is_inline, is_verbatim
 
+DEFAULT_WIDTH = 88
 
-def format_source(source: str, *, indent_size: int = 4) -> str:
+
+def format_source(
+    source: str, *, indent_size: int = 4, width: int = DEFAULT_WIDTH
+) -> str:
     """Format a `.html` template source string."""
     body_start = _body_offset(source)
     frontmatter_block = source[:body_start]
@@ -67,7 +69,7 @@ def format_source(source: str, *, indent_size: int = 4) -> str:
     tokens = tokenize(body)
     tree = parse(tokens)
 
-    body_out = _format_root(tree, indent_size=indent_size)
+    body_out = _format_root(tree, indent_size=indent_size, width=width)
     if not body_out.endswith("\n"):
         body_out += "\n"
     return frontmatter_block + body_out
@@ -87,17 +89,17 @@ def _body_offset(source: str) -> int:
     return 0
 
 
-def _format_root(nodes: list[Node], *, indent_size: int) -> str:
+def _format_root(nodes: list[Node], *, indent_size: int, width: int) -> str:
     """Format the top-level node sequence (one node per line, no indent)."""
     parts: list[str] = []
     for node in nodes:
         if isinstance(node, TextNode) and not node.text.strip():
             continue
-        parts.append(_format_node(node, indent=0, indent_size=indent_size))
+        parts.append(_format_node(node, indent=0, indent_size=indent_size, width=width))
     return "\n".join(parts)
 
 
-def _format_node(node: Node, *, indent: int, indent_size: int) -> str:
+def _format_node(node: Node, *, indent: int, indent_size: int, width: int) -> str:
     """Render one node as a string. Caller controls surrounding whitespace."""
     match node:
         case TextNode():
@@ -111,13 +113,19 @@ def _format_node(node: Node, *, indent: int, indent_size: int) -> str:
         case DoctypeNode():
             return node.text
         case ElementNode():
-            return _format_element(node, indent=indent, indent_size=indent_size)
+            return _format_element(
+                node, indent=indent, indent_size=indent_size, width=width
+            )
         case _:
             raise ValueError(f"Unknown node type: {type(node).__name__}")
 
 
-def _format_element(node: ElementNode, *, indent: int, indent_size: int) -> str:
-    open_tag = _format_open_tag(node)
+def _format_element(
+    node: ElementNode, *, indent: int, indent_size: int, width: int
+) -> str:
+    open_tag = _format_open_tag(
+        node, indent=indent, indent_size=indent_size, width=width
+    )
 
     if node.self_closing or node.tag in VOID_ELEMENTS:
         return open_tag
@@ -130,7 +138,7 @@ def _format_element(node: ElementNode, *, indent: int, indent_size: int) -> str:
         # normally, so expression nodes can appear — emit every child
         # byte-for-byte preserving original whitespace.
         body = "".join(
-            _format_node(c, indent=indent, indent_size=indent_size)
+            _format_node(c, indent=indent, indent_size=indent_size, width=width)
             for c in node.children
         )
         return f"{open_tag}{body}{close_tag}"
@@ -140,7 +148,7 @@ def _format_element(node: ElementNode, *, indent: int, indent_size: int) -> str:
 
     if _format_inline(node):
         body = "".join(
-            _format_node(c, indent=indent, indent_size=indent_size)
+            _format_node(c, indent=indent, indent_size=indent_size, width=width)
             for c in node.children
         )
         return f"{open_tag}{body}{close_tag}"
@@ -155,7 +163,11 @@ def _format_element(node: ElementNode, *, indent: int, indent_size: int) -> str:
             continue
         parts.append("\n")
         parts.append(inner_pad)
-        parts.append(_format_node(child, indent=inner_indent, indent_size=indent_size))
+        parts.append(
+            _format_node(
+                child, indent=inner_indent, indent_size=indent_size, width=width
+            )
+        )
     parts.append("\n")
     parts.append(pad)
     parts.append(close_tag)
@@ -180,21 +192,50 @@ def _format_inline(node: ElementNode) -> bool:
     return False
 
 
-def _format_open_tag(node: ElementNode) -> str:
-    parts: list[str] = ["<", node.tag]
+def _format_open_tag(
+    node: ElementNode, *, indent: int, indent_size: int, width: int
+) -> str:
+    attrs = _directive_attrs(node) + [_format_attribute(a) for a in node.attrs]
+    flat = _open_tag_flat(node.tag, attrs, self_closing=node.self_closing)
 
-    for piece in _directive_attrs(node):
+    if not attrs or indent + len(flat) <= width:
+        return flat
+
+    return _open_tag_wrapped(
+        node.tag,
+        attrs,
+        self_closing=node.self_closing,
+        indent=indent,
+        indent_size=indent_size,
+    )
+
+
+def _open_tag_flat(tag: str, attrs: list[str], *, self_closing: bool) -> str:
+    parts: list[str] = ["<", tag]
+    for attr in attrs:
         parts.append(" ")
-        parts.append(piece)
+        parts.append(attr)
+    parts.append(" />" if self_closing else ">")
+    return "".join(parts)
 
-    for attr in node.attrs:
-        parts.append(" ")
-        parts.append(_format_attribute(attr))
 
-    if node.self_closing:
-        parts.append(" />")
-    else:
-        parts.append(">")
+def _open_tag_wrapped(
+    tag: str,
+    attrs: list[str],
+    *,
+    self_closing: bool,
+    indent: int,
+    indent_size: int,
+) -> str:
+    inner_pad = " " * (indent + indent_size)
+    pad = " " * indent
+    parts: list[str] = ["<", tag, "\n"]
+    for attr in attrs:
+        parts.append(inner_pad)
+        parts.append(attr)
+        parts.append("\n")
+    parts.append(pad)
+    parts.append("/>" if self_closing else ">")
     return "".join(parts)
 
 
