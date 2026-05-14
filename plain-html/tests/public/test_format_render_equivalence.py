@@ -1,20 +1,20 @@
-"""Rendered-DOM equivalence test for the formatter (tier-2, render path).
+"""Public contract: formatting a template never changes its rendered output.
 
-Renders a hand-curated set of `(template, context)` fixtures both
-unformatted and formatted, parses each output with html5lib, and
-asserts the resulting DOM trees are equivalent. This is the strongest
-correctness signal we have: it's the HTML users actually see.
+A user-visible promise. `plain html format` is meant to canonicalize
+source layout only — the bytes a browser parses must be DOM-equivalent
+to the unformatted source's rendered bytes. Anything else is a
+regression in the formatter, not a stylistic choice.
 
-Complements the masked-source DOM test (`test_format_dom_comparison.py`):
+The test renders a hand-curated `(template, context)` fixture list
+both unformatted and formatted, parses each output with html5lib, and
+asserts the resulting DOM trees match (after collapsing whitespace
+where the spec allows formatters to add or remove it, and folding
+boolean-attribute values to a canonical sentinel).
 
-- The source test runs against every template in the repo without
-  needing context, but compares masked template structure.
-- This test compares real rendered output, but only for a small fixture
-  list because most templates need realistic context to render.
-
-Add a fixture when you want to lock in a render-time behavior that the
-source-level tests can't reach (autoescape, expression evaluation,
-inline-in-block whitespace, etc.).
+Add a fixture when locking in a render-time behavior that source-level
+tests (`tests/internal/test_format_*`) can't reach — autoescape,
+expression evaluation, inline-in-block whitespace, boolean-attribute
+collapse, etc.
 """
 
 from __future__ import annotations

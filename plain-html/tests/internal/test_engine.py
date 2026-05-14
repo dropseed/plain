@@ -1,7 +1,10 @@
-"""Phase 0 smoke tests for the tracer-bullet engine.
+"""Compiler-render smoke tests via the `render_source` entry point.
 
-Internal tests — these pin the current interpreter behavior so Phase 5's
-compile-to-Python rewrite can be verified against the same expectations.
+Internal tests — these pin specific in-process behaviors of the compiler
+(token errors, parse errors, brace-escape decoding, boolean-attribute
+collapse, etc.) by calling `render_source(...)` directly. The
+user-visible contract for `Template`/`render`/`Markup` lives in
+`tests/public/test_template.py`.
 """
 
 from __future__ import annotations
