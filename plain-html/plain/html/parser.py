@@ -52,6 +52,10 @@ class ElementNode:
     include_path: str | None = None  # `:include="..."` literal path
     include_path_code: str | None = None  # `:include={expr}` dynamic path
     slot_name: str | None = None  # `slot="..."` routing attribute
+    reserved_directives: list[Attribute] = field(default_factory=list)
+    # `:as` and any other `:`-prefixed attr the engine doesn't recognize.
+    # Held on the node so the formatter can round-trip them; the renderer
+    # ignores them.
 
 
 @dataclass
@@ -138,6 +142,7 @@ def parse(tokens: list[Token]) -> list[Node]:
 
 def _make_element(tok: StartTagToken) -> ElementNode:
     attrs: list[Attribute] = []
+    reserved_directives: list[Attribute] = []
     if_code: str | None = None
     for_clause: ForClause | None = None
     include_path: str | None = None
@@ -158,10 +163,9 @@ def _make_element(tok: StartTagToken) -> ElementNode:
         elif attr.name == "slot":
             slot_name = _expect_single_text(attr)
         elif attr.name.startswith(":"):
-            # Reserved for future directives (`:as`). Phase 0 lets them through
-            # silently so prototype templates can be written against the spec
-            # ahead of implementation.
-            continue
+            # Reserved directives like `:as` that the engine doesn't act on yet.
+            # Held so the formatter can round-trip them without erasing author code.
+            reserved_directives.append(attr)
         else:
             attrs.append(attr)
 
@@ -174,6 +178,7 @@ def _make_element(tok: StartTagToken) -> ElementNode:
         include_path=include_path,
         include_path_code=include_path_code,
         slot_name=slot_name,
+        reserved_directives=reserved_directives,
     )
 
 

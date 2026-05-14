@@ -251,6 +251,8 @@ def _directive_attrs(node: ElementNode) -> list[str]:
         out.append(f":include={{{node.include_path_code}}}")
     if node.slot_name is not None:
         out.append(f'slot="{node.slot_name}"')
+    for attr in node.reserved_directives:
+        out.append(_format_attribute(attr))
     return out
 
 
@@ -267,6 +269,11 @@ def _format_for_clause(clause: ForClause) -> str:
 def _format_attribute(attr: Attribute) -> str:
     if attr.segments is None:
         return attr.name
+    # A value that's a single `{expr}` emits unquoted — matches how authors
+    # write `:if={ok}` or `class={x}` and is what the recognized directives
+    # already canonicalize to.
+    if len(attr.segments) == 1 and isinstance(attr.segments[0], AttrExpr):
+        return f"{attr.name}={{{attr.segments[0].code}}}"
     rendered = _format_attr_value(attr.segments)
     return f'{attr.name}="{rendered}"'
 

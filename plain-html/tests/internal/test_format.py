@@ -80,6 +80,23 @@ def test_format_directive_for_tuple_target():
     assert ":for={i, x in enumerate(items)}" in out
 
 
+def test_format_preserves_reserved_directive_as():
+    # `:as` is the scoped-slot binding from the spec. The engine doesn't
+    # act on it yet, but the formatter must round-trip it.
+    src = '<template slot="default" :as={item}>{item}</template>'
+    out = format_source(src)
+    assert ":as={item}" in out
+    assert format_source(out) == out
+
+
+def test_format_preserves_unknown_colon_directive():
+    # Any `:`-prefixed attribute the parser doesn't recognize is held on
+    # the node so the formatter doesn't erase it.
+    src = "<div :something={value}>x</div>"
+    out = format_source(src)
+    assert ":something={value}" in out
+
+
 def test_format_boolean_attribute():
     src = "<input disabled>"
     assert format_source(src) == "<input disabled>\n"
