@@ -1,14 +1,20 @@
-"""Tree-walking renderer.
+"""Template rendering entry points.
 
-Phase 0 scope: interpret a parsed tag tree directly against a context dict,
-producing an HTML output string. Phase 5 will replace this interpreter with
-an AOT compile-to-Python step; output is byte-equivalent by construction.
+`render(path)` and `render_source(source)` are the public surface — view
+code, the admin, and `Template` all call them. By default they route
+through the AOT compiler (`plain.html.compiler`). Setting
+`PLAIN_HTML_ENGINE=interpreter` falls back to the tree-walking
+interpreter below — kept as a parity oracle (used by
+`tests/internal/test_compiler_corpus_parity.py`) and an emergency
+rollback. The interpreter will be deleted in a follow-up once the
+compiler has burned in on real workloads.
 """
 
 from __future__ import annotations
 
 import keyword
 import os
+import types
 from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
@@ -41,14 +47,71 @@ class RenderError(Exception):
     pass
 
 
+def _use_interpreter() -> bool:
+    """Emergency rollback: `PLAIN_HTML_ENGINE=interpreter` flips back to
+    the tree-walking renderer. Anything else (or unset) uses the
+    compiler.
+    """
+    return os.environ.get("PLAIN_HTML_ENGINE", "").lower() == "interpreter"
+
+
 def render(path: str | os.PathLike, context: dict | None = None) -> str:
-    """Render a `.plain` file from disk."""
+    """Render a `.html` file from disk."""
     path = Path(path)
-    source = path.read_text(encoding="utf-8")
-    return render_source(source, context, source_path=path)
+    if _use_interpreter():
+        return _interpret_render(path, context)
+    # Lazy import to avoid a load-time cycle: compiler imports loader/parser,
+    # and engine.py is the natural place to find via `from plain.html import …`.
+    from .compiler import get_or_compile
+
+    return get_or_compile(path)(**(context or {}))
 
 
 def render_source(
+    source: str,
+    context: dict | None = None,
+    *,
+    source_path: Path | None = None,
+    root_context: dict | None = None,
+) -> str:
+    """Render a template from a string.
+
+    With `source_path` the includes resolve relative to that file; the
+    compiler can topologically pre-compile the include graph. Without
+    it, only inline `{expr}`-style content is supported (dynamic
+    `:include={expr}` still works at render time but literal
+    `:include="x"` needs a path to resolve relative paths against).
+    """
+    if _use_interpreter() or root_context is not None:
+        # `root_context` is an interpreter-era hook used by `_render_include`
+        # to thread view-level context through nested renders. The compiler
+        # handles that via `_root_ctx` automatically, so callers passing it
+        # are by definition still on the old API — fall through to interp.
+        return _interpret_source(
+            source, context, source_path=source_path, root_context=root_context
+        )
+
+    from .compiler import compile_source as _compile_source
+
+    src = _compile_source(
+        source, source_label=str(source_path) if source_path else "<source>"
+    )
+    mod = types.ModuleType(f"_plain_html_inline_{abs(hash(source))}")
+    mod.__file__ = str(source_path) if source_path else "<source>"
+    code = compile(src, mod.__file__, "exec")
+    exec(code, mod.__dict__)
+    return mod.render(**(context or {}))
+
+
+# --- interpreter (kept as parity oracle / rollback) -------------------------
+
+
+def _interpret_render(path: Path, context: dict | None) -> str:
+    source = path.read_text(encoding="utf-8")
+    return _interpret_source(source, context, source_path=path)
+
+
+def _interpret_source(
     source: str,
     context: dict | None = None,
     *,

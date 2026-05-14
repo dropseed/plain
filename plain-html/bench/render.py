@@ -29,14 +29,20 @@ import jinja2
 from plain.html import engine as html_engine
 from plain.html.compiler import compile_path as _compile_path
 from plain.html.compiler import compile_source as _compile_source
-from plain.html.engine import render as _engine_render_path
-from plain.html.engine import render_source as _render_source_real
+from plain.html.engine import _interpret_render, _interpret_source
 from plain.html.frontmatter import split as split_frontmatter
 from plain.html.parser import parse
 from plain.html.tokenizer import tokenize
 
+# Bench the interpreter directly. The public `engine.render` /
+# `engine.render_source` route through the compiler after the cutover, so
+# using them as the baseline would silently measure the same code path
+# twice. The `_interpret_*` helpers stay around for this comparison.
+_render_source_real = _interpret_source
+_engine_render_path = _interpret_render
 
-def _load_compiled(plain_source: str):
+
+def _load_compiled(plain_source: str) -> Any:
     """Compile a plain.html template to a Python module and return its render()."""
     import types
 
@@ -183,11 +189,11 @@ def _install_expression_cache() -> None:
 
             raise RenderError(f"Error evaluating {code!r}: {e}") from e
 
-    html_engine._eval = fast_eval  # type: ignore[assignment]
+    html_engine._eval = fast_eval  # ty: ignore[invalid-assignment]
 
 
 def _restore_eval() -> None:
-    html_engine._eval = _ORIGINAL_EVAL  # type: ignore[assignment]
+    html_engine._eval = _ORIGINAL_EVAL
 
 
 class _Item:
@@ -349,7 +355,7 @@ def _run_file_cases() -> None:
             )
 
 
-def time_callable(fn, iters: int) -> dict[str, float]:
+def time_callable(fn: Any, iters: int) -> dict[str, float]:
     # Warm up so import / first-call cost doesn't skew the timing.
     fn()
     samples = []
