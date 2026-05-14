@@ -83,6 +83,14 @@ def test_static_attr():
     )
 
 
+def test_static_attr_with_double_quote_swaps_to_single():
+    """Author writes `{{...}}` JSON inside a single-quoted attribute. The
+    decoded value contains literal `"`, so the engine must wrap with `'`
+    rather than emit broken `attr="{"..."}"`."""
+    src = """<button hx-vals='{{"mode": "persist"}}'>x</button>"""
+    assert _load(src)() == """<button hx-vals='{"mode": "persist"}'>x</button>"""
+
+
 def test_dyn_attr_string():
     assert _load("<a href={url}>x</a>")(url="/foo") == '<a href="/foo">x</a>'
 

@@ -458,7 +458,16 @@ def _emit_attribute(attr: Attribute, e: _Emit) -> None:
 
     if all(isinstance(s, AttrText) for s in attr.segments):
         value = "".join(s.text for s in attr.segments if isinstance(s, AttrText))
-        e.text(f' {attr.name}="{value}"')
+        # Pick a quote that doesn't appear in the value, matching the
+        # formatter. If both quotes appear, fall back to `"..."` with
+        # `"` entity-escaped — anything else would produce invalid HTML
+        # (the next `"` would terminate the attribute early).
+        if '"' not in value:
+            e.text(f' {attr.name}="{value}"')
+        elif "'" not in value:
+            e.text(f" {attr.name}='{value}'")
+        else:
+            e.text(f' {attr.name}="{value.replace(chr(34), "&quot;")}"')
         return
 
     if len(attr.segments) == 1 and isinstance(attr.segments[0], AttrExpr):
