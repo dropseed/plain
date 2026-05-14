@@ -1,6 +1,10 @@
 ---
 imports:
-  - from plain.admin.templates import get_admin_model_detail_url
+  - from plain.admin.html import get_admin_model_detail_url
+attrs:
+  value: Any = None
+  field: Any = None
+  object: Any = None
 ---
 <template :if={value}>
     <template :if={get_admin_model_detail_url(value)}>

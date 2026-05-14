@@ -831,6 +831,7 @@ dependencies = [
     { name = "plain-html" },
     { name = "plain-htmx" },
     { name = "plain-tailwind" },
+    { name = "plain-toolbar" },
 ]
 
 [package.dev-dependencies]
@@ -845,6 +846,7 @@ requires-dist = [
     { name = "plain-html", editable = "plain-html" },
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
+    { name = "plain-toolbar", editable = "plain-toolbar" },
 ]
 
 [package.metadata.requires-dev]

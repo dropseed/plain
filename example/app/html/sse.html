@@ -1,3 +1,7 @@
+---
+attrs:
+  request: plain.http.Request = None
+---
 <template :include="base">
 <template slot="title">SSE demo — live terminal</template>
 <style nonce={request.csp_nonce}>

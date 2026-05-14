@@ -1,4 +1,8 @@
 ---
+imports:
+  - from plain.urls import reverse as url
+attrs:
+  request: plain.http.Request = None
 slots:
   default: required
 ---

@@ -1,8 +1,12 @@
 ---
+imports:
+  - from plain.urls import reverse as url
 attrs:
   observer: Any
   trace_stats: Any = None
   system_stats: Any = None
+  request: plain.http.Request = None
+  form: Any = None
 ---
 {# Observer pill + record dot, visually semi-attached #}
 <div class="inline-flex items-center gap-px">

@@ -73,7 +73,7 @@ def load(key: str, *, root: Path | None = None) -> list[dict] | None:
         return None
 
 
-def store(key: str, diagnostics, *, root: Path | None = None) -> None:
+def store(key: str, diagnostics: list, *, root: Path | None = None) -> None:
     """Store diagnostics for `key`. `diagnostics` is a list of dataclasses."""
     path = _entry_path(key, root)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,7 @@
 ---
+imports:
+  - from plain.assets.html import asset
+  - from plain.admin.html import render_value_template
 attrs:
   title: str = ""
   app_name: str = "Plain"
@@ -21,6 +24,14 @@ attrs:
   order_by_field: str = ""
   order_by_direction: str = ""
   objects: list = []
+  request: plain.http.Request = None
+  get_object_id: Any = None
+  get_object_url: Any = None
+  get_object_links: Any = None
+  get_field_value: Any = None
+  get_field_label: Any = None
+  get_field_value_template: Any = None
+  format_field_value: Any = None
 ---
 <template :include="admin/base"
     title={title} app_name={app_name} admin_force_theme={admin_force_theme}

@@ -1,4 +1,10 @@
 ---
+imports:
+  - from plain.pageviews.html import pageviews_js
+  - from plain.tailwind.html import tailwind_css
+  - from plain.toolbar.html import toolbar
+attrs:
+  request: plain.http.Request = None
 slots:
   title: optional
   default: required

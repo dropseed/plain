@@ -17,7 +17,6 @@ from plain.utils.html import conditional_escape
 from plain.utils.safestring import SafeString, mark_safe
 
 from . import frontmatter as fm
-from .globals import all_globals
 from .loader import find_template
 from .parser import (
     DoctypeNode,
@@ -83,13 +82,13 @@ def render_source(
 def _build_scope(fmdict: dict, context: dict, source_path: Path | None) -> dict:
     """Construct the expression-evaluation namespace.
 
-    Order: engine globals → template `imports:` → caller context. Caller
-    context wins on conflict because attrs declared by the template arrive
-    there. Python's `eval` auto-injects builtins on first use, so we don't
-    seed them explicitly.
+    Order: template `imports:` → caller context. Caller context wins on
+    conflict because attrs declared by the template arrive there.
+    Python's `eval` auto-injects builtins on first use, so we don't seed
+    them explicitly. There's no engine-level globals registry — every
+    name a template uses must come from its own `imports:` block.
     """
     scope: dict = {}
-    scope.update(all_globals())
     for stmt in fmdict.get("imports", []) or []:
         try:
             exec(stmt, scope)  # noqa: S102 — frontmatter is trusted author input

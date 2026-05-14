@@ -1,10 +1,15 @@
 ---
 imports:
+  - from plain.assets.html import asset
+  - from plain.htmx.html import htmx_js
+  - from plain.tailwind.html import tailwind_css
+  - from plain.urls import reverse as url
   - from plain.utils.timesince import timesince
   - from plain.utils.timezone import localtime
 attrs:
   traces: Any
   observer: Any
+  request: plain.http.Request = None
 ---
 <!DOCTYPE html>
 <html lang="en" class="h-full">

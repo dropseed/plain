@@ -10,6 +10,7 @@ attrs:
   parent_view_classes: list = []
   object: Any = None
   cards: list = []
+  request: plain.http.Request = None
 ---
 <template :include="admin/base"
     title={title} app_name={app_name} admin_force_theme={admin_force_theme}

@@ -1,6 +1,7 @@
 ---
 attrs:
   form: Any
+  value: Any = None
 ---
 <template :include="components/nonfield_errors" form={form} />
 <template :include="components/field" bf={form.title} label="Title" autofocus={True} required={True} />

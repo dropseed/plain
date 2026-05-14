@@ -1,4 +1,12 @@
 ---
+imports:
+  - from plain.assets.html import asset
+  - from plain.htmx.html import htmx_js
+  - from plain.admin.html import is_package_installed
+  - from plain.html import mark_safe
+  - from plain.tailwind.html import tailwind_css
+  - from plain.toolbar.html import toolbar
+  - from plain.urls import reverse as url
 attrs:
   title: str = ""
   app_name: str = "Plain"
@@ -10,6 +18,11 @@ attrs:
   parent_view_classes: list = []
   object: Any = None
   cards: list = []
+  request: plain.http.Request = None
+  render_card: Any = None
+  nav_tabs: list = []
+  pinned_slugs: set = set()
+  slug: str = ""
 slots:
   default: required
   actions: optional

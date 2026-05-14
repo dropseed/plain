@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
+from typing import Any
 
 
 class DeclarationError(Exception):
@@ -80,7 +81,7 @@ def _parse_attrs(raw: object) -> list[AttrDeclaration]:
     return out
 
 
-def _parse_attr_value(name: str, value: object) -> AttrDeclaration:
+def _parse_attr_value(name: str, value: Any) -> AttrDeclaration:
     if isinstance(value, str):
         type_source, default_source = _split_inline_attr(value)
         return AttrDeclaration(
@@ -240,7 +241,7 @@ def _parse_slots(raw: object) -> list[SlotDeclaration]:
     return out
 
 
-def _parse_slot_value(name: str, value: object) -> SlotDeclaration:
+def _parse_slot_value(name: str, value: Any) -> SlotDeclaration:
     if isinstance(value, str):
         token = value.strip().lower()
         if token == "required":

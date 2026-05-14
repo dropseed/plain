@@ -9,6 +9,7 @@ attrs:
   filters: list = []
   current_filter: str = ""
   chart_data: Any = None
+  request: plain.http.Request = None
 ---
 <template :include="admin/cards/base" slug={slug} title={title} description={description} size={size} filters={filters} current_filter={current_filter}>
     <div class="chart-wrapper" data-chart-id={slug}>

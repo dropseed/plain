@@ -1,6 +1,10 @@
 ---
+imports:
+  - from plain.urls import reverse as url
 attrs:
   observer: Any
+  request: plain.http.Request = None
+  form: Any = None
 ---
 <div id="observer-traces" class="h-full" data-observer-mode={observer.mode() if observer else ""} data-traces-url={url('observer:traces')}>
     <div class="px-6 py-4 text-center">

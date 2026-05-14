@@ -1,6 +1,8 @@
 ---
 imports:
   - from plain.sessions import get_request_session
+attrs:
+  request: plain.http.Request = None
 ---
 <dl class="text-sm grid grid-cols-1 sm:grid-cols-[max-content_1fr] sm:gap-y-2 gap-x-8 px-6 py-4">
     <template :for={(k, v) in get_request_session(request).items()}>

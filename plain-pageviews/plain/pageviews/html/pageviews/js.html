@@ -1,5 +1,8 @@
 ---
+imports:
+  - from plain.assets.html import asset
 attrs:
   pageviews_track_url: str
+  request: plain.http.Request = None
 ---
 <script src={asset('pageviews/pageviews.js')} data-track-url={pageviews_track_url} async nonce={request.csp_nonce}></script>

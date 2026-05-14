@@ -1,6 +1,12 @@
 ---
+imports:
+  - from plain.assets.html import asset
+  - from plain.htmx.html import htmx_js
+  - from plain.tailwind.html import tailwind_css
+  - from plain.urls import reverse as url
 attrs:
   trace: Any
+  request: plain.http.Request = None
 ---
 <!DOCTYPE html>
 <html lang="en">

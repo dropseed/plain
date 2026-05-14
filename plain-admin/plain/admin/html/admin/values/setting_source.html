@@ -1,3 +1,9 @@
+---
+attrs:
+  value: Any = None
+  field: Any = None
+  object: Any = None
+---
 <span :if={object["source"] == 'env'} class="admin-badge admin-badge-warning font-mono">{value}</span>
 <span :if={object["source"] == 'explicit'} class="admin-badge admin-badge-outline">{value}</span>
 <span :if={object["source"] not in ('env', 'explicit')} class="admin-badge admin-badge-secondary">{value}</span>

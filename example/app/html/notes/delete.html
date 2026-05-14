@@ -1,3 +1,9 @@
+---
+imports:
+  - from plain.urls import reverse as url
+attrs:
+  note: Any = None
+---
 <template :include="base">
 <template slot="title">Delete {note.title}</template>
 <div class="max-w-2xl mx-auto px-5 py-12">

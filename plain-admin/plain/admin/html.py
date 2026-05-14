@@ -1,18 +1,16 @@
 from typing import Any
 
-from plain.html import Template, TemplateFileMissing, register_global
+from plain.html import Template, TemplateFileMissing
 from plain.packages import packages_registry
 from plain.utils.safestring import SafeString, mark_safe
 
 from .views.registry import registry
 
 
-@register_global
 def get_admin_model_detail_url(obj: Any) -> str | None:
     return registry.get_model_detail_url(obj)
 
 
-@register_global
 def is_package_installed(package_name: str) -> bool:
     try:
         packages_registry.get_package_config(package_name)
@@ -21,7 +19,6 @@ def is_package_installed(package_name: str) -> bool:
         return False
 
 
-@register_global
 def render_value_template(candidates: list[str], context: dict[str, Any]) -> SafeString:
     """Render the first existing template from a list of candidates.
 

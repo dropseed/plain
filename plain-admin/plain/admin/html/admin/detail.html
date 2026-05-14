@@ -1,7 +1,13 @@
 ---
+imports:
+  - from plain.admin.html import render_value_template
 attrs:
   object: Any
   fields: list = []
+  get_field_label: Any = None
+  get_field_value: Any = None
+  format_field_value: Any = None
+  get_field_value_template: Any = None
   title: str = ""
   app_name: str = "Plain"
   admin_force_theme: str = ""

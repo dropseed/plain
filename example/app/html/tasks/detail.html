@@ -1,3 +1,10 @@
+---
+imports:
+  - from plain.urls import reverse as url
+attrs:
+  task: Any = None
+  title_form: Any = None
+---
 <template :include="base">
 <template slot="title">{task.title}</template>
 <div class="max-w-2xl mx-auto px-5 py-12">

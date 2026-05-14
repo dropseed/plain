@@ -1,6 +1,9 @@
 ---
+imports:
+  - from plain.assets.html import asset
 attrs:
   toolbar: Any
+  request: plain.http.Request = None
 ---
 <template :if={toolbar.should_render()}>
 <script defer src={asset('toolbar/toolbar.js')} nonce={request.csp_nonce}></script>

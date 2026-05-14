@@ -1,5 +1,6 @@
 ---
 imports:
+  - from plain.html import mark_safe
   - from plain.utils.safestring import mark_safe
 attrs:
   title: str = ""
@@ -13,6 +14,7 @@ attrs:
   object: Any = None
   cards: list = []
   demo_cards: list = []
+  request: plain.http.Request = None
 ---
 {# Customization page: design-token reference + component catalog.
 

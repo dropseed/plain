@@ -1,4 +1,6 @@
 ---
+imports:
+  - from plain.urls import reverse as url
 attrs:
   global_search_query: str = ""
   searchable_views: list = []
@@ -11,6 +13,7 @@ attrs:
   parent_view_classes: list = []
   object: Any = None
   cards: list = []
+  request: plain.http.Request = None
 ---
 <template :include="admin/base"
     title={"Search results for \"" + global_search_query + "\"" if global_search_query else "Search"}

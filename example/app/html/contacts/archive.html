@@ -1,3 +1,12 @@
+---
+imports:
+  - from plain.urls import reverse as url
+attrs:
+  form: Any = None
+  search_form: Any = None
+  filter_form: Any = None
+  submissions: Any = None
+---
 <template :include="base">
 <template slot="title">Contact archive</template>
 <div class="max-w-3xl mx-auto px-5 py-12">

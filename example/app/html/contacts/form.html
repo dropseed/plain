@@ -1,3 +1,9 @@
+---
+imports:
+  - from plain.urls import reverse as url
+attrs:
+  form: Any = None
+---
 <template :include="base">
 <template slot="title">Contact us</template>
 <div class="max-w-2xl mx-auto px-5 py-12">
