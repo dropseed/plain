@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import threading
 import types
+from collections import OrderedDict
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,18 +54,30 @@ class _CompiledEntry:
 # concurrently; whoever finishes first wins the cache slot, the others' work
 # is discarded. Acceptable: compile output is deterministic, the loss is
 # only the extra compile cycles.
-_PROCESS_CACHE: dict[Path, _CompiledEntry] = {}
+#
+# An `OrderedDict` backs the cache so we can evict the least-recently-used
+# entry once the size exceeds `_PROCESS_CACHE_MAX`. The cap matters for
+# long-running test runners or scripts that compile many ad-hoc templates;
+# normal projects sit well below the limit.
+_PROCESS_CACHE_MAX = 512
+_PROCESS_CACHE: OrderedDict[Path, _CompiledEntry] = OrderedDict()
 _PROCESS_LOCK = threading.Lock()
 
 
 def _process_cache_get(path: Path) -> _CompiledEntry | None:
     with _PROCESS_LOCK:
-        return _PROCESS_CACHE.get(path)
+        entry = _PROCESS_CACHE.get(path)
+        if entry is not None:
+            _PROCESS_CACHE.move_to_end(path)
+        return entry
 
 
 def _process_cache_set(path: Path, entry: _CompiledEntry) -> None:
     with _PROCESS_LOCK:
         _PROCESS_CACHE[path] = entry
+        _PROCESS_CACHE.move_to_end(path)
+        while len(_PROCESS_CACHE) > _PROCESS_CACHE_MAX:
+            _PROCESS_CACHE.popitem(last=False)
 
 
 def clear_process_cache() -> None:

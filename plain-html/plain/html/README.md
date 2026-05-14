@@ -253,7 +253,7 @@ plain.html treats two things very differently.
 
 - YAML frontmatter loading uses `python-frontmatter`'s safe loader — `!!python/object/apply` tags raise `ConstructorError` and do not execute.
 - The compiler's emitted Python sets `__template_source__` on each module so tracebacks point at the original `.html` source.
-- The on-disk compile cache (at `<project>/.plain/html/` or `$PLAIN_HTML_CACHE_DIR`) is written with mode `0700`.
+- The on-disk compile cache lives at `<project>/.plain/html/` and is written with mode `0700`. Override the location with `PLAIN_HTML_CACHE_DIR`, or disable the disk cache entirely with `PLAIN_HTML_CACHE_DISABLED=1`.
 
 ## CLI
 

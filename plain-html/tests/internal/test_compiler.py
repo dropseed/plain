@@ -778,14 +778,129 @@ def test_disk_cache_invalidates_transitively(tmp_path, monkeypatch):
     assert len(parent_files_v2) > len(parent_files_v1)
 
 
-def test_disk_cache_disabled_when_env_empty(tmp_path, monkeypatch):
-    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", "")
+def test_disk_cache_disabled_via_env(tmp_path, monkeypatch):
+    monkeypatch.setenv("PLAIN_HTML_CACHE_DISABLED", "1")
     paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
     clear_process_cache()
-    # With cache dir disabled, compile still works — just no on-disk artifact.
+    # With the disk cache disabled, compile still works — just no on-disk
+    # artifact. cache_root() must return None for this flag to be honored.
+    from plain.html import _cache
+
+    assert _cache.cache_root() is None
     CompileSession(use_disk_cache=True).compile_path(paths["x"])
-    # Nothing was written anywhere we could check, but the compile completed,
-    # which is what we wanted.
+
+
+def test_disk_cache_disabled_flag_takes_precedence_over_dir(tmp_path, monkeypatch):
+    # Explicit disable wins even if a path is also set — the two env vars
+    # have independent roles, and "disabled" is the safer default to honor.
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setenv("PLAIN_HTML_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("PLAIN_HTML_CACHE_DISABLED", "yes")
+    from plain.html import _cache
+
+    assert _cache.cache_root() is None
+
+
+def test_imports_mtimes_tracks_deep_module(tmp_path, monkeypatch):
+    # Regression: `from a.b.c import D` must key off `a/b/c.py`'s mtime,
+    # not just `a/__init__.py`. Edits to the leaf module should change
+    # the recorded mtime so the cache key flips.
+    pkg = tmp_path / "deeppkg"
+    (pkg / "users").mkdir(parents=True)
+    (pkg / "__init__.py").write_text("")
+    (pkg / "users" / "__init__.py").write_text("")
+    leaf = pkg / "users" / "models.py"
+    leaf.write_text("class Task:\n    pass\n")
+
+    monkeypatch.syspath_prepend(str(tmp_path))
+    # Bust importlib's caches so the freshly-written package is visible.
+    import importlib
+
+    importlib.invalidate_caches()
+
+    from plain.html import _cache
+
+    stmts = ["from deeppkg.users.models import Task"]
+    before = _cache.imports_mtimes(stmts)
+
+    # The most-specific dotted candidate must be the key — not the top-level.
+    assert "deeppkg.users.models" in before
+    assert before["deeppkg.users.models"] != 0.0
+
+    # Touch the leaf; recorded mtime should change.
+    import os
+    import time
+
+    new_mtime = before["deeppkg.users.models"] + 5
+    os.utime(leaf, (new_mtime, new_mtime))
+    # Some filesystems quantize mtimes; sleep briefly if we got the same value.
+    if os.path.getmtime(leaf) == before["deeppkg.users.models"]:
+        time.sleep(0.05)
+        leaf.write_text("class Task:\n    pass\n# touched\n")
+
+    after = _cache.imports_mtimes(stmts)
+    assert after["deeppkg.users.models"] != before["deeppkg.users.models"]
+
+
+def test_imports_mtimes_records_submodule_from_package_import(tmp_path, monkeypatch):
+    # `from a.b import c` may import the submodule `a.b.c`; that submodule
+    # is what should be stat'd so leaf edits invalidate cache keys.
+    pkg = tmp_path / "subpkg"
+    (pkg / "sub").mkdir(parents=True)
+    (pkg / "__init__.py").write_text("")
+    (pkg / "sub" / "__init__.py").write_text("")
+    leaf = pkg / "sub" / "models.py"
+    leaf.write_text("VALUE = 1\n")
+
+    monkeypatch.syspath_prepend(str(tmp_path))
+    import importlib
+
+    importlib.invalidate_caches()
+
+    from plain.html import _cache
+
+    out = _cache.imports_mtimes(["from subpkg.sub import models"])
+    assert "subpkg.sub.models" in out
+    assert out["subpkg.sub.models"] != 0.0
+
+
+def test_process_cache_evicts_lru_when_over_capacity(tmp_path, monkeypatch):
+    # Shrink the cap so we can exercise eviction without compiling 500+
+    # templates. Anything pushed in beyond the cap should bump the
+    # oldest entry out.
+    from plain.html.compiler import session as session_mod
+
+    clear_process_cache()
+    monkeypatch.setattr(session_mod, "_PROCESS_CACHE_MAX", 3)
+
+    paths = _write_templates(
+        tmp_path,
+        {
+            "a": "<p>a</p>",
+            "b": "<p>b</p>",
+            "c": "<p>c</p>",
+            "d": "<p>d</p>",
+        },
+    )
+    for name in ("a", "b", "c"):
+        _compile_path(paths[name])
+
+    # Touching "a" makes "b" the least-recently-used.
+    _compile_path(paths["a"])
+
+    # Adding "d" should now evict "b".
+    _compile_path(paths["d"])
+
+    with session_mod._PROCESS_LOCK:
+        keys = set(session_mod._PROCESS_CACHE.keys())
+
+    assert paths["b"].resolve() not in keys
+    assert paths["a"].resolve() in keys
+    assert paths["c"].resolve() in keys
+    assert paths["d"].resolve() in keys
+    assert len(keys) == 3
+
+    clear_process_cache()
 
 
 # --- :include parity with interpreter ----------------------------------------

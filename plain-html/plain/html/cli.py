@@ -325,8 +325,9 @@ def compile_cmd(paths: tuple[str, ...], include_installed_packages: bool) -> Non
     cache_dir = _cache.cache_root()
     if cache_dir is None:
         click.secho(
-            "Cache is disabled (PLAIN_HTML_CACHE_DIR is empty). "
-            "Set the env var or unset it to use the default location.",
+            "Cache is disabled (PLAIN_HTML_CACHE_DISABLED is set). "
+            "Unset it to compile to the default location, or set "
+            "PLAIN_HTML_CACHE_DIR to override the path.",
             fg="red",
             err=True,
         )
