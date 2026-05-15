@@ -84,16 +84,14 @@ Create `templates/email/loginlink.subject.txt`:
 Log in to My App
 ```
 
-For more control over how the email is sent, subclass [`LoginLinkFormView`](./views.py#LoginLinkFormView) and override the [`get_template_email`](./views.py#get_template_email) method:
+For more control over how the email is sent, subclass [`LoginLinkForm`](./forms.py#LoginLinkForm) and override the [`get_template_email`](./forms.py#get_template_email) method:
 
 ```python
-from plain.loginlink.views import LoginLinkFormView
+from plain.loginlink.forms import LoginLinkForm
 from plain.email import TemplateEmail
 
 
-class CustomLoginView(LoginLinkFormView):
-    template_name = "login.html"
-
+class CustomLoginLinkForm(LoginLinkForm):
     def get_template_email(self, *, email, context):
         return TemplateEmail(
             template="custom_login",
@@ -106,15 +104,20 @@ See [plain.email](/plain-email/plain/email/README.md) for more details on email 
 
 ## Customizing link expiration
 
-By default, login links expire after 1 hour (3600 seconds). You can change this by setting `link_expires_in` on the view:
+By default, login links expire after 1 hour (3600 seconds). You can change this by overriding the form's `maybe_send_link` call:
 
 ```python
 from plain.loginlink.views import LoginLinkFormView
+from plain.loginlink.forms import LoginLinkForm
+
+
+class CustomLoginLinkForm(LoginLinkForm):
+    def maybe_send_link(self, request, expires_in=60 * 15):  # 15 minutes
+        return super().maybe_send_link(request, expires_in=expires_in)
 
 
 class CustomLoginView(LoginLinkFormView):
-    template_name = "login.html"
-    link_expires_in = 60 * 15  # 15 minutes
+    form_class = CustomLoginLinkForm
 ```
 
 ## Generating links manually

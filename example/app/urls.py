@@ -13,8 +13,6 @@ from app.views.sse import ClockView, StockTickerView
 from plain.admin.urls import AdminRouter
 from plain.assets.urls import AssetsRouter
 from plain.auth.views import LogoutView
-from plain.loginlink.urls import LoginlinkRouter
-from plain.loginlink.views import LoginLinkFormView
 from plain.observer.urls import ObserverRouter
 from plain.pageviews.urls import PageviewsRouter
 from plain.passwords.views import PasswordLoginView
@@ -24,10 +22,6 @@ from plain.urls import Router, include, path
 
 class LoginView(PasswordLoginView):
     template_name = "login.html"
-
-
-class LoginLinkView(LoginLinkFormView):
-    template_name = "loginlink.html"
 
 
 class SSEDemoView(TemplateView):
@@ -60,8 +54,6 @@ class AppRouter(Router):
         include("tasks-api", TasksAPIRouter),
         path("mcp", NotesMCP, name="mcp"),
         path("login", LoginView, name="login"),
-        path("login-link", LoginLinkView, name="login_link"),
-        include("loginlink", LoginlinkRouter),
         path("logout", LogoutView, name="logout"),
         path("error", ErrorView, name="error"),
         path("sse", SSEDemoView, name="sse_demo"),

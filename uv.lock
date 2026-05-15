@@ -1142,7 +1142,6 @@ source = { editable = "plain-loginlink" }
 dependencies = [
     { name = "plain" },
     { name = "plain-email" },
-    { name = "plain-schema" },
     { name = "plain-templates" },
 ]
 
@@ -1150,7 +1149,6 @@ dependencies = [
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-email", editable = "plain-email" },
-    { name = "plain-schema", editable = "plain-schema" },
     { name = "plain-templates", editable = "plain-templates" },
 ]
 

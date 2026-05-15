@@ -9,7 +9,6 @@ requires-python = ">=3.13"
 dependencies = [
   "plain>=0.145.0,<1.0.0",
   "plain.email>=0.19.3,<1.0.0",
-  "plain.schema>=0.0.0,<1.0.0",
   "plain.templates>=0.1.0,<1.0.0",
 ]
 
