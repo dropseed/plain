@@ -5,9 +5,9 @@ slots:
   default: required
 ---
 <div
-    plain-hx-fragment={name}
+    plain-hx-fragment={{ name }}
     hx-swap="innerHTML"
     hx-target="this"
     hx-indicator="this"
-    id={"plain-hx-fragment-" + name}
->{children}</div>
+    id={{ "plain-hx-fragment-" + name }}
+>{{ children }}</div>

@@ -18,11 +18,11 @@ attrs:
         id="plain-hx-fragment-header"
     >
         <div class="flex items-start justify-between">
-            <h2 class="text-lg font-semibold text-white flex-1 min-w-0">{trace.root_span_name}</h2>
+            <h2 class="text-lg font-semibold text-white flex-1 min-w-0">{{ trace.root_span_name }}</h2>
             <div class="flex items-center gap-2">
                 <button
                     data-copy-json
-                    data-json-url={trace.get_absolute_url() + "?format=json"}
+                    data-json-url={{ trace.get_absolute_url() + "?format=json" }}
                     class="cursor-pointer px-2 py-1 text-xs bg-white/10 text-white/70 hover:bg-white/20 hover:text-white rounded transition-colors flex items-center gap-1.5"
                     title="Copy trace as JSON"
                 >
@@ -55,7 +55,7 @@ attrs:
                     >
                         <div class="py-1">
                             <a
-                                href={trace.get_absolute_url() + "?format=json"}
+                                href={{ trace.get_absolute_url() + "?format=json" }}
                                 target="_blank"
                                 class="cursor-pointer w-full text-left px-4 py-3 text-sm text-stone-200 hover:bg-stone-800 transition-colors flex items-center gap-3"
                             >
@@ -72,7 +72,7 @@ attrs:
                                 View as JSON
                             </a>
                             <a
-                                href={trace.get_absolute_url() + "?logs=true"}
+                                href={{ trace.get_absolute_url() + "?logs=true" }}
                                 target="_blank"
                                 class="cursor-pointer w-full text-left px-4 py-3 text-sm text-stone-200 hover:bg-stone-800 transition-colors flex items-center gap-3"
                             >
@@ -88,7 +88,7 @@ attrs:
                                 View Logs
                             </a>
                             <button
-                                hx-delete={trace.get_absolute_url()}
+                                hx-delete={{ trace.get_absolute_url() }}
                                 hx-swap="none"
                                 hx-confirm="Delete this trace?"
                                 class="cursor-pointer w-full text-left px-4 py-3 text-sm text-red-200 hover:bg-red-900/30 transition-colors flex items-center gap-3"
@@ -116,54 +116,67 @@ attrs:
 </header>
 <div class="space-y-2">
     <div class="flex items-center justify-between">
-        <span
-            :if={trace.summary}
+        {% if trace.summary %}<span
             class="text-xs inline-flex items-center px-2 py-0.5 bg-white/10 text-white/80 rounded-md border border-white/10"
         >
-            {trace.summary}
-        </span>
-        <div :if={not trace.summary}></div>
+            {{ trace.summary }}
+        </span>{% endif %}
+        {% if not trace.summary %}
+            <div></div>
+        {% endif %}
         <div class="text-xs text-white/40">
-            <span class="text-white/30">Trace ID:</span> <span class="font-mono">{trace.trace_id}</span>
+            <span class="text-white/30">Trace ID:</span> <span class="font-mono">{{ trace.trace_id }}</span>
         </div>
     </div>
-    <div
-        :if={trace.request_id or trace.user_id or trace.session_id or trace.app_version}
-        class="bg-white/5 rounded-lg border border-white/10 p-3"
-    >
-        <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/70">
-            <div :if={trace.request_id}>
-                <span class="text-white/50">Request:</span> {trace.request_id}
+    {% if trace.request_id or trace.user_id or trace.session_id or trace.app_version %}
+        <div class="bg-white/5 rounded-lg border border-white/10 p-3">
+            <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/70">
+                {% if trace.request_id %}
+                    <div>
+                <span class="text-white/50">Request:</span> {{ trace.request_id }}
             </div>
-            <div :if={trace.user_id}>
-                <span class="text-white/50">User:</span> {trace.user_id}
+                {% endif %}
+                {% if trace.user_id %}
+                    <div>
+                <span class="text-white/50">User:</span> {{ trace.user_id }}
             </div>
-            <div :if={trace.session_id}>
-                <span class="text-white/50">Session:</span> {trace.session_id}
+                {% endif %}
+                {% if trace.session_id %}
+                    <div>
+                <span class="text-white/50">Session:</span> {{ trace.session_id }}
             </div>
-            <div :if={trace.app_version}>
-                <span class="text-white/50">App Version:</span> {trace.app_version}
+                {% endif %}
+                {% if trace.app_version %}
+                    <div>
+                <span class="text-white/50">App Version:</span> {{ trace.app_version }}
+            </div>
+                {% endif %}
             </div>
         </div>
-    </div>
+    {% endif %}
 </div>
 <div class="mt-6">
     <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-medium text-white/80">Spans ({trace.spans.query.count()}) + Logs ({trace.logs.query.count()})</h3>
+        <h3 class="text-sm font-medium text-white/80">Spans ({{ trace.spans.query.count() }}) + Logs ({{ trace.logs.query.count() }})</h3>
         <div class="text-xs text-white/60">
-            <span class="text-white/50">Started:</span> {localtime(trace.start_time).strftime("%b %-d, %-I:%M %p")}
+            <span class="text-white/50">Started:</span> {{ localtime(trace.start_time).strftime("%b %-d, %-I:%M %p") }}
         </div>
     </div>
     <div class="space-y-1 text-xs">
-        <template :for={event in trace.get_timeline_events()}>
-            <Span
-                :if={event["type"] == 'span'}
-                trace={trace}
-                span={event["instance"]}
-                event={event}
-            />
-            <Log :if={event["type"] == 'log'} log={event["instance"]} event={event} />
-        </template>
-        <div :if={not trace.get_timeline_events()}>No spans or logs...</div>
+        {% for event in trace.get_timeline_events() %}
+            {% if event["type"] == 'span' %}
+                <Span
+                    trace={{ trace }}
+                    span={{ event["instance"] }}
+                    event={{ event }}
+                />
+            {% endif %}
+            {% if event["type"] == 'log' %}
+                <Log log={{ event["instance"] }} event={{ event }} />
+            {% endif %}
+        {% endfor %}
+        {% if not trace.get_timeline_events() %}
+            <div>No spans or logs...</div>
+        {% endif %}
     </div>
 </div>

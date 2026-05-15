@@ -10,15 +10,20 @@ attrs:
   form: Any
 ---
 <Base>
-<template :slot="title">New note</template>
-<div class="max-w-2xl mx-auto px-5 py-12">
-    <BackLink href={url('notes:list')} label="Back to notes" />
-    <h1 class="page-h1">New note</h1>
-    <form method="post" class="mt-6 flex flex-col gap-5">
-        <NonfieldErrors form={form} />
-        <Field bf={form.title} label="Title" autofocus={True} required={True} />
-        <Field bf={form.body} label="Body" type="textarea" min_height="200px" />
+    {% slot "title" %}New note{% endslot %}
+    <div class="max-w-2xl mx-auto px-5 py-12">
+        <BackLink href={{ url('notes:list') }} label="Back to notes" />
+        <h1 class="page-h1">New note</h1>
+        <form method="post" class="mt-6 flex flex-col gap-5">
+        <NonfieldErrors form={{ form }} />
+        <Field
+            bf={{ form.title }}
+            label="Title"
+            autofocus={{ True }}
+            required={{ True }}
+        />
+        <Field bf={{ form.body }} label="Body" type="textarea" min_height="200px" />
         <button type="submit" class="btn-primary self-start">Create</button>
     </form>
-</div>
+    </div>
 </Base>

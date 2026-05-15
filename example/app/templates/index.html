@@ -10,11 +10,10 @@ slots:
   default: required
 ---
 <Base>
-<template :slot="title">Plain — example app</template>
-
-<div class="min-h-screen">
-    <header class="border-b border-outline">
-        <div class="flex items-center w-full max-w-6xl mx-auto px-5 h-12">
+    {% slot "title" %}Plain — example app{% endslot %}
+    <div class="min-h-screen">
+        <header class="border-b border-outline">
+            <div class="flex items-center w-full max-w-6xl mx-auto px-5 h-12">
             <a
                 href="/"
                 class="font-display font-medium text-[13px] tracking-tight text-ink no-underline"
@@ -27,8 +26,8 @@ slots:
                 <span>dev</span>
             </div>
         </div>
-    </header>
-    <div class="max-w-6xl mx-auto px-5 pt-12 pb-2">
+        </header>
+        <div class="max-w-6xl mx-auto px-5 pt-12 pb-2">
         <a
             href="https://plainframework.com/"
             class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent-deep no-underline hover:underline underline-offset-4"
@@ -44,119 +43,121 @@ slots:
             Follow any route to see the piece of Plain it exercises — pages, streaming, admin, tooling.
         </p>
     </div>
-    <div :if={request.query_params.get('queued')} class="max-w-6xl mx-auto px-5 pt-6">
-        <div
-            class="rounded border border-success/30 bg-success/8 px-3.5 py-3 text-sm text-ink"
-        >
-            Queued <span class="font-mono text-success">{request.query_params['queued']}</span> — watch
+        {% if request.query_params.get('queued') %}
+            <div class="max-w-6xl mx-auto px-5 pt-6">
+                <div
+                    class="rounded border border-success/30 bg-success/8 px-3.5 py-3 text-sm text-ink"
+                >
+            Queued <span class="font-mono text-success">{{ request.query_params['queued'] }}</span> — watch
             <span class="font-mono">plain dev logs</span> or check
             <a href="/admin/" class="body-link font-semibold">/admin/</a>.
         </div>
-    </div>
-    <section class="max-w-6xl mx-auto px-5 pt-10">
-        <h2 class="page-h2">Pages</h2>
-        <p class="mt-1 text-sm text-muted">
+            </div>
+        {% endif %}
+        <section class="max-w-6xl mx-auto px-5 pt-10">
+            <h2 class="page-h2">Pages</h2>
+            <p class="mt-1 text-sm text-muted">
             Hand-written views in <span class="font-mono text-body">app/urls.py</span>.
         </p>
-        <div class="list-card mt-4">
-            <Row href="/" path="/" description="This index — the page you're on." />
-            <Row
-                href="/notes/"
-                path="/notes/"
-                description="A tiny CRUD app — create, edit, pin, delete."
-                badge_class="badge-info"
-                badge_text="Auth"
-            />
-            <Row
-                href="/contacts/"
-                path="/contacts/"
-                description="Plain <span class='font-mono'>forms.Form</span> — text, email, choice, bool, dynamic fields, prefix."
-            />
-            <Row
-                href="/tasks/"
-                path="/tasks/"
-                description="<span class='font-mono'>ModelForm</span> — FK, M2M, date, choice, file. HTMX inline rename. JSON API."
-                badge_class="badge-info"
-                badge_text="Auth"
-            />
-            <Row
-                href="/sse/"
-                path="/sse/"
-                description="Server-sent events streaming in real time."
-                badge_class="badge-success"
-                badge_text="Live"
-            />
-        </div>
-    </section>
-    <section class="max-w-6xl mx-auto px-5 pt-10">
-        <h2 class="page-h2">Dev tools</h2>
-        <p class="mt-1 text-sm text-muted">Packages that ship with Plain, mounted locally.</p>
-        <div class="list-card mt-4">
-            <Row
-                href="/admin/"
-                path="/admin/"
-                description="Browse models, run admin actions."
-                badge_class="badge-info"
-                badge_text="Auth"
-            />
-            <Row
-                href="/observer/"
-                path="/observer/"
-                description="Traces, spans, and slow-query hunting."
-            />
-            <Row
-                href="/error/"
-                path="/error/"
-                description="Raises on purpose — see the toolbar catch it."
-                badge_class="badge-danger"
-                badge_text="500"
-            />
-        </div>
-    </section>
-    <section class="max-w-6xl mx-auto px-5 pt-10">
-        <h2 class="page-h2">Background jobs</h2>
-        <p class="mt-1 text-sm text-muted">
+            <div class="list-card mt-4">
+                <Row href="/" path="/" description="This index — the page you're on." />
+                <Row
+                    href="/notes/"
+                    path="/notes/"
+                    description="A tiny CRUD app — create, edit, pin, delete."
+                    badge_class="badge-info"
+                    badge_text="Auth"
+                />
+                <Row
+                    href="/contacts/"
+                    path="/contacts/"
+                    description="Plain <span class='font-mono'>forms.Form</span> — text, email, choice, bool, dynamic fields, prefix."
+                />
+                <Row
+                    href="/tasks/"
+                    path="/tasks/"
+                    description="<span class='font-mono'>ModelForm</span> — FK, M2M, date, choice, file. HTMX inline rename. JSON API."
+                    badge_class="badge-info"
+                    badge_text="Auth"
+                />
+                <Row
+                    href="/sse/"
+                    path="/sse/"
+                    description="Server-sent events streaming in real time."
+                    badge_class="badge-success"
+                    badge_text="Live"
+                />
+            </div>
+        </section>
+        <section class="max-w-6xl mx-auto px-5 pt-10">
+            <h2 class="page-h2">Dev tools</h2>
+            <p class="mt-1 text-sm text-muted">Packages that ship with Plain, mounted locally.</p>
+            <div class="list-card mt-4">
+                <Row
+                    href="/admin/"
+                    path="/admin/"
+                    description="Browse models, run admin actions."
+                    badge_class="badge-info"
+                    badge_text="Auth"
+                />
+                <Row
+                    href="/observer/"
+                    path="/observer/"
+                    description="Traces, spans, and slow-query hunting."
+                />
+                <Row
+                    href="/error/"
+                    path="/error/"
+                    description="Raises on purpose — see the toolbar catch it."
+                    badge_class="badge-danger"
+                    badge_text="500"
+                />
+            </div>
+        </section>
+        <section class="max-w-6xl mx-auto px-5 pt-10">
+            <h2 class="page-h2">Background jobs</h2>
+            <p class="mt-1 text-sm text-muted">
             <span class="font-mono text-body">plain dev</span> runs a worker — enqueue an
             <span class="font-mono text-body">ExampleJob</span> from <span class="font-mono text-body">app/jobs.py</span>.
         </p>
-        <div class="border border-outline rounded bg-white overflow-hidden mt-4">
-            <form
-                method="post"
-                action={url('run_example_job')}
-                class="grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3"
-            >
+            <div class="border border-outline rounded bg-white overflow-hidden mt-4">
+                <form
+                    method="post"
+                    action={{ url('run_example_job') }}
+                    class="grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3"
+                >
                 <div class="font-mono text-sm text-ink">/jobs/run/</div>
                 <div class="text-sm text-body">Enqueue an <span class="font-mono">ExampleJob</span> — the worker logs its progress.</div>
                 <button type="submit" class="btn-primary">
                     Queue job <span class="ml-1.5" aria-hidden="true">→</span>
                 </button>
             </form>
-        </div>
-    </section>
-    <section class="max-w-6xl mx-auto px-5 pt-10">
-        <h2 class="page-h2">Auth</h2>
-        <p class="mt-1 text-sm text-muted">
+            </div>
+        </section>
+        <section class="max-w-6xl mx-auto px-5 pt-10">
+            <h2 class="page-h2">Auth</h2>
+            <p class="mt-1 text-sm text-muted">
             Sessions and password login, per <span class="font-mono text-body">plain.passwords</span>.
         </p>
-        <div class="list-card mt-4">
-            <Row href="/login/" path="/login/" description="Password login form." />
-            <Row
-                href="/logout/"
-                path="/logout/"
-                description="Sign out and clear the session."
-            />
-        </div>
-    </section>
-    <footer
-        class="max-w-6xl mx-auto px-5 pt-10 pb-12 mt-12 border-t border-outline flex flex-wrap justify-between gap-2 text-xs text-muted"
-    >
-        <div>URLs sourced from <span class="font-mono text-body">app/urls.py</span>.</div>
-        <div>
+            <div class="list-card mt-4">
+                <Row href="/login/" path="/login/" description="Password login form." />
+                <Row
+                    href="/logout/"
+                    path="/logout/"
+                    description="Sign out and clear the session."
+                />
+            </div>
+        </section>
+        <footer
+            class="max-w-6xl mx-auto px-5 pt-10 pb-12 mt-12 border-t border-outline flex flex-wrap justify-between gap-2 text-xs text-muted"
+        >
+            <div>URLs sourced from <span class="font-mono text-body">app/urls.py</span>.</div>
+            <div>
             <a
                 href="https://plainframework.com/"
                 class="text-ink font-semibold no-underline hover:underline underline-offset-4"
             >plainframework.com</a>
         </div>
-    </footer>
-</div>
+        </footer>
+    </div>
 </Base>

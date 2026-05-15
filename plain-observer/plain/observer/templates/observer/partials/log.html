@@ -5,7 +5,7 @@ attrs:
   event: Any
   log: Any
 ---
-<div data-span-level={event["span_level"]} class="border-l border-white/10">
+<div data-span-level={{ event["span_level"] }} class="border-l border-white/10">
     <div class="ml-px px-2 py-1 text-xs flex items-start space-x-2">
         <div class="w-4 h-4 mr-2 flex items-center justify-center">
             <svg
@@ -18,15 +18,15 @@ attrs:
         </div>
         <span
             class="text-white/40 whitespace-nowrap tabular-nums"
-            title={str(localtime(log.timestamp))}
-        >{localtime(log.timestamp).strftime("%-I:%M:%S %p")}</span>
+            title={{ str(localtime(log.timestamp)) }}
+        >{{ localtime(log.timestamp).strftime("%-I:%M:%S %p") }}</span>
         <span
-            data-level={log.level}
+            data-level={{ log.level }}
             class="font-mono text-white/90 break-words
                     data-[level='DEBUG']:text-stone-400
                     data-[level='WARNING']:text-yellow-400
                     data-[level='ERROR']:text-red-400
                     data-[level='CRITICAL']:text-red-300"
-        >{log.message}</span>
+        >{{ log.message }}</span>
     </div>
 </div>

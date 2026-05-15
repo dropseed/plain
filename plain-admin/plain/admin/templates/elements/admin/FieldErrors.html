@@ -2,10 +2,8 @@
 attrs:
   field: Any
 ---
-<div
-    :for={error in field.errors}
-    class="mt-2 flex items-center space-x-1.5 text-sm text-admin-danger"
->
+{% for error in field.errors %}
+    <div class="mt-2 flex items-center space-x-1.5 text-sm text-admin-danger">
     <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
         <path
             fill-rule="evenodd"
@@ -13,5 +11,6 @@ attrs:
             clip-rule="evenodd"
         />
     </svg>
-    <span>{error}</span>
+    <span>{{ error }}</span>
 </div>
+{% endfor %}

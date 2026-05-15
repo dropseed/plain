@@ -7,13 +7,16 @@ attrs:
 ---
 <Base>
     <div class="m-auto text-center">
-    <h1 :if={error == "expired"} class="text-4xl">Link Expired</h1>
-    <h1 :if={error == "invalid"} class="text-4xl">Link Invalid</h1>
-    <h1 :if={error == "changed"} class="text-4xl">Link Changed</h1>
-    <h1 :if={error not in ("expired", "invalid", "changed")} class="text-4xl">Link Error</h1>
-
-    <a
-        href={login_url}
+    {% if error == "expired" %}
+        <h1 class="text-4xl">Link Expired</h1>
+    {% endif %}{% if error == "invalid" %}
+        <h1 class="text-4xl">Link Invalid</h1>
+    {% endif %}{% if error == "changed" %}
+        <h1 class="text-4xl">Link Changed</h1>
+    {% endif %}{% if error not in ("expired", "invalid", "changed") %}
+        <h1 class="text-4xl">Link Error</h1>
+    {% endif %}<a
+        href={{ login_url }}
         class="inline-block mt-4 text-center text-blue-600 hover:underline"
     >Request a new link →</a>
 </div>

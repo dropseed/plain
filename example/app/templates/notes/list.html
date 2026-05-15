@@ -8,26 +8,32 @@ attrs:
   notes: list[app.notes.models.Note]
 ---
 <Base>
-<template :slot="title">Notes</template>
-<div class="max-w-2xl mx-auto px-5 py-12">
-    <BackLink href={url('index')} label="Back to index" />
-    <div class="flex items-end justify-between gap-4">
+    {% slot "title" %}Notes{% endslot %}
+    <div class="max-w-2xl mx-auto px-5 py-12">
+        <BackLink href={{ url('index') }} label="Back to index" />
+        <div class="flex items-end justify-between gap-4">
         <h1 class="page-h1">Notes</h1>
-        <a href={url('notes:create')} class="btn-primary">New note</a>
+        <a href={{ url('notes:create') }} class="btn-primary">New note</a>
     </div>
-    <ul :if={notes} class="list-card mt-6">
-        <li :for={note in notes}>
+        {% if notes %}
+            <ul class="list-card mt-6">
+                {% for note in notes %}
+                    <li>
             <a
-                href={url('notes:detail', id=note.id)}
+                href={{ url('notes:detail', id=note.id) }}
                 class="block px-4 py-3 hover:bg-warm-tint transition-colors no-underline"
             >
-                <div class="text-sm font-semibold text-ink">{note.title}</div>
+                <div class="text-sm font-semibold text-ink">{{ note.title }}</div>
                 <div class="text-[12px] font-mono text-muted mt-1">
-                    {note.updated_at.strftime("%Y-%m-%d %H:%M")}
+                    {{ note.updated_at.strftime("%Y-%m-%d %H:%M") }}
                 </div>
             </a>
         </li>
-    </ul>
-    <p :if={not notes} class="mt-6 text-sm text-muted">No notes yet. Create your first one.</p>
-</div>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        {% if not notes %}
+            <p class="mt-6 text-sm text-muted">No notes yet. Create your first one.</p>
+        {% endif %}
+    </div>
 </Base>

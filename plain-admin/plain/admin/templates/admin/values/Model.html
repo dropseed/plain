@@ -6,19 +6,15 @@ attrs:
   field: Any = None
   object: Any = None
 ---
-<template :if={value}>
-    <template :if={get_admin_model_detail_url(value)}>
-        <a href={get_admin_model_detail_url(value)}>{value}</a>
-    </template>
-    <template
-        :if={not get_admin_model_detail_url(value) and hasattr(value, 'get_absolute_url')}
-    >
-        <a href={value.get_absolute_url()}>{value}</a>
-    </template>
-    <template
-        :if={not get_admin_model_detail_url(value) and not hasattr(value, 'get_absolute_url')}
-    >
-        <div>{value}</div>
-    </template>
-</template>
-<span :if={not value} class="text-admin-muted-foreground/80 italic">None</span>
+{% if value %}
+    {% if get_admin_model_detail_url(value) %}
+        <a href={{ get_admin_model_detail_url(value) }}>{{ value }}</a>
+    {% endif %}
+    {% if not get_admin_model_detail_url(value) and hasattr(value, 'get_absolute_url') %}
+        <a href={{ value.get_absolute_url() }}>{{ value }}</a>
+    {% endif %}
+    {% if not get_admin_model_detail_url(value) and not hasattr(value, 'get_absolute_url') %}
+        <div>{{ value }}</div>
+    {% endif %}
+{% endif %}
+{% if not value %}<span class="text-admin-muted-foreground/80 italic">None</span>{% endif %}

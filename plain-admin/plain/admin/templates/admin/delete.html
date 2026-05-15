@@ -16,16 +16,16 @@ attrs:
   request: plain.http.Request = None
 ---
 <Base
-    title={title}
-    app_name={app_name}
-    admin_force_theme={admin_force_theme}
-    description={description}
-    image={image}
-    links={links}
-    extra_links={extra_links}
-    parent_view_classes={parent_view_classes}
-    object={object}
-    cards={cards}
+    title={{ title }}
+    app_name={{ app_name }}
+    admin_force_theme={{ admin_force_theme }}
+    description={{ description }}
+    image={{ image }}
+    links={{ links }}
+    extra_links={{ extra_links }}
+    parent_view_classes={{ parent_view_classes }}
+    object={{ object }}
+    cards={{ cards }}
 >
     <div class="max-w-lg">
         <div class="admin-alert admin-alert-danger w-full">
@@ -37,7 +37,7 @@ attrs:
                 class="col-start-2 mt-4 flex items-center justify-end space-x-3"
             >
             <a
-                href={request.headers.get('Referer', '..')}
+                href={{ request.headers.get('Referer', '..') }}
                 class="admin-btn admin-btn-outline no-underline"
             >
                 Cancel

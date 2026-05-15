@@ -7,6 +7,6 @@ attrs:
   page: Any
 ---
 <Base>
-<template :slot="title">{page.title}</template>
-{mark_safe(page.content)}
+{% slot "title" %}{{ page.title }}{% endslot %}
+{{ mark_safe(page.content) }}
 </Base>

@@ -5,8 +5,8 @@ attrs:
   request: plain.http.Request = None
 ---
 <Base>
-<template :slot="title">SSE demo — live terminal</template>
-<style nonce={request.csp_nonce}>
+    {% slot "title" %}SSE demo — live terminal{% endslot %}
+    <style nonce={{ request.csp_nonce }}>
     .terminal-bg {
         background: #0a0e17;
         background-image:
@@ -66,87 +66,94 @@ attrs:
         background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 20%, rgba(255,255,255,0.08) 80%, transparent);
     }
 </style>
-
-<div class="terminal-bg">
-    <div class="max-w-3xl mx-auto px-6 py-16 space-y-12">
-        <div class="animate-in">
-            <div class="flex items-center justify-between mb-3">
-                <h1
-                    class="font-display font-semibold text-[15px] tracking-tight text-zinc-300"
-                >
+    <div class="terminal-bg">
+        <div class="max-w-3xl mx-auto px-6 py-16 space-y-12">
+            <div class="animate-in">
+                <div class="flex items-center justify-between mb-3">
+                    <h1
+                        class="font-display font-semibold text-[15px] tracking-tight text-zinc-300"
+                    >
                     SSE terminal
                 </h1>
-                <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2">
                     <span
                         class="live-dot inline-block w-1.5 h-1.5 rounded-full bg-success"
                     ></span>
                     <span class="font-mono text-[11px] text-success">live</span>
                 </div>
+                </div>
+                <div class="separator"></div>
             </div>
-            <div class="separator"></div>
-        </div>
-        <div class="animate-in delay-1">
-            <div class="text-zinc-500 font-display text-[13px] mb-3">System clock</div>
-            <div
-                id="clock"
-                class="font-mono text-6xl sm:text-7xl tracking-tight text-success clock-glow tabular-nums"
-            >--:--:--</div>
-        </div>
-        <div class="separator animate-in delay-2"></div>
-        <div class="animate-in delay-2">
-            <div class="flex items-center justify-between mb-5">
-                <div class="text-zinc-500 font-display text-[13px]">Market feed</div>
-                <div class="font-mono text-[11px] text-zinc-600" id="update-counter">0 updates</div>
-            </div>
-            <div id="ticker" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="animate-in delay-1">
+                <div class="text-zinc-500 font-display text-[13px] mb-3">System clock</div>
                 <div
-                    id="stock-ACME"
-                    class="card-surface rounded p-5 transition-all duration-300 animate-in delay-2"
-                >
-                    <div class="flex items-center justify-between mb-3">
+                    id="clock"
+                    class="font-mono text-6xl sm:text-7xl tracking-tight text-success clock-glow tabular-nums"
+                >--:--:--</div>
+            </div>
+            <div class="separator animate-in delay-2"></div>
+            <div class="animate-in delay-2">
+                <div class="flex items-center justify-between mb-5">
+                    <div class="text-zinc-500 font-display text-[13px]">Market feed</div>
+                    <div
+                        class="font-mono text-[11px] text-zinc-600"
+                        id="update-counter"
+                    >0 updates</div>
+                </div>
+                <div id="ticker" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div
+                        id="stock-ACME"
+                        class="card-surface rounded p-5 transition-all duration-300 animate-in delay-2"
+                    >
+                        <div class="flex items-center justify-between mb-3">
                         <span class="font-mono text-xs font-semibold text-zinc-300">ACME</span>
                         <span class="change font-mono text-xs text-zinc-600">--</span>
                     </div>
-                    <div class="price font-mono text-3xl text-white tabular-nums mb-3">--</div>
-                    <div class="price-bar w-0 bg-zinc-700"></div>
-                </div>
-                <div
-                    id="stock-GLOB"
-                    class="card-surface rounded p-5 transition-all duration-300 animate-in delay-3"
-                >
-                    <div class="flex items-center justify-between mb-3">
+                        <div
+                            class="price font-mono text-3xl text-white tabular-nums mb-3"
+                        >--</div>
+                        <div class="price-bar w-0 bg-zinc-700"></div>
+                    </div>
+                    <div
+                        id="stock-GLOB"
+                        class="card-surface rounded p-5 transition-all duration-300 animate-in delay-3"
+                    >
+                        <div class="flex items-center justify-between mb-3">
                         <span class="font-mono text-xs font-semibold text-zinc-300">GLOB</span>
                         <span class="change font-mono text-xs text-zinc-600">--</span>
                     </div>
-                    <div class="price font-mono text-3xl text-white tabular-nums mb-3">--</div>
-                    <div class="price-bar w-0 bg-zinc-700"></div>
-                </div>
-                <div
-                    id="stock-WIDG"
-                    class="card-surface rounded p-5 transition-all duration-300 animate-in delay-4"
-                >
-                    <div class="flex items-center justify-between mb-3">
+                        <div
+                            class="price font-mono text-3xl text-white tabular-nums mb-3"
+                        >--</div>
+                        <div class="price-bar w-0 bg-zinc-700"></div>
+                    </div>
+                    <div
+                        id="stock-WIDG"
+                        class="card-surface rounded p-5 transition-all duration-300 animate-in delay-4"
+                    >
+                        <div class="flex items-center justify-between mb-3">
                         <span class="font-mono text-xs font-semibold text-zinc-300">WIDG</span>
                         <span class="change font-mono text-xs text-zinc-600">--</span>
                     </div>
-                    <div class="price font-mono text-3xl text-white tabular-nums mb-3">--</div>
-                    <div class="price-bar w-0 bg-zinc-700"></div>
+                        <div
+                            class="price font-mono text-3xl text-white tabular-nums mb-3"
+                        >--</div>
+                        <div class="price-bar w-0 bg-zinc-700"></div>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="separator animate-in delay-3"></div>
-        <div class="animate-in delay-4 flex items-center justify-between">
-            <div class="font-mono text-[11px] text-zinc-600">
+            <div class="separator animate-in delay-3"></div>
+            <div class="animate-in delay-4 flex items-center justify-between">
+                <div class="font-mono text-[11px] text-zinc-600">
                 EventSource &middot; server-sent events
             </div>
-            <div class="font-mono text-[11px] text-zinc-600">
+                <div class="font-mono text-[11px] text-zinc-600">
                 Open DevTools network tab to inspect
+            </div>
             </div>
         </div>
     </div>
-</div>
-
-<script nonce={request.csp_nonce}>
+    <script nonce={{ request.csp_nonce }}>
     let updateCount = 0;
 
     const clockSource = new EventSource("/sse/clock/");

@@ -21,89 +21,95 @@ attrs:
   cards: list = []
 ---
 <Base
-    title={title}
-    app_name={app_name}
-    admin_force_theme={admin_force_theme}
-    description={description}
-    image={image}
-    links={links}
-    extra_links={extra_links}
-    parent_view_classes={parent_view_classes}
-    object={object}
-    cards={cards}
+    title={{ title }}
+    app_name={{ app_name }}
+    admin_force_theme={{ admin_force_theme }}
+    description={{ description }}
+    image={{ image }}
+    links={{ links }}
+    extra_links={{ extra_links }}
+    parent_view_classes={{ parent_view_classes }}
+    object={{ object }}
+    cards={{ cards }}
 >
-
-<template :if={checks}>
-    <div
-        class="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 mb-7 font-mono text-xs tabular-nums"
-    >
+    {% if checks %}
+        <div
+            class="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 mb-7 font-mono text-xs tabular-nums"
+        >
     <span class="flex items-baseline gap-1">
-        <span class="text-admin-foreground">{passed_count}</span>
+        <span class="text-admin-foreground">{{ passed_count }}</span>
         <span class="text-admin-muted-foreground">passed</span>
     </span>
     <span class="text-admin-muted-foreground">·</span>
     <span
-        data-empty={warning_count == 0}
+        data-empty={{ warning_count == 0 }}
         class="flex items-baseline gap-1 data-[empty=True]:text-admin-muted-foreground data-[empty=False]:text-admin-warning"
     >
-        <span>{warning_count}</span>
-        <span>warning{"s" if warning_count != 1 else ""}</span>
+        <span>{{ warning_count }}</span>
+        <span>warning{{ "s" if warning_count != 1 else "" }}</span>
     </span>
     <span class="text-admin-muted-foreground">·</span>
     <span
-        data-empty={error_count == 0}
+        data-empty={{ error_count == 0 }}
         class="flex items-baseline gap-1 data-[empty=True]:text-admin-muted-foreground data-[empty=False]:text-admin-danger"
     >
-        <span>{error_count}</span>
-        <span>error{"s" if error_count != 1 else ""}</span>
+        <span>{{ error_count }}</span>
+        <span>error{{ "s" if error_count != 1 else "" }}</span>
     </span>
-    <template :if={include_deploy}>
+    {% if include_deploy %}
     <span class="text-admin-muted-foreground">·</span>
     <span class="text-admin-muted-foreground">including deploy</span>
-    </template>
-</div>
-    <div
-        class="grid grid-cols-[1fr_6rem] items-baseline gap-3 pb-2 mb-px border-b border-admin-border font-mono text-xs uppercase tracking-widest text-admin-foreground font-semibold"
-    >
+    {% endif %}</div>
+        <div
+            class="grid grid-cols-[1fr_6rem] items-baseline gap-3 pb-2 mb-px border-b border-admin-border font-mono text-xs uppercase tracking-widest text-admin-foreground font-semibold"
+        >
     <span>Check</span>
     <span class="text-right">Status</span>
 </div>
-    <ul role="list" class="divide-y divide-admin-border">
-    <template :for={check in checks}>
-        <li
-            :if={check["status"] == "passed"}
-            class="grid grid-cols-[1fr_6rem] items-baseline gap-3 py-2.5"
-        >
-        <span class="font-mono text-sm text-admin-foreground truncate min-w-0">{mark_safe("<span class='text-admin-muted-foreground'>" + check["name"].split(".", 1)[0] + ".</span>" + check["name"].split(".", 1)[1]) if "." in check["name"] else check["name"]}</span>
+        <ul role="list" class="divide-y divide-admin-border">
+            {% for check in checks %}
+                {% if check["status"] == "passed" %}
+                    <li class="grid grid-cols-[1fr_6rem] items-baseline gap-3 py-2.5">
+        <span class="font-mono text-sm text-admin-foreground truncate min-w-0">{{ mark_safe("<span class='text-admin-muted-foreground'>" + check["name"].split(".", 1)[0] + ".</span>" + check["name"].split(".", 1)[1]) if "." in check["name"] else check["name"] }}</span>
         <span class="font-mono text-xs text-admin-success tabular-nums text-right">ok</span>
     </li>
-        <li :if={check["status"] != "passed"}>
-            <div class="grid grid-cols-[1fr_6rem] items-baseline gap-3 py-2.5">
+                {% endif %}
+                {% if check["status"] != "passed" %}
+                    <li>
+                        <div
+                            class="grid grid-cols-[1fr_6rem] items-baseline gap-3 py-2.5"
+                        >
             <span
                 class="font-mono text-sm font-medium text-admin-foreground truncate min-w-0"
-            >{mark_safe("<span class='text-admin-muted-foreground'>" + check["name"].split(".", 1)[0] + ".</span>" + check["name"].split(".", 1)[1]) if "." in check["name"] else check["name"]}</span>
+            >{{ mark_safe("<span class='text-admin-muted-foreground'>" + check["name"].split(".", 1)[0] + ".</span>" + check["name"].split(".", 1)[1]) if "." in check["name"] else check["name"] }}</span>
             <span
-                data-status={check["status"]}
+                data-status={{ check["status"] }}
                 class="font-mono text-xs tabular-nums text-right data-[status=error]:text-admin-danger data-[status=warning]:text-admin-warning"
             >
-                {len(check["issues"])} {"error" if check["status"] == "error" else "warning"}{"s" if len(check["issues"]) != 1 else ""}
+                {{ len(check["issues"]) }} {{ "error" if check["status"] == "error" else "warning" }}{{ "s" if len(check["issues"]) != 1 else "" }}
             </span>
         </div>
-            <dl class="pt-1 pb-3 pl-4 space-y-2.5 text-sm">
-                <div :for={issue in check["issues"]} class="space-y-1">
-                    <dt
-                        data-warning={issue["warning"]}
-                        class="font-mono text-xs tabular-nums data-[warning=True]:text-admin-warning data-[warning=False]:text-admin-danger"
-                    >{mark_safe("<span class='text-admin-muted-foreground'>" + issue["id"].split(".", 1)[0] + ".</span>" + issue["id"].split(".", 1)[1]) if "." in issue["id"] else issue["id"]}</dt>
-                    <dd class="max-w-prose text-admin-foreground leading-relaxed">{issue["fix"]}</dd>
-                </div>
-            </dl>
-        </li>
-    </template>
-</ul>
-</template>
-
-<div :if={not checks} class="border-t border-admin-border py-10 text-center">
-    <p class="text-sm text-admin-muted-foreground">No preflight checks registered</p>
-</div>
+                        <dl class="pt-1 pb-3 pl-4 space-y-2.5 text-sm">
+                            {% for issue in check["issues"] %}
+                                <div class="space-y-1">
+                                    <dt
+                                        data-warning={{ issue["warning"] }}
+                                        class="font-mono text-xs tabular-nums data-[warning=True]:text-admin-warning data-[warning=False]:text-admin-danger"
+                                    >{{ mark_safe("<span class='text-admin-muted-foreground'>" + issue["id"].split(".", 1)[0] + ".</span>" + issue["id"].split(".", 1)[1]) if "." in issue["id"] else issue["id"] }}</dt>
+                                    <dd
+                                        class="max-w-prose text-admin-foreground leading-relaxed"
+                                    >{{ issue["fix"] }}</dd>
+                                </div>
+                            {% endfor %}
+                        </dl>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    {% endif %}
+    {% if not checks %}
+        <div class="border-t border-admin-border py-10 text-center">
+            <p class="text-sm text-admin-muted-foreground">No preflight checks registered</p>
+        </div>
+    {% endif %}
 </Base>

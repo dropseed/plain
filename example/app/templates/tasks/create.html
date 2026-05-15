@@ -9,13 +9,13 @@ attrs:
   form: Any
 ---
 <Base>
-<template :slot="title">New task</template>
-<div class="max-w-2xl mx-auto px-5 py-12">
-    <BackLink href={url('tasks:list')} label="Back to tasks" />
-    <h1 class="page-h1">New task</h1>
-    <form method="post" class="mt-6 flex flex-col gap-5">
-        <TaskFormFields form={form} />
+    {% slot "title" %}New task{% endslot %}
+    <div class="max-w-2xl mx-auto px-5 py-12">
+        <BackLink href={{ url('tasks:list') }} label="Back to tasks" />
+        <h1 class="page-h1">New task</h1>
+        <form method="post" class="mt-6 flex flex-col gap-5">
+        <TaskFormFields form={{ form }} />
         <button type="submit" class="btn-primary self-start">Create</button>
     </form>
-</div>
+    </div>
 </Base>

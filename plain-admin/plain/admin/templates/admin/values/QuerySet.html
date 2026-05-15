@@ -6,6 +6,8 @@ attrs:
   field: Any = None
   object: Any = None
 ---
-<div :for={item in value}>
-    <Model value={item} />
-</div>
+{% for item in value %}
+    <div>
+        <Model value={{ item }} />
+    </div>
+{% endfor %}

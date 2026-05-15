@@ -11,15 +11,20 @@ attrs:
   note: app.notes.models.Note
 ---
 <Base>
-<template :slot="title">Edit {note.title}</template>
-<div class="max-w-2xl mx-auto px-5 py-12">
-    <BackLink href={url('notes:detail', id=note.id)} label="Back to note" />
-    <h1 class="page-h1">Edit note</h1>
-    <form method="post" class="mt-6 flex flex-col gap-5">
-        <NonfieldErrors form={form} />
-        <Field bf={form.title} label="Title" autofocus={True} required={True} />
-        <Field bf={form.body} label="Body" type="textarea" min_height="200px" />
+    {% slot "title" %}Edit {{ note.title }}{% endslot %}
+    <div class="max-w-2xl mx-auto px-5 py-12">
+        <BackLink href={{ url('notes:detail', id=note.id) }} label="Back to note" />
+        <h1 class="page-h1">Edit note</h1>
+        <form method="post" class="mt-6 flex flex-col gap-5">
+        <NonfieldErrors form={{ form }} />
+        <Field
+            bf={{ form.title }}
+            label="Title"
+            autofocus={{ True }}
+            required={{ True }}
+        />
+        <Field bf={{ form.body }} label="Body" type="textarea" min_height="200px" />
         <button type="submit" class="btn-primary self-start">Save</button>
     </form>
-</div>
+    </div>
 </Base>

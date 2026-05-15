@@ -8,10 +8,10 @@ attrs:
 ---
 <html>
     <head>
-        {tailwind_css()}
-        <script src={asset('support/iframe.js')} nonce={request.csp_nonce}></script>
+        {{ tailwind_css() }}
+        <script src={{ asset('support/iframe.js') }} nonce={{ request.csp_nonce }}></script>
     </head>
     <body>
-        {panel}
+        {{ panel }}
     </body>
 </html>

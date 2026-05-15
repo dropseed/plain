@@ -4,7 +4,6 @@ attrs:
 slots:
   default: required
 ---
-<label for={field.html_id} class="admin-label w-full">
-    {children}
-    <span :if={field.field.required} class="text-admin-danger">*</span>
-</label>
+<label for={{ field.html_id }} class="admin-label w-full">
+    {{ children }}
+    {% if field.field.required %}<span class="text-admin-danger">*</span>{% endif %}</label>

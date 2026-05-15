@@ -6,8 +6,8 @@ attrs:
   request: plain.http.Request = None
 ---
 <script
-    src={asset('pageviews/pageviews.js')}
-    data-track-url={pageviews_track_url}
+    src={{ asset('pageviews/pageviews.js') }}
+    data-track-url={{ pageviews_track_url }}
     async
-    nonce={request.csp_nonce}
+    nonce={{ request.csp_nonce }}
 ></script>

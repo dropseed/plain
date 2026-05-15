@@ -11,8 +11,10 @@ attrs:
   help: str = ""
 ---
 <div class="space-y-1">
-    <Label field={field}>{label}</Label>
-    <Input field={field} type={type} />
-    <Help :if={help} help={help} />
-    <FieldErrors field={field} />
+    <Label field={{ field }}>{{ label }}</Label>
+    <Input field={{ field }} type={{ type }} />
+    {% if help %}
+        <Help help={{ help }} />
+    {% endif %}
+    <FieldErrors field={{ field }} />
 </div>

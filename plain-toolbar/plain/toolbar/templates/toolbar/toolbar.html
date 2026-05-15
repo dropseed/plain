@@ -5,8 +5,8 @@ attrs:
   toolbar: Any
   request: plain.http.Request = None
 ---
-<template :if={toolbar.should_render()}>
-    <script defer src={asset('toolbar/toolbar.js')} nonce={request.csp_nonce}></script>
+{% if toolbar.should_render() %}
+    <script defer src={{ asset('toolbar/toolbar.js') }} nonce={{ request.csp_nonce }}></script>
     <div
         id="plaintoolbar"
         class="print:hidden text-stone-300 fixed bottom-0 w-full z-50 flex flex-col"
@@ -21,15 +21,14 @@ attrs:
                     id="plaintoolbar-tabs"
                     class="flex flex-grow overflow-x-auto scrollbar-none"
                 >
-                <template :for={(i, item) in enumerate(toolbar.get_items())}>
-                <button
-                    :if={item.name and item.panel_template_name}
-                    data-active={i == 0}
-                    data-toolbar-tab={item.name}
-                    class="data-active:border-yellow-500 px-3 sm:px-4 py-3 sm:py-2.5 -mb-px cursor-pointer border-b-2 border-transparent hover:border-yellow-600 whitespace-nowrap text-sm"
-                    type="button"
-                >{item.name}</button>
-                </template>
+                {% for (i, item) in enumerate(toolbar.get_items()) %}
+                    {% if item.name and item.panel_template_name %}<button
+                        data-active={{ i == 0 }}
+                        data-toolbar-tab={{ item.name }}
+                        class="data-active:border-yellow-500 px-3 sm:px-4 py-3 sm:py-2.5 -mb-px cursor-pointer border-b-2 border-transparent hover:border-yellow-600 whitespace-nowrap text-sm"
+                        type="button"
+                    >{{ item.name }}</button>{% endif %}
+                {% endfor %}
                 <button
                     data-plaintoolbar-expand
                     class="flex-grow cursor-pointer inline-flex h-full min-w-[2rem]"
@@ -90,16 +89,17 @@ attrs:
             ></div>
             {# Panel content - taller on mobile for better usability #}
             <div class="overflow-auto h-[50vh] sm:h-[30vh] flex flex-col">
-            <template :for={(i, item) in enumerate(toolbar.get_items())}>
-                <div
-                    :if={item.name and item.panel_template_name}
-                    data-toolbar-tab={item.name}
-                    class={["h-full", "hidden" if i > 0 else None]}
-                >
-                {item.render_panel()}
+                {% for (i, item) in enumerate(toolbar.get_items()) %}
+                    {% if item.name and item.panel_template_name %}
+                        <div
+                            data-toolbar-tab={{ item.name }}
+                            class={{ ["h-full", "hidden" if i > 0 else None] }}
+                        >
+                {{ item.render_panel() }}
             </div>
-            </template>
-        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
         </div>
         {# Bottom bar: floating pill on mobile, full-width on desktop #}
         <div
@@ -113,13 +113,13 @@ attrs:
         {# Version: selectable text on desktop, tappable toggle on mobile #}
         <span
             class="hidden sm:flex items-center flex-shrink-0 whitespace-nowrap select-all"
-        >{toolbar.version}</span>
+        >{{ toolbar.version }}</span>
         <button
             id="plaintoolbar-mobile-toggle"
             class="flex sm:hidden items-center flex-shrink-0 cursor-pointer whitespace-nowrap"
             type="button"
         >
-            {toolbar.version}
+            {{ toolbar.version }}
         </button>
         <button
             type="button"
@@ -131,9 +131,9 @@ attrs:
                 class="flex items-center gap-3 transition-all min-w-0 [&>button]:max-w-[200px] sm:[&>button]:max-w-none"
             >
 
-                <template :for={item in toolbar.get_items()}>
-                <template :if={item.button_template_name}>{item.render_button()}</template>
-                </template>
+                {% for item in toolbar.get_items() %}
+                {% if item.button_template_name %}{{ item.render_button() }}{% endif %}
+            {% endfor %}
 
                 <button
                     data-plaintoolbar-expand
@@ -180,4 +180,4 @@ attrs:
         </div>
     </div>
     </div>
-</template>
+{% endif %}

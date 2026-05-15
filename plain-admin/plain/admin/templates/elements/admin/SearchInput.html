@@ -11,16 +11,16 @@ attrs:
   wrapper_class: str = ""
   autofocus: bool = False
 ---
-<label :if={id} for={id} class="sr-only">{label}</label>
-<div class={["relative", wrapper_class]}>
+{% if id %}<label for={{ id }} class="sr-only">{{ label }}</label>{% endif %}
+<div class={{ ["relative", wrapper_class] }}>
     <input
         type="text"
-        name={name or None}
-        id={id or None}
-        value={value or None}
-        placeholder={placeholder}
-        class={class_ or "admin-input pl-8"}
-        autofocus={autofocus}
+        name={{ name or None }}
+        id={{ id or None }}
+        value={{ value or None }}
+        placeholder={{ placeholder }}
+        class={{ class_ or "admin-input pl-8" }}
+        autofocus={{ autofocus }}
     >
     <Icon
         name="search"

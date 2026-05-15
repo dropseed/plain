@@ -8,45 +8,40 @@ attrs:
     class="text-sm grid grid-cols-1 sm:grid-cols-[max-content_1fr] sm:gap-y-2 gap-x-8 px-6 py-4"
 >
     <dt>Request ID</dt>
-    <dd class="text-sm text-white/50">{request.unique_id}</dd>
-
+    <dd class="text-sm text-white/50">{{ request.unique_id }}</dd>
     <dt>Query params</dt>
-    <dd class="text-sm text-white/50">{request.query_params}</dd>
-
+    <dd class="text-sm text-white/50">{{ request.query_params }}</dd>
     <dt>Method</dt>
-    <dd class="text-sm text-white/50">{request.method}</dd>
-
-    <template :if={request.resolver_match}>
+    <dd class="text-sm text-white/50">{{ request.method }}</dd>
+    {% if request.resolver_match %}
         <dt>View</dt>
-        <dd class="text-sm text-white/50">{request.resolver_match.view_class}</dd>
+        <dd class="text-sm text-white/50">{{ request.resolver_match.view_class }}</dd>
         <dt>URL pattern</dt>
         <dd class="text-sm text-white/50">
-            <pre><code>"{request.resolver_match.route}"</code></pre>
+            <pre><code>"{{ request.resolver_match.route }}"</code></pre>
         </dd>
         <dt>URL name</dt>
         <dd class="text-sm text-white/50">
-            <pre><code>"{request.resolver_match.namespaced_url_name}"</code></pre>
+            <pre><code>"{{ request.resolver_match.namespaced_url_name }}"</code></pre>
         </dd>
         <dt>URL kwargs</dt>
         <dd class="text-sm text-white/50">
-            <pre><code>{request.resolver_match.kwargs}</code></pre>
+            <pre><code>{{ request.resolver_match.kwargs }}</code></pre>
         </dd>
-    </template>
-
-    <template :if={template_names}>
+    {% endif %}
+    {% if template_names %}
         <dt>Template names</dt>
         <dd class="text-sm text-white/50">
-            <pre><code>{template_names}</code></pre>
+            <pre><code>{{ template_names }}</code></pre>
         </dd>
-    </template>
-
-    <template :if={object}>
+    {% endif %}
+    {% if object %}
         <dt>Primary object</dt>
         <dd
             class="text-sm text-white/50 inline-flex items-center"
-            title={"ID: " + str(getattr(object, "id", "unknown"))}
+            title={{ "ID: " + str(getattr(object, "id", "unknown")) }}
         >
-            <pre><code>{object.__repr__()}</code></pre>
+            <pre><code>{{ object.__repr__() }}</code></pre>
         </dd>
-    </template>
+    {% endif %}
 </dl>

@@ -12,25 +12,21 @@ attrs:
 <div class="inline-flex items-center gap-px">
 
     {# Record dot — separate clickable circle, tight against the pill #}
-    <button
-        :if={observer.is_summarizing() or observer.is_persist_once()}
-        type="button"
-        class="inline-flex items-center justify-center cursor-pointer rounded-full px-1.5 py-px bg-white/8 text-white/30 hover:text-red-400 hover:bg-white/12 transition-colors self-stretch"
-        data-observer-record-page
-        title="Record this page"
-    >
+    {% if observer.is_summarizing() or observer.is_persist_once() %}<button
+    type="button"
+    class="inline-flex items-center justify-center cursor-pointer rounded-full px-1.5 py-px bg-white/8 text-white/30 hover:text-red-400 hover:bg-white/12 transition-colors self-stretch"
+    data-observer-record-page
+    title="Record this page"
+>
         <svg class="size-1.5" viewBox="0 0 16 16" fill="currentColor">
             <circle cx="8" cy="8" r="8" />
         </svg>
-    </button>
-
-    {# Request pill — observer state + request stats, clickable to open Observer panel #}
-    <button
-        type="button"
-        class="inline-flex items-center cursor-pointer text-xs rounded-full px-1 py-px bg-white/8 text-white/80 hover:bg-white/12 overflow-hidden divide-x divide-white/10 [&>span]:px-1.5"
-        data-toolbar-tab="Observer"
-    >
-        <span :if={observer.is_recording_session()} class="inline-flex items-center">
+    </button>{% endif %}<button
+    type="button"
+    class="inline-flex items-center cursor-pointer text-xs rounded-full px-1 py-px bg-white/8 text-white/80 hover:bg-white/12 overflow-hidden divide-x divide-white/10 [&>span]:px-1.5"
+    data-toolbar-tab="Observer"
+>
+        {% if observer.is_recording_session() %}<span class="inline-flex items-center">
             <span class="relative inline-flex size-1.5 mr-1.5 flex-shrink-0">
                 <span
                     class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"
@@ -38,86 +34,71 @@ attrs:
                 <span class="relative inline-flex size-1.5 rounded-full bg-red-500"></span>
             </span>
             <span class="text-[11px]">Recording</span>
-        </span>
-        <span
-            :if={not observer.is_recording_session() and not observer.is_enabled()}
-            class="inline-flex items-center gap-1.5"
-        >
+        </span>{% endif %}{% if not observer.is_recording_session() and not observer.is_enabled() %}<span class="inline-flex items-center gap-1.5">
             <span class="rounded-full bg-zinc-500 size-1.5 flex-shrink-0"></span>
             <span class="text-[11px]">Disabled</span>
-        </span>
-
-        <template :if={trace_stats}>
+        </span>{% endif %}{% if trace_stats %}
             <span
-                class="text-[11px] text-white/50
+    class="text-[11px] text-white/50
                        data-[level=warn]:text-amber-400
                        data-[level=danger]:text-red-400"
-                title="SQL queries"
-                data-level={trace_stats["query_level"] if trace_stats["query_level"] != "ok" else None}
-            >{trace_stats["query_count"]}{("+" + str(trace_stats["duplicate_count"])) if trace_stats["duplicate_count"] else ""} {"query" if trace_stats["query_count"] == 1 else "queries"}</span>
-            <span
-                :if={trace_stats["duration_display"]}
-                class="text-[11px] text-white/50
+    title="SQL queries"
+    data-level={{ trace_stats["query_level"] if trace_stats["query_level"] != "ok" else None }}
+>{{ trace_stats["query_count"] }}{{ ("+" + str(trace_stats["duplicate_count"])) if trace_stats["duplicate_count"] else "" }} {{ "query" if trace_stats["query_count"] == 1 else "queries" }}</span>
+            {% if trace_stats["duration_display"] %}<span
+    class="text-[11px] text-white/50
                        data-[level=warn]:text-amber-400
                        data-[level=danger]:text-red-400"
-                title="Request duration"
-                data-level={trace_stats["duration_level"] if trace_stats["duration_level"] != "ok" else None}
-            >{trace_stats["duration_display"]}</span>
-        </template>
-
-        <span
-            data-observer-response-size
-            class="hidden text-[11px] text-white/50
+    title="Request duration"
+    data-level={{ trace_stats["duration_level"] if trace_stats["duration_level"] != "ok" else None }}
+>{{ trace_stats["duration_display"] }}</span>{% endif %}{% endif %}<span
+    data-observer-response-size
+    class="hidden text-[11px] text-white/50
                    data-[level=warn]:text-amber-400
                    data-[level=danger]:text-red-400"
-            title="Response body size"
-            data-observer-response-size-value
-        ></span>
+    title="Response body size"
+    data-observer-response-size-value
+></span>
     </button>
 
     {# System pill — CPU and memory, non-interactive #}
-    <span
-        :if={system_stats}
-        class="inline-flex items-center text-xs rounded-full px-1 py-px bg-white/8 overflow-hidden divide-x divide-white/10 [&>span]:px-1.5"
+    {% if system_stats %}<span
+    class="inline-flex items-center text-xs rounded-full px-1 py-px bg-white/8 overflow-hidden divide-x divide-white/10 [&>span]:px-1.5"
+>
+    {% if "cpu_percent" in system_stats %}<span
+        class="items-baseline text-[11px] tabular-nums"
+        title="Server process CPU usage"
     >
-        <span
-            :if={"cpu_percent" in system_stats}
-            class="items-baseline text-[11px] tabular-nums"
-            title="Server process CPU usage"
-        >
             <span class="text-[9px] text-white/30 mr-0.5">CPU</span>
             <span
                 class="text-white/50
                        data-[level=warn]:text-amber-400
                        data-[level=danger]:text-red-400"
-                data-level={system_stats["cpu_level"] if system_stats["cpu_level"] != "ok" else None}
-            >{system_stats["cpu_percent"]}%</span>
-        </span>
-        <span
-            :if={system_stats["mem_display"]}
-            class="items-baseline text-[11px] tabular-nums"
-            title={system_stats["mem_title"]}
-        >
+                data-level={{ system_stats["cpu_level"] if system_stats["cpu_level"] != "ok" else None }}
+            >{{ system_stats["cpu_percent"] }}%</span>
+        </span>{% endif %}
+    {% if system_stats["mem_display"] %}<span
+        class="items-baseline text-[11px] tabular-nums"
+        title={{ system_stats["mem_title"] }}
+    >
             <span class="text-[9px] text-white/30 mr-0.5">MEM</span>
             <span
                 class="text-white/50
                        data-[level=warn]:text-amber-400
                        data-[level=danger]:text-red-400"
-                data-level={system_stats["mem_level"] if system_stats["mem_level"] != "ok" else None}
-            >{system_stats["mem_display"]}</span>
-        </span>
-    </span>
-
-</div>
+                data-level={{ system_stats["mem_level"] if system_stats["mem_level"] != "ok" else None }}
+            >{{ system_stats["mem_display"] }}</span>
+        </span>{% endif %}
+</span>{% endif %}</div>
 {# Carrier element exposes server-side values to the inline JS via data attrs
    (CSP-safe: script body is opaque, no expression interpolation). #}
 <div
     data-observer-button-config
-    data-traces-url={url('observer:traces')}
-    data-persist-once={"true" if observer.is_persist_once() else "false"}
+    data-traces-url={{ url('observer:traces') }}
+    data-persist-once={{ "true" if observer.is_persist_once() else "false" }}
     hidden
 ></div>
-<script nonce={request.csp_nonce}>
+<script nonce={{ request.csp_nonce }}>
 (function() {
     var config = document.querySelector("[data-observer-button-config]");
     var tracesUrl = config ? config.dataset.tracesUrl : "";

@@ -13,39 +13,55 @@ attrs:
   footers: list = []
 ---
 <Base
-    slug={slug}
-    title={title}
-    description={description}
-    size={size}
-    filters={filters}
-    current_filter={current_filter}
+    slug={{ slug }}
+    title={{ title }}
+    description={{ description }}
+    size={{ size }}
+    filters={{ filters }}
+    current_filter={{ current_filter }}
 >
     <div class="overflow-x-auto -mx-6">
         <table
             class="admin-table w-full [&_th]:px-6 [&_td]:px-6 [&_th]:text-xs [&_th]:font-medium [&_th]:text-admin-muted-foreground"
         >
-            <thead :if={headers}>
-                <tr>
-                    <th :for={header in headers}>{header}</th>
-                </tr>
-            </thead>
+            {% if headers %}
+                <thead>
+                    <tr>
+                        {% for header in headers %}
+                            <th>{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+            {% endif %}
             <tbody>
-                <tr :for={row in rows}>
-                    <td :for={cell in row}>{cell}</td>
-                </tr>
+                {% for row in rows %}
+                    <tr>
+                        {% for cell in row %}
+                            <td>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
             </tbody>
-            <tfoot :if={footers}>
-          <template :if={footers and isinstance(footers[0], (list, tuple))}>
-              <tr :for={footer_row in footers}>
-                  <td :for={cell in footer_row}>{cell}</td>
-              </tr>
-          </template>
-          <template :if={footers and not isinstance(footers[0], (list, tuple))}>
-              <tr>
-                  <td :for={footer in footers}>{footer}</td>
-              </tr>
-          </template>
-        </tfoot>
+            {% if footers %}
+                <tfoot>
+                    {% if footers and isinstance(footers[0], (list, tuple)) %}
+                        {% for footer_row in footers %}
+                            <tr>
+                                {% for cell in footer_row %}
+                                    <td>{{ cell }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    {% endif %}
+                    {% if footers and not isinstance(footers[0], (list, tuple)) %}
+                        <tr>
+                            {% for footer in footers %}
+                                <td>{{ footer }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endif %}
+                </tfoot>
+            {% endif %}
         </table>
     </div>
 </Base>

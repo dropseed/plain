@@ -14,15 +14,15 @@ attrs:
     class="my-3 rounded-admin-lg border border-admin-border bg-admin-card text-admin-card-foreground"
 >
     <div class="p-6 flex flex-wrap items-center gap-3 border-b border-admin-border">
-        {mark_safe(markup)}
+        {{ mark_safe(markup) }}
     </div>
     <details class="group">
         <summary
             class="cursor-pointer select-none px-4 py-2 text-xs text-admin-muted-foreground hover:text-admin-foreground flex items-center gap-2"
         >
             <Icon name="code-slash" />
-            <span>Show markup{" — " + caption if caption else ""}</span>
+            <span>Show markup{{ " — " + caption if caption else "" }}</span>
         </summary>
-        <pre class="m-0! rounded-none! border-none! text-xs"><code>{markup}</code></pre>
+        <pre class="m-0! rounded-none! border-none! text-xs"><code>{{ markup }}</code></pre>
     </details>
 </figure>

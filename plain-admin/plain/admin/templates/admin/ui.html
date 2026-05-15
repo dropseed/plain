@@ -33,20 +33,19 @@ attrs:
    in the inline init script highlights the current section as the user
    scrolls. #}
 <Base
-    title={title}
-    app_name={app_name}
-    admin_force_theme={admin_force_theme}
-    description={description}
-    image={image}
-    links={links}
-    extra_links={extra_links}
-    parent_view_classes={parent_view_classes}
-    object={object}
-    cards={cards}
+    title={{ title }}
+    app_name={{ app_name }}
+    admin_force_theme={{ admin_force_theme }}
+    description={{ description }}
+    image={{ image }}
+    links={{ links }}
+    extra_links={{ extra_links }}
+    parent_view_classes={{ parent_view_classes }}
+    object={{ object }}
+    cards={{ cards }}
 >
-
-<template :slot="header_scripts">
-    <script nonce={request.csp_nonce}>
+    {% slot "header_scripts" %}
+        <script nonce={{ request.csp_nonce }}>
 /* Sticky side-nav active-section highlight: as the user scrolls, mark the
    TOC link for the section currently in view. Pure navigation aid — no
    styling state lives in JS. */
@@ -107,24 +106,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 </script>
-</template>
-
-<div class="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-x-8">
-    <div class="min-w-0 max-w-3xl pb-24">
-        <p class="text-sm text-admin-muted-foreground mb-6">
+    {% endslot %}
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-x-8">
+        <div class="min-w-0 max-w-3xl pb-24">
+            <p class="text-sm text-admin-muted-foreground mb-6">
         Reference for the design tokens shipped with the admin and
         copy-pasteable markup for every UI primitive.
     </p>
-        {# Compact TOC for small screens (large screens get the sticky side nav on the right). #}
-        <nav
-            class="lg:hidden rounded-admin-lg border border-admin-border bg-admin-muted/30 p-4 mb-8"
-        >
-            <p
-                class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground mb-3"
-            >On this page</p>
-            <div class="space-y-3 text-sm">
-                <div
-                    :for={(group_title, items) in [
+            {# Compact TOC for small screens (large screens get the sticky side nav on the right). #}
+            <nav
+                class="lg:hidden rounded-admin-lg border border-admin-border bg-admin-muted/30 p-4 mb-8"
+            >
+                <p
+                    class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground mb-3"
+                >On this page</p>
+                <div class="space-y-3 text-sm">
+                    {% for (group_title, items) in [
                 ("Theme", [("customizing", "Customizing"), ("beyond-tokens", "Beyond tokens"), ("dark-mode", "Dark mode"), ("typography", "Typography")]),
                 ("Tokens", [("tokens-surface", "Surface tokens"), ("tokens-action", "Action tokens"), ("tokens-status", "Status tokens"), ("tokens-header", "Header tokens"), ("tokens-sizing", "Sizing tokens")]),
                 ("Content", [("prose", "Prose"), ("icons", "Icons"), ("kbd", "Keyboard hints")]),
@@ -135,82 +132,83 @@ document.addEventListener("DOMContentLoaded", () => {
                 ("Overlays", [("dialogs", "Dialogs"), ("popovers", "Popovers"), ("dropdowns", "Dropdowns"), ("tooltips", "Tooltips"), ("hovercards", "Hovercards")]),
                 ("Disclosure", [("tabs", "Tabs"), ("segmented", "Segmented control"), ("collapsible", "Collapsible")]),
                 ("Behaviors", [("behaviors", "Data attributes")])
-            ]}
-                >
-                    <p
-                        class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground/70 mb-1"
-                    >{group_title}</p>
-                    <div
-                        class="grid grid-cols-2 gap-x-4 gap-y-0.5 [&>a]:text-admin-link [&>a:hover]:text-admin-link-hover"
-                    >
-                    <a :for={(id, title) in items} href={"#" + id}>{title}</a>
+            ] %}
+                        <div>
+                            <p
+                                class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground/70 mb-1"
+                            >{{ group_title }}</p>
+                            <div
+                                class="grid grid-cols-2 gap-x-4 gap-y-0.5 [&>a]:text-admin-link [&>a:hover]:text-admin-link-hover"
+                            >
+                                {% for (id, title) in items %}<a href={{ "#" + id }}>{{ title }}</a>{% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
                 </div>
-                </div>
-            </div>
-        </nav>
-        {# ====================================================================== #}
-        {# Theme                                                                  #}
-        {# ====================================================================== #}
-        <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Theme</h2>
-        <UiSection
-            id="customizing"
-            title="Customizing the admin"
-            blurb="Plain's admin is themeable through CSS variables. Override tokens in your own stylesheet — no need to fork templates."
-        >
-            <p class="text-sm mb-3">
+            </nav>
+            {# ====================================================================== #}
+            {# Theme                                                                  #}
+            {# ====================================================================== #}
+            <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Theme</h2>
+            <UiSection
+                id="customizing"
+                title="Customizing the admin"
+                blurb="Plain's admin is themeable through CSS variables. Override tokens in your own stylesheet — no need to fork templates."
+            >
+                <p class="text-sm mb-3">
     The design system has three layers, loaded in order:
 </p>
-            <ol class="list-decimal list-inside text-sm space-y-1 mb-4">
-                <li><strong>Tailwind v4</strong> — utility classes</li>
-                <li><strong><code>styles/tokens.css</code></strong> — design tokens, scoped to <code>.plain-admin</code></li>
-                <li><strong><code>styles/components/*.css</code></strong> — component primitives, wrapped in <code>@scope&nbsp;(.plain-admin)</code></li>
-            </ol>
-            <p class="text-sm mb-3">
+                <ol class="list-decimal list-inside text-sm space-y-1 mb-4">
+                    <li><strong>Tailwind v4</strong> — utility classes</li>
+                    <li><strong><code>styles/tokens.css</code></strong> — design tokens, scoped to <code>.plain-admin</code></li>
+                    <li><strong><code>styles/components/*.css</code></strong> — component primitives, wrapped in <code>@scope&nbsp;(.plain-admin)</code></li>
+                </ol>
+                <p class="text-sm mb-3">
     Override any token in your own stylesheet, loaded after the admin's
     Tailwind output. Example — swap the primary action color to indigo:
 </p>
-            <pre><code>/* app/static/admin-overrides.css */
-.plain-admin {{
+                <pre><code>/* app/static/admin-overrides.css */
+.plain-admin {
   --primary: #4f46e5;        /* indigo-600 */
   --primary-foreground: white;
   --ring: #4f46e5;
-}}
+}
 .dark.plain-admin,
-.dark .plain-admin {{
+.dark .plain-admin {
   --primary: #818cf8;        /* indigo-400 */
   --primary-foreground: #1e1b4b;
-}}</code></pre>
-            <p class="text-sm mt-3">
+}</code></pre>
+                <p class="text-sm mt-3">
     Every <code>.btn-primary</code> and focus ring in the admin will pick
     that up — no template changes required.
 </p>
-        </UiSection>
-        <UiSection
-            id="beyond-tokens"
-            title="Beyond tokens"
-            blurb="When a token swap doesn't cover what you need, override the `.admin-*` classes directly in your stylesheet. They're treated as a stable surface — every class shown on this page can be overridden. The admin's component rules live in `@layer components`, so unlayered declarations in your stylesheet beat them automatically."
-        >
-            <pre><code>/* tailwind.css */
-.admin-card {{
+            </UiSection>
+            <UiSection
+                id="beyond-tokens"
+                title="Beyond tokens"
+                blurb="When a token swap doesn't cover what you need, override the `.admin-*` classes directly in your stylesheet. They're treated as a stable surface — every class shown on this page can be overridden. The admin's component rules live in `@layer components`, so unlayered declarations in your stylesheet beat them automatically."
+            >
+                <pre><code>/* tailwind.css */
+.admin-card {
   border-width: 2px;
   box-shadow: 0 1px 0 var(--border) inset;
-}}
+}
 
-.admin-btn-primary {{
+.admin-btn-primary {
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}}</code></pre>
-            <p class="text-sm mt-3">
+}</code></pre>
+                <p class="text-sm mt-3">
     Forking templates remains as an escape hatch but should be the last resort —
     you take on keeping the fork in sync as the admin evolves.
 </p>
-        </UiSection>
-        <UiSection
-            id="dark-mode"
-            title="Dark mode"
-            blurb='The admin ships with a built-in theme menu in the top-right with Light, Dark, and System options. The choice is stored in localStorage; `.dark` is set on `<html>`; the no-flash init in base.html resolves before paint. Wire your own picker by adding `data-theme-set="light|dark|system"` to any element.'
-        >
-            <div class="flex gap-2">
+            </UiSection>
+            <UiSection
+                id="dark-mode"
+                title="Dark mode"
+                blurb='The admin ships with a built-in theme menu in the top-right with Light, Dark, and System options. The choice is stored in localStorage; `.dark` is set on `<html>`; the no-flash init in base.html resolves before paint. Wire your own picker by adding `data-theme-set="light|dark|system"` to any element.'
+            >
+                <div class="flex gap-2">
     <button
         type="button"
         data-theme-set="light"
@@ -233,16 +231,16 @@ document.addEventListener("DOMContentLoaded", () => {
         <Icon name="display" /> System
     </button>
 </div>
-        </UiSection>
-        <UiSection
-            id="typography"
-            title="Typography"
-            blurb="Defaults: Inter (sans) and JetBrains Mono (mono), both vendored under `assets/admin/fonts/`. Override `--font-sans` / `--font-mono` on `.plain-admin` to retheme — Tailwind's `font-sans` / `font-mono` utilities pick those up automatically. To swap or drop the bundled `@font-face` declarations, shadow `admin/base.html` in your app (extending `admin/_base.html`) and override the `admin_fonts` block."
-        >
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-                <div
-                    class="rounded-admin-md border border-admin-border p-2 flex items-center gap-3"
-                >
+            </UiSection>
+            <UiSection
+                id="typography"
+                title="Typography"
+                blurb="Defaults: Inter (sans) and JetBrains Mono (mono), both vendored under `assets/admin/fonts/`. Override `--font-sans` / `--font-mono` on `.plain-admin` to retheme — Tailwind's `font-sans` / `font-mono` utilities pick those up automatically. To swap or drop the bundled `@font-face` declarations, shadow `admin/base.html` in your app (extending `admin/_base.html`) and override the `admin_fonts` block."
+            >
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                    <div
+                        class="rounded-admin-md border border-admin-border p-2 flex items-center gap-3"
+                    >
         <span class="font-sans text-base shrink-0 px-2">Sans Mlw 0Oo</span>
         <div class="min-w-0 flex-1">
             <code class="text-xs text-admin-muted-foreground block truncate">--font-sans</code>
@@ -252,9 +250,9 @@ document.addEventListener("DOMContentLoaded", () => {
             ></code>
         </div>
     </div>
-                <div
-                    class="rounded-admin-md border border-admin-border p-2 flex items-center gap-3"
-                >
+                    <div
+                        class="rounded-admin-md border border-admin-border p-2 flex items-center gap-3"
+                    >
         <span class="font-mono text-base shrink-0 px-2">Mono Mlw 0Oo</span>
         <div class="min-w-0 flex-1">
             <code class="text-xs text-admin-muted-foreground block truncate">--font-mono</code>
@@ -264,27 +262,27 @@ document.addEventListener("DOMContentLoaded", () => {
             ></code>
         </div>
     </div>
-            </div>
-            <div class="space-y-2">
-                <h1 class="text-3xl font-bold">Heading 1 — page title</h1>
-                <h2 class="text-2xl font-semibold">Heading 2 — section</h2>
-                <h3 class="text-lg font-semibold">Heading 3 — subsection</h3>
-                <p class="text-base">Body text. The quick brown fox jumps over the lazy dog.</p>
-                <p class="text-sm text-admin-muted-foreground">Muted helper text — used for secondary information.</p>
-                <p class="text-xs text-admin-muted-foreground">Tiny text — labels, metadata, timestamps.</p>
-            </div>
-        </UiSection>
-        {# ====================================================================== #}
-        {# Tokens                                                                 #}
-        {# ====================================================================== #}
-        <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Tokens</h2>
-        <UiSection
-            id="tokens-surface"
-            title="Surface tokens"
-            blurb="The neutral palette: page backgrounds, muted/accent surfaces, borders. Component-scoped surfaces (`--card`, `--popover`, chart) live in their respective component sections below."
-        >
-            <UiSwatchGrid
-                swatches={[
+                </div>
+                <div class="space-y-2">
+                    <h1 class="text-3xl font-bold">Heading 1 — page title</h1>
+                    <h2 class="text-2xl font-semibold">Heading 2 — section</h2>
+                    <h3 class="text-lg font-semibold">Heading 3 — subsection</h3>
+                    <p class="text-base">Body text. The quick brown fox jumps over the lazy dog.</p>
+                    <p class="text-sm text-admin-muted-foreground">Muted helper text — used for secondary information.</p>
+                    <p class="text-xs text-admin-muted-foreground">Tiny text — labels, metadata, timestamps.</p>
+                </div>
+            </UiSection>
+            {# ====================================================================== #}
+            {# Tokens                                                                 #}
+            {# ====================================================================== #}
+            <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Tokens</h2>
+            <UiSection
+                id="tokens-surface"
+                title="Surface tokens"
+                blurb="The neutral palette: page backgrounds, muted/accent surfaces, borders. Component-scoped surfaces (`--card`, `--popover`, chart) live in their respective component sections below."
+            >
+                <UiSwatchGrid
+                    swatches={{ [
     ("background", "bg-admin-background"),
     ("foreground", "bg-admin-foreground"),
     ("secondary", "bg-admin-secondary"),
@@ -296,29 +294,29 @@ document.addEventListener("DOMContentLoaded", () => {
     ("border", "bg-admin-border"),
     ("input", "bg-admin-input"),
     ("scrollbar-thumb", "bg-[var(--scrollbar-thumb)]")
-]}
-            />
-        </UiSection>
-        <UiSection
-            id="tokens-action"
-            title="Action tokens"
-            blurb="Colors for buttons and focus rings. `--primary` and `--ring` drive `.admin-btn-primary`, focus outlines, and the active-tab indicator. (Danger actions like `.admin-btn-danger` pull from the `--danger` status token below.)"
-        >
-            <UiSwatchGrid
-                swatches={[
+] }}
+                />
+            </UiSection>
+            <UiSection
+                id="tokens-action"
+                title="Action tokens"
+                blurb="Colors for buttons and focus rings. `--primary` and `--ring` drive `.admin-btn-primary`, focus outlines, and the active-tab indicator. (Danger actions like `.admin-btn-danger` pull from the `--danger` status token below.)"
+            >
+                <UiSwatchGrid
+                    swatches={{ [
     ("primary", "bg-admin-primary"),
     ("primary-foreground", "bg-admin-primary-foreground"),
     ("ring", "bg-admin-ring")
-]}
-            />
-        </UiSection>
-        <UiSection
-            id="tokens-status"
-            title="Status tokens"
-            blurb="Status colors exposed as Tailwind utilities (`text-success`, `bg-warning/10`, `border-info`). Used by alerts, badges, preflight, and form validation."
-        >
-            <UiSwatchGrid
-                swatches={[
+] }}
+                />
+            </UiSection>
+            <UiSection
+                id="tokens-status"
+                title="Status tokens"
+                blurb="Status colors exposed as Tailwind utilities (`text-success`, `bg-warning/10`, `border-info`). Used by alerts, badges, preflight, and form validation."
+            >
+                <UiSwatchGrid
+                    swatches={{ [
     ("success", "bg-admin-success"),
     ("success-foreground", "bg-admin-success-foreground"),
     ("warning", "bg-admin-warning"),
@@ -327,417 +325,419 @@ document.addEventListener("DOMContentLoaded", () => {
     ("danger-foreground", "bg-admin-danger-foreground"),
     ("info", "bg-admin-info"),
     ("info-foreground", "bg-admin-info-foreground")
-]}
-            />
-        </UiSection>
-        <UiSection
-            id="tokens-header"
-            title="Header tokens"
-            blurb='The admin&apos;s sticky top header. Plain ships a faint warm tint that&apos;s a hair off the page background — `#f6f3f2` (slightly darker than white) in light mode, and a subtly lighter shade in dark mode. Override `--header-bg` to match your own brand. For full contrast inversion (light page, dark header), add `class="dark"` to the `<header>` element instead — that flips every token via the dark variant.'
-        >
-            <UiSwatchGrid swatches={[
+] }}
+                />
+            </UiSection>
+            <UiSection
+                id="tokens-header"
+                title="Header tokens"
+                blurb='The admin&apos;s sticky top header. Plain ships a faint warm tint that&apos;s a hair off the page background — `#f6f3f2` (slightly darker than white) in light mode, and a subtly lighter shade in dark mode. Override `--header-bg` to match your own brand. For full contrast inversion (light page, dark header), add `class="dark"` to the `<header>` element instead — that flips every token via the dark variant.'
+            >
+                <UiSwatchGrid
+                    swatches={{ [
     ("header-bg", "bg-admin-header-bg")
-]} />
-        </UiSection>
-        <UiSection
-            id="tokens-sizing"
-            title="Sizing tokens"
-            blurb="Default column shows what Plain ships in `tokens.css`. Current column shows the resolved value as the page is currently loaded — overrides on `.plain-admin` flow through."
-        >
-            <p class="text-sm mb-3">
+] }}
+                />
+            </UiSection>
+            <UiSection
+                id="tokens-sizing"
+                title="Sizing tokens"
+                blurb="Default column shows what Plain ships in `tokens.css`. Current column shows the resolved value as the page is currently loaded — overrides on `.plain-admin` flow through."
+            >
+                <p class="text-sm mb-3">
     Each component owns its own <code>--radius-*</code> token. Override one to retune just that
     component, or override <code>--radius</code> (the master) to shift every default proportionally.
 </p>
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Token</th>
-                        <th>Default</th>
-                        <th>Current</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>--radius</code></td>
-                        <td><code>0.5rem</code></td>
-                        <td><code data-token-current="--radius"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-card</code></td>
-                        <td><code>var(--radius)</code></td>
-                        <td><code data-token-current="--radius-card"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-button</code></td>
-                        <td><code>var(--radius)</code></td>
-                        <td><code data-token-current="--radius-button"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-input</code></td>
-                        <td><code>var(--radius)</code></td>
-                        <td><code data-token-current="--radius-input"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-select</code></td>
-                        <td><code>var(--radius)</code></td>
-                        <td><code data-token-current="--radius-select"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-textarea</code></td>
-                        <td><code>var(--radius)</code></td>
-                        <td><code data-token-current="--radius-textarea"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-dialog</code></td>
-                        <td><code>calc(var(--radius) + 2px)</code></td>
-                        <td><code data-token-current="--radius-dialog"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-alert</code></td>
-                        <td><code>var(--radius)</code></td>
-                        <td><code data-token-current="--radius-alert"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-popover</code></td>
-                        <td><code>calc(var(--radius) - 2px)</code></td>
-                        <td><code data-token-current="--radius-popover"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-tooltip</code></td>
-                        <td><code>calc(var(--radius) - 2px)</code></td>
-                        <td><code data-token-current="--radius-tooltip"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-segmented</code></td>
-                        <td><code>var(--radius)</code></td>
-                        <td><code data-token-current="--radius-segmented"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-segmented-item</code></td>
-                        <td><code>calc(var(--radius) - 2px)</code></td>
-                        <td><code data-token-current="--radius-segmented-item"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-dropdown-item</code></td>
-                        <td><code>calc(var(--radius) - 4px)</code></td>
-                        <td><code data-token-current="--radius-dropdown-item"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-kbd</code></td>
-                        <td><code>calc(var(--radius) - 4px)</code></td>
-                        <td><code data-token-current="--radius-kbd"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-checkbox</code></td>
-                        <td><code>calc(var(--radius) - 4px)</code></td>
-                        <td><code data-token-current="--radius-checkbox"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--radius-tabs-focus</code></td>
-                        <td><code>calc(var(--radius) - 4px)</code></td>
-                        <td><code data-token-current="--radius-tabs-focus"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--scrollbar-width</code></td>
-                        <td><code>6px</code></td>
-                        <td><code data-token-current="--scrollbar-width"></code></td>
-                    </tr>
-                    <tr>
-                        <td><code>--scrollbar-radius</code></td>
-                        <td><code>6px</code></td>
-                        <td><code data-token-current="--scrollbar-radius"></code></td>
-                    </tr>
-                </tbody>
-            </table>
-            <p class="text-sm text-admin-muted-foreground mt-3">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Token</th>
+                            <th>Default</th>
+                            <th>Current</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>--radius</code></td>
+                            <td><code>0.5rem</code></td>
+                            <td><code data-token-current="--radius"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-card</code></td>
+                            <td><code>var(--radius)</code></td>
+                            <td><code data-token-current="--radius-card"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-button</code></td>
+                            <td><code>var(--radius)</code></td>
+                            <td><code data-token-current="--radius-button"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-input</code></td>
+                            <td><code>var(--radius)</code></td>
+                            <td><code data-token-current="--radius-input"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-select</code></td>
+                            <td><code>var(--radius)</code></td>
+                            <td><code data-token-current="--radius-select"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-textarea</code></td>
+                            <td><code>var(--radius)</code></td>
+                            <td><code data-token-current="--radius-textarea"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-dialog</code></td>
+                            <td><code>calc(var(--radius) + 2px)</code></td>
+                            <td><code data-token-current="--radius-dialog"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-alert</code></td>
+                            <td><code>var(--radius)</code></td>
+                            <td><code data-token-current="--radius-alert"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-popover</code></td>
+                            <td><code>calc(var(--radius) - 2px)</code></td>
+                            <td><code data-token-current="--radius-popover"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-tooltip</code></td>
+                            <td><code>calc(var(--radius) - 2px)</code></td>
+                            <td><code data-token-current="--radius-tooltip"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-segmented</code></td>
+                            <td><code>var(--radius)</code></td>
+                            <td><code data-token-current="--radius-segmented"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-segmented-item</code></td>
+                            <td><code>calc(var(--radius) - 2px)</code></td>
+                            <td><code data-token-current="--radius-segmented-item"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-dropdown-item</code></td>
+                            <td><code>calc(var(--radius) - 4px)</code></td>
+                            <td><code data-token-current="--radius-dropdown-item"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-kbd</code></td>
+                            <td><code>calc(var(--radius) - 4px)</code></td>
+                            <td><code data-token-current="--radius-kbd"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-checkbox</code></td>
+                            <td><code>calc(var(--radius) - 4px)</code></td>
+                            <td><code data-token-current="--radius-checkbox"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--radius-tabs-focus</code></td>
+                            <td><code>calc(var(--radius) - 4px)</code></td>
+                            <td><code data-token-current="--radius-tabs-focus"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--scrollbar-width</code></td>
+                            <td><code>6px</code></td>
+                            <td><code data-token-current="--scrollbar-width"></code></td>
+                        </tr>
+                        <tr>
+                            <td><code>--scrollbar-radius</code></td>
+                            <td><code>6px</code></td>
+                            <td><code data-token-current="--scrollbar-radius"></code></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-sm text-admin-muted-foreground mt-3">
     Generic <code>rounded-admin-sm</code> / <code>-md</code> / <code>-lg</code> Tailwind utilities
     are also available for ad-hoc rounding in templates (menu items, preflight rows, chart legends).
     Component CSS doesn't use them — each component has its own token above.
 </p>
-            <p class="text-sm text-admin-muted-foreground mt-3">
+                <p class="text-sm text-admin-muted-foreground mt-3">
     Add <code>class="admin-scrollbar"</code> to any scrollable element to opt in to the slim
     themed scrollbar — uses <code>--scrollbar-width</code>, <code>--scrollbar-radius</code>,
     <code>--scrollbar-thumb</code>, <code>--scrollbar-track</code>. The default browser
     scrollbar is left alone elsewhere.
 </p>
-        </UiSection>
-        {# ====================================================================== #}
-        {# Content                                                                #}
-        {# ====================================================================== #}
-        <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Content</h2>
-        <UiSection
-            id="prose"
-            title="Prose"
-            blurb="Element-level defaults for raw HTML inside admin views — prose links, description lists, code blocks. Form chrome stays opt-in via component classes."
-        >
-            <p class="text-sm text-admin-muted-foreground mb-3">Plain-only prose tokens:</p>
-            <UiSwatchGrid
-                swatches={[
+            </UiSection>
+            {# ====================================================================== #}
+            {# Content                                                                #}
+            {# ====================================================================== #}
+            <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Content</h2>
+            <UiSection
+                id="prose"
+                title="Prose"
+                blurb="Element-level defaults for raw HTML inside admin views — prose links, description lists, code blocks. Form chrome stays opt-in via component classes."
+            >
+                <p class="text-sm text-admin-muted-foreground mb-3">Plain-only prose tokens:</p>
+                <UiSwatchGrid
+                    swatches={{ [
     ("link", "bg-admin-link"),
     ("link-hover", "bg-admin-link-hover"),
     ("code-bg", "bg-admin-code-bg")
-]}
-            />
-            <h4 class="text-sm font-semibold text-admin-foreground mt-6 mb-2">Prose links</h4>
-            <div class="border border-admin-border rounded-admin-lg p-4 text-sm">
-                <p>This paragraph contains a <a href="#prose">prose link</a> styled with <code>--link</code> and underlined by default. Hover for <code>--link-hover</code>.</p>
-            </div>
-            <h4 class="text-sm font-semibold text-admin-foreground mt-6 mb-2">Description list</h4>
-            <div class="border border-admin-border rounded-admin-lg p-4">
-                <dl>
-                    <dt>Package</dt>
-                    <dd>plain-admin</dd>
-                    <dt class="mt-2">Status</dt>
-                    <dd>Stable</dd>
-                    <dt class="mt-2">Maintainer</dt>
-                    <dd>Dropseed</dd>
-                </dl>
-            </div>
-            <h4 class="text-sm font-semibold text-admin-foreground mt-6 mb-2">Code</h4>
-            <UiExample
-                caption="Inline"
-                markup='<p class="text-sm">Run <code>uv run plain check</code> to lint, type-check, and run tests.</p>'
-            />
-            <UiExample
-                caption="Block"
-                markup={"<pre><code>def hello(name: str) -> str:\n    return f\"Hello, {name}!\"</code></pre>"}
-            />
-        </UiSection>
-        <UiSection
-            id="icons"
-            title="Icons"
-            blurb="Bootstrap Icons are vendored. Use the admin.Icon element with a name."
-        >
-            <UiExample
-                markup={'<admin.Icon name="check-circle-fill" class="text-admin-success" />\n<admin.Icon name="exclamation-triangle-fill" class="text-admin-warning" />\n<admin.Icon name="x-circle-fill" class="text-admin-danger" />\n<admin.Icon name="info-circle-fill" class="text-admin-info" />\n<admin.Icon name="gear" />\n<admin.Icon name="search" />\n<admin.Icon name="chevron-down" />\n<admin.Icon name="three-dots-vertical" />\n<admin.Icon name="palette" />\n<admin.Icon name="moon-stars" />'}
-            />
-            <p class="text-xs text-admin-muted-foreground">
+] }}
+                />
+                <h4 class="text-sm font-semibold text-admin-foreground mt-6 mb-2">Prose links</h4>
+                <div class="border border-admin-border rounded-admin-lg p-4 text-sm">
+                    <p>This paragraph contains a <a href="#prose">prose link</a> styled with <code>--link</code> and underlined by default. Hover for <code>--link-hover</code>.</p>
+                </div>
+                <h4 class="text-sm font-semibold text-admin-foreground mt-6 mb-2">Description list</h4>
+                <div class="border border-admin-border rounded-admin-lg p-4">
+                    <dl>
+                        <dt>Package</dt>
+                        <dd>plain-admin</dd>
+                        <dt class="mt-2">Status</dt>
+                        <dd>Stable</dd>
+                        <dt class="mt-2">Maintainer</dt>
+                        <dd>Dropseed</dd>
+                    </dl>
+                </div>
+                <h4 class="text-sm font-semibold text-admin-foreground mt-6 mb-2">Code</h4>
+                <UiExample
+                    caption="Inline"
+                    markup='<p class="text-sm">Run <code>uv run plain check</code> to lint, type-check, and run tests.</p>'
+                />
+                <UiExample
+                    caption="Block"
+                    markup={{ "<pre><code>def hello(name: str) -> str:\n    return f\"Hello, {name}!\"</code></pre>" }}
+                />
+            </UiSection>
+            <UiSection
+                id="icons"
+                title="Icons"
+                blurb="Bootstrap Icons are vendored. Use the admin.Icon element with a name."
+            >
+                <UiExample
+                    markup={{ '<admin.Icon name="check-circle-fill" class="text-admin-success" />\n<admin.Icon name="exclamation-triangle-fill" class="text-admin-warning" />\n<admin.Icon name="x-circle-fill" class="text-admin-danger" />\n<admin.Icon name="info-circle-fill" class="text-admin-info" />\n<admin.Icon name="gear" />\n<admin.Icon name="search" />\n<admin.Icon name="chevron-down" />\n<admin.Icon name="three-dots-vertical" />\n<admin.Icon name="palette" />\n<admin.Icon name="moon-stars" />' }}
+                />
+                <p class="text-xs text-admin-muted-foreground">
     Browse the full set at <a
-                href="https://icons.getbootstrap.com/"
-                class="text-admin-link hover:text-admin-link-hover underline"
-                target="_blank"
-                rel="noopener"
-            >icons.getbootstrap.com</a>.
+                    href="https://icons.getbootstrap.com/"
+                    class="text-admin-link hover:text-admin-link-hover underline"
+                    target="_blank"
+                    rel="noopener"
+                >icons.getbootstrap.com</a>.
 </p>
-        </UiSection>
-        <UiSection
-            id="kbd"
-            title="Keyboard hints"
-            blurb='Small inline labels for key names — useful inline in help text or alongside menu items that have a keyboard shortcut. Wrap the key in `<kbd class="kbd">`.'
-        >
-            <UiExample
-                markup={'<p class="text-sm">\n    Press <kbd class="admin-kbd">Esc</kbd> to dismiss, or <kbd class="admin-kbd">â\x8c\x98</kbd> + <kbd class="admin-kbd">K</kbd> to open the search.\n</p>'}
-            />
-        </UiSection>
-        {# ====================================================================== #}
-        {# Actions                                                                #}
-        {# ====================================================================== #}
-        <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Actions</h2>
-        <UiSection
-            id="buttons"
-            title="Buttons"
-            blurb="Compose a button by stacking a base `.admin-btn` with size, shape, and color modifiers. Neutral variants (primary, secondary, outline, ghost, link) plus the status family (success, warning, danger, info) for actions that match an alert tone. Sizes: default, `.admin-btn-sm`, `.admin-btn-lg`. Add `.admin-btn-icon` for square icon-only."
-        >
-            <UiExample
-                caption="Neutral variants"
-                markup={'<button class="admin-btn admin-btn-primary">Primary</button>\n<button class="admin-btn admin-btn-secondary">Secondary</button>\n<button class="admin-btn admin-btn-outline">Outline</button>\n<button class="admin-btn admin-btn-ghost">Ghost</button>\n<button class="admin-btn admin-btn-link">Link</button>'}
-            />
-            <UiExample
-                caption="Status variants"
-                markup={'<button class="admin-btn admin-btn-success">Success</button>\n<button class="admin-btn admin-btn-warning">Warning</button>\n<button class="admin-btn admin-btn-danger">Danger</button>\n<button class="admin-btn admin-btn-info">Info</button>'}
-            />
-            <UiExample
-                caption="Sizes"
-                markup={'<button class="admin-btn admin-btn-sm admin-btn-primary">Small</button>\n<button class="admin-btn admin-btn-primary">Default</button>\n<button class="admin-btn admin-btn-lg admin-btn-primary">Large</button>'}
-            />
-            <UiExample
-                caption="With icon"
-                markup={'<button class="admin-btn admin-btn-primary"><admin.Icon name="plus-lg" />Create</button>\n<button class="admin-btn admin-btn-outline"><admin.Icon name="download" />Export</button>\n<button class="admin-btn admin-btn-icon admin-btn-outline" title="Refresh"><admin.Icon name="arrow-clockwise" /></button>\n<button class="admin-btn admin-btn-danger" disabled>Disabled</button>'}
-            />
-        </UiSection>
-        <UiSection
-            id="button-groups"
-            title="Button groups"
-            blurb="Wrap related buttons in `.button-group` to fuse them visually — the wrapper joins corners and collapses inner borders. Set `data-orientation='vertical'` to stack instead. Insert `<hr role='separator'>` for a divider."
-        >
-            <UiExample
-                caption="Horizontal"
-                markup={'<div class="admin-button-group">\n    <button class="admin-btn admin-btn-outline">List</button>\n    <button class="admin-btn admin-btn-outline" aria-pressed="true">Grid</button>\n    <button class="admin-btn admin-btn-outline">Chart</button>\n</div>'}
-            />
-            <UiExample
-                caption="With separator"
-                markup={'<div class="admin-button-group">\n    <button class="admin-btn admin-btn-outline">Save</button>\n    <hr role="separator" />\n    <button class="admin-btn admin-btn-outline">Cancel</button>\n</div>'}
-            />
-            <UiExample
-                caption="Vertical"
-                markup={'<div class="admin-button-group" data-orientation="vertical">\n    <button class="admin-btn admin-btn-outline">Option A</button>\n    <button class="admin-btn admin-btn-outline">Option B</button>\n    <button class="admin-btn admin-btn-outline">Option C</button>\n</div>'}
-            />
-        </UiSection>
-        <UiSection
-            id="badges"
-            title="Badges"
-            blurb="Semantic badges for status indicators. Neutral variants (primary/secondary/outline) and Plain's translucent status family (success/warning/danger/info) — the latter use a 10% fill of the matching token so they read in dense table contexts."
-        >
-            <UiExample
-                caption="Neutral variants"
-                markup={'<span class="admin-badge admin-badge-primary">Primary</span>\n<span class="admin-badge admin-badge-secondary">Secondary</span>\n<span class="admin-badge admin-badge-outline">Outline</span>'}
-            />
-            <UiExample
-                caption="Plain semantic variants"
-                markup={'<span class="admin-badge admin-badge-success">Stable</span>\n<span class="admin-badge admin-badge-warning">Beta</span>\n<span class="admin-badge admin-badge-danger">Deprecated</span>\n<span class="admin-badge admin-badge-info">New</span>'}
-            />
-        </UiSection>
-        {# ====================================================================== #}
-        {# Feedback                                                               #}
-        {# ====================================================================== #}
-        <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Feedback</h2>
-        <UiSection
-            id="alerts"
-            title="Alerts"
-            blurb="Inline status panels. Wrap the title in an h2-h6 or [data-title] and put body content in a <section>."
-        >
-            <UiExample
-                markup={'<div class="admin-alert w-full">\n    <admin.Icon name="info-circle" />\n    <h4>Heads up</h4>\n    <section>This is a default alert. Use it for neutral status messages.</section>\n</div>'}
-            />
-            <UiExample
-                markup={'<div class="admin-alert admin-alert-success w-full">\n    <admin.Icon name="check-circle" />\n    <h4>All checks passed</h4>\n    <section>The success variant confirms a positive outcome.</section>\n</div>'}
-            />
-            <UiExample
-                markup={'<div class="admin-alert admin-alert-warning w-full">\n    <admin.Icon name="exclamation-triangle" />\n    <h4>Heads up</h4>\n    <section>The warning variant is for non-fatal issues that need attention.</section>\n</div>'}
-            />
-            <UiExample
-                markup={'<div class="admin-alert admin-alert-danger w-full">\n    <admin.Icon name="x-circle" />\n    <h4>Something went wrong</h4>\n    <section>The danger variant is for errors and failed actions.</section>\n</div>'}
-            />
-            <UiExample
-                markup={'<div class="admin-alert admin-alert-info w-full">\n    <admin.Icon name="info-circle" />\n    <h4>Just so you know</h4>\n    <section>The info variant is for incidental notes and pointers.</section>\n</div>'}
-            />
-        </UiSection>
-        <UiSection
-            id="progress"
-            title="Progress"
-            blurb="Native <progress> element. Set value/max (default 0–100); status follows data-status: ok (default success), warning, error."
-        >
-            <UiExample
-                caption="Default — success"
-                markup='<progress class="admin-progress" value="72" max="100"></progress>'
-            />
-            <UiExample
-                caption="Warning"
-                markup='<progress class="admin-progress" data-status="warning" value="48" max="100"></progress>'
-            />
-            <UiExample
-                caption="Error"
-                markup='<progress class="admin-progress" data-status="error" value="20" max="100"></progress>'
-            />
-        </UiSection>
-        {# ====================================================================== #}
-        {# Containers                                                             #}
-        {# ====================================================================== #}
-        <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Containers</h2>
-        <UiSection
-            id="cards"
-            title="Cards"
-            blurb="Visual shell only — themed surface, border, and rounded corners. Layout and padding are yours to compose with utility classes (e.g. `flex flex-col gap-6 p-6`)."
-        >
-            <p class="text-sm text-admin-muted-foreground mb-2">Card surface tokens:</p>
-            <UiSwatchGrid
-                swatches={[
+            </UiSection>
+            <UiSection
+                id="kbd"
+                title="Keyboard hints"
+                blurb='Small inline labels for key names — useful inline in help text or alongside menu items that have a keyboard shortcut. Wrap the key in `<kbd class="kbd">`.'
+            >
+                <UiExample
+                    markup={{ '<p class="text-sm">\n    Press <kbd class="admin-kbd">Esc</kbd> to dismiss, or <kbd class="admin-kbd">â\x8c\x98</kbd> + <kbd class="admin-kbd">K</kbd> to open the search.\n</p>' }}
+                />
+            </UiSection>
+            {# ====================================================================== #}
+            {# Actions                                                                #}
+            {# ====================================================================== #}
+            <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Actions</h2>
+            <UiSection
+                id="buttons"
+                title="Buttons"
+                blurb="Compose a button by stacking a base `.admin-btn` with size, shape, and color modifiers. Neutral variants (primary, secondary, outline, ghost, link) plus the status family (success, warning, danger, info) for actions that match an alert tone. Sizes: default, `.admin-btn-sm`, `.admin-btn-lg`. Add `.admin-btn-icon` for square icon-only."
+            >
+                <UiExample
+                    caption="Neutral variants"
+                    markup={{ '<button class="admin-btn admin-btn-primary">Primary</button>\n<button class="admin-btn admin-btn-secondary">Secondary</button>\n<button class="admin-btn admin-btn-outline">Outline</button>\n<button class="admin-btn admin-btn-ghost">Ghost</button>\n<button class="admin-btn admin-btn-link">Link</button>' }}
+                />
+                <UiExample
+                    caption="Status variants"
+                    markup={{ '<button class="admin-btn admin-btn-success">Success</button>\n<button class="admin-btn admin-btn-warning">Warning</button>\n<button class="admin-btn admin-btn-danger">Danger</button>\n<button class="admin-btn admin-btn-info">Info</button>' }}
+                />
+                <UiExample
+                    caption="Sizes"
+                    markup={{ '<button class="admin-btn admin-btn-sm admin-btn-primary">Small</button>\n<button class="admin-btn admin-btn-primary">Default</button>\n<button class="admin-btn admin-btn-lg admin-btn-primary">Large</button>' }}
+                />
+                <UiExample
+                    caption="With icon"
+                    markup={{ '<button class="admin-btn admin-btn-primary"><admin.Icon name="plus-lg" />Create</button>\n<button class="admin-btn admin-btn-outline"><admin.Icon name="download" />Export</button>\n<button class="admin-btn admin-btn-icon admin-btn-outline" title="Refresh"><admin.Icon name="arrow-clockwise" /></button>\n<button class="admin-btn admin-btn-danger" disabled>Disabled</button>' }}
+                />
+            </UiSection>
+            <UiSection
+                id="button-groups"
+                title="Button groups"
+                blurb="Wrap related buttons in `.button-group` to fuse them visually — the wrapper joins corners and collapses inner borders. Set `data-orientation='vertical'` to stack instead. Insert `<hr role='separator'>` for a divider."
+            >
+                <UiExample
+                    caption="Horizontal"
+                    markup={{ '<div class="admin-button-group">\n    <button class="admin-btn admin-btn-outline">List</button>\n    <button class="admin-btn admin-btn-outline" aria-pressed="true">Grid</button>\n    <button class="admin-btn admin-btn-outline">Chart</button>\n</div>' }}
+                />
+                <UiExample
+                    caption="With separator"
+                    markup={{ '<div class="admin-button-group">\n    <button class="admin-btn admin-btn-outline">Save</button>\n    <hr role="separator" />\n    <button class="admin-btn admin-btn-outline">Cancel</button>\n</div>' }}
+                />
+                <UiExample
+                    caption="Vertical"
+                    markup={{ '<div class="admin-button-group" data-orientation="vertical">\n    <button class="admin-btn admin-btn-outline">Option A</button>\n    <button class="admin-btn admin-btn-outline">Option B</button>\n    <button class="admin-btn admin-btn-outline">Option C</button>\n</div>' }}
+                />
+            </UiSection>
+            <UiSection
+                id="badges"
+                title="Badges"
+                blurb="Semantic badges for status indicators. Neutral variants (primary/secondary/outline) and Plain's translucent status family (success/warning/danger/info) — the latter use a 10% fill of the matching token so they read in dense table contexts."
+            >
+                <UiExample
+                    caption="Neutral variants"
+                    markup={{ '<span class="admin-badge admin-badge-primary">Primary</span>\n<span class="admin-badge admin-badge-secondary">Secondary</span>\n<span class="admin-badge admin-badge-outline">Outline</span>' }}
+                />
+                <UiExample
+                    caption="Plain semantic variants"
+                    markup={{ '<span class="admin-badge admin-badge-success">Stable</span>\n<span class="admin-badge admin-badge-warning">Beta</span>\n<span class="admin-badge admin-badge-danger">Deprecated</span>\n<span class="admin-badge admin-badge-info">New</span>' }}
+                />
+            </UiSection>
+            {# ====================================================================== #}
+            {# Feedback                                                               #}
+            {# ====================================================================== #}
+            <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Feedback</h2>
+            <UiSection
+                id="alerts"
+                title="Alerts"
+                blurb="Inline status panels. Wrap the title in an h2-h6 or [data-title] and put body content in a <section>."
+            >
+                <UiExample
+                    markup={{ '<div class="admin-alert w-full">\n    <admin.Icon name="info-circle" />\n    <h4>Heads up</h4>\n    <section>This is a default alert. Use it for neutral status messages.</section>\n</div>' }}
+                />
+                <UiExample
+                    markup={{ '<div class="admin-alert admin-alert-success w-full">\n    <admin.Icon name="check-circle" />\n    <h4>All checks passed</h4>\n    <section>The success variant confirms a positive outcome.</section>\n</div>' }}
+                />
+                <UiExample
+                    markup={{ '<div class="admin-alert admin-alert-warning w-full">\n    <admin.Icon name="exclamation-triangle" />\n    <h4>Heads up</h4>\n    <section>The warning variant is for non-fatal issues that need attention.</section>\n</div>' }}
+                />
+                <UiExample
+                    markup={{ '<div class="admin-alert admin-alert-danger w-full">\n    <admin.Icon name="x-circle" />\n    <h4>Something went wrong</h4>\n    <section>The danger variant is for errors and failed actions.</section>\n</div>' }}
+                />
+                <UiExample
+                    markup={{ '<div class="admin-alert admin-alert-info w-full">\n    <admin.Icon name="info-circle" />\n    <h4>Just so you know</h4>\n    <section>The info variant is for incidental notes and pointers.</section>\n</div>' }}
+                />
+            </UiSection>
+            <UiSection
+                id="progress"
+                title="Progress"
+                blurb="Native <progress> element. Set value/max (default 0–100); status follows data-status: ok (default success), warning, error."
+            >
+                <UiExample
+                    caption="Default — success"
+                    markup='<progress class="admin-progress" value="72" max="100"></progress>'
+                />
+                <UiExample
+                    caption="Warning"
+                    markup='<progress class="admin-progress" data-status="warning" value="48" max="100"></progress>'
+                />
+                <UiExample
+                    caption="Error"
+                    markup='<progress class="admin-progress" data-status="error" value="20" max="100"></progress>'
+                />
+            </UiSection>
+            {# ====================================================================== #}
+            {# Containers                                                             #}
+            {# ====================================================================== #}
+            <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Containers</h2>
+            <UiSection
+                id="cards"
+                title="Cards"
+                blurb="Visual shell only — themed surface, border, and rounded corners. Layout and padding are yours to compose with utility classes (e.g. `flex flex-col gap-6 p-6`)."
+            >
+                <p class="text-sm text-admin-muted-foreground mb-2">Card surface tokens:</p>
+                <UiSwatchGrid
+                    swatches={{ [
     ("card", "bg-admin-card"),
     ("card-foreground", "bg-admin-card-foreground")
-]}
-            />
-            <div class="mt-4"></div>
-            <UiExample
-                caption="Default"
-                markup={'<div class="admin-card flex flex-col gap-6 p-6 w-80">\n    <header>\n        <h2 class="font-semibold leading-none">Active users</h2>\n        <p class="text-sm text-admin-muted-foreground">Last 30 days</p>\n    </header>\n    <section>\n        <p class="text-sm">Body content sits in a section.</p>\n    </section>\n</div>'}
-            />
-            <UiExample
-                caption="Dense + metric typography (dashboard pattern)"
-                markup={'<div class="admin-card flex flex-col gap-2 px-6 py-4 w-64">\n    <header>\n        <h2 class="text-xs font-medium text-admin-muted-foreground">Active users</h2>\n    </header>\n    <section>\n        <div class="text-3xl font-semibold leading-tight tracking-tight tabular-nums text-admin-foreground">1,284</div>\n        <a href="#" class="text-xs text-admin-link hover:underline">View all</a>\n    </section>\n</div>'}
-            />
-        </UiSection>
-        <UiSection
-            id="admin-cards"
-            title="Admin card classes"
-            blurb="Live previews of the four card subclasses shipped from `plain.admin.cards`. Subclass these and register them on a view's `cards = [...]` to surface them on dashboards."
-        >
-            <p class="text-sm text-admin-muted-foreground mb-2">Chart palette (used by <code>TrendCard</code>):</p>
-            <UiSwatchGrid
-                swatches={[
+] }}
+                />
+                <div class="mt-4"></div>
+                <UiExample
+                    caption="Default"
+                    markup={{ '<div class="admin-card flex flex-col gap-6 p-6 w-80">\n    <header>\n        <h2 class="font-semibold leading-none">Active users</h2>\n        <p class="text-sm text-admin-muted-foreground">Last 30 days</p>\n    </header>\n    <section>\n        <p class="text-sm">Body content sits in a section.</p>\n    </section>\n</div>' }}
+                />
+                <UiExample
+                    caption="Dense + metric typography (dashboard pattern)"
+                    markup={{ '<div class="admin-card flex flex-col gap-2 px-6 py-4 w-64">\n    <header>\n        <h2 class="text-xs font-medium text-admin-muted-foreground">Active users</h2>\n    </header>\n    <section>\n        <div class="text-3xl font-semibold leading-tight tracking-tight tabular-nums text-admin-foreground">1,284</div>\n        <a href="#" class="text-xs text-admin-link hover:underline">View all</a>\n    </section>\n</div>' }}
+                />
+            </UiSection>
+            <UiSection
+                id="admin-cards"
+                title="Admin card classes"
+                blurb="Live previews of the four card subclasses shipped from `plain.admin.cards`. Subclass these and register them on a view's `cards = [...]` to surface them on dashboards."
+            >
+                <p class="text-sm text-admin-muted-foreground mb-2">Chart palette (used by <code>TrendCard</code>):</p>
+                <UiSwatchGrid
+                    swatches={{ [
     ("chart-1", "bg-admin-chart-1"),
     ("chart-2", "bg-admin-chart-2"),
     ("chart-3", "bg-admin-chart-3"),
     ("chart-4", "bg-admin-chart-4"),
     ("chart-5", "bg-admin-chart-5")
-]}
-            />
-            <div
-                class="grid grid-cols-2 gap-4 mt-6 lg:grid-cols-4 [&>aside]:col-span-1 [&>aside.col-span-2]:col-span-2 [&>aside.col-span-3]:col-span-2 lg:[&>aside.col-span-3]:col-span-3 [&>aside.col-span-4]:col-span-2 lg:[&>aside.col-span-4]:col-span-4"
-            >
-    <template :for={card in demo_cards}>{mark_safe(render_card(card))}</template>
-</div>
-            <p class="text-xs text-admin-muted-foreground mt-3">
+] }}
+                />
+                <div
+                    class="grid grid-cols-2 gap-4 mt-6 lg:grid-cols-4 [&>aside]:col-span-1 [&>aside.col-span-2]:col-span-2 [&>aside.col-span-3]:col-span-2 lg:[&>aside.col-span-3]:col-span-3 [&>aside.col-span-4]:col-span-2 lg:[&>aside.col-span-4]:col-span-4"
+                >
+                    {% for card in demo_cards %}{{ mark_safe(render_card(card)) }}{% endfor %}
+                </div>
+                <p class="text-xs text-admin-muted-foreground mt-3">
     <code>Card</code> (small, with metric and link),
     <code>KeyValueCard</code> (medium, key/value pairs),
     <code>TrendCard</code> (full-width, exercises <code>--chart-1..5</code>),
     and <code>TableCard</code> (full-width, header + rows).
 </p>
-        </UiSection>
-        <UiSection
-            id="tables"
-            title="Tables"
-            blurb='Add `class="table"` for header/row/hover styling.'
-        >
-            <UiExample
-                markup={'<table class="admin-table w-full">\n    <thead>\n        <tr>\n            <th>Package</th>\n            <th>Status</th>\n            <th>Version</th>\n        </tr>\n    </thead>\n    <tbody>\n        <tr>\n            <td>plain</td>\n            <td><span class="admin-badge admin-badge-success">Stable</span></td>\n            <td>0.137.1</td>\n        </tr>\n        <tr>\n            <td>plain-admin</td>\n            <td><span class="admin-badge admin-badge-success">Stable</span></td>\n            <td>0.50.0</td>\n        </tr>\n        <tr>\n            <td>plain-htmx</td>\n            <td><span class="admin-badge admin-badge-warning">Beta</span></td>\n            <td>0.19.0</td>\n        </tr>\n    </tbody>\n</table>'}
-            />
-        </UiSection>
-        {# ====================================================================== #}
-        {# Forms                                                                  #}
-        {# ====================================================================== #}
-        <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Forms</h2>
-        <UiSection
-            id="forms"
-            title="Form fields"
-            blurb="Use the .input/.textarea classes (or the matching admin element templates), Plain's brand color drives the focus ring."
-        >
-            <UiExample
-                caption="Text input"
-                markup={'<div class="space-y-1 w-72">\n    <label for="example-input" class="admin-label">Email</label>\n    <input id="example-input" class="admin-input" type="email" placeholder="you@example.com" />\n    <p class="text-xs text-admin-muted-foreground">We&apos;ll never share your email.</p>\n</div>'}
-            />
-            <UiExample
-                caption="Invalid input"
-                markup={'<div class="space-y-1 w-72">\n    <label for="example-input-invalid" class="admin-label">Email</label>\n    <input id="example-input-invalid" class="admin-input" type="email" value="not an email" aria-invalid="true" />\n    <p class="text-xs text-admin-danger">Enter a valid email address.</p>\n</div>'}
-            />
-            <UiExample
-                caption="Textarea"
-                markup={'<div class="space-y-1 w-72">\n    <label for="example-textarea" class="admin-label">Notes</label>\n    <textarea id="example-textarea" class="admin-textarea" rows="3" placeholder="Anything to add?"></textarea>\n</div>'}
-            />
-            <UiExample
-                caption="Select"
-                markup={'<div class="space-y-1 w-72">\n    <label for="example-select" class="admin-label">Role</label>\n    <select id="example-select" class="admin-select">\n        <option>Reader</option>\n        <option>Editor</option>\n        <option>Admin</option>\n    </select>\n</div>'}
-            />
-            <UiExample
-                caption="Checkbox"
-                markup={'<label class="flex items-center gap-2 text-sm">\n    <input class="admin-input" type="checkbox" checked /> Send me email updates\n</label>'}
-            />
-            <UiExample
-                caption="Radio group"
-                markup={'<div class="space-y-2 text-sm">\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="reader" checked /> Reader\n    </label>\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="editor" /> Editor\n    </label>\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="admin" /> Admin\n    </label>\n</div>'}
-            />
-            <UiExample
-                caption="Switch"
-                markup={'<label class="flex items-center gap-2 text-sm">\n    <input class="admin-input" type="checkbox" role="switch" checked /> Enable notifications\n</label>'}
-            />
-            <UiExample
-                caption="Compact size — pair `input-sm` / `select-sm` for dense rows"
-                markup={'<div class="flex items-end gap-2">\n    <input class="admin-input input-sm w-40" type="text" placeholder="Filterâ\x80¦" />\n    <select class="admin-select admin-select-sm">\n        <option>All</option>\n        <option>Active</option>\n        <option>Archived</option>\n    </select>\n    <button type="button" class="admin-btn admin-btn-sm admin-btn-primary">Apply</button>\n</div>'}
-            />
-            <UiExample
-                caption="Search input — admin element"
-                markup={'<div class="w-72">\n    <admin.SearchInput name="q" placeholder="Search packagesâ\x80¦" />\n</div>'}
-            />
-            <p class="text-xs text-admin-muted-foreground mt-3">
+            </UiSection>
+            <UiSection
+                id="tables"
+                title="Tables"
+                blurb='Add `class="table"` for header/row/hover styling.'
+            >
+                <UiExample
+                    markup={{ '<table class="admin-table w-full">\n    <thead>\n        <tr>\n            <th>Package</th>\n            <th>Status</th>\n            <th>Version</th>\n        </tr>\n    </thead>\n    <tbody>\n        <tr>\n            <td>plain</td>\n            <td><span class="admin-badge admin-badge-success">Stable</span></td>\n            <td>0.137.1</td>\n        </tr>\n        <tr>\n            <td>plain-admin</td>\n            <td><span class="admin-badge admin-badge-success">Stable</span></td>\n            <td>0.50.0</td>\n        </tr>\n        <tr>\n            <td>plain-htmx</td>\n            <td><span class="admin-badge admin-badge-warning">Beta</span></td>\n            <td>0.19.0</td>\n        </tr>\n    </tbody>\n</table>' }}
+                />
+            </UiSection>
+            {# ====================================================================== #}
+            {# Forms                                                                  #}
+            {# ====================================================================== #}
+            <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Forms</h2>
+            <UiSection
+                id="forms"
+                title="Form fields"
+                blurb="Use the .input/.textarea classes (or the matching admin element templates), Plain's brand color drives the focus ring."
+            >
+                <UiExample
+                    caption="Text input"
+                    markup={{ '<div class="space-y-1 w-72">\n    <label for="example-input" class="admin-label">Email</label>\n    <input id="example-input" class="admin-input" type="email" placeholder="you@example.com" />\n    <p class="text-xs text-admin-muted-foreground">We&apos;ll never share your email.</p>\n</div>' }}
+                />
+                <UiExample
+                    caption="Invalid input"
+                    markup={{ '<div class="space-y-1 w-72">\n    <label for="example-input-invalid" class="admin-label">Email</label>\n    <input id="example-input-invalid" class="admin-input" type="email" value="not an email" aria-invalid="true" />\n    <p class="text-xs text-admin-danger">Enter a valid email address.</p>\n</div>' }}
+                />
+                <UiExample
+                    caption="Textarea"
+                    markup={{ '<div class="space-y-1 w-72">\n    <label for="example-textarea" class="admin-label">Notes</label>\n    <textarea id="example-textarea" class="admin-textarea" rows="3" placeholder="Anything to add?"></textarea>\n</div>' }}
+                />
+                <UiExample
+                    caption="Select"
+                    markup={{ '<div class="space-y-1 w-72">\n    <label for="example-select" class="admin-label">Role</label>\n    <select id="example-select" class="admin-select">\n        <option>Reader</option>\n        <option>Editor</option>\n        <option>Admin</option>\n    </select>\n</div>' }}
+                />
+                <UiExample
+                    caption="Checkbox"
+                    markup={{ '<label class="flex items-center gap-2 text-sm">\n    <input class="admin-input" type="checkbox" checked /> Send me email updates\n</label>' }}
+                />
+                <UiExample
+                    caption="Radio group"
+                    markup={{ '<div class="space-y-2 text-sm">\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="reader" checked /> Reader\n    </label>\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="editor" /> Editor\n    </label>\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="admin" /> Admin\n    </label>\n</div>' }}
+                />
+                <UiExample
+                    caption="Switch"
+                    markup={{ '<label class="flex items-center gap-2 text-sm">\n    <input class="admin-input" type="checkbox" role="switch" checked /> Enable notifications\n</label>' }}
+                />
+                <UiExample
+                    caption="Compact size — pair `input-sm` / `select-sm` for dense rows"
+                    markup={{ '<div class="flex items-end gap-2">\n    <input class="admin-input input-sm w-40" type="text" placeholder="Filterâ\x80¦" />\n    <select class="admin-select admin-select-sm">\n        <option>All</option>\n        <option>Active</option>\n        <option>Archived</option>\n    </select>\n    <button type="button" class="admin-btn admin-btn-sm admin-btn-primary">Apply</button>\n</div>' }}
+                />
+                <UiExample
+                    caption="Search input — admin element"
+                    markup={{ '<div class="w-72">\n    <admin.SearchInput name="q" placeholder="Search packagesâ\x80¦" />\n</div>' }}
+                />
+                <p class="text-xs text-admin-muted-foreground mt-3">
     Plain ships matching element templates that wrap these classes:
     <code>&lt;admin.Input&gt;</code>, <code>&lt;admin.Textarea&gt;</code>,
     <code>&lt;admin.Select&gt;</code>, <code>&lt;admin.Checkbox&gt;</code>,
@@ -745,181 +745,180 @@ document.addEventListener("DOMContentLoaded", () => {
     <code>&lt;admin.CheckboxField&gt;</code> for the full label + control + errors stack
     when rendering a Plain form field.
 </p>
-        </UiSection>
-        <UiSection
-            id="field-wrapper"
-            title="Field wrapper"
-            blurb='Wrap a label, control, and helper/error text in a `.field` for consistent vertical rhythm. Group several fields under a `.fieldset` with a legend. Set `data-orientation="horizontal"` on a `.field` to lay the label and control side-by-side (handy for switches and checkboxes). Mark a field as invalid with `data-invalid="true"` to flip its label/helper to the danger color.'
-        >
-            <UiExample
-                caption="Vertical fieldset"
-                markup={'<fieldset class="admin-fieldset w-72">\n    <legend>Profile</legend>\n    <p>Public information shown on your account page.</p>\n\n    <div class="admin-field">\n        <label for="field-name" class="admin-label">Display name</label>\n        <input id="field-name" class="admin-input" type="text" value="Ada" />\n        <p>Visible to other admins.</p>\n    </div>\n\n    <div class="admin-field" data-orientation="horizontal">\n        <label for="field-notify" class="admin-label">Email notifications</label>\n        <input id="field-notify" class="admin-input" type="checkbox" role="switch" checked />\n    </div>\n\n    <div class="admin-field" data-invalid="true">\n        <label for="field-email" class="admin-label">Email</label>\n        <input id="field-email" class="admin-input" type="email" value="not an email" aria-invalid="true" />\n        <div role="alert">Enter a valid email address.</div>\n    </div>\n</fieldset>'}
-            />
-        </UiSection>
-        {# ====================================================================== #}
-        {# Overlays                                                               #}
-        {# ====================================================================== #}
-        <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Overlays</h2>
-        <UiSection
-            id="dialogs"
-            title="Dialogs"
-            blurb="Native <dialog> with the `.admin-dialog` class. Open and close via the HTML Invoker Commands API (`command` + `commandfor`) — no JS, no inline `onclick`, CSP-safe."
-        >
-            <UiExample
-                markup={'<button type="button" class="admin-btn admin-btn-outline" command="show-modal" commandfor="example-dialog">Open dialog</button>\n<dialog id="example-dialog" class="admin-dialog max-w-sm m-auto">\n    <article class="p-6">\n        <header>\n            <h2 class="text-lg font-semibold">Example dialog</h2>\n            <p class="text-sm text-admin-muted-foreground">Native &lt;dialog&gt; styled with .dialog.</p>\n        </header>\n        <section class="mt-4 text-sm">\n            Press Escape or click the close button to dismiss.\n        </section>\n        <footer class="mt-6 flex justify-end gap-2">\n            <button type="button" class="admin-btn admin-btn-outline" command="close" commandfor="example-dialog">Cancel</button>\n            <button type="button" class="admin-btn admin-btn-primary" command="close" commandfor="example-dialog">OK</button>\n        </footer>\n    </article>\n</dialog>'}
-            />
-            <p class="text-xs text-admin-muted-foreground -mt-2">
+            </UiSection>
+            <UiSection
+                id="field-wrapper"
+                title="Field wrapper"
+                blurb='Wrap a label, control, and helper/error text in a `.field` for consistent vertical rhythm. Group several fields under a `.fieldset` with a legend. Set `data-orientation="horizontal"` on a `.field` to lay the label and control side-by-side (handy for switches and checkboxes). Mark a field as invalid with `data-invalid="true"` to flip its label/helper to the danger color.'
+            >
+                <UiExample
+                    caption="Vertical fieldset"
+                    markup={{ '<fieldset class="admin-fieldset w-72">\n    <legend>Profile</legend>\n    <p>Public information shown on your account page.</p>\n\n    <div class="admin-field">\n        <label for="field-name" class="admin-label">Display name</label>\n        <input id="field-name" class="admin-input" type="text" value="Ada" />\n        <p>Visible to other admins.</p>\n    </div>\n\n    <div class="admin-field" data-orientation="horizontal">\n        <label for="field-notify" class="admin-label">Email notifications</label>\n        <input id="field-notify" class="admin-input" type="checkbox" role="switch" checked />\n    </div>\n\n    <div class="admin-field" data-invalid="true">\n        <label for="field-email" class="admin-label">Email</label>\n        <input id="field-email" class="admin-input" type="email" value="not an email" aria-invalid="true" />\n        <div role="alert">Enter a valid email address.</div>\n    </div>\n</fieldset>' }}
+                />
+            </UiSection>
+            {# ====================================================================== #}
+            {# Overlays                                                               #}
+            {# ====================================================================== #}
+            <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Overlays</h2>
+            <UiSection
+                id="dialogs"
+                title="Dialogs"
+                blurb="Native <dialog> with the `.admin-dialog` class. Open and close via the HTML Invoker Commands API (`command` + `commandfor`) — no JS, no inline `onclick`, CSP-safe."
+            >
+                <UiExample
+                    markup={{ '<button type="button" class="admin-btn admin-btn-outline" command="show-modal" commandfor="example-dialog">Open dialog</button>\n<dialog id="example-dialog" class="admin-dialog max-w-sm m-auto">\n    <article class="p-6">\n        <header>\n            <h2 class="text-lg font-semibold">Example dialog</h2>\n            <p class="text-sm text-admin-muted-foreground">Native &lt;dialog&gt; styled with .dialog.</p>\n        </header>\n        <section class="mt-4 text-sm">\n            Press Escape or click the close button to dismiss.\n        </section>\n        <footer class="mt-6 flex justify-end gap-2">\n            <button type="button" class="admin-btn admin-btn-outline" command="close" commandfor="example-dialog">Cancel</button>\n            <button type="button" class="admin-btn admin-btn-primary" command="close" commandfor="example-dialog">OK</button>\n        </footer>\n    </article>\n</dialog>' }}
+                />
+                <p class="text-xs text-admin-muted-foreground -mt-2">
     Closing from inside without an id also works via <code>&lt;form method="dialog"&gt;&lt;button&gt;…&lt;/button&gt;&lt;/form&gt;</code> —
     submitting that form closes the enclosing dialog and returns the button's <code>value</code>.
 </p>
-        </UiSection>
-        <UiSection
-            id="popovers"
-            title="Popovers"
-            blurb="Generic click-to-open panel. Wrap a trigger `<button>` and a `[data-popover]` panel in a `.admin-popover` element — the panel can hold anything (form fields, descriptive content, multi-step UI). Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end). JS in `components.js` shares open/close, outside-click, and Esc handling with `.admin-dropdown-menu`."
-        >
-            <p class="text-sm text-admin-muted-foreground mb-2">Popover surface tokens (shared with dropdowns and hovercards):</p>
-            <UiSwatchGrid
-                swatches={[
+            </UiSection>
+            <UiSection
+                id="popovers"
+                title="Popovers"
+                blurb="Generic click-to-open panel. Wrap a trigger `<button>` and a `[data-popover]` panel in a `.admin-popover` element — the panel can hold anything (form fields, descriptive content, multi-step UI). Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end). JS in `components.js` shares open/close, outside-click, and Esc handling with `.admin-dropdown-menu`."
+            >
+                <p class="text-sm text-admin-muted-foreground mb-2">Popover surface tokens (shared with dropdowns and hovercards):</p>
+                <UiSwatchGrid
+                    swatches={{ [
     ("popover", "bg-admin-popover"),
     ("popover-foreground", "bg-admin-popover-foreground")
-]}
-            />
-            <div class="mt-4"></div>
-            <UiExample
-                markup={'<div class="admin-popover">\n    <button\n        type="button"\n        aria-haspopup="dialog"\n        aria-expanded="false"\n        aria-controls="example-popover-panel"\n        class="admin-btn admin-btn-outline"\n    >\n        Filter <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-popover-panel" data-popover data-align="end" aria-hidden="true" class="w-64">\n        <div class="space-y-2">\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" /> Active\n            </label>\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" checked /> Archived\n            </label>\n            <button type="button" class="admin-btn admin-btn-sm admin-btn-primary w-full mt-2">Apply</button>\n        </div>\n    </div>\n</div>'}
-            />
-        </UiSection>
-        <UiSection
-            id="dropdowns"
-            title="Dropdowns"
-            blurb='Wrap a trigger button + a [data-popover] menu in a .admin-dropdown-menu element. Items use role="menuitem" and pick up styling from the admin-dropdown-menu component. JS in components.js handles open/close, outside-click, and keyboard navigation (arrow keys, Home/End, Enter/Esc).'
-        >
-            <UiExample
-                markup={'<div class="admin-dropdown-menu">\n    <button\n        type="button"\n        aria-haspopup="menu"\n        aria-expanded="false"\n        aria-controls="example-actions-popover"\n        class="admin-btn admin-btn-outline"\n    >\n        Actions <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-40">\n        <div role="menu">\n            <a role="menuitem" href="#">Edit</a>\n            <a role="menuitem" href="#">Duplicate</a>\n            <hr role="separator">\n            <a role="menuitem" href="#" class="text-admin-danger">Delete</a>\n        </div>\n    </div>\n</div>'}
-            />
-        </UiSection>
-        <UiSection
-            id="tooltips"
-            title="Tooltips"
-            blurb='Pure-CSS tooltip via the `data-tooltip="…"` attribute. Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end). Hover or focus the trigger to reveal — no JS, no popper.'
-        >
-            <UiExample
-                caption="Sides"
-                markup={'<div class="flex flex-wrap gap-3">\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Top tooltip" data-side="top">Top</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Bottom tooltip" data-side="bottom">Bottom</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Left tooltip" data-side="left">Left</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Right tooltip" data-side="right">Right</button>\n</div>'}
-            />
-            <UiExample
-                caption="On an icon button"
-                markup={'<button type="button" class="admin-btn admin-btn-icon admin-btn-ghost" data-tooltip="Refresh" aria-label="Refresh">\n    <admin.Icon name="arrow-clockwise" />\n</button>'}
-            />
-        </UiSection>
-        <UiSection
-            id="hovercards"
-            title="Hovercards"
-            blurb="Hover-triggered version of popover. Trigger can be any element (no `<button>` requirement); panel positions fixed via JS so it escapes table-cell clipping. Use for preview/info that doesn't want a click commitment — user mention previews, FK row previews, the datetime hover details on every `<time>` in the admin."
-        >
-            <UiExample
-                caption="Inline trigger — user preview"
-                markup={'<div class="text-sm">\n    Pinged by\n    <span class="admin-hovercard">\n        <span class="text-admin-link cursor-help underline decoration-dotted">alice</span>\n        <div data-hovercard aria-hidden="true" class="w-64 flex gap-3 p-3">\n            <div class="w-10 h-10 rounded-full bg-admin-muted text-admin-muted-foreground flex items-center justify-center font-medium shrink-0" aria-hidden="true">A</div>\n            <div class="flex flex-col gap-0.5 min-w-0">\n                <span class="font-medium truncate">Alice Sanchez</span>\n                <span class="text-admin-muted-foreground text-xs truncate">alice@example.com</span>\n                <span class="admin-badge admin-badge-success mt-1 self-start">Admin</span>\n            </div>\n        </div>\n    </span>\n    in #releases.\n</div>'}
-            />
-            <p class="text-sm text-admin-muted-foreground mt-3">
+] }}
+                />
+                <div class="mt-4"></div>
+                <UiExample
+                    markup={{ '<div class="admin-popover">\n    <button\n        type="button"\n        aria-haspopup="dialog"\n        aria-expanded="false"\n        aria-controls="example-popover-panel"\n        class="admin-btn admin-btn-outline"\n    >\n        Filter <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-popover-panel" data-popover data-align="end" aria-hidden="true" class="w-64">\n        <div class="space-y-2">\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" /> Active\n            </label>\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" checked /> Archived\n            </label>\n            <button type="button" class="admin-btn admin-btn-sm admin-btn-primary w-full mt-2">Apply</button>\n        </div>\n    </div>\n</div>' }}
+                />
+            </UiSection>
+            <UiSection
+                id="dropdowns"
+                title="Dropdowns"
+                blurb='Wrap a trigger button + a [data-popover] menu in a .admin-dropdown-menu element. Items use role="menuitem" and pick up styling from the admin-dropdown-menu component. JS in components.js handles open/close, outside-click, and keyboard navigation (arrow keys, Home/End, Enter/Esc).'
+            >
+                <UiExample
+                    markup={{ '<div class="admin-dropdown-menu">\n    <button\n        type="button"\n        aria-haspopup="menu"\n        aria-expanded="false"\n        aria-controls="example-actions-popover"\n        class="admin-btn admin-btn-outline"\n    >\n        Actions <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-40">\n        <div role="menu">\n            <a role="menuitem" href="#">Edit</a>\n            <a role="menuitem" href="#">Duplicate</a>\n            <hr role="separator">\n            <a role="menuitem" href="#" class="text-admin-danger">Delete</a>\n        </div>\n    </div>\n</div>' }}
+                />
+            </UiSection>
+            <UiSection
+                id="tooltips"
+                title="Tooltips"
+                blurb='Pure-CSS tooltip via the `data-tooltip="…"` attribute. Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end). Hover or focus the trigger to reveal — no JS, no popper.'
+            >
+                <UiExample
+                    caption="Sides"
+                    markup={{ '<div class="flex flex-wrap gap-3">\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Top tooltip" data-side="top">Top</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Bottom tooltip" data-side="bottom">Bottom</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Left tooltip" data-side="left">Left</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Right tooltip" data-side="right">Right</button>\n</div>' }}
+                />
+                <UiExample
+                    caption="On an icon button"
+                    markup={{ '<button type="button" class="admin-btn admin-btn-icon admin-btn-ghost" data-tooltip="Refresh" aria-label="Refresh">\n    <admin.Icon name="arrow-clockwise" />\n</button>' }}
+                />
+            </UiSection>
+            <UiSection
+                id="hovercards"
+                title="Hovercards"
+                blurb="Hover-triggered version of popover. Trigger can be any element (no `<button>` requirement); panel positions fixed via JS so it escapes table-cell clipping. Use for preview/info that doesn't want a click commitment — user mention previews, FK row previews, the datetime hover details on every `<time>` in the admin."
+            >
+                <UiExample
+                    caption="Inline trigger — user preview"
+                    markup={{ '<div class="text-sm">\n    Pinged by\n    <span class="admin-hovercard">\n        <span class="text-admin-link cursor-help underline decoration-dotted">alice</span>\n        <div data-hovercard aria-hidden="true" class="w-64 flex gap-3 p-3">\n            <div class="w-10 h-10 rounded-full bg-admin-muted text-admin-muted-foreground flex items-center justify-center font-medium shrink-0" aria-hidden="true">A</div>\n            <div class="flex flex-col gap-0.5 min-w-0">\n                <span class="font-medium truncate">Alice Sanchez</span>\n                <span class="text-admin-muted-foreground text-xs truncate">alice@example.com</span>\n                <span class="admin-badge admin-badge-success mt-1 self-start">Admin</span>\n            </div>\n        </div>\n    </span>\n    in #releases.\n</div>' }}
+                />
+                <p class="text-sm text-admin-muted-foreground mt-3">
     Hovercards are a generic primitive — wrap anything in <code>&lt;span class="admin-hovercard"&gt;</code>
     with a sibling <code>&lt;div data-hovercard&gt;</code> panel. The admin uses them for FK row
     previews, status details, and one built-in case: every
     <code>&lt;time datetime="…"&gt;</code> is auto-wrapped at runtime with local/UTC/relative/Unix/ISO
     rows, each clickable to copy via the <code>data-copy-value</code> behavior.
 </p>
-            <UiExample
-                caption="Auto-wrapped <time> element"
-                markup={'<div class="text-sm">\n    Last seen <time datetime="2026-04-27T14:14:00Z">2 days ago</time> by alice.\n</div>'}
-            />
-        </UiSection>
-        {# ====================================================================== #}
-        {# Disclosure                                                             #}
-        {# ====================================================================== #}
-        <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Disclosure</h2>
-        <UiSection
-            id="tabs"
-            title="Tabs"
-            blurb='Switch between content panels. Underline indicator on the active tab; arrow-key navigation and panel show/hide are wired in components.js. For "set this value to X" choices, reach for the segmented control instead.'
-        >
-            <UiExample
-                markup={'<div class="admin-tabs w-96">\n    <div role="tablist" aria-label="Settings">\n        <button role="tab" aria-controls="tab-general" aria-selected="true">General</button>\n        <button role="tab" aria-controls="tab-advanced" aria-selected="false">Advanced</button>\n    </div>\n    <div role="tabpanel" id="tab-general" class="text-sm py-2">General tab content.</div>\n    <div role="tabpanel" id="tab-advanced" class="text-sm py-2" hidden>Advanced tab content.</div>\n</div>'}
-            />
-        </UiSection>
-        <UiSection
-            id="segmented"
-            title="Segmented control"
-            blurb="Pick one of a small set of mutually-exclusive values — theme, density, view mode. Roving tabindex and arrow-key navigation are wired in components.js; the consumer toggles `aria-checked` in response to clicks. For switching content panels, reach for tabs."
-        >
-            <UiExample
-                markup={'<div class="admin-segmented w-72" role="radiogroup" aria-label="View mode">\n    <button role="radio" aria-checked="true" class="px-3 py-1.5">List</button>\n    <button role="radio" aria-checked="false" class="px-3 py-1.5">Grid</button>\n    <button role="radio" aria-checked="false" class="px-3 py-1.5">Cards</button>\n</div>'}
-            />
-        </UiSection>
-        <UiSection
-            id="collapsible"
-            title="Collapsible"
-            blurb='Native `<details>` / `<summary>` get a smooth expand/collapse transition (via the new `::details-content` pseudo-element) and the default disclosure triangle is hidden so you can ship your own affordance. Used implicitly by the "Show markup" disclosures on this page.'
-        >
-            <UiExample
-                markup={'<details class="rounded-admin-md border border-admin-border p-3 w-96">\n    <summary class="gap-2 text-sm font-medium">\n        <admin.Icon name="chevron-right" class="transition-transform group-open:rotate-90" />\n        Advanced options\n    </summary>\n    <div class="text-sm text-admin-muted-foreground mt-2">\n        Tucked-away configuration the everyday user shouldn&apos;t have to think about.\n    </div>\n</details>'}
-            />
-            <UiExample
-                caption="Collapsible card"
-                markup={'<details class="admin-card group w-96" open>\n    <summary class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4">\n        <h3 class="font-semibold">Object Details</h3>\n        <admin.Icon name="chevron-right" class="text-admin-muted-foreground transition-transform group-open:rotate-90" />\n    </summary>\n    <section class="px-6 pb-6 text-sm text-admin-muted-foreground">\n        Body content of the card, revealed when expanded.\n    </section>\n</details>'}
-            />
-        </UiSection>
-        {# ====================================================================== #}
-        {# Behaviors                                                              #}
-        {# ====================================================================== #}
-        <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Behaviors</h2>
-        <UiSection
-            id="behaviors"
-            title="Data attributes"
-            blurb="Declarative `data-*` attributes you sprinkle on existing elements. Behaviors are delegated event handlers in `assets/admin/behaviors.js` — no markup pattern, no CSS. They piggyback on whatever element you stick them on."
-        >
-            {# Cells use `whitespace-normal` so the prose descriptions wrap inside
+                <UiExample
+                    caption="Auto-wrapped <time> element"
+                    markup={{ '<div class="text-sm">\n    Last seen <time datetime="2026-04-27T14:14:00Z">2 days ago</time> by alice.\n</div>' }}
+                />
+            </UiSection>
+            {# ====================================================================== #}
+            {# Disclosure                                                             #}
+            {# ====================================================================== #}
+            <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Disclosure</h2>
+            <UiSection
+                id="tabs"
+                title="Tabs"
+                blurb='Switch between content panels. Underline indicator on the active tab; arrow-key navigation and panel show/hide are wired in components.js. For "set this value to X" choices, reach for the segmented control instead.'
+            >
+                <UiExample
+                    markup={{ '<div class="admin-tabs w-96">\n    <div role="tablist" aria-label="Settings">\n        <button role="tab" aria-controls="tab-general" aria-selected="true">General</button>\n        <button role="tab" aria-controls="tab-advanced" aria-selected="false">Advanced</button>\n    </div>\n    <div role="tabpanel" id="tab-general" class="text-sm py-2">General tab content.</div>\n    <div role="tabpanel" id="tab-advanced" class="text-sm py-2" hidden>Advanced tab content.</div>\n</div>' }}
+                />
+            </UiSection>
+            <UiSection
+                id="segmented"
+                title="Segmented control"
+                blurb="Pick one of a small set of mutually-exclusive values — theme, density, view mode. Roving tabindex and arrow-key navigation are wired in components.js; the consumer toggles `aria-checked` in response to clicks. For switching content panels, reach for tabs."
+            >
+                <UiExample
+                    markup={{ '<div class="admin-segmented w-72" role="radiogroup" aria-label="View mode">\n    <button role="radio" aria-checked="true" class="px-3 py-1.5">List</button>\n    <button role="radio" aria-checked="false" class="px-3 py-1.5">Grid</button>\n    <button role="radio" aria-checked="false" class="px-3 py-1.5">Cards</button>\n</div>' }}
+                />
+            </UiSection>
+            <UiSection
+                id="collapsible"
+                title="Collapsible"
+                blurb='Native `<details>` / `<summary>` get a smooth expand/collapse transition (via the new `::details-content` pseudo-element) and the default disclosure triangle is hidden so you can ship your own affordance. Used implicitly by the "Show markup" disclosures on this page.'
+            >
+                <UiExample
+                    markup={{ '<details class="rounded-admin-md border border-admin-border p-3 w-96">\n    <summary class="gap-2 text-sm font-medium">\n        <admin.Icon name="chevron-right" class="transition-transform group-open:rotate-90" />\n        Advanced options\n    </summary>\n    <div class="text-sm text-admin-muted-foreground mt-2">\n        Tucked-away configuration the everyday user shouldn&apos;t have to think about.\n    </div>\n</details>' }}
+                />
+                <UiExample
+                    caption="Collapsible card"
+                    markup={{ '<details class="admin-card group w-96" open>\n    <summary class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4">\n        <h3 class="font-semibold">Object Details</h3>\n        <admin.Icon name="chevron-right" class="text-admin-muted-foreground transition-transform group-open:rotate-90" />\n    </summary>\n    <section class="px-6 pb-6 text-sm text-admin-muted-foreground">\n        Body content of the card, revealed when expanded.\n    </section>\n</details>' }}
+                />
+            </UiSection>
+            {# ====================================================================== #}
+            {# Behaviors                                                              #}
+            {# ====================================================================== #}
+            <h2 class="text-2xl font-bold text-admin-foreground mt-16 mb-1">Behaviors</h2>
+            <UiSection
+                id="behaviors"
+                title="Data attributes"
+                blurb="Declarative `data-*` attributes you sprinkle on existing elements. Behaviors are delegated event handlers in `assets/admin/behaviors.js` — no markup pattern, no CSS. They piggyback on whatever element you stick them on."
+            >
+                {# Cells use `whitespace-normal` so the prose descriptions wrap inside
    the content column. The default `.table` cell style is
    `whitespace-nowrap`, which is correct for list views (IDs,
    timestamps) but wrong for doc-prose tables like this. #}
-            <table class="admin-table [&_td]:whitespace-normal [&_td]:align-top">
-                <thead>
-                    <tr>
-                        <th>Attribute</th>
-                        <th>What it does</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td class="whitespace-nowrap!"><code>data-copy-value="…"</code></td>
-                        <td>Click to write the value to the clipboard. A descendant marked <code>data-copy-feedback</code> (or the trigger's last child) gets a brief "Copied!" text swap.</td>
-                    </tr>
-                    <tr>
-                        <td class="whitespace-nowrap!"><code>data-autosubmit</code></td>
-                        <td>On a form field — submit the enclosing form on <code>change</code>. Used for list filters and pagination dropdowns.</td>
-                    </tr>
-                    <tr>
-                        <td class="whitespace-nowrap!"><code>data-column-autolink="<em>url</em>"</code></td>
-                        <td>Wrap a table cell's content in an <code>&lt;a href&gt;</code> link to <em>url</em>. No-op if the cell already contains an anchor.</td>
-                    </tr>
-                    <tr>
-                        <td class="whitespace-nowrap!"><code>data-encrypted="<em>value</em>"</code></td>
-                        <td>Click to reveal/hide an encrypted value (used for API keys and similar). Clicking inside the revealed <code>&lt;code&gt;</code> doesn't re-toggle, so the user can select to copy.</td>
-                    </tr>
-                </tbody>
-            </table>
-            <p class="text-sm text-admin-muted-foreground mt-3">
+                <table class="admin-table [&_td]:whitespace-normal [&_td]:align-top">
+                    <thead>
+                        <tr>
+                            <th>Attribute</th>
+                            <th>What it does</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="whitespace-nowrap!"><code>data-copy-value="…"</code></td>
+                            <td>Click to write the value to the clipboard. A descendant marked <code>data-copy-feedback</code> (or the trigger's last child) gets a brief "Copied!" text swap.</td>
+                        </tr>
+                        <tr>
+                            <td class="whitespace-nowrap!"><code>data-autosubmit</code></td>
+                            <td>On a form field — submit the enclosing form on <code>change</code>. Used for list filters and pagination dropdowns.</td>
+                        </tr>
+                        <tr>
+                            <td class="whitespace-nowrap!"><code>data-column-autolink="<em>url</em>"</code></td>
+                            <td>Wrap a table cell's content in an <code>&lt;a href&gt;</code> link to <em>url</em>. No-op if the cell already contains an anchor.</td>
+                        </tr>
+                        <tr>
+                            <td class="whitespace-nowrap!"><code>data-encrypted="<em>value</em>"</code></td>
+                            <td>Click to reveal/hide an encrypted value (used for API keys and similar). Clicking inside the revealed <code>&lt;code&gt;</code> doesn't re-toggle, so the user can select to copy.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-sm text-admin-muted-foreground mt-3">
     GET-form submissions are also intercepted globally to drop empty params from the URL — keeps list views from accumulating <code>?q=&amp;filter=</code> cruft when filters are cleared. No attribute needed; applies to every <code>&lt;form method="GET"&gt;</code>.
 </p>
-        </UiSection>
-    </div>
-    {# Side nav (sticky on lg+, hidden on mobile where the top TOC takes over) #}
-    <nav
-        data-ui-toc
-        class="hidden lg:block lg:sticky lg:top-28 self-start text-xs leading-snug border-l border-admin-border pl-3 max-h-[calc(100vh-8rem)] overflow-y-auto [&_a]:block [&_a]:py-px [&_a]:text-admin-muted-foreground [&_a:hover]:text-admin-foreground [&_a[data-active=true]]:text-admin-foreground [&_a[data-active=true]]:font-medium"
-    >
-        <div
-            :for={(group_title, items) in [
+            </UiSection>
+        </div>
+        {# Side nav (sticky on lg+, hidden on mobile where the top TOC takes over) #}
+        <nav
+            data-ui-toc
+            class="hidden lg:block lg:sticky lg:top-28 self-start text-xs leading-snug border-l border-admin-border pl-3 max-h-[calc(100vh-8rem)] overflow-y-auto [&_a]:block [&_a]:py-px [&_a]:text-admin-muted-foreground [&_a:hover]:text-admin-foreground [&_a[data-active=true]]:text-admin-foreground [&_a[data-active=true]]:font-medium"
+        >
+            {% for (group_title, items) in [
             ("Theme", [("customizing", "Customizing"), ("beyond-tokens", "Beyond tokens"), ("dark-mode", "Dark mode"), ("typography", "Typography")]),
             ("Tokens", [("tokens-surface", "Surface tokens"), ("tokens-action", "Action tokens"), ("tokens-status", "Status tokens"), ("tokens-header", "Header tokens"), ("tokens-sizing", "Sizing tokens")]),
             ("Content", [("prose", "Prose"), ("icons", "Icons"), ("kbd", "Keyboard hints")]),
@@ -930,14 +929,14 @@ document.addEventListener("DOMContentLoaded", () => {
             ("Overlays", [("dialogs", "Dialogs"), ("popovers", "Popovers"), ("dropdowns", "Dropdowns"), ("tooltips", "Tooltips"), ("hovercards", "Hovercards")]),
             ("Disclosure", [("tabs", "Tabs"), ("segmented", "Segmented control"), ("collapsible", "Collapsible")]),
             ("Behaviors", [("behaviors", "Data attributes")])
-        ]}
-            class="mt-2 first:mt-0"
-        >
-            <p
-                class="text-[10px] font-semibold uppercase tracking-wider text-admin-muted-foreground/70 mb-0.5"
-            >{group_title}</p>
-            <a :for={(id, title) in items} href={"#" + id}>{title}</a>
-        </div>
-    </nav>
-</div>
+        ] %}
+                <div class="mt-2 first:mt-0">
+                    <p
+                        class="text-[10px] font-semibold uppercase tracking-wider text-admin-muted-foreground/70 mb-0.5"
+                    >{{ group_title }}</p>
+                    {% for (id, title) in items %}<a href={{ "#" + id }}>{{ title }}</a>{% endfor %}
+                </div>
+            {% endfor %}
+        </nav>
+    </div>
 </Base>

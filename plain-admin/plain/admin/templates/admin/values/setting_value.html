@@ -4,9 +4,8 @@ attrs:
   field: Any = None
   object: Any = None
 ---
-<span :if={value == "''"} class="text-admin-muted-foreground/50">&mdash;</span>
-<span
-    :if={value != "''"}
-    data-secret={object["is_secret"]}
+{% if value == "''" %}<span class="text-admin-muted-foreground/50">&mdash;</span>{% endif %}
+{% if value != "''" %}<span
+    data-secret={{ object["is_secret"] }}
     class="font-mono text-sm break-all data-[secret=True]:text-admin-muted-foreground/80 data-[secret=True]:italic"
->{value}</span>
+>{{ value }}</span>{% endif %}

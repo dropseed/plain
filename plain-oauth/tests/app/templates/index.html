@@ -8,33 +8,37 @@ attrs:
   oauth_provider_keys: list = []
 ---
 <Base>
-Hello {user}!
+Hello {{ user }}!
 
 <h2>Existing connections</h2>
 <ul>
-    <li :for={connection in user.oauth_connections.query.all()}>
-        {connection.provider_key} [ID: {connection.provider_user_id}]
+    {% for connection in user.oauth_connections.query.all() %}
+        <li>
+        {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
         <form
-            action={url('oauth:disconnect', provider=connection.provider_key)}
+            action={{ url('oauth:disconnect', provider=connection.provider_key) }}
             method="post"
         >
             <input
                 type="hidden"
                 name="provider_user_id"
-                value={connection.provider_user_id}
+                value={{ connection.provider_user_id }}
             >
             <button type="submit">Disconnect</button>
         </form>
     </li>
+    {% endfor %}
 </ul>
 
 <h2>Add a connection</h2>
 <ul>
-    <li :for={provider_key in oauth_provider_keys}>
-        {provider_key}
-        <form action={url('oauth:connect', provider=provider_key)} method="post">
+    {% for provider_key in oauth_provider_keys %}
+        <li>
+        {{ provider_key }}
+        <form action={{ url('oauth:connect', provider=provider_key) }} method="post">
             <button type="submit">Connect</button>
         </form>
     </li>
+    {% endfor %}
 </ul>
 </Base>

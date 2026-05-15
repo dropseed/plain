@@ -6,7 +6,7 @@ attrs:
 <div class="px-6 py-4" data-exception-container>
     <div class="flex justify-between items-start mb-4">
         <div class="text-amber-400 min-w-0 break-words" data-exception-message>
-            <span class="font-semibold">{exception_context.exception.__class__.__name__}</span>: {exception_context.exception}
+            <span class="font-semibold">{{ exception_context.exception.__class__.__name__ }}</span>: {{ exception_context.exception }}
         </div>
         <div class="flex items-center space-x-2 ml-4 shrink-0">
             <button
@@ -40,12 +40,12 @@ attrs:
     </div>
     {# Traceback frames with source code #}
     <div class="space-y-1" data-exception-frames>
-        <div
-            :for={frame in exception_context.traceback_frames}
-            data-category={frame.category}
-            data-expanded={"true" if frame.category == "app" else "false"}
-            class="group rounded overflow-hidden border border-white/10 bg-white/5 data-[category=app]:bg-amber-500/10"
-        >
+        {% for frame in exception_context.traceback_frames %}
+            <div
+                data-category={{ frame.category }}
+                data-expanded={{ "true" if frame.category == "app" else "false" }}
+                class="group rounded overflow-hidden border border-white/10 bg-white/5 data-[category=app]:bg-amber-500/10"
+            >
             <button
                 data-toggle-frame
                 class="w-full px-2 py-1 text-xs flex justify-between items-center text-stone-400 hover:text-stone-300 hover:bg-white/5 cursor-pointer group-data-[category=app]:text-stone-300"
@@ -66,66 +66,76 @@ attrs:
                         />
                     </svg>
                     <span
-                        data-category={frame.category}
+                        data-category={{ frame.category }}
                         class="px-1.5 py-0.5 rounded text-[10px] font-medium
                         data-[category=app]:bg-amber-500/30 data-[category=app]:text-amber-300
                         data-[category=plain]:bg-emerald-500/30 data-[category=plain]:text-emerald-300
                         data-[category=plainx]:bg-violet-500/30 data-[category=plainx]:text-violet-300
                         data-[category=python]:bg-sky-500/30 data-[category=python]:text-sky-300
                         data-[category=third-party]:bg-zinc-600/30 data-[category=third-party]:text-zinc-400"
-                    >{frame.category}</span>
+                    >{{ frame.category }}</span>
                     <a
-                        href={"vscode://file/" + frame.filename + ":" + str(frame.lineno)}
+                        href={{ "vscode://file/" + frame.filename + ":" + str(frame.lineno) }}
                         data-vscode-link
                         class="font-mono hover:underline text-stone-500"
-                    >{frame.filename}</a>
+                    >{{ frame.filename }}</a>
                 </div>
-                <span>line {frame.lineno} in <span class="font-semibold">{frame.name}</span></span>
+                <span>line {{ frame.lineno }} in <span class="font-semibold">{{ frame.name }}</span></span>
             </button>
             <div
                 data-frame-content
-                data-visible={"true" if frame.category == "app" else "false"}
+                data-visible={{ "true" if frame.category == "app" else "false" }}
                 class="data-[visible=false]:hidden"
             >
-                <div :if={frame.source_lines} class="text-xs overflow-auto">
-                    <table class="w-full">
-                        <tr
-                            :for={line in frame.source_lines}
-                            data-error-line={"true" if line["is_error_line"] else "false"}
-                            class="data-[error-line=true]:bg-amber-500/20"
-                        >
-                            <td
-                                class="px-2 py-0.5 text-right text-stone-500 select-none w-12 font-mono"
-                            >{line["lineno"]}</td>
-                            <td
-                                class="px-2 py-0.5 font-mono whitespace-pre text-stone-300"
-                            >{line["code"]}</td>
-                        </tr>
-                    </table>
-                </div>
-                <div :if={frame.locals} class="border-t border-white/10">
-                    <table class="text-xs">
-                        <tr :for={var in frame.locals} class="hover:bg-white/5">
-                            <td
-                                class="py-0.5 pl-2 pr-4 text-stone-400 font-mono whitespace-nowrap"
-                            >{var["name"]}</td>
-                            <td class="py-0.5 pr-4 text-stone-500 whitespace-nowrap">{var["type"]}</td>
-                            <td class="py-0.5 pr-2 text-stone-400 font-mono">{var["value"]}</td>
-                        </tr>
-                    </table>
-                </div>
+                {% if frame.source_lines %}
+                    <div class="text-xs overflow-auto">
+                        <table class="w-full">
+                            {% for line in frame.source_lines %}
+                                <tr
+                                    data-error-line={{ "true" if line["is_error_line"] else "false" }}
+                                    class="data-[error-line=true]:bg-amber-500/20"
+                                >
+                                    <td
+                                        class="px-2 py-0.5 text-right text-stone-500 select-none w-12 font-mono"
+                                    >{{ line["lineno"] }}</td>
+                                    <td
+                                        class="px-2 py-0.5 font-mono whitespace-pre text-stone-300"
+                                    >{{ line["code"] }}</td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    </div>
+                {% endif %}
+                {% if frame.locals %}
+                    <div class="border-t border-white/10">
+                        <table class="text-xs">
+                            {% for var in frame.locals %}
+                                <tr class="hover:bg-white/5">
+                                    <td
+                                        class="py-0.5 pl-2 pr-4 text-stone-400 font-mono whitespace-nowrap"
+                                    >{{ var["name"] }}</td>
+                                    <td
+                                        class="py-0.5 pr-4 text-stone-500 whitespace-nowrap"
+                                    >{{ var["type"] }}</td>
+                                    <td class="py-0.5 pr-2 text-stone-400 font-mono">{{ var["value"] }}</td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    </div>
+                {% endif %}
             </div>
         </div>
+        {% endfor %}
     </div>
     {# Raw traceback (hidden by default, toggled with Raw button) #}
     <div
         class="hidden mt-4 text-stone-300 text-xs bg-white/5 p-2 rounded overflow-auto"
         data-exception-traceback
     >
-        <pre><code>{exception_context.traceback_string}</code></pre>
+        <pre><code>{{ exception_context.traceback_string }}</code></pre>
     </div>
 </div>
-<script nonce={request.csp_nonce}>
+<script nonce={{ request.csp_nonce }}>
 (function() {
     function copyException(button) {
         const container = button.closest('[data-exception-container]');

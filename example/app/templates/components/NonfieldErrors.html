@@ -2,4 +2,6 @@
 attrs:
   form: plain.forms.Form
 ---
-<div :for={error in form.non_field_errors} class="nonfield-error">{error}</div>
+{% for error in form.non_field_errors %}
+    <div class="nonfield-error">{{ error }}</div>
+{% endfor %}

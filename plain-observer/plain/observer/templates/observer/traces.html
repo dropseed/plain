@@ -17,11 +17,11 @@ attrs:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Observer Traces</title>
-    {tailwind_css()}
-    {htmx_js(request)}
-    <link rel="stylesheet" href={asset('observer/observer.css')}>
-    <script src={asset('observer/observer.js')} defer nonce={request.csp_nonce}></script>
-    <script nonce={request.csp_nonce}>
+    {{ tailwind_css() }}
+    {{ htmx_js(request) }}
+    <link rel="stylesheet" href={{ asset('observer/observer.css') }}>
+    <script src={{ asset('observer/observer.js') }} defer nonce={{ request.csp_nonce }}></script>
+    <script nonce={{ request.csp_nonce }}>
         if (window.self !== window.top) {
             document.addEventListener('DOMContentLoaded', function() {
                 document.body.setAttribute('data-iframe', 'true');
@@ -34,43 +34,44 @@ attrs:
         hx-ext="morph"
     >
         <div id="main-content" class="h-full">
-            <div :if={traces} class="flex h-full">
-                <aside
-                    class="fixed left-0 top-0 bottom-0 w-80 border-r border-white/10 flex flex-col"
-                >
-                    <div class="flex-shrink-0 p-3 border-b border-white/10 z-10">
-                        <div class="flex items-center justify-between">
-                            <h3 class="text-sm text-white/90">Traces ({len(traces)})</h3>
-                            <div class="flex items-center gap-2">
-                            <div
-                                :if={observer.is_persisting()}
-                                class="w-2 h-2 bg-red-500 rounded-full animate-pulse"
-                                title="Recording"
-                            ></div>
-                            <select
-                                hx-put={url('observer:traces')}
-                                hx-trigger="change"
-                                hx-swap="morph:innerHTML"
-                                hx-target="#main-content"
-                                plain-hx-action="mode"
-                                name="mode"
-                                class="h-8 bg-white/10 text-white/70 rounded-sm px-2 py-0 text-xs border border-white/10 focus:border-white/20 focus:outline-none cursor-pointer"
-                            >
-                                <option
-                                    value="summary"
-                                    selected={observer.is_summarizing()}
-                                >Summary</option>
-                                <option
-                                    value="persist"
-                                    selected={observer.is_persisting()}
-                                >Recording</option>
-                                <option disabled>───────</option>
-                                <option
-                                    value="disable"
-                                    selected={observer.is_disabled()}
-                                    class="text-white/50"
-                                >Disabled</option>
-                            </select>
+            {% if traces %}
+                <div class="flex h-full">
+                    <aside
+                        class="fixed left-0 top-0 bottom-0 w-80 border-r border-white/10 flex flex-col"
+                    >
+                        <div class="flex-shrink-0 p-3 border-b border-white/10 z-10">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-sm text-white/90">Traces ({{ len(traces) }})</h3>
+                                <div class="flex items-center gap-2">
+                            {% if observer.is_persisting() %}
+                                    <div
+                                        class="w-2 h-2 bg-red-500 rounded-full animate-pulse"
+                                        title="Recording"
+                                    ></div>
+                                {% endif %}<select
+                                    hx-put={{ url('observer:traces') }}
+                                    hx-trigger="change"
+                                    hx-swap="morph:innerHTML"
+                                    hx-target="#main-content"
+                                    plain-hx-action="mode"
+                                    name="mode"
+                                    class="h-8 bg-white/10 text-white/70 rounded-sm px-2 py-0 text-xs border border-white/10 focus:border-white/20 focus:outline-none cursor-pointer"
+                                >
+                                    <option
+                                        value="summary"
+                                        selected={{ observer.is_summarizing() }}
+                                    >Summary</option>
+                                    <option
+                                        value="persist"
+                                        selected={{ observer.is_persisting() }}
+                                    >Recording</option>
+                                    <option disabled>───────</option>
+                                    <option
+                                        value="disable"
+                                        selected={{ observer.is_disabled() }}
+                                        class="text-white/50"
+                                    >Disabled</option>
+                                </select>
                             <div class="relative group">
                                 <div
                                     class="flex items-center gap-2 hover:bg-white/10 rounded-lg p-1 transition-colors cursor-pointer"
@@ -112,7 +113,7 @@ attrs:
                                             <span class="hidden htmx-request:inline">Refreshing...</span>
                                         </button>
                                         <button
-                                            hx-delete={url('observer:traces')}
+                                            hx-delete={{ url('observer:traces') }}
                                             plain-hx-action="traces"
                                             hx-swap="morph:innerHTML"
                                             hx-target="#main-content"
@@ -137,46 +138,45 @@ attrs:
                                 </div>
                             </div>
                         </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="flex-1 overflow-y-auto">
-                        <ul class="divide-y divide-white/5">
-                            <li :for={trace_item in traces}>
+                        <div class="flex-1 overflow-y-auto">
+                            <ul class="divide-y divide-white/5">
+                                {% for trace_item in traces %}
+                                    <li>
                             <a
-                                href={trace_item.get_absolute_url()}
-                                hx-get={trace_item.get_absolute_url()}
+                                href={{ trace_item.get_absolute_url() }}
+                                hx-get={{ trace_item.get_absolute_url() }}
                                 hx-target="#trace"
                                 hx-swap="innerHTML"
                                 hx-push-url="true"
                                 class="block w-full text-left p-3 transition-colors hover:bg-white/5 focus:outline-none focus:bg-white/5"
-                                data-trace-id={trace_item.trace_id}
+                                data-trace-id={{ trace_item.trace_id }}
                             >
                                 <div class="flex items-center justify-between gap-2">
                                     <div class="flex-1 min-w-0">
-                                        <div
-                                            :if={trace_item.root_span_name}
-                                            class="text-xs font-medium text-white/90 truncate"
-                                        >{trace_item.root_span_name}</div>
-                                        <div
-                                            :if={not trace_item.root_span_name}
-                                            class="text-xs font-medium text-white/30 font-mono truncate"
-                                        >{trace_item.trace_id}</div>
+                                        {% if trace_item.root_span_name %}
+                                            <div
+                                                class="text-xs font-medium text-white/90 truncate"
+                                            >{{ trace_item.root_span_name }}</div>
+                                        {% endif %}
+                                        {% if not trace_item.root_span_name %}
+                                            <div
+                                                class="text-xs font-medium text-white/30 font-mono truncate"
+                                            >{{ trace_item.trace_id }}</div>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 <div class="mt-1 space-y-1">
-                                    <div
-                                        :if={trace_item.summary}
-                                        class="text-xs text-white/60"
-                                    >{trace_item.summary}</div>
+                                    {% if trace_item.summary %}
+                                        <div class="text-xs text-white/60">{{ trace_item.summary }}</div>
+                                    {% endif %}
                                     <div
                                         class="flex items-center justify-between gap-3 text-xs text-white/50"
                                     >
-                                        <div
-                                            :if={trace_item.user_id or trace_item.session_id or trace_item.app_version}
-                                            class="flex items-center gap-3"
-                                        >
-                                            <span
-                                                :if={trace_item.user_id}
+                                        {% if trace_item.user_id or trace_item.session_id or trace_item.app_version %}
+                                        <div class="flex items-center gap-3">
+                                            {% if trace_item.user_id %}<span
                                                 class="flex items-center gap-1 flex-shrink-0"
                                             >
                                                 <svg
@@ -188,10 +188,9 @@ attrs:
                                                         d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"
                                                     />
                                                 </svg>
-                                                {trace_item.user_id}
-                                            </span>
-                                            <span
-                                                :if={trace_item.session_id}
+                                                {{ trace_item.user_id }}
+                                            </span>{% endif %}
+                                            {% if trace_item.session_id %}<span
                                                 class="flex items-center gap-1 min-w-0 flex-shrink"
                                             >
                                                 <svg
@@ -205,11 +204,10 @@ attrs:
                                                 </svg>
                                                 <span
                                                     class="truncate"
-                                                    title={trace_item.session_id}
-                                                >{trace_item.session_id}</span>
-                                            </span>
-                                            <span
-                                                :if={trace_item.app_version}
+                                                    title={{ trace_item.session_id }}
+                                                >{{ trace_item.session_id }}</span>
+                                            </span>{% endif %}
+                                            {% if trace_item.app_version %}<span
                                                 class="flex items-center gap-1 flex-shrink-0"
                                             >
                                                 <svg
@@ -224,93 +222,90 @@ attrs:
                                                         d="M2 1h4.586a1 1 0 0 1 .707.293l7 7a1 1 0 0 1 0 1.414l-4.586 4.586a1 1 0 0 1-1.414 0l-7-7A1 1 0 0 1 1 6.586V2a1 1 0 0 1 1-1zm0 5.586 7 7L13.586 9l-7-7H2v4.586z"
                                                     />
                                                 </svg>
-                                                {trace_item.app_version}
-                                            </span>
+                                                {{ trace_item.app_version }}
+                                            </span>{% endif %}
                                         </div>
-                                        <span
-                                            class="flex-shrink-0 text-white/40"
-                                            title={str(localtime(trace_item.start_time))}
-                                        >{timesince(trace_item.start_time)} ago</span>
+                                    {% endif %}<span
+                                        class="flex-shrink-0 text-white/40"
+                                        title={{ str(localtime(trace_item.start_time)) }}
+                                    >{{ timesince(trace_item.start_time) }} ago</span>
                                     </div>
                                 </div>
                             </a>
                         </li>
-                        </ul>
-                    </div>
-                </aside>
-                <main
-                    id="trace"
-                    class="flex-1 px-6 py-4 overflow-auto overscroll-contain ml-80"
-                >
-                    <div
-                        hx-get={traces.first().get_absolute_url()}
-                        hx-trigger="load"
-                        hx-swap="innerHTML"
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </aside>
+                    <main
+                        id="trace"
+                        class="flex-1 px-6 py-4 overflow-auto overscroll-contain ml-80"
                     >
-                        <div class="flex items-center justify-center h-full">
-                            <div class="text-white/50">Loading trace...</div>
+                        <div
+                            hx-get={{ traces.first().get_absolute_url() }}
+                            hx-trigger="load"
+                            hx-swap="innerHTML"
+                        >
+                            <div class="flex items-center justify-center h-full">
+                                <div class="text-white/50">Loading trace...</div>
+                            </div>
                         </div>
-                    </div>
-                </main>
-            </div>
-            <div
-                :if={not traces and observer.is_enabled()}
-                class="flex items-center justify-center min-h-screen p-6"
-            >
-                <div class="text-center max-w-2xl w-full">
-                    <div
-                        class="flex flex-col sm:flex-row items-center sm:items-start gap-6"
-                    >
-                        <div class="flex-shrink-0">
-                            <div class="p-3 bg-white/10 rounded-full mb-3 sm:mb-0">
-                            <svg
-                                :if={observer.is_summarizing()}
-                                width="32"
-                                height="32"
-                                fill="currentColor"
-                                class="text-yellow-500"
-                                viewBox="0 0 16 16"
-                            >
-                                <path
-                                    d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"
-                                />
-                                <path
-                                    d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"
-                                />
-                            </svg>
-                            <svg
-                                :if={not observer.is_summarizing()}
-                                width="32"
-                                height="32"
-                                fill="currentColor"
-                                class="text-red-500 animate-pulse"
-                                viewBox="0 0 16 16"
-                            >
-                                <circle cx="8" cy="8" r="8" />
-                            </svg>
-                        </div>
-                        </div>
-                        <div class="flex-1 text-center sm:text-left">
-                            <h3 class="text-lg font-medium text-white/80 mb-1">
-                            <template :if={observer.is_summarizing()}>Toolbar Summary Only</template>
-                            <template :if={not observer.is_summarizing()}>Recording Traces</template>
-                        </h3>
-                            <p class="text-sm text-white/40 mb-4">
-                            <template :if={observer.is_summarizing()}>Performance summary is displayed in real-time. No traces are being stored.</template>
-                            <template :if={not observer.is_summarizing()}>Waiting for requests... Traces will appear here automatically.</template>
-                        </p>
-                            <div
-                                class="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2"
-                            >
-                            <button
-                                :if={observer.is_summarizing()}
-                                hx-put={url('observer:traces')}
-                                plain-hx-action="mode"
-                                hx-vals='{{"mode": "persist"}}'
-                                hx-swap="morph:innerHTML"
-                                hx-target="#main-content"
-                                class="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 cursor-pointer transition-colors"
-                            >
+                    </main>
+                </div>
+            {% endif %}
+            {% if not traces and observer.is_enabled() %}
+                <div class="flex items-center justify-center min-h-screen p-6">
+                    <div class="text-center max-w-2xl w-full">
+                        <div
+                            class="flex flex-col sm:flex-row items-center sm:items-start gap-6"
+                        >
+                            <div class="flex-shrink-0">
+                                <div class="p-3 bg-white/10 rounded-full mb-3 sm:mb-0">
+                                    {% if observer.is_summarizing() %}<svg
+                                        width="32"
+                                        height="32"
+                                        fill="currentColor"
+                                        class="text-yellow-500"
+                                        viewBox="0 0 16 16"
+                                    >
+                                        <path
+                                            d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"
+                                        />
+                                        <path
+                                            d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"
+                                        />
+                                    </svg>{% endif %}
+                                    {% if not observer.is_summarizing() %}<svg
+                                        width="32"
+                                        height="32"
+                                        fill="currentColor"
+                                        class="text-red-500 animate-pulse"
+                                        viewBox="0 0 16 16"
+                                    >
+                                        <circle cx="8" cy="8" r="8" />
+                                    </svg>{% endif %}
+                                </div>
+                            </div>
+                            <div class="flex-1 text-center sm:text-left">
+                                <h3 class="text-lg font-medium text-white/80 mb-1">
+                                    {% if observer.is_summarizing() %}Toolbar Summary Only{% endif %}
+                                    {% if not observer.is_summarizing() %}Recording Traces{% endif %}
+                                </h3>
+                                <p class="text-sm text-white/40 mb-4">
+                                    {% if observer.is_summarizing() %}Performance summary is displayed in real-time. No traces are being stored.{% endif %}
+                                    {% if not observer.is_summarizing() %}Waiting for requests... Traces will appear here automatically.{% endif %}
+                                </p>
+                                <div
+                                    class="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2"
+                                >
+                            {% if observer.is_summarizing() %}<button
+                                    hx-put={{ url('observer:traces') }}
+                                    plain-hx-action="mode"
+                                    hx-vals='{"mode": "persist"}'
+                                    hx-swap="morph:innerHTML"
+                                    hx-target="#main-content"
+                                    class="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 cursor-pointer transition-colors"
+                                >
                                 <svg
                                     class="w-4 h-4"
                                     fill="currentColor"
@@ -319,8 +314,7 @@ attrs:
                                     <circle cx="8" cy="8" r="8" />
                                 </svg>
                                 <span>Record Session Traces</span>
-                            </button>
-                            <template :if={observer.is_persisting()}>
+                            </button>{% endif %}{% if observer.is_persisting() %}
                                 <button
                                     hx-get="."
                                     hx-swap="morph:innerHTML"
@@ -344,9 +338,9 @@ attrs:
                                     <span class="hidden htmx-request:inline">Checking...</span>
                                 </button>
                                 <button
-                                    hx-put={url('observer:traces')}
+                                    hx-put={{ url('observer:traces') }}
                                     plain-hx-action="mode"
-                                    hx-vals='{{"mode": "summary"}}'
+                                    hx-vals='{"mode": "summary"}'
                                     hx-swap="morph:innerHTML"
                                     hx-target="#main-content"
                                     class="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-lg bg-white/20 text-white/80 hover:bg-white/30 cursor-pointer transition-colors"
@@ -365,33 +359,30 @@ attrs:
                                     </svg>
                                     <span>Stop Recording</span>
                                 </button>
-                            </template>
-
-                            <button
-                                hx-put={url('observer:traces')}
-                                plain-hx-action="mode"
-                                hx-vals='{{"mode": "disable"}}'
-                                hx-swap="morph:innerHTML"
-                                hx-target="#main-content"
-                                class="px-3 py-1.5 text-sm text-white/50 hover:text-white/40 transition-colors"
-                            >
+                            {% endif %}<button
+                                    hx-put={{ url('observer:traces') }}
+                                    plain-hx-action="mode"
+                                    hx-vals='{"mode": "disable"}'
+                                    hx-swap="morph:innerHTML"
+                                    hx-target="#main-content"
+                                    class="px-3 py-1.5 text-sm text-white/50 hover:text-white/40 transition-colors"
+                                >
                                 Disable Observer
                             </button>
                         </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div
-                :if={not traces and not observer.is_enabled()}
-                class="flex items-center justify-center min-h-screen p-6"
-            >
-                <div class="text-center max-w-2xl w-full">
-                    <div
-                        class="flex flex-col sm:flex-row items-center sm:items-start gap-6"
-                    >
-                        <div class="flex-shrink-0">
-                            <div class="p-3 bg-white/10 rounded-full mb-3 sm:mb-0">
+            {% endif %}
+            {% if not traces and not observer.is_enabled() %}
+                <div class="flex items-center justify-center min-h-screen p-6">
+                    <div class="text-center max-w-2xl w-full">
+                        <div
+                            class="flex flex-col sm:flex-row items-center sm:items-start gap-6"
+                        >
+                            <div class="flex-shrink-0">
+                                <div class="p-3 bg-white/10 rounded-full mb-3 sm:mb-0">
                             <svg
                                 width="32"
                                 height="32"
@@ -410,18 +401,18 @@ attrs:
                                 />
                             </svg>
                         </div>
-                        </div>
-                        <div class="flex-1 text-center sm:text-left">
-                            <h3 class="text-lg font-medium text-white/80 mb-1">Observer is Disabled</h3>
-                            <p class="text-sm text-white/40 mb-4">
+                            </div>
+                            <div class="flex-1 text-center sm:text-left">
+                                <h3 class="text-lg font-medium text-white/80 mb-1">Observer is Disabled</h3>
+                                <p class="text-sm text-white/40 mb-4">
                             Enable observer to start monitoring your application's performance and traces.
                         </p>
-                            <div class="bg-white/10 rounded-lg p-3 mb-4">
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div class="text-left">
-                                        <h4
-                                            class="text-xs font-medium text-yellow-400 mb-1 flex items-center"
-                                        >
+                                <div class="bg-white/10 rounded-lg p-3 mb-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div class="text-left">
+                                            <h4
+                                                class="text-xs font-medium text-yellow-400 mb-1 flex items-center"
+                                            >
                                         <svg
                                             width="12"
                                             height="12"
@@ -438,12 +429,12 @@ attrs:
                                         </svg>
                                         Summary Mode
                                     </h4>
-                                        <p class="text-xs text-white/40">Monitor performance in real-time without saving traces.</p>
-                                    </div>
-                                    <div class="text-left">
-                                        <h4
-                                            class="text-xs font-medium text-red-400 mb-1 flex items-center"
-                                        >
+                                            <p class="text-xs text-white/40">Monitor performance in real-time without saving traces.</p>
+                                        </div>
+                                        <div class="text-left">
+                                            <h4
+                                                class="text-xs font-medium text-red-400 mb-1 flex items-center"
+                                            >
                                         <svg
                                             width="12"
                                             height="12"
@@ -455,17 +446,17 @@ attrs:
                                         </svg>
                                         Recording Mode
                                     </h4>
-                                        <p class="text-xs text-white/40">Record and store traces for detailed analysis.</p>
+                                            <p class="text-xs text-white/40">Record and store traces for detailed analysis.</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div
-                                class="flex flex-col sm:flex-row items-center sm:items-start gap-2"
-                            >
+                                <div
+                                    class="flex flex-col sm:flex-row items-center sm:items-start gap-2"
+                                >
                             <button
-                                hx-put={url('observer:traces')}
+                                hx-put={{ url('observer:traces') }}
                                 plain-hx-action="mode"
-                                hx-vals='{{"mode": "summary"}}'
+                                hx-vals='{"mode": "summary"}'
                                 hx-swap="morph:innerHTML"
                                 hx-target="#main-content"
                                 class="flex items-center justify-center space-x-2 px-4 py-1.5 text-sm rounded-lg bg-white/20 text-white/80 hover:bg-white/30 cursor-pointer transition-colors w-full sm:w-auto"
@@ -485,9 +476,9 @@ attrs:
                                 <span>Enable Summary</span>
                             </button>
                             <button
-                                hx-put={url('observer:traces')}
+                                hx-put={{ url('observer:traces') }}
                                 plain-hx-action="mode"
-                                hx-vals='{{"mode": "persist"}}'
+                                hx-vals='{"mode": "persist"}'
                                 hx-swap="morph:innerHTML"
                                 hx-target="#main-content"
                                 class="flex items-center justify-center space-x-2 px-4 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 cursor-pointer transition-colors w-full sm:w-auto"
@@ -502,10 +493,11 @@ attrs:
                                 <span>Start Recording Session</span>
                             </button>
                         </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            {% endif %}
         </div>
     </body>
 </html>

@@ -2,4 +2,6 @@
 attrs:
   bf: Any
 ---
-<div :for={error in bf.errors} class="field-error">⚠ {error}</div>
+{% for error in bf.errors %}
+    <div class="field-error">⚠ {{ error }}</div>
+{% endfor %}

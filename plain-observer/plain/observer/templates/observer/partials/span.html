@@ -6,7 +6,7 @@ attrs:
   span: Any
   event: Any
 ---
-<div data-span-level={event["span_level"]} class="border-l border-white/20">
+<div data-span-level={{ event["span_level"] }} class="border-l border-white/20">
     <details class="rounded bg-white/5 min-w-[600px] ml-px">
         <summary
             class="cursor-pointer hover:bg-white/10 transition-colors px-2 py-1 list-none [&::-webkit-details-marker]:hidden"
@@ -28,30 +28,28 @@ attrs:
                 <div class="w-80 flex items-center space-x-2">
                     <div
                         class="text-white/40 whitespace-nowrap tabular-nums"
-                        title={str(localtime(span.start_time))}
+                        title={{ str(localtime(span.start_time)) }}
                     >
-                        {localtime(span.start_time).strftime("%-I:%M:%S %p")}
+                        {{ localtime(span.start_time).strftime("%-I:%M:%S %p") }}
                     </div>
-                    <div class="flex-grow whitespace-nowrap truncate text-white/90">{span.name}</div>
-                    <div
-                        :if={span.annotations}
-                        class="flex items-center space-x-1 flex-shrink-0"
-                    >
-                        <span
-                            :for={annotation in span.annotations}
-                            class="w-4 h-4 inline-flex justify-center items-center text-xs rounded-full
+                    <div class="flex-grow whitespace-nowrap truncate text-white/90">{{ span.name }}</div>
+                    {% if span.annotations %}
+                        <div class="flex items-center space-x-1 flex-shrink-0">
+                            {% for annotation in span.annotations %}<span
+                                class="w-4 h-4 inline-flex justify-center items-center text-xs rounded-full
                                     data-[severity='warning']:bg-amber-500/20
                                     data-[severity='warning']:text-amber-400
                                     data-[severity='error']:bg-red-500/20
                                     data-[severity='error']:text-red-400
                                     data-[severity='info']:bg-blue-500/20
                                     data-[severity='info']:text-blue-400"
-                            data-severity={annotation["severity"]}
-                            title={annotation["message"]}
-                        >
+                                data-severity={{ annotation["severity"] }}
+                                title={{ annotation["message"] }}
+                            >
                             !
-                        </span>
-                    </div>
+                        </span>{% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
                 <div class="flex-1 px-4 min-w-[300px]">
                     <div class="relative h-6 bg-white/2 rounded-sm">
@@ -63,36 +61,36 @@ attrs:
                                     data-[kind='PRODUCER']:bg-purple-500
                                     data-[kind='INTERNAL']:bg-gray-500
                                     bg-white/30"
-                            data-kind={span.kind}
-                            data-span-id={span.span_id}
-                            data-start-percent={((span.start_time - trace.start_time).total_seconds() * 1000 / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0}
-                            data-width-percent={(span.duration_ms() / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0}
-                            title={span.name + " - " + str(span.duration_ms()) + "ms"}
+                            data-kind={{ span.kind }}
+                            data-span-id={{ span.span_id }}
+                            data-start-percent={{ ((span.start_time - trace.start_time).total_seconds() * 1000 / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}
+                            data-width-percent={{ (span.duration_ms() / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}
+                            title={{ span.name + " - " + str(span.duration_ms()) + "ms" }}
                         >
                         </div>
                         <div
                             class="absolute inset-0 flex items-center justify-start pl-1 text-xs text-white/80 font-medium whitespace-nowrap pointer-events-none"
-                            data-span-id={str(span.span_id) + "-label"}
-                            data-start-percent={((span.start_time - trace.start_time).total_seconds() * 1000 / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0}
-                            data-width-percent={(span.duration_ms() / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0}
+                            data-span-id={{ str(span.span_id) + "-label" }}
+                            data-start-percent={{ ((span.start_time - trace.start_time).total_seconds() * 1000 / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}
+                            data-width-percent={{ (span.duration_ms() / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}
                         >
-                            {"%.2f" % span.duration_ms()}ms
+                            {{ "%.2f" % span.duration_ms() }}ms
                         </div>
                     </div>
                 </div>
             </div>
         </summary>
         <div class="p-4 pt-2 bg-white/3 border-t border-white/20">
-            <div
-                :if={span.sql_query}
-                class={["mb-6 bg-white/3 rounded-lg border border-white/20 overflow-hidden", "ring-2 ring-amber-500/50" if span.annotations else None]}
-            >
+            {% if span.sql_query %}
                 <div
-                    class="bg-white/10 px-4 py-2 border-b border-white/20 flex items-center justify-between"
+                    class={{ ["mb-6 bg-white/3 rounded-lg border border-white/20 overflow-hidden", "ring-2 ring-amber-500/50" if span.annotations else None] }}
                 >
-                    <h4
-                        class="text-sm font-semibold text-emerald-400 flex items-center"
+                    <div
+                        class="bg-white/10 px-4 py-2 border-b border-white/20 flex items-center justify-between"
                     >
+                        <h4
+                            class="text-sm font-semibold text-emerald-400 flex items-center"
+                        >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             width="16"
@@ -116,53 +114,55 @@ attrs:
                         </svg>
                         Database Query
                     </h4>
-                    <div :if={span.annotations} class="flex items-center space-x-1">
-                        <span
-                            :for={annotation in span.annotations}
-                            class="px-2 py-0.5 text-xs rounded-full
+                        {% if span.annotations %}
+                            <div class="flex items-center space-x-1">
+                                {% for annotation in span.annotations %}<span
+                                    class="px-2 py-0.5 text-xs rounded-full
                                     data-[severity='warning']:bg-amber-500/20
                                     data-[severity='warning']:text-amber-400
                                     data-[severity='error']:bg-red-500/20
                                     data-[severity='error']:text-red-400
                                     data-[severity='info']:bg-blue-500/20
                                     data-[severity='info']:text-blue-400"
-                            data-severity={annotation["severity"]}
-                        >
-                            {annotation["message"]}
-                        </span>
+                                    data-severity={{ annotation["severity"] }}
+                                >
+                            {{ annotation["message"] }}
+                        </span>{% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
-                </div>
-                <div class="p-4">
-                    <pre
-                        class="text-xs text-white/80 font-mono whitespace-pre-wrap overflow-x-auto"
-                    ><code>{span.get_formatted_sql()}</code></pre>
-                    <div
-                        :if={span.sql_query_params}
-                        class="mt-4 pt-4 border-t border-white/20"
-                    >
-                        <h5 class="text-xs font-semibold text-white/40 mb-2">Query Parameters</h5>
-                        <div class="space-y-1">
-                            <div
-                                :for={(param_key, param_value) in span.sql_query_params.items()}
-                                class="flex text-xs"
-                            >
+                    <div class="p-4">
+                        <pre
+                            class="text-xs text-white/80 font-mono whitespace-pre-wrap overflow-x-auto"
+                        ><code>{{ span.get_formatted_sql() }}</code></pre>
+                        {% if span.sql_query_params %}
+                            <div class="mt-4 pt-4 border-t border-white/20">
+                                <h5 class="text-xs font-semibold text-white/40 mb-2">Query Parameters</h5>
+                                <div class="space-y-1">
+                                    {% for (param_key, param_value) in span.sql_query_params.items() %}
+                                        <div class="flex text-xs">
                                 <span
                                     class="text-white/50 min-w-0 flex-shrink-0 pr-2 font-mono"
-                                >{param_key}:</span>
-                                <span class="text-white/70 break-words font-mono">{param_value}</span>
+                                >{{ param_key }}:</span>
+                                <span class="text-white/70 break-words font-mono">{{ param_value }}</span>
                             </div>
-                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
-            </div>
-            <div
-                :if={span.source_code_location}
-                class="mb-6 bg-white/3 rounded-lg border border-white/20 overflow-hidden"
-            >
+            {% endif %}
+            {% if span.source_code_location %}
                 <div
-                    class="bg-white/10 px-4 py-2 border-b border-white/20 flex items-center justify-between"
+                    class="mb-6 bg-white/3 rounded-lg border border-white/20 overflow-hidden"
                 >
-                    <h4 class="text-sm font-semibold text-blue-400 flex items-center">
+                    <div
+                        class="bg-white/10 px-4 py-2 border-b border-white/20 flex items-center justify-between"
+                    >
+                        <h4
+                            class="text-sm font-semibold text-blue-400 flex items-center"
+                        >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             width="16"
@@ -177,45 +177,47 @@ attrs:
                         </svg>
                         Source Code Location
                     </h4>
-                </div>
-                <div class="p-4">
-                    <div class="space-y-2 text-xs">
-                        <template
-                            :for={(key, value) in span.source_code_location.items()}
-                        >
-                            <div
-                                :if={key == "Stacktrace"}
-                                class="mt-3 pt-3 border-t border-white/10"
-                            >
-                                <details class="cursor-pointer">
-                                    <summary
-                                        class="text-white/50 text-xs font-mono mb-2 hover:text-white/70 transition-colors"
-                                    >{key}</summary>
-                                    <div
-                                        class="bg-white/5 rounded p-3 max-h-64 overflow-y-auto"
-                                    >
-                                        <pre
-                                            class="text-white/80 font-mono text-xs whitespace-pre-wrap break-words"
-                                        ><code>{value}</code></pre>
+                    </div>
+                    <div class="p-4">
+                        <div class="space-y-2 text-xs">
+                            {% for (key, value) in span.source_code_location.items() %}
+                                {% if key == "Stacktrace" %}
+                                    <div class="mt-3 pt-3 border-t border-white/10">
+                                        <details class="cursor-pointer">
+                                            <summary
+                                                class="text-white/50 text-xs font-mono mb-2 hover:text-white/70 transition-colors"
+                                            >{{ key }}</summary>
+                                            <div
+                                                class="bg-white/5 rounded p-3 max-h-64 overflow-y-auto"
+                                            >
+                                                <pre
+                                                    class="text-white/80 font-mono text-xs whitespace-pre-wrap break-words"
+                                                ><code>{{ value }}</code></pre>
+                                            </div>
+                                        </details>
                                     </div>
-                                </details>
-                            </div>
-                            <div :if={key != "Stacktrace"} class="flex">
+                                {% endif %}
+                                {% if key != "Stacktrace" %}
+                                    <div class="flex">
                                 <span
                                     class="text-white/50 min-w-0 flex-shrink-0 pr-2 font-mono w-20"
-                                >{key}</span>
-                                <span class="text-white/70 break-words font-mono">{value}</span>
+                                >{{ key }}</span>
+                                <span class="text-white/70 break-words font-mono">{{ value }}</span>
                             </div>
-                        </template>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div
-                :if={span.get_exception_stacktrace()}
-                class="mb-6 bg-red-900/20 rounded-lg border border-red-600/30 overflow-hidden"
-            >
-                <div class="bg-red-900/40 px-4 py-2 border-b border-red-600/30">
-                    <h4 class="text-sm font-semibold text-red-300 flex items-center">
+            {% endif %}
+            {% if span.get_exception_stacktrace() %}
+                <div
+                    class="mb-6 bg-red-900/20 rounded-lg border border-red-600/30 overflow-hidden"
+                >
+                    <div class="bg-red-900/40 px-4 py-2 border-b border-red-600/30">
+                        <h4
+                            class="text-sm font-semibold text-red-300 flex items-center"
+                        >
                         <svg
                             class="w-4 h-4 mr-2"
                             fill="currentColor"
@@ -229,24 +231,25 @@ attrs:
                         </svg>
                         Exception Stacktrace
                     </h4>
+                    </div>
+                    <div class="p-4">
+                        <pre
+                            class="text-xs text-red-100 font-mono whitespace-pre-wrap overflow-x-auto"
+                        ><code>{{ span.get_exception_stacktrace() }}</code></pre>
+                    </div>
                 </div>
-                <div class="p-4">
-                    <pre
-                        class="text-xs text-red-100 font-mono whitespace-pre-wrap overflow-x-auto"
-                    ><code>{span.get_exception_stacktrace()}</code></pre>
-                </div>
-            </div>
+            {% endif %}
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div>
                     <h4 class="text-sm font-semibold text-white/70 mb-3">Basic Information</h4>
                     <div class="space-y-2 text-xs">
                         <div class="flex">
                             <span class="text-white/40 w-20">ID:</span>
-                            <span class="text-white/80 font-mono">{span.span_id}</span>
+                            <span class="text-white/80 font-mono">{{ span.span_id }}</span>
                         </div>
                         <div class="flex">
                             <span class="text-white/40 w-20">Name:</span>
-                            <span class="text-white/80">{span.name}</span>
+                            <span class="text-white/80">{{ span.name }}</span>
                         </div>
                         <div class="flex">
                             <span class="text-white/40 w-20">Kind:</span>
@@ -258,19 +261,21 @@ attrs:
                                         data-[kind='PRODUCER']:bg-purple-500/20 data-[kind='PRODUCER']:text-purple-300
                                         data-[kind='INTERNAL']:bg-gray-500/20 data-[kind='INTERNAL']:text-gray-300
                                         bg-gray-500/20 text-gray-300"
-                                data-kind={span.kind}
+                                data-kind={{ span.kind }}
                             >
-                                {span.kind}
+                                {{ span.kind }}
                             </span>
                         </div>
                         <div class="flex">
                             <span class="text-white/40 w-20">Duration:</span>
-                            <span class="text-white/80">{"%.2f" % (span.duration_ms() or 0)}ms</span>
+                            <span class="text-white/80">{{ "%.2f" % (span.duration_ms() or 0) }}ms</span>
                         </div>
-                        <div :if={span.parent_id} class="flex">
+                        {% if span.parent_id %}
+                            <div class="flex">
                             <span class="text-white/40 w-20">Parent:</span>
-                            <span class="text-white/80 font-mono text-xs">{span.parent_id}</span>
+                            <span class="text-white/80 font-mono text-xs">{{ span.parent_id }}</span>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
                 <div>
@@ -278,94 +283,93 @@ attrs:
                     <div class="space-y-2 text-xs">
                         <div class="flex">
                             <span class="text-white/40 w-20">Started:</span>
-                            <span class="text-white/80">{localtime(span.start_time).strftime("%-I:%M:%S.%f %p")}</span>
+                            <span class="text-white/80">{{ localtime(span.start_time).strftime("%-I:%M:%S.%f %p") }}</span>
                         </div>
                         <div class="flex">
                             <span class="text-white/40 w-20">Ended:</span>
-                            <span class="text-white/80">{localtime(span.end_time).strftime("%-I:%M:%S.%f %p")}</span>
+                            <span class="text-white/80">{{ localtime(span.end_time).strftime("%-I:%M:%S.%f %p") }}</span>
                         </div>
-                        <div
-                            :if={span.status and span.status != '' and span.status != 'UNSET'}
-                            class="flex"
-                        >
+                        {% if span.status and span.status != '' and span.status != 'UNSET' %}
+                            <div class="flex">
                             <span class="text-white/40 w-20">Status:</span>
                             <span
                                 class="px-2 py-0.5 rounded text-xs font-medium
                                         data-[status='ERROR']:bg-red-500/20 data-[status='ERROR']:text-red-300
                                         data-[status='OK']:bg-green-500/20 data-[status='OK']:text-green-300
                                         bg-yellow-500/20 text-yellow-300"
-                                data-status={span.status}
+                                data-status={{ span.status }}
                             >
-                                {span.status}
+                                {{ span.status }}
                             </span>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
-            <div :if={span.attributes} class="mt-6">
-                <h4 class="text-sm font-semibold text-white/70 mb-3">Attributes</h4>
-                <div class="bg-white/3 rounded p-3 max-h-48 overflow-y-auto">
-                    <div class="space-y-1 text-xs">
-                        <div
-                            :for={(key, value) in span.attributes.items()}
-                            class="flex"
-                        >
-                            <span class="text-white/40 min-w-0 flex-shrink-0 pr-2">{key}:</span>
-                            <span class="text-white/80 break-words">{value}</span>
+            {% if span.attributes %}
+                <div class="mt-6">
+                    <h4 class="text-sm font-semibold text-white/70 mb-3">Attributes</h4>
+                    <div class="bg-white/3 rounded p-3 max-h-48 overflow-y-auto">
+                        <div class="space-y-1 text-xs">
+                            {% for (key, value) in span.attributes.items() %}
+                                <div class="flex">
+                            <span class="text-white/40 min-w-0 flex-shrink-0 pr-2">{{ key }}:</span>
+                            <span class="text-white/80 break-words">{{ value }}</span>
+                        </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
-            </div>
-            <div :if={span.events} class="mt-6">
-                <h4 class="text-sm font-semibold text-white/70 mb-3">Events ({len(span.events)})</h4>
-                <div class="bg-white/3 rounded p-3 max-h-48 overflow-y-auto">
-                    <div class="space-y-3 text-xs">
-                        <div
-                            :for={span_event in span.events}
-                            class="border-l-2 border-white/20 pl-3"
-                        >
-                            <div class="flex items-center justify-between mb-1">
-                                <div class="text-white/80 font-medium">{span_event["name"]}</div>
-                                <div class="text-white/40 text-xs">
-                                    <template
-                                        :if={span.format_event_timestamp(span_event["timestamp"]).__class__.__name__ == 'datetime'}
-                                    >{localtime(span.format_event_timestamp(span_event["timestamp"])).strftime("%-I:%M:%S.%f %p")}</template>
-                                    <template
-                                        :if={span.format_event_timestamp(span_event["timestamp"]).__class__.__name__ != 'datetime'}
-                                    >{span.format_event_timestamp(span_event["timestamp"])}</template>
-                                </div>
-                            </div>
-                            <div :if={span_event.get("attributes")} class="space-y-1">
-                                <div
-                                    :for={(key, value) in span_event["attributes"].items()}
-                                    class="flex"
-                                >
+            {% endif %}
+            {% if span.events %}
+                <div class="mt-6">
+                    <h4 class="text-sm font-semibold text-white/70 mb-3">Events ({{ len(span.events) }})</h4>
+                    <div class="bg-white/3 rounded p-3 max-h-48 overflow-y-auto">
+                        <div class="space-y-3 text-xs">
+                            {% for span_event in span.events %}
+                                <div class="border-l-2 border-white/20 pl-3">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <div class="text-white/80 font-medium">{{ span_event["name"] }}</div>
+                                        <div class="text-white/40 text-xs">
+                                            {% if span.format_event_timestamp(span_event["timestamp"]).__class__.__name__ == 'datetime' %}{{ localtime(span.format_event_timestamp(span_event["timestamp"])).strftime("%-I:%M:%S.%f %p") }}{% endif %}
+                                            {% if span.format_event_timestamp(span_event["timestamp"]).__class__.__name__ != 'datetime' %}{{ span.format_event_timestamp(span_event["timestamp"]) }}{% endif %}
+                                        </div>
+                                    </div>
+                                    {% if span_event.get("attributes") %}
+                                        <div class="space-y-1">
+                                            {% for (key, value) in span_event["attributes"].items() %}
+                                                <div class="flex">
                                     <span
                                         class="text-white/40 min-w-0 flex-shrink-0 pr-2"
-                                    >{key}:</span>
+                                    >{{ key }}:</span>
                                     <pre
                                         class="text-white/80 whitespace-pre-wrap break-words font-mono text-xs"
-                                    >{value}</pre>
+                                    >{{ value }}</pre>
                                 </div>
-                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
-            </div>
-            <div :if={span.links} class="mt-6">
-                <h4 class="text-sm font-semibold text-white/70 mb-3">Links ({len(span.links)})</h4>
-                <div class="bg-stone-800/50 rounded p-3">
-                    <div class="space-y-2 text-xs">
-                        <div
-                            :for={link in span.links}
-                            class="border-l-2 border-white/20 pl-2"
-                        >
-                            <div class="text-white/80 font-mono">{link["context"]["trace_id"]}</div>
-                            <div class="text-white/40 font-mono">{link["context"]["span_id"]}</div>
+            {% endif %}
+            {% if span.links %}
+                <div class="mt-6">
+                    <h4 class="text-sm font-semibold text-white/70 mb-3">Links ({{ len(span.links) }})</h4>
+                    <div class="bg-stone-800/50 rounded p-3">
+                        <div class="space-y-2 text-xs">
+                            {% for link in span.links %}
+                                <div class="border-l-2 border-white/20 pl-2">
+                                    <div class="text-white/80 font-mono">{{ link["context"]["trace_id"] }}</div>
+                                    <div class="text-white/40 font-mono">{{ link["context"]["span_id"] }}</div>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
-            </div>
+            {% endif %}
         </div>
     </details>
 </div>
