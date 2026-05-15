@@ -8,6 +8,7 @@ since plain.schema.testing is opt-in for users who want property tests.
 from __future__ import annotations
 
 from datetime import date, datetime
+from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
@@ -40,11 +41,10 @@ class _Wide(Schema):
 @given(payload=schema_strategy(_Wide))
 def test_strategy_always_produces_valid_payload(payload):
     result = _Wide.validate(payload)
-    assert not isinstance(result, Invalid), (
-        f"strategy produced an invalid payload: {payload!r} → {result.errors}"
-        if isinstance(result, Invalid)
-        else ""
-    )
+    if isinstance(result, Invalid):
+        raise AssertionError(
+            f"strategy produced an invalid payload: {payload!r} → {result.errors}"
+        )
 
 
 class _WithOptional(Schema):
@@ -78,12 +78,8 @@ def test_strategy_raises_for_unsupported_field():
 @given(payload=schema_strategy(_Wide))
 def test_strategy_payloads_round_trip_through_apply_to(payload):
     """A strategy-generated payload survives validate → apply_to → access."""
-
-    class Bag:
-        pass
-
     result = _Wide.validate(payload)
     assert not isinstance(result, Invalid)
-    target = result.apply_to(Bag())
+    target = result.apply_to(SimpleNamespace())
     assert target.name == result.name
     assert target.priority in {"low", "med", "high"}

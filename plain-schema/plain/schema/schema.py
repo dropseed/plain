@@ -75,6 +75,7 @@ class Schema(metaclass=SchemaMeta):
     runs after fields have cleaned successfully.
     """
 
+    # Populated by SchemaMeta; the empty default is for type-checker visibility.
     _schema_fields: ClassVar[dict[str, Field]] = {}
 
     def __init__(self, **data: Any) -> None:
@@ -259,12 +260,8 @@ class Schema(metaclass=SchemaMeta):
             extra_errors = instance.check(context=context)
         except ValidationError as e:
             if hasattr(e, "error_dict"):
-                # Each error_list is a list of ValidationError objects; wrap
-                # in a ValidationError to flatten back to message strings.
-                extra_errors = {
-                    field: [str(m) for m in ValidationError(error_list)]
-                    for field, error_list in e.error_dict.items()
-                }
+                # dict(ValidationError) flattens error_dict to {field: [messages]}.
+                extra_errors = dict(e)  # ty: ignore[no-matching-overload]
             else:
                 extra_errors = {NON_FIELD_ERRORS: list(e.messages)}
 

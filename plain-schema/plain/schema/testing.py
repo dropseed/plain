@@ -54,6 +54,9 @@ def field_strategy(field: form_fields.Field) -> st.SearchStrategy[Any]:
     `required=False` is handled by `schema_strategy()`, which adds the
     `none()` branch and decides whether to include the key at all.
     """
+    # isinstance checks run subclass-before-base: RegexField before
+    # EmailField/URLField, MultipleChoiceField before ChoiceField,
+    # NullBooleanField before BooleanField.
     if isinstance(field, form_fields.RegexField):
         regex = getattr(field, "regex", None)
         pattern = getattr(regex, "pattern", None) if regex is not None else None

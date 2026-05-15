@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import pytest
+
+from plain.exceptions import ValidationError
 from plain.schema import Invalid, Schema, UploadedFile, make_schema, types
 
 
@@ -126,8 +131,6 @@ def test_check_returning_dict_adds_errors():
 
 
 def test_check_raising_validationerror_string_attaches_to_all():
-    from plain.exceptions import ValidationError
-
     class S(Schema):
         a: int = types.IntegerField()
 
@@ -140,8 +143,6 @@ def test_check_raising_validationerror_string_attaches_to_all():
 
 
 def test_check_raising_validationerror_dict_attaches_per_field():
-    from plain.exceptions import ValidationError
-
     class S(Schema):
         a: int = types.IntegerField()
         b: int = types.IntegerField()
@@ -347,14 +348,6 @@ def test_filefield_with_other_field_errors():
 # ---------------------------------------------------------------------------
 
 
-class _Bag:
-    """Plain attribute bag standing in for a model instance."""
-
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-
 def test_apply_to_copies_validated_fields_onto_instance():
     class S(Schema):
         title: str = types.TextField(min_length=1)
@@ -363,7 +356,7 @@ def test_apply_to_copies_validated_fields_onto_instance():
     result = S.validate({"title": "Q3", "priority": "high"})
     assert not isinstance(result, Invalid)
 
-    target = _Bag(title="old", priority="low", unrelated="kept")
+    target = SimpleNamespace(title="old", priority="low", unrelated="kept")
     returned = result.apply_to(target)
 
     assert returned is target  # chainable
@@ -382,8 +375,6 @@ def test_schema_instance_is_frozen():
     result = S.validate({"a": "1"})
     assert not isinstance(result, Invalid)
     assert result.a == 1
-
-    import pytest
 
     with pytest.raises(AttributeError, match="frozen"):
         result.a = 99
@@ -408,7 +399,7 @@ def test_apply_to_skips_unset_fields_after_partial_validation():
     assert not isinstance(result, Invalid)
     assert not hasattr(result, "priority")
 
-    target = _Bag(title="old", priority="low")
+    target = SimpleNamespace(title="old", priority="low")
     result.apply_to(target)
 
     assert target.title == "Q3"
