@@ -52,15 +52,10 @@ class ContactSchemaView(SchemaView[ContactSchema]):
         return context
 
     def schema_valid(self, result: ContactSchema) -> Response:
-        # Schemas are pure data — persisting the result is the view's job.
-        ContactSubmission.query.create(
-            name=result.name,
-            email=result.email,
-            subject=result.subject,
-            message=result.message,
-            company=result.company or "",
-            subscribe=result.subscribe,
-        )
+        # Schemas are pure data — persisting is the view's job. apply_to()
+        # copies the validated fields onto a fresh model; save() then writes
+        # it. (ContactForm, by contrast, carries its own save() method.)
+        result.save(ContactSubmission())
         return super().schema_valid(result)
 
 
