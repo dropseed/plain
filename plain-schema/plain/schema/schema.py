@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any, ClassVar, Self, cast
 
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
-from plain.forms.fields import Field, FileField, MultipleChoiceField
 from plain.utils.hashable import make_hashable
 
+from .fields import Field, FileField, MultipleChoiceField
 from .result import Invalid
 
 __all__ = ("Schema", "make_schema")

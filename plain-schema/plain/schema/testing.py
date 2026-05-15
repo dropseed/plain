@@ -41,56 +41,54 @@ from typing import Any
 
 from hypothesis import strategies as st
 
-from plain.forms import fields as form_fields
-
+from . import fields
 from .schema import Schema
 
 __all__ = ("schema_strategy", "field_strategy")
 
 
-def field_strategy(field: form_fields.Field) -> st.SearchStrategy[Any]:
+def field_strategy(field: fields.Field) -> st.SearchStrategy[Any]:
     """Strategy for a single field's *value* (not wrapped in a dict).
 
     `required=False` is handled by `schema_strategy()`, which adds the
     `none()` branch and decides whether to include the key at all.
     """
-    # isinstance checks run subclass-before-base: RegexField before
-    # EmailField/URLField, MultipleChoiceField before ChoiceField,
-    # NullBooleanField before BooleanField.
-    if isinstance(field, form_fields.RegexField):
+    # EmailField, URLField and RegexField subclass TextField, so they must
+    # be checked before the TextField branch below.
+    if isinstance(field, fields.RegexField):
         regex = getattr(field, "regex", None)
         pattern = getattr(regex, "pattern", None) if regex is not None else None
         if isinstance(pattern, str):
             return st.from_regex(pattern, fullmatch=True)
         # Fall through to TextField behavior
 
-    if isinstance(field, form_fields.EmailField):
+    if isinstance(field, fields.EmailField):
         return st.emails()
 
-    if isinstance(field, form_fields.URLField):
+    if isinstance(field, fields.URLField):
         return st.from_regex(
             r"^https?://[a-z][a-z0-9.-]{0,32}\.test(/[a-zA-Z0-9._-]{0,16})?$",
             fullmatch=True,
         )
 
-    if isinstance(field, form_fields.UUIDField):
+    if isinstance(field, fields.UUIDField):
         return st.uuids().map(str)
 
-    if isinstance(field, form_fields.MultipleChoiceField):
+    if isinstance(field, fields.MultipleChoiceField):
         choices = getattr(field, "choices", None) or []
         values = [v for v, _ in choices]
         if not values:
             return st.lists(st.text(), min_size=0, max_size=3)
         return st.lists(st.sampled_from(values), min_size=0, max_size=len(values))
 
-    if isinstance(field, form_fields.ChoiceField):
+    if isinstance(field, fields.ChoiceField):
         choices = getattr(field, "choices", None) or []
         values = [v for v, _ in choices]
         if not values:
             return st.text(min_size=1, max_size=20)
         return st.sampled_from(values)
 
-    if isinstance(field, form_fields.TextField):
+    if isinstance(field, fields.TextField):
         min_length = getattr(field, "min_length", None) or 0
         max_length = getattr(field, "max_length", None) or 100
         # TextField strips by default — generate without leading/trailing
@@ -101,13 +99,13 @@ def field_strategy(field: form_fields.Field) -> st.SearchStrategy[Any]:
             max_size=max_length,
         )
 
-    if isinstance(field, form_fields.IntegerField):
+    if isinstance(field, fields.IntegerField):
         return st.integers(
             min_value=getattr(field, "min_value", None),
             max_value=getattr(field, "max_value", None),
         )
 
-    if isinstance(field, form_fields.FloatField):
+    if isinstance(field, fields.FloatField):
         return st.floats(
             min_value=getattr(field, "min_value", None),
             max_value=getattr(field, "max_value", None),
@@ -115,7 +113,7 @@ def field_strategy(field: form_fields.Field) -> st.SearchStrategy[Any]:
             allow_infinity=False,
         )
 
-    if isinstance(field, form_fields.DecimalField):
+    if isinstance(field, fields.DecimalField):
         max_digits = getattr(field, "max_digits", None) or 10
         decimal_places = getattr(field, "decimal_places", None) or 2
         # Generate ints in the integer-part range, divide for places.
@@ -128,10 +126,10 @@ def field_strategy(field: form_fields.Field) -> st.SearchStrategy[Any]:
             allow_infinity=False,
         )
 
-    if isinstance(field, form_fields.NullBooleanField):
+    if isinstance(field, fields.NullBooleanField):
         return st.one_of(st.booleans(), st.none())
 
-    if isinstance(field, form_fields.BooleanField):
+    if isinstance(field, fields.BooleanField):
         # BooleanField(required=True) means "must be checked" — Plain treats
         # `False` as a missing-value (matches HTML checkbox semantics where
         # unchecked sends no key). For required fields, only True passes
@@ -140,16 +138,16 @@ def field_strategy(field: form_fields.Field) -> st.SearchStrategy[Any]:
             return st.just(True)
         return st.booleans()
 
-    if isinstance(field, form_fields.DateTimeField):
+    if isinstance(field, fields.DateTimeField):
         return st.datetimes().map(datetime.isoformat)
 
-    if isinstance(field, form_fields.DateField):
+    if isinstance(field, fields.DateField):
         return st.dates().map(date.isoformat)
 
-    if isinstance(field, form_fields.TimeField):
+    if isinstance(field, fields.TimeField):
         return st.times().map(time.isoformat)
 
-    if isinstance(field, form_fields.DurationField):
+    if isinstance(field, fields.DurationField):
         return st.timedeltas(
             min_value=timedelta(0),
             max_value=timedelta(days=365),

@@ -15,7 +15,7 @@ This mirrors the `from plain.postgres import types` pattern used by models.
 
 from __future__ import annotations
 
-from plain.forms.fields import (
+from .fields import (
     BooleanField,
     ChoiceField,
     DateField,

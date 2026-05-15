@@ -20,8 +20,7 @@ from plain.exceptions import NON_FIELD_ERRORS
 from .result import Invalid
 
 if TYPE_CHECKING:
-    from plain.forms.fields import Field
-
+    from .fields import Field
     from .schema import Schema
 
 __all__ = ("BoundSchema", "BoundField")
