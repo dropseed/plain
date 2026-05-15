@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 # Sanity check: if the test isn't running from a repo checkout, skip the
 # whole module rather than producing a misleading empty pass.
-_REPO_MARKER = REPO_ROOT / "plain-html-implementation-plan.md"
+_REPO_MARKER = REPO_ROOT / "CLAUDE.md"
 
 pytestmark = pytest.mark.skipif(
     not _REPO_MARKER.exists(),

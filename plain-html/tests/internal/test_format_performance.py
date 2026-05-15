@@ -18,7 +18,7 @@ from plain.html.parser import ParseError
 from plain.html.tokenizer import TokenizeError
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-_REPO_MARKER = REPO_ROOT / "plain-html-implementation-plan.md"
+_REPO_MARKER = REPO_ROOT / "CLAUDE.md"
 
 pytestmark = pytest.mark.skipif(
     not _REPO_MARKER.exists(),

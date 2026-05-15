@@ -16,6 +16,7 @@ from plain.runtime import PLAIN_TEMP_PATH
 
 from .. import frontmatter as fm
 from ..positions import body_offset, offset_to_line_col
+from ..tokenizer import TokenizeError
 from . import cache
 from .backends import Backend, BackendDiagnostic, BackendError, resolve
 from .declarations import DeclarationError, Declarations
@@ -101,7 +102,13 @@ def check_source(
         if cached is not None:
             return [_from_cache(entry, path) for entry in cached]
 
-    synth = synthesize(body, declarations, component_attrs=component_attrs)
+    try:
+        synth = synthesize(body, declarations, component_attrs=component_attrs)
+    except TokenizeError:
+        # Malformed template — `plain html check`'s structural pass already
+        # reports tokenize errors with a `file:line:col` anchor. The
+        # typecheck pass has nothing to add and must not crash.
+        return []
     diagnostics = _run_backend(active_backend, synth)
     errors = _map_diagnostics(diagnostics, synth, source, path)
 
