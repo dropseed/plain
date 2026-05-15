@@ -66,10 +66,14 @@ class Field:
     append validators in `__init__`.
     """
 
+    # Validators every instance of this field type runs. Subclasses set a
+    # class-level list; __init__ copies it so per-instance appends are safe.
+    default_validators: list[Callable[[Any], None]] = []
+
     def __init__(self, *, required: bool = True, initial: Any = None) -> None:
         self.required = required
         self.initial = initial
-        self.validators: list[Callable[[Any], None]] = []
+        self.validators: list[Callable[[Any], None]] = list(self.default_validators)
 
     def parse(self, value: Any) -> Any:
         """Coerce a raw value to this field's Python type. Empty input
@@ -135,43 +139,11 @@ class TextField(Field):
 
 
 class EmailField(TextField):
-    def __init__(
-        self,
-        *,
-        max_length: int | None = None,
-        min_length: int | None = None,
-        strip: bool = True,
-        required: bool = True,
-        initial: Any = None,
-    ) -> None:
-        super().__init__(
-            max_length=max_length,
-            min_length=min_length,
-            strip=strip,
-            required=required,
-            initial=initial,
-        )
-        self.validators.append(validators.validate_email)
+    default_validators: list[Callable[[Any], None]] = [validators.validate_email]
 
 
 class URLField(TextField):
-    def __init__(
-        self,
-        *,
-        max_length: int | None = None,
-        min_length: int | None = None,
-        strip: bool = True,
-        required: bool = True,
-        initial: Any = None,
-    ) -> None:
-        super().__init__(
-            max_length=max_length,
-            min_length=min_length,
-            strip=strip,
-            required=required,
-            initial=initial,
-        )
-        self.validators.append(validators.URLValidator())
+    default_validators: list[Callable[[Any], None]] = [validators.URLValidator()]
 
     def parse(self, value: Any) -> str:
         value = super().parse(value)
@@ -334,7 +306,7 @@ class _ChoiceField(Field):
     def __init__(
         self,
         *,
-        choices: Any = (),
+        choices: Any,
         required: bool = True,
         initial: Any = None,
     ) -> None:
@@ -382,7 +354,7 @@ class TypedChoiceField(ChoiceField):
         *,
         coerce: Callable[[Any], Any] = lambda value: value,
         empty_value: Any = "",
-        choices: Any = (),
+        choices: Any,
         required: bool = True,
         initial: Any = None,
     ) -> None:
@@ -550,21 +522,15 @@ class FileField(Field):
 
     def clean(self, value: Any, initial: Any = None) -> Any:
         # No new upload but an existing file — keep it.
-        if not value and initial is not None:
+        if not value and initial:
             return initial
         return super().clean(value)
 
 
 class ImageField(FileField):
-    def __init__(
-        self,
-        *,
-        max_length: int | None = None,
-        required: bool = True,
-        initial: Any = None,
-    ) -> None:
-        super().__init__(max_length=max_length, required=required, initial=initial)
-        self.validators.append(validators.validate_image_file_extension)
+    default_validators: list[Callable[[Any], None]] = [
+        validators.validate_image_file_extension
+    ]
 
     def parse(self, value: Any) -> Any:
         uploaded = super().parse(value)

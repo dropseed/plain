@@ -14,6 +14,7 @@ Return type is conditional on `required`:
 - required=False → returns T | None
 """
 
+import re
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -79,7 +80,7 @@ def URLField(
 ) -> str: ...
 @overload
 def RegexField(
-    regex: str,
+    regex: str | re.Pattern[str],
     *,
     required: Literal[False],
     max_length: int | None = None,
@@ -89,7 +90,7 @@ def RegexField(
 ) -> str | None: ...
 @overload
 def RegexField(
-    regex: str,
+    regex: str | re.Pattern[str],
     *,
     required: Literal[True] = True,
     max_length: int | None = None,
