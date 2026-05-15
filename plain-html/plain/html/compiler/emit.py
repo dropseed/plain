@@ -11,9 +11,10 @@ offset of the node that produced it. `emit_module` returns the source +
 a `gen_line → tpl_offset` map; the session uses it to remap AST line
 numbers so tracebacks point at the template, not the generated `.py`.
 
-`:if` / `:for` become real Python control flow. Component-tag sites call
-the resolved child `_inc_N` render function injected into module globals
-by `CompileSession`. Expression interiors are rewritten by
+`{% if %}` / `{% for %}` blocks become real Python control flow.
+Component-tag sites call the resolved child `_inc_N` render function
+injected into module globals by `CompileSession`. Expression interiors
+are rewritten by
 `.expressions.rewrite_expression` so free names load from `_ctx`.
 Attribute names are classified by `.security` so URL attrs route through
 `escape_url` and event-handler attrs refuse unmarked dynamic data.
@@ -27,8 +28,12 @@ from ..parser import (
     DoctypeNode,
     ElementNode,
     ExprNode,
+    ForNode,
     HtmlCommentNode,
+    IfNode,
     Node,
+    RawNode,
+    SlotNode,
     TemplateCommentNode,
     TextNode,
 )
@@ -353,80 +358,21 @@ def emit_module(
 
 
 def _emit_nodes(nodes: list[Node], e: _Emit) -> None:
-    """Emit a sequence of sibling nodes, gathering `:if`/`:elif`/`:else`
-    chains into a single Python `if / elif* / else?` block.
-
-    A plain node emits via `_emit_node`. An element carrying `:if` opens a
-    conditional chain: the contiguous run of following `:elif`/`:else`
-    elements (skipping whitespace and comment nodes between members) is
-    collected and emitted as one Python conditional. Whitespace/comment
-    nodes that sit *between* chain members are dropped — they don't belong
-    to any branch.
-    """
-    i = 0
-    n = len(nodes)
-    while i < n:
-        node = nodes[i]
-        if isinstance(node, ElementNode) and node.if_code is not None:
-            chain, next_i = _gather_chain(nodes, i)
-            _emit_conditional_chain(chain, e)
-            i = next_i
-            continue
+    """Emit a sequence of sibling nodes."""
+    for node in nodes:
         _emit_node(node, e)
-        i += 1
 
 
-def _gather_chain(nodes: list[Node], start: int) -> tuple[list[ElementNode], int]:
-    """Collect the conditional chain that begins at `nodes[start]`.
+def _emit_block_children(children: list[Node], e: _Emit) -> None:
+    """Emit a block branch body, inserting `pass` if it produces nothing.
 
-    Returns the chain elements (the `:if`, then any `:elif`/`:else`
-    members) and the index of the first node *after* the chain.
+    An `{% if %}` / `{% for %}` branch can be empty (whitespace only);
+    the generated Python suite still needs a statement.
     """
-    first = nodes[start]
-    assert isinstance(first, ElementNode)  # caller checks before calling
-    chain: list[ElementNode] = [first]
-    i = start + 1
-    n = len(nodes)
-    saw_else = False
-    while i < n:
-        node = nodes[i]
-        if isinstance(node, TextNode) and not node.text.strip():
-            i += 1
-            continue
-        if isinstance(node, HtmlCommentNode | TemplateCommentNode):
-            i += 1
-            continue
-        if isinstance(node, ElementNode) and not saw_else:
-            if node.elif_code is not None:
-                chain.append(node)
-                i += 1
-                continue
-            if node.is_else:
-                chain.append(node)
-                saw_else = True
-                i += 1
-                continue
-        break
-    return chain, i
-
-
-def _emit_conditional_chain(chain: list[ElementNode], e: _Emit) -> None:
-    """Emit a gathered `:if`/`:elif`/`:else` chain as Python control flow."""
-    for idx, node in enumerate(chain):
-        saved_offset = e.current_offset
-        e.current_offset = node.offset or saved_offset
-        try:
-            if idx == 0:
-                assert node.if_code is not None
-                e.block_start(f"if {e.rewrite_expr(node.if_code)}:")
-            elif node.elif_code is not None:
-                e.block_start(f"elif {e.rewrite_expr(node.elif_code)}:")
-            else:
-                e.block_start("else:")
-            _emit_element_body(node, e)
-            e.block_end()
-        finally:
-            e.current_offset = saved_offset
+    before = (len(e.lines), len(e.pending))
+    _emit_nodes(children, e)
+    if (len(e.lines), len(e.pending)) == before:
+        e.line("pass")
 
 
 def _emit_node(node: Node, e: _Emit) -> None:
@@ -438,6 +384,8 @@ def _emit_node(node: Node, e: _Emit) -> None:
         match node:
             case TextNode():
                 e.text(node.text)
+            case RawNode():
+                e.text(node.text)
             case ExprNode():
                 e.expr_frag(f"escape_html({e.rewrite_expr(node.code)})")
             case HtmlCommentNode():
@@ -446,6 +394,14 @@ def _emit_node(node: Node, e: _Emit) -> None:
                 pass
             case DoctypeNode():
                 e.text(node.text)
+            case IfNode():
+                _emit_if(node, e)
+            case ForNode():
+                _emit_for(node, e)
+            case SlotNode():
+                raise CompileError(
+                    "`{% slot %}` can only appear as a direct child of a component tag"
+                )
             case ElementNode():
                 _emit_element(node, e)
             case _:
@@ -454,60 +410,60 @@ def _emit_node(node: Node, e: _Emit) -> None:
         e.current_offset = saved_offset
 
 
+def _emit_if(node: IfNode, e: _Emit) -> None:
+    """Emit an `{% if %}` chain as Python `if / elif* / else?`."""
+    for idx, branch in enumerate(node.branches):
+        saved_offset = e.current_offset
+        e.current_offset = branch.offset or node.offset or saved_offset
+        if idx == 0:
+            assert branch.condition is not None
+            e.block_start(f"if {e.rewrite_expr(branch.condition)}:")
+        elif branch.condition is not None:
+            e.block_start(f"elif {e.rewrite_expr(branch.condition)}:")
+        else:
+            e.block_start("else:")
+        e.current_offset = saved_offset
+        _emit_block_children(branch.children, e)
+        e.block_end()
+
+
+def _emit_for(node: ForNode, e: _Emit) -> None:
+    """Emit a `{% for %}` loop as a Python `for` block."""
+    clause = node.clause
+    iter_expr = e.rewrite_expr(clause.iter_code)
+    targets = clause.raw_target or ", ".join(clause.targets)
+    e.block_start(f"for {targets} in {iter_expr}:")
+    # Loop targets become real Python locals inside the for body.
+    e.push_locals(set(clause.targets))
+    if clause.filter_code is not None:
+        e.block_start(f"if {e.rewrite_expr(clause.filter_code)}:")
+        _emit_block_children(node.children, e)
+        e.block_end()
+    else:
+        _emit_block_children(node.children, e)
+    e.pop_locals()
+    e.block_end()
+
+
 def _emit_element(node: ElementNode, e: _Emit) -> None:
-    # A standalone element reached here has no conditional directive — the
-    # `:if`/`:elif`/`:else` chain handling lives in `_emit_nodes`. Just
-    # emit the `:for` (if any) plus the element body.
-    _emit_element_body(node, e)
-
-
-def _emit_element_body(node: ElementNode, e: _Emit) -> None:
-    """Emit an element's `:for` loop (if any) plus its body.
-
-    Deliberately ignores `if_code` / `elif_code` / `is_else` — the
-    conditional chain wrapping is the caller's job (`_emit_nodes`).
-    """
-    if node.for_clause is not None:
-        iter_expr = e.rewrite_expr(node.for_clause.iter_code)
-        targets = node.for_clause.raw_target or ", ".join(node.for_clause.targets)
-        e.block_start(f"for {targets} in {iter_expr}:")
-        # Loop targets become real Python locals inside the for body.
-        e.push_locals(set(node.for_clause.targets))
-        if node.for_clause.filter_code is not None:
-            e.block_start(f"if {e.rewrite_expr(node.for_clause.filter_code)}:")
-
     if node.include_path is not None:
         _emit_static_include(node, e)
-    elif node.tag == "template":
-        # Transparent fragment — emit children inline, no wrapper.
-        # `slot_name` here is harmless metadata; it only matters when this
-        # template is a direct child of a parent component (handled by the
-        # parent's slot routing, not by this branch).
+        return
+    e.text(f"<{node.tag}")
+    for attr in node.attrs:
+        _emit_attribute(attr, e)
+    e.text(">")
+    if not (node.self_closing or node.tag in VOID_ELEMENTS):
         _emit_nodes(node.children, e)
-    else:
-        e.text(f"<{node.tag}")
-        for attr in node.attrs:
-            _emit_attribute(attr, e)
-        e.text(">")
-        if not (node.self_closing or node.tag in VOID_ELEMENTS):
-            _emit_nodes(node.children, e)
-            e.text(f"</{node.tag}>")
-
-    if node.for_clause is not None:
-        if node.for_clause.filter_code is not None:
-            e.block_end()
-        e.pop_locals()
-        e.block_end()
+        e.text(f"</{node.tag}>")
 
 
 def _emit_static_include(node: ElementNode, e: _Emit) -> None:
     """Emit code for a component-tag site (`<Card ...>...</Card>`).
 
     Slot routing:
-      - Children with `:slot="name"` route into the named slot.
-        `<template :slot="x">` contributes only its inner children
-        (the `<template>` wrapper is dropped). Other elements with
-        `:slot="..."` contribute the element itself.
+      - A `{% slot "name" %}` child routes its children into the named
+        slot.
       - All other children collect in the `default` slot.
 
     Each slot's content is rendered in the PARENT's scope into a fresh
@@ -528,12 +484,8 @@ def _emit_static_include(node: ElementNode, e: _Emit) -> None:
     default_children: list[Node] = []
     named_slots: dict[str, list[Node]] = {}
     for child in node.children:
-        if isinstance(child, ElementNode) and child.slot_name is not None:
-            target = named_slots.setdefault(child.slot_name, [])
-            if child.tag == "template":
-                target.extend(child.children)
-            else:
-                target.append(child)
+        if isinstance(child, SlotNode):
+            named_slots.setdefault(child.name, []).extend(child.children)
         else:
             default_children.append(child)
 

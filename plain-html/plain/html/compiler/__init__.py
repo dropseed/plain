@@ -6,11 +6,11 @@ Module split:
   - `emit`        — codegen for the tag tree
   - `session`     — `:include`-graph walker + process-wide compiled-template cache
 
-Supported template features: text (constant-folded), `{expr}` in text
-and attribute values, real elements + `<template>` fragments, comments
-and doctype, `:if` / `:for` control flow, frontmatter `attrs:` /
-`slots:` / `imports:`, `<template :include="...">` with attr passing,
-and slot composition (default slot plus named `slot="..."` routing).
+Supported template features: text (constant-folded), `{{ expr }}` in
+text and attribute values, real elements, comments and doctype,
+`{% if %}` / `{% for %}` control flow, frontmatter `attrs:` / `slots:` /
+`imports:`, PascalCase component tags with attr passing, and slot
+composition (default slot plus named `{% slot %}` routing).
 
 Expressions are inlined as real Python sub-expressions: free `Name`
 loads are AST-rewritten to `_ctx['name']` except for names bound by

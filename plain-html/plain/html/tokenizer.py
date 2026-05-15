@@ -1,18 +1,33 @@
 """HTML-aware tokenizer.
 
 Emits a flat token stream from a template body string: tags, text,
-comments, doctype, and `{expr}` segments. Attribute values are split
-into typed segments (`AttrText` / `AttrExpr`) so the compiler can apply
-contextual escape without sniffing strings. `<script>` and `<style>`
-bodies are tokenized opaquely — no `{expr}` recognition inside them.
+comments, doctype, `{{ expr }}` interpolations, and `{% block %}` tags.
+Attribute values are split into typed segments (`AttrText` / `AttrExpr`)
+so the compiler can apply contextual escape without sniffing strings.
+`<script>` and `<style>` bodies are tokenized opaquely — no `{{ }}` or
+`{% %}` recognition inside them.
+
+Delimiters:
+
+- `{{ python_expr }}` — an interpolated expression.
+- `{% keyword ... %}` — a control-flow block tag (`if`/`for`/`slot`/…).
+- `{# comment #}` — a template comment, dropped from output.
+- `{% raw %}…{% endraw %}` — a literal region; its body is emitted
+  verbatim with no delimiter recognition.
+
+Single `{` and `}` are ordinary text. To emit a literal `{{`, `{%`, or
+`{#`, wrap the region in `{% raw %}…{% endraw %}`.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import cast
 
 _OPAQUE_BODY_TAGS = frozenset({"script", "style"})
+
+_RAW_END_RE = re.compile(r"\{%\s*endraw\s*%\}")
 
 VOID_ELEMENTS = frozenset(
     {
@@ -47,7 +62,7 @@ class AttrText:
 
 @dataclass
 class AttrExpr:
-    """A `{python_expr}` segment inside an attribute value."""
+    """A `{{ python_expr }}` segment inside an attribute value."""
 
     code: str
 
@@ -77,6 +92,27 @@ class TextToken:
 @dataclass
 class ExprToken:
     code: str
+    offset: int
+
+
+@dataclass
+class BlockToken:
+    """A `{% keyword ... %}` control-flow tag.
+
+    `content` is the text between `{%` and `%}`, stripped. The parser
+    interprets the leading keyword (`if`, `elif`, `else`, `endif`, `for`,
+    `endfor`, `slot`, `endslot`).
+    """
+
+    content: str
+    offset: int
+
+
+@dataclass
+class RawToken:
+    """The verbatim body of a `{% raw %}…{% endraw %}` region."""
+
+    text: str
     offset: int
 
 
@@ -115,6 +151,8 @@ class EndTagToken:
 Token = (
     TextToken
     | ExprToken
+    | BlockToken
+    | RawToken
     | HtmlCommentToken
     | TemplateCommentToken
     | DoctypeToken
@@ -182,9 +220,10 @@ def tokenize(source: str) -> list[Token]:
             tokens.append(tok)
             i = new_i
             text_start = i
-            # `<script>` and `<style>` bodies are opaque per spec: no `{expr}`
-            # recognition. Consume the entire body verbatim and emit it as a
-            # single text token, then synthesize the matching end tag.
+            # `<script>` and `<style>` bodies are opaque per spec: no `{{ }}`
+            # or `{% %}` recognition. Consume the entire body verbatim and
+            # emit it as a single text token, then synthesize the matching
+            # end tag.
             if isinstance(tok, StartTagToken) and tok.name in _OPAQUE_BODY_TAGS:
                 close = f"</{tok.name}"
                 lower = source.lower()
@@ -211,17 +250,27 @@ def tokenize(source: str) -> list[Token]:
             text_start = i
             continue
 
-        # `{{` / `}}` are the f-string-style escapes for literal `{` and `}`.
-        if source.startswith("{{", i):
-            text_buf.append("{")
-            i += 2
-            continue
-        if source.startswith("}}", i):
-            text_buf.append("}")
-            i += 2
+        if source.startswith("{%", i):
+            flush_text()
+            end = source.find("%}", i + 2)
+            if end == -1:
+                raise TokenizeError(f"Unterminated block tag at offset {i}")
+            content = source[i + 2 : end].strip()
+            if content == "raw":
+                # Everything up to `{% endraw %}` is emitted verbatim.
+                raw_start = end + 2
+                match = _RAW_END_RE.search(source, raw_start)
+                if match is None:
+                    raise TokenizeError(f"Unterminated {{% raw %}} block at offset {i}")
+                tokens.append(RawToken(source[raw_start : match.start()], i))
+                i = match.end()
+            else:
+                tokens.append(BlockToken(content, i))
+                i = end + 2
+            text_start = i
             continue
 
-        if c == "{":
+        if source.startswith("{{", i):
             flush_text()
             expr, new_i = _consume_expr(source, i)
             tokens.append(ExprToken(expr, i))
@@ -237,15 +286,16 @@ def tokenize(source: str) -> list[Token]:
 
 
 def _consume_expr(source: str, start: int) -> tuple[str, int]:
-    """Consume a `{python_expr}` starting at the `{` position.
+    """Consume a `{{ python_expr }}` starting at the `{{` position.
 
     Tracks brace depth so nested dict/set literals work, and honors string
-    quoting so braces inside strings don't fool the counter.
+    quoting so braces inside strings don't fool the counter. Returns the
+    stripped expression source and the index past the closing `}}`.
     """
-    assert source[start] == "{"
-    i = start + 1
+    assert source.startswith("{{", start)
+    i = start + 2
     n = len(source)
-    depth = 1
+    depth = 0
     quote: str | None = None
     expr_start = i
     while i < n:
@@ -267,9 +317,12 @@ def _consume_expr(source: str, start: int) -> tuple[str, int]:
             i += 1
             continue
         if c == "}":
-            depth -= 1
-            if depth == 0:
-                return source[expr_start:i], i + 1
+            if depth > 0:
+                depth -= 1
+                i += 1
+                continue
+            if i + 1 < n and source[i + 1] == "}":
+                return source[expr_start:i].strip(), i + 2
             i += 1
             continue
         i += 1
@@ -277,7 +330,7 @@ def _consume_expr(source: str, start: int) -> tuple[str, int]:
 
 
 def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
-    """Consume `<tag attr1 attr2="..." attr3={expr}>` or `<tag/>`."""
+    """Consume `<tag attr1 attr2="..." attr3={{ expr }}>` or `<tag/>`."""
     assert source[start] == "<"
     i = start + 1
     n = len(source)
@@ -312,6 +365,20 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
             i += 2
             break
 
+        # Block/comment/expression tags can't appear loose in a start tag.
+        # Conditional attributes are done with an expression value
+        # (`disabled={{ flag }}`), never with a `{% if %}` block.
+        if (
+            source.startswith("{%", i)
+            or source.startswith("{#", i)
+            or source.startswith("{{", i)
+        ):
+            raise TokenizeError(
+                f"template tag inside a start tag at offset {i} — attributes "
+                f"can't be wrapped in a block; use an expression attribute "
+                f"value like `name={{{{ expr }}}}` instead"
+            )
+
         attr_name_start = i
         while i < n and source[i] not in " \t\r\n=/>":
             i += 1
@@ -329,11 +396,15 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
             if i >= n:
                 raise TokenizeError(f"Expected attribute value at offset {i}")
 
-            ac = source[i]
             segments: list[AttrText | AttrExpr]
+            if source.startswith("{%", i) or source.startswith("{#", i):
+                raise TokenizeError(
+                    f"block/comment tag inside an attribute value at offset {i}"
+                )
+            ac = source[i]
             if ac == '"' or ac == "'":
                 segments, i = _consume_quoted_attr(source, i, ac)
-            elif ac == "{":
+            elif source.startswith("{{", i):
                 expr, i = _consume_expr(source, i)
                 segments = cast("list[AttrText | AttrExpr]", [AttrExpr(expr)])
             else:
@@ -360,7 +431,7 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
 def _consume_quoted_attr(
     source: str, start: int, quote: str
 ) -> tuple[list[AttrSegment], int]:
-    """Consume `"static {expr} more"` returning typed segments."""
+    """Consume `"static {{ expr }} more"` returning typed segments."""
     assert source[start] == quote
     i = start + 1
     n = len(source)
@@ -377,15 +448,11 @@ def _consume_quoted_attr(
         if c == quote:
             flush()
             return segments, i + 1
+        if source.startswith("{%", i) or source.startswith("{#", i):
+            raise TokenizeError(
+                f"block/comment tag inside an attribute value at offset {i}"
+            )
         if source.startswith("{{", i):
-            buf.append("{")
-            i += 2
-            continue
-        if source.startswith("}}", i):
-            buf.append("}")
-            i += 2
-            continue
-        if c == "{":
             flush()
             expr, i = _consume_expr(source, i)
             segments.append(AttrExpr(expr))

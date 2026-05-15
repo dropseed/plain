@@ -30,7 +30,7 @@ from pathlib import Path
 from plain.runtime import settings
 
 # Bump on codegen changes so stale cache entries get rebuilt automatically.
-COMPILER_VERSION = 5
+COMPILER_VERSION = 6
 
 # Tracks which cache roots this process has already `mkdir`'d, so we skip
 # the syscall on every subsequent compile. Settings reads in `cache_root()`

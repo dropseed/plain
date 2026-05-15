@@ -28,8 +28,11 @@ from .loader import TemplateFileMissing, find_template
 from .parser import (
     DoctypeNode,
     ElementNode,
+    ForNode,
     HtmlCommentNode,
+    IfNode,
     Node,
+    SlotNode,
     TemplateCommentNode,
     TextNode,
 )
@@ -122,6 +125,11 @@ def check_component_slots(
                         node, errors, component_decls, label, source, body_start
                     )
                 visit(node.children)
+            elif isinstance(node, IfNode):
+                for branch in node.branches:
+                    visit(branch.children)
+            elif isinstance(node, ForNode | SlotNode):
+                visit(node.children)
 
     visit(nodes)
     return errors
@@ -154,12 +162,8 @@ def _check_call_site(
     here = f"{label}:{line}:{column}:"
 
     # Attribute names — plain.html has no pass-through, so every attr
-    # written on the tag must be a declared `attrs:` entry. Directives
-    # (`:if`, `:for`, `:slot`, ...) are lifted off `node.attrs` by the
-    # parser; guard against a stray `:`-prefixed name regardless.
+    # written on the tag must be a declared `attrs:` entry.
     for attr in node.attrs:
-        if attr.name.startswith(":"):
-            continue
         if attr.name not in decls.attrs:
             errors.append(
                 f"{here} unknown attr '{attr.name}' on component <{node.tag}>"
@@ -168,8 +172,8 @@ def _check_call_site(
     seen: set[str] = set()
     has_default_content = False
     for child in node.children:
-        if isinstance(child, ElementNode) and child.slot_name is not None:
-            name = child.slot_name
+        if isinstance(child, SlotNode):
+            name = child.name
             if name not in decls.slots:
                 errors.append(f"{here} unknown slot '{name}' on component <{node.tag}>")
                 continue

@@ -6,15 +6,16 @@ Public API:
 
 Walks the parsed tree and emits canonical bytes. Frontmatter values are
 preserved byte-for-byte; only the **top-level key order** is canonicalized
-to `imports → attrs → slots → (others, original order)`. Expression
-interiors (`{...}`) are never modified; verbatim elements (`<pre>`,
-`<textarea>`, `<script>`, `<style>`) preserve their text content exactly.
+to `imports → components → attrs → slots → (others, original order)`.
+Expression interiors (`{{ ... }}`) are never modified; verbatim elements
+(`<pre>`, `<textarea>`, `<script>`, `<style>`) preserve their text content
+exactly.
 
-The walker is context-aware rather than a Wadler doc tree: each element
-picks **inline** mode (single line, text whitespace preserved exactly) or
-**block** mode (each child on its own indented line, inter-tag whitespace
-freely added) based on whether its children include text, expressions, or
-inline-classified child elements.
+The walker is context-aware rather than a Wadler doc tree: each element or
+`{% %}` block picks **inline** mode (single line, text whitespace preserved
+exactly) or **block** mode (each child on its own indented line, inter-tag
+whitespace freely added) based on whether its children include text,
+expressions, or inline-classified child elements.
 
 Hard invariants:
 
@@ -25,16 +26,6 @@ Hard invariants:
    whitespace-insensitive contexts (between block siblings in flow
    content), the formatter may add or remove newlines and indentation —
    the rendered HTML remains equivalent under browser parsing.
-
-Deliberate canonical-form choices (not bugs):
-
-- Directives (`:if`, `:elif`, `:else`, `:for`, `:slot`, plus reserved
-  `:`-prefixed attrs like `:as`) emit before user attributes in a fixed
-  order, not in the author's original position. Rationale: in plain.html,
-  directives are control flow (the engine acts on them), distinct from
-  data attributes.
-  Putting them first makes them scan-readable like an if-statement header
-  and groups them away from HTML output attributes.
 """
 
 from __future__ import annotations
@@ -48,8 +39,13 @@ from .parser import (
     ElementNode,
     ExprNode,
     ForClause,
+    ForNode,
     HtmlCommentNode,
+    IfBranch,
+    IfNode,
     Node,
+    RawNode,
+    SlotNode,
     TemplateCommentNode,
     TextNode,
     parse,
@@ -188,14 +184,15 @@ def _format_node(node: Node, *, indent: int, indent_size: int, width: int) -> st
     """Render one node as a string. Caller controls surrounding whitespace."""
     match node:
         case TextNode():
-            # Re-encode literal braces — the tokenizer decoded `{{`/`}}` into
-            # single `{`/`}` on the way in, so on the way out we restore the
-            # escape or the re-parsed bytes become a live `{...}` expression.
-            # The script/style path below bypasses this; their bodies are
-            # opaque and the tokenizer never decoded them.
-            return node.text.replace("{", "{{").replace("}", "}}")
+            # Single `{` / `}` are ordinary text — emit verbatim. Normal
+            # tokenization never leaves `{{` / `{%` / `{#` in a text node
+            # (those are consumed as their own tokens), so verbatim output
+            # round-trips.
+            return node.text
+        case RawNode():
+            return "{% raw %}" + node.text + "{% endraw %}"
         case ExprNode():
-            return "{" + node.code + "}"
+            return "{{ " + node.code + " }}"
         case HtmlCommentNode():
             return f"<!--{node.text}-->"
         case TemplateCommentNode():
@@ -204,6 +201,16 @@ def _format_node(node: Node, *, indent: int, indent_size: int, width: int) -> st
             return node.text
         case ElementNode():
             return _format_element(
+                node, indent=indent, indent_size=indent_size, width=width
+            )
+        case IfNode():
+            return _format_if(node, indent=indent, indent_size=indent_size, width=width)
+        case ForNode():
+            return _format_for(
+                node, indent=indent, indent_size=indent_size, width=width
+            )
+        case SlotNode():
+            return _format_slot(
                 node, indent=indent, indent_size=indent_size, width=width
             )
         case _:
@@ -224,13 +231,10 @@ def _format_element(
 
     if is_verbatim(node.tag):
         if node.tag in ("script", "style"):
-            # Opaque body: tokenizer captured the full text verbatim without
-            # decoding brace escapes. Emit byte-for-byte; do not re-escape.
+            # Opaque body: tokenizer captured the full text verbatim.
             body = "".join(c.text for c in node.children if isinstance(c, TextNode))
         else:
-            # `<pre>`/`<textarea>` bodies tokenize normally — text and
-            # expression nodes both appear, brace escapes were decoded on
-            # the way in, and `_format_node` re-encodes them on the way out.
+            # `<pre>`/`<textarea>` bodies tokenize normally.
             body = "".join(
                 _format_node(c, indent=indent, indent_size=indent_size, width=width)
                 for c in node.children
@@ -240,11 +244,10 @@ def _format_element(
     if not node.children:
         return f"{open_tag}{close_tag}"
 
-    if _format_inline(node):
+    if _children_force_inline(node.children):
         # Inline mode preserves inter-element whitespace verbatim, so a child
         # element's visual column comes from the preceding text node, not from
-        # a computed indent. Pass that recovered column so a wrapped-attribute
-        # child indents its attribute lines correctly under the tag.
+        # a computed indent.
         parts: list[str] = []
         for idx, child in enumerate(node.children):
             child_indent = (
@@ -261,10 +264,34 @@ def _format_element(
 
     inner_indent = indent + indent_size
     pad = " " * indent
-    inner_pad = " " * inner_indent
 
     parts = [open_tag]
-    for child in node.children:
+    parts.extend(
+        _block_children_parts(
+            node.children,
+            inner_indent=inner_indent,
+            indent_size=indent_size,
+            width=width,
+        )
+    )
+    parts.append("\n")
+    parts.append(pad)
+    parts.append(close_tag)
+    return "".join(parts)
+
+
+def _block_children_parts(
+    children: list[Node], *, inner_indent: int, indent_size: int, width: int
+) -> list[str]:
+    """Render `children` one-per-line at `inner_indent`.
+
+    Each non-blank child contributes `"\\n"`, the indent pad, and its
+    formatted text. Whitespace-only text nodes are dropped — inter-tag
+    whitespace in block mode is not significant.
+    """
+    inner_pad = " " * inner_indent
+    parts: list[str] = []
+    for child in children:
         if isinstance(child, TextNode) and not child.text.strip():
             continue
         parts.append("\n")
@@ -274,21 +301,17 @@ def _format_element(
                 child, indent=inner_indent, indent_size=indent_size, width=width
             )
         )
-    parts.append("\n")
-    parts.append(pad)
-    parts.append(close_tag)
-    return "".join(parts)
+    return parts
 
 
-def _format_inline(node: ElementNode) -> bool:
+def _children_force_inline(children: list[Node]) -> bool:
     """Inline mode: children include text content, expressions, or inline elements.
 
-    When True, the formatter renders the element on a single line and
-    preserves all text whitespace exactly. When False (block mode),
-    children get their own indented lines and inter-tag whitespace is
-    inserted freely.
+    When True, the parent renders on a single line and preserves all text
+    whitespace exactly. When False (block mode), children get their own
+    indented lines and inter-tag whitespace is inserted freely.
     """
-    for c in node.children:
+    for c in children:
         if isinstance(c, TextNode) and c.text.strip():
             return True
         if isinstance(c, ExprNode):
@@ -304,8 +327,7 @@ def _inline_child_indent(children: list[Node], idx: int, *, fallback: int) -> in
     In inline mode inter-element whitespace is preserved verbatim, so a
     child element's visual column is the trailing whitespace run of the
     preceding text node. Returns that width so a wrapped-attribute child
-    aligns its attribute lines under the tag. Falls back to `fallback`
-    when the child isn't preceded by a newline-terminated whitespace run.
+    aligns its attribute lines under the tag.
     """
     if idx == 0:
         return fallback
@@ -317,16 +339,132 @@ def _inline_child_indent(children: list[Node], idx: int, *, fallback: int) -> in
     return fallback
 
 
+# --- block tags -------------------------------------------------------------
+
+
+def _if_header(branch: IfBranch, idx: int) -> str:
+    if idx == 0:
+        assert branch.condition is not None
+        return "{% if " + branch.condition + " %}"
+    if branch.condition is None:
+        return "{% else %}"
+    return "{% elif " + branch.condition + " %}"
+
+
+def _format_if(node: IfNode, *, indent: int, indent_size: int, width: int) -> str:
+    if any(_children_force_inline(b.children) for b in node.branches):
+        out: list[str] = []
+        for idx, branch in enumerate(node.branches):
+            out.append(_if_header(branch, idx))
+            for child in branch.children:
+                out.append(
+                    _format_node(
+                        child, indent=indent, indent_size=indent_size, width=width
+                    )
+                )
+        out.append("{% endif %}")
+        return "".join(out)
+
+    inner_indent = indent + indent_size
+    pad = " " * indent
+    parts: list[str] = []
+    for idx, branch in enumerate(node.branches):
+        parts.append(_if_header(branch, idx))
+        parts.extend(
+            _block_children_parts(
+                branch.children,
+                inner_indent=inner_indent,
+                indent_size=indent_size,
+                width=width,
+            )
+        )
+        parts.append("\n")
+        parts.append(pad)
+    parts.append("{% endif %}")
+    return "".join(parts)
+
+
+def _format_for(node: ForNode, *, indent: int, indent_size: int, width: int) -> str:
+    header = "{% for " + _for_clause_str(node.clause) + " %}"
+    footer = "{% endfor %}"
+    return _format_simple_block(
+        header,
+        footer,
+        node.children,
+        indent=indent,
+        indent_size=indent_size,
+        width=width,
+    )
+
+
+def _format_slot(node: SlotNode, *, indent: int, indent_size: int, width: int) -> str:
+    header = '{% slot "' + node.name + '" %}'
+    footer = "{% endslot %}"
+    return _format_simple_block(
+        header,
+        footer,
+        node.children,
+        indent=indent,
+        indent_size=indent_size,
+        width=width,
+    )
+
+
+def _format_simple_block(
+    header: str,
+    footer: str,
+    children: list[Node],
+    *,
+    indent: int,
+    indent_size: int,
+    width: int,
+) -> str:
+    """Format a single-section block (`{% for %}` / `{% slot %}`)."""
+    if _children_force_inline(children):
+        body = "".join(
+            _format_node(c, indent=indent, indent_size=indent_size, width=width)
+            for c in children
+        )
+        return header + body + footer
+    pad = " " * indent
+    parts = [header]
+    parts.extend(
+        _block_children_parts(
+            children,
+            inner_indent=indent + indent_size,
+            indent_size=indent_size,
+            width=width,
+        )
+    )
+    parts.append("\n")
+    parts.append(pad)
+    parts.append(footer)
+    return "".join(parts)
+
+
+def _for_clause_str(clause: ForClause) -> str:
+    # Prefer the original target source when available so tuple-unpack
+    # parens like `(a, b) in xs` survive round-trip.
+    target = clause.raw_target or (
+        clause.targets[0] if len(clause.targets) == 1 else ", ".join(clause.targets)
+    )
+    if clause.filter_code is not None:
+        return f"{target} in {clause.iter_code} if {clause.filter_code}"
+    return f"{target} in {clause.iter_code}"
+
+
+# --- elements ---------------------------------------------------------------
+
+
 def _format_open_tag(
     node: ElementNode, *, indent: int, indent_size: int, width: int
 ) -> str:
     # Per the HTML5 spec, void elements (img, br, hr, input, …) always
-    # use the bare `<tag>` form. The trailing `/` is "permitted but has
-    # no effect" — a legacy XHTML accommodation we don't emit. Drop the
-    # source's self-closing flag for void tags so output is canonical.
+    # use the bare `<tag>` form. Drop the source's self-closing flag for
+    # void tags so output is canonical.
     self_closing = node.self_closing and node.tag not in VOID_ELEMENTS
 
-    attrs = _directive_attrs(node) + [_format_attribute(a) for a in node.attrs]
+    attrs = [_format_attribute(a) for a in node.attrs]
     flat = _open_tag_flat(node.tag, attrs, self_closing=self_closing)
 
     if not attrs or indent + len(flat) <= width:
@@ -370,45 +508,13 @@ def _open_tag_wrapped(
     return "".join(parts)
 
 
-def _directive_attrs(node: ElementNode) -> list[str]:
-    out: list[str] = []
-    if node.if_code is not None:
-        out.append(f":if={{{node.if_code}}}")
-    if node.elif_code is not None:
-        out.append(f":elif={{{node.elif_code}}}")
-    if node.is_else:
-        out.append(":else")
-    if node.for_clause is not None:
-        out.append(f":for={{{_format_for_clause(node.for_clause)}}}")
-    # `include_path` is set only for PascalCase component tags — the tag
-    # name itself names the component, so no directive is emitted for it.
-    if node.slot_name is not None:
-        out.append(f':slot="{node.slot_name}"')
-    for attr in node.reserved_directives:
-        out.append(_format_attribute(attr))
-    return out
-
-
-def _format_for_clause(clause: ForClause) -> str:
-    # Prefer the original target source when available so tuple-unpack
-    # parens like `(a, b) in xs` survive round-trip — the parser strips
-    # them into a flat name list otherwise.
-    target = clause.raw_target or (
-        clause.targets[0] if len(clause.targets) == 1 else ", ".join(clause.targets)
-    )
-    if clause.filter_code is not None:
-        return f"{target} in {clause.iter_code} if {clause.filter_code}"
-    return f"{target} in {clause.iter_code}"
-
-
 def _format_attribute(attr: Attribute) -> str:
     if attr.segments is None:
         return attr.name
-    # A value that's a single `{expr}` emits unquoted — matches how authors
-    # write `:if={ok}` or `class={x}` and is what the recognized directives
-    # already canonicalize to.
+    # A value that's a single `{{ expr }}` emits unquoted — matches how
+    # authors write `disabled={{ ok }}` or `class={{ x }}`.
     if len(attr.segments) == 1 and isinstance(attr.segments[0], AttrExpr):
-        return f"{attr.name}={{{attr.segments[0].code}}}"
+        return f"{attr.name}={{{{ {attr.segments[0].code} }}}}"
     # HTML5 boolean attribute: `disabled="disabled"` collapses to `disabled`.
     if (
         len(attr.segments) == 1
@@ -425,10 +531,7 @@ def _format_attr_value(segments: list[AttrText | AttrExpr]) -> str:
     out: list[str] = []
     for seg in segments:
         if isinstance(seg, AttrText):
-            # Re-encode literal braces — the tokenizer decoded `{{`/`}}` into
-            # single `{`/`}` on the way in, so they need re-escaping on the
-            # way out or the next pass parses them as a live `{...}` expr.
-            out.append(seg.text.replace("{", "{{").replace("}", "}}"))
+            out.append(seg.text)
         else:
-            out.append("{" + seg.code + "}")
+            out.append("{{ " + seg.code + " }}")
     return "".join(out)
