@@ -7,7 +7,7 @@
     - [`plain tailwind init`](#plain-tailwind-init)
     - [`plain tailwind build`](#plain-tailwind-build)
     - [`plain tailwind update`](#plain-tailwind-update)
-- [Template tag](#template-tag)
+- [Template helper](#template-helper)
 - [Settings](#settings)
 - [Adding custom CSS](#adding-custom-css)
 - [Deployment](#deployment)
@@ -36,13 +36,17 @@ For development, use watch mode to automatically recompile when files change:
 plain tailwind build --watch
 ```
 
-Include the compiled CSS in your templates:
+Include the compiled CSS in your templates by importing the `tailwind_css` helper in frontmatter and calling it in the `<head>`:
 
 ```html
+---
+imports:
+  - from plain.tailwind.html import tailwind_css
+---
 <!DOCTYPE html>
 <html>
 <head>
-    {% tailwind_css %}
+    {{ tailwind_css() }}
 </head>
 <body>
     <h1 class="text-3xl font-bold text-blue-600">Hello, Tailwind!</h1>
@@ -90,23 +94,29 @@ plain tailwind update
 
 This downloads the newest version and updates your `pyproject.toml`.
 
-## Template tag
+## Template helper
 
-The `tailwind_css` template tag includes the compiled CSS file in your templates. Place it in your base template's `<head>`:
+The `tailwind_css` helper includes the compiled CSS file in your templates. Import it in your base template's frontmatter and call it in the `<head>`:
 
 ```html
+---
+imports:
+  - from plain.tailwind.html import tailwind_css
+slots:
+  default: required
+---
 <!DOCTYPE html>
 <html>
 <head>
-    {% tailwind_css %}
+    {{ tailwind_css() }}
 </head>
 <body>
-    {% block content %}{% endblock %}
+    {{ children }}
 </body>
 </html>
 ```
 
-The tag renders a `<link>` element pointing to your compiled CSS file.
+The helper renders a `<link>` element pointing to your compiled CSS file.
 
 ## Settings
 
@@ -251,16 +261,22 @@ Initialize Tailwind in your project:
 plain tailwind init
 ```
 
-Add the `tailwind_css` template tag to your base template:
+Add the `tailwind_css` helper to your base template:
 
 ```html
+---
+imports:
+  - from plain.tailwind.html import tailwind_css
+slots:
+  default: required
+---
 <!DOCTYPE html>
 <html>
 <head>
-    {% tailwind_css %}
+    {{ tailwind_css() }}
 </head>
 <body>
-    {% block content %}{% endblock %}
+    {{ children }}
 </body>
 </html>
 ```

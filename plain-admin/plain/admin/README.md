@@ -329,23 +329,52 @@ class UpdateView(AdminModelUpdateView):
     template_name = "admin/users/user_form.html"  # Optional custom template
 ```
 
-The form template extends the admin base and renders fields with the admin's elements:
+The form template renders inside the admin base layout component and uses the admin's field elements. The base and each element are imported in `components:`, then invoked as PascalCase tags:
 
 ```html
-{% extends "admin/base.html" %}
-{% use_elements %}
+---
+components:
+  - admin/base as Base
+  - elements/admin/InputField
+  - elements/admin/CheckboxField
+  - elements/admin/Submit
+attrs:
+  form: Any
+  title: str = ""
+  app_name: str = "Plain"
+  admin_force_theme: str = ""
+  description: str = ""
+  image: Any = None
+  links: dict = {}
+  extra_links: dict = {}
+  parent_view_classes: list = []
+  object: Any = None
+  cards: list = []
+---
+<Base
+    title={{ title }}
+    app_name={{ app_name }}
+    admin_force_theme={{ admin_force_theme }}
+    description={{ description }}
+    image={{ image }}
+    links={{ links }}
+    extra_links={{ extra_links }}
+    parent_view_classes={{ parent_view_classes }}
+    object={{ object }}
+    cards={{ cards }}
+>
+    <form method="post" class="space-y-4">
+        <InputField label="Email" field={{ form.email }} />
+        <InputField label="First name" field={{ form.first_name }} />
+        <InputField label="Last name" field={{ form.last_name }} />
+        <CheckboxField label="Active" field={{ form.is_active }} />
 
-{% block content %}
-<form method="post" class="space-y-4">
-    <admin.InputField label="Email" field={{ form.email }} />
-    <admin.InputField label="First name" field={{ form.first_name }} />
-    <admin.InputField label="Last name" field={{ form.last_name }} />
-    <admin.CheckboxField label="Active" field={{ form.is_active }} />
-
-    <admin.Submit>Save</admin.Submit>
-</form>
-{% endblock %}
+        <Submit>Save</Submit>
+    </form>
+</Base>
 ```
+
+The chrome attributes (`title`, `links`, `cards`, …) are supplied by the admin view and passed straight through to `<Base>`. Most admin form templates are this exact shape — copy a shipped one (e.g. a package's `*_form.html`) as a starting point.
 
 CSRF is automatic (no `{{ csrf_input }}` needed). Plain forms are headless — there's no `as_p()` / `as_table()`; you compose the markup yourself with the elements above.
 
@@ -353,22 +382,24 @@ CSRF is automatic (no `{{ csrf_input }}` needed). Plain forms are headless — t
 
 The admin ships these elements for building admin templates. Paired field elements (label + input + help + errors) cover the common case; unwrapped primitives are there when you need custom layouts.
 
-| Element                 | Renders                                                                                                                |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `<admin.Submit>`        | Right-aligned `<button>` with `admin-btn admin-btn-primary` styling                                                    |
-| `<admin.InputField>`    | `<admin.Label>` + `<admin.Input>` + `<admin.Help>` + `<admin.FieldErrors>`                                             |
-| `<admin.CheckboxField>` | `<admin.Checkbox>` + `<admin.Label>` + `<admin.Help>` + `<admin.FieldErrors>`                                          |
-| `<admin.SelectField>`   | `<admin.Label>` + `<admin.Select>` + `<admin.Help>` + `<admin.FieldErrors>`                                            |
-| `<admin.TextareaField>` | `<admin.Label>` + `<admin.Textarea>` + `<admin.Help>` + `<admin.FieldErrors>`                                          |
-| `<admin.Input>`         | `<input class="admin-input">`; pass `type="email"` etc. via the `type` prop                                            |
-| `<admin.Checkbox>`      | `<input type="checkbox" class="admin-input">`                                                                          |
-| `<admin.Select>`        | `<select class="admin-select">` with `<option>`s from `field.field.choices`                                            |
-| `<admin.Textarea>`      | `<textarea class="admin-textarea">` (set `rows` via prop)                                                              |
-| `<admin.Label>`         | `<label class="admin-label">` with required `*` indicator                                                              |
-| `<admin.Help>`          | `<p class="text-admin-muted-foreground">` of help text                                                                 |
-| `<admin.FieldErrors>`   | Error messages with danger icon                                                                                        |
-| `<admin.SearchInput>`   | `<input class="admin-input pl-8">` with a leading search-icon overlay (used in list filters / topbar)                  |
-| `<admin.Icon>`          | `<i class="bi bi-{name}">` — pass `name="plus-lg"` etc. (full set: [bootstrap-icons](https://icons.getbootstrap.com/)) |
+Each element lives at `elements/admin/<Name>.html`; import the ones you need in `components:` and invoke them as PascalCase tags.
+
+| Element           | Renders                                                                                                                |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `<Submit>`        | Right-aligned `<button>` with `admin-btn admin-btn-primary` styling                                                    |
+| `<InputField>`    | `<Label>` + `<Input>` + `<Help>` + `<FieldErrors>`                                                                     |
+| `<CheckboxField>` | `<Checkbox>` + `<Label>` + `<Help>` + `<FieldErrors>`                                                                  |
+| `<SelectField>`   | `<Label>` + `<Select>` + `<Help>` + `<FieldErrors>`                                                                    |
+| `<TextareaField>` | `<Label>` + `<Textarea>` + `<Help>` + `<FieldErrors>`                                                                  |
+| `<Input>`         | `<input class="admin-input">`; pass `type="email"` etc. via the `type` prop                                            |
+| `<Checkbox>`      | `<input type="checkbox" class="admin-input">`                                                                          |
+| `<Select>`        | `<select class="admin-select">` with `<option>`s from `field.field.choices`                                            |
+| `<Textarea>`      | `<textarea class="admin-textarea">` (set `rows` via prop)                                                              |
+| `<Label>`         | `<label class="admin-label">` with required `*` indicator                                                              |
+| `<Help>`          | `<p class="text-admin-muted-foreground">` of help text                                                                 |
+| `<FieldErrors>`   | Error messages with danger icon                                                                                        |
+| `<SearchInput>`   | `<input class="admin-input pl-8">` with a leading search-icon overlay (used in list filters / topbar)                  |
+| `<Icon>`          | `<i class="bi bi-<name>">` — pass `name="plus-lg"` etc. (full set: [bootstrap-icons](https://icons.getbootstrap.com/)) |
 
 Source: [`templates/elements/admin/`](./templates/elements/admin/) — read the file directly to see exactly what each element accepts.
 

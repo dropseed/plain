@@ -270,36 +270,40 @@ email = forms.EmailField(
 
 Forms provide access to field data through [`BoundField`](./boundfield.py#BoundField) objects. You render the HTML inputs yourself, giving you full control over markup and styling.
 
+Conditional attributes use an expression value — a falsy value omits the attribute — rather than wrapping the attribute in `{% if %}`:
+
 ```html
 <form method="post">
-    <!-- Non-field errors (from form.clean()) -->
+    {# Non-field errors (from form.clean()) #}
     {% for error in form.non_field_errors %}
-    <div class="error">{{ error }}</div>
+        <div class="error">{{ error }}</div>
     {% endfor %}
 
     <div>
-        <label for="{{ form.email.html_id }}">Email</label>
+        <label for={{ form.email.html_id }}>Email</label>
         <input
             type="email"
-            name="{{ form.email.html_name }}"
-            id="{{ form.email.html_id }}"
-            value="{{ form.email.value }}"
-            {% if form.email.field.required %}required{% endif %}>
+            name={{ form.email.html_name }}
+            id={{ form.email.html_id }}
+            value={{ form.email.value() or '' }}
+            required={{ form.email.field.required }}
+        >
 
         {% for error in form.email.errors %}
-        <div class="field-error">{{ error }}</div>
+            <div class="field-error">{{ error }}</div>
         {% endfor %}
     </div>
 
     <div>
-        <label for="{{ form.message.html_id }}">Message</label>
+        <label for={{ form.message.html_id }}>Message</label>
         <textarea
-            name="{{ form.message.html_name }}"
-            id="{{ form.message.html_id }}"
-            {% if form.message.field.required %}required{% endif %}>{{ form.message.value }}</textarea>
+            name={{ form.message.html_name }}
+            id={{ form.message.html_id }}
+            required={{ form.message.field.required }}
+        >{{ form.message.value() or '' }}</textarea>
 
         {% for error in form.message.errors %}
-        <div class="field-error">{{ error }}</div>
+            <div class="field-error">{{ error }}</div>
         {% endfor %}
     </div>
 
@@ -311,12 +315,12 @@ Each bound field provides:
 
 - `html_name` - The input's `name` attribute
 - `html_id` - The input's `id` attribute
-- `value` - The current value (initial or submitted)
+- `value()` - The current value (initial or submitted)
 - `errors` - List of validation error messages
 - `field` - The underlying [`Field`](./fields.py#Field) instance
 - `initial` - The field's initial value
 
-For large applications, you can reduce repetition by creating reusable patterns with Jinja [includes](https://jinja.palletsprojects.com/en/stable/templates/#include), [macros](https://jinja.palletsprojects.com/en/stable/templates/#macros), or [plain.elements](/plain-elements/README.md).
+For large applications, you can reduce repetition by extracting a reusable [component](/plain-html/plain/html/README.md) — e.g. a `components/Field.html` template invoked as `<Field bf={{ form.email }} label="Email" />`.
 
 ## JSON data
 
@@ -446,58 +450,65 @@ class ContactView(FormView):
         return super().form_valid(form)
 ```
 
-Create the template to render the form.
+Create the template to render the form. Layouts are ordinary components — import your `base.html` and render the page content inside it.
 
 ```html
 <!-- app/templates/contact.html -->
-{% extends "base.html" %}
+---
+components:
+  - base as Base
+attrs:
+  form: plain.forms.Form
+---
+<Base>
+    <h1>Contact Us</h1>
 
-{% block content %}
-<h1>Contact Us</h1>
-
-<form method="post">
-    {% for error in form.non_field_errors %}
-    <div class="error">{{ error }}</div>
-    {% endfor %}
-
-    <div>
-        <label for="{{ form.name.html_id }}">Name</label>
-        <input
-            type="text"
-            name="{{ form.name.html_name }}"
-            id="{{ form.name.html_id }}"
-            value="{{ form.name.value }}"
-            required>
-        {% for error in form.name.errors %}
-        <div class="field-error">{{ error }}</div>
+    <form method="post">
+        {% for error in form.non_field_errors %}
+            <div class="error">{{ error }}</div>
         {% endfor %}
-    </div>
 
-    <div>
-        <label for="{{ form.email.html_id }}">Email</label>
-        <input
-            type="email"
-            name="{{ form.email.html_name }}"
-            id="{{ form.email.html_id }}"
-            value="{{ form.email.value }}"
-            required>
-        {% for error in form.email.errors %}
-        <div class="field-error">{{ error }}</div>
-        {% endfor %}
-    </div>
+        <div>
+            <label for={{ form.name.html_id }}>Name</label>
+            <input
+                type="text"
+                name={{ form.name.html_name }}
+                id={{ form.name.html_id }}
+                value={{ form.name.value() or '' }}
+                required
+            >
+            {% for error in form.name.errors %}
+                <div class="field-error">{{ error }}</div>
+            {% endfor %}
+        </div>
 
-    <div>
-        <label for="{{ form.message.html_id }}">Message</label>
-        <textarea
-            name="{{ form.message.html_name }}"
-            id="{{ form.message.html_id }}"
-            required>{{ form.message.value }}</textarea>
-        {% for error in form.message.errors %}
-        <div class="field-error">{{ error }}</div>
-        {% endfor %}
-    </div>
+        <div>
+            <label for={{ form.email.html_id }}>Email</label>
+            <input
+                type="email"
+                name={{ form.email.html_name }}
+                id={{ form.email.html_id }}
+                value={{ form.email.value() or '' }}
+                required
+            >
+            {% for error in form.email.errors %}
+                <div class="field-error">{{ error }}</div>
+            {% endfor %}
+        </div>
 
-    <button type="submit">Send Message</button>
-</form>
-{% endblock %}
+        <div>
+            <label for={{ form.message.html_id }}>Message</label>
+            <textarea
+                name={{ form.message.html_name }}
+                id={{ form.message.html_id }}
+                required
+            >{{ form.message.value() or '' }}</textarea>
+            {% for error in form.message.errors %}
+                <div class="field-error">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <button type="submit">Send Message</button>
+    </form>
+</Base>
 ```

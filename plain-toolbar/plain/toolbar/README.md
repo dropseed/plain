@@ -17,18 +17,26 @@
 
 The toolbar appears at the bottom of your browser window and shows useful debugging information about the current request. You can expand it to see detailed panels, switch between tabs, and resize it by dragging the top edge.
 
-To render the toolbar, add the `{% toolbar %}` tag to your base template (typically just before the closing `</body>` tag):
+To render the toolbar, import the `toolbar` helper in your base template's frontmatter and call it just before the closing `</body>` tag:
 
 ```html
+---
+imports:
+  - from plain.toolbar.html import toolbar
+attrs:
+  request: plain.http.Request
+slots:
+  default: required
+---
 <!DOCTYPE html>
 <html>
 <head>
     <title>My App</title>
 </head>
 <body>
-    {% block content %}{% endblock %}
+    {{ children }}
 
-    {% toolbar %}
+    {{ toolbar(request) }}
 </body>
 </html>
 ```
@@ -89,16 +97,20 @@ Then create the panel template:
 
 ```html
 <!-- app/users/templates/toolbar/user.html -->
+---
+attrs:
+  current_user: Any = None
+---
 <div class="px-6 py-4 text-sm">
     {% if current_user %}
-    <dl class="grid grid-cols-[max-content_1fr] gap-x-8 gap-y-2">
-        <dt>Email</dt>
-        <dd class="text-white/50">{{ current_user.email }}</dd>
-        <dt>ID</dt>
-        <dd class="text-white/50">{{ current_user.id }}</dd>
-    </dl>
+        <dl class="grid grid-cols-[max-content_1fr] gap-x-8 gap-y-2">
+            <dt>Email</dt>
+            <dd class="text-white/50">{{ current_user.email }}</dd>
+            <dt>ID</dt>
+            <dd class="text-white/50">{{ current_user.id }}</dd>
+        </dl>
     {% else %}
-    <p class="text-white/50">No user logged in</p>
+        <p class="text-white/50">No user logged in</p>
     {% endif %}
 </div>
 ```
@@ -177,7 +189,7 @@ When an exception occurs, the toolbar automatically expands and shows the Except
 
 #### How do I disable the toolbar completely?
 
-Remove `plain.toolbar` from your `INSTALLED_PACKAGES` setting. Alternatively, remove the `{% toolbar %}` tag from your templates.
+Remove `plain.toolbar` from your `INSTALLED_PACKAGES` setting. Alternatively, remove the `toolbar()` call from your templates.
 
 ## Installation
 
@@ -196,18 +208,26 @@ INSTALLED_PACKAGES = [
 ]
 ```
 
-Add the `{% toolbar %}` template tag to your base template, just before the closing `</body>` tag:
+Add the `toolbar` helper to your base template, just before the closing `</body>` tag:
 
 ```html
+---
+imports:
+  - from plain.toolbar.html import toolbar
+attrs:
+  request: plain.http.Request
+slots:
+  default: required
+---
 <!DOCTYPE html>
 <html>
 <head>
     <title>My App</title>
 </head>
 <body>
-    {% block content %}{% endblock %}
+    {{ children }}
 
-    {% toolbar %}
+    {{ toolbar(request) }}
 </body>
 </html>
 ```

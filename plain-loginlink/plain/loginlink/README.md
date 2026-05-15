@@ -68,23 +68,21 @@ The form includes a hidden `next` field that preserves the redirect destination 
 
 ## Customizing the email
 
-The default email template is minimal. You can override it by creating your own templates.
-
-Create `templates/email/loginlink.html`:
+The default email template is minimal. You can override it by creating your own template at `templates/email/loginlink.html`. The template receives `user`, `url`, and `expires_in` in its context:
 
 ```html
+---
+attrs:
+  user: Any
+  url: str
+  expires_in: int
+---
 <p>Hi {{ user.email }},</p>
-<p>Click here to log in: <a href="{{ url }}">{{ url }}</a></p>
-<p>This link expires in {{ expires_in|floatformat:0 }} seconds.</p>
+<p>Click here to log in: <a href={{ url }}>{{ url }}</a></p>
+<p>This link expires in {{ expires_in }} seconds.</p>
 ```
 
-Create `templates/email/loginlink.subject.txt`:
-
-```
-Log in to My App
-```
-
-For more control over how the email is sent, subclass [`LoginLinkForm`](./forms.py#LoginLinkForm) and override the [`get_template_email`](./forms.py#get_template_email) method:
+For more control over how the email is sent — including the subject line — subclass [`LoginLinkForm`](./forms.py#LoginLinkForm) and override the [`get_template_email`](./forms.py#get_template_email) method:
 
 ```python
 from plain.loginlink.forms import LoginLinkForm
@@ -94,7 +92,8 @@ from plain.email import TemplateEmail
 class CustomLoginLinkForm(LoginLinkForm):
     def get_template_email(self, *, email, context):
         return TemplateEmail(
-            template="custom_login",
+            template="email/loginlink",
+            subject="Log in to My App",
             to=[email],
             context=context,
         )
@@ -215,54 +214,71 @@ Set `AUTH_LOGIN_URL` in your settings to point to your login view:
 AUTH_LOGIN_URL = "app:login"
 ```
 
-Create the "sent" and "failed" templates. These templates should extend your base template.
+Create the "sent" and "failed" templates. Layouts are ordinary components — import your `base.html` and render the page content inside it.
 
 Create `templates/loginlink/sent.html`:
 
 ```html
-{% extends "base.html" %}
-
-{% block content %}
-<h1>Check your email</h1>
-<p>If your email address was found, we sent you a link to log in.</p>
-<p>If you don't see it, check your spam folder.</p>
-{% endblock %}
+---
+components:
+  - base as Base
+---
+<Base>
+    <h1>Check your email</h1>
+    <p>If your email address was found, we sent you a link to log in.</p>
+    <p>If you don't see it, check your spam folder.</p>
+</Base>
 ```
 
 Create `templates/loginlink/failed.html`:
 
 ```html
-{% extends "base.html" %}
+---
+components:
+  - base as Base
+attrs:
+  error: str = ""
+  login_url: str = ""
+---
+<Base>
+    {% if error == "expired" %}
+        <h1>Link Expired</h1>
+    {% elif error == "invalid" %}
+        <h1>Link Invalid</h1>
+    {% elif error == "changed" %}
+        <h1>Link Changed</h1>
+    {% else %}
+        <h1>Link Error</h1>
+    {% endif %}
 
-{% block content %}
-{% if error == "expired" %}
-<h1>Link Expired</h1>
-{% elif error == "invalid" %}
-<h1>Link Invalid</h1>
-{% elif error == "changed" %}
-<h1>Link Changed</h1>
-{% else %}
-<h1>Link Error</h1>
-{% endif %}
-
-<a href="{{ login_url }}">Request a new link</a>
-{% endblock %}
+    <a href={{ login_url }}>Request a new link</a>
+</Base>
 ```
 
-Create a login form template. Create `templates/loginlink/loginlinkform.html` (or set a custom `template_name` on your view):
+Create a login form template. Create `templates/loginlink/loginlinkform.html` (or set a custom `template_name` on your view). CSRF is automatic — no token is needed:
 
 ```html
-{% extends "base.html" %}
-
-{% block content %}
-<h1>Log in</h1>
-<form method="post">
-    {{ csrf_input }}
-    {{ form.email.as_input }}
-    <input type="hidden" name="next" value="{{ request.query_params.next }}">
-    <button type="submit">Send login link</button>
-</form>
-{% endblock %}
+---
+components:
+  - base as Base
+attrs:
+  form: plain.forms.Form
+  request: plain.http.Request
+---
+<Base>
+    <h1>Log in</h1>
+    <form method="post">
+        <input
+            type="email"
+            name={{ form.email.html_name }}
+            id={{ form.email.html_id }}
+            value={{ form.email.value() or '' }}
+            required
+        >
+        <input type="hidden" name="next" value={{ request.query_params.get('next', '') }}>
+        <button type="submit">Send login link</button>
+    </form>
+</Base>
 ```
 
 Your passwordless login is now ready. Visit `/login/` to test the flow.

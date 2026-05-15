@@ -33,17 +33,25 @@ For most use cases, client-side tracking is the simplest approach. Add the route
 
 Client-side tracking uses a small JavaScript snippet that sends pageview data via the Beacon API. This captures the full browser URL, page title, referrer, and timestamp.
 
-Add `{% pageviews_js %}` to your base template:
+Import the `pageviews_js` helper in your base template's frontmatter and call it before the closing `</body>` tag:
 
 ```html
+---
+imports:
+  - from plain.pageviews.html import pageviews_js
+attrs:
+  request: plain.http.Request
+slots:
+  default: required
+---
 <!DOCTYPE html>
 <html>
 <head>
     <title>My App</title>
 </head>
 <body>
-    {% block content %}{% endblock %}
-    {% pageviews_js %}
+    {{ children }}
+    {{ pageviews_js(request) }}
 </body>
 </html>
 ```
@@ -172,7 +180,7 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 #### When should I use server-side vs client-side tracking?
 
-**Client-side tracking** (via `{% pageviews_js %}`) works best for:
+**Client-side tracking** (via `pageviews_js()`) works best for:
 
 - Standard web pages viewed by users
 - Getting accurate client-side information (full URL with hash fragments, page title)
@@ -236,18 +244,26 @@ class AppRouter(Router):
     ]
 ```
 
-For client-side tracking, add the JavaScript tag to your base template:
+For client-side tracking, add the `pageviews_js` helper to your base template:
 
 ```html
 <!-- templates/base.html -->
+---
+imports:
+  - from plain.pageviews.html import pageviews_js
+attrs:
+  request: plain.http.Request
+slots:
+  default: required
+---
 <!DOCTYPE html>
 <html>
 <head>
-    <title>{% block title %}My App{% endblock %}</title>
+    <title>My App</title>
 </head>
 <body>
-    {% block content %}{% endblock %}
-    {% pageviews_js %}
+    {{ children }}
+    {{ pageviews_js(request) }}
 </body>
 </html>
 ```

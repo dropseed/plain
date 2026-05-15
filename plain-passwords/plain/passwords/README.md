@@ -327,41 +327,45 @@ urlpatterns = [
 ]
 ```
 
-Create templates for your views. For the login view, create `templates/passwords/passwordlogin.html`:
+Create templates for your views. Layouts are ordinary components — import your `base.html` and render the page content inside it. For the login view, create `templates/passwords/passwordlogin.html`:
 
 ```html
-{% extends "base.html" %}
+---
+components:
+  - base as Base
+attrs:
+  form: plain.forms.Form
+---
+<Base>
+    <form method="post">
+        <div>
+            <label for={{ form.email.html_id }}>Email</label>
+            <input
+                type="email"
+                name={{ form.email.html_name }}
+                id={{ form.email.html_id }}
+                value={{ form.email.value() or '' }}
+            >
+            {% for error in form.email.errors %}
+                <p>{{ error }}</p>
+            {% endfor %}
+        </div>
 
-{% block content %}
-<form method="post">
-    <div>
-        <label for="{{ form.email.html_id }}">Email</label>
-        <input
-            type="email"
-            name="{{ form.email.html_name }}"
-            id="{{ form.email.html_id }}"
-            value="{{ form.email.value }}"
-        >
-        {% for error in form.email.errors %}
-        <p>{{ error }}</p>
-        {% endfor %}
-    </div>
+        <div>
+            <label for={{ form.password.html_id }}>Password</label>
+            <input
+                type="password"
+                name={{ form.password.html_name }}
+                id={{ form.password.html_id }}
+            >
+            {% for error in form.password.errors %}
+                <p>{{ error }}</p>
+            {% endfor %}
+        </div>
 
-    <div>
-        <label for="{{ form.password.html_id }}">Password</label>
-        <input
-            type="password"
-            name="{{ form.password.html_name }}"
-            id="{{ form.password.html_id }}"
-        >
-        {% for error in form.password.errors %}
-        <p>{{ error }}</p>
-        {% endfor %}
-    </div>
-
-    <button type="submit">Log in</button>
-</form>
-{% endblock %}
+        <button type="submit">Log in</button>
+    </form>
+</Base>
 ```
 
 For password resets, install [plain.email](../../../plain-email/plain/email/README.md) and create a reset email template.
