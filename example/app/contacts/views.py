@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from plain.http import Response
-from plain.templates.views import FormView, TemplateView
+from plain.templates.views import FormView, SchemaView, TemplateView
 from plain.urls import reverse_lazy
 
 from .forms import ArchiveFilterForm, ArchiveSearchForm, ContactForm
 from .models import ContactSubmission
+from .schemas import ContactSchema
 
 
 class ContactView(FormView):
@@ -29,6 +30,41 @@ class ContactView(FormView):
 
 class ContactSuccessView(TemplateView):
     template_name = "contacts/success.html"
+
+
+class ContactSchemaView(SchemaView[ContactSchema]):
+    """The plain.schema counterpart to ContactView — same page, built on
+    SchemaView + ContactSchema instead of FormView + ContactForm."""
+
+    template_name = "contacts/schema_form.html"
+    schema_class = ContactSchema
+    success_url = reverse_lazy("contacts:schema_success")
+
+    def get_initial(self) -> dict[str, Any]:
+        if name := self.request.query_params.get("name"):
+            return {"name": name}
+        return {}
+
+    def get_template_context(self) -> dict[str, Any]:
+        context = super().get_template_context()
+        context["ask_company"] = self.request.query_params.get("company") == "1"
+        return context
+
+    def schema_valid(self, result: ContactSchema) -> Response:
+        # Schemas are pure data — persisting the result is the view's job.
+        ContactSubmission.query.create(
+            name=result.name,
+            email=result.email,
+            subject=result.subject,
+            message=result.message,
+            company=result.company or "",
+            subscribe=result.subscribe,
+        )
+        return super().schema_valid(result)
+
+
+class ContactSchemaSuccessView(TemplateView):
+    template_name = "contacts/schema_success.html"
 
 
 class ContactArchiveView(TemplateView):

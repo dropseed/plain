@@ -185,6 +185,8 @@ class ContactView(View):
 
 The bound form's duck-typed surface (`html_id`, `html_name`, `value()`, `errors`, `field`, `non_field_errors`, `fields`) is the same surface `plain.forms.BoundField` exposes — existing form templates render against `BoundSchema` unchanged.
 
+For full HTML pages, `plain.templates.views.SchemaView` wraps this GET-render / POST-validate / re-render-or-redirect cycle — the schema counterpart to `FormView`.
+
 ## Property tests with Hypothesis
 
 `plain.schema.testing.schema_strategy()` produces a Hypothesis strategy that generates valid input dicts for any schema. Useful for fuzz-testing endpoints — every keystroke shouldn't produce a 500.

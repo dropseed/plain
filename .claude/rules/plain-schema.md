@@ -58,4 +58,6 @@ If you're tempted to `request.json_data["x"]` and then check it — write a Sche
 
 Pair with `BoundSchema` for template rendering — `BoundSchema(SchemaClass)` for a blank form, `BoundSchema.from_invalid(SchemaClass, result)` to re-render after a failed POST. Its field surface is duck-compatible with `plain.forms.BoundField`, so existing form templates render unchanged.
 
+For full HTML pages, use `plain.templates.views.SchemaView[MySchema]` — the schema counterpart to `FormView`. Set `schema_class` + `success_url`, override `schema_valid(result)` to persist.
+
 Run `uv run plain docs schema` for full patterns. Run `uv run plain docs schema --api` for the public API surface.

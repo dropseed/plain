@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import field, field_errors, nonfield_errors, back_link %}
 
-{% block title %}Contact us{% endblock %}
+{% block title %}Contact us (schema){% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto px-5 py-12">
@@ -9,13 +9,13 @@
 
     <h1 class="page-h1">Contact us</h1>
     <p class="mt-3 text-sm text-muted">
-        Plain <span class="font-mono text-body">forms.Form</span> with text, email, choice, boolean,
-        custom <span class="font-mono text-body">clean_email</span>, cross-field
-        <span class="font-mono text-body">clean()</span>, and a dynamic
-        <span class="font-mono text-body">company</span> field via
+        The same form as the <a class="body-link" href="{{ url('contacts:form') }}">forms.Form version</a>,
+        built with <span class="font-mono text-body">plain.schema</span>: a
+        <span class="font-mono text-body">Schema</span> driven by a
+        <span class="font-mono text-body">SchemaView</span>, with the per-field and
+        cross-field rules in <span class="font-mono text-body">check()</span>, and a
+        dynamic <span class="font-mono text-body">company</span> field via
         <a class="body-link" href="?company=1">?company=1</a>.
-        See the same form built with
-        <a class="body-link" href="{{ url('contacts:schema') }}">plain.schema</a>.
     </p>
 
     <form method="post" class="mt-6 flex flex-col gap-5">
@@ -23,7 +23,7 @@
         {{ field(form.name, "Name", autofocus=True, required=True) }}
         {{ field(form.email, "Email", type="email", required=True) }}
         {{ field(form.subject, "Subject", type="select", required=True) }}
-        {% if 'company' in form.fields %}
+        {% if ask_company %}
         {{ field(form.company, "Company (optional)") }}
         {% endif %}
         {{ field(form.message, "Message", type="textarea", min_height="160px", required=True) }}
