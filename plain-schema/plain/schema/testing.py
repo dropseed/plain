@@ -180,7 +180,6 @@ def schema_strategy(
         out: dict[str, Any] = {}
         for name, strategy in field_strategies.items():
             if name in optional_field_names and draw(st.booleans()):
-                # Optionally omit this field entirely
                 continue
             out[name] = draw(strategy)
         return out

@@ -15,6 +15,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from plain.exceptions import NON_FIELD_ERRORS
+
 from .result import Invalid
 
 if TYPE_CHECKING:
@@ -112,7 +114,7 @@ class BoundSchema:
 
     @property
     def non_field_errors(self) -> list[str]:
-        return self.errors.get("__all__", [])
+        return self.errors.get(NON_FIELD_ERRORS, [])
 
     def __getitem__(self, name: str) -> BoundField:
         if name not in self.schema_class._schema_fields:

@@ -1,6 +1,6 @@
 [project]
 name = "plain.schema"
-version = "0.1.0"
+version = "0.0.0"
 description = "Validating parsers for typed Python data."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"

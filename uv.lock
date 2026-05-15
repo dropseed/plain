@@ -1405,7 +1405,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-schema"
-version = "0.1.0"
+version = "0.0.0"
 source = { editable = "plain-schema" }
 dependencies = [
     { name = "plain" },

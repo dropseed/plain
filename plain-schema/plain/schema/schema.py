@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Any, ClassVar, Self, cast
 
-from plain.exceptions import ValidationError
+from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.forms.fields import Field, FileField, MultipleChoiceField
+from plain.utils.hashable import make_hashable
 
 from .result import Invalid
 
@@ -32,8 +33,8 @@ class SchemaMeta(type):
             if base_fields:
                 fields.update(base_fields)
 
-        # Pop Field instances from the class body and register them.
-        # We pop them so __init__ can set the cleaned value as an attribute.
+        # Pop the Field instances off the class body so __init__ can later
+        # set each cleaned value as an instance attribute under the same name.
         for key in list(namespace):
             value = namespace[key]
             if isinstance(value, Field):
@@ -115,7 +116,10 @@ class Schema(metaclass=SchemaMeta):
         )
 
     def __hash__(self) -> int:
-        return hash(tuple(getattr(self, k, None) for k in self._schema_fields))
+        # make_hashable converts list-valued fields (e.g. MultipleChoiceField)
+        # into tuples so schema instances stay hashable.
+        values = tuple(getattr(self, k, None) for k in self._schema_fields)
+        return hash(make_hashable(values))
 
     def apply_to[Instance](self, instance: Instance) -> Instance:
         """Copy validated field values onto an existing object — typically
@@ -229,23 +233,17 @@ class Schema(metaclass=SchemaMeta):
             if partial and not present:
                 continue
 
-            if is_file_field:
-                raw_value = files_map.get(name)
-                try:
-                    # FileField.clean takes (data, initial=None)
-                    cleaned[name] = field.clean(raw_value, None)
-                except ValidationError as e:
-                    errors[name] = list(e.messages)
-            else:
-                if is_multi_value_dict and isinstance(field, MultipleChoiceField):
-                    # `raw` has .getlist (verified by is_multi_value_dict guard)
-                    raw_value = raw.getlist(name)  # ty: ignore[call-non-callable]
+            try:
+                if is_file_field:
+                    # FileField.clean takes (data, initial).
+                    cleaned[name] = field.clean(files_map.get(name), None)
+                elif is_multi_value_dict and isinstance(field, MultipleChoiceField):
+                    # `raw` has .getlist (verified by the is_multi_value_dict guard).
+                    cleaned[name] = field.clean(raw.getlist(name))  # ty: ignore[call-non-callable]
                 else:
-                    raw_value = raw.get(name)
-                try:
-                    cleaned[name] = field.clean(raw_value)
-                except ValidationError as e:
-                    errors[name] = list(e.messages)
+                    cleaned[name] = field.clean(raw.get(name))
+            except ValidationError as e:
+                errors[name] = list(e.messages)
 
         if errors:
             return Invalid(errors=errors, raw=raw)
@@ -268,7 +266,7 @@ class Schema(metaclass=SchemaMeta):
                     for field, error_list in e.error_dict.items()
                 }
             else:
-                extra_errors = {"__all__": list(e.messages)}
+                extra_errors = {NON_FIELD_ERRORS: list(e.messages)}
 
         if extra_errors:
             return Invalid(errors=dict(extra_errors), raw=raw)
