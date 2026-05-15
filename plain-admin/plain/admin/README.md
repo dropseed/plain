@@ -337,10 +337,10 @@ The form template extends the admin base and renders fields with the admin's ele
 
 {% block content %}
 <form method="post" class="space-y-4">
-    <admin.InputField label="Email" field={form.email} />
-    <admin.InputField label="First name" field={form.first_name} />
-    <admin.InputField label="Last name" field={form.last_name} />
-    <admin.CheckboxField label="Active" field={form.is_active} />
+    <admin.InputField label="Email" field={{ form.email }} />
+    <admin.InputField label="First name" field={{ form.first_name }} />
+    <admin.InputField label="Last name" field={{ form.last_name }} />
+    <admin.CheckboxField label="Active" field={{ form.is_active }} />
 
     <admin.Submit>Save</admin.Submit>
 </form>
