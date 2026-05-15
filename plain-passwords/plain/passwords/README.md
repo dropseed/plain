@@ -339,12 +339,12 @@ attrs:
 <Base>
     <form method="post">
         <div>
-            <label for={{ form.email.html_id }}>Email</label>
+            <label for="{{ form.email.html_id }}">Email</label>
             <input
                 type="email"
-                name={{ form.email.html_name }}
-                id={{ form.email.html_id }}
-                value={{ form.email.value() or '' }}
+                name="{{ form.email.html_name }}"
+                id="{{ form.email.html_id }}"
+                value="{{ form.email.value() or '' }}"
             >
             {% for error in form.email.errors %}
                 <p>{{ error }}</p>
@@ -352,11 +352,11 @@ attrs:
         </div>
 
         <div>
-            <label for={{ form.password.html_id }}>Password</label>
+            <label for="{{ form.password.html_id }}">Password</label>
             <input
                 type="password"
-                name={{ form.password.html_name }}
-                id={{ form.password.html_id }}
+                name="{{ form.password.html_name }}"
+                id="{{ form.password.html_id }}"
             >
             {% for error in form.password.errors %}
                 <p>{{ error }}</p>

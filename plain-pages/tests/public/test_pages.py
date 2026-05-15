@@ -160,6 +160,32 @@ def test_unpaired_html_no_vary_header():
     assert "Vary" not in response.headers
 
 
+def test_markdown_page_with_html_like_text_renders():
+    """Markdown bodies render through text mode, not the HTML-aware engine.
+
+    Placeholder `<tags>`, autolinks, and other non-HTML content must not
+    break rendering — Markdown is not balanced HTML.
+    """
+    client = Client()
+    response = client.get("/markdown-edge", headers={"Accept": "text/html"})
+    assert response.status_code == 200
+    content = response.content.decode()
+    # `{{ page.title }}` interpolated.
+    assert "Markdown Edge" in content
+    # `<app>` placeholder survived (would have raised ParseError before).
+    assert "&lt;app&gt;" in content or "<app>" in content
+    # `<https://example.com>` autolink became a real link.
+    assert 'href="https://example.com"' in content
+
+
+def test_markdown_raw_block_escapes_interpolation():
+    """`{% raw %}` in a Markdown body passes `{{ }}` through literally."""
+    client = Client()
+    response = client.get("/markdown-edge.md")
+    assert response.status_code == 200
+    assert b"{{ not_interpolated }}" in response.content
+
+
 def test_paired_serve_markdown_disabled(monkeypatch):
     """Paired page should return HTML when PAGES_SERVE_MARKDOWN is False, even with Accept: text/markdown."""
     from plain.runtime import settings

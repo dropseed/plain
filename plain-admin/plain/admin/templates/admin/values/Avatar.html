@@ -6,9 +6,9 @@ attrs:
 ---
 {% if value is None %}<span class="text-admin-muted-foreground/80 font-mono text-sm">None</span>{% endif %}
 {% if value == "" %}<span class="text-admin-muted-foreground/50">—</span>{% endif %}
-{% if isinstance(value, str) and value %}<img src={{ value }} alt="" class="rounded-full w-6 h-6 min-w-6 min-h-6 object-cover">{% endif %}
+{% if isinstance(value, str) and value %}<img src="{{ value }}" alt="" class="rounded-full w-6 h-6 min-w-6 min-h-6 object-cover">{% endif %}
 {% if value and not isinstance(value, str) %}<img
-    src={{ value.src }}
-    alt={{ value.alt }}
+    src="{{ value.src }}"
+    alt="{{ value.alt }}"
     class="rounded-full w-6 h-6 min-w-6 min-h-6 object-cover"
 >{% endif %}

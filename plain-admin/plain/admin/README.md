@@ -352,22 +352,22 @@ attrs:
   cards: list = []
 ---
 <Base
-    title={{ title }}
-    app_name={{ app_name }}
-    admin_force_theme={{ admin_force_theme }}
-    description={{ description }}
-    image={{ image }}
-    links={{ links }}
-    extra_links={{ extra_links }}
-    parent_view_classes={{ parent_view_classes }}
-    object={{ object }}
-    cards={{ cards }}
+    title="{{ title }}"
+    app_name="{{ app_name }}"
+    admin_force_theme="{{ admin_force_theme }}"
+    description="{{ description }}"
+    image="{{ image }}"
+    links="{{ links }}"
+    extra_links="{{ extra_links }}"
+    parent_view_classes="{{ parent_view_classes }}"
+    object="{{ object }}"
+    cards="{{ cards }}"
 >
     <form method="post" class="space-y-4">
-        <InputField label="Email" field={{ form.email }} />
-        <InputField label="First name" field={{ form.first_name }} />
-        <InputField label="Last name" field={{ form.last_name }} />
-        <CheckboxField label="Active" field={{ form.is_active }} />
+        <InputField label="Email" field="{{ form.email }}" />
+        <InputField label="First name" field="{{ form.first_name }}" />
+        <InputField label="Last name" field="{{ form.last_name }}" />
+        <CheckboxField label="Active" field="{{ form.is_active }}" />
 
         <Submit>Save</Submit>
     </form>
@@ -501,8 +501,7 @@ MIDDLEWARE = [
 
 ```html
 <!-- In your base template -->
-{% load toolbar %}
-{% toolbar %}
+{% load toolbar %} {% toolbar %}
 ```
 
 When viewing a page that has an `object` in the template context, the toolbar will show a link to that object's admin detail page (if one exists).
@@ -557,10 +556,10 @@ into the same bundle. Anything you add after that import wins:
 @import "./.plain/tailwind.css";
 
 .plain-admin {
-  --primary: #4f46e5;             /* drives .admin-btn-primary, focus rings, active tab */
+  --primary: #4f46e5; /* drives .admin-btn-primary, focus rings, active tab */
   --primary-foreground: white;
   --ring: #4f46e5;
-  --header-bg: #eef2ff;           /* sticky top header surface */
+  --header-bg: #eef2ff; /* sticky top header surface */
   --link: #4f46e5;
   --link-hover: #3730a3;
 }
@@ -649,41 +648,35 @@ the last resort: you take on keeping the fork in sync as the admin evolves.
 The admin ships [Inter](https://github.com/rsms/inter) (sans) and
 [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (mono), vendored
 under `plain.admin`'s assets and licensed under the SIL Open Font License 1.1.
-Their `@font-face` declarations live in an overridable `admin_fonts` block
-of `admin/_base.html`; the defaults of `--font-sans` and `--font-mono` lead
-with these families and fall back to the system stack.
+Their `@font-face` declarations live in `admin/base.html`; the defaults of
+`--font-sans` and `--font-mono` lead with these families and fall back to the
+system stack.
 
-Three override patterns:
+To lean on the system stack — the bundled fonts still load, but the cascade
+picks the OS default first — override the token:
 
 ```css
-/* 1. Use the bundled fonts but lean on the system stack as the
-      primary — Inter / JetBrains Mono still load. */
 .plain-admin {
   --font-sans: ui-sans-serif, system-ui, sans-serif;
 }
 ```
 
-```jinja
-{# 2. Replace the bundled fonts with your own.
-   In app/templates/admin/base.html: #}
-{% extends "admin/_base.html" %}
-{% block admin_fonts %}
-<style nonce="{{ request.csp_nonce }}">
+To use your own font, declare its `@font-face` in your stylesheet and point
+the token at it — no template changes needed:
+
+```css
 @font-face {
   font-family: "Geist";
-  src: url("{{ asset('fonts/Geist.woff2') }}") format("woff2");
+  src: url("/assets/fonts/Geist.woff2") format("woff2");
 }
-</style>
-{% endblock %}
+.plain-admin {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+}
 ```
 
-```jinja
-{# 3. Drop the bundled fonts entirely and use the system stack. #}
-{% block admin_fonts %}{% endblock %}
-```
-
-Pair (2) and (3) with a `--font-sans` / `--font-mono` override on `.plain-admin`
-so the cascade actually picks up the new family.
+The bundled font files still download. To stop them loading entirely, fork
+`admin/base.html` (see the [FAQ](#faqs)) and drop its default `@font-face`
+block.
 
 ### Components
 
@@ -747,7 +740,7 @@ The top-left corner of the admin header shows your app name and an "Admin" link 
 ```html
 <!-- app/templates/admin/header_branding.html -->
 <a href="/">
-    <img src="{{ asset('img/logo.svg') }}" alt="My App" class="h-5">
+  <img src="{{ asset('img/logo.svg') }}" alt="My App" class="h-5" />
 </a>
 ```
 
@@ -783,10 +776,10 @@ To add items to the user dropdown menu (e.g., a profile page), create an `admin/
 ```html
 <!-- app/templates/admin/user_menu_items.html -->
 <a
-    href="{{ admin_url('profile') }}"
-    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-admin-popover-foreground hover:bg-admin-accent hover:text-admin-accent-foreground rounded"
+  href="{{ admin_url('profile') }}"
+  class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-admin-popover-foreground hover:bg-admin-accent hover:text-admin-accent-foreground rounded"
 >
-    Profile
+  Profile
 </a>
 ```
 
@@ -857,18 +850,9 @@ The callable should return `True` to allow access, `False` to deny it. Views can
 
 #### How do I customize the admin templates?
 
-Override any admin template by creating a file with the same path in your app's templates directory. For example, to customize the list view, create `app/templates/admin/list.html`.
+Override any admin template by creating a file with the same path in your app's `templates/` directory — the loader checks your app before `plain.admin`. For example, to customize the list view, create `app/templates/admin/list.html`.
 
-For project-wide hooks (extra `<head>` scripts, swapping fonts, wrapping `content`), shadow `admin/base.html` and extend `admin/_base.html` from it. The thin `admin/base.html` exists as a user-overridable layer; `admin/_base.html` is the structural template — don't override it directly.
-
-```jinja
-{# app/templates/admin/base.html #}
-{% extends "admin/_base.html" %}
-
-{% block header_scripts %}
-<script src="{{ asset('analytics.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-{% endblock %}
-```
+Every admin page renders into `admin/base.html`, the shared layout component. To change project-wide chrome — extra `<head>` scripts, fonts, wrapping the content — shadow that file: copy `plain.admin`'s `admin/base.html` into `app/templates/admin/base.html` and edit your copy. It's the structural template, so you take on keeping the fork in sync as the admin evolves — reach for CSS token overrides first where they're enough.
 
 #### How do I add a standalone admin page without a viewset?
 

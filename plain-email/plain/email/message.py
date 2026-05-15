@@ -20,7 +20,8 @@ from io import BytesIO, StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from plain.html import Template, TemplateFileMissing
+from plain.html import Template, render_text_source
+from plain.html.loader import get_template_dirs
 from plain.runtime import settings
 from plain.utils.encoding import force_str, punycode
 from plain.utils.html import strip_tags
@@ -564,10 +565,8 @@ class TemplateEmail(EmailMultiAlternatives):
         # Run this once for all uses of the context
         render_context = self.get_template_context()
 
-        self.body_html, body = self.render_content(render_context)
-
-        if not subject:
-            subject = self.render_subject(render_context)
+        self.body_html = self.render_html(render_context)
+        body = self.render_plain(render_context)
 
         super().__init__(
             subject=subject,
@@ -589,34 +588,28 @@ class TemplateEmail(EmailMultiAlternatives):
         """Subclasses can override this method to add context data."""
         return self.context
 
-    def render_content(self, context: dict[str, Any]) -> tuple[str, str]:
-        html_content = self.render_html(context)
-
-        try:
-            plain_content = self.render_plain(context)
-        except TemplateFileMissing:
-            plain_content = strip_tags(html_content)
-
-        return html_content, plain_content
-
-    def render_plain(self, context: dict[str, Any]) -> str:
-        return Template(self.get_plain_template_name()).render(context)
-
     def render_html(self, context: dict[str, Any]) -> str:
         return Template(self.get_html_template_name()).render(context)
 
-    def render_subject(self, context: dict[str, Any]) -> str:
-        try:
-            subject = Template(self.get_subject_template_name()).render(context)
-            return subject.strip()
-        except TemplateFileMissing:
-            return ""
+    def render_plain(self, context: dict[str, Any]) -> str:
+        """Return the plain-text body of the email.
 
-    def get_plain_template_name(self) -> str:
-        return f"email/{self.template}.txt"
+        Renders `email/{template}.txt` through plain.html text mode when
+        that file exists — a plain-text body is a text template, so
+        `{{ }}` interpolation works but no HTML parsing or escaping is
+        applied. When no `.txt` file exists, falls back to stripping
+        tags from the rendered HTML. Override in a subclass for full
+        control.
+        """
+        name = self.get_plain_template_name()
+        for directory in get_template_dirs():
+            candidate = directory / name
+            if candidate.is_file():
+                return render_text_source(candidate.read_text(), context)
+        return strip_tags(self.body_html)
 
     def get_html_template_name(self) -> str:
         return f"email/{self.template}.html"
 
-    def get_subject_template_name(self) -> str:
-        return f"email/{self.template}.subject.txt"
+    def get_plain_template_name(self) -> str:
+        return f"email/{self.template}.txt"

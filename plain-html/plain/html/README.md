@@ -54,7 +54,9 @@ Control flow uses `{% %}` blocks that wrap the content they affect. Rendering a 
 
 ```html
 <ul>
-    {% for task in tasks %}<li>{{ task.title }}</li>{% endfor %}
+  {% for task in tasks %}
+  <li>{{ task.title }}</li>
+  {% endfor %}
 </ul>
 ```
 
@@ -94,21 +96,23 @@ Anywhere you can write text, you can write `{{ python_expression }}`. The expres
 
 Names in the expression resolve against the context you pass to `render(...)`. Bindings introduced by `{% for %}` (and the template's own frontmatter `attrs:`, `slots:`, and `imports:`) are also in scope.
 
-Expressions work in attribute values too. Inside a quoted string, `{{ }}` interpolates and the result is escaped into the value:
+Expressions work in attribute values too. Always quote attribute values — `attr="..."`.
+
+When the value mixes literal text with `{{ }}`, each expression is interpolated into the string and escaped into the value:
 
 ```html
 <a href="/users/{{ user.id }}/" class="btn {{ css_class }}">Profile</a>
 ```
 
-When `{{ }}` is the **entire** attribute value (unquoted), the attribute takes the expression's actual typed result — not just its string form. This unlocks boolean and "omit me" semantics:
+When the value is **exactly one `{{ }}` expression**, the attribute takes the expression's actual typed result — not just its string form. This unlocks boolean and "omit me" semantics:
 
 ```html
-<a href={{ url('home') }}>Home</a>
-<input required={{ field.required }}>
+<a href="{{ url('home') }}">Home</a>
+<input required="{{ field.required }}">
 ```
 
 - `True` renders the bare attribute (`required`); `False` or `None` omits it entirely.
-- A list joins its truthy members with spaces — handy for class lists: `class={{ ["btn", "btn-lg" if large else None] }}`.
+- A list joins its truthy members with spaces — handy for class lists: `class="{{ ["btn", "btn-lg" if large else None] }}"`.
 - Any other value is stringified and escaped for its position.
 
 A single `{` or `}` is ordinary text — only the `{{ ... }}` pair starts an expression. CSS and JavaScript braces in a text body or attribute value are just literal characters, and a JSON literal in an attribute passes through untouched:
@@ -136,8 +140,10 @@ Blocks are **HTML-aware**: each block — and each branch of an `{% if %}` chain
 
 ```html
 <!-- Compile error: <div> opened in one branch, closed outside it -->
-{% if wide %}<div class="wide">{% else %}<div class="narrow">{% endif %}
-    {{ content }}
+{% if wide %}
+<div class="wide">
+  {% else %}
+  <div class="narrow">{% endif %} {{ content }}</div>
 </div>
 ```
 
@@ -145,29 +151,31 @@ Vary the whole element with two complete branches instead, or extract a componen
 
 ```html
 {% if wide %}
-    <div class="wide">{{ content }}</div>
+<div class="wide">{{ content }}</div>
 {% else %}
-    <div class="narrow">{{ content }}</div>
+<div class="narrow">{{ content }}</div>
 {% endif %}
 ```
 
-Blocks also **cannot appear inside a start tag** — `<button {% if disabled %}disabled{% endif %}>` is a compile error. Conditional attributes are done with an expression value instead: `disabled={{ is_disabled }}` (a falsy value omits the attribute). This keeps every start tag a clean, parseable unit.
+Blocks also **cannot appear inside a start tag** — `<button {% if disabled %}disabled{% endif %}>` is a compile error. Conditional attributes are done with an expression value instead: `disabled="{{ is_disabled }}"` (a falsy value omits the attribute). This keeps every start tag a clean, parseable unit.
 
 ### `{% if %}` / `{% elif %}` / `{% else %}`
 
 ```html
-{% if alert %}<div class="alert">{{ alert.message }}</div>{% endif %}
+{% if alert %}
+<div class="alert">{{ alert.message }}</div>
+{% endif %}
 ```
 
 The wrapped content only renders when the expression is truthy. Chain conditions with `{% elif %}` and `{% else %}`:
 
 ```html
 {% if status == "open" %}
-    <p>Open</p>
+<p>Open</p>
 {% elif status == "pending" %}
-    <p>Pending</p>
+<p>Pending</p>
 {% else %}
-    <p>Closed</p>
+<p>Closed</p>
 {% endif %}
 ```
 
@@ -177,15 +185,18 @@ A `{% if %}` block can wrap any amount of content, with or without a surrounding
 
 ```html
 {% for task in tasks %}
-    <li><a href="/tasks/{{ task.id }}/">{{ task.title }}</a></li>
+<li><a href="/tasks/{{ task.id }}/">{{ task.title }}</a></li>
 {% endfor %}
 ```
 
 The wrapped content is repeated for each iteration. The clause is a Python comprehension clause — one `for` plus any number of `if` filters:
 
 ```html
-{% for task in tasks if task.visible %}<li>{{ task.title }}</li>{% endfor %}
-{% for t in tasks if t.visible if not t.archived %}<li>{{ t.title }}</li>{% endfor %}
+{% for task in tasks if task.visible %}
+<li>{{ task.title }}</li>
+{% endfor %} {% for t in tasks if t.visible if not t.archived %}
+<li>{{ t.title }}</li>
+{% endfor %}
 ```
 
 Tuple unpacking works, parenthesized or not: `{% for (i, item) in enumerate(items) %}`.
@@ -194,12 +205,13 @@ There is **no `{% empty %}` clause and no `for`-`else`**. Jinja overloads `else`
 
 ```html
 {% if notes %}
-    <ul>
-        {% for note in notes %}<li>{{ note.title }}</li>{% endfor %}
-    </ul>
-{% endif %}
-{% if not notes %}
-    <p>No notes yet.</p>
+<ul>
+  {% for note in notes %}
+  <li>{{ note.title }}</li>
+  {% endfor %}
+</ul>
+{% endif %} {% if not notes %}
+<p>No notes yet.</p>
 {% endif %}
 ```
 
@@ -211,8 +223,10 @@ Multiple `for` clauses in one tag (`{% for x in xs for y in ys %}`) are a compil
 
 ```html
 <Card>
-    {% slot "header" %}<h2>Welcome</h2>{% endslot %}
-    <p>Body content.</p>
+  {% slot "header" %}
+  <h2>Welcome</h2>
+  {% endslot %}
+  <p>Body content.</p>
 </Card>
 ```
 
@@ -225,7 +239,9 @@ A server-side comment. It is dropped from the rendered output entirely — unlik
 ```html
 {# TODO: paginate this list once it grows #}
 <ul>
-    {% for note in notes %}<li>{{ note.title }}</li>{% endfor %}
+  {% for note in notes %}
+  <li>{{ note.title }}</li>
+  {% endfor %}
 </ul>
 ```
 
@@ -234,7 +250,9 @@ A server-side comment. It is dropped from the rendered output entirely — unlik
 Everything between `{% raw %}` and `{% endraw %}` is emitted verbatim — no `{{ }}`, `{% %}`, or `{# #}` recognition inside. This is how you emit a literal delimiter:
 
 ```html
-{% raw %}<p>Write {{ name }} to interpolate a value.</p>{% endraw %}
+{% raw %}
+<p>Write {{ name }} to interpolate a value.</p>
+{% endraw %}
 ```
 
 That renders the literal text `<p>Write {{ name }} to interpolate a value.</p>` — braces and all.
@@ -247,23 +265,15 @@ To use a component, list it under the `components:` frontmatter key, then invoke
 
 ```html
 <!-- app/templates/components/Button.html -->
----
-attrs:
-    href: str
-    label: str
-    variant: str = "primary"
----
+--- attrs: href: str label: str variant: str = "primary" ---
 <a href="{{ href }}" class="btn btn-{{ variant }}">{{ label }}</a>
 ```
 
 ```html
 <!-- caller -->
----
-components:
-    - components/Button
----
-<Button href="/signup" label="Sign up" />
-<Button href="/learn" label="Learn more" variant="ghost" />
+--- components: - components/Button ---
+<button href="/signup" label="Sign up" />
+<button href="/learn" label="Learn more" variant="ghost" />
 ```
 
 Each `components:` entry is a template path. The tag name is the path's last segment — so `components/Button` becomes `<Button>`. Use `as Name` to rename:
@@ -271,8 +281,8 @@ Each `components:` entry is a template path. The tag name is the path's last seg
 ```html
 ---
 components:
-    - components/Card
-    - base as Base
+  - components/Card
+  - base as Base
 ---
 ```
 
@@ -294,14 +304,11 @@ A component declares which slots it accepts in its `slots:` frontmatter and read
 
 ```html
 <!-- app/templates/components/Card.html -->
----
-slots:
-    header: optional
-    default: required
----
+--- slots: header: optional default: required ---
 <section class="card">
-    {% if header %}<header>{{ header }}</header>{% endif %}
-    {{ children }}
+  {% if header %}
+  <header>{{ header }}</header>
+  {% endif %} {{ children }}
 </section>
 ```
 
@@ -310,11 +317,14 @@ When you invoke the component, unmarked direct children fall through to the **de
 ```html
 ---
 components:
-    - components/Card
+  - components/Card
 ---
+
 <Card>
-    {% slot "header" %}<h2>Welcome</h2>{% endslot %}
-    <p>Body content.</p>
+  {% slot "header" %}
+  <h2>Welcome</h2>
+  {% endslot %}
+  <p>Body content.</p>
 </Card>
 ```
 
@@ -322,11 +332,11 @@ A `{% slot %}` block can wrap multiple elements:
 
 ```html
 <Card>
-    {% slot "header" %}
-        <h2>Welcome</h2>
-        <p class="subtitle">Glad you're here.</p>
-    {% endslot %}
-    <p>Body content.</p>
+  {% slot "header" %}
+  <h2>Welcome</h2>
+  <p class="subtitle">Glad you're here.</p>
+  {% endslot %}
+  <p>Body content.</p>
 </Card>
 ```
 
@@ -462,7 +472,7 @@ All three accept paths or directories on the command line, or `-` to read source
 
 #### Why not Jinja2?
 
-Jinja2 is excellent — Plain still ships it as the default engine. plain.html exists because a few specific problems are easier when the engine knows it's emitting HTML:
+Jinja2 is excellent, and plain.html's `{% %}` block syntax is deliberately modeled on it. plain.html exists because a few specific problems are easier when the engine knows it's emitting HTML:
 
 - **Contextual autoescape.** Jinja escapes every `{{ x }}` the same way. plain.html knows whether the expression sits in text, in a URL attribute, or in an event handler, and picks the right escape (or refuses dynamic data, in the event-handler case).
 - **HTML-aware blocks.** `{% if %}` and `{% for %}` blocks must contain balanced HTML, so the engine guarantees well-formed output and catches tag straddles at compile time. An opaque text block can't do that.
@@ -494,13 +504,17 @@ List its template path under the `components:` frontmatter key, then write it as
 
 No. See [Security](#security) — `imports:` runs at module load and `{{ ... }}` expressions execute real Python. There is no safe configuration for hostile authors.
 
+#### Can I render Markdown or other non-HTML text?
+
+Use `render_text_source(source, context)`. It interpolates a non-HTML body in text mode: only `{{ expr }}`, `{% raw %}…{% endraw %}`, and `{# #}` are recognized — everything else (including `<tags>`, autolinks, and other `{% … %}`) is literal text, and expressions are emitted unescaped. This is how `plain.pages` interpolates Markdown bodies: Markdown is not balanced HTML, so it can't go through the HTML-aware `render` / `render_source`. `{% if %}` / `{% for %}` blocks are HTML-mode only.
+
 #### How do I write a literal `{`?
 
 Just write it. A single `{` or `}` is ordinary text — only the `{{ ... }}` pair starts an expression. JSON literals like `{"id": 42}` pass through untouched. To emit a literal `{{`, `{%`, or `{#`, wrap the region in `{% raw %}...{% endraw %}` — see [`{% raw %}`](#raw).
 
 #### How do I do a conditional attribute?
 
-You can't put a `{% if %}` block inside a start tag. Use an expression value instead: `disabled={{ is_disabled }}`. A `True` value renders the bare attribute, a falsy value (`False`/`None`) omits it. See [Expressions](#expressions).
+You can't put a `{% if %}` block inside a start tag. Use an expression value instead: `disabled="{{ is_disabled }}"`. A `True` value renders the bare attribute, a falsy value (`False`/`None`) omits it. See [Expressions](#expressions).
 
 #### How do `components:` paths resolve?
 

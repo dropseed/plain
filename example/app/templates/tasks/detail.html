@@ -13,7 +13,7 @@ attrs:
 <Base>
     {% slot "title" %}{{ task.title }}{% endslot %}
     <div class="max-w-2xl mx-auto px-5 py-12">
-        <BackLink href={{ url('tasks:list') }} label="Back to tasks" />
+        <BackLink href="{{ url('tasks:list') }}" label="Back to tasks" />
         <HtmxFragment name="title">
             <div>
                 <form hx-post plain-hx-action="rename" class="flex items-center gap-2">
@@ -21,13 +21,13 @@ attrs:
                     aria-label="Task title"
                     class="flex-1 page-h1 bg-transparent border border-transparent hover:border-outline focus:border-ink focus:ring-[3px] focus:ring-ink/15 rounded px-2 py-1 outline-none"
                     type="text"
-                    name={{ title_form.title.html_name }}
-                    id={{ title_form.title.html_id }}
-                    value={{ title_form.title.value() or task.title }}
+                    name="{{ title_form.title.html_name }}"
+                    id="{{ title_form.title.html_id }}"
+                    value="{{ title_form.title.value() or task.title }}"
                 >
                 <button type="submit" class="btn-primary">Rename</button>
             </form>
-                <FieldErrors bf={{ title_form.title }} />
+                <FieldErrors bf="{{ title_form.title }}" />
             </div>
         </HtmxFragment>
         <div class="mt-3 text-[12px] text-muted">
@@ -44,8 +44,8 @@ attrs:
             </div>
         {% endif %}
         <div class="mt-8 flex gap-2">
-        <a href={{ url('tasks:update', id=task.id) }} class="btn-primary">Edit</a>
-        <a href={{ url('tasks:delete', id=task.id) }} class="btn-secondary">Delete</a>
+        <a href="{{ url('tasks:update', id=task.id) }}" class="btn-primary">Edit</a>
+        <a href="{{ url('tasks:delete', id=task.id) }}" class="btn-secondary">Delete</a>
     </div>
     </div>
 </Base>

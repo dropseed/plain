@@ -16,7 +16,7 @@ Today an undeclared attribute on a component tag is dropped (and flagged by
 painful — they can't accept ambient `class` / `data-*` / `aria-*` without
 declaring each one. Add a declared escape hatch in the spirit of HEEx's
 `attr :rest, :global`: the component opts in to "accepts arbitrary
-attributes," so it stays statically *known that* it takes globals without
+attributes," so it stays statically _known that_ it takes globals without
 enumerating which. Spread the collected attributes onto an element. Purely
 additive — fully back-compatible to add later.
 
@@ -39,15 +39,16 @@ Today a named slot is supplied once with no arguments. HEEx slots can be
 supplied multiple times, and each entry carries its own attributes — that's
 how tables / tabs / menus are built (the component owns iteration, the
 caller owns per-item markup). This is the real feature gap. Ship repeatable
-+ attribute-carrying slots first; treat `:let` (passing data from the
-component back into the caller's slot markup) as a separate, harder
-decision — it reintroduces caller-side scope binding.
+
+- attribute-carrying slots first; treat `:let` (passing data from the
+  component back into the caller's slot markup) as a separate, harder
+  decision — it reintroduces caller-side scope binding.
 
 ## Static/dynamic compiled representation
 
 The architectural bet, deferred until there's a consumer. The compiler emits
-a flat `render() -> str`; HEEx instead keeps a tree of *static* segments and
-*dynamic* holes. That split is the single primitive behind efficient
+a flat `render() -> str`; HEEx instead keeps a tree of _static_ segments and
+_dynamic_ holes. That split is the single primitive behind efficient
 partial re-render and minimal-diff updates — the thing a serious hypermedia
 layer in `plain-htmx` would want. Not worth building speculatively. The
 current block syntax is already compatible with it; the one footgun to avoid
@@ -73,8 +74,8 @@ existing `file:line:col` shape.
 
 plain.html wrinkles: the walker must descend `{% if %}` / `{% for %}` /
 `{% slot %}` blocks transparently for nesting purposes; a dynamic
-`id={{ expr }}` skips the duplicate-id check; a literal `id` inside a
-`{% for %}` gets its own rule; `type={{ x }}` skips the enum check.
+`id="{{ expr }}"` skips the duplicate-id check; a literal `id` inside a
+`{% for %}` gets its own rule; `type="{{ x }}"` skips the enum check.
 
 Vendor `html-validate`'s `html5.json` (MIT) as the content-model data.
 

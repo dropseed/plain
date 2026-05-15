@@ -21,16 +21,16 @@ attrs:
   cards: list = []
 ---
 <Base
-    title={{ title }}
-    app_name={{ app_name }}
-    admin_force_theme={{ admin_force_theme }}
-    description={{ description }}
-    image={{ image }}
-    links={{ links }}
-    extra_links={{ extra_links }}
-    parent_view_classes={{ parent_view_classes }}
-    object={{ object }}
-    cards={{ cards }}
+    title="{{ title }}"
+    app_name="{{ app_name }}"
+    admin_force_theme="{{ admin_force_theme }}"
+    description="{{ description }}"
+    image="{{ image }}"
+    links="{{ links }}"
+    extra_links="{{ extra_links }}"
+    parent_view_classes="{{ parent_view_classes }}"
+    object="{{ object }}"
+    cards="{{ cards }}"
 >
     {% if checks %}
         <div
@@ -42,7 +42,7 @@ attrs:
     </span>
     <span class="text-admin-muted-foreground">·</span>
     <span
-        data-empty={{ warning_count == 0 }}
+        data-empty="{{ warning_count == 0 }}"
         class="flex items-baseline gap-1 data-[empty=True]:text-admin-muted-foreground data-[empty=False]:text-admin-warning"
     >
         <span>{{ warning_count }}</span>
@@ -50,7 +50,7 @@ attrs:
     </span>
     <span class="text-admin-muted-foreground">·</span>
     <span
-        data-empty={{ error_count == 0 }}
+        data-empty="{{ error_count == 0 }}"
         class="flex items-baseline gap-1 data-[empty=True]:text-admin-muted-foreground data-[empty=False]:text-admin-danger"
     >
         <span>{{ error_count }}</span>
@@ -83,7 +83,7 @@ attrs:
                 class="font-mono text-sm font-medium text-admin-foreground truncate min-w-0"
             >{{ mark_safe("<span class='text-admin-muted-foreground'>" + check["name"].split(".", 1)[0] + ".</span>" + check["name"].split(".", 1)[1]) if "." in check["name"] else check["name"] }}</span>
             <span
-                data-status={{ check["status"] }}
+                data-status="{{ check["status"] }}"
                 class="font-mono text-xs tabular-nums text-right data-[status=error]:text-admin-danger data-[status=warning]:text-admin-warning"
             >
                 {{ len(check["issues"]) }} {{ "error" if check["status"] == "error" else "warning" }}{{ "s" if len(check["issues"]) != 1 else "" }}
@@ -93,7 +93,7 @@ attrs:
                             {% for issue in check["issues"] %}
                                 <div class="space-y-1">
                                     <dt
-                                        data-warning={{ issue["warning"] }}
+                                        data-warning="{{ issue["warning"] }}"
                                         class="font-mono text-xs tabular-nums data-[warning=True]:text-admin-warning data-[warning=False]:text-admin-danger"
                                     >{{ mark_safe("<span class='text-admin-muted-foreground'>" + issue["id"].split(".", 1)[0] + ".</span>" + issue["id"].split(".", 1)[1]) if "." in issue["id"] else issue["id"] }}</dt>
                                     <dd

@@ -78,7 +78,7 @@ attrs:
   expires_in: int
 ---
 <p>Hi {{ user.email }},</p>
-<p>Click here to log in: <a href={{ url }}>{{ url }}</a></p>
+<p>Click here to log in: <a href="{{ url }}">{{ url }}</a></p>
 <p>This link expires in {{ expires_in }} seconds.</p>
 ```
 
@@ -251,7 +251,7 @@ attrs:
         <h1>Link Error</h1>
     {% endif %}
 
-    <a href={{ login_url }}>Request a new link</a>
+    <a href="{{ login_url }}">Request a new link</a>
 </Base>
 ```
 
@@ -270,12 +270,12 @@ attrs:
     <form method="post">
         <input
             type="email"
-            name={{ form.email.html_name }}
-            id={{ form.email.html_id }}
-            value={{ form.email.value() or '' }}
+            name="{{ form.email.html_name }}"
+            id="{{ form.email.html_id }}"
+            value="{{ form.email.value() or '' }}"
             required
         >
-        <input type="hidden" name="next" value={{ request.query_params.get('next', '') }}>
+        <input type="hidden" name="next" value="{{ request.query_params.get('next', '') }}">
         <button type="submit">Send login link</button>
     </form>
 </Base>

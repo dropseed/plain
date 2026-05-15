@@ -11,12 +11,12 @@ attrs:
   items: dict = {}
 ---
 <Base
-    slug={{ slug }}
-    title={{ title }}
-    description={{ description }}
-    size={{ size }}
-    filters={{ filters }}
-    current_filter={{ current_filter }}
+    slug="{{ slug }}"
+    title="{{ title }}"
+    description="{{ description }}"
+    size="{{ size }}"
+    filters="{{ filters }}"
+    current_filter="{{ current_filter }}"
 >
     <dl class="text-sm">
         {% for (label, value) in items.items() %}

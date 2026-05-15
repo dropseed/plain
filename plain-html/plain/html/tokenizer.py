@@ -17,6 +17,11 @@ Delimiters:
 
 Single `{` and `}` are ordinary text. To emit a literal `{{`, `{%`, or
 `{#`, wrap the region in `{% raw %}…{% endraw %}`.
+
+`tokenize_text` is the non-HTML counterpart: it recognizes only the
+template delimiters (`{{ }}`, `{% raw %}`, `{# #}`) and treats all other
+text — including HTML-looking tags — as literal. It backs text-mode
+rendering for Markdown bodies.
 """
 
 from __future__ import annotations
@@ -279,6 +284,74 @@ def tokenize(source: str) -> list[Token]:
             continue
 
         text_buf.append(c)
+        i += 1
+
+    flush_text()
+    return tokens
+
+
+def tokenize_text(source: str) -> list[Token]:
+    """Tokenize a non-HTML text template (e.g. a Markdown page body).
+
+    Recognizes only the template delimiters that make sense outside
+    HTML: `{{ expr }}` interpolation, `{% raw %}…{% endraw %}` literal
+    regions, and `{# comment #}`. Everything else — including `<`,
+    HTML-looking tags, and any other `{% … %}` — is literal text.
+
+    This is what lets Markdown render through the engine. Markdown is
+    not balanced HTML (placeholder text like `<name>`, autolinks, raw
+    snippets in code fences), so the HTML-aware `tokenize` rejects it.
+    """
+    tokens: list[Token] = []
+    i = 0
+    n = len(source)
+    text_buf: list[str] = []
+    text_start = 0
+
+    def flush_text() -> None:
+        if text_buf:
+            tokens.append(TextToken("".join(text_buf), text_start))
+            text_buf.clear()
+
+    while i < n:
+        if source.startswith("{#", i):
+            flush_text()
+            end = source.find("#}", i + 2)
+            if end == -1:
+                raise TokenizeError(f"Unterminated template comment at offset {i}")
+            tokens.append(TemplateCommentToken(source[i + 2 : end], i))
+            i = end + 2
+            text_start = i
+            continue
+
+        if source.startswith("{%", i):
+            end = source.find("%}", i + 2)
+            if end != -1 and source[i + 2 : end].strip() == "raw":
+                flush_text()
+                raw_start = end + 2
+                match = _RAW_END_RE.search(source, raw_start)
+                if match is None:
+                    raise TokenizeError(f"Unterminated {{% raw %}} block at offset {i}")
+                tokens.append(RawToken(source[raw_start : match.start()], i))
+                i = match.end()
+                text_start = i
+                continue
+            # Any other `{% … %}` is literal text in a non-HTML template —
+            # block control flow (`{% if %}` / `{% for %}`) is HTML-mode
+            # only. Emit the `{` and let the rest flow as text.
+            text_buf.append(source[i])
+            i += 1
+            continue
+
+        if source.startswith("{{", i):
+            flush_text()
+            expr, new_i = _consume_expr(source, i)
+            tokens.append(ExprToken(expr, i))
+            i = new_i
+            text_start = i
+            continue
+
+        text_buf.append(source[i])
         i += 1
 
     flush_text()

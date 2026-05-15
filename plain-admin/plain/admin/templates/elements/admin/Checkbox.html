@@ -3,10 +3,10 @@ attrs:
   field: Any
 ---
 <input
-    id={{ field.html_id }}
+    id="{{ field.html_id }}"
     class="admin-input"
     type="checkbox"
-    name={{ field.html_name }}
-    checked={{ bool(field.value()) }}
-    required={{ field.field.required }}
+    name="{{ field.html_name }}"
+    checked="{{ bool(field.value()) }}"
+    required="{{ field.field.required }}"
 >

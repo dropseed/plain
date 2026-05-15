@@ -12,7 +12,7 @@ Templates are `.html` files under `templates/` (in your app or any installed pac
 
 - Interpolate with `{{ ... }}` — real Python, NOT a DSL. No `|filter` syntax; call Python directly. Need a helper? Import it in frontmatter.
 - Single `{` and `}` are ordinary text. For a literal `{{`, `{%`, or `{#`, wrap the region in `{% raw %}...{% endraw %}`.
-- `class` works as a normal attribute (`<div class={{ css }}>`). Don't use `class_=` — that's a Jinja workaround and doesn't apply here.
+- `class` works as a normal attribute (`<div class="{{ css }}">`). Don't use `class_=` — that's a Jinja workaround and doesn't apply here.
 
 ## Control flow (`{% %}` blocks)
 
@@ -23,7 +23,7 @@ Control flow is `{% %}` block tags — a visibly separate layer from HTML. Block
 - `{% slot "name" %}` / `{% endslot %}` — caller-side, routes content to a component's named slot.
 - `{# comment #}` — dropped from output (unlike `<!-- -->`, which is rendered).
 - A **tag straddle** (`{% if %}<div>{% endif %}…</div>`) is a compile error — each branch must be balanced HTML. Vary the whole element with two branches, or extract a component.
-- `{% %}` cannot appear inside a start tag. Conditional attributes use an expression value: `disabled={{ is_disabled }}` (a falsy value omits the attribute).
+- `{% %}` cannot appear inside a start tag. Conditional attributes use an expression value: `disabled="{{ is_disabled }}"` (a falsy value omits the attribute).
 
 ## Components
 

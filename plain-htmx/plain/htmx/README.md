@@ -64,11 +64,11 @@ slots:
   default: required
 ---
 <div
-    plain-hx-fragment={{ name }}
+    plain-hx-fragment="{{ name }}"
     hx-swap="innerHTML"
     hx-target="this"
     hx-indicator="this"
-    id={{ "plain-hx-fragment-" + name }}
+    id="{{ "plain-hx-fragment-" + name }}"
 >{{ children }}</div>
 ```
 
@@ -214,7 +214,7 @@ attrs:
   pullrequest: Any
 ---
 <div
-    hx-get={{ url('pullrequests:detail', uuid=pullrequest.uuid) }}
+    hx-get="{{ url('pullrequests:detail', uuid=pullrequest.uuid) }}"
     hx-swap="outerHTML"
     hx-target="this"
 >
@@ -240,7 +240,7 @@ attrs:
 <Base>
     {% for pullrequest in pullrequests %}
         <div>
-            <PullRequestItem pullrequest={{ pullrequest }} />
+            <PullRequestItem pullrequest="{{ pullrequest }}" />
         </div>
     {% endfor %}
 </Base>
@@ -258,7 +258,7 @@ attrs:
   pullrequest: Any
 ---
 <Base>
-    <PullRequestItem pullrequest={{ pullrequest }} />
+    <PullRequestItem pullrequest="{{ pullrequest }}" />
 </Base>
 ```
 

@@ -6,11 +6,11 @@ attrs:
 slots:
   default: required
 ---
-<section id={{ id }} data-ui-section class="scroll-mt-28 mt-10">
+<section id="{{ id }}" data-ui-section class="scroll-mt-28 mt-10">
     <h3
         class="text-lg font-semibold text-admin-foreground border-b border-admin-border pb-2 mb-2"
     >
-        <a href={{ "#" + id }} class="no-underline hover:underline">{{ title }}</a>
+        <a href="{{ "#" + id }}" class="no-underline hover:underline">{{ title }}</a>
     </h3>
     {% if blurb %}
     <p class="text-sm text-admin-muted-foreground mb-4">{{ blurb }}</p>

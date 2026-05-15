@@ -13,15 +13,15 @@ attrs:
   link: str = ""
 ---
 <Base
-    slug={{ slug }}
-    title={{ title }}
-    description={{ description }}
-    size={{ size }}
-    filters={{ filters }}
-    current_filter={{ current_filter }}
+    slug="{{ slug }}"
+    title="{{ title }}"
+    description="{{ description }}"
+    size="{{ size }}"
+    filters="{{ filters }}"
+    current_filter="{{ current_filter }}"
 >
     {% if metric is not None and link %}<a
-        href={{ link }}
+        href="{{ link }}"
         class="block text-3xl font-semibold leading-tight tracking-tight tabular-nums text-foreground hover:underline"
     >{{ metric }}</a>{% endif %}
     {% if metric is not None and not link %}
@@ -30,7 +30,7 @@ attrs:
         >{{ metric }}</div>
     {% endif %}
     {% if text and link and metric is None %}<a
-        href={{ link }}
+        href="{{ link }}"
         class="text-sm text-admin-link hover:text-admin-link-hover hover:underline"
     >{{ text }}</a>{% endif %}
     {% if text and not link %}

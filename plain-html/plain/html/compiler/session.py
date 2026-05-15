@@ -37,7 +37,7 @@ from ..components import parse_components
 from ..loader import find_template
 from ..parser import ElementNode, ForNode, IfNode, Node, SlotNode, parse
 from ..positions import body_offset, offset_to_line_col
-from ..tokenizer import tokenize
+from ..tokenizer import tokenize, tokenize_text
 from . import CompileError
 from .emit import EmittedModule, emit_module
 
@@ -162,6 +162,20 @@ class CompileSession:
         emitted = emit_module(tree, fmdict, label, include_renders={})
         return emitted.source
 
+    def compile_text_string(self, source: str, *, label: str = "<text>") -> str:
+        """Tokenize + parse + emit Python source for a non-HTML text template.
+
+        Like `compile_string` but uses the text-mode tokenizer (Markdown
+        page bodies): no HTML structure, no component tags, and
+        text-position expressions emit unescaped. Returns the generated
+        module source — the caller compiles/exec's it.
+        """
+        fmdict, body = fm.split(source)
+        tokens = tokenize_text(body)
+        tree = parse(tokens, components={})
+        emitted = emit_module(tree, fmdict, label, include_renders={}, escape=False)
+        return emitted.source
+
     def compile_path(
         self,
         path: Path,
@@ -173,13 +187,19 @@ class CompileSession:
         Pass `source_override` when the caller has the template source
         in memory and just wants component tags resolved relative to the
         given path (e.g. `plain.pages` rendering Markdown-prefixed
-        templates). Process-cache hits ignore source_override — they
-        assume the path's content is stable.
+        templates). An override bypasses the process cache entirely —
+        both the read and the write. The cache is keyed by path alone,
+        so it can't distinguish one in-memory source from another: a
+        cache hit would return stale output for a changed override, and
+        storing an override's compile would poison later renders of the
+        real file.
         """
         path = path.resolve()
-        cached = _process_cache_get(path)
-        if cached is not None:
-            return cached.render
+        overriding = source_override is not None
+        if not overriding:
+            cached = _process_cache_get(path)
+            if cached is not None:
+                return cached.render
         if path in self._in_progress:
             raise CompileError(f"component cycle detected involving {path}")
         self._in_progress.add(path)
@@ -187,7 +207,8 @@ class CompileSession:
             entry = self._compile_one(path, source_override=source_override)
         finally:
             self._in_progress.discard(path)
-        _process_cache_set(path, entry)
+        if not overriding:
+            _process_cache_set(path, entry)
         return entry.render
 
     def _compile_one(

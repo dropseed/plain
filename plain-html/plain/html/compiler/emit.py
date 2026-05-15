@@ -22,6 +22,7 @@ Attribute names are classified by `.security` so URL attrs route through
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass, field
 
 from ..parser import (
@@ -99,6 +100,10 @@ class _Emit:
     include_renders: dict[int, str] = field(default_factory=dict)
     current_offset: int = 0
     _acc_counter: int = 0
+    # When False (text mode — Markdown bodies), text-position expressions
+    # emit `to_text(...)` instead of `escape_html(...)`: the output isn't
+    # HTML, so escaping would corrupt it.
+    escape: bool = True
 
     def text(self, s: str) -> None:
         if s:
@@ -213,15 +218,43 @@ class EmittedModule:
     line_offsets: list[int]
 
 
+def _attr_default_sources(attrs_raw: dict) -> dict[str, str]:
+    """Map declared attrs to their default-value Python source.
+
+    Attrs declared without a default are absent from the result. The
+    inline string form (`type = default`) is split via Python's
+    annotated-assignment grammar; the expanded mapping form reads the
+    `default:` key. This mirrors the default extraction in
+    `typecheck/declarations.py` so the runtime `render()` signature
+    carries the same defaults the type checker validates against.
+    """
+    defaults: dict[str, str] = {}
+    for name, value in attrs_raw.items():
+        if isinstance(value, str):
+            node = ast.parse(f"_d: {value.strip()}", mode="exec").body[0]
+            if isinstance(node, ast.AnnAssign) and node.value is not None:
+                defaults[name] = ast.unparse(node.value)
+        elif isinstance(value, dict) and "default" in value:
+            defaults[name] = repr(value["default"])
+    return defaults
+
+
 def emit_module(
     tree: list[Node],
     fmdict: dict,
     source_label: str,
     *,
     include_renders: dict[int, str],
+    escape: bool = True,
 ) -> EmittedModule:
-    """Emit a complete Python module + per-line template offset map."""
-    declared_attrs = list((fmdict.get("attrs") or {}).keys())
+    """Emit a complete Python module + per-line template offset map.
+
+    `escape=False` selects text mode (Markdown page bodies): text-position
+    expressions emit `to_text(...)` rather than `escape_html(...)`.
+    """
+    attrs_raw = fmdict.get("attrs") or {}
+    declared_attrs = list(attrs_raw.keys())
+    attr_defaults = _attr_default_sources(attrs_raw)
     declared_slots = list((fmdict.get("slots") or {}).keys())
     imports = list(fmdict.get("imports") or [])
     # Always-available names in compiled modules: `mark_safe` / `Markup` are
@@ -239,7 +272,7 @@ def emit_module(
     promoted_slots = [s for s in declared_slots if is_promotable_name(s)]
     ctx_slots = [s for s in declared_slots if s not in set(promoted_slots)]
 
-    e = _Emit(include_renders=include_renders)
+    e = _Emit(include_renders=include_renders, escape=escape)
     # Imports + promoted attrs/slots are all real Python locals — tell the
     # rewriter to leave bare references alone for any of them.
     e.local_stack[0] |= module_globals
@@ -254,7 +287,7 @@ def emit_module(
     header.append("")
     header.append(
         "from plain.html._runtime import "
-        "escape_html, escape_url, "
+        "escape_html, escape_url, to_text, "
         "render_dyn_attr, render_dyn_url_attr, normalize_keywords"
     )
     header.append("from plain.utils.safestring import mark_safe")
@@ -279,7 +312,7 @@ def emit_module(
     # means "this is the entry render; _ctx is the root."
     sig_params = ["*", "_root_ctx=None"]
     for name in promoted_attrs:
-        sig_params.append(f"{name}=None")
+        sig_params.append(f"{name}={attr_defaults.get(name, 'None')}")
     for name in promoted_slots:
         sig_params.append(f"{name}=_mark_safe('')")
     sig_params.append("**_ctx")
@@ -302,9 +335,11 @@ def emit_module(
         body_lines.append("    else:")
         body_lines.append("        _ctx = {**_root_ctx, **_ctx}")
         # When a parent include omits a promoted attr the child declared,
-        # the param defaults to None. Pull the ambient value from _ctx
-        # (which now has _root_ctx merged in). Explicit non-None passes win
-        # because they skip this rebind.
+        # the param falls back to its signature default (`None` when the
+        # attr declared no default). Only the `None` case pulls the
+        # ambient value from `_ctx` — a declared default is a deliberate
+        # value and wins over ambient leakage; an explicit non-None pass
+        # wins because it skips this rebind too.
         for name in promoted_all:
             body_lines.append(f"        if {name} is None:")
             body_lines.append(f"            {name} = _ctx.get({name!r})")
@@ -313,11 +348,14 @@ def emit_module(
         body_lines.append("        _root_ctx = _ctx")
         body_lines.append("    else:")
         body_lines.append("        _ctx = {**_root_ctx, **_ctx}")
-    # Keyword-named declared attrs/slots stay in _ctx — apply their defaults
-    # the old way. `normalize_keywords` will then alias `class` → `class_`,
-    # `for` → `for_`, etc. so templates can write `{class_}` to access them.
+    # Keyword-named declared attrs/slots stay in _ctx — seed their
+    # declared default (or `None`) via `setdefault`. `normalize_keywords`
+    # will then alias `class` → `class_`, `for` → `for_`, etc. so
+    # templates can write `{class_}` to access them.
     for name in ctx_attrs:
-        body_lines.append(f"    _ctx.setdefault({name!r}, None)")
+        body_lines.append(
+            f"    _ctx.setdefault({name!r}, {attr_defaults.get(name, 'None')})"
+        )
     for name in ctx_slots:
         body_lines.append(f"    _ctx.setdefault({name!r}, _mark_safe(''))")
     body_lines.append("    normalize_keywords(_ctx)")
@@ -387,7 +425,8 @@ def _emit_node(node: Node, e: _Emit) -> None:
             case RawNode():
                 e.text(node.text)
             case ExprNode():
-                e.expr_frag(f"escape_html({e.rewrite_expr(node.code)})")
+                helper = "escape_html" if e.escape else "to_text"
+                e.expr_frag(f"{helper}({e.rewrite_expr(node.code)})")
             case HtmlCommentNode():
                 e.text(f"<!--{node.text}-->")
             case TemplateCommentNode():

@@ -50,7 +50,7 @@ attrs:
                     {% if email.html_body %}<iframe
                         sandbox
                         loading="lazy"
-                        srcdoc={{ email.html_body }}
+                        srcdoc="{{ email.html_body }}"
                         class="w-full h-[400px] border-0 bg-white rounded-b"
                     ></iframe>{% endif %}
                     {% if email.text_body and not email.html_body %}

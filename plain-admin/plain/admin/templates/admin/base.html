@@ -36,7 +36,7 @@ slots:
 <!DOCTYPE html>
 <html
     lang="en"
-    class={{ ["plain-admin", "dark" if admin_force_theme == "dark" else None] }}
+    class="{{ ["plain-admin", "dark" if admin_force_theme == "dark" else None] }}"
 >
     <head>
     <meta charset="UTF-8">
@@ -45,7 +45,7 @@ slots:
     {% if not admin_force_theme %}
         {# Resolve theme choice before paint to avoid a flash of light/dark
        mismatch. Storage key + resolver shape must match theme.js. #}
-        <script nonce={{ request.csp_nonce }}>
+        <script nonce="{{ request.csp_nonce }}">
     (() => {
         const stored = localStorage.getItem("plain-admin-theme");
         const dark = stored === "dark"
@@ -55,7 +55,7 @@ slots:
     </script>
     {% endif %}{{ tailwind_css() }}
     {{ htmx_js(request) }}
-    <style nonce={{ request.csp_nonce }}>{% raw %}
+    <style nonce="{{ request.csp_nonce }}">{% raw %}
     @font-face {{
       font-family: "bootstrap-icons";
       src: url("{asset('admin/vendor/fonts/bootstrap-icons.woff2')}") format("woff2"),
@@ -63,7 +63,7 @@ slots:
     }}
     {% endraw %}</style>
     {% if admin_fonts %}{{ admin_fonts }}{% endif %}{% if not admin_fonts %}
-        <style nonce={{ request.csp_nonce }}>{% raw %}
+        <style nonce="{{ request.csp_nonce }}">{% raw %}
     @font-face {{
       font-family: "Inter";
       font-style: normal;
@@ -86,27 +86,35 @@ slots:
       src: url("{asset('admin/fonts/JetBrainsMono.woff2')}") format("woff2");
     }}
     {% endraw %}</style>
-    {% endif %}<link href={{ asset('admin/vendor/bootstrap-icons.min.css') }} rel="stylesheet">
+    {% endif %}<link href="{{ asset('admin/vendor/bootstrap-icons.min.css') }}" rel="stylesheet">
     <script
-        src={{ asset('admin/vendor/chart.js') }}
+        src="{{ asset('admin/vendor/chart.js') }}"
         defer
-        nonce={{ request.csp_nonce }}
+        nonce="{{ request.csp_nonce }}"
     ></script>
-    <script src={{ asset('admin/charts.js') }} defer nonce={{ request.csp_nonce }}></script>
-    <script src={{ asset('admin/htmx.js') }} defer nonce={{ request.csp_nonce }}></script>
-    <script src={{ asset('admin/theme.js') }} defer nonce={{ request.csp_nonce }}></script>
+    <script src="{{ asset('admin/charts.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/htmx.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/theme.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script
-        src={{ asset('admin/datetime-hovercard.js') }}
+        src="{{ asset('admin/datetime-hovercard.js') }}"
         defer
-        nonce={{ request.csp_nonce }}
+        nonce="{{ request.csp_nonce }}"
     ></script>
-    <script src={{ asset('admin/menu.js') }} defer nonce={{ request.csp_nonce }}></script>
-    <script src={{ asset('admin/behaviors.js') }} defer nonce={{ request.csp_nonce }}></script>
-    <script src={{ asset('admin/components.js') }} defer nonce={{ request.csp_nonce }}></script>
+    <script src="{{ asset('admin/menu.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script
+        src="{{ asset('admin/behaviors.js') }}"
+        defer
+        nonce="{{ request.csp_nonce }}"
+    ></script>
+    <script
+        src="{{ asset('admin/components.js') }}"
+        defer
+        nonce="{{ request.csp_nonce }}"
+    ></script>
     {% if header_scripts %}{{ header_scripts }}{% endif %}</head>
     <body
         class="flex flex-col min-h-screen pb-12"
-        data-toolbar-installed={{ is_package_installed('plaintoolbar') or None }}
+        data-toolbar-installed="{{ is_package_installed('plaintoolbar') or None }}"
     >
 
     <Header />
@@ -123,7 +131,7 @@ slots:
                         >
                             {% for (i, parent_view) in enumerate(reversed(parent_view_classes)) %}
                         {% if i > 0 %}<span class="text-admin-muted-foreground/60">/</span>{% endif %}<a
-                                href={{ parent_view.get_view_url(object if object is not None else None) }}
+                                href="{{ parent_view.get_view_url(object if object is not None else None) }}"
                                 class="hover:text-admin-foreground hover:underline"
                             >
                             {{ parent_view.get_nav_title() }}
@@ -138,8 +146,8 @@ slots:
                     <div class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-3 min-w-0">
                             {% if image %}<img
-                                src={{ image.src }}
-                                alt={{ image.alt }}
+                                src="{{ image.src }}"
+                                alt="{{ image.alt }}"
                                 class="h-8 rounded flex-shrink-0"
                             >{% endif %}
                             <h1 class="font-semibold text-2xl truncate">{{ title }}</h1>
@@ -148,7 +156,7 @@ slots:
                             class="hidden sm:flex items-center space-x-2 text-sm flex-shrink-0"
                         >
                         {{ actions }}
-                        {% for (link, link_url) in links.items() %}<a href={{ link_url }} class="admin-btn admin-btn-outline">{{ link }}</a>{% endfor %}
+                        {% for (link, link_url) in links.items() %}<a href="{{ link_url }}" class="admin-btn admin-btn-outline">{{ link }}</a>{% endfor %}
                         {% if extra_links %}
                             <div class="admin-dropdown-menu">
                             <button
@@ -168,7 +176,7 @@ slots:
                                 class="w-48"
                             >
                                 <div role="menu">
-                                    {% for (link, link_url) in extra_links.items() %}<a role="menuitem" href={{ link_url }}>{{ link }}</a>{% endfor %}
+                                    {% for (link, link_url) in extra_links.items() %}<a role="menuitem" href="{{ link_url }}">{{ link }}</a>{% endfor %}
                                 </div>
                             </div>
                         </div>
@@ -196,8 +204,8 @@ slots:
                                 class="w-48"
                             >
                                 <div role="menu">
-                                    {% for (link, link_url) in links.items() %}<a role="menuitem" href={{ link_url }}>{{ link }}</a>{% endfor %}
-                                    {% for (link, link_url) in extra_links.items() %}<a role="menuitem" href={{ link_url }}>{{ link }}</a>{% endfor %}
+                                    {% for (link, link_url) in links.items() %}<a role="menuitem" href="{{ link_url }}">{{ link }}</a>{% endfor %}
+                                    {% for (link, link_url) in extra_links.items() %}<a role="menuitem" href="{{ link_url }}">{{ link }}</a>{% endfor %}
                                 </div>
                             </div>
                         </div>

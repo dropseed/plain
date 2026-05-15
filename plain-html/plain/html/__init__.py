@@ -6,7 +6,7 @@ from plain.utils.safestring import SafeString as Markup
 from plain.utils.safestring import mark_safe
 
 from .compiler import CompileError
-from .engine import render, render_source
+from .engine import render, render_source, render_text_source
 from .loader import TemplateFileMissing
 from .parser import ParseError
 from .template import Template
@@ -40,4 +40,5 @@ __all__ = [
     "mark_safe",
     "render",
     "render_source",
+    "render_text_source",
 ]

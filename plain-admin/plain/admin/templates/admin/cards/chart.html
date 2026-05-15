@@ -14,16 +14,16 @@ attrs:
   request: plain.http.Request = None
 ---
 <Base
-    slug={{ slug }}
-    title={{ title }}
-    description={{ description }}
-    size={{ size }}
-    filters={{ filters }}
-    current_filter={{ current_filter }}
+    slug="{{ slug }}"
+    title="{{ title }}"
+    description="{{ description }}"
+    size="{{ size }}"
+    filters="{{ filters }}"
+    current_filter="{{ current_filter }}"
 >
-    <div class="chart-wrapper" data-chart-id={{ slug }}>
+    <div class="chart-wrapper" data-chart-id="{{ slug }}">
         <div
-            id={{ "card-chart-" + slug + "-stats" }}
+            id="{{ "card-chart-" + slug + "-stats" }}"
             class="chart-stats hidden flex items-baseline justify-between gap-4 mb-2 text-xs"
         >
             <div
@@ -41,9 +41,9 @@ attrs:
         <div
             class="chart-container relative min-h-[140px] px-1 border-b border-admin-border"
         >
-            <canvas id={{ "card-chart-" + slug }}></canvas>
+            <canvas id="{{ "card-chart-" + slug }}"></canvas>
             <div
-                id={{ "card-chart-" + slug + "-empty" }}
+                id="{{ "card-chart-" + slug + "-empty" }}"
                 class="hidden absolute inset-0 flex flex-col items-center justify-center gap-2"
             >
                 <svg
@@ -63,7 +63,7 @@ attrs:
             </div>
         </div>
         <div
-            id={{ "card-chart-" + slug + "-axis" }}
+            id="{{ "card-chart-" + slug + "-axis" }}"
             class="chart-axis hidden flex justify-between mt-1 px-1 text-[10px] text-admin-muted-foreground tabular-nums"
         >
             <span data-axis-start></span>

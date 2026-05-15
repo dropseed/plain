@@ -10,12 +10,12 @@ attrs:
 <Base>
     {% slot "title" %}Tasks{% endslot %}
     <div class="max-w-3xl mx-auto px-5 py-12">
-        <BackLink href={{ url('index') }} label="Back to index" />
+        <BackLink href="{{ url('index') }}" label="Back to index" />
         <div class="flex items-end justify-between gap-4">
             <h1 class="page-h1">Tasks</h1>
             <div class="flex gap-2">
-            <a href={{ url('tasks:seed') }} class="btn-secondary">Seed projects + tags</a>
-            <a href={{ url('tasks:create') }} class="btn-primary">New task</a>
+            <a href="{{ url('tasks:seed') }}" class="btn-secondary">Seed projects + tags</a>
+            <a href="{{ url('tasks:create') }}" class="btn-primary">New task</a>
         </div>
         </div>
         <p class="mt-3 text-sm text-muted max-w-2xl">
@@ -27,12 +27,12 @@ attrs:
                 {% for task in tasks %}
                     <li>
             <a
-                href={{ url('tasks:detail', id=task.id) }}
+                href="{{ url('tasks:detail', id=task.id) }}"
                 class="block px-4 py-3 hover:bg-warm-tint transition-colors no-underline"
             >
                 <div class="flex items-baseline justify-between gap-3">
                     <div
-                        class={{ ["text-sm", "font-semibold", "line-through text-muted" if task.is_complete else "text-ink"] }}
+                        class="{{ ["text-sm", "font-semibold", "line-through text-muted" if task.is_complete else "text-ink"] }}"
                     >{{ task.title }}</div>
                     <div class="text-[12px] text-muted whitespace-nowrap">
                         {{ task.priority }}{% if task.due_date %} · due <span class="font-mono">{{ task.due_date }}</span>{% endif %}</div>
@@ -49,7 +49,7 @@ attrs:
         {% endif %}
         {% if not tasks %}
             <p class="mt-6 text-sm text-muted">
-        No tasks yet — start with <a class="body-link" href={{ url('tasks:seed') }}>seeding</a>, then create one.
+        No tasks yet — start with <a class="body-link" href="{{ url('tasks:seed') }}">seeding</a>, then create one.
     </p>
         {% endif %}
     </div>

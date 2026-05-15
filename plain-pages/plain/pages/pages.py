@@ -7,7 +7,7 @@ from typing import Any
 
 import frontmatter
 
-from plain.html import render_source
+from plain.html import render_source, render_text_source
 from plain.runtime import settings
 from plain.urls import URLPattern, path
 
@@ -45,12 +45,17 @@ class Page:
         return self.vars.get("title", default_title)
 
     def rendered_source(self, context: dict[str, Any] | None = None) -> str:
-        """Apply plain.html `{expr}` interpolation to the content body.
+        """Apply plain.html `{{ expr }}` interpolation to the content body.
 
-        For markdown pages this returns the post-substitution markdown
-        (still markdown, not HTML); markdown→HTML conversion happens in
-        `content` below. `render_plain: true` in frontmatter skips
-        interpolation entirely — the body is served as-authored.
+        HTML pages render through the HTML-aware engine. Markdown pages
+        render through text mode (`render_text_source`) — Markdown is not
+        balanced HTML, so only `{{ }}`, `{% raw %}`, and `{# #}` are
+        recognized and everything else (placeholder `<tags>`, autolinks,
+        code fences) stays literal. For Markdown this returns the
+        post-substitution Markdown (still Markdown, not HTML); the
+        Markdown→HTML conversion happens in `content` below.
+        `render_plain: true` in frontmatter skips interpolation entirely —
+        the body is served as-authored.
         """
         if self.vars.get("render_plain", False):
             return self._frontmatter.content
@@ -61,6 +66,8 @@ class Page:
             source = f.read()
 
         try:
+            if self.is_markdown():
+                return render_text_source(source, render_context)
             return render_source(
                 source,
                 render_context,

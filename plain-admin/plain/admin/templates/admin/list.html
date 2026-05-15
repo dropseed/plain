@@ -38,19 +38,23 @@ attrs:
   format_field_value: Any = None
 ---
 <Base
-    title={{ title }}
-    app_name={{ app_name }}
-    admin_force_theme={{ admin_force_theme }}
-    description={{ description }}
-    image={{ image }}
-    links={{ links }}
-    extra_links={{ extra_links }}
-    parent_view_classes={{ parent_view_classes }}
-    object={{ object }}
-    cards={{ cards }}
+    title="{{ title }}"
+    app_name="{{ app_name }}"
+    admin_force_theme="{{ admin_force_theme }}"
+    description="{{ description }}"
+    image="{{ image }}"
+    links="{{ links }}"
+    extra_links="{{ extra_links }}"
+    parent_view_classes="{{ parent_view_classes }}"
+    object="{{ object }}"
+    cards="{{ cards }}"
 >
     {% slot "header_scripts" %}
-        <script src={{ asset('admin/list.js') }} defer nonce={{ request.csp_nonce }}></script>
+        <script
+            src="{{ asset('admin/list.js') }}"
+            defer
+            nonce="{{ request.csp_nonce }}"
+        ></script>
     {% endslot %}
     <div
         plain-hx-fragment="list"
@@ -73,7 +77,7 @@ attrs:
             <div class="flex space-x-2">
                 {% if table_style == "preview" %}<a
                     class="text-sm"
-                    href={{ request.path + ("?search=" + search_query if search_query else "") }}
+                    href="{{ request.path + ("?search=" + search_query if search_query else "") }}"
                 >View {{ page.paginator.count }} result{{ "s" if page.paginator.count != 1 else "" }}</a>{% endif %}
                 {% if table_style != "preview" %}
                     {% if actions %}
@@ -95,14 +99,14 @@ attrs:
                         >
                             <option value="">Filter...</option>
                             {% for f in filter_names %}
-                                <option selected={{ f == current_filter }}>{{ f }}</option>
+                                <option selected="{{ f == current_filter }}">{{ f }}</option>
                             {% endfor %}
                         </select>{% endif %}
                         {% if search_fields %}
                             <SearchInput
                                 name="search"
                                 id="search"
-                                value={{ search_query or "" }}
+                                value="{{ search_query or "" }}"
                                 class="admin-input input-sm w-auto pl-8!"
                             />
                         {% endif %}
@@ -133,7 +137,7 @@ attrs:
                                         {% if table_style != "preview" %}<a
                                             data-merge-params
                                             class="text-xs font-normal flex items-center gap-1 hover:text-admin-foreground group"
-                                            href={{ "?page=1&order_by=" + ("-" if not order_by_direction else "") + str(field) }}
+                                            href="{{ "?page=1&order_by=" + ("-" if not order_by_direction else "") + str(field) }}"
                                         >
                             <span>{{ get_field_label(field) }}</span>
                             {% if field == order_by_field and order_by_direction == "-" %}<span class="text-[10px]">▼</span>{% endif %}{% if field == order_by_field and order_by_direction != "-" %}<span class="text-[10px]">▲</span>{% endif %}{% if field != order_by_field %}<span
@@ -159,12 +163,14 @@ attrs:
                         data-action-checkbox
                         class="admin-input"
                         type="checkbox"
-                        name={{ str(get_object_id(obj)) }}
+                        name="{{ str(get_object_id(obj)) }}"
                     >
                 </td>
                                 {% endif %}
                                 {% for field in fields %}
-                                    <td data-column-autolink={{ get_object_url(obj) }}>
+                                    <td
+                                        data-column-autolink="{{ get_object_url(obj) }}"
+                                    >
                                         <div class="max-w-prose truncate">{{ render_value_template(get_field_value_template(obj, field, format_field_value(obj, field, get_field_value(obj, field))), {"object": obj, "field": field, "value": format_field_value(obj, field, get_field_value(obj, field))}) }}</div>
                                     </td>
                                 {% endfor %}
@@ -175,20 +181,20 @@ attrs:
                             type="button"
                             aria-haspopup="menu"
                             aria-expanded="false"
-                            aria-controls={{ "row-actions-" + str(row_index + 1) }}
+                            aria-controls="{{ "row-actions-" + str(row_index + 1) }}"
                             class="admin-btn admin-btn-icon admin-btn-ghost"
                         >
                             <Icon name="three-dots" />
                         </button>
                         <div
-                            id={{ "row-actions-" + str(row_index + 1) }}
+                            id="{{ "row-actions-" + str(row_index + 1) }}"
                             data-popover
                             data-align="end"
                             aria-hidden="true"
                             class="w-48"
                         >
                             <div role="menu">
-                                {% for (text, link_url) in get_object_links(obj).items() %}<a role="menuitem" href={{ link_url }}>{{ text }}</a>{% endfor %}
+                                {% for (text, link_url) in get_object_links(obj).items() %}<a role="menuitem" href="{{ link_url }}">{{ text }}</a>{% endfor %}
                             </div>
                         </div>
                     </div>
@@ -225,19 +231,22 @@ attrs:
         <div class="flex items-center gap-2">
             {% if page.has_previous() %}<a
                 data-merge-params
-                href={{ "?page=" + str(page.previous_page_number()) }}
+                href="{{ "?page=" + str(page.previous_page_number()) }}"
                 class="admin-btn admin-btn-sm admin-btn-outline"
             >&lt;</a>{% endif %}
             <form data-autosubmit method="GET">
-                {% if search_fields and search_query %}<input type="hidden" name="search" value={{ search_query }}>{% endif %}{% if filter_names and current_filter %}<input type="hidden" name="filter" value={{ current_filter }}>{% endif %}<select name="page" class="admin-select admin-select-sm w-auto">
+                {% if search_fields and search_query %}<input type="hidden" name="search" value="{{ search_query }}">{% endif %}{% if filter_names and current_filter %}<input type="hidden" name="filter" value="{{ current_filter }}">{% endif %}<select name="page" class="admin-select admin-select-sm w-auto">
                 {% for page_num in page.paginator.page_range %}
-                    <option value={{ page_num }} selected={{ page_num == page.number }}>Page {{ page_num }}</option>
+                    <option
+                        value="{{ page_num }}"
+                        selected="{{ page_num == page.number }}"
+                    >Page {{ page_num }}</option>
                 {% endfor %}
             </select>
             </form>
             {% if page.has_next() %}<a
                 data-merge-params
-                href={{ "?page=" + str(page.next_page_number()) }}
+                href="{{ "?page=" + str(page.next_page_number()) }}"
                 class="admin-btn admin-btn-sm admin-btn-outline"
             >&gt;</a>{% endif %}
         </div>

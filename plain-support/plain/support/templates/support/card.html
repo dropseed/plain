@@ -14,26 +14,26 @@ attrs:
   current_filter: str = ""
 ---
 <CardBase
-    slug={{ slug }}
-    title={{ title }}
-    description={{ description }}
-    size={{ size }}
-    filters={{ filters }}
-    current_filter={{ current_filter }}
+    slug="{{ slug }}"
+    title="{{ title }}"
+    description="{{ description }}"
+    size="{{ size }}"
+    filters="{{ filters }}"
+    current_filter="{{ current_filter }}"
 >
     <div class="w-full space-y-2 overflow-auto max-h-60 flex-grow">
         {% for entry in entries %}
             <div class="flex space-x-2 text-sm">
             <a
                 class="flex-shrink-0 text-admin-muted-foreground tabular-nums hover:underline"
-                href={{ get_admin_model_detail_url(entry) }}
-                title={{ str(entry.created_at) }}
+                href="{{ get_admin_model_detail_url(entry) }}"
+                title="{{ str(entry.created_at) }}"
             >
                 {{ timesince(entry.created_at, format="short", depth=1) }}
             </a>
             <a
                 class="overflow-hidden hover:underline text-ellipsis whitespace-nowrap"
-                href={{ get_admin_model_detail_url(entry) }}
+                href="{{ get_admin_model_detail_url(entry) }}"
             >
                 {{ entry.message[:100] + ("..." if len(entry.message) > 100 else "") }}
             </a>

@@ -3,12 +3,12 @@ attrs:
   field: Any
 ---
 <select
-    id={{ field.html_id }}
-    name={{ field.html_name }}
+    id="{{ field.html_id }}"
+    name="{{ field.html_name }}"
     class="admin-select"
-    required={{ field.field.required }}
+    required="{{ field.field.required }}"
 >
     {% for (value, label) in field.field.choices %}
-        <option value={{ value }} selected={{ value == field.value() }}>{{ label }}</option>
+        <option value="{{ value }}" selected="{{ value == field.value() }}">{{ label }}</option>
     {% endfor %}
 </select>

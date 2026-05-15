@@ -39,7 +39,7 @@ attrs:
         <dt>Primary object</dt>
         <dd
             class="text-sm text-white/50 inline-flex items-center"
-            title={{ "ID: " + str(getattr(object, "id", "unknown")) }}
+            title="{{ "ID: " + str(getattr(object, "id", "unknown")) }}"
         >
             <pre><code>{{ object.__repr__() }}</code></pre>
         </dd>

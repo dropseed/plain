@@ -22,7 +22,7 @@ attrs:
             <div class="flex items-center gap-2">
                 <button
                     data-copy-json
-                    data-json-url={{ trace.get_absolute_url() + "?format=json" }}
+                    data-json-url="{{ trace.get_absolute_url() + "?format=json" }}"
                     class="cursor-pointer px-2 py-1 text-xs bg-white/10 text-white/70 hover:bg-white/20 hover:text-white rounded transition-colors flex items-center gap-1.5"
                     title="Copy trace as JSON"
                 >
@@ -55,7 +55,7 @@ attrs:
                     >
                         <div class="py-1">
                             <a
-                                href={{ trace.get_absolute_url() + "?format=json" }}
+                                href="{{ trace.get_absolute_url() + "?format=json" }}"
                                 target="_blank"
                                 class="cursor-pointer w-full text-left px-4 py-3 text-sm text-stone-200 hover:bg-stone-800 transition-colors flex items-center gap-3"
                             >
@@ -72,7 +72,7 @@ attrs:
                                 View as JSON
                             </a>
                             <a
-                                href={{ trace.get_absolute_url() + "?logs=true" }}
+                                href="{{ trace.get_absolute_url() + "?logs=true" }}"
                                 target="_blank"
                                 class="cursor-pointer w-full text-left px-4 py-3 text-sm text-stone-200 hover:bg-stone-800 transition-colors flex items-center gap-3"
                             >
@@ -88,7 +88,7 @@ attrs:
                                 View Logs
                             </a>
                             <button
-                                hx-delete={{ trace.get_absolute_url() }}
+                                hx-delete="{{ trace.get_absolute_url() }}"
                                 hx-swap="none"
                                 hx-confirm="Delete this trace?"
                                 class="cursor-pointer w-full text-left px-4 py-3 text-sm text-red-200 hover:bg-red-900/30 transition-colors flex items-center gap-3"
@@ -166,13 +166,13 @@ attrs:
         {% for event in trace.get_timeline_events() %}
             {% if event["type"] == 'span' %}
                 <Span
-                    trace={{ trace }}
-                    span={{ event["instance"] }}
-                    event={{ event }}
+                    trace="{{ trace }}"
+                    span="{{ event["instance"] }}"
+                    event="{{ event }}"
                 />
             {% endif %}
             {% if event["type"] == 'log' %}
-                <Log log={{ event["instance"] }} event={{ event }} />
+                <Log log="{{ event["instance"] }}" event="{{ event }}" />
             {% endif %}
         {% endfor %}
         {% if not trace.get_timeline_events() %}

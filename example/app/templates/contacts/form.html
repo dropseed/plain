@@ -13,7 +13,7 @@ attrs:
 <Base>
     {% slot "title" %}Contact us{% endslot %}
     <div class="max-w-2xl mx-auto px-5 py-12">
-        <BackLink href={{ url('index') }} label="Back to index" />
+        <BackLink href="{{ url('index') }}" label="Back to index" />
         <h1 class="page-h1">Contact us</h1>
         <p class="mt-3 text-sm text-muted">
         Plain <span class="font-mono text-body">forms.Form</span> with text, email, choice, boolean,
@@ -23,48 +23,48 @@ attrs:
         <a class="body-link" href="?company=1">?company=1</a>.
     </p>
         <form method="post" class="mt-6 flex flex-col gap-5">
-        <NonfieldErrors form={{ form }} />
+        <NonfieldErrors form="{{ form }}" />
         <Field
-            bf={{ form.name }}
+            bf="{{ form.name }}"
             label="Name"
-            autofocus={{ True }}
-            required={{ True }}
+            autofocus="{{ True }}"
+            required="{{ True }}"
         />
-        <Field bf={{ form.email }} label="Email" type="email" required={{ True }} />
+        <Field bf="{{ form.email }}" label="Email" type="email" required="{{ True }}" />
         <Field
-            bf={{ form.subject }}
+            bf="{{ form.subject }}"
             label="Subject"
             type="select"
-            required={{ True }}
+            required="{{ True }}"
         />
         {% if 'company' in form.fields %}
-            <Field bf={{ form.company }} label="Company (optional)" />
+            <Field bf="{{ form.company }}" label="Company (optional)" />
         {% endif %}<Field
-            bf={{ form.message }}
+            bf="{{ form.message }}"
             label="Message"
             type="textarea"
             min_height="160px"
-            required={{ True }}
+            required="{{ True }}"
         />
 
         <div>
             <label class="flex items-center gap-2 text-sm text-body">
                 <input
                     type="checkbox"
-                    name={{ form.subscribe.html_name }}
-                    id={{ form.subscribe.html_id }}
-                    checked={{ form.subscribe.value() }}
+                    name="{{ form.subscribe.html_name }}"
+                    id="{{ form.subscribe.html_id }}"
+                    checked="{{ form.subscribe.value() }}"
                 >
                 Subscribe to the newsletter
             </label>
-            <FieldErrors bf={{ form.subscribe }} />
+            <FieldErrors bf="{{ form.subscribe }}" />
         </div>
 
         <button type="submit" class="btn-primary self-start">Send</button>
     </form>
         <p class="mt-8 text-sm text-muted">
         See submitted entries in the
-        <a class="body-link" href={{ url('contacts:archive') }}>archive</a>.
+        <a class="body-link" href="{{ url('contacts:archive') }}">archive</a>.
     </p>
     </div>
 </Base>

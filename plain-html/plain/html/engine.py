@@ -2,8 +2,9 @@
 
 `render(path)` reads + compiles + renders a `.html` file.
 `render_source(source, *, source_path)` renders a source string,
-optionally resolving `:include`s relative to a known path. Both
-delegate to `plain.html.compiler`.
+optionally resolving `:include`s relative to a known path.
+`render_text_source(source)` renders a non-HTML text template
+(Markdown bodies). All delegate to `plain.html.compiler`.
 """
 
 from __future__ import annotations
@@ -58,3 +59,24 @@ def render_source(
     code = compile(src, "<source>", "exec")
     exec(code, mod.__dict__)
     return mod.render(**ctx)
+
+
+def render_text_source(source: str, context: dict | None = None) -> str:
+    """Render a non-HTML text template source string.
+
+    Uses the text-mode pipeline: only `{{ expr }}`, `{% raw %}`, and
+    `{# comment #}` are recognized — everything else (including `<`,
+    HTML-looking tags, and other `{% … %}`) is literal text, and
+    expressions are emitted unescaped.
+
+    This is how `plain.pages` interpolates Markdown bodies. Markdown is
+    not balanced HTML — placeholder text like `<name>`, autolinks, raw
+    snippets in code fences — so it can't go through the HTML-aware
+    `render` / `render_source`.
+    """
+    src = CompileSession().compile_text_string(source)
+    mod = types.ModuleType(f"_plain_html_text_{abs(hash(source))}")
+    mod.__file__ = "<text>"
+    code = compile(src, "<text>", "exec")
+    exec(code, mod.__dict__)
+    return mod.render(**(context or {}))

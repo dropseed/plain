@@ -11,11 +11,11 @@ attrs:
 ---
 <div>
     <div class="flex items-center space-x-2">
-        <Checkbox field={{ field }} />
-        <Label field={{ field }}>{{ label }}</Label>
+        <Checkbox field="{{ field }}" />
+        <Label field="{{ field }}">{{ label }}</Label>
         {% if help %}
-            <Help help={{ help }} />
+            <Help help="{{ help }}" />
         {% endif %}
     </div>
-    <FieldErrors field={{ field }} />
+    <FieldErrors field="{{ field }}" />
 </div>

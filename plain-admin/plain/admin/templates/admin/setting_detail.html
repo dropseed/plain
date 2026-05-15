@@ -15,16 +15,16 @@ attrs:
   cards: list = []
 ---
 <Base
-    title={{ title }}
-    app_name={{ app_name }}
-    admin_force_theme={{ admin_force_theme }}
-    description={{ description }}
-    image={{ image }}
-    links={{ links }}
-    extra_links={{ extra_links }}
-    parent_view_classes={{ parent_view_classes }}
-    object={{ object }}
-    cards={{ cards }}
+    title="{{ title }}"
+    app_name="{{ app_name }}"
+    admin_force_theme="{{ admin_force_theme }}"
+    description="{{ description }}"
+    image="{{ image }}"
+    links="{{ links }}"
+    extra_links="{{ extra_links }}"
+    parent_view_classes="{{ parent_view_classes }}"
+    object="{{ object }}"
+    cards="{{ cards }}"
 >
     <div class="admin-card p-6">
         <section>
@@ -47,7 +47,7 @@ attrs:
                     <dt class="w-40 flex-shrink-0 text-admin-muted-foreground">Value</dt>
                     <dd class="min-w-0">
                     <span
-                        data-secret={{ setting["is_secret"] }}
+                        data-secret="{{ setting["is_secret"] }}"
                         class="font-mono text-sm break-all whitespace-pre-wrap data-[secret=True]:text-admin-muted-foreground/80 data-[secret=True]:italic"
                     >{{ setting["value"] }}</span>
                 </dd>

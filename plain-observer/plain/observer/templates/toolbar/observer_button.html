@@ -43,14 +43,14 @@ attrs:
                        data-[level=warn]:text-amber-400
                        data-[level=danger]:text-red-400"
     title="SQL queries"
-    data-level={{ trace_stats["query_level"] if trace_stats["query_level"] != "ok" else None }}
+    data-level="{{ trace_stats["query_level"] if trace_stats["query_level"] != "ok" else None }}"
 >{{ trace_stats["query_count"] }}{{ ("+" + str(trace_stats["duplicate_count"])) if trace_stats["duplicate_count"] else "" }} {{ "query" if trace_stats["query_count"] == 1 else "queries" }}</span>
             {% if trace_stats["duration_display"] %}<span
     class="text-[11px] text-white/50
                        data-[level=warn]:text-amber-400
                        data-[level=danger]:text-red-400"
     title="Request duration"
-    data-level={{ trace_stats["duration_level"] if trace_stats["duration_level"] != "ok" else None }}
+    data-level="{{ trace_stats["duration_level"] if trace_stats["duration_level"] != "ok" else None }}"
 >{{ trace_stats["duration_display"] }}</span>{% endif %}{% endif %}<span
     data-observer-response-size
     class="hidden text-[11px] text-white/50
@@ -74,19 +74,19 @@ attrs:
                 class="text-white/50
                        data-[level=warn]:text-amber-400
                        data-[level=danger]:text-red-400"
-                data-level={{ system_stats["cpu_level"] if system_stats["cpu_level"] != "ok" else None }}
+                data-level="{{ system_stats["cpu_level"] if system_stats["cpu_level"] != "ok" else None }}"
             >{{ system_stats["cpu_percent"] }}%</span>
         </span>{% endif %}
     {% if system_stats["mem_display"] %}<span
         class="items-baseline text-[11px] tabular-nums"
-        title={{ system_stats["mem_title"] }}
+        title="{{ system_stats["mem_title"] }}"
     >
             <span class="text-[9px] text-white/30 mr-0.5">MEM</span>
             <span
                 class="text-white/50
                        data-[level=warn]:text-amber-400
                        data-[level=danger]:text-red-400"
-                data-level={{ system_stats["mem_level"] if system_stats["mem_level"] != "ok" else None }}
+                data-level="{{ system_stats["mem_level"] if system_stats["mem_level"] != "ok" else None }}"
             >{{ system_stats["mem_display"] }}</span>
         </span>{% endif %}
 </span>{% endif %}</div>
@@ -94,11 +94,11 @@ attrs:
    (CSP-safe: script body is opaque, no expression interpolation). #}
 <div
     data-observer-button-config
-    data-traces-url={{ url('observer:traces') }}
-    data-persist-once={{ "true" if observer.is_persist_once() else "false" }}
+    data-traces-url="{{ url('observer:traces') }}"
+    data-persist-once="{{ "true" if observer.is_persist_once() else "false" }}"
     hidden
 ></div>
-<script nonce={{ request.csp_nonce }}>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     var config = document.querySelector("[data-observer-button-config]");
     var tracesUrl = config ? config.dataset.tracesUrl : "";

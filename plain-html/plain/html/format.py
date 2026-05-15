@@ -511,10 +511,13 @@ def _open_tag_wrapped(
 def _format_attribute(attr: Attribute) -> str:
     if attr.segments is None:
         return attr.name
-    # A value that's a single `{{ expr }}` emits unquoted — matches how
-    # authors write `disabled={{ ok }}` or `class={{ x }}`.
+    # A value that's a single `{{ expr }}` is quoted — `href="{{ href }}"`.
+    # The tokenizer accepts quoted and unquoted `{{ }}` identically (both
+    # become one `AttrExpr` segment → `render_dyn_attr`, keeping typed
+    # behavior like `disabled="{{ flag }}"` omitting on falsy); quoting is
+    # the canonical form so HTML syntax highlighters see `attr="..."`.
     if len(attr.segments) == 1 and isinstance(attr.segments[0], AttrExpr):
-        return f"{attr.name}={{{{ {attr.segments[0].code} }}}}"
+        return f'{attr.name}="{{{{ {attr.segments[0].code} }}}}"'
     # HTML5 boolean attribute: `disabled="disabled"` collapses to `disabled`.
     if (
         len(attr.segments) == 1

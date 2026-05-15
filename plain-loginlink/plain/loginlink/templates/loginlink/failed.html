@@ -16,7 +16,7 @@ attrs:
     {% endif %}{% if error not in ("expired", "invalid", "changed") %}
         <h1 class="text-4xl">Link Error</h1>
     {% endif %}<a
-        href={{ login_url }}
+        href="{{ login_url }}"
         class="inline-block mt-4 text-center text-blue-600 hover:underline"
     >Request a new link →</a>
 </div>

@@ -33,19 +33,19 @@ attrs:
    in the inline init script highlights the current section as the user
    scrolls. #}
 <Base
-    title={{ title }}
-    app_name={{ app_name }}
-    admin_force_theme={{ admin_force_theme }}
-    description={{ description }}
-    image={{ image }}
-    links={{ links }}
-    extra_links={{ extra_links }}
-    parent_view_classes={{ parent_view_classes }}
-    object={{ object }}
-    cards={{ cards }}
+    title="{{ title }}"
+    app_name="{{ app_name }}"
+    admin_force_theme="{{ admin_force_theme }}"
+    description="{{ description }}"
+    image="{{ image }}"
+    links="{{ links }}"
+    extra_links="{{ extra_links }}"
+    parent_view_classes="{{ parent_view_classes }}"
+    object="{{ object }}"
+    cards="{{ cards }}"
 >
     {% slot "header_scripts" %}
-        <script nonce={{ request.csp_nonce }}>
+        <script nonce="{{ request.csp_nonce }}">
 /* Sticky side-nav active-section highlight: as the user scrolls, mark the
    TOC link for the section currently in view. Pure navigation aid — no
    styling state lives in JS. */
@@ -140,7 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <div
                                 class="grid grid-cols-2 gap-x-4 gap-y-0.5 [&>a]:text-admin-link [&>a:hover]:text-admin-link-hover"
                             >
-                                {% for (id, title) in items %}<a href={{ "#" + id }}>{{ title }}</a>{% endfor %}
+                                {% for (id, title) in items %}<a href="{{ "#" + id }}">{{ title }}</a>{% endfor %}
                             </div>
                         </div>
                     {% endfor %}
@@ -282,7 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb="The neutral palette: page backgrounds, muted/accent surfaces, borders. Component-scoped surfaces (`--card`, `--popover`, chart) live in their respective component sections below."
             >
                 <UiSwatchGrid
-                    swatches={{ [
+                    swatches="{{ [
     ("background", "bg-admin-background"),
     ("foreground", "bg-admin-foreground"),
     ("secondary", "bg-admin-secondary"),
@@ -294,7 +294,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ("border", "bg-admin-border"),
     ("input", "bg-admin-input"),
     ("scrollbar-thumb", "bg-[var(--scrollbar-thumb)]")
-] }}
+] }}"
                 />
             </UiSection>
             <UiSection
@@ -303,11 +303,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb="Colors for buttons and focus rings. `--primary` and `--ring` drive `.admin-btn-primary`, focus outlines, and the active-tab indicator. (Danger actions like `.admin-btn-danger` pull from the `--danger` status token below.)"
             >
                 <UiSwatchGrid
-                    swatches={{ [
+                    swatches="{{ [
     ("primary", "bg-admin-primary"),
     ("primary-foreground", "bg-admin-primary-foreground"),
     ("ring", "bg-admin-ring")
-] }}
+] }}"
                 />
             </UiSection>
             <UiSection
@@ -316,7 +316,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb="Status colors exposed as Tailwind utilities (`text-success`, `bg-warning/10`, `border-info`). Used by alerts, badges, preflight, and form validation."
             >
                 <UiSwatchGrid
-                    swatches={{ [
+                    swatches="{{ [
     ("success", "bg-admin-success"),
     ("success-foreground", "bg-admin-success-foreground"),
     ("warning", "bg-admin-warning"),
@@ -325,7 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ("danger-foreground", "bg-admin-danger-foreground"),
     ("info", "bg-admin-info"),
     ("info-foreground", "bg-admin-info-foreground")
-] }}
+] }}"
                 />
             </UiSection>
             <UiSection
@@ -334,9 +334,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb='The admin&apos;s sticky top header. Plain ships a faint warm tint that&apos;s a hair off the page background — `#f6f3f2` (slightly darker than white) in light mode, and a subtly lighter shade in dark mode. Override `--header-bg` to match your own brand. For full contrast inversion (light page, dark header), add `class="dark"` to the `<header>` element instead — that flips every token via the dark variant.'
             >
                 <UiSwatchGrid
-                    swatches={{ [
+                    swatches="{{ [
     ("header-bg", "bg-admin-header-bg")
-] }}
+] }}"
                 />
             </UiSection>
             <UiSection
@@ -472,11 +472,11 @@ document.addEventListener("DOMContentLoaded", () => {
             >
                 <p class="text-sm text-admin-muted-foreground mb-3">Plain-only prose tokens:</p>
                 <UiSwatchGrid
-                    swatches={{ [
+                    swatches="{{ [
     ("link", "bg-admin-link"),
     ("link-hover", "bg-admin-link-hover"),
     ("code-bg", "bg-admin-code-bg")
-] }}
+] }}"
                 />
                 <h4 class="text-sm font-semibold text-admin-foreground mt-6 mb-2">Prose links</h4>
                 <div class="border border-admin-border rounded-admin-lg p-4 text-sm">
@@ -500,7 +500,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 />
                 <UiExample
                     caption="Block"
-                    markup={{ "<pre><code>def hello(name: str) -> str:\n    return f\"Hello, {name}!\"</code></pre>" }}
+                    markup="{{ "<pre><code>def hello(name: str) -> str:\n    return f\"Hello, {name}!\"</code></pre>" }}"
                 />
             </UiSection>
             <UiSection
@@ -509,7 +509,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb="Bootstrap Icons are vendored. Use the admin.Icon element with a name."
             >
                 <UiExample
-                    markup={{ '<admin.Icon name="check-circle-fill" class="text-admin-success" />\n<admin.Icon name="exclamation-triangle-fill" class="text-admin-warning" />\n<admin.Icon name="x-circle-fill" class="text-admin-danger" />\n<admin.Icon name="info-circle-fill" class="text-admin-info" />\n<admin.Icon name="gear" />\n<admin.Icon name="search" />\n<admin.Icon name="chevron-down" />\n<admin.Icon name="three-dots-vertical" />\n<admin.Icon name="palette" />\n<admin.Icon name="moon-stars" />' }}
+                    markup="{{ '<admin.Icon name="check-circle-fill" class="text-admin-success" />\n<admin.Icon name="exclamation-triangle-fill" class="text-admin-warning" />\n<admin.Icon name="x-circle-fill" class="text-admin-danger" />\n<admin.Icon name="info-circle-fill" class="text-admin-info" />\n<admin.Icon name="gear" />\n<admin.Icon name="search" />\n<admin.Icon name="chevron-down" />\n<admin.Icon name="three-dots-vertical" />\n<admin.Icon name="palette" />\n<admin.Icon name="moon-stars" />' }}"
                 />
                 <p class="text-xs text-admin-muted-foreground">
     Browse the full set at <a
@@ -526,7 +526,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb='Small inline labels for key names — useful inline in help text or alongside menu items that have a keyboard shortcut. Wrap the key in `<kbd class="kbd">`.'
             >
                 <UiExample
-                    markup={{ '<p class="text-sm">\n    Press <kbd class="admin-kbd">Esc</kbd> to dismiss, or <kbd class="admin-kbd">â\x8c\x98</kbd> + <kbd class="admin-kbd">K</kbd> to open the search.\n</p>' }}
+                    markup="{{ '<p class="text-sm">\n    Press <kbd class="admin-kbd">Esc</kbd> to dismiss, or <kbd class="admin-kbd">â\x8c\x98</kbd> + <kbd class="admin-kbd">K</kbd> to open the search.\n</p>' }}"
                 />
             </UiSection>
             {# ====================================================================== #}
@@ -540,19 +540,19 @@ document.addEventListener("DOMContentLoaded", () => {
             >
                 <UiExample
                     caption="Neutral variants"
-                    markup={{ '<button class="admin-btn admin-btn-primary">Primary</button>\n<button class="admin-btn admin-btn-secondary">Secondary</button>\n<button class="admin-btn admin-btn-outline">Outline</button>\n<button class="admin-btn admin-btn-ghost">Ghost</button>\n<button class="admin-btn admin-btn-link">Link</button>' }}
+                    markup="{{ '<button class="admin-btn admin-btn-primary">Primary</button>\n<button class="admin-btn admin-btn-secondary">Secondary</button>\n<button class="admin-btn admin-btn-outline">Outline</button>\n<button class="admin-btn admin-btn-ghost">Ghost</button>\n<button class="admin-btn admin-btn-link">Link</button>' }}"
                 />
                 <UiExample
                     caption="Status variants"
-                    markup={{ '<button class="admin-btn admin-btn-success">Success</button>\n<button class="admin-btn admin-btn-warning">Warning</button>\n<button class="admin-btn admin-btn-danger">Danger</button>\n<button class="admin-btn admin-btn-info">Info</button>' }}
+                    markup="{{ '<button class="admin-btn admin-btn-success">Success</button>\n<button class="admin-btn admin-btn-warning">Warning</button>\n<button class="admin-btn admin-btn-danger">Danger</button>\n<button class="admin-btn admin-btn-info">Info</button>' }}"
                 />
                 <UiExample
                     caption="Sizes"
-                    markup={{ '<button class="admin-btn admin-btn-sm admin-btn-primary">Small</button>\n<button class="admin-btn admin-btn-primary">Default</button>\n<button class="admin-btn admin-btn-lg admin-btn-primary">Large</button>' }}
+                    markup="{{ '<button class="admin-btn admin-btn-sm admin-btn-primary">Small</button>\n<button class="admin-btn admin-btn-primary">Default</button>\n<button class="admin-btn admin-btn-lg admin-btn-primary">Large</button>' }}"
                 />
                 <UiExample
                     caption="With icon"
-                    markup={{ '<button class="admin-btn admin-btn-primary"><admin.Icon name="plus-lg" />Create</button>\n<button class="admin-btn admin-btn-outline"><admin.Icon name="download" />Export</button>\n<button class="admin-btn admin-btn-icon admin-btn-outline" title="Refresh"><admin.Icon name="arrow-clockwise" /></button>\n<button class="admin-btn admin-btn-danger" disabled>Disabled</button>' }}
+                    markup="{{ '<button class="admin-btn admin-btn-primary"><admin.Icon name="plus-lg" />Create</button>\n<button class="admin-btn admin-btn-outline"><admin.Icon name="download" />Export</button>\n<button class="admin-btn admin-btn-icon admin-btn-outline" title="Refresh"><admin.Icon name="arrow-clockwise" /></button>\n<button class="admin-btn admin-btn-danger" disabled>Disabled</button>' }}"
                 />
             </UiSection>
             <UiSection
@@ -562,15 +562,15 @@ document.addEventListener("DOMContentLoaded", () => {
             >
                 <UiExample
                     caption="Horizontal"
-                    markup={{ '<div class="admin-button-group">\n    <button class="admin-btn admin-btn-outline">List</button>\n    <button class="admin-btn admin-btn-outline" aria-pressed="true">Grid</button>\n    <button class="admin-btn admin-btn-outline">Chart</button>\n</div>' }}
+                    markup="{{ '<div class="admin-button-group">\n    <button class="admin-btn admin-btn-outline">List</button>\n    <button class="admin-btn admin-btn-outline" aria-pressed="true">Grid</button>\n    <button class="admin-btn admin-btn-outline">Chart</button>\n</div>' }}"
                 />
                 <UiExample
                     caption="With separator"
-                    markup={{ '<div class="admin-button-group">\n    <button class="admin-btn admin-btn-outline">Save</button>\n    <hr role="separator" />\n    <button class="admin-btn admin-btn-outline">Cancel</button>\n</div>' }}
+                    markup="{{ '<div class="admin-button-group">\n    <button class="admin-btn admin-btn-outline">Save</button>\n    <hr role="separator" />\n    <button class="admin-btn admin-btn-outline">Cancel</button>\n</div>' }}"
                 />
                 <UiExample
                     caption="Vertical"
-                    markup={{ '<div class="admin-button-group" data-orientation="vertical">\n    <button class="admin-btn admin-btn-outline">Option A</button>\n    <button class="admin-btn admin-btn-outline">Option B</button>\n    <button class="admin-btn admin-btn-outline">Option C</button>\n</div>' }}
+                    markup="{{ '<div class="admin-button-group" data-orientation="vertical">\n    <button class="admin-btn admin-btn-outline">Option A</button>\n    <button class="admin-btn admin-btn-outline">Option B</button>\n    <button class="admin-btn admin-btn-outline">Option C</button>\n</div>' }}"
                 />
             </UiSection>
             <UiSection
@@ -580,11 +580,11 @@ document.addEventListener("DOMContentLoaded", () => {
             >
                 <UiExample
                     caption="Neutral variants"
-                    markup={{ '<span class="admin-badge admin-badge-primary">Primary</span>\n<span class="admin-badge admin-badge-secondary">Secondary</span>\n<span class="admin-badge admin-badge-outline">Outline</span>' }}
+                    markup="{{ '<span class="admin-badge admin-badge-primary">Primary</span>\n<span class="admin-badge admin-badge-secondary">Secondary</span>\n<span class="admin-badge admin-badge-outline">Outline</span>' }}"
                 />
                 <UiExample
                     caption="Plain semantic variants"
-                    markup={{ '<span class="admin-badge admin-badge-success">Stable</span>\n<span class="admin-badge admin-badge-warning">Beta</span>\n<span class="admin-badge admin-badge-danger">Deprecated</span>\n<span class="admin-badge admin-badge-info">New</span>' }}
+                    markup="{{ '<span class="admin-badge admin-badge-success">Stable</span>\n<span class="admin-badge admin-badge-warning">Beta</span>\n<span class="admin-badge admin-badge-danger">Deprecated</span>\n<span class="admin-badge admin-badge-info">New</span>' }}"
                 />
             </UiSection>
             {# ====================================================================== #}
@@ -597,19 +597,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb="Inline status panels. Wrap the title in an h2-h6 or [data-title] and put body content in a <section>."
             >
                 <UiExample
-                    markup={{ '<div class="admin-alert w-full">\n    <admin.Icon name="info-circle" />\n    <h4>Heads up</h4>\n    <section>This is a default alert. Use it for neutral status messages.</section>\n</div>' }}
+                    markup="{{ '<div class="admin-alert w-full">\n    <admin.Icon name="info-circle" />\n    <h4>Heads up</h4>\n    <section>This is a default alert. Use it for neutral status messages.</section>\n</div>' }}"
                 />
                 <UiExample
-                    markup={{ '<div class="admin-alert admin-alert-success w-full">\n    <admin.Icon name="check-circle" />\n    <h4>All checks passed</h4>\n    <section>The success variant confirms a positive outcome.</section>\n</div>' }}
+                    markup="{{ '<div class="admin-alert admin-alert-success w-full">\n    <admin.Icon name="check-circle" />\n    <h4>All checks passed</h4>\n    <section>The success variant confirms a positive outcome.</section>\n</div>' }}"
                 />
                 <UiExample
-                    markup={{ '<div class="admin-alert admin-alert-warning w-full">\n    <admin.Icon name="exclamation-triangle" />\n    <h4>Heads up</h4>\n    <section>The warning variant is for non-fatal issues that need attention.</section>\n</div>' }}
+                    markup="{{ '<div class="admin-alert admin-alert-warning w-full">\n    <admin.Icon name="exclamation-triangle" />\n    <h4>Heads up</h4>\n    <section>The warning variant is for non-fatal issues that need attention.</section>\n</div>' }}"
                 />
                 <UiExample
-                    markup={{ '<div class="admin-alert admin-alert-danger w-full">\n    <admin.Icon name="x-circle" />\n    <h4>Something went wrong</h4>\n    <section>The danger variant is for errors and failed actions.</section>\n</div>' }}
+                    markup="{{ '<div class="admin-alert admin-alert-danger w-full">\n    <admin.Icon name="x-circle" />\n    <h4>Something went wrong</h4>\n    <section>The danger variant is for errors and failed actions.</section>\n</div>' }}"
                 />
                 <UiExample
-                    markup={{ '<div class="admin-alert admin-alert-info w-full">\n    <admin.Icon name="info-circle" />\n    <h4>Just so you know</h4>\n    <section>The info variant is for incidental notes and pointers.</section>\n</div>' }}
+                    markup="{{ '<div class="admin-alert admin-alert-info w-full">\n    <admin.Icon name="info-circle" />\n    <h4>Just so you know</h4>\n    <section>The info variant is for incidental notes and pointers.</section>\n</div>' }}"
                 />
             </UiSection>
             <UiSection
@@ -641,19 +641,19 @@ document.addEventListener("DOMContentLoaded", () => {
             >
                 <p class="text-sm text-admin-muted-foreground mb-2">Card surface tokens:</p>
                 <UiSwatchGrid
-                    swatches={{ [
+                    swatches="{{ [
     ("card", "bg-admin-card"),
     ("card-foreground", "bg-admin-card-foreground")
-] }}
+] }}"
                 />
                 <div class="mt-4"></div>
                 <UiExample
                     caption="Default"
-                    markup={{ '<div class="admin-card flex flex-col gap-6 p-6 w-80">\n    <header>\n        <h2 class="font-semibold leading-none">Active users</h2>\n        <p class="text-sm text-admin-muted-foreground">Last 30 days</p>\n    </header>\n    <section>\n        <p class="text-sm">Body content sits in a section.</p>\n    </section>\n</div>' }}
+                    markup="{{ '<div class="admin-card flex flex-col gap-6 p-6 w-80">\n    <header>\n        <h2 class="font-semibold leading-none">Active users</h2>\n        <p class="text-sm text-admin-muted-foreground">Last 30 days</p>\n    </header>\n    <section>\n        <p class="text-sm">Body content sits in a section.</p>\n    </section>\n</div>' }}"
                 />
                 <UiExample
                     caption="Dense + metric typography (dashboard pattern)"
-                    markup={{ '<div class="admin-card flex flex-col gap-2 px-6 py-4 w-64">\n    <header>\n        <h2 class="text-xs font-medium text-admin-muted-foreground">Active users</h2>\n    </header>\n    <section>\n        <div class="text-3xl font-semibold leading-tight tracking-tight tabular-nums text-admin-foreground">1,284</div>\n        <a href="#" class="text-xs text-admin-link hover:underline">View all</a>\n    </section>\n</div>' }}
+                    markup="{{ '<div class="admin-card flex flex-col gap-2 px-6 py-4 w-64">\n    <header>\n        <h2 class="text-xs font-medium text-admin-muted-foreground">Active users</h2>\n    </header>\n    <section>\n        <div class="text-3xl font-semibold leading-tight tracking-tight tabular-nums text-admin-foreground">1,284</div>\n        <a href="#" class="text-xs text-admin-link hover:underline">View all</a>\n    </section>\n</div>' }}"
                 />
             </UiSection>
             <UiSection
@@ -663,13 +663,13 @@ document.addEventListener("DOMContentLoaded", () => {
             >
                 <p class="text-sm text-admin-muted-foreground mb-2">Chart palette (used by <code>TrendCard</code>):</p>
                 <UiSwatchGrid
-                    swatches={{ [
+                    swatches="{{ [
     ("chart-1", "bg-admin-chart-1"),
     ("chart-2", "bg-admin-chart-2"),
     ("chart-3", "bg-admin-chart-3"),
     ("chart-4", "bg-admin-chart-4"),
     ("chart-5", "bg-admin-chart-5")
-] }}
+] }}"
                 />
                 <div
                     class="grid grid-cols-2 gap-4 mt-6 lg:grid-cols-4 [&>aside]:col-span-1 [&>aside.col-span-2]:col-span-2 [&>aside.col-span-3]:col-span-2 lg:[&>aside.col-span-3]:col-span-3 [&>aside.col-span-4]:col-span-2 lg:[&>aside.col-span-4]:col-span-4"
@@ -689,7 +689,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb='Add `class="table"` for header/row/hover styling.'
             >
                 <UiExample
-                    markup={{ '<table class="admin-table w-full">\n    <thead>\n        <tr>\n            <th>Package</th>\n            <th>Status</th>\n            <th>Version</th>\n        </tr>\n    </thead>\n    <tbody>\n        <tr>\n            <td>plain</td>\n            <td><span class="admin-badge admin-badge-success">Stable</span></td>\n            <td>0.137.1</td>\n        </tr>\n        <tr>\n            <td>plain-admin</td>\n            <td><span class="admin-badge admin-badge-success">Stable</span></td>\n            <td>0.50.0</td>\n        </tr>\n        <tr>\n            <td>plain-htmx</td>\n            <td><span class="admin-badge admin-badge-warning">Beta</span></td>\n            <td>0.19.0</td>\n        </tr>\n    </tbody>\n</table>' }}
+                    markup="{{ '<table class="admin-table w-full">\n    <thead>\n        <tr>\n            <th>Package</th>\n            <th>Status</th>\n            <th>Version</th>\n        </tr>\n    </thead>\n    <tbody>\n        <tr>\n            <td>plain</td>\n            <td><span class="admin-badge admin-badge-success">Stable</span></td>\n            <td>0.137.1</td>\n        </tr>\n        <tr>\n            <td>plain-admin</td>\n            <td><span class="admin-badge admin-badge-success">Stable</span></td>\n            <td>0.50.0</td>\n        </tr>\n        <tr>\n            <td>plain-htmx</td>\n            <td><span class="admin-badge admin-badge-warning">Beta</span></td>\n            <td>0.19.0</td>\n        </tr>\n    </tbody>\n</table>' }}"
                 />
             </UiSection>
             {# ====================================================================== #}
@@ -703,39 +703,39 @@ document.addEventListener("DOMContentLoaded", () => {
             >
                 <UiExample
                     caption="Text input"
-                    markup={{ '<div class="space-y-1 w-72">\n    <label for="example-input" class="admin-label">Email</label>\n    <input id="example-input" class="admin-input" type="email" placeholder="you@example.com" />\n    <p class="text-xs text-admin-muted-foreground">We&apos;ll never share your email.</p>\n</div>' }}
+                    markup="{{ '<div class="space-y-1 w-72">\n    <label for="example-input" class="admin-label">Email</label>\n    <input id="example-input" class="admin-input" type="email" placeholder="you@example.com" />\n    <p class="text-xs text-admin-muted-foreground">We&apos;ll never share your email.</p>\n</div>' }}"
                 />
                 <UiExample
                     caption="Invalid input"
-                    markup={{ '<div class="space-y-1 w-72">\n    <label for="example-input-invalid" class="admin-label">Email</label>\n    <input id="example-input-invalid" class="admin-input" type="email" value="not an email" aria-invalid="true" />\n    <p class="text-xs text-admin-danger">Enter a valid email address.</p>\n</div>' }}
+                    markup="{{ '<div class="space-y-1 w-72">\n    <label for="example-input-invalid" class="admin-label">Email</label>\n    <input id="example-input-invalid" class="admin-input" type="email" value="not an email" aria-invalid="true" />\n    <p class="text-xs text-admin-danger">Enter a valid email address.</p>\n</div>' }}"
                 />
                 <UiExample
                     caption="Textarea"
-                    markup={{ '<div class="space-y-1 w-72">\n    <label for="example-textarea" class="admin-label">Notes</label>\n    <textarea id="example-textarea" class="admin-textarea" rows="3" placeholder="Anything to add?"></textarea>\n</div>' }}
+                    markup="{{ '<div class="space-y-1 w-72">\n    <label for="example-textarea" class="admin-label">Notes</label>\n    <textarea id="example-textarea" class="admin-textarea" rows="3" placeholder="Anything to add?"></textarea>\n</div>' }}"
                 />
                 <UiExample
                     caption="Select"
-                    markup={{ '<div class="space-y-1 w-72">\n    <label for="example-select" class="admin-label">Role</label>\n    <select id="example-select" class="admin-select">\n        <option>Reader</option>\n        <option>Editor</option>\n        <option>Admin</option>\n    </select>\n</div>' }}
+                    markup="{{ '<div class="space-y-1 w-72">\n    <label for="example-select" class="admin-label">Role</label>\n    <select id="example-select" class="admin-select">\n        <option>Reader</option>\n        <option>Editor</option>\n        <option>Admin</option>\n    </select>\n</div>' }}"
                 />
                 <UiExample
                     caption="Checkbox"
-                    markup={{ '<label class="flex items-center gap-2 text-sm">\n    <input class="admin-input" type="checkbox" checked /> Send me email updates\n</label>' }}
+                    markup="{{ '<label class="flex items-center gap-2 text-sm">\n    <input class="admin-input" type="checkbox" checked /> Send me email updates\n</label>' }}"
                 />
                 <UiExample
                     caption="Radio group"
-                    markup={{ '<div class="space-y-2 text-sm">\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="reader" checked /> Reader\n    </label>\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="editor" /> Editor\n    </label>\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="admin" /> Admin\n    </label>\n</div>' }}
+                    markup="{{ '<div class="space-y-2 text-sm">\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="reader" checked /> Reader\n    </label>\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="editor" /> Editor\n    </label>\n    <label class="flex items-center gap-2">\n        <input class="admin-input" type="radio" name="example-role" value="admin" /> Admin\n    </label>\n</div>' }}"
                 />
                 <UiExample
                     caption="Switch"
-                    markup={{ '<label class="flex items-center gap-2 text-sm">\n    <input class="admin-input" type="checkbox" role="switch" checked /> Enable notifications\n</label>' }}
+                    markup="{{ '<label class="flex items-center gap-2 text-sm">\n    <input class="admin-input" type="checkbox" role="switch" checked /> Enable notifications\n</label>' }}"
                 />
                 <UiExample
                     caption="Compact size — pair `input-sm` / `select-sm` for dense rows"
-                    markup={{ '<div class="flex items-end gap-2">\n    <input class="admin-input input-sm w-40" type="text" placeholder="Filterâ\x80¦" />\n    <select class="admin-select admin-select-sm">\n        <option>All</option>\n        <option>Active</option>\n        <option>Archived</option>\n    </select>\n    <button type="button" class="admin-btn admin-btn-sm admin-btn-primary">Apply</button>\n</div>' }}
+                    markup="{{ '<div class="flex items-end gap-2">\n    <input class="admin-input input-sm w-40" type="text" placeholder="Filterâ\x80¦" />\n    <select class="admin-select admin-select-sm">\n        <option>All</option>\n        <option>Active</option>\n        <option>Archived</option>\n    </select>\n    <button type="button" class="admin-btn admin-btn-sm admin-btn-primary">Apply</button>\n</div>' }}"
                 />
                 <UiExample
                     caption="Search input — admin element"
-                    markup={{ '<div class="w-72">\n    <admin.SearchInput name="q" placeholder="Search packagesâ\x80¦" />\n</div>' }}
+                    markup="{{ '<div class="w-72">\n    <admin.SearchInput name="q" placeholder="Search packagesâ\x80¦" />\n</div>' }}"
                 />
                 <p class="text-xs text-admin-muted-foreground mt-3">
     Plain ships matching element templates that wrap these classes:
@@ -753,7 +753,7 @@ document.addEventListener("DOMContentLoaded", () => {
             >
                 <UiExample
                     caption="Vertical fieldset"
-                    markup={{ '<fieldset class="admin-fieldset w-72">\n    <legend>Profile</legend>\n    <p>Public information shown on your account page.</p>\n\n    <div class="admin-field">\n        <label for="field-name" class="admin-label">Display name</label>\n        <input id="field-name" class="admin-input" type="text" value="Ada" />\n        <p>Visible to other admins.</p>\n    </div>\n\n    <div class="admin-field" data-orientation="horizontal">\n        <label for="field-notify" class="admin-label">Email notifications</label>\n        <input id="field-notify" class="admin-input" type="checkbox" role="switch" checked />\n    </div>\n\n    <div class="admin-field" data-invalid="true">\n        <label for="field-email" class="admin-label">Email</label>\n        <input id="field-email" class="admin-input" type="email" value="not an email" aria-invalid="true" />\n        <div role="alert">Enter a valid email address.</div>\n    </div>\n</fieldset>' }}
+                    markup="{{ '<fieldset class="admin-fieldset w-72">\n    <legend>Profile</legend>\n    <p>Public information shown on your account page.</p>\n\n    <div class="admin-field">\n        <label for="field-name" class="admin-label">Display name</label>\n        <input id="field-name" class="admin-input" type="text" value="Ada" />\n        <p>Visible to other admins.</p>\n    </div>\n\n    <div class="admin-field" data-orientation="horizontal">\n        <label for="field-notify" class="admin-label">Email notifications</label>\n        <input id="field-notify" class="admin-input" type="checkbox" role="switch" checked />\n    </div>\n\n    <div class="admin-field" data-invalid="true">\n        <label for="field-email" class="admin-label">Email</label>\n        <input id="field-email" class="admin-input" type="email" value="not an email" aria-invalid="true" />\n        <div role="alert">Enter a valid email address.</div>\n    </div>\n</fieldset>' }}"
                 />
             </UiSection>
             {# ====================================================================== #}
@@ -766,7 +766,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb="Native <dialog> with the `.admin-dialog` class. Open and close via the HTML Invoker Commands API (`command` + `commandfor`) — no JS, no inline `onclick`, CSP-safe."
             >
                 <UiExample
-                    markup={{ '<button type="button" class="admin-btn admin-btn-outline" command="show-modal" commandfor="example-dialog">Open dialog</button>\n<dialog id="example-dialog" class="admin-dialog max-w-sm m-auto">\n    <article class="p-6">\n        <header>\n            <h2 class="text-lg font-semibold">Example dialog</h2>\n            <p class="text-sm text-admin-muted-foreground">Native &lt;dialog&gt; styled with .dialog.</p>\n        </header>\n        <section class="mt-4 text-sm">\n            Press Escape or click the close button to dismiss.\n        </section>\n        <footer class="mt-6 flex justify-end gap-2">\n            <button type="button" class="admin-btn admin-btn-outline" command="close" commandfor="example-dialog">Cancel</button>\n            <button type="button" class="admin-btn admin-btn-primary" command="close" commandfor="example-dialog">OK</button>\n        </footer>\n    </article>\n</dialog>' }}
+                    markup="{{ '<button type="button" class="admin-btn admin-btn-outline" command="show-modal" commandfor="example-dialog">Open dialog</button>\n<dialog id="example-dialog" class="admin-dialog max-w-sm m-auto">\n    <article class="p-6">\n        <header>\n            <h2 class="text-lg font-semibold">Example dialog</h2>\n            <p class="text-sm text-admin-muted-foreground">Native &lt;dialog&gt; styled with .dialog.</p>\n        </header>\n        <section class="mt-4 text-sm">\n            Press Escape or click the close button to dismiss.\n        </section>\n        <footer class="mt-6 flex justify-end gap-2">\n            <button type="button" class="admin-btn admin-btn-outline" command="close" commandfor="example-dialog">Cancel</button>\n            <button type="button" class="admin-btn admin-btn-primary" command="close" commandfor="example-dialog">OK</button>\n        </footer>\n    </article>\n</dialog>' }}"
                 />
                 <p class="text-xs text-admin-muted-foreground -mt-2">
     Closing from inside without an id also works via <code>&lt;form method="dialog"&gt;&lt;button&gt;…&lt;/button&gt;&lt;/form&gt;</code> —
@@ -780,14 +780,14 @@ document.addEventListener("DOMContentLoaded", () => {
             >
                 <p class="text-sm text-admin-muted-foreground mb-2">Popover surface tokens (shared with dropdowns and hovercards):</p>
                 <UiSwatchGrid
-                    swatches={{ [
+                    swatches="{{ [
     ("popover", "bg-admin-popover"),
     ("popover-foreground", "bg-admin-popover-foreground")
-] }}
+] }}"
                 />
                 <div class="mt-4"></div>
                 <UiExample
-                    markup={{ '<div class="admin-popover">\n    <button\n        type="button"\n        aria-haspopup="dialog"\n        aria-expanded="false"\n        aria-controls="example-popover-panel"\n        class="admin-btn admin-btn-outline"\n    >\n        Filter <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-popover-panel" data-popover data-align="end" aria-hidden="true" class="w-64">\n        <div class="space-y-2">\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" /> Active\n            </label>\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" checked /> Archived\n            </label>\n            <button type="button" class="admin-btn admin-btn-sm admin-btn-primary w-full mt-2">Apply</button>\n        </div>\n    </div>\n</div>' }}
+                    markup="{{ '<div class="admin-popover">\n    <button\n        type="button"\n        aria-haspopup="dialog"\n        aria-expanded="false"\n        aria-controls="example-popover-panel"\n        class="admin-btn admin-btn-outline"\n    >\n        Filter <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-popover-panel" data-popover data-align="end" aria-hidden="true" class="w-64">\n        <div class="space-y-2">\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" /> Active\n            </label>\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" checked /> Archived\n            </label>\n            <button type="button" class="admin-btn admin-btn-sm admin-btn-primary w-full mt-2">Apply</button>\n        </div>\n    </div>\n</div>' }}"
                 />
             </UiSection>
             <UiSection
@@ -796,7 +796,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb='Wrap a trigger button + a [data-popover] menu in a .admin-dropdown-menu element. Items use role="menuitem" and pick up styling from the admin-dropdown-menu component. JS in components.js handles open/close, outside-click, and keyboard navigation (arrow keys, Home/End, Enter/Esc).'
             >
                 <UiExample
-                    markup={{ '<div class="admin-dropdown-menu">\n    <button\n        type="button"\n        aria-haspopup="menu"\n        aria-expanded="false"\n        aria-controls="example-actions-popover"\n        class="admin-btn admin-btn-outline"\n    >\n        Actions <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-40">\n        <div role="menu">\n            <a role="menuitem" href="#">Edit</a>\n            <a role="menuitem" href="#">Duplicate</a>\n            <hr role="separator">\n            <a role="menuitem" href="#" class="text-admin-danger">Delete</a>\n        </div>\n    </div>\n</div>' }}
+                    markup="{{ '<div class="admin-dropdown-menu">\n    <button\n        type="button"\n        aria-haspopup="menu"\n        aria-expanded="false"\n        aria-controls="example-actions-popover"\n        class="admin-btn admin-btn-outline"\n    >\n        Actions <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-40">\n        <div role="menu">\n            <a role="menuitem" href="#">Edit</a>\n            <a role="menuitem" href="#">Duplicate</a>\n            <hr role="separator">\n            <a role="menuitem" href="#" class="text-admin-danger">Delete</a>\n        </div>\n    </div>\n</div>' }}"
                 />
             </UiSection>
             <UiSection
@@ -806,11 +806,11 @@ document.addEventListener("DOMContentLoaded", () => {
             >
                 <UiExample
                     caption="Sides"
-                    markup={{ '<div class="flex flex-wrap gap-3">\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Top tooltip" data-side="top">Top</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Bottom tooltip" data-side="bottom">Bottom</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Left tooltip" data-side="left">Left</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Right tooltip" data-side="right">Right</button>\n</div>' }}
+                    markup="{{ '<div class="flex flex-wrap gap-3">\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Top tooltip" data-side="top">Top</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Bottom tooltip" data-side="bottom">Bottom</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Left tooltip" data-side="left">Left</button>\n    <button type="button" class="admin-btn admin-btn-outline" data-tooltip="Right tooltip" data-side="right">Right</button>\n</div>' }}"
                 />
                 <UiExample
                     caption="On an icon button"
-                    markup={{ '<button type="button" class="admin-btn admin-btn-icon admin-btn-ghost" data-tooltip="Refresh" aria-label="Refresh">\n    <admin.Icon name="arrow-clockwise" />\n</button>' }}
+                    markup="{{ '<button type="button" class="admin-btn admin-btn-icon admin-btn-ghost" data-tooltip="Refresh" aria-label="Refresh">\n    <admin.Icon name="arrow-clockwise" />\n</button>' }}"
                 />
             </UiSection>
             <UiSection
@@ -820,7 +820,7 @@ document.addEventListener("DOMContentLoaded", () => {
             >
                 <UiExample
                     caption="Inline trigger — user preview"
-                    markup={{ '<div class="text-sm">\n    Pinged by\n    <span class="admin-hovercard">\n        <span class="text-admin-link cursor-help underline decoration-dotted">alice</span>\n        <div data-hovercard aria-hidden="true" class="w-64 flex gap-3 p-3">\n            <div class="w-10 h-10 rounded-full bg-admin-muted text-admin-muted-foreground flex items-center justify-center font-medium shrink-0" aria-hidden="true">A</div>\n            <div class="flex flex-col gap-0.5 min-w-0">\n                <span class="font-medium truncate">Alice Sanchez</span>\n                <span class="text-admin-muted-foreground text-xs truncate">alice@example.com</span>\n                <span class="admin-badge admin-badge-success mt-1 self-start">Admin</span>\n            </div>\n        </div>\n    </span>\n    in #releases.\n</div>' }}
+                    markup="{{ '<div class="text-sm">\n    Pinged by\n    <span class="admin-hovercard">\n        <span class="text-admin-link cursor-help underline decoration-dotted">alice</span>\n        <div data-hovercard aria-hidden="true" class="w-64 flex gap-3 p-3">\n            <div class="w-10 h-10 rounded-full bg-admin-muted text-admin-muted-foreground flex items-center justify-center font-medium shrink-0" aria-hidden="true">A</div>\n            <div class="flex flex-col gap-0.5 min-w-0">\n                <span class="font-medium truncate">Alice Sanchez</span>\n                <span class="text-admin-muted-foreground text-xs truncate">alice@example.com</span>\n                <span class="admin-badge admin-badge-success mt-1 self-start">Admin</span>\n            </div>\n        </div>\n    </span>\n    in #releases.\n</div>' }}"
                 />
                 <p class="text-sm text-admin-muted-foreground mt-3">
     Hovercards are a generic primitive — wrap anything in <code>&lt;span class="admin-hovercard"&gt;</code>
@@ -831,7 +831,7 @@ document.addEventListener("DOMContentLoaded", () => {
 </p>
                 <UiExample
                     caption="Auto-wrapped <time> element"
-                    markup={{ '<div class="text-sm">\n    Last seen <time datetime="2026-04-27T14:14:00Z">2 days ago</time> by alice.\n</div>' }}
+                    markup="{{ '<div class="text-sm">\n    Last seen <time datetime="2026-04-27T14:14:00Z">2 days ago</time> by alice.\n</div>' }}"
                 />
             </UiSection>
             {# ====================================================================== #}
@@ -844,7 +844,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb='Switch between content panels. Underline indicator on the active tab; arrow-key navigation and panel show/hide are wired in components.js. For "set this value to X" choices, reach for the segmented control instead.'
             >
                 <UiExample
-                    markup={{ '<div class="admin-tabs w-96">\n    <div role="tablist" aria-label="Settings">\n        <button role="tab" aria-controls="tab-general" aria-selected="true">General</button>\n        <button role="tab" aria-controls="tab-advanced" aria-selected="false">Advanced</button>\n    </div>\n    <div role="tabpanel" id="tab-general" class="text-sm py-2">General tab content.</div>\n    <div role="tabpanel" id="tab-advanced" class="text-sm py-2" hidden>Advanced tab content.</div>\n</div>' }}
+                    markup="{{ '<div class="admin-tabs w-96">\n    <div role="tablist" aria-label="Settings">\n        <button role="tab" aria-controls="tab-general" aria-selected="true">General</button>\n        <button role="tab" aria-controls="tab-advanced" aria-selected="false">Advanced</button>\n    </div>\n    <div role="tabpanel" id="tab-general" class="text-sm py-2">General tab content.</div>\n    <div role="tabpanel" id="tab-advanced" class="text-sm py-2" hidden>Advanced tab content.</div>\n</div>' }}"
                 />
             </UiSection>
             <UiSection
@@ -853,7 +853,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb="Pick one of a small set of mutually-exclusive values — theme, density, view mode. Roving tabindex and arrow-key navigation are wired in components.js; the consumer toggles `aria-checked` in response to clicks. For switching content panels, reach for tabs."
             >
                 <UiExample
-                    markup={{ '<div class="admin-segmented w-72" role="radiogroup" aria-label="View mode">\n    <button role="radio" aria-checked="true" class="px-3 py-1.5">List</button>\n    <button role="radio" aria-checked="false" class="px-3 py-1.5">Grid</button>\n    <button role="radio" aria-checked="false" class="px-3 py-1.5">Cards</button>\n</div>' }}
+                    markup="{{ '<div class="admin-segmented w-72" role="radiogroup" aria-label="View mode">\n    <button role="radio" aria-checked="true" class="px-3 py-1.5">List</button>\n    <button role="radio" aria-checked="false" class="px-3 py-1.5">Grid</button>\n    <button role="radio" aria-checked="false" class="px-3 py-1.5">Cards</button>\n</div>' }}"
                 />
             </UiSection>
             <UiSection
@@ -862,11 +862,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 blurb='Native `<details>` / `<summary>` get a smooth expand/collapse transition (via the new `::details-content` pseudo-element) and the default disclosure triangle is hidden so you can ship your own affordance. Used implicitly by the "Show markup" disclosures on this page.'
             >
                 <UiExample
-                    markup={{ '<details class="rounded-admin-md border border-admin-border p-3 w-96">\n    <summary class="gap-2 text-sm font-medium">\n        <admin.Icon name="chevron-right" class="transition-transform group-open:rotate-90" />\n        Advanced options\n    </summary>\n    <div class="text-sm text-admin-muted-foreground mt-2">\n        Tucked-away configuration the everyday user shouldn&apos;t have to think about.\n    </div>\n</details>' }}
+                    markup="{{ '<details class="rounded-admin-md border border-admin-border p-3 w-96">\n    <summary class="gap-2 text-sm font-medium">\n        <admin.Icon name="chevron-right" class="transition-transform group-open:rotate-90" />\n        Advanced options\n    </summary>\n    <div class="text-sm text-admin-muted-foreground mt-2">\n        Tucked-away configuration the everyday user shouldn&apos;t have to think about.\n    </div>\n</details>' }}"
                 />
                 <UiExample
                     caption="Collapsible card"
-                    markup={{ '<details class="admin-card group w-96" open>\n    <summary class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4">\n        <h3 class="font-semibold">Object Details</h3>\n        <admin.Icon name="chevron-right" class="text-admin-muted-foreground transition-transform group-open:rotate-90" />\n    </summary>\n    <section class="px-6 pb-6 text-sm text-admin-muted-foreground">\n        Body content of the card, revealed when expanded.\n    </section>\n</details>' }}
+                    markup="{{ '<details class="admin-card group w-96" open>\n    <summary class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4">\n        <h3 class="font-semibold">Object Details</h3>\n        <admin.Icon name="chevron-right" class="text-admin-muted-foreground transition-transform group-open:rotate-90" />\n    </summary>\n    <section class="px-6 pb-6 text-sm text-admin-muted-foreground">\n        Body content of the card, revealed when expanded.\n    </section>\n</details>' }}"
                 />
             </UiSection>
             {# ====================================================================== #}
@@ -934,7 +934,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <p
                         class="text-[10px] font-semibold uppercase tracking-wider text-admin-muted-foreground/70 mb-0.5"
                     >{{ group_title }}</p>
-                    {% for (id, title) in items %}<a href={{ "#" + id }}>{{ title }}</a>{% endfor %}
+                    {% for (id, title) in items %}<a href="{{ "#" + id }}">{{ title }}</a>{% endfor %}
                 </div>
             {% endfor %}
         </nav>

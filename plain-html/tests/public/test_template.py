@@ -1,13 +1,15 @@
-"""Public contract for the six names exported from `plain.html`.
+"""Public contract for the core names exported from `plain.html`.
 
-`Template`, `render`, `render_source`, `Markup`, `mark_safe`, and
-`TemplateFileMissing` are the API users import. These tests pin the
-behaviors a changelog reader would expect to stay stable:
+`Template`, `render`, `render_source`, `render_text_source`, `Markup`,
+`mark_safe`, and `TemplateFileMissing` are the API users import. These
+tests pin the behaviors a changelog reader would expect to stay stable:
 
 - `Template(name).render(ctx)` and `render(path, ctx)` are equivalent
   paths through the same compiler.
 - `render_source(src, ctx)` matches `render(path, ctx)` when `path`
   contains `src`.
+- `render_text_source(src, ctx)` interpolates `{{ }}` without HTML
+  parsing or escaping — for non-HTML bodies like Markdown.
 - Missing templates raise `plain.html.TemplateFileMissing` (so users
   can catch by that name without reaching into `plain.html.loader`).
 - `Markup` and `mark_safe` are the same callable, both bypass
@@ -29,6 +31,7 @@ from plain.html import (
     mark_safe,
     render,
     render_source,
+    render_text_source,
 )
 from plain.utils.safestring import SafeString
 
@@ -116,6 +119,26 @@ def test_render_accepts_pathlike(tmp_path: Path) -> None:
 
     assert render(path, {"x": "ok"}) == "<p>ok</p>"
     assert render(str(path), {"x": "ok"}) == "<p>ok</p>"
+
+
+# --- render_text_source (non-HTML text mode) --------------------------------
+
+
+def test_render_text_source_interpolates_without_html_parsing() -> None:
+    """`render_text_source` interpolates `{{ }}` but treats everything
+    else as literal text — Markdown is not balanced HTML, so placeholder
+    `<tags>` and unbalanced fragments must pass through untouched.
+    """
+    out = render_text_source(
+        "# {{ title }}\n\nrun `cmd --app <app>` see <https://x.com>",
+        {"title": "Guide"},
+    )
+    assert out == "# Guide\n\nrun `cmd --app <app>` see <https://x.com>"
+
+
+def test_render_text_source_does_not_html_escape() -> None:
+    """Text mode is for non-HTML output — `{{ }}` values are not escaped."""
+    assert render_text_source("{{ v }}", {"v": "a & b <c>"}) == "a & b <c>"
 
 
 # --- Markup / mark_safe contract --------------------------------------------

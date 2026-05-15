@@ -42,8 +42,8 @@ attrs:
     <div class="space-y-1" data-exception-frames>
         {% for frame in exception_context.traceback_frames %}
             <div
-                data-category={{ frame.category }}
-                data-expanded={{ "true" if frame.category == "app" else "false" }}
+                data-category="{{ frame.category }}"
+                data-expanded="{{ "true" if frame.category == "app" else "false" }}"
                 class="group rounded overflow-hidden border border-white/10 bg-white/5 data-[category=app]:bg-amber-500/10"
             >
             <button
@@ -66,7 +66,7 @@ attrs:
                         />
                     </svg>
                     <span
-                        data-category={{ frame.category }}
+                        data-category="{{ frame.category }}"
                         class="px-1.5 py-0.5 rounded text-[10px] font-medium
                         data-[category=app]:bg-amber-500/30 data-[category=app]:text-amber-300
                         data-[category=plain]:bg-emerald-500/30 data-[category=plain]:text-emerald-300
@@ -75,7 +75,7 @@ attrs:
                         data-[category=third-party]:bg-zinc-600/30 data-[category=third-party]:text-zinc-400"
                     >{{ frame.category }}</span>
                     <a
-                        href={{ "vscode://file/" + frame.filename + ":" + str(frame.lineno) }}
+                        href="{{ "vscode://file/" + frame.filename + ":" + str(frame.lineno) }}"
                         data-vscode-link
                         class="font-mono hover:underline text-stone-500"
                     >{{ frame.filename }}</a>
@@ -84,7 +84,7 @@ attrs:
             </button>
             <div
                 data-frame-content
-                data-visible={{ "true" if frame.category == "app" else "false" }}
+                data-visible="{{ "true" if frame.category == "app" else "false" }}"
                 class="data-[visible=false]:hidden"
             >
                 {% if frame.source_lines %}
@@ -92,7 +92,7 @@ attrs:
                         <table class="w-full">
                             {% for line in frame.source_lines %}
                                 <tr
-                                    data-error-line={{ "true" if line["is_error_line"] else "false" }}
+                                    data-error-line="{{ "true" if line["is_error_line"] else "false" }}"
                                     class="data-[error-line=true]:bg-amber-500/20"
                                 >
                                     <td
@@ -135,7 +135,7 @@ attrs:
         <pre><code>{{ exception_context.traceback_string }}</code></pre>
     </div>
 </div>
-<script nonce={{ request.csp_nonce }}>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     function copyException(button) {
         const container = button.closest('[data-exception-container]');

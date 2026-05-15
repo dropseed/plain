@@ -8,30 +8,30 @@ attrs:
   csp_nonce: str = ""
 ---
 <script
-    src={{ asset('htmx/vendor/src/htmx.js' if DEBUG else 'htmx/vendor/src/htmx.min.js') }}
+    src="{{ asset('htmx/vendor/src/htmx.js' if DEBUG else 'htmx/vendor/src/htmx.min.js') }}"
     defer
-    nonce={{ csp_nonce }}
+    nonce="{{ csp_nonce }}"
 ></script>
 <script
-    src={{ asset('htmx/vendor/idiomorph/idiomorph.js' if DEBUG else 'htmx/vendor/idiomorph/idiomorph.min.js') }}
+    src="{{ asset('htmx/vendor/idiomorph/idiomorph.js' if DEBUG else 'htmx/vendor/idiomorph/idiomorph.min.js') }}"
     defer
-    nonce={{ csp_nonce }}
+    nonce="{{ csp_nonce }}"
 ></script>
 <script
-    src={{ asset('htmx/vendor/idiomorph/idiomorph-htmx.js') }}
+    src="{{ asset('htmx/vendor/idiomorph/idiomorph-htmx.js') }}"
     defer
-    nonce={{ csp_nonce }}
+    nonce="{{ csp_nonce }}"
 ></script>
 {% for extension in extensions %}
     <script
-        src={{ asset('htmx/vendor/src/ext/' + extension + '.js') }}
+        src="{{ asset('htmx/vendor/src/ext/' + extension + '.js') }}"
         defer
-        nonce={{ csp_nonce }}
+        nonce="{{ csp_nonce }}"
     ></script>
 {% endfor %}
 <script
-    src={{ asset('htmx/plainhtmx.js') }}
+    src="{{ asset('htmx/plainhtmx.js') }}"
     defer
-    nonce={{ csp_nonce }}
-    data-csp-nonce={{ csp_nonce }}
+    nonce="{{ csp_nonce }}"
+    data-csp-nonce="{{ csp_nonce }}"
 ></script>

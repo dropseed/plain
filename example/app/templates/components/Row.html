@@ -9,12 +9,12 @@ attrs:
   badge_text: str = ""
 ---
 <a
-    href={{ href }}
+    href="{{ href }}"
     class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-warm-tint transition-colors no-underline"
 >
     <div class="font-mono text-sm text-ink">{{ path }}</div>
     <div class="text-sm text-body">{{ mark_safe(description) }}</div>
     <div class="flex items-center gap-3">
-        {% if badge_text %}<span class={{ badge_class }}>{{ badge_text }}</span>{% endif %}<span class="row-arrow">→</span>
+        {% if badge_text %}<span class="{{ badge_class }}">{{ badge_text }}</span>{% endif %}<span class="row-arrow">→</span>
     </div>
 </a>

@@ -280,13 +280,13 @@ Conditional attributes use an expression value — a falsy value omits the attri
     {% endfor %}
 
     <div>
-        <label for={{ form.email.html_id }}>Email</label>
+        <label for="{{ form.email.html_id }}">Email</label>
         <input
             type="email"
-            name={{ form.email.html_name }}
-            id={{ form.email.html_id }}
-            value={{ form.email.value() or '' }}
-            required={{ form.email.field.required }}
+            name="{{ form.email.html_name }}"
+            id="{{ form.email.html_id }}"
+            value="{{ form.email.value() or '' }}"
+            required="{{ form.email.field.required }}"
         >
 
         {% for error in form.email.errors %}
@@ -295,11 +295,11 @@ Conditional attributes use an expression value — a falsy value omits the attri
     </div>
 
     <div>
-        <label for={{ form.message.html_id }}>Message</label>
+        <label for="{{ form.message.html_id }}">Message</label>
         <textarea
-            name={{ form.message.html_name }}
-            id={{ form.message.html_id }}
-            required={{ form.message.field.required }}
+            name="{{ form.message.html_name }}"
+            id="{{ form.message.html_id }}"
+            required="{{ form.message.field.required }}"
         >{{ form.message.value() or '' }}</textarea>
 
         {% for error in form.message.errors %}
@@ -320,7 +320,7 @@ Each bound field provides:
 - `field` - The underlying [`Field`](./fields.py#Field) instance
 - `initial` - The field's initial value
 
-For large applications, you can reduce repetition by extracting a reusable [component](/plain-html/plain/html/README.md) — e.g. a `components/Field.html` template invoked as `<Field bf={{ form.email }} label="Email" />`.
+For large applications, you can reduce repetition by extracting a reusable [component](/plain-html/plain/html/README.md) — e.g. a `components/Field.html` template invoked as `<Field bf="{{ form.email }}" label="Email" />`.
 
 ## JSON data
 
@@ -469,12 +469,12 @@ attrs:
         {% endfor %}
 
         <div>
-            <label for={{ form.name.html_id }}>Name</label>
+            <label for="{{ form.name.html_id }}">Name</label>
             <input
                 type="text"
-                name={{ form.name.html_name }}
-                id={{ form.name.html_id }}
-                value={{ form.name.value() or '' }}
+                name="{{ form.name.html_name }}"
+                id="{{ form.name.html_id }}"
+                value="{{ form.name.value() or '' }}"
                 required
             >
             {% for error in form.name.errors %}
@@ -483,12 +483,12 @@ attrs:
         </div>
 
         <div>
-            <label for={{ form.email.html_id }}>Email</label>
+            <label for="{{ form.email.html_id }}">Email</label>
             <input
                 type="email"
-                name={{ form.email.html_name }}
-                id={{ form.email.html_id }}
-                value={{ form.email.value() or '' }}
+                name="{{ form.email.html_name }}"
+                id="{{ form.email.html_id }}"
+                value="{{ form.email.value() or '' }}"
                 required
             >
             {% for error in form.email.errors %}
@@ -497,10 +497,10 @@ attrs:
         </div>
 
         <div>
-            <label for={{ form.message.html_id }}>Message</label>
+            <label for="{{ form.message.html_id }}">Message</label>
             <textarea
-                name={{ form.message.html_name }}
-                id={{ form.message.html_id }}
+                name="{{ form.message.html_name }}"
+                id="{{ form.message.html_id }}"
                 required
             >{{ form.message.value() or '' }}</textarea>
             {% for error in form.message.errors %}

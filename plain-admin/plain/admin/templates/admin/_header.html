@@ -24,34 +24,38 @@ attrs:
 >
     <div class="flex items-center justify-between px-4 lg:px-8 h-11">
         <div class="flex items-center gap-1.5">
-            <HeaderBranding app_name={{ app_name }} />
+            <HeaderBranding app_name="{{ app_name }}" />
         </div>
         <div class="flex items-center gap-2 sm:gap-3">
-            <form method="GET" action={{ url('admin:search') }} class="hidden sm:flex">
+            <form
+                method="GET"
+                action="{{ url('admin:search') }}"
+                class="hidden sm:flex"
+            >
                 <SearchInput
                     name="query"
                     id="topbar-search"
-                    value={{ global_search_query or '' }}
+                    value="{{ global_search_query or '' }}"
                     placeholder="Search..."
                     class="w-52 pr-10 pl-8 text-sm bg-admin-muted/60 border border-transparent py-1.5 rounded-admin-md transition-all duration-150 placeholder:text-admin-muted-foreground focus:outline-none focus:bg-admin-background focus:border-admin-input focus:ring-1 focus:ring-admin-ring focus:w-64"
                 />
             </form>
 
             <a
-                href={{ url('admin:search') }}
+                href="{{ url('admin:search') }}"
                 class="sm:hidden admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost text-admin-muted-foreground"
             >
                 <Icon name="search" />
             </a>
 
             <a
-                href={{ url('admin:preflight') }}
+                href="{{ url('admin:preflight') }}"
                 class="relative admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost text-admin-muted-foreground"
                 title="Preflight checks"
             >
                 <Icon name="shield-check" />
                 {% if preflight_counts and (preflight_counts["errors"] + preflight_counts["warnings"]) > 0 %}<span
-                    data-status={{ "error" if preflight_counts["errors"] else "warning" }}
+                    data-status="{{ "error" if preflight_counts["errors"] else "warning" }}"
                     class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 text-[10px] font-bold leading-4 text-center text-white rounded-full data-[status=error]:bg-admin-danger data-[status=warning]:bg-admin-warning"
                 >{{ preflight_counts["errors"] + preflight_counts["warnings"] if preflight_counts else 0 }}</span>{% endif %}
             </a>
@@ -65,8 +69,8 @@ attrs:
                     class="flex items-center cursor-pointer"
                 >
                     {% if user and hasattr(user, "get_avatar_url") and user.get_avatar_url() %}<img
-                        src={{ user.get_avatar_url() }}
-                        alt={{ str(user) }}
+                        src="{{ user.get_avatar_url() }}"
+                        alt="{{ str(user) }}"
                         class="w-7 h-7 rounded-full"
                     >{% endif %}
                     {% if not (user and hasattr(user, "get_avatar_url") and user.get_avatar_url()) %}
@@ -96,22 +100,22 @@ attrs:
                             {% for (theme_slug, icon, label) in [("light", "sun", "Light"), ("dark", "moon-stars", "Dark"), ("system", "display", "System")] %}<button
                                 type="button"
                                 role="radio"
-                                data-theme-set={{ theme_slug }}
+                                data-theme-set="{{ theme_slug }}"
                                 aria-checked="false"
                                 class="flex flex-col items-center gap-0.5 py-1.5 text-[11px]"
                             >
-                            <Icon name={{ icon }} />
+                            <Icon name="{{ icon }}" />
                             {{ label }}
                         </button>{% endfor %}
                         </div>
                         <div role="separator"></div>
                     {% endif %}
                     <div role="menu">
-                        <a role="menuitem" href={{ url('admin:settings') }}>
+                        <a role="menuitem" href="{{ url('admin:settings') }}">
                             <Icon name="gear" />
                             App Settings
                         </a>
-                        <form method="POST" action={{ url('admin:logout') }}>
+                        <form method="POST" action="{{ url('admin:logout') }}">
                             <button
                                 role="menuitem"
                                 type="submit"
@@ -134,18 +138,18 @@ attrs:
         <div
             id="nav-tabs-container"
             class="relative z-10 flex items-center -ml-3 overflow-x-auto admin-scrollbar-hide"
-            data-reorder-url={{ url('admin:reorder') }}
+            data-reorder-url="{{ url('admin:reorder') }}"
         >
             {% for tab in nav_tabs %}<a
-                href={{ tab["view"].get_view_url() }}
-                data-active={{ tab["view"].get_slug() == slug or tab["view"] in parent_view_classes or None }}
-                draggable={{ "true" if tab["pinned"] else None }}
-                data-slug={{ tab["view"].get_slug() if tab["pinned"] else None }}
-                data-recent={{ None if tab["pinned"] else True }}
+                href="{{ tab["view"].get_view_url() }}"
+                data-active="{{ tab["view"].get_slug() == slug or tab["view"] in parent_view_classes or None }}"
+                draggable="{{ "true" if tab["pinned"] else None }}"
+                data-slug="{{ tab["view"].get_slug() if tab["pinned"] else None }}"
+                data-recent="{{ None if tab["pinned"] else True }}"
                 class="admin-nav-tab flex items-center gap-1.5 px-3 py-3 text-sm whitespace-nowrap text-admin-muted-foreground hover:text-admin-foreground border-b-2 border-transparent hover:border-admin-border data-[active]:text-admin-foreground data-[active]:font-medium data-[active]:border-admin-primary data-[recent]:text-admin-muted-foreground/80 data-[recent]:font-normal data-[recent]:italic"
             >
                 {% if tab["view"].nav_icon %}
-                <Icon name={{ tab["view"].nav_icon }} class="opacity-60" />
+                <Icon name="{{ tab["view"].nav_icon }}" class="opacity-60" />
             {% endif %}{{ tab["view"].get_nav_title() }}
             </a>{% endfor %}
         </div>
@@ -176,16 +180,16 @@ attrs:
                 </div>
                 <div class="overflow-auto flex-1 py-2 px-1.5" id="menu-items-container">
                     <MenuSection
-                        sections={{ admin_registry.get_nav_sections(plain_packages=False, user=user) if admin_registry else {} }}
+                        sections="{{ admin_registry.get_nav_sections(plain_packages=False, user=user) if admin_registry else {} }}"
                         header_label="App"
-                        pinned_slugs={{ pinned_slugs }}
-                        slug={{ slug }}
+                        pinned_slugs="{{ pinned_slugs }}"
+                        slug="{{ slug }}"
                     />
                     <MenuSection
-                        sections={{ admin_registry.get_nav_sections(plain_packages=True, user=user) if admin_registry else {} }}
+                        sections="{{ admin_registry.get_nav_sections(plain_packages=True, user=user) if admin_registry else {} }}"
                         header_label="Packages"
-                        pinned_slugs={{ pinned_slugs }}
-                        slug={{ slug }}
+                        pinned_slugs="{{ pinned_slugs }}"
+                        slug="{{ slug }}"
                     />
                 </div>
             </div>

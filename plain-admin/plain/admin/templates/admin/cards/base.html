@@ -11,11 +11,11 @@ slots:
   default: required
 ---
 <aside
-    id={{ "card-" + slug }}
+    id="{{ "card-" + slug }}"
     hx-target="this"
-    hx-select={{ "#card-" + slug }}
+    hx-select="{{ "#card-" + slug }}"
     hx-swap="outerHTML"
-    class={{ "admin-card col-span-" + str(size.value if size else 1) + " flex flex-col gap-2 px-6 py-4" }}
+    class="{{ "admin-card col-span-" + str(size.value if size else 1) + " flex flex-col gap-2 px-6 py-4" }}"
 >
     {% if header %}{{ header }}{% endif %}
     {% if not header %}
@@ -30,14 +30,14 @@ slots:
                 <div>
             <select
                 hx-get
-                name={{ slug + ".filter" }}
+                name="{{ slug + ".filter" }}"
                 class="admin-select admin-select-sm w-auto text-xs!"
             >
                 <option value="">(Reset to default)</option>
                 {% for f in filters %}
                     <option
-                        value={{ f.value }}
-                        selected={{ f.value == current_filter }}
+                        value="{{ f.value }}"
+                        selected="{{ f.value == current_filter }}"
                     >{{ f }}</option>
                 {% endfor %}
             </select>

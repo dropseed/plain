@@ -9,14 +9,14 @@ attrs:
 <div
     id="observer-traces"
     class="h-full"
-    data-observer-mode={{ observer.mode() if observer else "" }}
-    data-traces-url={{ url('observer:traces') }}
+    data-observer-mode="{{ observer.mode() if observer else "" }}"
+    data-traces-url="{{ url('observer:traces') }}"
 >
     <div class="px-6 py-4 text-center">
         <p>Loading spans...</p>
     </div>
 </div>
-<script nonce={{ request.csp_nonce }}>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     var container = document.getElementById('observer-traces');
     var loaded = false;

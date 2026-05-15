@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from plain.html import Markup, render_source
+from plain.html import Markup, render_source, render_text_source
 from plain.html.parser import ParseError
 from plain.html.tokenizer import TokenizeError
 
@@ -111,3 +111,52 @@ def test_single_braces_are_literal_text():
 
 def test_raw_block_emits_literal_delimiters():
     assert render_source("<p>{% raw %}{{ x }}{% endraw %}</p>") == "<p>{{ x }}</p>"
+
+
+# --- text mode (render_text_source) -----------------------------------------
+
+
+def test_text_mode_interpolates_expressions():
+    assert render_text_source("# {{ title }}", {"title": "Guide"}) == "# Guide"
+
+
+def test_text_mode_does_not_html_escape():
+    # Text mode output is not HTML — values must not be escaped.
+    assert render_text_source("{{ v }}", {"v": "a & b <c>"}) == "a & b <c>"
+
+
+def test_text_mode_leaves_html_like_text_literal():
+    # Placeholder <tags>, autolinks, unbalanced fragments — all literal.
+    src = "run `cmd --app <app>` see <https://x.com> and <div>unclosed"
+    assert render_text_source(src) == src
+
+
+def test_text_mode_block_tags_are_literal():
+    # `{% if %}` / `{% for %}` are HTML-mode only; literal text here.
+    assert render_text_source("{% if x %}y{% endif %}") == "{% if x %}y{% endif %}"
+
+
+def test_text_mode_raw_block_passes_delimiters_through():
+    assert render_text_source("{% raw %}{{ x }}{% endraw %}") == "{{ x }}"
+
+
+def test_text_mode_drops_comments():
+    assert render_text_source("a{# note #}b") == "ab"
+
+
+def test_text_mode_none_renders_empty():
+    assert render_text_source("[{{ v }}]", {"v": None}) == "[]"
+
+
+def test_source_override_bypasses_process_cache(tmp_path):
+    """`render_source(..., source_path=...)` reflects the in-memory source
+    on every call. The process cache is keyed by path alone, so compiling
+    a path once must not pin a stale render for a later, different source.
+    """
+    from plain.html.compiler import clear_process_cache
+
+    clear_process_cache()
+    path = tmp_path / "page.html"
+
+    assert render_source("<p>first</p>", source_path=path) == "<p>first</p>"
+    assert render_source("<p>second</p>", source_path=path) == "<p>second</p>"

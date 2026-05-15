@@ -10,10 +10,10 @@ attrs:
   help: str = ""
 ---
 <div class="space-y-1">
-    <Label field={{ field }}>{{ label }}</Label>
-    <Textarea field={{ field }} />
+    <Label field="{{ field }}">{{ label }}</Label>
+    <Textarea field="{{ field }}" />
     {% if help %}
-        <Help help={{ help }} />
+        <Help help="{{ help }}" />
     {% endif %}
-    <FieldErrors field={{ field }} />
+    <FieldErrors field="{{ field }}" />
 </div>

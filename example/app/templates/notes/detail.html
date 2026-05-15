@@ -10,7 +10,7 @@ attrs:
 <Base>
     {% slot "title" %}{{ note.title }}{% endslot %}
     <div class="max-w-2xl mx-auto px-5 py-12">
-        <BackLink href={{ url('notes:list') }} label="Back to notes" />
+        <BackLink href="{{ url('notes:list') }}" label="Back to notes" />
         <h1 class="page-h1">{{ note.title }}</h1>
         <div class="mt-2 text-[12px] font-mono text-muted">
         Created {{ note.created_at.strftime("%Y-%m-%d %H:%M") }}
@@ -24,8 +24,8 @@ attrs:
             <p class="mt-6 text-sm text-muted italic">No body.</p>
         {% endif %}
         <div class="mt-8 flex gap-2">
-        <a href={{ url('notes:update', id=note.id) }} class="btn-primary">Edit</a>
-        <a href={{ url('notes:delete', id=note.id) }} class="btn-secondary">Delete</a>
+        <a href="{{ url('notes:update', id=note.id) }}" class="btn-primary">Edit</a>
+        <a href="{{ url('notes:delete', id=note.id) }}" class="btn-secondary">Delete</a>
     </div>
     </div>
 </Base>

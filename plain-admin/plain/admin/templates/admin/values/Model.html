@@ -8,10 +8,10 @@ attrs:
 ---
 {% if value %}
     {% if get_admin_model_detail_url(value) %}
-        <a href={{ get_admin_model_detail_url(value) }}>{{ value }}</a>
+        <a href="{{ get_admin_model_detail_url(value) }}">{{ value }}</a>
     {% endif %}
     {% if not get_admin_model_detail_url(value) and hasattr(value, 'get_absolute_url') %}
-        <a href={{ value.get_absolute_url() }}>{{ value }}</a>
+        <a href="{{ value.get_absolute_url() }}">{{ value }}</a>
     {% endif %}
     {% if not get_admin_model_detail_url(value) and not hasattr(value, 'get_absolute_url') %}
         <div>{{ value }}</div>

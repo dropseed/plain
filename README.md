@@ -78,16 +78,18 @@ class UserDetail(DetailView):
         return User.query.get(pk=self.url_kwargs["pk"])
 ```
 
-Templates are Jinja:
+Templates are `plain.html` — HTML-aware, with components as files and real Python in `{{ }}`:
 
 ```html
-{# app/users/templates/users/detail.html #}
-{% extends "base.html" %}
-
-{% block content %}
-<h1>{{ user.display_name }}</h1>
-<p>Joined {{ user.created_at.strftime("%B %Y") }}</p>
-{% endblock %}
+---
+components:
+  - base as Base
+---
+<Base>
+    {% slot "title" %}{{ user.display_name }}{% endslot %}
+    <h1>{{ user.display_name }}</h1>
+    <p>Joined {{ user.created_at.strftime("%B %Y") }}</p>
+</Base>
 ```
 
 ## An opinionated stack
@@ -96,7 +98,7 @@ Python where you want it, JS where you need it.
 
 - **Python:** 3.13+
 - **Database:** Postgres
-- **Templates:** Jinja2
+- **Templates:** plain.html
 - **Frontend:** htmx, Tailwind CSS
 - **Python tooling:** uv (packages), ruff (lint/format), ty (type checking)
 - **JavaScript tooling:** oxc (lint/format), esbuild (bundling)

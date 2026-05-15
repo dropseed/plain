@@ -78,6 +78,14 @@ template_name: custom-page.html
 This is **markdown** content with [links](/other-page/).
 ```
 
+Markdown bodies support `{{ expr }}` interpolation (e.g. `{{ page.title }}`)
+before conversion. Because Markdown is not HTML, it renders through
+plain.html's text mode: only `{{ }}`, `{% raw %}…{% endraw %}`, and
+`{# #}` are recognized — everything else, including placeholder text like
+`<your-app>` and code fences, is left literal. `{% if %}` / `{% for %}`
+control-flow blocks are HTML-only and not available in Markdown bodies.
+Set `render_plain: true` in the frontmatter to skip interpolation entirely.
+
 ### Redirect pages
 
 Files with `.redirect` extension create redirects:
@@ -215,9 +223,9 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 Set the `template_name` in frontmatter to specify your own template. Your template should include `{{ page.content }}` to render the markdown content.
 
-#### Can I use template tags and filters in markdown files?
+#### Can I use template expressions in markdown files?
 
-Yes. Unless you set `render_plain: true` in the frontmatter, markdown files are processed as templates first, then converted to HTML. You can use any template tags and filters available in your project.
+Yes. Unless you set `render_plain: true` in the frontmatter, markdown bodies are interpolated before being converted to HTML. Markdown renders through plain.html's text mode, so only `{{ expr }}` interpolation, `{% raw %}` blocks, and `{# #}` comments are recognized — `{% if %}` / `{% for %}` control flow is HTML-only. To show a literal `{{ }}` in your content, wrap it in `{% raw %}…{% endraw %}`.
 
 #### How do I access frontmatter variables in templates?
 

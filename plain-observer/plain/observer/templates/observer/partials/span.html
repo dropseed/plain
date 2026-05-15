@@ -6,7 +6,7 @@ attrs:
   span: Any
   event: Any
 ---
-<div data-span-level={{ event["span_level"] }} class="border-l border-white/20">
+<div data-span-level="{{ event["span_level"] }}" class="border-l border-white/20">
     <details class="rounded bg-white/5 min-w-[600px] ml-px">
         <summary
             class="cursor-pointer hover:bg-white/10 transition-colors px-2 py-1 list-none [&::-webkit-details-marker]:hidden"
@@ -28,7 +28,7 @@ attrs:
                 <div class="w-80 flex items-center space-x-2">
                     <div
                         class="text-white/40 whitespace-nowrap tabular-nums"
-                        title={{ str(localtime(span.start_time)) }}
+                        title="{{ str(localtime(span.start_time)) }}"
                     >
                         {{ localtime(span.start_time).strftime("%-I:%M:%S %p") }}
                     </div>
@@ -43,8 +43,8 @@ attrs:
                                     data-[severity='error']:text-red-400
                                     data-[severity='info']:bg-blue-500/20
                                     data-[severity='info']:text-blue-400"
-                                data-severity={{ annotation["severity"] }}
-                                title={{ annotation["message"] }}
+                                data-severity="{{ annotation["severity"] }}"
+                                title="{{ annotation["message"] }}"
                             >
                             !
                         </span>{% endfor %}
@@ -61,18 +61,18 @@ attrs:
                                     data-[kind='PRODUCER']:bg-purple-500
                                     data-[kind='INTERNAL']:bg-gray-500
                                     bg-white/30"
-                            data-kind={{ span.kind }}
-                            data-span-id={{ span.span_id }}
-                            data-start-percent={{ ((span.start_time - trace.start_time).total_seconds() * 1000 / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}
-                            data-width-percent={{ (span.duration_ms() / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}
-                            title={{ span.name + " - " + str(span.duration_ms()) + "ms" }}
+                            data-kind="{{ span.kind }}"
+                            data-span-id="{{ span.span_id }}"
+                            data-start-percent="{{ ((span.start_time - trace.start_time).total_seconds() * 1000 / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}"
+                            data-width-percent="{{ (span.duration_ms() / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}"
+                            title="{{ span.name + " - " + str(span.duration_ms()) + "ms" }}"
                         >
                         </div>
                         <div
                             class="absolute inset-0 flex items-center justify-start pl-1 text-xs text-white/80 font-medium whitespace-nowrap pointer-events-none"
-                            data-span-id={{ str(span.span_id) + "-label" }}
-                            data-start-percent={{ ((span.start_time - trace.start_time).total_seconds() * 1000 / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}
-                            data-width-percent={{ (span.duration_ms() / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}
+                            data-span-id="{{ str(span.span_id) + "-label" }}"
+                            data-start-percent="{{ ((span.start_time - trace.start_time).total_seconds() * 1000 / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}"
+                            data-width-percent="{{ (span.duration_ms() / trace.duration_ms() * 100) if trace.duration_ms() > 0 else 0 }}"
                         >
                             {{ "%.2f" % span.duration_ms() }}ms
                         </div>
@@ -83,7 +83,7 @@ attrs:
         <div class="p-4 pt-2 bg-white/3 border-t border-white/20">
             {% if span.sql_query %}
                 <div
-                    class={{ ["mb-6 bg-white/3 rounded-lg border border-white/20 overflow-hidden", "ring-2 ring-amber-500/50" if span.annotations else None] }}
+                    class="{{ ["mb-6 bg-white/3 rounded-lg border border-white/20 overflow-hidden", "ring-2 ring-amber-500/50" if span.annotations else None] }}"
                 >
                     <div
                         class="bg-white/10 px-4 py-2 border-b border-white/20 flex items-center justify-between"
@@ -124,7 +124,7 @@ attrs:
                                     data-[severity='error']:text-red-400
                                     data-[severity='info']:bg-blue-500/20
                                     data-[severity='info']:text-blue-400"
-                                    data-severity={{ annotation["severity"] }}
+                                    data-severity="{{ annotation["severity"] }}"
                                 >
                             {{ annotation["message"] }}
                         </span>{% endfor %}
@@ -261,7 +261,7 @@ attrs:
                                         data-[kind='PRODUCER']:bg-purple-500/20 data-[kind='PRODUCER']:text-purple-300
                                         data-[kind='INTERNAL']:bg-gray-500/20 data-[kind='INTERNAL']:text-gray-300
                                         bg-gray-500/20 text-gray-300"
-                                data-kind={{ span.kind }}
+                                data-kind="{{ span.kind }}"
                             >
                                 {{ span.kind }}
                             </span>
@@ -297,7 +297,7 @@ attrs:
                                         data-[status='ERROR']:bg-red-500/20 data-[status='ERROR']:text-red-300
                                         data-[status='OK']:bg-green-500/20 data-[status='OK']:text-green-300
                                         bg-yellow-500/20 text-yellow-300"
-                                data-status={{ span.status }}
+                                data-status="{{ span.status }}"
                             >
                                 {{ span.status }}
                             </span>

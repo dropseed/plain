@@ -10,7 +10,7 @@ attrs:
 <Base>
     {% slot "title" %}Delete {{ note.title }}{% endslot %}
     <div class="max-w-2xl mx-auto px-5 py-12">
-        <BackLink href={{ url('notes:detail', id=note.id) }} label="Back to note" />
+        <BackLink href="{{ url('notes:detail', id=note.id) }}" label="Back to note" />
         <h1 class="page-h1">Delete note</h1>
         <p class="mt-3 text-sm text-body">
         Are you sure you want to delete
@@ -19,7 +19,7 @@ attrs:
     </p>
         <form method="post" class="mt-6 flex gap-2">
         <button type="submit" class="btn-danger">Delete</button>
-        <a href={{ url('notes:detail', id=note.id) }} class="btn-secondary">Cancel</a>
+        <a href="{{ url('notes:detail', id=note.id) }}" class="btn-secondary">Cancel</a>
     </form>
     </div>
 </Base>

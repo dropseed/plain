@@ -6,7 +6,11 @@ attrs:
   request: plain.http.Request = None
 ---
 {% if toolbar.should_render() %}
-    <script defer src={{ asset('toolbar/toolbar.js') }} nonce={{ request.csp_nonce }}></script>
+    <script
+        defer
+        src="{{ asset('toolbar/toolbar.js') }}"
+        nonce="{{ request.csp_nonce }}"
+    ></script>
     <div
         id="plaintoolbar"
         class="print:hidden text-stone-300 fixed bottom-0 w-full z-50 flex flex-col"
@@ -23,8 +27,8 @@ attrs:
                 >
                 {% for (i, item) in enumerate(toolbar.get_items()) %}
                     {% if item.name and item.panel_template_name %}<button
-                        data-active={{ i == 0 }}
-                        data-toolbar-tab={{ item.name }}
+                        data-active="{{ i == 0 }}"
+                        data-toolbar-tab="{{ item.name }}"
                         class="data-active:border-yellow-500 px-3 sm:px-4 py-3 sm:py-2.5 -mb-px cursor-pointer border-b-2 border-transparent hover:border-yellow-600 whitespace-nowrap text-sm"
                         type="button"
                     >{{ item.name }}</button>{% endif %}
@@ -92,8 +96,8 @@ attrs:
                 {% for (i, item) in enumerate(toolbar.get_items()) %}
                     {% if item.name and item.panel_template_name %}
                         <div
-                            data-toolbar-tab={{ item.name }}
-                            class={{ ["h-full", "hidden" if i > 0 else None] }}
+                            data-toolbar-tab="{{ item.name }}"
+                            class="{{ ["h-full", "hidden" if i > 0 else None] }}"
                         >
                 {{ item.render_panel() }}
             </div>

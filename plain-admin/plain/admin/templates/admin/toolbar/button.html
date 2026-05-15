@@ -13,7 +13,7 @@ attrs:
     <div class="flex items-center font-light">
         Impersonating&nbsp;<span class="font-medium">{{ user }}</span>
         <a
-            href={{ url('admin:impersonate:stop') }}
+            href="{{ url('admin:impersonate:stop') }}"
             title="Stop impersonating"
             class="flex items-center px-1 ml-1 text-red-300 hover:text-white"
         >
@@ -32,7 +32,7 @@ attrs:
         </a>
     </div>
 {% endif %}{% if preflight_counts and (preflight_counts["errors"] + preflight_counts["warnings"]) > 0 %}<a
-    href={{ url('admin:preflight') }}
+    href="{{ url('admin:preflight') }}"
     class="relative inline-flex items-center mr-2 hover:text-white text-white/50"
     title="Preflight checks"
 >
@@ -50,11 +50,11 @@ attrs:
             />
         </svg>
         <span
-            class={{ ["absolute -top-1 -right-1.5 min-w-[12px] h-3 px-0.5 text-[8px] font-bold leading-3 text-center text-white rounded-full", "bg-red-500" if preflight_counts["errors"] > 0 else "bg-amber-500"] }}
+            class="{{ ["absolute -top-1 -right-1.5 min-w-[12px] h-3 px-0.5 text-[8px] font-bold leading-3 text-center text-white rounded-full", "bg-red-500" if preflight_counts["errors"] > 0 else "bg-amber-500"] }}"
         >{{ preflight_counts["errors"] + preflight_counts["warnings"] }}</span>
-    </a>{% endif %}<a href={{ url('admin:index') }} class="hover:underline">Admin</a>
+    </a>{% endif %}<a href="{{ url('admin:index') }}" class="hover:underline">Admin</a>
 
     {% if object_admin_url %}
     <span>→</span>
-    <a href={{ object_admin_url }} class="hover:underline">{{ object_class_name }}</a>
+    <a href="{{ object_admin_url }}" class="hover:underline">{{ object_class_name }}</a>
     {% endif %}</div>

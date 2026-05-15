@@ -19,9 +19,13 @@ attrs:
     <title>Observer Traces</title>
     {{ tailwind_css() }}
     {{ htmx_js(request) }}
-    <link rel="stylesheet" href={{ asset('observer/observer.css') }}>
-    <script src={{ asset('observer/observer.js') }} defer nonce={{ request.csp_nonce }}></script>
-    <script nonce={{ request.csp_nonce }}>
+    <link rel="stylesheet" href="{{ asset('observer/observer.css') }}">
+    <script
+        src="{{ asset('observer/observer.js') }}"
+        defer
+        nonce="{{ request.csp_nonce }}"
+    ></script>
+    <script nonce="{{ request.csp_nonce }}">
         if (window.self !== window.top) {
             document.addEventListener('DOMContentLoaded', function() {
                 document.body.setAttribute('data-iframe', 'true');
@@ -49,7 +53,7 @@ attrs:
                                         title="Recording"
                                     ></div>
                                 {% endif %}<select
-                                    hx-put={{ url('observer:traces') }}
+                                    hx-put="{{ url('observer:traces') }}"
                                     hx-trigger="change"
                                     hx-swap="morph:innerHTML"
                                     hx-target="#main-content"
@@ -59,16 +63,16 @@ attrs:
                                 >
                                     <option
                                         value="summary"
-                                        selected={{ observer.is_summarizing() }}
+                                        selected="{{ observer.is_summarizing() }}"
                                     >Summary</option>
                                     <option
                                         value="persist"
-                                        selected={{ observer.is_persisting() }}
+                                        selected="{{ observer.is_persisting() }}"
                                     >Recording</option>
                                     <option disabled>───────</option>
                                     <option
                                         value="disable"
-                                        selected={{ observer.is_disabled() }}
+                                        selected="{{ observer.is_disabled() }}"
                                         class="text-white/50"
                                     >Disabled</option>
                                 </select>
@@ -113,7 +117,7 @@ attrs:
                                             <span class="hidden htmx-request:inline">Refreshing...</span>
                                         </button>
                                         <button
-                                            hx-delete={{ url('observer:traces') }}
+                                            hx-delete="{{ url('observer:traces') }}"
                                             plain-hx-action="traces"
                                             hx-swap="morph:innerHTML"
                                             hx-target="#main-content"
@@ -145,13 +149,13 @@ attrs:
                                 {% for trace_item in traces %}
                                     <li>
                             <a
-                                href={{ trace_item.get_absolute_url() }}
-                                hx-get={{ trace_item.get_absolute_url() }}
+                                href="{{ trace_item.get_absolute_url() }}"
+                                hx-get="{{ trace_item.get_absolute_url() }}"
                                 hx-target="#trace"
                                 hx-swap="innerHTML"
                                 hx-push-url="true"
                                 class="block w-full text-left p-3 transition-colors hover:bg-white/5 focus:outline-none focus:bg-white/5"
-                                data-trace-id={{ trace_item.trace_id }}
+                                data-trace-id="{{ trace_item.trace_id }}"
                             >
                                 <div class="flex items-center justify-between gap-2">
                                     <div class="flex-1 min-w-0">
@@ -204,7 +208,7 @@ attrs:
                                                 </svg>
                                                 <span
                                                     class="truncate"
-                                                    title={{ trace_item.session_id }}
+                                                    title="{{ trace_item.session_id }}"
                                                 >{{ trace_item.session_id }}</span>
                                             </span>{% endif %}
                                             {% if trace_item.app_version %}<span
@@ -227,7 +231,7 @@ attrs:
                                         </div>
                                     {% endif %}<span
                                         class="flex-shrink-0 text-white/40"
-                                        title={{ str(localtime(trace_item.start_time)) }}
+                                        title="{{ str(localtime(trace_item.start_time)) }}"
                                     >{{ timesince(trace_item.start_time) }} ago</span>
                                     </div>
                                 </div>
@@ -242,7 +246,7 @@ attrs:
                         class="flex-1 px-6 py-4 overflow-auto overscroll-contain ml-80"
                     >
                         <div
-                            hx-get={{ traces.first().get_absolute_url() }}
+                            hx-get="{{ traces.first().get_absolute_url() }}"
                             hx-trigger="load"
                             hx-swap="innerHTML"
                         >
@@ -299,7 +303,7 @@ attrs:
                                     class="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2"
                                 >
                             {% if observer.is_summarizing() %}<button
-                                    hx-put={{ url('observer:traces') }}
+                                    hx-put="{{ url('observer:traces') }}"
                                     plain-hx-action="mode"
                                     hx-vals='{"mode": "persist"}'
                                     hx-swap="morph:innerHTML"
@@ -338,7 +342,7 @@ attrs:
                                     <span class="hidden htmx-request:inline">Checking...</span>
                                 </button>
                                 <button
-                                    hx-put={{ url('observer:traces') }}
+                                    hx-put="{{ url('observer:traces') }}"
                                     plain-hx-action="mode"
                                     hx-vals='{"mode": "summary"}'
                                     hx-swap="morph:innerHTML"
@@ -360,7 +364,7 @@ attrs:
                                     <span>Stop Recording</span>
                                 </button>
                             {% endif %}<button
-                                    hx-put={{ url('observer:traces') }}
+                                    hx-put="{{ url('observer:traces') }}"
                                     plain-hx-action="mode"
                                     hx-vals='{"mode": "disable"}'
                                     hx-swap="morph:innerHTML"
@@ -454,7 +458,7 @@ attrs:
                                     class="flex flex-col sm:flex-row items-center sm:items-start gap-2"
                                 >
                             <button
-                                hx-put={{ url('observer:traces') }}
+                                hx-put="{{ url('observer:traces') }}"
                                 plain-hx-action="mode"
                                 hx-vals='{"mode": "summary"}'
                                 hx-swap="morph:innerHTML"
@@ -476,7 +480,7 @@ attrs:
                                 <span>Enable Summary</span>
                             </button>
                             <button
-                                hx-put={{ url('observer:traces') }}
+                                hx-put="{{ url('observer:traces') }}"
                                 plain-hx-action="mode"
                                 hx-vals='{"mode": "persist"}'
                                 hx-swap="morph:innerHTML"

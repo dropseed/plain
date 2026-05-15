@@ -6,7 +6,7 @@ attrs:
 ---
 <Base>
     {% slot "title" %}SSE demo — live terminal{% endslot %}
-    <style nonce={{ request.csp_nonce }}>
+    <style nonce="{{ request.csp_nonce }}">
     .terminal-bg {
         background: #0a0e17;
         background-image:
@@ -153,7 +153,7 @@ attrs:
             </div>
         </div>
     </div>
-    <script nonce={{ request.csp_nonce }}>
+    <script nonce="{{ request.csp_nonce }}">
     let updateCount = 0;
 
     const clockSource = new EventSource("/sse/clock/");

@@ -19,25 +19,25 @@ attrs:
   request: plain.http.Request = None
 ---
 <Base
-    title={{ "Search results for \"" + global_search_query + "\"" if global_search_query else "Search" }}
-    app_name={{ app_name }}
-    admin_force_theme={{ admin_force_theme }}
-    description={{ description }}
-    image={{ image }}
-    links={{ links }}
-    extra_links={{ extra_links }}
-    parent_view_classes={{ parent_view_classes }}
-    object={{ object }}
-    cards={{ cards }}
+    title="{{ "Search results for \"" + global_search_query + "\"" if global_search_query else "Search" }}"
+    app_name="{{ app_name }}"
+    admin_force_theme="{{ admin_force_theme }}"
+    description="{{ description }}"
+    image="{{ image }}"
+    links="{{ links }}"
+    extra_links="{{ extra_links }}"
+    parent_view_classes="{{ parent_view_classes }}"
+    object="{{ object }}"
+    cards="{{ cards }}"
 >
-    <form method="GET" action={{ url('admin:search') }} class="mb-6">
+    <form method="GET" action="{{ url('admin:search') }}" class="mb-6">
         <SearchInput
             name="query"
             id="query"
-            value={{ global_search_query or "" }}
+            value="{{ global_search_query or "" }}"
             placeholder="Search admin..."
             wrapper_class="max-w-md"
-            autofocus={{ True }}
+            autofocus="{{ True }}"
         />
     </form>
     {% if global_search_query %}
@@ -47,7 +47,7 @@ attrs:
         >
             {% for view in searchable_views %}
                 <div
-                    hx-get={{ view.get_view_url() + "?search=" + global_search_query + "&page_size=5" }}
+                    hx-get="{{ view.get_view_url() + "?search=" + global_search_query + "&page_size=5" }}"
                     hx-trigger="load from:body"
                     plain-hx-fragment="list"
                 >
@@ -57,7 +57,7 @@ attrs:
         <div id="no-results" class="hidden text-center py-12">
             <p class="text-admin-muted-foreground">No results found for "{{ global_search_query }}"</p>
         </div>
-        <script nonce={{ request.csp_nonce }}>
+        <script nonce="{{ request.csp_nonce }}">
     // Show "no results" message if all search result containers are empty
     function checkForResults() {
         const results = document.getElementById('search-results');

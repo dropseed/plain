@@ -7,7 +7,7 @@ attrs:
   field: Any = None
   object: Any = None
 ---
-<time class="tabular-nums cursor-help" datetime={{ value.isoformat() }}>
+<time class="tabular-nums cursor-help" datetime="{{ value.isoformat() }}">
     {% if localtime(value).year == localtime(now()).year %}
         <span class="sm:hidden">{{ localtime(value).strftime("%-m/%-d %-I:%M %p") }}</span>
         <span class="hidden sm:inline">{{ localtime(value).strftime("%b %-d at %-I:%M %p") }}</span>

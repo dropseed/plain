@@ -65,24 +65,21 @@ email.send()
 
 ### Template-based emails
 
-The `TemplateEmail` class renders emails from template files. You provide a template name, and it looks for corresponding files in your `templates/email/` directory:
-
-- `email/{template}.html` - HTML content (required)
-- `email/{template}.txt` - Plain text content (optional, falls back to stripping HTML tags)
-- `email/{template}.subject.txt` - Subject line (optional)
+The `TemplateEmail` class renders emails from templates in your `templates/email/` directory. You provide a template name, and it renders `email/{template}.html` as the HTML body. The subject is passed directly as a `subject=` argument.
 
 ```python
 from plain.email import TemplateEmail
 
 email = TemplateEmail(
     template="welcome",
+    subject="Welcome to our app",
     context={"user_name": "Alice"},
     to=["alice@example.com"],
 )
 email.send()
 ```
 
-With these template files:
+With this template file:
 
 ```html
 <!-- templates/email/welcome.html -->
@@ -90,12 +87,18 @@ With these template files:
 <p>We're glad you're here.</p>
 ```
 
-```text
-{# templates/email/welcome.subject.txt #}
-Welcome to our app, {{ user_name }}!
+For the plain-text body, add an optional `email/{template}.txt`. It renders through plain.html text mode — `{{ }}` interpolation works, but the content is treated as plain text (no HTML parsing or escaping):
+
+```
+{# templates/email/welcome.txt #}
+Welcome, {{ user_name }}!
+
+We're glad you're here.
 ```
 
-You can subclass `TemplateEmail` to customize the template context by overriding `get_template_context()`.
+When no `.txt` file exists, the plain-text body falls back to a tag-stripped version of the HTML.
+
+You can subclass `TemplateEmail` to customize the template context by overriding `get_template_context()`, or to take full control of the plain-text body by overriding `render_plain()`.
 
 ### Attachments
 

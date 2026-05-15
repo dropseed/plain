@@ -60,6 +60,23 @@ def test_format_preserves_frontmatter_byte_for_byte():
     assert out.startswith("---\nattrs:\n  name: str\n---\n")
 
 
+def test_format_quotes_single_expression_attribute():
+    """A single-`{{ }}` attribute value canonicalizes to quoted form —
+    `href="{{ href }}"`, not `href={{ href }}` — so HTML highlighters
+    see `attr="..."`. Quoted and unquoted input compile identically.
+    """
+    assert format_source("<a href={{ url }}>x</a>") == '<a href="{{ url }}">x</a>\n'
+    assert format_source('<a href="{{ url }}">x</a>') == '<a href="{{ url }}">x</a>\n'
+
+
+def test_format_quotes_expression_attribute_with_inner_quotes():
+    """An expression containing quotes still quotes cleanly — the
+    tokenizer scans to `}}` and is quote-aware inside the expression.
+    """
+    src = '<div id={{ "row-" + n }}></div>'
+    assert format_source(src) == '<div id="{{ "row-" + n }}"></div>\n'
+
+
 def test_format_void_element():
     """Void elements (`<img>`) keep their bare form with no trailing slash."""
     assert format_source('<img src="x.png">') == '<img src="x.png">\n'

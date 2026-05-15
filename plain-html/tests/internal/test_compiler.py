@@ -521,6 +521,35 @@ def test_component_with_attrs(tmp_path):
     assert _compile_path(paths["parent"])() == "<h1>Hello</h1>"
 
 
+def test_component_attr_default(tmp_path):
+    """A component invoked without an attr uses the attr's declared default."""
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": "---\ncomponents:\n  - ./Field\n---\n<Field />",
+            "Field": (
+                "---\nattrs:\n"
+                '  label: str = "Anonymous"\n'
+                "  rows: int = 3\n"
+                "---\n<p>{{ label }}/{{ rows }}</p>"
+            ),
+        },
+    )
+    assert _compile_path(paths["parent"])() == "<p>Anonymous/3</p>"
+
+
+def test_component_attr_default_overridden(tmp_path):
+    """An explicitly passed attr wins over the attr's declared default."""
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": '---\ncomponents:\n  - ./Field\n---\n<Field label="Hi" />',
+            "Field": '---\nattrs:\n  label: str = "Anonymous"\n---\n<p>{{ label }}</p>',
+        },
+    )
+    assert _compile_path(paths["parent"])() == "<p>Hi</p>"
+
+
 def test_component_with_expr_attr(tmp_path):
     paths = _write_templates(
         tmp_path,

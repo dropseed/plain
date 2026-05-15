@@ -58,6 +58,16 @@ def escape_html(value: object) -> str:
     return str(conditional_escape(value))
 
 
+def to_text(value: object) -> str:
+    """Render a value for plain-text (non-HTML) output — no escaping.
+
+    Used by text-mode templates (Markdown page bodies) where the output
+    is not HTML and HTML-escaping would corrupt it. `None` renders as
+    the empty string, matching `escape_html`'s handling.
+    """
+    return "" if value is None else str(value)
+
+
 # URL schemes considered safe for href/src/action/etc. Anything else (notably
 # `javascript:` and `data:`) becomes an empty string so the resulting markup
 # can't navigate to or execute attacker-controlled code.
