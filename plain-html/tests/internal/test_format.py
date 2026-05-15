@@ -93,44 +93,63 @@ def test_format_self_closing_template():
     assert "<template" in out
 
 
-def test_format_directive_if():
-    """`:if={expr}` is preserved verbatim as a structured directive attribute."""
-    src = "<div :if={ok}>x</div>"
+def test_format_block_if():
+    """`{% if %}` blocks round-trip with their condition preserved."""
+    src = "{% if ok %}<div>x</div>{% endif %}"
     out = format_source(src)
-    assert ":if={ok}" in out
+    assert "{% if ok %}" in out
+    assert "{% endif %}" in out
 
 
-def test_format_directive_for():
-    """`:for={x in xs}` is preserved verbatim as a structured directive attribute."""
-    src = "<li :for={item in items}>{item}</li>"
+def test_format_block_if_elif_else():
+    """`{% if %}` / `{% elif %}` / `{% else %}` chains round-trip intact."""
+    src = "{% if a %}<p>a</p>{% elif b %}<p>b</p>{% else %}<p>c</p>{% endif %}"
     out = format_source(src)
-    assert ":for={item in items}" in out
+    assert "{% if a %}" in out
+    assert "{% elif b %}" in out
+    assert "{% else %}" in out
+    assert "{% endif %}" in out
 
 
-def test_format_directive_for_tuple_target():
-    """`:for` with tuple-unpacking targets round-trips exactly."""
-    src = "<li :for={i, x in enumerate(items)}>{x}</li>"
+def test_format_block_for():
+    """`{% for %}` blocks round-trip with their loop clause preserved."""
+    src = "{% for item in items %}<li>{{ item }}</li>{% endfor %}"
     out = format_source(src)
-    assert ":for={i, x in enumerate(items)}" in out
+    assert "{% for item in items %}" in out
+    assert "{% endfor %}" in out
 
 
-def test_format_preserves_reserved_directive_as():
-    """`:as={var}` (scoped-slot binding) round-trips even though the engine doesn't act on it yet."""
-    # `:as` is the scoped-slot binding from the spec. The engine doesn't
-    # act on it yet, but the formatter must round-trip it.
-    src = '<template slot="default" :as={item}>{item}</template>'
+def test_format_block_for_tuple_target():
+    """`{% for %}` with tuple-unpacking targets round-trips exactly."""
+    src = "{% for i, x in enumerate(items) %}<li>{{ x }}</li>{% endfor %}"
     out = format_source(src)
-    assert ":as={item}" in out
+    assert "{% for i, x in enumerate(items) %}" in out
+
+
+def test_format_block_for_filter_clause():
+    """`{% for %}` with an `if` filter clause round-trips exactly."""
+    src = "{% for x in items if x.visible %}<li>{{ x }}</li>{% endfor %}"
+    out = format_source(src)
+    assert "{% for x in items if x.visible %}" in out
+
+
+def test_format_block_slot():
+    """`{% slot %}` blocks round-trip with their name preserved."""
+    src = '{% slot "footer" %}<div>x</div>{% endslot %}'
+    out = format_source(src)
+    assert '{% slot "footer" %}' in out
+    assert "{% endslot %}" in out
     assert format_source(out) == out
 
 
-def test_format_preserves_unknown_colon_directive():
-    """Unknown `:`-prefixed attributes survive — formatter doesn't erase what it doesn't recognize."""
-    # Any `:`-prefixed attribute the parser doesn't recognize is held on
-    # the node so the formatter doesn't erase it.
-    src = "<div :something={value}>x</div>"
+def test_format_preserves_slot_attribute():
+    """Caller-side `:slot="name"` attribute survives — it routes content to a named slot."""
+    # `:slot` is the only directive that remains an attribute (caller-side
+    # slot marker). The formatter must round-trip it.
+    src = '<div :slot="footer">x</div>'
     out = format_source(src)
-    assert ":something={value}" in out
+    assert ':slot="footer"' in out
+    assert format_source(out) == out
 
 
 def test_format_reescapes_literal_braces_in_text():

@@ -16,7 +16,7 @@ def _write(dir: Path, name: str, content: str) -> Path:
 
 def test_check_valid_templates_pass(tmp_path: Path) -> None:
     _write(tmp_path, "ok.html", "<p>hi</p>\n")
-    _write(tmp_path, "nested/ok.html", "<div><p>{name}</p></div>\n")
+    _write(tmp_path, "nested/ok.html", "<div><p>{{ name }}</p></div>\n")
 
     runner = CliRunner()
     result = runner.invoke(cli, ["check", str(tmp_path)])
@@ -70,16 +70,17 @@ def test_check_maps_offsets_through_frontmatter(tmp_path: Path) -> None:
     assert f"{path}:6:3:" in result.output
 
 
-def test_check_reports_directive_shape_error(tmp_path: Path) -> None:
-    # `:if` with no `{expression}` value is a directive-shape error.
-    path = _write(tmp_path, "bad.html", "<div :if></div>\n")
+def test_check_reports_unbalanced_block(tmp_path: Path) -> None:
+    # A stray `{% endif %}` with no opening `{% if %}` is a structural
+    # block error — reported with file:line:col anchored at the tag.
+    path = _write(tmp_path, "bad.html", "{% endif %}<div></div>\n")
 
     runner = CliRunner()
     result = runner.invoke(cli, ["check", str(tmp_path)])
 
     assert result.exit_code == 1
     assert f"{path}:1:1:" in result.output
-    assert ":if" in result.output
+    assert "endif" in result.output
 
 
 def test_check_reports_invalid_attr_declaration(tmp_path: Path) -> None:
@@ -381,14 +382,15 @@ def test_check_reports_unknown_slot(tmp_path: Path) -> None:
     _write(
         tmp_path,
         "Card.html",
-        "---\nslots:\n  footer: optional\n---\n<div>{footer}</div>\n",
+        "---\nslots:\n  footer: optional\n---\n<div>{{ footer }}</div>\n",
     )
     path = _write(
         tmp_path,
         "page.html",
         # `<Card>` sits on line 7 — two blank lines below the
         # frontmatter — so the error must anchor there, not at line 1.
-        '---\ncomponents:\n  - ./Card\n---\n\n\n<Card><p :slot="header">x</p></Card>\n',
+        "---\ncomponents:\n  - ./Card\n---\n\n\n"
+        '<Card>{% slot "header" %}<p>x</p>{% endslot %}</Card>\n',
     )
 
     runner = CliRunner()
@@ -402,7 +404,7 @@ def test_check_reports_missing_required_slot(tmp_path: Path) -> None:
     _write(
         tmp_path,
         "Card.html",
-        "---\nslots:\n  footer: required\n---\n<div>{footer}</div>\n",
+        "---\nslots:\n  footer: required\n---\n<div>{{ footer }}</div>\n",
     )
     path = _write(
         tmp_path,
@@ -425,14 +427,15 @@ def test_check_reports_duplicate_slot(tmp_path: Path) -> None:
     _write(
         tmp_path,
         "Card.html",
-        "---\nslots:\n  footer: optional\n---\n<div>{footer}</div>\n",
+        "---\nslots:\n  footer: optional\n---\n<div>{{ footer }}</div>\n",
     )
     path = _write(
         tmp_path,
         "page.html",
         # `<Card>` on line 7 — the error anchors at the tag.
         "---\ncomponents:\n  - ./Card\n---\n\n\n<Card>"
-        '<p :slot="footer">a</p><p :slot="footer">b</p></Card>\n',
+        '{% slot "footer" %}<p>a</p>{% endslot %}'
+        '{% slot "footer" %}<p>b</p>{% endslot %}</Card>\n',
     )
 
     runner = CliRunner()
@@ -450,7 +453,7 @@ def test_check_required_default_slot_satisfied_by_content(tmp_path: Path) -> Non
     _write(
         tmp_path,
         "Card.html",
-        "---\nslots:\n  default: required\n---\n<div>{children}</div>\n",
+        "---\nslots:\n  default: required\n---\n<div>{{ children }}</div>\n",
     )
     _write(
         tmp_path,
@@ -490,7 +493,7 @@ def test_check_reports_unknown_attr(tmp_path: Path) -> None:
     _write(
         tmp_path,
         "Card.html",
-        "---\nattrs:\n  title: str\n---\n<p>{title}</p>\n",
+        "---\nattrs:\n  title: str\n---\n<p>{{ title }}</p>\n",
     )
     path = _write(
         tmp_path,
@@ -514,7 +517,7 @@ def test_check_accepts_declared_attrs_including_keyword_named(tmp_path: Path) ->
     _write(
         tmp_path,
         "Card.html",
-        "---\nattrs:\n  class: str\n  title: str\n---\n<div>{title}</div>\n",
+        "---\nattrs:\n  class: str\n  title: str\n---\n<div>{{ title }}</div>\n",
     )
     _write(
         tmp_path,

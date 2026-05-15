@@ -52,7 +52,7 @@ def test_template_renders_named_template(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     app = _app_dir(tmp_path, monkeypatch)
-    (app / "templates" / "hello.html").write_text("<p>Hello, {name}!</p>")
+    (app / "templates" / "hello.html").write_text("<p>Hello, {{ name }}!</p>")
 
     assert Template("hello").render({"name": "Dave"}) == "<p>Hello, Dave!</p>"
 
@@ -65,7 +65,7 @@ def test_template_and_render_produce_identical_output(
     """
     app = _app_dir(tmp_path, monkeypatch)
     path = app / "templates" / "greet.html"
-    path.write_text("<p>Hello, {name}!</p>")
+    path.write_text("<p>Hello, {{ name }}!</p>")
 
     via_template = Template("greet").render({"name": "Dave"})
     via_render = render(path, {"name": "Dave"})
@@ -99,7 +99,7 @@ def test_render_and_render_source_produce_identical_output(tmp_path: Path) -> No
     must produce the same bytes — they're the same compiler under two
     entry points.
     """
-    src = "<ul><li :for={x in items}>{x}</li></ul>"
+    src = "<ul>{% for x in items %}<li>{{ x }}</li>{% endfor %}</ul>"
     ctx = {"items": ["a", "b", "c"]}
 
     path = tmp_path / "list.html"
@@ -110,7 +110,7 @@ def test_render_and_render_source_produce_identical_output(tmp_path: Path) -> No
 
 def test_render_accepts_pathlike(tmp_path: Path) -> None:
     """`render` is typed as `str | os.PathLike` — Path objects work."""
-    src = "<p>{x}</p>"
+    src = "<p>{{ x }}</p>"
     path = tmp_path / "p.html"
     path.write_text(src)
 
@@ -144,20 +144,20 @@ def test_markup_and_mark_safe_produce_identical_results() -> None:
 
 
 def test_markup_bypasses_escape_in_text() -> None:
-    out = render_source("<p>{x}</p>", {"x": Markup("<b>bold</b>")})
+    out = render_source("<p>{{ x }}</p>", {"x": Markup("<b>bold</b>")})
     assert out == "<p><b>bold</b></p>"
 
 
 def test_mark_safe_bypasses_escape_in_text() -> None:
     """`mark_safe` is the canonical name in Python code; same effect."""
-    out = render_source("<p>{x}</p>", {"x": mark_safe("<b>bold</b>")})
+    out = render_source("<p>{{ x }}</p>", {"x": mark_safe("<b>bold</b>")})
     assert out == "<p><b>bold</b></p>"
 
 
 def test_unmarked_string_is_escaped_in_text() -> None:
     """Sanity: the non-`Markup` baseline does get escaped, so the
     `Markup` test above isn't trivially passing."""
-    out = render_source("<p>{x}</p>", {"x": "<b>bold</b>"})
+    out = render_source("<p>{{ x }}</p>", {"x": "<b>bold</b>"})
     assert out == "<p>&lt;b&gt;bold&lt;/b&gt;</p>"
 
 

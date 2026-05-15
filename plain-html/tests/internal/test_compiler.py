@@ -53,26 +53,26 @@ def test_static_text():
 
 
 def test_simple_expression():
-    assert _load("<p>{name}</p>")(name="Dave") == "<p>Dave</p>"
+    assert _load("<p>{{ name }}</p>")(name="Dave") == "<p>Dave</p>"
 
 
 def test_expression_html_escaped():
-    assert _load("<p>{x}</p>")(x="<b>") == "<p>&lt;b&gt;</p>"
+    assert _load("<p>{{ x }}</p>")(x="<b>") == "<p>&lt;b&gt;</p>"
 
 
 def test_none_renders_empty():
-    assert _load("<p>{x}</p>")(x=None) == "<p></p>"
+    assert _load("<p>{{ x }}</p>")(x=None) == "<p></p>"
 
 
 def test_adjacent_text_runs_constant_fold():
     # Two text nodes around an expression should fold into single literal append
     # before and after, plus one expression append.
-    src = _compile_string("<p>before {x} after</p>")
+    src = _compile_string("<p>before {{ x }} after</p>")
     # Generated should have exactly one `_append('before ')` chunk and one
     # `_append(' after')` chunk — quick sanity grep on the generated source.
     assert "before " in src
     assert " after" in src
-    assert _load("<p>before {x} after</p>")(x="MID") == "<p>before MID after</p>"
+    assert _load("<p>before {{ x }} after</p>")(x="MID") == "<p>before MID after</p>"
 
 
 # --- attributes --------------------------------------------------------------
@@ -90,104 +90,122 @@ def test_static_attr():
 
 
 def test_static_attr_with_double_quote_swaps_to_single():
-    """Author writes `{{...}}` JSON inside a single-quoted attribute. The
-    decoded value contains literal `"`, so the engine must wrap with `'`
-    rather than emit broken `attr="{"..."}"`."""
-    src = """<button hx-vals='{{"mode": "persist"}}'>x</button>"""
+    """Author writes literal JSON inside a single-quoted attribute. Single
+    braces are ordinary text now, so the value passes through verbatim — but
+    it contains literal `"`, so the engine must keep the `'` wrapping rather
+    than emit broken `attr="{"..."}"`."""
+    src = """<button hx-vals='{"mode": "persist"}'>x</button>"""
     assert _load(src)() == """<button hx-vals='{"mode": "persist"}'>x</button>"""
 
 
 def test_dyn_attr_string():
-    assert _load("<a href={url}>x</a>")(url="/foo") == '<a href="/foo">x</a>'
+    assert _load("<a href={{ url }}>x</a>")(url="/foo") == '<a href="/foo">x</a>'
 
 
 def test_dyn_attr_true():
-    assert _load("<input disabled={cond}>")(cond=True) == "<input disabled>"
+    assert _load("<input disabled={{ cond }}>")(cond=True) == "<input disabled>"
 
 
 def test_dyn_attr_false():
-    assert _load("<input disabled={cond}>")(cond=False) == "<input>"
+    assert _load("<input disabled={{ cond }}>")(cond=False) == "<input>"
 
 
 def test_dyn_attr_none():
-    assert _load("<input disabled={cond}>")(cond=None) == "<input>"
+    assert _load("<input disabled={{ cond }}>")(cond=None) == "<input>"
 
 
 def test_dyn_attr_list_class():
-    out = _load("<a class={classes}>x</a>")(classes=["btn", "", "primary"])
+    out = _load("<a class={{ classes }}>x</a>")(classes=["btn", "", "primary"])
     assert out == '<a class="btn primary">x</a>'
 
 
 def test_dyn_attr_list_empty_is_omitted():
-    assert _load("<a class={classes}>x</a>")(classes=[]) == "<a>x</a>"
+    assert _load("<a class={{ classes }}>x</a>")(classes=[]) == "<a>x</a>"
 
 
 def test_mixed_attr_segments():
-    out = _load('<a href="/u/{handle}/{tab}">x</a>')(handle="ada", tab="bio")
+    out = _load('<a href="/u/{{ handle }}/{{ tab }}">x</a>')(handle="ada", tab="bio")
     assert out == '<a href="/u/ada/bio">x</a>'
 
 
-# --- :if / :for --------------------------------------------------------------
+# --- if / for blocks ---------------------------------------------------------
 
 
 def test_if_true():
-    assert _load("<p :if={show}>hi</p>")(show=True) == "<p>hi</p>"
+    assert _load("{% if show %}<p>hi</p>{% endif %}")(show=True) == "<p>hi</p>"
 
 
 def test_if_false():
-    assert _load("<p :if={show}>hi</p>")(show=False) == ""
+    assert _load("{% if show %}<p>hi</p>{% endif %}")(show=False) == ""
+
+
+def test_if_elif_else():
+    src = "{% if a %}<p>A</p>{% elif b %}<p>B</p>{% else %}<p>C</p>{% endif %}"
+    render = _load(src)
+    assert render(a=True, b=False) == "<p>A</p>"
+    assert render(a=False, b=True) == "<p>B</p>"
+    assert render(a=False, b=False) == "<p>C</p>"
 
 
 def test_for_simple():
-    out = _load("<li :for={x in items}>{x}</li>")(items=[1, 2, 3])
+    out = _load("{% for x in items %}<li>{{ x }}</li>{% endfor %}")(items=[1, 2, 3])
     assert out == "<li>1</li><li>2</li><li>3</li>"
 
 
 def test_for_unpacking():
-    out = _load("<li :for={a, b in pairs}>{a}={b}</li>")(pairs=[("x", 1), ("y", 2)])
+    out = _load("{% for a, b in pairs %}<li>{{ a }}={{ b }}</li>{% endfor %}")(
+        pairs=[("x", 1), ("y", 2)]
+    )
     assert out == "<li>x=1</li><li>y=2</li>"
 
 
 def test_for_parenthesized_unpacking():
-    out = _load("<li :for={(a, b) in pairs}>{a}={b}</li>")(pairs=[("x", 1)])
+    out = _load("{% for (a, b) in pairs %}<li>{{ a }}={{ b }}</li>{% endfor %}")(
+        pairs=[("x", 1)]
+    )
     assert out == "<li>x=1</li>"
 
 
 def test_nested_for():
-    src = "<tr :for={row in rows}><td :for={c in row}>{c}</td></tr>"
+    src = (
+        "{% for row in rows %}<tr>"
+        "{% for c in row %}<td>{{ c }}</td>{% endfor %}"
+        "</tr>{% endfor %}"
+    )
     out = _load(src)(rows=[[1, 2], [3, 4]])
     assert out == "<tr><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr>"
 
 
 def test_for_target_does_not_leak():
-    # `x` in :for should not shadow an outer `x` after the loop.
-    render = _load("<a :for={x in items}>{x}</a><b>{x}</b>")
+    # The `x` loop target should not shadow an outer `x` after the loop.
+    render = _load("{% for x in items %}<a>{{ x }}</a>{% endfor %}<b>{{ x }}</b>")
     assert render(items=[1, 2], x="OUT") == "<a>1</a><a>2</a><b>OUT</b>"
 
 
-def test_if_and_for_same_element_rejected():
-    # Spec: a conditional directive and `:for` on the same element is a
-    # compile error — gate the loop with `<template :if>`, or filter the
-    # `:for` clause itself.
+def test_block_straddle_rejected():
+    # An element opened inside an `{% if %}` branch must close in the same
+    # branch — a straddle leaves unbalanced HTML and is a parse error.
     from plain.html.parser import ParseError
 
-    with pytest.raises(ParseError, match="conditional directive"):
-        _compile_string("<li :if={show} :for={x in items}>{x}</li>")
+    with pytest.raises(ParseError):
+        _compile_string("{% if show %}<div>{% endif %}x</div>")
 
 
 def test_for_filter_clause():
-    out = _load("<li :for={x in items if x % 2}>{x}</li>")(items=[1, 2, 3, 4, 5])
+    out = _load("{% for x in items if x % 2 %}<li>{{ x }}</li>{% endfor %}")(
+        items=[1, 2, 3, 4, 5]
+    )
     assert out == "<li>1</li><li>3</li><li>5</li>"
 
 
 def test_for_filter_sees_loop_target():
-    src = "<li :for={(i, x) in enumerate(items) if i}>{x}</li>"
+    src = "{% for (i, x) in enumerate(items) if i %}<li>{{ x }}</li>{% endfor %}"
     out = _load(src)(items=["a", "b", "c"])
     assert out == "<li>b</li><li>c</li>"
 
 
 def test_for_multiple_filters():
-    src = "<li :for={x in items if x > 1 if x < 5}>{x}</li>"
+    src = "{% for x in items if x > 1 if x < 5 %}<li>{{ x }}</li>{% endfor %}"
     out = _load(src)(items=[0, 1, 2, 3, 4, 5, 6])
     assert out == "<li>2</li><li>3</li><li>4</li>"
 
@@ -196,14 +214,19 @@ def test_for_nested_loop_clause_rejected():
     from plain.html.parser import ParseError
 
     with pytest.raises(ParseError, match="one `for` clause"):
-        _compile_string("<li :for={x in xs for y in ys}>{x}</li>")
+        _compile_string("{% for x in xs for y in ys %}<li>{{ x }}</li>{% endfor %}")
 
 
 # --- elements, fragments, comments, doctype ---------------------------------
 
 
-def test_template_fragment():
-    assert _load("<template>{x}<br></template>")(x="hi") == "hi<br>"
+def test_template_is_ordinary_element():
+    # `<template>` is no longer a transparent fragment host — it renders as
+    # an ordinary element, tag and all.
+    assert (
+        _load("<template>{{ x }}<br></template>")(x="hi")
+        == "<template>hi<br></template>"
+    )
 
 
 def test_html_comment_preserved():
@@ -234,7 +257,7 @@ def test_declared_attr_defaults_to_none():
 attrs:
     name: str
 ---
-<p :if={name}>{name}</p><span :if={not name}>none</span>"""
+{% if name %}<p>{{ name }}</p>{% endif %}{% if not name %}<span>none</span>{% endif %}"""
     render = _load(src)
     assert "<span>none</span>" in render()
     assert render(name="Dave") == "<p>Dave</p>"
@@ -245,12 +268,12 @@ def test_declared_slot_defaults_to_empty_markup():
 slots:
     header: Markup
 ---
-<header>{header}</header>"""
+<header>{{ header }}</header>"""
     assert _load(src)() == "<header></header>"
 
 
 def test_keyword_attr_alias():
-    src = "<div :if={class_}>has class</div>"
+    src = "{% if class_ %}<div>has class</div>{% endif %}"
     out = _load(src)(**{"class": "btn"})
     assert out == "<div>has class</div>"
 
@@ -260,7 +283,7 @@ def test_imports_block():
 imports:
     - from itertools import chain
 ---
-<p>{list(chain([1, 2], [3]))}</p>"""
+<p>{{ list(chain([1, 2], [3])) }}</p>"""
     assert _load(src)() == "<p>[1, 2, 3]</p>"
 
 
@@ -274,7 +297,7 @@ def test_caller_context_overrides_imports():
 imports:
     - from itertools import chain
 ---
-<p>{chain}</p>"""
+<p>{{ chain }}</p>"""
     assert _load(src)(chain="OVERRIDE") == "<p>OVERRIDE</p>"
 
 
@@ -283,34 +306,34 @@ imports:
 
 def test_builtin_left_alone():
     # `len` is a builtin; rewriter must not turn it into _ctx['len'].
-    assert _load("<p>{len(items)}</p>")(items=[1, 2, 3]) == "<p>3</p>"
+    assert _load("<p>{{ len(items) }}</p>")(items=[1, 2, 3]) == "<p>3</p>"
 
 
 def test_comprehension_target_is_local():
     # In `[x for x in items]`, the inner `x` is comp-local, the outer
     # `items` is from _ctx. Rewriter must keep `x` bare.
-    src = "<p>{', '.join(str(x*2) for x in items)}</p>"
+    src = "<p>{{ ', '.join(str(x*2) for x in items) }}</p>"
     assert _load(src)(items=[1, 2, 3]) == "<p>2, 4, 6</p>"
 
 
 def test_lambda_param_is_local():
-    src = "<p>{(lambda v: v + 1)(n)}</p>"
+    src = "<p>{{ (lambda v: v + 1)(n) }}</p>"
     assert _load(src)(n=10) == "<p>11</p>"
 
 
 def test_nested_comprehension():
-    src = "<p>{[c for r in rows for c in r]}</p>"
+    src = "<p>{{ [c for r in rows for c in r] }}</p>"
     assert _load(src)(rows=[[1, 2], [3, 4]]) == "<p>[1, 2, 3, 4]</p>"
 
 
 def test_for_target_visible_in_inner_expression():
     # `x` is a for-target; rewriter must leave bare references alone.
-    src = "<a :for={x in items}>{x.upper()}</a>"
+    src = "{% for x in items %}<a>{{ x.upper() }}</a>{% endfor %}"
     assert _load(src)(items=["a", "b"]) == "<a>A</a><a>B</a>"
 
 
 def test_attribute_access_on_ctx_name():
-    src = "<p>{user.name}</p>"
+    src = "<p>{{ user.name }}</p>"
 
     class U:
         name = "Dave"
@@ -321,7 +344,7 @@ def test_attribute_access_on_ctx_name():
 def test_no_eval_in_generated_source():
     # 5b inlines every expression — the generated module should not contain
     # an `eval(` call. Guard against regressing back to the 5a runtime.
-    src = _compile_string("<p :if={x}>{x.upper()}</p>")
+    src = _compile_string("{% if x %}<p>{{ x.upper() }}</p>{% endif %}")
     assert "eval(" not in src
 
 
@@ -329,74 +352,76 @@ def test_no_eval_in_generated_source():
 
 
 def test_safe_url_scheme_passes():
-    out = _load("<a href={url}>x</a>")(url="https://example.com/page")
+    out = _load("<a href={{ url }}>x</a>")(url="https://example.com/page")
     assert out == '<a href="https://example.com/page">x</a>'
 
 
 def test_relative_url_passes():
-    assert _load("<a href={url}>x</a>")(url="/path?q=1") == '<a href="/path?q=1">x</a>'
+    assert (
+        _load("<a href={{ url }}>x</a>")(url="/path?q=1") == '<a href="/path?q=1">x</a>'
+    )
 
 
 def test_javascript_url_rejected():
     # `escape_url` returns "" for non-safe schemes; `render_dyn_url_attr`
     # then omits the attribute entirely — cleaner DOM than `href=""`.
-    out = _load("<a href={url}>x</a>")(url="javascript:alert(1)")
+    out = _load("<a href={{ url }}>x</a>")(url="javascript:alert(1)")
     assert "javascript" not in out
     assert "alert" not in out
     assert out == "<a>x</a>"
 
 
 def test_data_text_html_url_rejected():
-    out = _load("<a href={url}>x</a>")(url="data:text/html,<script>x</script>")
+    out = _load("<a href={{ url }}>x</a>")(url="data:text/html,<script>x</script>")
     assert "<script>" not in out
     assert out == "<a>x</a>"
 
 
 def test_url_scheme_case_insensitive():
     # `JaVaScRiPt:` is the same scheme — reject it.
-    out = _load("<a href={url}>x</a>")(url="JaVaScRiPt:alert(1)")
+    out = _load("<a href={{ url }}>x</a>")(url="JaVaScRiPt:alert(1)")
     assert "alert" not in out
 
 
 def test_mixed_segment_url_attr_validates_full():
     # Static prefix + dynamic suffix — full URL is validated.
-    src = '<a href="/{path}">x</a>'
+    src = '<a href="/{{ path }}">x</a>'
     out = _load(src)(path="search?q=1")
     assert out == '<a href="/search?q=1">x</a>'
 
 
 def test_mixed_segment_url_with_evil_scheme():
-    # Author wrote `<a href="{scheme}:..."` and `scheme=javascript` — composed
-    # URL has an unsafe scheme. escape_url rejects.
-    src = '<a href="{scheme}:alert(1)">x</a>'
+    # Author wrote `<a href="{{ scheme }}:..."` and `scheme=javascript` —
+    # composed URL has an unsafe scheme. escape_url rejects.
+    src = '<a href="{{ scheme }}:alert(1)">x</a>'
     out = _load(src)(scheme="javascript")
     assert "alert" not in out
 
 
 def test_src_attr_also_validated():
-    out = _load("<img src={u} />")(u="javascript:alert(1)")
+    out = _load("<img src={{ u }} />")(u="javascript:alert(1)")
     assert "alert" not in out
 
 
 def test_action_attr_also_validated():
-    out = _load("<form action={u}></form>")(u="javascript:alert(1)")
+    out = _load("<form action={{ u }}></form>")(u="javascript:alert(1)")
     assert "alert" not in out
 
 
 def test_event_handler_with_dynamic_value_rejected():
     with pytest.raises(CompileError, match="event-handler"):
-        _compile_string("<a onclick={handler}>x</a>")
+        _compile_string("<a onclick={{ handler }}>x</a>")
 
 
 def test_event_handler_with_mark_safe_allowed():
-    out = _load('<a onclick={mark_safe("alert(1)")}>x</a>')()
+    out = _load('<a onclick={{ mark_safe("alert(1)") }}>x</a>')()
     assert out == '<a onclick="alert(1)">x</a>'
 
 
 def test_event_handler_with_markup_allowed():
     # `Markup(...)` is the spec-named alias for `mark_safe`; both are
     # auto-available in every compiled module, no `imports:` needed.
-    src = "<a onclick={Markup(handler)}>x</a>"
+    src = "<a onclick={{ Markup(handler) }}>x</a>"
     assert _load(src)(handler="alert(1)") == '<a onclick="alert(1)">x</a>'
 
 
@@ -404,7 +429,7 @@ def test_event_handler_with_mixed_segments_rejected():
     # Even with one mark_safe segment, the surrounding text could leak —
     # safer to refuse the whole mixed shape.
     with pytest.raises(CompileError, match="event-handler"):
-        _compile_string('<a onclick="x={val}">x</a>')
+        _compile_string('<a onclick="x={{ val }}">x</a>')
 
 
 def test_static_event_handler_allowed():
@@ -418,7 +443,7 @@ def test_static_event_handler_allowed():
 def test_event_handler_case_insensitive():
     # HTML attr names are case-insensitive; check `ONCLICK=` is caught too.
     with pytest.raises(CompileError, match="event-handler"):
-        _compile_string("<a ONCLICK={handler}>x</a>")
+        _compile_string("<a ONCLICK={{ handler }}>x</a>")
 
 
 def test_expr_inside_script_is_literal_text():
@@ -490,7 +515,7 @@ def test_component_with_attrs(tmp_path):
         tmp_path,
         {
             "parent": '---\ncomponents:\n  - ./Card\n---\n<Card title="Hello" />',
-            "Card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{{ title }}</h1>",
         },
     )
     assert _compile_path(paths["parent"])() == "<h1>Hello</h1>"
@@ -500,8 +525,8 @@ def test_component_with_expr_attr(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
-            "parent": "---\ncomponents:\n  - ./Card\n---\n<Card title={name} />",
-            "Card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
+            "parent": "---\ncomponents:\n  - ./Card\n---\n<Card title={{ name }} />",
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{{ title }}</h1>",
         },
     )
     assert _compile_path(paths["parent"])(name="Dave") == "<h1>Dave</h1>"
@@ -512,7 +537,7 @@ def test_component_default_slot(tmp_path):
         tmp_path,
         {
             "parent": "---\ncomponents:\n  - ./Card\n---\n<Card><p>body</p></Card>",
-            "Card": ("---\nslots:\n  default: Markup\n---\n<div>{children}</div>"),
+            "Card": ("---\nslots:\n  default: Markup\n---\n<div>{{ children }}</div>"),
         },
     )
     assert _compile_path(paths["parent"])() == "<div><p>body</p></div>"
@@ -525,13 +550,13 @@ def test_component_named_slot(tmp_path):
             "parent": (
                 "---\ncomponents:\n  - ./Card\n---\n"
                 "<Card>"
-                '<template :slot="header">H</template>'
+                '{% slot "header" %}H{% endslot %}'
                 "<p>body</p>"
                 "</Card>"
             ),
             "Card": (
                 "---\nslots:\n  header: Markup\n  default: Markup\n---\n"
-                "<div>{header}|{children}</div>"
+                "<div>{{ header }}|{{ children }}</div>"
             ),
         },
     )
@@ -539,15 +564,18 @@ def test_component_named_slot(tmp_path):
 
 
 def test_component_named_slot_on_element(tmp_path):
-    # `<div :slot="x">` routes the whole div into the slot.
+    # `{% slot "header" %}<div>...</div>{% endslot %}` routes the whole div
+    # into the named slot.
     paths = _write_templates(
         tmp_path,
         {
             "parent": (
                 "---\ncomponents:\n  - ./Card\n---\n"
-                '<Card><div :slot="header">H</div></Card>'
+                '<Card>{% slot "header" %}<div>H</div>{% endslot %}</Card>'
             ),
-            "Card": ("---\nslots:\n  header: Markup\n---\n<section>{header}</section>"),
+            "Card": (
+                "---\nslots:\n  header: Markup\n---\n<section>{{ header }}</section>"
+            ),
         },
     )
     assert _compile_path(paths["parent"])() == "<section><div>H</div></section>"
@@ -558,7 +586,7 @@ def test_component_root_ctx_propagates(tmp_path):
         tmp_path,
         {
             "parent": "---\ncomponents:\n  - ./Inner\n---\n<Inner />",
-            "Inner": "<p>{name}</p>",
+            "Inner": "<p>{{ name }}</p>",
         },
     )
     assert _compile_path(paths["parent"])(name="Dave") == "<p>Dave</p>"
@@ -569,7 +597,7 @@ def test_component_explicit_attr_wins_over_root_ctx(tmp_path):
         tmp_path,
         {
             "parent": '---\ncomponents:\n  - ./Inner\n---\n<Inner name="LOCAL" />',
-            "Inner": "<p>{name}</p>",
+            "Inner": "<p>{{ name }}</p>",
         },
     )
     assert _compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
@@ -583,7 +611,7 @@ def test_component_promoted_attr_inherits_from_root_ctx(tmp_path):
         tmp_path,
         {
             "parent": "---\ncomponents:\n  - ./Inner\n---\n<Inner />",
-            "Inner": "---\nattrs:\n  name: str\n---\n<p>{name}</p>",
+            "Inner": "---\nattrs:\n  name: str\n---\n<p>{{ name }}</p>",
         },
     )
     assert _compile_path(paths["parent"])(name="Dave") == "<p>Dave</p>"
@@ -596,7 +624,7 @@ def test_component_promoted_attr_explicit_pass_wins(tmp_path):
         tmp_path,
         {
             "parent": '---\ncomponents:\n  - ./Inner\n---\n<Inner name="LOCAL" />',
-            "Inner": "---\nattrs:\n  name: str\n---\n<p>{name}</p>",
+            "Inner": "---\nattrs:\n  name: str\n---\n<p>{{ name }}</p>",
         },
     )
     assert _compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
@@ -608,9 +636,9 @@ def test_component_inside_for(tmp_path):
         {
             "parent": (
                 "---\ncomponents:\n  - ./Card\n---\n"
-                "<Card :for={x in items} title={x} />"
+                "{% for x in items %}<Card title={{ x }} />{% endfor %}"
             ),
-            "Card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{{ title }}</h1>",
         },
     )
     assert (
@@ -625,7 +653,7 @@ def test_component_inside_if(tmp_path):
         {
             "parent": (
                 "---\ncomponents:\n  - ./Card\n---\n"
-                "<template :if={show}><Card /></template>"
+                "{% if show %}<Card />{% endif %}"
             ),
             "Card": "<p>shown</p>",
         },
@@ -740,13 +768,13 @@ def test_disk_cache_hit_skips_codegen(tmp_path, monkeypatch):
 def test_disk_cache_invalidates_on_source_change(tmp_path, monkeypatch):
     cache_dir = tmp_path / "cache"
     _set_cache_dir(monkeypatch, cache_dir)
-    paths = _write_templates(tmp_path, {"x": "<p>{name}</p>"})
+    paths = _write_templates(tmp_path, {"x": "<p>{{ name }}</p>"})
     r1 = _compile_with_disk_cache(paths["x"])
     assert r1(name="Dave") == "<p>Dave</p>"
     # Same path, different *content* — the source hash flips, so a new
     # cache file is written; the old one stays (no GC in this phase) but
     # the new render reflects the new source.
-    paths["x"].write_text("<b>{name}</b>")
+    paths["x"].write_text("<b>{{ name }}</b>")
     r2 = _compile_with_disk_cache(paths["x"])
     assert r2(name="Dave") == "<b>Dave</b>"
 
@@ -917,7 +945,7 @@ COMPONENT_PARITY_CASES: list[tuple[dict[str, str], dict]] = [
     (
         {
             "parent": '---\ncomponents:\n  - ./Card\n---\n<Card title="Hello" />',
-            "Card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{{ title }}</h1>",
         },
         {},
     ),
@@ -925,21 +953,21 @@ COMPONENT_PARITY_CASES: list[tuple[dict[str, str], dict]] = [
     (
         {
             "parent": "---\ncomponents:\n  - ./Card\n---\n<Card><p>body</p></Card>",
-            "Card": "---\nslots:\n  default: Markup\n---\n<div>{children}</div>",
+            "Card": "---\nslots:\n  default: Markup\n---\n<div>{{ children }}</div>",
         },
         {},
     ),
-    # Named slot via `<template :slot=>`.
+    # Named slot via `{% slot %}`.
     (
         {
             "parent": (
                 "---\ncomponents:\n  - ./Card\n---\n"
                 "<Card>"
-                '<template :slot="header">HDR</template>X</Card>'
+                '{% slot "header" %}HDR{% endslot %}X</Card>'
             ),
             "Card": (
                 "---\nslots:\n  header: Markup\n  default: Markup\n---\n"
-                "<div>{header}|{children}</div>"
+                "<div>{{ header }}|{{ children }}</div>"
             ),
         },
         {},
@@ -949,7 +977,7 @@ COMPONENT_PARITY_CASES: list[tuple[dict[str, str], dict]] = [
         {
             "outer": "---\ncomponents:\n  - ./Middle\n---\n<Middle />",
             "Middle": "---\ncomponents:\n  - ./Inner\n---\n<Inner />",
-            "Inner": "<p>{name}</p>",
+            "Inner": "<p>{{ name }}</p>",
         },
         {"name": "Dave"},
     ),
@@ -969,25 +997,30 @@ def test_component_render_matches_engine_render(tmp_path, templates, ctx):
 
 
 PARITY_CASES: list[tuple[str, dict]] = [
-    ("<p>Hi, {name}</p>", {"name": "Dave"}),
-    ("<p>{x}</p>", {"x": "<b>bold</b>"}),  # escape
-    ("<a href={url}>x</a>", {"url": "/foo?q=&"}),
-    ("<a class={c}>x</a>", {"c": ["btn", "primary"]}),
-    ("<a class={c}>x</a>", {"c": False}),
-    ('<a href="/u/{h}/{t}">x</a>', {"h": "ada", "t": "bio"}),
-    ("<p :if={ok}>shown</p>", {"ok": True}),
-    ("<p :if={ok}>shown</p>", {"ok": False}),
-    ("<ul><li :for={x in items}>{x}</li></ul>", {"items": ["a", "b", "c"]}),
+    ("<p>Hi, {{ name }}</p>", {"name": "Dave"}),
+    ("<p>{{ x }}</p>", {"x": "<b>bold</b>"}),  # escape
+    ("<a href={{ url }}>x</a>", {"url": "/foo?q=&"}),
+    ("<a class={{ c }}>x</a>", {"c": ["btn", "primary"]}),
+    ("<a class={{ c }}>x</a>", {"c": False}),
+    ('<a href="/u/{{ h }}/{{ t }}">x</a>', {"h": "ada", "t": "bio"}),
+    ("{% if ok %}<p>shown</p>{% endif %}", {"ok": True}),
+    ("{% if ok %}<p>shown</p>{% endif %}", {"ok": False}),
     (
-        "<tr :for={r in rows}><td :for={c in r}>{c}</td></tr>",
+        "<ul>{% for x in items %}<li>{{ x }}</li>{% endfor %}</ul>",
+        {"items": ["a", "b", "c"]},
+    ),
+    (
+        "{% for r in rows %}<tr>"
+        "{% for c in r %}<td>{{ c }}</td>{% endfor %}"
+        "</tr>{% endfor %}",
         {"rows": [[1, 2], [3, 4]]},
     ),
-    ("<template>{x}<br></template>", {"x": "hi"}),
-    ("<!-- c --><p>{x}</p>", {"x": "y"}),
-    ("{# discarded #}<p>{x}</p>", {"x": "y"}),
-    ("<!DOCTYPE html><html><body>{x}</body></html>", {"x": "z"}),
-    ("<input disabled={d}>", {"d": True}),
-    ("<input disabled={d}>", {"d": None}),
+    ("<template>{{ x }}<br></template>", {"x": "hi"}),
+    ("<!-- c --><p>{{ x }}</p>", {"x": "y"}),
+    ("{# discarded #}<p>{{ x }}</p>", {"x": "y"}),
+    ("<!DOCTYPE html><html><body>{{ x }}</body></html>", {"x": "z"}),
+    ("<input disabled={{ d }}>", {"d": True}),
+    ("<input disabled={{ d }}>", {"d": None}),
 ]
 
 
@@ -1010,7 +1043,7 @@ def test_traceback_points_at_template_line(tmp_path):
     tpl.write_text(
         "<div>\n"  # line 1
         "  <p>hello</p>\n"  # line 2
-        "  <p>broken: {user.no_such_attr}</p>\n"  # line 3 — error here
+        "  <p>broken: {{ user.no_such_attr }}</p>\n"  # line 3 — error here
         "  <p>goodbye</p>\n"  # line 4
         "</div>\n"
     )
@@ -1048,7 +1081,7 @@ def test_traceback_with_frontmatter_offsets_correctly(tmp_path):
         "imports:\n"  # line 2
         "  - import os\n"  # line 3
         "---\n"  # line 4 (frontmatter end)
-        "<p>{user.no_such_attr}</p>\n"  # line 5 — error here
+        "<p>{{ user.no_such_attr }}</p>\n"  # line 5 — error here
     )
 
     clear_process_cache()
@@ -1076,7 +1109,9 @@ def test_coalesces_adjacent_fragments_into_single_append():
     """A loop body that mixes text + expr + text should emit ONE buffer
     operation per iteration, not three separate `_append(...)` calls.
     """
-    src = _compile_string("<ul><li :for={x in items}>before {x} after</li></ul>")
+    src = _compile_string(
+        "<ul>{% for x in items %}<li>before {{ x }} after</li>{% endfor %}</ul>"
+    )
     # The loop body has 3 fragments → should be `_out += (...)` for
     # multi-frag runs.
     assert "_out +=" in src
@@ -1100,7 +1135,7 @@ def test_coalesces_through_component_call():
     # Build the emitted source directly: component sites need an
     # `include_renders` slot, which `compile_string` doesn't wire up.
     tree = parse(
-        tokenize("<div>before<Row item={x} />after</div>"),
+        tokenize("<div>before<Row item={{ x }} />after</div>"),
         components={"Row": "./Row"},
     )
     from plain.html.compiler.session import _walk_includes
