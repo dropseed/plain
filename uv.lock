@@ -1407,6 +1407,7 @@ version = "0.0.0"
 source = { editable = "plain-schema" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-templates" },
 ]
 
 [package.dev-dependencies]
@@ -1416,7 +1417,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-templates", editable = "plain-templates" },
+]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1509,7 +1513,6 @@ source = { editable = "plain-templates" }
 dependencies = [
     { name = "jinja2" },
     { name = "plain" },
-    { name = "plain-schema" },
 ]
 
 [package.dev-dependencies]
@@ -1521,7 +1524,6 @@ dev = [
 requires-dist = [
     { name = "jinja2", specifier = ">=3.1.2" },
     { name = "plain", editable = "plain" },
-    { name = "plain-schema", editable = "plain-schema" },
 ]
 
 [package.metadata.requires-dev]

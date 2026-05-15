@@ -13,6 +13,7 @@ A `Schema` declares fields with type annotations and validators; `.validate(data
 - [Partial validation](#partial-validation)
 - [File uploads](#file-uploads)
 - [HTML rendering with BoundSchema](#html-rendering-with-boundschema)
+- [SchemaView](#schemaview)
 - [Property tests with Hypothesis](#property-tests-with-hypothesis)
 - [Installation](#installation)
 
@@ -185,7 +186,30 @@ class ContactView(View):
 
 The bound form's duck-typed surface (`html_id`, `html_name`, `value()`, `errors`, `field`, `non_field_errors`, `fields`) is the same surface `plain.forms.BoundField` exposes — existing form templates render against `BoundSchema` unchanged.
 
-For full HTML pages, `plain.templates.views.SchemaView` wraps this GET-render / POST-validate / re-render-or-redirect cycle — the schema counterpart to `FormView`.
+## SchemaView
+
+For full HTML pages, [`SchemaView`](./views.py#SchemaView) wraps the GET-render / POST-validate / re-render-or-redirect cycle — the schema counterpart to `plain.templates`' `FormView`. Set `schema_class` and `success_url`, and override `schema_valid()` to do something with the validated result:
+
+```python
+from plain.schema import SchemaView
+
+from .schemas import ContactSchema
+
+
+class ContactView(SchemaView[ContactSchema]):
+    template_name = "contact.html"
+    schema_class = ContactSchema
+    success_url = "/thanks/"
+
+    def schema_valid(self, result):
+        # `result` is a validated ContactSchema — persist it, send mail, etc.
+        result.save(ContactSubmission())
+        return super().schema_valid(result)
+```
+
+Parameterize as `SchemaView[ContactSchema]` so `result` is typed in `schema_valid()`. The template receives the schema as `form` (a `BoundSchema`), so it renders with the same field markup a `FormView` template uses.
+
+> `SchemaView` lives in `plain.schema` for now — while the schema view design is still being iterated on — even though it makes this package depend on `plain.templates`. Importing it is deferred (`from plain.schema import SchemaView`), so a plain `from plain.schema import Schema` still doesn't load the template layer.
 
 ## Property tests with Hypothesis
 

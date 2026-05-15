@@ -24,14 +24,24 @@ if TYPE_CHECKING:
     # plain.http → plain.internal.files.uploadhandler → plain.internal.files.uploadedfile.
     from plain.internal.files.uploadedfile import UploadedFile  # noqa: F401
 
+    from .views import SchemaView  # noqa: F401
+
 
 def __getattr__(name: str) -> Any:
-    """Lazy attribute lookup for `UploadedFile` so we don't trigger the
-    plain.http import chain at plain.schema module load time."""
+    """Lazy attribute lookup so importing `plain.schema` stays cheap.
+
+    `UploadedFile` would otherwise trigger the plain.http import chain, and
+    `SchemaView` would pull in plain.templates — neither belongs in the load
+    path of a plain `from plain.schema import Schema`.
+    """
     if name == "UploadedFile":
         from plain.internal.files.uploadedfile import UploadedFile
 
         return UploadedFile
+    if name == "SchemaView":
+        from .views import SchemaView
+
+        return SchemaView
     raise AttributeError(f"module 'plain.schema' has no attribute {name!r}")
 
 
@@ -40,6 +50,7 @@ __all__ = (
     "BoundSchema",
     "Invalid",
     "Schema",
+    "SchemaView",
     "UploadedFile",
     "make_schema",
 )

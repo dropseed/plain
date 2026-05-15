@@ -10,7 +10,6 @@ from plain.forms import BaseForm, Form
 from plain.http import HTTPException, NotFoundError404, RedirectResponse, Response
 from plain.logs import get_framework_logger
 from plain.runtime import settings
-from plain.schema import BoundSchema, Invalid, Schema
 from plain.views import View
 
 from .core import Template, TemplateFileMissing
@@ -177,64 +176,6 @@ class FormView[F: "BaseForm"](TemplateView):
             return self.form_invalid(form)
 
 
-class SchemaView[S: Schema](TemplateView):
-    """A view for displaying a schema-backed form and handling its submission.
-
-    The schema-era counterpart to `FormView`. Generic over the schema type —
-    parameterize as `SchemaView[MySchema]` for a typed `result` in
-    `schema_valid()`. The `schema_class` attribute must still be set.
-    """
-
-    schema_class: type[S] | None = None
-    success_url: Callable | str | None = None
-
-    def get_schema_class(self) -> type[S]:
-        if not self.schema_class:
-            raise ImproperlyConfigured(
-                f"No schema class provided. Define {self.__class__.__name__}.schema_class "
-                f"or override {self.__class__.__name__}.get_schema_class()."
-            )
-        return self.schema_class
-
-    def get_initial(self) -> dict[str, Any]:
-        """Initial values for rendering a blank (or re-rendered) form."""
-        return {}
-
-    def get_success_url(self, result: S) -> str:
-        """Return the URL to redirect to after a valid submission."""
-        if not self.success_url:
-            raise ImproperlyConfigured("No URL to redirect to. Provide a success_url.")
-        return str(self.success_url)  # success_url may be lazy
-
-    def schema_valid(self, result: S) -> Response:
-        """Validation succeeded — redirect to the success URL."""
-        return RedirectResponse(self.get_success_url(result))
-
-    def schema_invalid(self, form: BoundSchema) -> Response:
-        """Validation failed — re-render the template with the bound schema."""
-        context = {**self.get_template_context(), "form": form}
-        return Response(self.get_template().render(context))
-
-    def get_template_context(self) -> dict[str, Any]:
-        """Insert a blank bound schema into the context as `form`."""
-        context = super().get_template_context()
-        context["form"] = BoundSchema(
-            self.get_schema_class(), initial=self.get_initial()
-        )
-        return context
-
-    def post(self) -> Response:
-        """Validate the POST data; redirect on success, re-render on failure."""
-        schema_class = self.get_schema_class()
-        result = schema_class.validate(self.request.form_data, files=self.request.files)
-        if isinstance(result, Invalid):
-            form = BoundSchema.from_invalid(
-                schema_class, result, initial=self.get_initial()
-            )
-            return self.schema_invalid(form)
-        return self.schema_valid(result)
-
-
 class CreateView(FormView):
     """
     View for creating a new object, with a response rendered by a template.
@@ -386,7 +327,6 @@ __all__ = [
     "TemplateView",
     "NotFoundView",
     "FormView",
-    "SchemaView",
     "CreateView",
     "UpdateView",
     "DeleteView",

@@ -7,7 +7,6 @@
 - [Template-rendering views](#template-rendering-views)
     - [TemplateView](#templateview)
     - [FormView](#formview)
-    - [SchemaView](#schemaview)
     - [DetailView, CreateView, UpdateView, DeleteView, ListView](#object-views)
 - [Error views](#error-views)
 - [Template context](#template-context)
@@ -110,27 +109,6 @@ class ExampleView(FormView):
     def form_valid(self, form):
         return super().form_valid(form)
 ```
-
-### SchemaView
-
-[`SchemaView`](./views.py#SchemaView) is the [`plain.schema`](../../../plain-schema/plain/schema/README.md) counterpart to `FormView`: it renders a `Schema`, validates the POST against it, and either redirects on success or re-renders with the errors. The bound schema is available in the template as `form`, just like `FormView`.
-
-```python
-from plain.templates.views import SchemaView
-from .schemas import ExampleSchema
-
-
-class ExampleView(SchemaView[ExampleSchema]):
-    template_name = "example.html"
-    schema_class = ExampleSchema
-    success_url = "."
-
-    def schema_valid(self, result):
-        # `result` is a validated ExampleSchema — persist it, send mail, etc.
-        return super().schema_valid(result)
-```
-
-Parameterize as `SchemaView[ExampleSchema]` so `result` is typed in `schema_valid()`.
 
 ### Object views
 
