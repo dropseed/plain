@@ -2,6 +2,6 @@
 title: Jinja Test
 ---
 
-# Hello {page.title}
+# Hello {{ page.title }}
 
-DEBUG is {DEBUG}.
+DEBUG is {{ DEBUG }}.

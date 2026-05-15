@@ -652,8 +652,7 @@ def test_component_inside_if(tmp_path):
         tmp_path,
         {
             "parent": (
-                "---\ncomponents:\n  - ./Card\n---\n"
-                "{% if show %}<Card />{% endif %}"
+                "---\ncomponents:\n  - ./Card\n---\n{% if show %}<Card />{% endif %}"
             ),
             "Card": "<p>shown</p>",
         },
