@@ -32,12 +32,18 @@ def _default_cache_root() -> Path:
     return PLAIN_TEMP_PATH / "html" / "typecheck"
 
 
+# Bumped when the *shape* of the cache key changes (new inputs folded
+# in), so stale entries written under an older layout never match.
+KEY_VERSION = 2
+
+
 def cache_key(
     *,
     source: str,
     declarations: Declarations,
     backend_name: str,
     backend_version: str,
+    component_sources: dict[str, str] | None = None,
 ) -> str:
     """Build the hash key for this template's typecheck result.
 
@@ -46,11 +52,14 @@ def cache_key(
     - the mtime of every module referenced in `imports:` and in `attrs:`
       type expressions (so editing a referenced model invalidates the
       cached result)
+    - the full source of every resolved `components:` file (so editing a
+      component's `attrs:` invalidates this template's cached result)
     - the backend name + version
     - the synthesis format version (bumped when synth.py output changes)
     """
     h = hashlib.sha256()
     h.update(b"plain.html.typecheck\n")
+    h.update(f"key={KEY_VERSION}\n".encode())
     h.update(f"format={FORMAT_VERSION}\n".encode())
     h.update(f"backend={backend_name}:{backend_version}\n".encode())
     h.update(b"source=")
@@ -59,6 +68,11 @@ def cache_key(
 
     for module_name in sorted(_referenced_modules(declarations)):
         h.update(f"module={module_name}:{module_mtime_ns(module_name)}\n".encode())
+
+    for name, component_source in sorted((component_sources or {}).items()):
+        h.update(f"component={name}=".encode())
+        h.update(component_source.encode("utf-8"))
+        h.update(b"\n")
 
     return h.hexdigest()
 
@@ -106,9 +120,6 @@ def _referenced_modules(declarations: Declarations) -> set[str]:
 
     for attr in declarations.attrs:
         names.update(_modules_in_type_expr(attr.type_source))
-    for slot in declarations.slots:
-        if slot.yields_source is not None:
-            names.update(_modules_in_type_expr(slot.yields_source))
 
     return names
 

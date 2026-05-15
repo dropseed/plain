@@ -5,6 +5,7 @@ from typing import Any
 from plain.assets.urls import get_asset_url
 from plain.auth.views import AuthView
 from plain.forms import Form
+from plain.html import Markup, Template
 from plain.html.views import FormView
 from plain.http import RedirectResponse, Response
 from plain.runtime import settings
@@ -24,9 +25,17 @@ class SupportFormView(AuthView, FormView):
         context = super().get_template_context()
         form_slug = self.url_kwargs["form_slug"]
         context["form_action"] = self.request.build_absolute_uri()
-        context["form_template_name"] = f"support/forms/{form_slug}.html"
-        context["success_template_name"] = f"support/success/{form_slug}.html"
-        context["success"] = self.request.query_params.get("success") == "true"
+        success = self.request.query_params.get("success") == "true"
+        context["success"] = success
+
+        # Render the configurable form/success template into a single
+        # pre-rendered panel. The set of sub-templates a template includes
+        # must be statically knowable, so this dispatch happens here.
+        if success:
+            panel_template_name = f"support/success/{form_slug}.html"
+        else:
+            panel_template_name = f"support/forms/{form_slug}.html"
+        context["panel"] = Markup(Template(panel_template_name).render(context))
         return context
 
     def get_form_kwargs(self) -> dict[str, Any]:

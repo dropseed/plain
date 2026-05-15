@@ -89,16 +89,14 @@ def test_slots_inline_form():
     by_name = {s.name: s for s in decls.slots}
     assert by_name["default"].required is True
     assert by_name["header"].required is False
-    assert by_name["default"].yields_source is None
 
 
-def test_slots_expanded_form_with_yields():
+def test_slots_expanded_form():
     decls = parse(
         {
             "slots": {
                 "col": {
                     "required": True,
-                    "yields": "app.users.User",
                 },
             },
         }
@@ -106,7 +104,6 @@ def test_slots_expanded_form_with_yields():
     slot = decls.slots[0]
     assert slot.name == "col"
     assert slot.required is True
-    assert slot.yields_source == "app.users.User"
 
 
 def test_attrs_rejects_invalid_identifier():

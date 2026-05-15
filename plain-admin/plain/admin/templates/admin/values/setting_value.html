@@ -5,4 +5,8 @@ attrs:
   object: Any = None
 ---
 <span :if={value == "''"} class="text-admin-muted-foreground/50">&mdash;</span>
-<span :if={value != "''"} data-secret={object["is_secret"]} class="font-mono text-sm break-all data-[secret=True]:text-admin-muted-foreground/80 data-[secret=True]:italic">{value}</span>
+<span
+    :if={value != "''"}
+    data-secret={object["is_secret"]}
+    class="font-mono text-sm break-all data-[secret=True]:text-admin-muted-foreground/80 data-[secret=True]:italic"
+>{value}</span>

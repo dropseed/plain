@@ -163,9 +163,14 @@ def tokenize(source: str) -> list[Token]:
             end = source.find(">", i + 2)
             if end == -1:
                 raise TokenizeError(f"Unterminated end tag at offset {i}")
-            name = source[i + 2 : end].strip().lower()
+            name = source[i + 2 : end].strip()
             if not name:
                 raise TokenizeError(f"Empty end tag at offset {i}")
+            # Component tags are PascalCase and preserve their case so the
+            # parser can match them against the `components:` map. HTML
+            # element names are lowercased as before.
+            if not name[0].isupper():
+                name = name.lower()
             tokens.append(EndTagToken(name, i))
             i = end + 1
             text_start = i
@@ -279,9 +284,15 @@ def _consume_start_tag(source: str, start: int) -> tuple[StartTagToken, int]:
     name_start = i
     while i < n and (source[i].isalnum() or source[i] in "-_:"):
         i += 1
-    name = source[name_start:i].lower()
+    name = source[name_start:i]
     if not name:
         raise TokenizeError(f"Expected tag name at offset {start}")
+    # Component tags are PascalCase and preserve their case so the parser
+    # can match them against the `components:` map. HTML element names are
+    # lowercased as before — `VOID_ELEMENTS` / opaque-body checks are
+    # unaffected since component tags never match those lowercase sets.
+    if not name[0].isupper():
+        name = name.lower()
 
     attrs: list[Attribute] = []
     self_closing = False

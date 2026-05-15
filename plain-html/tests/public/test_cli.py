@@ -71,14 +71,15 @@ def test_check_maps_offsets_through_frontmatter(tmp_path: Path) -> None:
 
 
 def test_check_reports_directive_shape_error(tmp_path: Path) -> None:
-    path = _write(tmp_path, "bad.html", "<template :include></template>\n")
+    # `:if` with no `{expression}` value is a directive-shape error.
+    path = _write(tmp_path, "bad.html", "<div :if></div>\n")
 
     runner = CliRunner()
     result = runner.invoke(cli, ["check", str(tmp_path)])
 
     assert result.exit_code == 1
     assert f"{path}:1:1:" in result.output
-    assert ":include" in result.output
+    assert ":if" in result.output
 
 
 def test_check_reports_invalid_attr_declaration(tmp_path: Path) -> None:
@@ -325,3 +326,221 @@ def test_check_stdin_clean_template_exits_zero() -> None:
     result = runner.invoke(cli, ["check", "-"], input="<p>hi</p>")
 
     assert result.exit_code == 0
+
+
+# --- component file existence (Fix A) -----------------------------------
+
+
+def test_check_reports_missing_component_file(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path,
+        "page.html",
+        "---\ncomponents:\n  - ./Missing\n---\n<p>hi</p>\n",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(path)])
+
+    assert result.exit_code == 1
+    assert f"{path}:1:1:" in result.output
+    assert "components: entry './Missing'" in result.output
+    assert "template file not found" in result.output
+
+
+def test_check_resolved_component_file_passes(tmp_path: Path) -> None:
+    _write(tmp_path, "Card.html", "<p>card</p>\n")
+    _write(
+        tmp_path,
+        "page.html",
+        "---\ncomponents:\n  - ./Card\n---\n<Card />\n",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "All templates checked" in result.output
+
+
+def test_check_stdin_skips_relative_component_paths() -> None:
+    """Relative component paths can't be resolved in stdin mode — skipped."""
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        ["check", "-"],
+        input="---\ncomponents:\n  - ./Card\n---\n<Card />\n",
+    )
+
+    assert result.exit_code == 0
+
+
+# --- component slot validation (Fix B) ----------------------------------
+
+
+def test_check_reports_unknown_slot(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "Card.html",
+        "---\nslots:\n  footer: optional\n---\n<div>{footer}</div>\n",
+    )
+    path = _write(
+        tmp_path,
+        "page.html",
+        # `<Card>` sits on line 7 — two blank lines below the
+        # frontmatter — so the error must anchor there, not at line 1.
+        '---\ncomponents:\n  - ./Card\n---\n\n\n<Card><p :slot="header">x</p></Card>\n',
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(path)])
+
+    assert result.exit_code == 1
+    assert f"{path}:7:1: unknown slot 'header' on component <Card>" in result.output
+
+
+def test_check_reports_missing_required_slot(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "Card.html",
+        "---\nslots:\n  footer: required\n---\n<div>{footer}</div>\n",
+    )
+    path = _write(
+        tmp_path,
+        "page.html",
+        # `<Card />` on line 7 — the error anchors at the tag.
+        "---\ncomponents:\n  - ./Card\n---\n\n\n<Card />\n",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(path)])
+
+    assert result.exit_code == 1
+    assert (
+        f"{path}:7:1: component <Card> is missing required slot 'footer'"
+        in result.output
+    )
+
+
+def test_check_reports_duplicate_slot(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "Card.html",
+        "---\nslots:\n  footer: optional\n---\n<div>{footer}</div>\n",
+    )
+    path = _write(
+        tmp_path,
+        "page.html",
+        # `<Card>` on line 7 — the error anchors at the tag.
+        "---\ncomponents:\n  - ./Card\n---\n\n\n<Card>"
+        '<p :slot="footer">a</p><p :slot="footer">b</p></Card>\n',
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(path)])
+
+    assert result.exit_code == 1
+    assert (
+        f"{path}:7:1: component <Card> assigns slot 'footer' more than once"
+        in result.output
+    )
+
+
+def test_check_required_default_slot_satisfied_by_content(tmp_path: Path) -> None:
+    """Unmarked child content satisfies a required `default` slot."""
+    _write(
+        tmp_path,
+        "Card.html",
+        "---\nslots:\n  default: required\n---\n<div>{children}</div>\n",
+    )
+    _write(
+        tmp_path,
+        "page.html",
+        "---\ncomponents:\n  - ./Card\n---\n<Card><p>hello</p></Card>\n",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(tmp_path)])
+
+    assert result.exit_code == 0
+
+
+def test_check_skips_slot_validation_for_missing_component(tmp_path: Path) -> None:
+    """A missing component file is reported once — slot validation skipped."""
+    path = _write(
+        tmp_path,
+        "page.html",
+        '---\ncomponents:\n  - ./Missing\n---\n<Missing><p :slot="x">y</p></Missing>\n',
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(path)])
+
+    assert result.exit_code == 1
+    assert "template file not found" in result.output
+    assert "unknown slot" not in result.output
+    assert "1 error found" in result.output
+
+
+# --- component attribute-name validation (Fix B) ------------------------
+
+
+def test_check_reports_unknown_attr(tmp_path: Path) -> None:
+    """An attr the component doesn't declare is flagged — plain.html has
+    no pass-through, so an undeclared attr is always a mistake."""
+    _write(
+        tmp_path,
+        "Card.html",
+        "---\nattrs:\n  title: str\n---\n<p>{title}</p>\n",
+    )
+    path = _write(
+        tmp_path,
+        "page.html",
+        # `<Card>` on line 7 — the error anchors at the tag.
+        '---\ncomponents:\n  - ./Card\n---\n\n\n<Card title="x" subtilte="oops" />\n',
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(path)])
+
+    assert result.exit_code == 1
+    assert f"{path}:7:1: unknown attr 'subtilte' on component <Card>" in result.output
+    # The correctly-named `title` attr must not be flagged.
+    assert "unknown attr 'title'" not in result.output
+
+
+def test_check_accepts_declared_attrs_including_keyword_named(tmp_path: Path) -> None:
+    """A declared attr — including a keyword-named one like `class` — is
+    accepted as written."""
+    _write(
+        tmp_path,
+        "Card.html",
+        "---\nattrs:\n  class: str\n  title: str\n---\n<div>{title}</div>\n",
+    )
+    _write(
+        tmp_path,
+        "page.html",
+        '---\ncomponents:\n  - ./Card\n---\n<Card class="box" title="x" />\n',
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "All templates checked" in result.output
+
+
+def test_check_skips_attr_validation_for_missing_component(tmp_path: Path) -> None:
+    """A missing component file is reported once — attr validation skipped."""
+    path = _write(
+        tmp_path,
+        "page.html",
+        '---\ncomponents:\n  - ./Missing\n---\n<Missing bogus="x" />\n',
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", str(path)])
+
+    assert result.exit_code == 1
+    assert "template file not found" in result.output
+    assert "unknown attr" not in result.output
+    assert "1 error found" in result.output

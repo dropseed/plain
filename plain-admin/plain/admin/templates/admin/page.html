@@ -1,5 +1,7 @@
 ---
+components:
+  - admin/base as Base
 slots:
   default: required
 ---
-<template :include="admin/base">{children}</template>
+<Base>{children}</Base>

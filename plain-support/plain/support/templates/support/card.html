@@ -2,6 +2,8 @@
 imports:
   - from plain.admin.html import get_admin_model_detail_url
   - from plain.utils.timesince import timesince
+components:
+  - admin/cards/base as CardBase
 attrs:
   entries: Any
   slug: str
@@ -11,20 +13,29 @@ attrs:
   filters: list = []
   current_filter: str = ""
 ---
-<template :include="admin/cards/base" slug={slug} title={title} description={description} size={size} filters={filters} current_filter={current_filter}>
+<CardBase
+    slug={slug}
+    title={title}
+    description={description}
+    size={size}
+    filters={filters}
+    current_filter={current_filter}
+>
     <div class="w-full space-y-2 overflow-auto max-h-60 flex-grow">
         <div :for={entry in entries} class="flex space-x-2 text-sm">
             <a
                 class="flex-shrink-0 text-admin-muted-foreground tabular-nums hover:underline"
                 href={get_admin_model_detail_url(entry)}
-                title={str(entry.created_at)}>
+                title={str(entry.created_at)}
+            >
                 {timesince(entry.created_at, format="short", depth=1)}
             </a>
             <a
                 class="overflow-hidden hover:underline text-ellipsis whitespace-nowrap"
-                href={get_admin_model_detail_url(entry)}>
+                href={get_admin_model_detail_url(entry)}
+            >
                 {entry.message[:100] + ("..." if len(entry.message) > 100 else "")}
             </a>
         </div>
     </div>
-</template>
+</CardBase>

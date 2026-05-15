@@ -2,6 +2,10 @@
 imports:
   - from plain.assets.html import asset
   - from plain.admin.html import render_value_template
+components:
+  - admin/base as Base
+  - elements/admin/SearchInput
+  - elements/admin/Icon
 attrs:
   title: str = ""
   app_name: str = "Plain"
@@ -33,38 +37,66 @@ attrs:
   get_field_value_template: Any = None
   format_field_value: Any = None
 ---
-<template :include="admin/base"
-    title={title} app_name={app_name} admin_force_theme={admin_force_theme}
-    description={description} image={image} links={links} extra_links={extra_links}
-    parent_view_classes={parent_view_classes} object={object} cards={cards}>
-<template slot="header_scripts">
-<script src={asset('admin/list.js')} defer nonce={request.csp_nonce}></script>
+<Base
+    title={title}
+    app_name={app_name}
+    admin_force_theme={admin_force_theme}
+    description={description}
+    image={image}
+    links={links}
+    extra_links={extra_links}
+    parent_view_classes={parent_view_classes}
+    object={object}
+    cards={cards}
+>
+<template :slot="header_scripts">
+    <script src={asset('admin/list.js')} defer nonce={request.csp_nonce}></script>
 </template>
-<div plain-hx-fragment="list" hx-swap="innerHTML" hx-target="this" hx-indicator="this" id="plain-hx-fragment-list">
-
-<header class="flex items-center justify-between">
-    <div>
-        <div :if={table_style == "preview"} class="text-sm font-medium text-admin-foreground/80 mb-2">{title}</div>
-        <h3 :if={table_style != "preview"} class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground">{page.paginator.count} result{"s" if page.paginator.count != 1 else ""}</h3>
-    </div>
-    <div class="flex space-x-2">
-        <a :if={table_style == "preview"} class="text-sm" href={request.path + ("?search=" + search_query if search_query else "")}>View {page.paginator.count} result{"s" if page.paginator.count != 1 else ""}</a>
+<div
+    plain-hx-fragment="list"
+    hx-swap="innerHTML"
+    hx-target="this"
+    hx-indicator="this"
+    id="plain-hx-fragment-list"
+>
+    <header class="flex items-center justify-between">
+        <div>
+            <div
+                :if={table_style == "preview"}
+                class="text-sm font-medium text-admin-foreground/80 mb-2"
+            >{title}</div>
+            <h3
+                :if={table_style != "preview"}
+                class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground"
+            >{page.paginator.count} result{"s" if page.paginator.count != 1 else ""}</h3>
+        </div>
+        <div class="flex space-x-2">
+        <a
+            :if={table_style == "preview"}
+            class="text-sm"
+            href={request.path + ("?search=" + search_query if search_query else "")}
+        >View {page.paginator.count} result{"s" if page.paginator.count != 1 else ""}</a>
         <template :if={table_style != "preview"}>
-        <form :if={actions} method="POST" data-actions-form>
+            <form :if={actions} method="POST" data-actions-form>
             <select name="action_name" class="admin-select admin-select-sm w-auto">
                 <option value="">Actions...</option>
                 <option :for={action in actions}>{action}</option>
             </select>
-            <input type="hidden" name="action_ids" value="" />
+            <input type="hidden" name="action_ids" value="">
         </form>
-
-        <form method="GET" class="inline-flex space-x-2">
-            <select :if={filter_names} data-autosubmit name="filter" class="admin-select admin-select-sm w-auto">
+            <form method="GET" class="inline-flex space-x-2">
+            <select
+                :if={filter_names}
+                data-autosubmit
+                name="filter"
+                class="admin-select admin-select-sm w-auto"
+            >
                 <option value="">Filter...</option>
                 <option :for={f in filter_names} selected={f == current_filter}>{f}</option>
             </select>
 
-            <template :if={search_fields} :include="elements/admin/SearchInput"
+            <SearchInput
+                :if={search_fields}
                 name="search"
                 id="search"
                 value={search_query or ""}
@@ -73,51 +105,67 @@ attrs:
         </form>
         </template>
     </div>
-</header>
-
-<div :if={objects} class="w-full overflow-auto mt-2">
-    <table class="admin-table table-auto">
-        <thead>
-            <tr class="[&>:first-child]:rounded-l-admin-md [&>:last-child]:rounded-r-admin-md">
-                <th :if={table_style != "preview" and actions} class="p-0 pl-1">
-                    <input data-action-checkbox-all class="admin-input" type="checkbox" />
+    </header>
+    <div :if={objects} class="w-full overflow-auto mt-2">
+        <table class="admin-table table-auto">
+            <thead>
+                <tr
+                    class="[&>:first-child]:rounded-l-admin-md [&>:last-child]:rounded-r-admin-md"
+                >
+                    <th :if={table_style != "preview" and actions} class="p-0 pl-1">
+                    <input data-action-checkbox-all class="admin-input" type="checkbox">
                 </th>
-
-                <th :for={field in fields}>
+                    <th :for={field in fields}>
                     <template :if={order_by_field is not None and order_by_field != ""}>
                         <div :if={table_style == "preview"} class="text-xs font-normal">
                             {get_field_label(field)}
                         </div>
-                        <a :if={table_style != "preview"}
+                        <a
+                            :if={table_style != "preview"}
                             data-merge-params
                             class="text-xs font-normal flex items-center gap-1 hover:text-admin-foreground group"
-                            href={"?page=1&order_by=" + ("-" if not order_by_direction else "") + str(field)}>
+                            href={"?page=1&order_by=" + ("-" if not order_by_direction else "") + str(field)}
+                        >
                             <span>{get_field_label(field)}</span>
-                            <span :if={field == order_by_field and order_by_direction == "-"} class="text-[10px]">▼</span>
-                            <span :if={field == order_by_field and order_by_direction != "-"} class="text-[10px]">▲</span>
-                            <span :if={field != order_by_field} class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100">▼</span>
+                            <span
+                                :if={field == order_by_field and order_by_direction == "-"}
+                                class="text-[10px]"
+                            >▼</span>
+                            <span
+                                :if={field == order_by_field and order_by_direction != "-"}
+                                class="text-[10px]"
+                            >▲</span>
+                            <span
+                                :if={field != order_by_field}
+                                class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100"
+                            >▼</span>
                         </a>
                     </template>
                     <template :if={not order_by_field}>
                         <span class="text-xs font-normal text-admin-muted-foreground">{get_field_label(field)}</span>
                     </template>
                 </th>
-
-                <th colspan="99"></th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr :for={(row_index, obj) in enumerate(objects)}>
-                <td :if={table_style != "preview" and actions} class="p-0 pl-1">
-                    <input data-action-checkbox class="admin-input" type="checkbox" name={str(get_object_id(obj))} />
+                    <th colspan="99"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr :for={(row_index, obj) in enumerate(objects)}>
+                    <td :if={table_style != "preview" and actions} class="p-0 pl-1">
+                    <input
+                        data-action-checkbox
+                        class="admin-input"
+                        type="checkbox"
+                        name={str(get_object_id(obj))}
+                    >
                 </td>
-
-                <td :for={field in fields} data-column-autolink={get_object_url(obj)}>
-                    <div class="max-w-prose truncate">{render_value_template(get_field_value_template(obj, field, format_field_value(obj, field, get_field_value(obj, field))), {"object": obj, "field": field, "value": format_field_value(obj, field, get_field_value(obj, field))})}</div>
-                </td>
-
-                <td :if={get_object_links(obj)} class="py-0">
-                    <div class="admin-dropdown-menu">
+                    <td
+                        :for={field in fields}
+                        data-column-autolink={get_object_url(obj)}
+                    >
+                        <div class="max-w-prose truncate">{render_value_template(get_field_value_template(obj, field, format_field_value(obj, field, get_field_value(obj, field))), {"object": obj, "field": field, "value": format_field_value(obj, field, get_field_value(obj, field))})}</div>
+                    </td>
+                    <td :if={get_object_links(obj)} class="py-0">
+                        <div class="admin-dropdown-menu">
                         <button
                             type="button"
                             aria-haspopup="menu"
@@ -125,46 +173,81 @@ attrs:
                             aria-controls={"row-actions-" + str(row_index + 1)}
                             class="admin-btn admin-btn-icon admin-btn-ghost"
                         >
-                            <template :include="elements/admin/Icon" name="three-dots" />
+                            <Icon name="three-dots" />
                         </button>
-                        <div id={"row-actions-" + str(row_index + 1)} data-popover data-align="end" aria-hidden="true" class="w-48">
+                        <div
+                            id={"row-actions-" + str(row_index + 1)}
+                            data-popover
+                            data-align="end"
+                            aria-hidden="true"
+                            class="w-48"
+                        >
                             <div role="menu">
-                                <a :for={(text, link_url) in get_object_links(obj).items()} role="menuitem" href={link_url}>{text}</a>
+                                <a
+                                    :for={(text, link_url) in get_object_links(obj).items()}
+                                    role="menuitem"
+                                    href={link_url}
+                                >{text}</a>
                             </div>
                         </div>
                     </div>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-<div :if={not objects} class="mt-2 border-t border-admin-border py-10 text-center">
-    <p :if={search_query} class="text-sm text-admin-muted-foreground/80">
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div :if={not objects} class="mt-2 border-t border-admin-border py-10 text-center">
+        <p :if={search_query} class="text-sm text-admin-muted-foreground/80">
         No results for "{search_query}"
     </p>
-    <p :if={not search_query} class="text-sm text-admin-muted-foreground/80">
+        <p :if={not search_query} class="text-sm text-admin-muted-foreground/80">
         No items yet
     </p>
-</div>
-
-<footer :if={table_style != "preview" and page and page.has_other_pages()} class="mt-4 sticky bottom-0 [body[data-toolbar-installed]_&]:pb-12 bg-admin-background/95 backdrop-blur-sm border-t border-admin-border pt-4 pb-3">
-    <div class="flex items-center justify-between text-sm">
+    </div>
+    <footer
+        :if={table_style != "preview" and page and page.has_other_pages()}
+        class="mt-4 sticky bottom-0 [body[data-toolbar-installed]_&]:pb-12 bg-admin-background/95 backdrop-blur-sm border-t border-admin-border pt-4 pb-3"
+    >
+        <div class="flex items-center justify-between text-sm">
         <span class="text-admin-muted-foreground">
             Page {page.number} of {page.paginator.num_pages} ({page.paginator.count} results, {page.paginator.per_page} per page)
         </span>
         <div class="flex items-center gap-2">
-            <a :if={page.has_previous()} data-merge-params href={"?page=" + str(page.previous_page_number())} class="admin-btn admin-btn-sm admin-btn-outline">&lt;</a>
+            <a
+                :if={page.has_previous()}
+                data-merge-params
+                href={"?page=" + str(page.previous_page_number())}
+                class="admin-btn admin-btn-sm admin-btn-outline"
+            >&lt;</a>
             <form data-autosubmit method="GET">
-                <input :if={search_fields and search_query} type="hidden" name="search" value={search_query} />
-                <input :if={filter_names and current_filter} type="hidden" name="filter" value={current_filter} />
+                <input
+                    :if={search_fields and search_query}
+                    type="hidden"
+                    name="search"
+                    value={search_query}
+                >
+                <input
+                    :if={filter_names and current_filter}
+                    type="hidden"
+                    name="filter"
+                    value={current_filter}
+                >
                 <select name="page" class="admin-select admin-select-sm w-auto">
-                    <option :for={page_num in page.paginator.page_range} value={page_num} selected={page_num == page.number}>Page {page_num}</option>
+                    <option
+                        :for={page_num in page.paginator.page_range}
+                        value={page_num}
+                        selected={page_num == page.number}
+                    >Page {page_num}</option>
                 </select>
             </form>
-            <a :if={page.has_next()} data-merge-params href={"?page=" + str(page.next_page_number())} class="admin-btn admin-btn-sm admin-btn-outline">&gt;</a>
+            <a
+                :if={page.has_next()}
+                data-merge-params
+                href={"?page=" + str(page.next_page_number())}
+                class="admin-btn admin-btn-sm admin-btn-outline"
+            >&gt;</a>
         </div>
     </div>
-</footer>
-
+    </footer>
 </div>
-</template>
+</Base>

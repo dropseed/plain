@@ -1,9 +1,11 @@
 ---
+components:
+  - base as Base
 attrs:
   request: plain.http.Request = None
 ---
-<template :include="base">
-<template slot="title">SSE demo — live terminal</template>
+<Base>
+<template :slot="title">SSE demo — live terminal</template>
 <style nonce={request.csp_nonce}>
     .terminal-bg {
         background: #0a0e17;
@@ -67,20 +69,22 @@ attrs:
 
 <div class="terminal-bg">
     <div class="max-w-3xl mx-auto px-6 py-16 space-y-12">
-
         <div class="animate-in">
             <div class="flex items-center justify-between mb-3">
-                <h1 class="font-display font-semibold text-[15px] tracking-tight text-zinc-300">
+                <h1
+                    class="font-display font-semibold text-[15px] tracking-tight text-zinc-300"
+                >
                     SSE terminal
                 </h1>
                 <div class="flex items-center gap-2">
-                    <span class="live-dot inline-block w-1.5 h-1.5 rounded-full bg-success"></span>
+                    <span
+                        class="live-dot inline-block w-1.5 h-1.5 rounded-full bg-success"
+                    ></span>
                     <span class="font-mono text-[11px] text-success">live</span>
                 </div>
             </div>
             <div class="separator"></div>
         </div>
-
         <div class="animate-in delay-1">
             <div class="text-zinc-500 font-display text-[13px] mb-3">System clock</div>
             <div
@@ -88,15 +92,12 @@ attrs:
                 class="font-mono text-6xl sm:text-7xl tracking-tight text-success clock-glow tabular-nums"
             >--:--:--</div>
         </div>
-
         <div class="separator animate-in delay-2"></div>
-
         <div class="animate-in delay-2">
             <div class="flex items-center justify-between mb-5">
                 <div class="text-zinc-500 font-display text-[13px]">Market feed</div>
                 <div class="font-mono text-[11px] text-zinc-600" id="update-counter">0 updates</div>
             </div>
-
             <div id="ticker" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div
                     id="stock-ACME"
@@ -109,7 +110,6 @@ attrs:
                     <div class="price font-mono text-3xl text-white tabular-nums mb-3">--</div>
                     <div class="price-bar w-0 bg-zinc-700"></div>
                 </div>
-
                 <div
                     id="stock-GLOB"
                     class="card-surface rounded p-5 transition-all duration-300 animate-in delay-3"
@@ -121,7 +121,6 @@ attrs:
                     <div class="price font-mono text-3xl text-white tabular-nums mb-3">--</div>
                     <div class="price-bar w-0 bg-zinc-700"></div>
                 </div>
-
                 <div
                     id="stock-WIDG"
                     class="card-surface rounded p-5 transition-all duration-300 animate-in delay-4"
@@ -135,9 +134,7 @@ attrs:
                 </div>
             </div>
         </div>
-
         <div class="separator animate-in delay-3"></div>
-
         <div class="animate-in delay-4 flex items-center justify-between">
             <div class="font-mono text-[11px] text-zinc-600">
                 EventSource &middot; server-sent events
@@ -196,4 +193,4 @@ attrs:
             : "rgba(150, 59, 47, 0.55)";
     });
 </script>
-</template>
+</Base>

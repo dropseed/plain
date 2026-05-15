@@ -4,7 +4,7 @@ The plain frontmatter parser hands back YAML primitives — strings, dicts,
 lists. For type checking we need stronger structure: each `attrs:` entry
 becomes a (type-expression, default-expression?) pair; each `imports:`
 line becomes a validated Python import statement; each `slots:` entry
-becomes a required/optional + optional `yields:` type.
+becomes a required/optional flag.
 
 Validation happens here so the synthesis layer can assume well-formed
 inputs. Errors raise `DeclarationError` with a human-readable message.
@@ -13,7 +13,7 @@ inputs. Errors raise `DeclarationError` with a human-readable message.
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -34,11 +34,10 @@ class AttrDeclaration:
 
 @dataclass
 class SlotDeclaration:
-    """One entry in `slots:` — name, required, optional `yields:` type-expression source."""
+    """One entry in `slots:` — name plus required/optional flag."""
 
     name: str
     required: bool
-    yields_source: str | None
 
 
 @dataclass
@@ -49,10 +48,20 @@ class ImportDeclaration:
 
 
 @dataclass
+class ComponentDeclaration:
+    """One entry in `components:` — the PascalCase tag name and the
+    template path string it resolves to."""
+
+    name: str
+    path: str
+
+
+@dataclass
 class Declarations:
     attrs: list[AttrDeclaration]
     imports: list[ImportDeclaration]
     slots: list[SlotDeclaration]
+    components: list[ComponentDeclaration] = field(default_factory=list)
 
 
 def parse(frontmatter: dict) -> Declarations:
@@ -65,7 +74,19 @@ def parse(frontmatter: dict) -> Declarations:
         attrs=_parse_attrs(frontmatter.get("attrs") or {}),
         imports=_parse_imports(frontmatter.get("imports") or []),
         slots=_parse_slots(frontmatter.get("slots") or {}),
+        components=_parse_components(frontmatter.get("components")),
     )
+
+
+def _parse_components(raw: object) -> list[ComponentDeclaration]:
+    """Parse the `components:` key via the shared components parser."""
+    from ..components import ComponentsError, parse_components
+
+    try:
+        mapping = parse_components(raw)
+    except ComponentsError as exc:
+        raise DeclarationError(str(exc)) from exc
+    return [ComponentDeclaration(name=n, path=p) for n, p in mapping.items()]
 
 
 def _parse_attrs(raw: object) -> list[AttrDeclaration]:
@@ -245,23 +266,16 @@ def _parse_slot_value(name: str, value: Any) -> SlotDeclaration:
     if isinstance(value, str):
         token = value.strip().lower()
         if token == "required":
-            return SlotDeclaration(name=name, required=True, yields_source=None)
+            return SlotDeclaration(name=name, required=True)
         if token == "optional":
-            return SlotDeclaration(name=name, required=False, yields_source=None)
+            return SlotDeclaration(name=name, required=False)
         raise DeclarationError(
             f"`slots.{name}` must be 'required' or 'optional', got {value!r}"
         )
     if isinstance(value, dict):
         required_field = value.get("required")
         required = bool(required_field) if required_field is not None else False
-        yields_source: str | None = None
-        if "yields" in value:
-            yields_source = _validate_type_expression(
-                f"slots.{name}.yields", str(value["yields"])
-            )
-        return SlotDeclaration(
-            name=name, required=required, yields_source=yields_source
-        )
+        return SlotDeclaration(name=name, required=required)
     raise DeclarationError(
         f"`slots:` entry {name!r} must be a string or mapping, got {type(value).__name__}"
     )

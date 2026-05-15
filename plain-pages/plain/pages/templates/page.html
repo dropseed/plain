@@ -1,10 +1,12 @@
 ---
 imports:
   - from plain.html import mark_safe
+components:
+  - base as Base
 attrs:
   page: Any
 ---
-<template :include="base">
-<template slot="title">{page.title}</template>
+<Base>
+<template :slot="title">{page.title}</template>
 {mark_safe(page.content)}
-</template>
+</Base>

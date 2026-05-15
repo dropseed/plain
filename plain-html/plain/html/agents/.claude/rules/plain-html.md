@@ -6,7 +6,7 @@ paths:
 
 # HTML Templates
 
-Templates are `.html` files under `templates/` (in your app or any installed package). One file per template/component — components are just templates you `:include`.
+Templates are `.html` files under `templates/` (in your app or any installed package). One file per template/component — components are just templates invoked as PascalCase tags.
 
 ## Expressions
 
@@ -16,15 +16,34 @@ Templates are `.html` files under `templates/` (in your app or any installed pac
 
 ## Directives (attribute form, prefixed with `:`)
 
-- `:if={expr}` — conditional render. `<template :if={...}>...</template>` for no wrapping element.
-- `:for={item in items}` — repeat element. Tuple unpacking works: `:for={(i, x) in enumerate(xs)}`.
-- `:include="path/To/Component"` — literal string resolves at compile time. Expression form `:include={name}` resolves at render time. Children become the default slot; use `<template slot="name">` for named slots.
+Every colon attribute is a directive — consumed and stripped, never rendered. The set is `:if`, `:elif`, `:else`, `:for`, `:slot`.
+
+- `:if={expr}` / `:elif={expr}` / `:else` — conditional chain. `:elif` / `:else` must be the next element sibling of their predecessor (only whitespace/comments between). `<template :if={...}>...</template>` for no wrapping element.
+- `:for={clause}` — repeat element. Clause is a Python comprehension clause: one `for` plus any number of `if` filters (`:for={x in xs if x.visible}`). Tuple unpacking works (`:for={(i, x) in enumerate(xs)}`). Multiple `for` clauses are disallowed — nest `<template :for>`.
+- A conditional directive and `:for` on the **same element** is a compile error — gate a loop with `<template :if>`, filter items with the `:for` clause's `if`.
+- `:slot="name"` — caller-side, marks an element as content for a named slot. Literal string value. Use `<template :slot="name">` to group multiple elements.
+
+## Components
+
+- Components are PascalCase tags. List each one under the `components:` frontmatter key, then invoke it: `<Card>...</Card>` or self-closing `<Card />`.
+- Tag name = path's last segment (`components/Card` → `<Card>`); use `as Name` to rename (`base as Base`).
+- Resolved tag name MUST be PascalCase. Lowercase tags are always plain HTML — you cannot shadow `<button>`.
+- There is no `<template :include>` — that syntax is removed. Component tags are the only way to invoke a component.
+- Layouts are ordinary components — no `extends` / `layout:`. Import the layout and render content inside it.
+
+## Slots
+
+- A component declares slots in `slots:` and reads them as bindings: `{children}` is the default slot, named slots by their declared name.
+- Caller: unmarked direct children fall through to the default slot; `:slot="name"` routes content to a named slot.
+- Required slot → `Markup`; optional slot not provided → `None`. Two elements with the same `:slot` value is a compile error.
+- No parametric slots — no `:let`, no `yields:`. Use composition.
 
 ## Frontmatter
 
-YAML between `---` fences at the top of the file. Three keys:
+YAML between `---` fences at the top of the file. Four keys:
 
 - `imports:` — list of import statements; run once at module load, visible in every `{expr}`.
+- `components:` — list of `path` or `path as Name` entries; templates to invoke as PascalCase tags.
 - `attrs:` — declared inputs (`name: type` or `name: type = default`). Used at runtime AND by `plain html check --typecheck`.
 - `slots:` — declared slot names (`name: required` / `name: optional`).
 
@@ -44,7 +63,7 @@ In this repo's templates (admin, toolbar, packages), the same CSP rules apply as
 
 ## CLI
 
-- `uv run plain html check` — parse + validate every template (add `--typecheck` to run `ty` over `{expr}` against `attrs:` / `imports:`).
+- `uv run plain html check` — parse + validate every template (add `--typecheck` to run `ty` over `{expr}` and component call sites against `attrs:` / `imports:` / `components:`).
 - `uv run plain html format` — canonicalize whitespace and attribute order in place. Use `--check` in CI.
 - `uv run plain html compile` — pre-fill the on-disk cache (deploy-time warm).
 

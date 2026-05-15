@@ -1,4 +1,6 @@
 ---
+components:
+  - components/FieldErrors
 attrs:
   bf: Any
   label: str
@@ -28,7 +30,11 @@ attrs:
             id={bf.html_id}
             required={required}
         >
-            <option :for={(value, choice_label) in bf.field.choices} value={value} selected={str(bf.value()) == str(value)}>{choice_label}</option>
+            <option
+                :for={(value, choice_label) in bf.field.choices}
+                value={value}
+                selected={str(bf.value()) == str(value)}
+            >{choice_label}</option>
         </select>
     </template>
     <template :if={type not in ("textarea", "select")}>
@@ -44,5 +50,5 @@ attrs:
             placeholder={placeholder or None}
         >
     </template>
-    <template :include="./field_errors" bf={bf} />
+    <FieldErrors bf={bf} />
 </div>

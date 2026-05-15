@@ -18,7 +18,7 @@ from .. import frontmatter as fm
 from ..positions import body_offset, offset_to_line_col
 from . import cache
 from .backends import Backend, BackendDiagnostic, BackendError, resolve
-from .declarations import DeclarationError
+from .declarations import DeclarationError, Declarations
 from .declarations import parse as parse_declarations
 from .synth import SourceMapEntry, Synthesis, synthesize
 
@@ -83,11 +83,17 @@ def check_source(
         else resolve(os.environ.get("PLAIN_HTML_TYPECHECK_BACKEND"))
     )
 
+    # Resolve component files up front: their `attrs:` feed the synth pass,
+    # and their full source must fold into the cache key so editing a
+    # component invalidates this parent template's cached result.
+    component_attrs, component_sources = _resolve_components(declarations, path)
+
     key = cache.cache_key(
         source=source,
         declarations=declarations,
         backend_name=active_backend.name,
         backend_version=active_backend.version,
+        component_sources=component_sources,
     )
 
     if use_cache:
@@ -95,7 +101,7 @@ def check_source(
         if cached is not None:
             return [_from_cache(entry, path) for entry in cached]
 
-    synth = synthesize(body, declarations)
+    synth = synthesize(body, declarations, component_attrs=component_attrs)
     diagnostics = _run_backend(active_backend, synth)
     errors = _map_diagnostics(diagnostics, synth, source, path)
 
@@ -107,6 +113,47 @@ def check_source(
         )
 
     return errors
+
+
+def _resolve_components(
+    declarations: Declarations, path: Path | None
+) -> tuple[dict[str, list], dict[str, str]]:
+    """Resolve each declared component to its `attrs:` and raw source.
+
+    Returns `(component_attrs, component_sources)`:
+    - `component_attrs` — `dict[tag_name -> list[AttrDeclaration]]`, used to
+      type-check component-tag call sites against the imported signature.
+    - `component_sources` — `dict[tag_name -> str]`, the component file's
+      full content, folded into the cache key so editing a component
+      invalidates a parent template's cached result.
+
+    Best-effort: a component whose file can't be located or whose
+    frontmatter can't be parsed is silently skipped — the structural
+    `plain html check` pass surfaces those problems separately, and a
+    typecheck pass should never crash because a sibling template is
+    broken. A component that can't be resolved contributes nothing to
+    either dict (and so nothing to the cache key).
+    """
+    if not declarations.components:
+        return {}, {}
+
+    from ..loader import find_template
+
+    attrs_out: dict[str, list] = {}
+    sources_out: dict[str, str] = {}
+    for component in declarations.components:
+        try:
+            component_path = find_template(component.path, current_template=path)
+            component_source = component_path.read_text(encoding="utf-8")
+            component_fm, _ = fm.split(component_source)
+            component_decls = parse_declarations(component_fm)
+        except Exception:
+            # Best-effort: a missing / broken component file is reported by
+            # the structural pass, not here. Skip and keep checking.
+            continue
+        attrs_out[component.name] = component_decls.attrs
+        sources_out[component.name] = component_source
+    return attrs_out, sources_out
 
 
 def _run_backend(backend: Backend, synth: Synthesis) -> list[BackendDiagnostic]:

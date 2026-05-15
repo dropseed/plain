@@ -1,4 +1,9 @@
 ---
+components:
+  - elements/admin/Label
+  - elements/admin/Input
+  - elements/admin/Help
+  - elements/admin/FieldErrors
 attrs:
   field: Any
   label: str
@@ -6,8 +11,8 @@ attrs:
   help: str = ""
 ---
 <div class="space-y-1">
-    <template :include="elements/admin/Label" field={field}>{label}</template>
-    <template :include="elements/admin/Input" field={field} type={type} />
-    <template :if={help} :include="elements/admin/Help" help={help} />
-    <template :include="elements/admin/FieldErrors" field={field} />
+    <Label field={field}>{label}</Label>
+    <Input field={field} type={type} />
+    <Help :if={help} help={help} />
+    <FieldErrors field={field} />
 </div>

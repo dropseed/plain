@@ -12,14 +12,15 @@ attrs:
 <div class="inline-flex items-center gap-px">
 
     {# Record dot — separate clickable circle, tight against the pill #}
-    <button :if={observer.is_summarizing() or observer.is_persist_once()}
+    <button
+        :if={observer.is_summarizing() or observer.is_persist_once()}
         type="button"
         class="inline-flex items-center justify-center cursor-pointer rounded-full px-1.5 py-px bg-white/8 text-white/30 hover:text-red-400 hover:bg-white/12 transition-colors self-stretch"
         data-observer-record-page
         title="Record this page"
     >
         <svg class="size-1.5" viewBox="0 0 16 16" fill="currentColor">
-            <circle cx="8" cy="8" r="8"/>
+            <circle cx="8" cy="8" r="8" />
         </svg>
     </button>
 
@@ -31,12 +32,17 @@ attrs:
     >
         <span :if={observer.is_recording_session()} class="inline-flex items-center">
             <span class="relative inline-flex size-1.5 mr-1.5 flex-shrink-0">
-                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+                <span
+                    class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"
+                ></span>
                 <span class="relative inline-flex size-1.5 rounded-full bg-red-500"></span>
             </span>
             <span class="text-[11px]">Recording</span>
         </span>
-        <span :if={not observer.is_recording_session() and not observer.is_enabled()} class="inline-flex items-center gap-1.5">
+        <span
+            :if={not observer.is_recording_session() and not observer.is_enabled()}
+            class="inline-flex items-center gap-1.5"
+        >
             <span class="rounded-full bg-zinc-500 size-1.5 flex-shrink-0"></span>
             <span class="text-[11px]">Disabled</span>
         </span>
@@ -49,7 +55,8 @@ attrs:
                 title="SQL queries"
                 data-level={trace_stats["query_level"] if trace_stats["query_level"] != "ok" else None}
             >{trace_stats["query_count"]}{("+" + str(trace_stats["duplicate_count"])) if trace_stats["duplicate_count"] else ""} {"query" if trace_stats["query_count"] == 1 else "queries"}</span>
-            <span :if={trace_stats["duration_display"]}
+            <span
+                :if={trace_stats["duration_display"]}
                 class="text-[11px] text-white/50
                        data-[level=warn]:text-amber-400
                        data-[level=danger]:text-red-400"
@@ -69,8 +76,15 @@ attrs:
     </button>
 
     {# System pill — CPU and memory, non-interactive #}
-    <span :if={system_stats} class="inline-flex items-center text-xs rounded-full px-1 py-px bg-white/8 overflow-hidden divide-x divide-white/10 [&>span]:px-1.5">
-        <span :if={"cpu_percent" in system_stats} class="items-baseline text-[11px] tabular-nums" title="Server process CPU usage">
+    <span
+        :if={system_stats}
+        class="inline-flex items-center text-xs rounded-full px-1 py-px bg-white/8 overflow-hidden divide-x divide-white/10 [&>span]:px-1.5"
+    >
+        <span
+            :if={"cpu_percent" in system_stats}
+            class="items-baseline text-[11px] tabular-nums"
+            title="Server process CPU usage"
+        >
             <span class="text-[9px] text-white/30 mr-0.5">CPU</span>
             <span
                 class="text-white/50
@@ -79,7 +93,11 @@ attrs:
                 data-level={system_stats["cpu_level"] if system_stats["cpu_level"] != "ok" else None}
             >{system_stats["cpu_percent"]}%</span>
         </span>
-        <span :if={system_stats["mem_display"]} class="items-baseline text-[11px] tabular-nums" title={system_stats["mem_title"]}>
+        <span
+            :if={system_stats["mem_display"]}
+            class="items-baseline text-[11px] tabular-nums"
+            title={system_stats["mem_title"]}
+        >
             <span class="text-[9px] text-white/30 mr-0.5">MEM</span>
             <span
                 class="text-white/50
@@ -91,7 +109,6 @@ attrs:
     </span>
 
 </div>
-
 {# Carrier element exposes server-side values to the inline JS via data attrs
    (CSP-safe: script body is opaque, no expression interpolation). #}
 <div
@@ -100,7 +117,6 @@ attrs:
     data-persist-once={"true" if observer.is_persist_once() else "false"}
     hidden
 ></div>
-
 <script nonce={request.csp_nonce}>
 (function() {
     var config = document.querySelector("[data-observer-button-config]");

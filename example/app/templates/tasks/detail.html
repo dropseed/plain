@@ -1,48 +1,54 @@
 ---
 imports:
   - from plain.urls import reverse as url
+components:
+  - base as Base
+  - components/BackLink
+  - components/HtmxFragment
+  - components/FieldErrors
 attrs:
   task: app.tasks.models.Task
   title_form: Any
 ---
-<template :include="base">
-<template slot="title">{task.title}</template>
+<Base>
+<template :slot="title">{task.title}</template>
 <div class="max-w-2xl mx-auto px-5 py-12">
-    <template :include="components/back_link" href={url('tasks:list')} label="Back to tasks" />
-
-    <template :include="components/htmxfragment" name="title">
-    <div>
-        <form hx-post plain-hx-action="rename" class="flex items-center gap-2">
-            <input
-                aria-label="Task title"
-                class="flex-1 page-h1 bg-transparent border border-transparent hover:border-outline focus:border-ink focus:ring-[3px] focus:ring-ink/15 rounded px-2 py-1 outline-none"
-                type="text"
-                name={title_form.title.html_name}
-                id={title_form.title.html_id}
-                value={title_form.title.value() or task.title}
-            >
-            <button type="submit" class="btn-primary">Rename</button>
-        </form>
-        <template :include="components/field_errors" bf={title_form.title} />
-    </div>
-    </template>
-
+    <BackLink href={url('tasks:list')} label="Back to tasks" />
+    <HtmxFragment name="title">
+        <div>
+            <form hx-post plain-hx-action="rename" class="flex items-center gap-2">
+                <input
+                    aria-label="Task title"
+                    class="flex-1 page-h1 bg-transparent border border-transparent hover:border-outline focus:border-ink focus:ring-[3px] focus:ring-ink/15 rounded px-2 py-1 outline-none"
+                    type="text"
+                    name={title_form.title.html_name}
+                    id={title_form.title.html_id}
+                    value={title_form.title.value() or task.title}
+                >
+                <button type="submit" class="btn-primary">Rename</button>
+            </form>
+            <FieldErrors bf={title_form.title} />
+        </div>
+    </HtmxFragment>
     <div class="mt-3 text-[12px] text-muted">
         {task.priority}
         <template :if={task.due_date}> · due <span class="font-mono">{task.due_date}</span></template>
         <template :if={task.project}> · {task.project.name}</template>
         <template :if={task.is_complete}> · <span class="text-success">complete</span></template>
     </div>
-
-    <div :if={task.notes} class="mt-6 text-sm text-body whitespace-pre-wrap leading-relaxed">{task.notes}</div>
-
+    <div
+        :if={task.notes}
+        class="mt-6 text-sm text-body whitespace-pre-wrap leading-relaxed"
+    >{task.notes}</div>
     <div :if={list(task.tags.query)} class="mt-6 flex flex-wrap gap-2">
-        <span :for={tag in task.tags.query} class="text-[12px] text-muted bg-warm-tint border border-outline px-2 py-0.5 rounded-sm">#{tag.name}</span>
+        <span
+            :for={tag in task.tags.query}
+            class="text-[12px] text-muted bg-warm-tint border border-outline px-2 py-0.5 rounded-sm"
+        >#{tag.name}</span>
     </div>
-
     <div class="mt-8 flex gap-2">
         <a href={url('tasks:update', id=task.id)} class="btn-primary">Edit</a>
         <a href={url('tasks:delete', id=task.id)} class="btn-secondary">Delete</a>
     </div>
 </div>
-</template>
+</Base>

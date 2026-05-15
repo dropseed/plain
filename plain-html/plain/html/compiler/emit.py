@@ -11,7 +11,7 @@ offset of the node that produced it. `emit_module` returns the source +
 a `gen_line → tpl_offset` map; the session uses it to remap AST line
 numbers so tracebacks point at the template, not the generated `.py`.
 
-`:if` / `:for` become real Python control flow. `:include` sites call
+`:if` / `:for` become real Python control flow. Component-tag sites call
 the resolved child `_inc_N` render function injected into module globals
 by `CompileSession`. Expression interiors are rewritten by
 `.expressions.rewrite_expression` so free names load from `_ctx`.
@@ -73,10 +73,10 @@ class _Emit:
     `target_list` is the Python identifier of the buffer (a `list[str]`)
     we're currently appending to. It defaults to `_out` (the function's
     output buffer) and switches to per-slot accumulator names while
-    rendering an include's slot children — that's how the same emission
+    rendering a component's slot children — that's how the same emission
     machinery can produce sub-buffers without copying.
 
-    `include_renders` maps each `:include` node (by id) to the Python
+    `include_renders` maps each component-tag node (by id) to the Python
     name (`_inc_0`, `_inc_1`, …) that the CompileSession will inject
     into module globals before exec.
 
@@ -240,8 +240,7 @@ def emit_module(
     e.local_stack[0] |= module_globals
     e.local_stack[0] |= set(promoted_attrs)
     e.local_stack[0] |= set(promoted_slots)
-    for node in tree:
-        _emit_node(node, e)
+    _emit_nodes(tree, e)
     e._flush()
 
     header: list[str] = []
@@ -251,8 +250,7 @@ def emit_module(
     header.append(
         "from plain.html._runtime import "
         "escape_html, escape_url, "
-        "render_dyn_attr, render_dyn_url_attr, normalize_keywords, "
-        "resolve_dynamic_include as _resolve_dynamic_include"
+        "render_dyn_attr, render_dyn_url_attr, normalize_keywords"
     )
     header.append("from plain.utils.safestring import mark_safe")
     # `Markup` is the spec-named alias users reach for; `_mark_safe` is the
@@ -354,6 +352,83 @@ def emit_module(
 # --- per-node emission ------------------------------------------------------
 
 
+def _emit_nodes(nodes: list[Node], e: _Emit) -> None:
+    """Emit a sequence of sibling nodes, gathering `:if`/`:elif`/`:else`
+    chains into a single Python `if / elif* / else?` block.
+
+    A plain node emits via `_emit_node`. An element carrying `:if` opens a
+    conditional chain: the contiguous run of following `:elif`/`:else`
+    elements (skipping whitespace and comment nodes between members) is
+    collected and emitted as one Python conditional. Whitespace/comment
+    nodes that sit *between* chain members are dropped — they don't belong
+    to any branch.
+    """
+    i = 0
+    n = len(nodes)
+    while i < n:
+        node = nodes[i]
+        if isinstance(node, ElementNode) and node.if_code is not None:
+            chain, next_i = _gather_chain(nodes, i)
+            _emit_conditional_chain(chain, e)
+            i = next_i
+            continue
+        _emit_node(node, e)
+        i += 1
+
+
+def _gather_chain(nodes: list[Node], start: int) -> tuple[list[ElementNode], int]:
+    """Collect the conditional chain that begins at `nodes[start]`.
+
+    Returns the chain elements (the `:if`, then any `:elif`/`:else`
+    members) and the index of the first node *after* the chain.
+    """
+    first = nodes[start]
+    assert isinstance(first, ElementNode)  # caller checks before calling
+    chain: list[ElementNode] = [first]
+    i = start + 1
+    n = len(nodes)
+    saw_else = False
+    while i < n:
+        node = nodes[i]
+        if isinstance(node, TextNode) and not node.text.strip():
+            i += 1
+            continue
+        if isinstance(node, HtmlCommentNode | TemplateCommentNode):
+            i += 1
+            continue
+        if isinstance(node, ElementNode) and not saw_else:
+            if node.elif_code is not None:
+                chain.append(node)
+                i += 1
+                continue
+            if node.is_else:
+                chain.append(node)
+                saw_else = True
+                i += 1
+                continue
+        break
+    return chain, i
+
+
+def _emit_conditional_chain(chain: list[ElementNode], e: _Emit) -> None:
+    """Emit a gathered `:if`/`:elif`/`:else` chain as Python control flow."""
+    for idx, node in enumerate(chain):
+        saved_offset = e.current_offset
+        e.current_offset = node.offset or saved_offset
+        try:
+            if idx == 0:
+                assert node.if_code is not None
+                e.block_start(f"if {e.rewrite_expr(node.if_code)}:")
+            elif node.elif_code is not None:
+                e.block_start(f"elif {e.rewrite_expr(node.elif_code)}:")
+            else:
+                e.block_start("else:")
+            _emit_element_body(node, e)
+            e.block_end()
+        finally:
+            e.current_offset = saved_offset
+
+
 def _emit_node(node: Node, e: _Emit) -> None:
     # Stamp every text/expr fragment emitted from this node with the node's
     # body offset so flushed `_append(...)` lines map back to the template.
@@ -380,76 +455,75 @@ def _emit_node(node: Node, e: _Emit) -> None:
 
 
 def _emit_element(node: ElementNode, e: _Emit) -> None:
-    # `:if` / `:for` wrap whatever the element emits — including an include
-    # call. Evaluate them in the outer scope before the element body.
-    if node.if_code is not None:
-        e.block_start(f"if {e.rewrite_expr(node.if_code)}:")
+    # A standalone element reached here has no conditional directive — the
+    # `:if`/`:elif`/`:else` chain handling lives in `_emit_nodes`. Just
+    # emit the `:for` (if any) plus the element body.
+    _emit_element_body(node, e)
 
+
+def _emit_element_body(node: ElementNode, e: _Emit) -> None:
+    """Emit an element's `:for` loop (if any) plus its body.
+
+    Deliberately ignores `if_code` / `elif_code` / `is_else` — the
+    conditional chain wrapping is the caller's job (`_emit_nodes`).
+    """
     if node.for_clause is not None:
         iter_expr = e.rewrite_expr(node.for_clause.iter_code)
         targets = node.for_clause.raw_target or ", ".join(node.for_clause.targets)
         e.block_start(f"for {targets} in {iter_expr}:")
         # Loop targets become real Python locals inside the for body.
         e.push_locals(set(node.for_clause.targets))
+        if node.for_clause.filter_code is not None:
+            e.block_start(f"if {e.rewrite_expr(node.for_clause.filter_code)}:")
 
-    if node.include_path is not None or node.include_path_code is not None:
+    if node.include_path is not None:
         _emit_static_include(node, e)
     elif node.tag == "template":
         # Transparent fragment — emit children inline, no wrapper.
         # `slot_name` here is harmless metadata; it only matters when this
-        # template is a direct child of a parent `:include` (handled by the
+        # template is a direct child of a parent component (handled by the
         # parent's slot routing, not by this branch).
-        for child in node.children:
-            _emit_node(child, e)
+        _emit_nodes(node.children, e)
     else:
         e.text(f"<{node.tag}")
         for attr in node.attrs:
             _emit_attribute(attr, e)
         e.text(">")
         if not (node.self_closing or node.tag in VOID_ELEMENTS):
-            for child in node.children:
-                _emit_node(child, e)
+            _emit_nodes(node.children, e)
             e.text(f"</{node.tag}>")
 
     if node.for_clause is not None:
+        if node.for_clause.filter_code is not None:
+            e.block_end()
         e.pop_locals()
-        e.block_end()
-    if node.if_code is not None:
         e.block_end()
 
 
 def _emit_static_include(node: ElementNode, e: _Emit) -> None:
-    """Emit code for a `<template :include="..." ...>...</template>` site.
+    """Emit code for a component-tag site (`<Card ...>...</Card>`).
 
-    Slot routing matches the interpreter's `_render_include`:
-      - Children with `slot="name"` route into the named slot.
-        `<template slot="x">` contributes only its inner children
+    Slot routing:
+      - Children with `:slot="name"` route into the named slot.
+        `<template :slot="x">` contributes only its inner children
         (the `<template>` wrapper is dropped). Other elements with
-        `slot="..."` contribute the element itself (the parser already
-        stripped the `slot` attribute from `attrs`).
+        `:slot="..."` contribute the element itself.
       - All other children collect in the `default` slot.
 
     Each slot's content is rendered in the PARENT's scope into a fresh
     accumulator (`_slot_acc_N`). The rendered strings are passed to the
-    child as kwargs, alongside the include's explicit attrs and the
+    child as kwargs, alongside the component's explicit attrs and the
     propagated `_root_ctx`.
     """
-    # Static include sites have a pre-assigned `_inc_N` slot in module globals
-    # populated by the CompileSession; dynamic sites resolve at render time.
-    is_dynamic = node.include_path_code is not None
-    if is_dynamic:
-        dyn_path_expr = e.rewrite_expr(node.include_path_code)  # type: ignore[arg-type]
-        # Each dynamic site needs its own local to hold the resolved render
-        # fn — `id(node)` makes the name unique across nested includes.
-        slot_name_var = f"_inc_dyn_{abs(id(node))}"
-    else:
-        slot_name_var = e.include_renders.get(id(node))
-        if slot_name_var is None:
-            raise CompileError(
-                "internal: `:include` site missing from compile session — "
-                "this shouldn't happen unless CompileSession.compile_string() "
-                "was used on a template that needs compile_path()"
-            )
+    # Component sites have a pre-assigned `_inc_N` slot in module globals
+    # populated by the CompileSession.
+    slot_name_var = e.include_renders.get(id(node))
+    if slot_name_var is None:
+        raise CompileError(
+            "internal: component site missing from compile session — "
+            "this shouldn't happen unless CompileSession.compile_string() "
+            "was used on a template that needs compile_path()"
+        )
 
     default_children: list[Node] = []
     named_slots: dict[str, list[Node]] = {}
@@ -492,16 +566,10 @@ def _emit_static_include(node: ElementNode, e: _Emit) -> None:
     if dict_items:
         parts.append("**{" + ", ".join(dict_items) + "}")
 
-    if is_dynamic:
-        # Resolve the target template once per render of this site, then call.
-        e.line(
-            f"{slot_name_var} = _resolve_dynamic_include("
-            f"{dyn_path_expr}, current_template=__template_source__)"
-        )
-    # Include call result is a `str` — feed into the fragment buffer so the
+    # Component call result is a `str` — feed into the fragment buffer so the
     # call coalesces with surrounding text rather than emitting a standalone
-    # `_append(...)`. In an `:include`-in-loop body that matters: the loop
-    # iteration drops from "3 calls + the include" to "1 call wrapping
+    # `_append(...)`. In a component-in-loop body that matters: the loop
+    # iteration drops from "3 calls + the component" to "1 call wrapping
     # everything in the run".
     e.expr_frag(f"{slot_name_var}({', '.join(parts)})")
 
@@ -522,8 +590,7 @@ def _render_slot_to_var(children: list[Node], e: _Emit) -> str:
 
     saved = e.target_list
     e.target_list = acc_var
-    for child in children:
-        _emit_node(child, e)
+    _emit_nodes(children, e)
     e._flush()
     e.target_list = saved
 

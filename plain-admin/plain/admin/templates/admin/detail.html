@@ -1,6 +1,9 @@
 ---
 imports:
   - from plain.admin.html import render_value_template
+components:
+  - admin/base as Base
+  - elements/admin/Icon
 attrs:
   object: Any
   fields: list = []
@@ -21,23 +24,36 @@ slots:
   default: optional
   actions: optional
 ---
-<template :include="admin/base"
-    title={title} app_name={app_name} admin_force_theme={admin_force_theme}
-    description={description} image={image} links={links} extra_links={extra_links}
-    parent_view_classes={parent_view_classes} object={object} cards={cards}>
-<template :if={actions} slot="actions">{actions}</template>
+<Base
+    title={title}
+    app_name={app_name}
+    admin_force_theme={admin_force_theme}
+    description={description}
+    image={image}
+    links={links}
+    extra_links={extra_links}
+    parent_view_classes={parent_view_classes}
+    object={object}
+    cards={cards}
+>
+<template :if={actions} :slot="actions">{actions}</template>
 <details class="admin-card group" open>
-    <summary class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4">
+    <summary
+        class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4"
+    >
         <h3 class="text-lg font-semibold">{object.__class__.__name__} Details</h3>
-        <template :include="elements/admin/Icon" name="chevron-right" class="text-admin-muted-foreground transition-transform group-open:rotate-90" />
+        <Icon
+            name="chevron-right"
+            class="text-admin-muted-foreground transition-transform group-open:rotate-90"
+        />
     </summary>
     <section class="px-6 pb-6">
         <dl class="grid grid-cols-[auto_1fr] gap-x-8">
             <template :for={field in fields}>
-            <dt class="whitespace-nowrap py-1.5">{get_field_label(field)}</dt>
-            <dd class="py-1.5 min-w-0">{render_value_template(get_field_value_template(object, field, format_field_value(object, field, get_field_value(object, field))), {"object": object, "field": field, "value": format_field_value(object, field, get_field_value(object, field))})}</dd>
+                <dt class="whitespace-nowrap py-1.5">{get_field_label(field)}</dt>
+                <dd class="py-1.5 min-w-0">{render_value_template(get_field_value_template(object, field, format_field_value(object, field, get_field_value(object, field))), {"object": object, "field": field, "value": format_field_value(object, field, get_field_value(object, field))})}</dd>
             </template>
         </dl>
     </section>
 </details>
-</template>
+</Base>

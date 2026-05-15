@@ -1,14 +1,19 @@
 ---
 imports:
   - from plain.urls import reverse as url
+components:
+  - base as Base
+  - components/BackLink
+  - components/NonfieldErrors
+  - components/Field
+  - components/FieldErrors
 attrs:
   form: Any
 ---
-<template :include="base">
-<template slot="title">Contact us</template>
+<Base>
+<template :slot="title">Contact us</template>
 <div class="max-w-2xl mx-auto px-5 py-12">
-    <template :include="components/back_link" href={url('index')} label="Back to index" />
-
+    <BackLink href={url('index')} label="Back to index" />
     <h1 class="page-h1">Contact us</h1>
     <p class="mt-3 text-sm text-muted">
         Plain <span class="font-mono text-body">forms.Form</span> with text, email, choice, boolean,
@@ -17,14 +22,23 @@ attrs:
         <span class="font-mono text-body">company</span> field via
         <a class="body-link" href="?company=1">?company=1</a>.
     </p>
-
     <form method="post" class="mt-6 flex flex-col gap-5">
-        <template :include="components/nonfield_errors" form={form} />
-        <template :include="components/field" bf={form.name} label="Name" autofocus={True} required={True} />
-        <template :include="components/field" bf={form.email} label="Email" type="email" required={True} />
-        <template :include="components/field" bf={form.subject} label="Subject" type="select" required={True} />
-        <template :if={'company' in form.fields} :include="components/field" bf={form.company} label="Company (optional)" />
-        <template :include="components/field" bf={form.message} label="Message" type="textarea" min_height="160px" required={True} />
+        <NonfieldErrors form={form} />
+        <Field bf={form.name} label="Name" autofocus={True} required={True} />
+        <Field bf={form.email} label="Email" type="email" required={True} />
+        <Field bf={form.subject} label="Subject" type="select" required={True} />
+        <Field
+            :if={'company' in form.fields}
+            bf={form.company}
+            label="Company (optional)"
+        />
+        <Field
+            bf={form.message}
+            label="Message"
+            type="textarea"
+            min_height="160px"
+            required={True}
+        />
 
         <div>
             <label class="flex items-center gap-2 text-sm text-body">
@@ -36,15 +50,14 @@ attrs:
                 >
                 Subscribe to the newsletter
             </label>
-            <template :include="components/field_errors" bf={form.subscribe} />
+            <FieldErrors bf={form.subscribe} />
         </div>
 
         <button type="submit" class="btn-primary self-start">Send</button>
     </form>
-
     <p class="mt-8 text-sm text-muted">
         See submitted entries in the
         <a class="body-link" href={url('contacts:archive')}>archive</a>.
     </p>
 </div>
-</template>
+</Base>

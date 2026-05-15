@@ -40,10 +40,9 @@ For variants, sizes, and copy-pasteable markup, see `/admin/ui/`.
 
 ## Elements
 
-The admin ships Plain elements for forms and chrome. Common ones:
-`<admin.Submit>`, `<admin.InputField>`, `<admin.SelectField>`, `<admin.CheckboxField>`, `<admin.TextareaField>`, `<admin.Icon name="…">`, `<admin.SearchInput>`. Use them instead of hand-writing `<button class="admin-btn admin-btn-primary">` or wiring up labels + errors yourself.
+The admin ships form and chrome components under `plain-admin/plain/admin/templates/elements/admin/` — `Submit`, `InputField`, `SelectField`, `CheckboxField`, `TextareaField`, `FieldErrors`, `Icon`, `SearchInput`, `Label`, `Help`. Use them instead of hand-writing `<button class="admin-btn admin-btn-primary">` or wiring up labels + errors yourself.
 
-Templates that use elements must include `{% use_elements %}`. Source: `plain-admin/plain/admin/templates/elements/admin/`. Run `uv run plain docs admin --search elements` for the full table.
+They're ordinary plain.html components: import each one in the template's `components:` frontmatter (e.g. `- elements/admin/InputField`), then invoke it as a PascalCase tag (`<InputField name="title" />`, `<Icon name="search" />`, `<Submit>Save</Submit>`). Run `uv run plain docs admin --search elements` for the full table.
 
 ## Behaviors
 

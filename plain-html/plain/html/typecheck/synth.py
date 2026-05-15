@@ -10,7 +10,6 @@ and emits a Python module that mirrors the template's expression scope:
 - `:if={cond}` becomes a flat expression check (walrus still binds)
 - `:for={target in iter}` opens a real `for`-block so subsequent
   expressions inside the loop see the loop variable in scope
-- `:include="..."` is structural; `:include={expr}` checks the path expr
 
 A line-keyed source map records `synth_line → (template_offset, kind)`
 so backend diagnostics can be re-anchored to the template later.
@@ -26,6 +25,7 @@ from ..parser import _parse_for_clause
 from ..tokenizer import (
     AttrExpr,
     Attribute,
+    AttrText,
     EndTagToken,
     ExprToken,
     StartTagToken,
@@ -40,12 +40,22 @@ from .declarations import (
 )
 
 
+# A component tag is PascalCase: starts with an uppercase letter.
+def _is_component_tag(tag: str) -> bool:
+    return bool(tag) and tag[0].isupper()
+
+
+def _component_fn(name: str) -> str:
+    """Python identifier for a component's synthesized check stub."""
+    return f"_component_{name}"
+
+
 @dataclass
 class SourceMapEntry:
     """One synthesized line's link back to the template."""
 
     template_offset: int
-    kind: str  # "expr" | "if" | "for-iter" | "include-path" | "attr-expr"
+    kind: str  # "expr" | "if" | "for-iter" | "attr-expr" | "component"
 
 
 @dataclass
@@ -58,13 +68,23 @@ class Synthesis:
 
 # Bumped whenever the synthesized layout changes — invalidates cached
 # results without the user touching anything else.
-FORMAT_VERSION = 2
+FORMAT_VERSION = 4
 
 
-def synthesize(body: str, declarations: Declarations) -> Synthesis:
-    """Build the synthesized module from a template body and declarations."""
+def synthesize(
+    body: str,
+    declarations: Declarations,
+    *,
+    component_attrs: dict[str, list[AttrDeclaration]] | None = None,
+) -> Synthesis:
+    """Build the synthesized module from a template body and declarations.
+
+    `component_attrs` maps each declared PascalCase component name to the
+    imported component template's `attrs:` declarations. When provided,
+    component-tag call sites are checked against that signature.
+    """
     tokens = tokenize(body)
-    builder = _Builder(declarations)
+    builder = _Builder(declarations, component_attrs or {})
     builder.emit_prelude()
     builder.walk(tokens)
     builder.emit_postlude()
@@ -86,8 +106,13 @@ _BUILTIN_TYPE_NAMES = {
 
 
 class _Builder:
-    def __init__(self, declarations: Declarations) -> None:
+    def __init__(
+        self,
+        declarations: Declarations,
+        component_attrs: dict[str, list[AttrDeclaration]],
+    ) -> None:
         self._decls = declarations
+        self._component_attrs = component_attrs
         self._lines: list[str] = []
         self._line_map: dict[int, SourceMapEntry] = {}
         self._indent = 0
@@ -117,6 +142,8 @@ class _Builder:
 
         for imp in self._decls.imports:
             self._emit_import(imp)
+
+        self._emit_component_stubs()
 
         self._lines.append("")
         self._lines.append("def _plain_html_check(")
@@ -163,7 +190,6 @@ class _Builder:
         # the for-block first, then emit attribute checks inside it.
         for_clause: str | None = None
         if_code: str | None = None
-        include_path_expr: str | None = None
         regular_attrs: list[Attribute] = []
 
         for attr in tok.attrs:
@@ -174,8 +200,6 @@ class _Builder:
                     raw = _single_expr_value(attr)
                     if raw is not None:
                         for_clause = raw
-                case ":include":
-                    include_path_expr = _single_expr_value(attr)
                 case _:
                     regular_attrs.append(attr)
 
@@ -213,14 +237,13 @@ class _Builder:
             self._lines.append(self._ind() + "_unused = None")
             opened_if = True
 
-        if include_path_expr is not None:
-            # Dynamic `:include={path_expr}` must be str-compatible.
-            self._emit_typed_expr(
-                include_path_expr, tok.offset, kind="include-path", typ="str"
-            )
-
-        for attr in regular_attrs:
-            self._emit_attr_expressions(attr, tok.offset)
+        if _is_component_tag(tok.name) and tok.name in self._component_attrs:
+            # Component-tag call site — check passed attrs against the
+            # imported component's declared `attrs:` signature.
+            self._emit_component_call(tok.name, regular_attrs, tok.offset)
+        else:
+            for attr in regular_attrs:
+                self._emit_attr_expressions(attr, tok.offset)
 
         scope = _Scope(opened_for=opened_for, opened_if=opened_if, tag=tok.name)
 
@@ -252,6 +275,45 @@ class _Builder:
         for seg in attr.segments:
             if isinstance(seg, AttrExpr):
                 self._emit_expr(seg.code, tag_offset, kind="attr-expr")
+
+    def _emit_component_call(
+        self, tag: str, attrs: list[Attribute], offset: int
+    ) -> None:
+        """Emit a call to a component's stub function for the call site.
+
+        Each attribute becomes a keyword argument whose value mirrors the
+        runtime value: a single `{expr}` passes the expression through, a
+        literal string passes a `str`, mixed segments concatenate. Backend
+        diagnostics on this line are anchored at the component tag.
+        """
+        kwargs: list[str] = []
+        for attr in attrs:
+            name = f"{attr.name}_" if keyword.iskeyword(attr.name) else attr.name
+            if not name.isidentifier():
+                # Keyword-named-only attrs route through `**_extra`; the
+                # stub accepts them but we can't name them positionally.
+                continue
+            kwargs.append(f"{name}=({self._attr_value_expr(attr)})")
+        call = f"{_component_fn(tag)}({', '.join(kwargs)})"
+        self._record_line(offset, "component")
+        self._lines.append(self._ind() + f"_ = {call}")
+
+    def _attr_value_expr(self, attr: Attribute) -> str:
+        """Return a Python expression source for an attribute's value."""
+        if attr.segments is None:
+            return "True"
+        if all(isinstance(s, AttrText) for s in attr.segments):
+            text = "".join(s.text for s in attr.segments if isinstance(s, AttrText))
+            return repr(text)
+        if len(attr.segments) == 1 and isinstance(attr.segments[0], AttrExpr):
+            return self._safe_expr(attr.segments[0].code)
+        parts: list[str] = []
+        for seg in attr.segments:
+            if isinstance(seg, AttrText):
+                parts.append(repr(seg.text))
+            else:
+                parts.append(f"str({self._safe_expr(seg.code)})")
+        return "(" + " + ".join(parts) + ")"
 
     # --- emission helpers ----------------------------------------------
 
@@ -330,6 +392,32 @@ class _Builder:
     def _emit_import(self, imp: ImportDeclaration) -> None:
         self._lines.append(imp.statement)
 
+    def _emit_component_stubs(self) -> None:
+        """Emit one stub function per declared component.
+
+        Each stub mirrors the imported component's `attrs:` signature. A
+        component-tag call site emits a call to the matching stub, so a
+        wrong attribute type or an unknown/missing attribute surfaces as a
+        backend diagnostic anchored at the call site.
+
+        Unknown attrs the component doesn't declare are accepted via
+        `**_extra` rather than flagged — a template often passes through
+        ambient HTML attributes (`class`, `id`) the component forwards. We
+        check declared attrs positively; we don't reject undeclared ones.
+        """
+        for name, attrs in sorted(self._component_attrs.items()):
+            self._lines.append("")
+            self._lines.append(f"def {_component_fn(name)}(")
+            self._lines.append("    *,")
+            for attr in attrs:
+                self._lines.append(self._format_attr_param(attr))
+            # Slots arrive as SafeString; the default slot is `children`.
+            self._lines.append('    children: SafeString = SafeString(""),')
+            # Allow undeclared pass-through attrs without complaint.
+            self._lines.append("    **_extra: Any,")
+            self._lines.append(") -> None:")
+            self._lines.append("    _unused = None")
+
     def _inferred_module_imports(self) -> list[str]:
         """Infer `import X.Y` statements from dotted names in `attrs:` types.
 
@@ -341,9 +429,13 @@ class _Builder:
         all_specs: list[str] = []
         for attr in self._decls.attrs:
             all_specs.append(attr.type_source)
-        for slot in self._decls.slots:
-            if slot.yields_source is not None:
-                all_specs.append(slot.yields_source)
+        # Component stub params reference the imported component's attr
+        # types — their dotted names need module imports too.
+        for attrs in self._component_attrs.values():
+            for attr in attrs:
+                all_specs.append(attr.type_source)
+                if attr.default_source is not None:
+                    all_specs.append(attr.default_source)
 
         for source in all_specs:
             try:

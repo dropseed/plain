@@ -13,19 +13,30 @@ def body_offset(source: str) -> int:
 
     Mirrors python-frontmatter's `---\\n…\\n---\\n` delimiter handling so
     error positions map back to file positions even when frontmatter is
-    present.
+    present. python-frontmatter also strips leading whitespace from the
+    body it returns, so the offset must skip past it too — otherwise
+    tokenizer offsets (which index the stripped body) anchor too early.
     """
     if not source.startswith("---\n"):
-        return 0
+        return _skip_leading_whitespace(source, 0)
     i = 4
     while i < len(source):
         end = source.find("\n", i)
         if end == -1:
             return 0
         if source[i:end].strip() == "---":
-            return end + 1
+            return _skip_leading_whitespace(source, end + 1)
         i = end + 1
     return 0
+
+
+def _skip_leading_whitespace(source: str, start: int) -> int:
+    """Advance `start` past any leading whitespace, mirroring the body
+    python-frontmatter hands back (it strips leading blank lines)."""
+    i = start
+    while i < len(source) and source[i].isspace():
+        i += 1
+    return i
 
 
 def offset_to_line_col(source: str, offset: int) -> tuple[int, int]:

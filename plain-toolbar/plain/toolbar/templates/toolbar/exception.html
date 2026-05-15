@@ -9,19 +9,35 @@ attrs:
             <span class="font-semibold">{exception_context.exception.__class__.__name__}</span>: {exception_context.exception}
         </div>
         <div class="flex items-center space-x-2 ml-4 shrink-0">
-            <button data-toggle-raw class="flex items-center space-x-1 px-2 py-0.5 text-sm text-stone-300 rounded bg-white/10 hover:bg-white/20 transition-colors cursor-pointer">
+            <button
+                data-toggle-raw
+                class="flex items-center space-x-1 px-2 py-0.5 text-sm text-stone-300 rounded bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+            >
                 <span>View raw</span>
             </button>
-            <button data-copy-exception class="flex items-center space-x-1 px-2 py-0.5 text-sm text-stone-300 rounded bg-white/10 hover:bg-white/20 transition-colors cursor-pointer">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3.5 h-3.5 bi bi-clipboard" viewBox="0 0 16 16">
-                    <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
-                    <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+            <button
+                data-copy-exception
+                class="flex items-center space-x-1 px-2 py-0.5 text-sm text-stone-300 rounded bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    fill="currentColor"
+                    class="w-3.5 h-3.5 bi bi-clipboard"
+                    viewBox="0 0 16 16"
+                >
+                    <path
+                        d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"
+                    />
+                    <path
+                        d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"
+                    />
                 </svg>
                 <span>Copy</span>
             </button>
         </div>
     </div>
-
     {# Traceback frames with source code #}
     <div class="space-y-1" data-exception-frames>
         <div
@@ -35,33 +51,64 @@ attrs:
                 class="w-full px-2 py-1 text-xs flex justify-between items-center text-stone-400 hover:text-stone-300 hover:bg-white/5 cursor-pointer group-data-[category=app]:text-stone-300"
             >
                 <div class="flex items-center gap-2">
-                    <svg data-frame-chevron class="w-3 h-3 transition-transform group-data-[expanded=false]:-rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    <svg
+                        data-frame-chevron
+                        class="w-3 h-3 transition-transform group-data-[expanded=false]:-rotate-90"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M19 9l-7 7-7-7"
+                        />
                     </svg>
-                    <span data-category={frame.category} class="px-1.5 py-0.5 rounded text-[10px] font-medium
+                    <span
+                        data-category={frame.category}
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium
                         data-[category=app]:bg-amber-500/30 data-[category=app]:text-amber-300
                         data-[category=plain]:bg-emerald-500/30 data-[category=plain]:text-emerald-300
                         data-[category=plainx]:bg-violet-500/30 data-[category=plainx]:text-violet-300
                         data-[category=python]:bg-sky-500/30 data-[category=python]:text-sky-300
                         data-[category=third-party]:bg-zinc-600/30 data-[category=third-party]:text-zinc-400"
                     >{frame.category}</span>
-                    <a href={"vscode://file/" + frame.filename + ":" + str(frame.lineno)} data-vscode-link class="font-mono hover:underline text-stone-500">{frame.filename}</a>
+                    <a
+                        href={"vscode://file/" + frame.filename + ":" + str(frame.lineno)}
+                        data-vscode-link
+                        class="font-mono hover:underline text-stone-500"
+                    >{frame.filename}</a>
                 </div>
                 <span>line {frame.lineno} in <span class="font-semibold">{frame.name}</span></span>
             </button>
-            <div data-frame-content data-visible={"true" if frame.category == "app" else "false"} class="data-[visible=false]:hidden">
+            <div
+                data-frame-content
+                data-visible={"true" if frame.category == "app" else "false"}
+                class="data-[visible=false]:hidden"
+            >
                 <div :if={frame.source_lines} class="text-xs overflow-auto">
                     <table class="w-full">
-                        <tr :for={line in frame.source_lines} data-error-line={"true" if line["is_error_line"] else "false"} class="data-[error-line=true]:bg-amber-500/20">
-                            <td class="px-2 py-0.5 text-right text-stone-500 select-none w-12 font-mono">{line["lineno"]}</td>
-                            <td class="px-2 py-0.5 font-mono whitespace-pre text-stone-300">{line["code"]}</td>
+                        <tr
+                            :for={line in frame.source_lines}
+                            data-error-line={"true" if line["is_error_line"] else "false"}
+                            class="data-[error-line=true]:bg-amber-500/20"
+                        >
+                            <td
+                                class="px-2 py-0.5 text-right text-stone-500 select-none w-12 font-mono"
+                            >{line["lineno"]}</td>
+                            <td
+                                class="px-2 py-0.5 font-mono whitespace-pre text-stone-300"
+                            >{line["code"]}</td>
                         </tr>
                     </table>
                 </div>
                 <div :if={frame.locals} class="border-t border-white/10">
                     <table class="text-xs">
                         <tr :for={var in frame.locals} class="hover:bg-white/5">
-                            <td class="py-0.5 pl-2 pr-4 text-stone-400 font-mono whitespace-nowrap">{var["name"]}</td>
+                            <td
+                                class="py-0.5 pl-2 pr-4 text-stone-400 font-mono whitespace-nowrap"
+                            >{var["name"]}</td>
                             <td class="py-0.5 pr-4 text-stone-500 whitespace-nowrap">{var["type"]}</td>
                             <td class="py-0.5 pr-2 text-stone-400 font-mono">{var["value"]}</td>
                         </tr>
@@ -70,13 +117,14 @@ attrs:
             </div>
         </div>
     </div>
-
     {# Raw traceback (hidden by default, toggled with Raw button) #}
-    <div class="hidden mt-4 text-stone-300 text-xs bg-white/5 p-2 rounded overflow-auto" data-exception-traceback>
+    <div
+        class="hidden mt-4 text-stone-300 text-xs bg-white/5 p-2 rounded overflow-auto"
+        data-exception-traceback
+    >
         <pre><code>{exception_context.traceback_string}</code></pre>
     </div>
 </div>
-
 <script nonce={request.csp_nonce}>
 (function() {
     function copyException(button) {

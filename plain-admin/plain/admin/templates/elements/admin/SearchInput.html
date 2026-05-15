@@ -1,4 +1,6 @@
 ---
+components:
+  - elements/admin/Icon
 attrs:
   id: str = ""
   name: str = ""
@@ -19,6 +21,9 @@ attrs:
         placeholder={placeholder}
         class={class_ or "admin-input pl-8"}
         autofocus={autofocus}
-        >
-    <template :include="elements/admin/Icon" name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-admin-muted-foreground pointer-events-none" />
+    >
+    <Icon
+        name="search"
+        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-admin-muted-foreground pointer-events-none"
+    />
 </div>

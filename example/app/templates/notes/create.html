@@ -1,21 +1,24 @@
 ---
 imports:
   - from plain.urls import reverse as url
+components:
+  - base as Base
+  - components/BackLink
+  - components/NonfieldErrors
+  - components/Field
 attrs:
   form: Any
 ---
-<template :include="base">
-<template slot="title">New note</template>
+<Base>
+<template :slot="title">New note</template>
 <div class="max-w-2xl mx-auto px-5 py-12">
-    <template :include="components/back_link" href={url('notes:list')} label="Back to notes" />
-
+    <BackLink href={url('notes:list')} label="Back to notes" />
     <h1 class="page-h1">New note</h1>
-
     <form method="post" class="mt-6 flex flex-col gap-5">
-        <template :include="components/nonfield_errors" form={form} />
-        <template :include="components/field" bf={form.title} label="Title" autofocus={True} required={True} />
-        <template :include="components/field" bf={form.body} label="Body" type="textarea" min_height="200px" />
+        <NonfieldErrors form={form} />
+        <Field bf={form.title} label="Title" autofocus={True} required={True} />
+        <Field bf={form.body} label="Body" type="textarea" min_height="200px" />
         <button type="submit" class="btn-primary self-start">Create</button>
     </form>
 </div>
-</template>
+</Base>

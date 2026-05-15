@@ -1,4 +1,9 @@
 ---
+components:
+  - elements/admin/Checkbox
+  - elements/admin/Label
+  - elements/admin/Help
+  - elements/admin/FieldErrors
 attrs:
   field: Any
   label: str
@@ -6,9 +11,9 @@ attrs:
 ---
 <div>
     <div class="flex items-center space-x-2">
-        <template :include="elements/admin/Checkbox" field={field} />
-        <template :include="elements/admin/Label" field={field}>{label}</template>
-        <template :if={help} :include="elements/admin/Help" help={help} />
+        <Checkbox field={field} />
+        <Label field={field}>{label}</Label>
+        <Help :if={help} help={help} />
     </div>
-    <template :include="elements/admin/FieldErrors" field={field} />
+    <FieldErrors field={field} />
 </div>

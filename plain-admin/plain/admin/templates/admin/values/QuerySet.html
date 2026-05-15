@@ -1,9 +1,11 @@
 ---
+components:
+  - admin/values/Model
 attrs:
   value: Any = None
   field: Any = None
   object: Any = None
 ---
 <div :for={item in value}>
-    <template :include="admin/values/Model" value={item} />
+    <Model value={item} />
 </div>

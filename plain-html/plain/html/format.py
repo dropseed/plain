@@ -28,10 +28,11 @@ Hard invariants:
 
 Deliberate canonical-form choices (not bugs):
 
-- Directives (`:if`, `:for`, `:include`, `slot`, plus reserved `:`-prefixed
-  attrs like `:as`) emit before user attributes in a fixed order, not in
-  the author's original position. Rationale: in plain.html, directives are
-  control flow (the engine acts on them), distinct from data attributes.
+- Directives (`:if`, `:elif`, `:else`, `:for`, `:slot`, plus reserved
+  `:`-prefixed attrs like `:as`) emit before user attributes in a fixed
+  order, not in the author's original position. Rationale: in plain.html,
+  directives are control flow (the engine acts on them), distinct from
+  data attributes.
   Putting them first makes them scan-readable like an if-statement header
   and groups them away from HTML output attributes.
 """
@@ -40,6 +41,7 @@ from __future__ import annotations
 
 import re
 
+from .components import parse_components
 from .frontmatter import split as split_frontmatter
 from .parser import (
     DoctypeNode,
@@ -67,7 +69,7 @@ DEFAULT_WIDTH = 88
 # Top-level frontmatter keys, in the order the formatter emits them. Any
 # key not listed keeps its original relative position (stable-sorted) and
 # sorts after the canonical block.
-_CANONICAL_FRONTMATTER_KEYS = ("imports", "attrs", "slots")
+_CANONICAL_FRONTMATTER_KEYS = ("imports", "components", "attrs", "slots")
 
 
 def format_source(
@@ -77,9 +79,9 @@ def format_source(
     body_start = body_offset(source)
     frontmatter_block = _format_frontmatter(source[:body_start])
 
-    _, body = split_frontmatter(source)
+    fmdict, body = split_frontmatter(source)
     tokens = tokenize(body)
-    tree = parse(tokens)
+    tree = parse(tokens, components=parse_components(fmdict.get("components")))
 
     body_out = _format_root(tree, indent_size=indent_size, width=width)
     if not body_out.endswith("\n"):
@@ -239,11 +241,23 @@ def _format_element(
         return f"{open_tag}{close_tag}"
 
     if _format_inline(node):
-        body = "".join(
-            _format_node(c, indent=indent, indent_size=indent_size, width=width)
-            for c in node.children
-        )
-        return f"{open_tag}{body}{close_tag}"
+        # Inline mode preserves inter-element whitespace verbatim, so a child
+        # element's visual column comes from the preceding text node, not from
+        # a computed indent. Pass that recovered column so a wrapped-attribute
+        # child indents its attribute lines correctly under the tag.
+        parts: list[str] = []
+        for idx, child in enumerate(node.children):
+            child_indent = (
+                _inline_child_indent(node.children, idx, fallback=indent)
+                if isinstance(child, ElementNode)
+                else indent
+            )
+            parts.append(
+                _format_node(
+                    child, indent=child_indent, indent_size=indent_size, width=width
+                )
+            )
+        return f"{open_tag}{''.join(parts)}{close_tag}"
 
     inner_indent = indent + indent_size
     pad = " " * indent
@@ -282,6 +296,25 @@ def _format_inline(node: ElementNode) -> bool:
         if isinstance(c, ElementNode) and is_inline(c.tag):
             return True
     return False
+
+
+def _inline_child_indent(children: list[Node], idx: int, *, fallback: int) -> int:
+    """Recover the column an inline-mode child element starts at.
+
+    In inline mode inter-element whitespace is preserved verbatim, so a
+    child element's visual column is the trailing whitespace run of the
+    preceding text node. Returns that width so a wrapped-attribute child
+    aligns its attribute lines under the tag. Falls back to `fallback`
+    when the child isn't preceded by a newline-terminated whitespace run.
+    """
+    if idx == 0:
+        return fallback
+    prev = children[idx - 1]
+    if isinstance(prev, TextNode) and "\n" in prev.text:
+        tail = prev.text.rsplit("\n", 1)[1]
+        if tail == "" or tail.isspace():
+            return len(tail)
+    return fallback
 
 
 def _format_open_tag(
@@ -341,14 +374,16 @@ def _directive_attrs(node: ElementNode) -> list[str]:
     out: list[str] = []
     if node.if_code is not None:
         out.append(f":if={{{node.if_code}}}")
+    if node.elif_code is not None:
+        out.append(f":elif={{{node.elif_code}}}")
+    if node.is_else:
+        out.append(":else")
     if node.for_clause is not None:
         out.append(f":for={{{_format_for_clause(node.for_clause)}}}")
-    if node.include_path is not None:
-        out.append(f':include="{node.include_path}"')
-    elif node.include_path_code is not None:
-        out.append(f":include={{{node.include_path_code}}}")
+    # `include_path` is set only for PascalCase component tags — the tag
+    # name itself names the component, so no directive is emitted for it.
     if node.slot_name is not None:
-        out.append(f'slot="{node.slot_name}"')
+        out.append(f':slot="{node.slot_name}"')
     for attr in node.reserved_directives:
         out.append(_format_attribute(attr))
     return out
@@ -361,6 +396,8 @@ def _format_for_clause(clause: ForClause) -> str:
     target = clause.raw_target or (
         clause.targets[0] if len(clause.targets) == 1 else ", ".join(clause.targets)
     )
+    if clause.filter_code is not None:
+        return f"{target} in {clause.iter_code} if {clause.filter_code}"
     return f"{target} in {clause.iter_code}"
 
 

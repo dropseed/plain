@@ -1,19 +1,21 @@
 ---
 imports:
   - from plain.urls import reverse as url
+components:
+  - base as Base
+  - components/BackLink
+  - tasks/_form_partial as TaskFormFields
 attrs:
   form: Any
 ---
-<template :include="base">
-<template slot="title">New task</template>
+<Base>
+<template :slot="title">New task</template>
 <div class="max-w-2xl mx-auto px-5 py-12">
-    <template :include="components/back_link" href={url('tasks:list')} label="Back to tasks" />
-
+    <BackLink href={url('tasks:list')} label="Back to tasks" />
     <h1 class="page-h1">New task</h1>
-
     <form method="post" class="mt-6 flex flex-col gap-5">
-        <template :include="tasks/_form_partial" form={form} />
+        <TaskFormFields form={form} />
         <button type="submit" class="btn-primary self-start">Create</button>
     </form>
 </div>
-</template>
+</Base>

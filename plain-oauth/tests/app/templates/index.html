@@ -1,19 +1,28 @@
 ---
 imports:
   - from plain.urls import reverse as url
+components:
+  - base as Base
 attrs:
   user: Any
   oauth_provider_keys: list = []
 ---
-<template :include="base">
+<Base>
 Hello {user}!
 
 <h2>Existing connections</h2>
 <ul>
     <li :for={connection in user.oauth_connections.query.all()}>
         {connection.provider_key} [ID: {connection.provider_user_id}]
-        <form action={url('oauth:disconnect', provider=connection.provider_key)} method="post">
-            <input type="hidden" name="provider_user_id" value={connection.provider_user_id}>
+        <form
+            action={url('oauth:disconnect', provider=connection.provider_key)}
+            method="post"
+        >
+            <input
+                type="hidden"
+                name="provider_user_id"
+                value={connection.provider_user_id}
+            >
             <button type="submit">Disconnect</button>
         </form>
     </li>
@@ -28,4 +37,4 @@ Hello {user}!
         </form>
     </li>
 </ul>
-</template>
+</Base>

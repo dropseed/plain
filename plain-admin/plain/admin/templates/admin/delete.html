@@ -1,4 +1,7 @@
 ---
+components:
+  - admin/base as Base
+  - elements/admin/Icon
 attrs:
   title: str = ""
   app_name: str = "Plain"
@@ -12,23 +15,37 @@ attrs:
   cards: list = []
   request: plain.http.Request = None
 ---
-<template :include="admin/base"
-    title={title} app_name={app_name} admin_force_theme={admin_force_theme}
-    description={description} image={image} links={links} extra_links={extra_links}
-    parent_view_classes={parent_view_classes} object={object} cards={cards}>
-<div class="max-w-lg">
-    <div class="admin-alert admin-alert-danger w-full">
-        <template :include="elements/admin/Icon" name="exclamation-triangle" />
-        <h4>Delete this item?</h4>
-        <section>This action cannot be undone. The item and all associated data will be permanently removed.</section>
-        <form method="post" class="col-start-2 mt-4 flex items-center justify-end space-x-3">
-            <a href={request.headers.get('Referer', '..')} class="admin-btn admin-btn-outline no-underline">
+<Base
+    title={title}
+    app_name={app_name}
+    admin_force_theme={admin_force_theme}
+    description={description}
+    image={image}
+    links={links}
+    extra_links={extra_links}
+    parent_view_classes={parent_view_classes}
+    object={object}
+    cards={cards}
+>
+    <div class="max-w-lg">
+        <div class="admin-alert admin-alert-danger w-full">
+            <Icon name="exclamation-triangle" />
+            <h4>Delete this item?</h4>
+            <section>This action cannot be undone. The item and all associated data will be permanently removed.</section>
+            <form
+                method="post"
+                class="col-start-2 mt-4 flex items-center justify-end space-x-3"
+            >
+            <a
+                href={request.headers.get('Referer', '..')}
+                class="admin-btn admin-btn-outline no-underline"
+            >
                 Cancel
             </a>
             <button type="submit" class="admin-btn admin-btn-danger">
                 Yes, delete
             </button>
         </form>
+        </div>
     </div>
-</div>
-</template>
+</Base>

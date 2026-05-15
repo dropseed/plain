@@ -1,10 +1,12 @@
 ---
+components:
+  - base as Base
 attrs:
   oauth_error: Any
 ---
-<template :include="base">
-<div class="text-center">
-    <h1 class="text-lg">OAuth Error</h1>
-    <p>{oauth_error.message}</p>
-</div>
-</template>
+<Base>
+    <div class="text-center">
+        <h1 class="text-lg">OAuth Error</h1>
+        <p>{oauth_error.message}</p>
+    </div>
+</Base>

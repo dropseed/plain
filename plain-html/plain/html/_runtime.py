@@ -2,8 +2,7 @@
 
 Each compiled template imports from this module. The helpers handle the
 work the codegen doesn't inline: contextual escaping, boolean / list
-attribute rendering, dynamic `:include` resolution, and Python-keyword
-aliasing of attr names.
+attribute rendering, and Python-keyword aliasing of attr names.
 """
 
 from __future__ import annotations
@@ -11,14 +10,10 @@ from __future__ import annotations
 import html as _html
 import keyword
 from collections.abc import Callable, Iterable
-from pathlib import Path
 from typing import cast
 
 from plain.utils.html import conditional_escape
 from plain.utils.safestring import SafeString
-
-from .compiler import get_or_compile
-from .loader import find_template
 
 # Module-local alias kept hot in the closure — `html.escape` is by far the
 # common case and we want to skip the LOAD_GLOBAL chain `_html.escape`.
@@ -150,17 +145,6 @@ def _render_dyn(
     if drop_on_empty and not safe:
         return ""
     return f' {name}="{safe}"'
-
-
-def resolve_dynamic_include(name: str, *, current_template: str) -> Callable[..., str]:
-    """Resolve a `<template :include={expr}>` site at render time.
-
-    Looks the name up via `loader.find_template` (relative to the
-    calling template, matching the static-include resolver), then asks
-    the compiler for a cached compiled `render` function.
-    """
-    target = find_template(name, current_template=Path(current_template))
-    return get_or_compile(target)
 
 
 def normalize_keywords(scope: dict) -> None:

@@ -165,10 +165,38 @@ def test_for_target_does_not_leak():
     assert render(items=[1, 2], x="OUT") == "<a>1</a><a>2</a><b>OUT</b>"
 
 
-def test_if_then_for():
-    render = _load("<li :if={show} :for={x in items}>{x}</li>")
-    assert render(show=True, items=[1, 2]) == "<li>1</li><li>2</li>"
-    assert render(show=False, items=[1, 2]) == ""
+def test_if_and_for_same_element_rejected():
+    # Spec: a conditional directive and `:for` on the same element is a
+    # compile error — gate the loop with `<template :if>`, or filter the
+    # `:for` clause itself.
+    from plain.html.parser import ParseError
+
+    with pytest.raises(ParseError, match="conditional directive"):
+        _compile_string("<li :if={show} :for={x in items}>{x}</li>")
+
+
+def test_for_filter_clause():
+    out = _load("<li :for={x in items if x % 2}>{x}</li>")(items=[1, 2, 3, 4, 5])
+    assert out == "<li>1</li><li>3</li><li>5</li>"
+
+
+def test_for_filter_sees_loop_target():
+    src = "<li :for={(i, x) in enumerate(items) if i}>{x}</li>"
+    out = _load(src)(items=["a", "b", "c"])
+    assert out == "<li>b</li><li>c</li>"
+
+
+def test_for_multiple_filters():
+    src = "<li :for={x in items if x > 1 if x < 5}>{x}</li>"
+    out = _load(src)(items=[0, 1, 2, 3, 4, 5, 6])
+    assert out == "<li>2</li><li>3</li><li>4</li>"
+
+
+def test_for_nested_loop_clause_rejected():
+    from plain.html.parser import ParseError
+
+    with pytest.raises(ParseError, match="one `for` clause"):
+        _compile_string("<li :for={x in xs for y in ys}>{x}</li>")
 
 
 # --- elements, fragments, comments, doctype ---------------------------------
@@ -432,7 +460,7 @@ def test_yaml_frontmatter_does_not_execute_unsafe_tags(tmp_path):
     assert not marker.exists(), "YAML loader executed os.system — UNSAFE"
 
 
-# --- :include + slot composition --------------------------------------------
+# --- component tags + slot composition --------------------------------------
 
 
 def _write_templates(tmp_path: Path, templates: dict[str, str]) -> dict[str, Path]:
@@ -446,61 +474,62 @@ def _write_templates(tmp_path: Path, templates: dict[str, str]) -> dict[str, Pat
     return out
 
 
-def test_include_no_attrs(tmp_path):
+def test_component_no_attrs(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
-            "parent": '<template :include="./child" />',
-            "child": "<p>hi</p>",
+            "parent": "---\ncomponents:\n  - ./Child\n---\n<Child />",
+            "Child": "<p>hi</p>",
         },
     )
     assert _compile_path(paths["parent"])() == "<p>hi</p>"
 
 
-def test_include_with_attrs(tmp_path):
+def test_component_with_attrs(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
-            "parent": '<template :include="./card" title="Hello" />',
-            "card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
+            "parent": '---\ncomponents:\n  - ./Card\n---\n<Card title="Hello" />',
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
         },
     )
     assert _compile_path(paths["parent"])() == "<h1>Hello</h1>"
 
 
-def test_include_with_expr_attr(tmp_path):
+def test_component_with_expr_attr(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
-            "parent": '<template :include="./card" title={name} />',
-            "card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
+            "parent": "---\ncomponents:\n  - ./Card\n---\n<Card title={name} />",
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
         },
     )
     assert _compile_path(paths["parent"])(name="Dave") == "<h1>Dave</h1>"
 
 
-def test_include_default_slot(tmp_path):
+def test_component_default_slot(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
-            "parent": '<template :include="./card"><p>body</p></template>',
-            "card": ("---\nslots:\n  default: Markup\n---\n<div>{children}</div>"),
+            "parent": "---\ncomponents:\n  - ./Card\n---\n<Card><p>body</p></Card>",
+            "Card": ("---\nslots:\n  default: Markup\n---\n<div>{children}</div>"),
         },
     )
     assert _compile_path(paths["parent"])() == "<div><p>body</p></div>"
 
 
-def test_include_named_slot(tmp_path):
+def test_component_named_slot(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
             "parent": (
-                '<template :include="./card">'
-                '<template slot="header">H</template>'
+                "---\ncomponents:\n  - ./Card\n---\n"
+                "<Card>"
+                '<template :slot="header">H</template>'
                 "<p>body</p>"
-                "</template>"
+                "</Card>"
             ),
-            "card": (
+            "Card": (
                 "---\nslots:\n  header: Markup\n  default: Markup\n---\n"
                 "<div>{header}|{children}</div>"
             ),
@@ -509,75 +538,79 @@ def test_include_named_slot(tmp_path):
     assert _compile_path(paths["parent"])() == "<div>H|<p>body</p></div>"
 
 
-def test_include_named_slot_on_element(tmp_path):
-    # `<div slot="x">` routes the whole div (sans slot=) into the slot.
+def test_component_named_slot_on_element(tmp_path):
+    # `<div :slot="x">` routes the whole div into the slot.
     paths = _write_templates(
         tmp_path,
         {
             "parent": (
-                '<template :include="./card"><div slot="header">H</div></template>'
+                "---\ncomponents:\n  - ./Card\n---\n"
+                '<Card><div :slot="header">H</div></Card>'
             ),
-            "card": ("---\nslots:\n  header: Markup\n---\n<section>{header}</section>"),
+            "Card": ("---\nslots:\n  header: Markup\n---\n<section>{header}</section>"),
         },
     )
     assert _compile_path(paths["parent"])() == "<section><div>H</div></section>"
 
 
-def test_include_root_ctx_propagates(tmp_path):
+def test_component_root_ctx_propagates(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
-            "parent": '<template :include="./inner" />',
-            "inner": "<p>{name}</p>",
+            "parent": "---\ncomponents:\n  - ./Inner\n---\n<Inner />",
+            "Inner": "<p>{name}</p>",
         },
     )
     assert _compile_path(paths["parent"])(name="Dave") == "<p>Dave</p>"
 
 
-def test_include_explicit_attr_wins_over_root_ctx(tmp_path):
+def test_component_explicit_attr_wins_over_root_ctx(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
-            "parent": '<template :include="./inner" name="LOCAL" />',
-            "inner": "<p>{name}</p>",
+            "parent": '---\ncomponents:\n  - ./Inner\n---\n<Inner name="LOCAL" />',
+            "Inner": "<p>{name}</p>",
         },
     )
     assert _compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
 
 
-def test_include_promoted_attr_inherits_from_root_ctx(tmp_path):
+def test_component_promoted_attr_inherits_from_root_ctx(tmp_path):
     """A child promotes `name` via `attrs:`, but parent omits it on the
-    include site. The child must still see the entry caller's value via
+    component site. The child must still see the entry caller's value via
     `_root_ctx` instead of the parameter default."""
     paths = _write_templates(
         tmp_path,
         {
-            "parent": '<template :include="./inner" />',
-            "inner": "---\nattrs:\n  name: str\n---\n<p>{name}</p>",
+            "parent": "---\ncomponents:\n  - ./Inner\n---\n<Inner />",
+            "Inner": "---\nattrs:\n  name: str\n---\n<p>{name}</p>",
         },
     )
     assert _compile_path(paths["parent"])(name="Dave") == "<p>Dave</p>"
 
 
-def test_include_promoted_attr_explicit_pass_wins(tmp_path):
+def test_component_promoted_attr_explicit_pass_wins(tmp_path):
     """If the parent passes the promoted attr explicitly, the explicit value
     must beat the ambient `_root_ctx` value."""
     paths = _write_templates(
         tmp_path,
         {
-            "parent": '<template :include="./inner" name="LOCAL" />',
-            "inner": "---\nattrs:\n  name: str\n---\n<p>{name}</p>",
+            "parent": '---\ncomponents:\n  - ./Inner\n---\n<Inner name="LOCAL" />',
+            "Inner": "---\nattrs:\n  name: str\n---\n<p>{name}</p>",
         },
     )
     assert _compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
 
 
-def test_include_inside_for(tmp_path):
+def test_component_inside_for(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
-            "parent": '<template :include="./card" :for={x in items} title={x} />',
-            "card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
+            "parent": (
+                "---\ncomponents:\n  - ./Card\n---\n"
+                "<Card :for={x in items} title={x} />"
+            ),
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
         },
     )
     assert (
@@ -586,12 +619,15 @@ def test_include_inside_for(tmp_path):
     )
 
 
-def test_include_inside_if(tmp_path):
+def test_component_inside_if(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
-            "parent": '<template :include="./card" :if={show} />',
-            "card": "<p>shown</p>",
+            "parent": (
+                "---\ncomponents:\n  - ./Card\n---\n"
+                "<template :if={show}><Card /></template>"
+            ),
+            "Card": "<p>shown</p>",
         },
     )
     render = _compile_path(paths["parent"])
@@ -599,24 +635,24 @@ def test_include_inside_if(tmp_path):
     assert render(show=False) == ""
 
 
-def test_include_chain(tmp_path):
+def test_component_chain(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
-            "A": '<template :include="./B" />',
-            "B": '<template :include="./C" />',
+            "A": "---\ncomponents:\n  - ./B\n---\n<B />",
+            "B": "---\ncomponents:\n  - ./C\n---\n<C />",
             "C": "<p>leaf</p>",
         },
     )
     assert _compile_path(paths["A"])() == "<p>leaf</p>"
 
 
-def test_include_cycle_detected(tmp_path):
+def test_component_cycle_detected(tmp_path):
     paths = _write_templates(
         tmp_path,
         {
-            "A": '<template :include="./B" />',
-            "B": '<template :include="./A" />',
+            "A": "---\ncomponents:\n  - ./B\n---\n<B />",
+            "B": "---\ncomponents:\n  - ./A\n---\n<A />",
         },
     )
     with pytest.raises(CompileError, match="cycle"):
@@ -634,73 +670,12 @@ def test_process_cache_returns_same_function(tmp_path):
     assert first is second
 
 
-def test_dynamic_include_basic(tmp_path):
-    paths = _write_templates(
-        tmp_path,
-        {
-            "parent": "<template :include={component} />",
-            "card": "<p>card body</p>",
-            "alert": "<div>alert!</div>",
-        },
-    )
-    render = _compile_path(paths["parent"])
-    assert render(component="./card") == "<p>card body</p>"
-    # Same parent module, different runtime target — dispatch works.
-    assert render(component="./alert") == "<div>alert!</div>"
-
-
-def test_dynamic_include_with_attrs(tmp_path):
-    paths = _write_templates(
-        tmp_path,
-        {
-            "parent": "<template :include={component} title={t} />",
-            "card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
-        },
-    )
-    render = _compile_path(paths["parent"])
-    assert render(component="./card", t="Hi") == "<h1>Hi</h1>"
-
-
-def test_dynamic_include_with_default_slot(tmp_path):
-    paths = _write_templates(
-        tmp_path,
-        {
-            "parent": "<template :include={component}><p>body</p></template>",
-            "card": ("---\nslots:\n  default: Markup\n---\n<div>{children}</div>"),
-        },
-    )
-    assert _compile_path(paths["parent"])(component="./card") == (
-        "<div><p>body</p></div>"
-    )
-
-
-def test_dynamic_include_inside_for(tmp_path):
-    paths = _write_templates(
-        tmp_path,
-        {
-            "parent": (
-                "<template :for={item in items} "
-                ':include={item["type"]} text={item["text"]} />'
-            ),
-            "card": "---\nattrs:\n  text: str\n---\n<p>{text}</p>",
-            "alert": "---\nattrs:\n  text: str\n---\n<b>{text}</b>",
-        },
-    )
-    render = _compile_path(paths["parent"])
-    items = [
-        {"type": "./card", "text": "one"},
-        {"type": "./alert", "text": "two"},
-        {"type": "./card", "text": "three"},
-    ]
-    assert render(items=items) == "<p>one</p><b>two</b><p>three</p>"
-
-
-def test_compile_string_rejects_static_include():
-    # compile_string emits a standalone module — a literal `:include` site
-    # has no `_inc_N` slot wired up, so emit() raises. Tells the caller to
-    # use compile_path() instead.
+def test_compile_string_rejects_component_tag():
+    # compile_string emits a standalone module — a component-tag site has
+    # no `_inc_N` slot wired up, so emit() raises. Tells the caller to use
+    # compile_path() instead.
     with pytest.raises(CompileError):
-        _compile_string('<template :include="x"></template>')
+        _compile_string("---\ncomponents:\n  - ./X\n---\n<X></X>")
 
 
 # --- disk cache --------------------------------------------------------------
@@ -777,7 +752,7 @@ def test_disk_cache_invalidates_on_source_change(tmp_path, monkeypatch):
 
 
 def test_disk_cache_invalidates_transitively(tmp_path, monkeypatch):
-    # Modify the LEAF (`child`) and confirm the PARENT recompiles. The
+    # Modify the LEAF (`Child`) and confirm the PARENT recompiles. The
     # parent's source is unchanged but its cache key folds in the child's
     # key, so editing the child shifts both keys upward.
     cache_dir = tmp_path / "cache"
@@ -785,14 +760,14 @@ def test_disk_cache_invalidates_transitively(tmp_path, monkeypatch):
     paths = _write_templates(
         tmp_path,
         {
-            "parent": '<template :include="./child" />',
-            "child": "<p>v1</p>",
+            "parent": "---\ncomponents:\n  - ./Child\n---\n<Child />",
+            "Child": "<p>v1</p>",
         },
     )
     assert _compile_with_disk_cache(paths["parent"])() == "<p>v1</p>"
     parent_files_v1 = list(cache_dir.glob("*__parent.html.pyc"))
 
-    paths["child"].write_text("<p>v2</p>")
+    paths["Child"].write_text("<p>v2</p>")
     assert _compile_with_disk_cache(paths["parent"])() == "<p>v2</p>"
     parent_files_v2 = list(cache_dir.glob("*__parent.html.pyc"))
 
@@ -926,61 +901,68 @@ def test_process_cache_evicts_lru_when_over_capacity(tmp_path, monkeypatch):
     clear_process_cache()
 
 
-# --- :include parity with interpreter ----------------------------------------
+# --- component-graph render-path parity --------------------------------------
 
 
-INCLUDE_PARITY_CASES: list[tuple[dict[str, str], dict]] = [
+COMPONENT_PARITY_CASES: list[tuple[dict[str, str], dict]] = [
     # No attrs, no slot.
-    ({"parent": '<template :include="./child" />', "child": "<p>hi</p>"}, {}),
+    (
+        {
+            "parent": "---\ncomponents:\n  - ./Child\n---\n<Child />",
+            "Child": "<p>hi</p>",
+        },
+        {},
+    ),
     # With attrs.
     (
         {
-            "parent": '<template :include="./card" title="Hello" />',
-            "card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
+            "parent": '---\ncomponents:\n  - ./Card\n---\n<Card title="Hello" />',
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{title}</h1>",
         },
         {},
     ),
     # Default slot.
     (
         {
-            "parent": '<template :include="./card"><p>body</p></template>',
-            "card": "---\nslots:\n  default: Markup\n---\n<div>{children}</div>",
+            "parent": "---\ncomponents:\n  - ./Card\n---\n<Card><p>body</p></Card>",
+            "Card": "---\nslots:\n  default: Markup\n---\n<div>{children}</div>",
         },
         {},
     ),
-    # Named slot via `<template slot=>`.
+    # Named slot via `<template :slot=>`.
     (
         {
             "parent": (
-                '<template :include="./card">'
-                '<template slot="header">HDR</template>X</template>'
+                "---\ncomponents:\n  - ./Card\n---\n"
+                "<Card>"
+                '<template :slot="header">HDR</template>X</Card>'
             ),
-            "card": (
+            "Card": (
                 "---\nslots:\n  header: Markup\n  default: Markup\n---\n"
                 "<div>{header}|{children}</div>"
             ),
         },
         {},
     ),
-    # Root-ctx propagation through nested include.
+    # Root-ctx propagation through nested components.
     (
         {
-            "outer": '<template :include="./middle" />',
-            "middle": '<template :include="./inner" />',
-            "inner": "<p>{name}</p>",
+            "outer": "---\ncomponents:\n  - ./Middle\n---\n<Middle />",
+            "Middle": "---\ncomponents:\n  - ./Inner\n---\n<Inner />",
+            "Inner": "<p>{name}</p>",
         },
         {"name": "Dave"},
     ),
 ]
 
 
-@pytest.mark.parametrize(("templates", "ctx"), INCLUDE_PARITY_CASES)
-def test_include_parity_with_interpreter(tmp_path, templates, ctx):
+@pytest.mark.parametrize(("templates", "ctx"), COMPONENT_PARITY_CASES)
+def test_component_render_matches_engine_render(tmp_path, templates, ctx):
     paths = _write_templates(tmp_path, templates)
     entry = next(iter(paths.values()))  # the first template in the set is the entry
-    interp = engine_render(entry, ctx)
-    compiled = _compile_path(entry)(**ctx)
-    assert compiled == interp
+    via_engine = engine_render(entry, ctx)
+    via_compile = _compile_path(entry)(**ctx)
+    assert via_compile == via_engine
 
 
 # --- parity with interpreter -------------------------------------------------
@@ -1106,15 +1088,25 @@ def test_coalesces_adjacent_fragments_into_single_append():
     assert body_appends <= 2, f"expected ≤2 appends, got {body_appends}:\n{src}"
 
 
-def test_coalesces_through_include_call():
-    """An include call inside a fragment run should fold into the same
+def test_coalesces_through_component_call():
+    """A component call inside a fragment run should fold into the same
     `_out += (...)` tuple as the surrounding text — not break the run
     into separate appends.
     """
-    src = _compile_string(
-        '<div>before<template :include={"row"} item={x} />after</div>',
-        label="<test>",
+    from plain.html.compiler.emit import emit_module
+    from plain.html.parser import parse
+    from plain.html.tokenizer import tokenize
+
+    # Build the emitted source directly: component sites need an
+    # `include_renders` slot, which `compile_string` doesn't wire up.
+    tree = parse(
+        tokenize("<div>before<Row item={x} />after</div>"),
+        components={"Row": "./Row"},
     )
-    # The dynamic include doesn't make the run break — we should still
-    # see a multi-fragment buffer push.
-    assert "_out +=" in src
+    from plain.html.compiler.session import _walk_includes
+
+    include_renders = {id(n): "_inc_0" for n in _walk_includes(tree)}
+    emitted = emit_module(tree, {}, "<test>", include_renders=include_renders)
+    # The component call doesn't break the run — we should still see a
+    # multi-fragment buffer push.
+    assert "_out +=" in emitted.source

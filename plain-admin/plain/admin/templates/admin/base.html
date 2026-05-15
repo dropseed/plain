@@ -7,6 +7,9 @@ imports:
   - from plain.tailwind.html import tailwind_css
   - from plain.toolbar.html import toolbar
   - from plain.urls import reverse as url
+components:
+  - admin/_header as Header
+  - elements/admin/Icon
 attrs:
   title: str = ""
   app_name: str = "Plain"
@@ -24,22 +27,25 @@ attrs:
   pinned_slugs: set = set()
   slug: str = ""
 slots:
-  default: required
+  default: optional
   actions: optional
   header: optional
   header_scripts: optional
   admin_fonts: optional
 ---
 <!DOCTYPE html>
-<html lang="en" class={["plain-admin", "dark" if admin_force_theme == "dark" else None]}>
-<head>
+<html
+    lang="en"
+    class={["plain-admin", "dark" if admin_force_theme == "dark" else None]}
+>
+    <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title + " - " + app_name + " Admin" if title else app_name + " Admin"}</title>
     <template :if={not admin_force_theme}>
-    {# Resolve theme choice before paint to avoid a flash of light/dark
+        {# Resolve theme choice before paint to avoid a flash of light/dark
        mismatch. Storage key + resolver shape must match theme.js. #}
-    <script nonce={request.csp_nonce}>
+        <script nonce={request.csp_nonce}>
     (() => {
         const stored = localStorage.getItem("plain-admin-theme");
         const dark = stored === "dark"
@@ -59,7 +65,7 @@ slots:
     </style>
     <template :if={admin_fonts}>{admin_fonts}</template>
     <template :if={not admin_fonts}>
-    <style nonce={request.csp_nonce}>
+        <style nonce={request.csp_nonce}>
     @font-face {{
       font-family: "Inter";
       font-style: normal;
@@ -94,22 +100,31 @@ slots:
     <script src={asset('admin/components.js')} defer nonce={request.csp_nonce}></script>
     <template :if={header_scripts}>{header_scripts}</template>
 </head>
-<body
-    class="flex flex-col min-h-screen pb-12"
-    data-toolbar-installed={is_package_installed('plaintoolbar') or None}
+    <body
+        class="flex flex-col min-h-screen pb-12"
+        data-toolbar-installed={is_package_installed('plaintoolbar') or None}
     >
 
-    <template :include="admin/_header" />
+    <Header />
 
     <div class="flex flex-1 min-h-[calc(100vh-5.5rem)]">
         <div id="plain-admin-content" class="w-full min-w-0 flex-grow">
             <header class="px-4 lg:px-8 inset-x-0 pt-6 pb-4">
                 <template :if={header}>{header}</template>
                 <template :if={not header}>
-                <nav :if={parent_view_classes} class="flex items-center space-x-1.5 mb-1 text-xs text-admin-muted-foreground" aria-label="Breadcrumb">
-                    <template :for={(i, parent_view) in enumerate(reversed(parent_view_classes))}>
+                    <nav
+                        :if={parent_view_classes}
+                        class="flex items-center space-x-1.5 mb-1 text-xs text-admin-muted-foreground"
+                        aria-label="Breadcrumb"
+                    >
+                    <template
+                        :for={(i, parent_view) in enumerate(reversed(parent_view_classes))}
+                    >
                         <span :if={i > 0} class="text-admin-muted-foreground/60">/</span>
-                        <a href={parent_view.get_view_url(object if object is not None else None)} class="hover:text-admin-foreground hover:underline">
+                        <a
+                            href={parent_view.get_view_url(object if object is not None else None)}
+                            class="hover:text-admin-foreground hover:underline"
+                        >
                             {parent_view.get_nav_title()}
                         </a>
                     </template>
@@ -118,15 +133,25 @@ slots:
                         <span class="text-admin-foreground/80 truncate max-w-48">{object.__repr__()}</span>
                     </template>
                 </nav>
-
-                <div class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <img :if={image} src={image.src} alt={image.alt} class="h-8 rounded flex-shrink-0">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                        <img
+                            :if={image}
+                            src={image.src}
+                            alt={image.alt}
+                            class="h-8 rounded flex-shrink-0"
+                        >
                         <h1 class="font-semibold text-2xl truncate">{title}</h1>
                     </div>
-                    <div class="hidden sm:flex items-center space-x-2 text-sm flex-shrink-0">
+                        <div
+                            class="hidden sm:flex items-center space-x-2 text-sm flex-shrink-0"
+                        >
                         {actions}
-                        <a :for={(link, link_url) in links.items()} href={link_url} class="admin-btn admin-btn-outline">{link}</a>
+                        <a
+                            :for={(link, link_url) in links.items()}
+                            href={link_url}
+                            class="admin-btn admin-btn-outline"
+                        >{link}</a>
                         <div :if={extra_links} class="admin-dropdown-menu">
                             <button
                                 type="button"
@@ -135,17 +160,27 @@ slots:
                                 aria-controls="header-extra-links-popover"
                                 class="admin-btn admin-btn-icon admin-btn-outline"
                             >
-                                <template :include="elements/admin/Icon" name="three-dots" />
+                                <Icon name="three-dots" />
                             </button>
-                            <div id="header-extra-links-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                            <div
+                                id="header-extra-links-popover"
+                                data-popover
+                                data-align="end"
+                                aria-hidden="true"
+                                class="w-48"
+                            >
                                 <div role="menu">
-                                    <a :for={(link, link_url) in extra_links.items()} role="menuitem" href={link_url}>{link}</a>
+                                    <a
+                                        :for={(link, link_url) in extra_links.items()}
+                                        role="menuitem"
+                                        href={link_url}
+                                    >{link}</a>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div :if={links or extra_links} class="sm:hidden flex-shrink-0">
-                        <div class="admin-dropdown-menu">
+                        <div :if={links or extra_links} class="sm:hidden flex-shrink-0">
+                            <div class="admin-dropdown-menu">
                             <button
                                 type="button"
                                 aria-haspopup="menu"
@@ -153,30 +188,49 @@ slots:
                                 aria-controls="header-mobile-actions-popover"
                                 class="flex items-center justify-center w-8 h-8 rounded hover:bg-admin-accent"
                             >
-                                <template :include="elements/admin/Icon" name="three-dots" class="text-admin-muted-foreground" />
+                                <Icon
+                                    name="three-dots"
+                                    class="text-admin-muted-foreground"
+                                />
                             </button>
-                            <div id="header-mobile-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                            <div
+                                id="header-mobile-actions-popover"
+                                data-popover
+                                data-align="end"
+                                aria-hidden="true"
+                                class="w-48"
+                            >
                                 <div role="menu">
-                                    <a :for={(link, link_url) in links.items()} role="menuitem" href={link_url}>{link}</a>
-                                    <a :for={(link, link_url) in extra_links.items()} role="menuitem" href={link_url}>{link}</a>
+                                    <a
+                                        :for={(link, link_url) in links.items()}
+                                        role="menuitem"
+                                        href={link_url}
+                                    >{link}</a>
+                                    <a
+                                        :for={(link, link_url) in extra_links.items()}
+                                        role="menuitem"
+                                        href={link_url}
+                                    >{link}</a>
                                 </div>
                             </div>
                         </div>
+                        </div>
                     </div>
-                </div>
-                <p :if={description} class="mt-1 text-sm text-admin-muted-foreground">{description}</p>
+                    <p
+                        :if={description}
+                        class="mt-1 text-sm text-admin-muted-foreground"
+                    >{description}</p>
                 </template>
             </header>
-
             <div :if={cards} class="px-4 mt-4 lg:px-8">
-                <div class="grid grid-cols-2 gap-4 mt-4 lg:grid-cols-4 [&>aside]:col-span-1 [&>aside.col-span-2]:col-span-2 [&>aside.col-span-3]:col-span-2 lg:[&>aside.col-span-3]:col-span-3 [&>aside.col-span-4]:col-span-2 lg:[&>aside.col-span-4]:col-span-4">
+                <div
+                    class="grid grid-cols-2 gap-4 mt-4 lg:grid-cols-4 [&>aside]:col-span-1 [&>aside.col-span-2]:col-span-2 [&>aside.col-span-3]:col-span-2 lg:[&>aside.col-span-3]:col-span-3 [&>aside.col-span-4]:col-span-2 lg:[&>aside.col-span-4]:col-span-4"
+                >
                     <template :for={card in cards}>{mark_safe(render_card(card))}</template>
                 </div>
             </div>
-
             <main class="px-4 pt-6 pb-6 lg:px-8 text-admin-foreground/80">{children}</main>
         </div>
-
     </div>
 
     {toolbar(request)}

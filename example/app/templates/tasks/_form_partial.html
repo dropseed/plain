@@ -1,18 +1,20 @@
 ---
+components:
+  - components/NonfieldErrors
+  - components/Field
+  - components/FieldErrors
 attrs:
   form: Any
   value: Any = None
 ---
-<template :include="components/nonfield_errors" form={form} />
-<template :include="components/field" bf={form.title} label="Title" autofocus={True} required={True} />
-<template :include="components/field" bf={form.project} label="Project" type="select" />
-<template :include="components/field" bf={form.notes} label="Notes" type="textarea" min_height="120px" />
-
+<NonfieldErrors form={form} />
+<Field bf={form.title} label="Title" autofocus={True} required={True} />
+<Field bf={form.project} label="Project" type="select" />
+<Field bf={form.notes} label="Notes" type="textarea" min_height="120px" />
 <div class="grid grid-cols-2 gap-4">
-    <template :include="components/field" bf={form.due_date} label="Due date" type="date" />
-    <template :include="components/field" bf={form.priority} label="Priority" type="select" />
+    <Field bf={form.due_date} label="Due date" type="date" />
+    <Field bf={form.priority} label="Priority" type="select" />
 </div>
-
 <label class="flex items-center gap-2 text-sm text-body">
     <input
         type="checkbox"
@@ -22,7 +24,6 @@ attrs:
     >
     Complete
 </label>
-
 <div>
     <label class="field-label" for={form.tags.html_id}>Tags</label>
     <select
@@ -31,7 +32,11 @@ attrs:
         id={form.tags.html_id}
         multiple
     >
-        <option :for={(value, label) in form.tags.field.choices} value={value} selected={str(value) in [str(v) for v in (form.tags.value() or [])]}>{label}</option>
+        <option
+            :for={(value, label) in form.tags.field.choices}
+            value={value}
+            selected={str(value) in [str(v) for v in (form.tags.value() or [])]}
+        >{label}</option>
     </select>
-    <template :include="components/field_errors" bf={form.tags} />
+    <FieldErrors bf={form.tags} />
 </div>

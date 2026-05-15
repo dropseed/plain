@@ -1,4 +1,6 @@
 ---
+components:
+  - admin/cards/base as Base
 attrs:
   slug: str
   title: str = ""
@@ -10,10 +12,28 @@ attrs:
   text: str = ""
   link: str = ""
 ---
-<template :include="admin/cards/base" slug={slug} title={title} description={description} size={size} filters={filters} current_filter={current_filter}>
-    <a :if={metric is not None and link} href={link} class="block text-3xl font-semibold leading-tight tracking-tight tabular-nums text-foreground hover:underline">{metric}</a>
-    <div :if={metric is not None and not link} class="block text-3xl font-semibold leading-tight tracking-tight tabular-nums text-foreground">{metric}</div>
+<Base
+    slug={slug}
+    title={title}
+    description={description}
+    size={size}
+    filters={filters}
+    current_filter={current_filter}
+>
+    <a
+        :if={metric is not None and link}
+        href={link}
+        class="block text-3xl font-semibold leading-tight tracking-tight tabular-nums text-foreground hover:underline"
+    >{metric}</a>
+    <div
+        :if={metric is not None and not link}
+        class="block text-3xl font-semibold leading-tight tracking-tight tabular-nums text-foreground"
+    >{metric}</div>
 
-    <a :if={text and link and metric is None} href={link} class="text-sm text-admin-link hover:text-admin-link-hover hover:underline">{text}</a>
+    <a
+        :if={text and link and metric is None}
+        href={link}
+        class="text-sm text-admin-link hover:text-admin-link-hover hover:underline"
+    >{text}</a>
     <div :if={text and not link} class="mt-1 text-xs text-admin-muted-foreground">{text}</div>
-</template>
+</Base>

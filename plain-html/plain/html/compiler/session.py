@@ -1,4 +1,4 @@
-"""Compile-session walking the `:include` graph.
+"""Compile-session walking the component graph.
 
 A `CompileSession` walks depth-first: a parent is compiled only after
 every leaf it depends on has its own compiled module ready. Each
@@ -6,9 +6,9 @@ compiled `render` is injected into the parent's module globals as
 `_inc_0`, `_inc_1`, … before the parent module is exec'd.
 
 Cycle detection is instance-local (`_in_progress`); the already-
-compiled cache is process-wide so dynamic includes at render time
-reuse work from startup. The disk cache (`.._cache`) is opt-in per
-session.
+compiled cache is process-wide so a component reached again from a
+later compile reuses work from startup. The disk cache (`.._cache`)
+is opt-in per session.
 
 Source-mapped tracebacks: after emitting the generated source, this
 module parses it to AST, walks every node, and rewrites `lineno` /
@@ -33,6 +33,7 @@ from types import CodeType
 
 from .. import _cache
 from .. import frontmatter as fm
+from ..components import parse_components
 from ..loader import find_template
 from ..parser import ElementNode, Node, parse
 from ..positions import body_offset, offset_to_line_col
@@ -60,11 +61,11 @@ class _CompiledEntry:
 
 
 # Process-wide compiled-template cache. Shared across CompileSessions so a
-# template reached via the dynamic `:include={expr}` resolver at render time
-# can hit a module that was already compiled by a startup pass. The lock is
-# coarse — under contention multiple threads may compile the same template
-# concurrently; whoever finishes first wins the cache slot, the others' work
-# is discarded. Acceptable: compile output is deterministic, the loss is
+# template reached again from a later compile pass can hit a module that
+# was already compiled by an earlier pass. The lock is coarse — under
+# contention multiple threads may compile the same template concurrently;
+# whoever finishes first wins the cache slot, the others' work is
+# discarded. Acceptable: compile output is deterministic, the loss is
 # only the extra compile cycles.
 #
 # An `OrderedDict` backs the cache so we can evict the least-recently-used
@@ -104,8 +105,8 @@ def clear_process_cache() -> None:
 
 def get_or_compile(path: Path) -> Callable[..., str]:
     """Return a compiled `render` for `path`, hitting the process cache
-    if available. Used by the dynamic `:include={expr}` resolver so
-    runtime-resolved targets share cache with startup-compiled ones.
+    if available. The entry point `engine.render` uses this so repeated
+    renders of the same template skip compile cost.
 
     Defaults to disk caching ON — at render time we want compile cost
     paid only once across processes, not on every cold start.
@@ -121,7 +122,7 @@ def get_or_compile(path: Path) -> Callable[..., str]:
 
 
 class CompileSession:
-    """One compile pass over the `:include` graph.
+    """One compile pass over the component graph.
 
     Walks depth-first: a parent is compiled only after every leaf it
     depends on has its own compiled module ready. Each compiled
@@ -129,8 +130,8 @@ class CompileSession:
     `_inc_1`, … before the parent module is exec'd.
 
     Cycle detection is instance-local (`_in_progress`); the
-    already-compiled cache is process-wide so dynamic includes at
-    render time reuse work from startup.
+    already-compiled cache is process-wide so a component reached
+    again from a later compile pass reuses earlier work.
     """
 
     def __init__(
@@ -149,15 +150,15 @@ class CompileSession:
         Returns the generated module source as a string — the caller is
         responsible for compiling/exec'ing it. Use this when there's no
         backing file (in-memory templates, tests, the bench). Templates
-        with a literal `:include` raise `CompileError` at emit time since
-        there's no `:include` graph for the session to walk.
+        invoking a component tag raise `CompileError` at emit time since
+        there's no component graph for the session to walk.
 
         Note: in-memory compiles via this entry point don't get source
         mapping (no template path → nothing for `linecache` to read).
         """
         fmdict, body = fm.split(source)
         tokens = tokenize(body)
-        tree = parse(tokens)
+        tree = parse(tokens, components=parse_components(fmdict.get("components")))
         emitted = emit_module(tree, fmdict, label, include_renders={})
         return emitted.source
 
@@ -170,7 +171,7 @@ class CompileSession:
         """Compile the template at `path`. Returns its `render` callable.
 
         Pass `source_override` when the caller has the template source
-        in memory and just wants includes resolved relative to the
+        in memory and just wants component tags resolved relative to the
         given path (e.g. `plain.pages` rendering Markdown-prefixed
         templates). Process-cache hits ignore source_override — they
         assume the path's content is stable.
@@ -180,7 +181,7 @@ class CompileSession:
         if cached is not None:
             return cached.render
         if path in self._in_progress:
-            raise CompileError(f"`:include` cycle detected involving {path}")
+            raise CompileError(f"component cycle detected involving {path}")
         self._in_progress.add(path)
         try:
             entry = self._compile_one(path, source_override=source_override)
@@ -199,22 +200,15 @@ class CompileSession:
         )
         fmdict, body = fm.split(source)
         tokens = tokenize(body)
-        tree = parse(tokens)
+        tree = parse(tokens, components=parse_components(fmdict.get("components")))
 
-        # Walk the tree, find every literal `:include`, recursively compile its
-        # target, and assign each include site a unique `_inc_N` slot. Dynamic
-        # `:include={expr}` sites stay unresolved here — they're handled by a
-        # runtime helper that looks up + compiles on demand.
+        # Walk the tree, find every component-tag site, recursively compile
+        # its target, and assign each one a unique `_inc_N` slot.
         include_renders: dict[int, str] = {}
         include_funcs: dict[str, Callable[..., str]] = {}
         child_keys: list[str] = []
         idx = 0
         for inc_node in _walk_includes(tree):
-            if inc_node.include_path_code is not None:
-                # Dynamic include — resolver runs at render time. Doesn't
-                # contribute to this template's cache key, since the target
-                # is unknowable at compile time.
-                continue
             assert inc_node.include_path is not None
             child_path = self.resolver(inc_node.include_path, current_template=path)
             child_render = self.compile_path(child_path)
@@ -326,9 +320,9 @@ def _load_cached_code(path: Path) -> CodeType:
 
 
 def _walk_includes(nodes: list[Node]) -> Iterator[ElementNode]:
-    """Yield every ElementNode that has `:include` set, in tree order."""
+    """Yield every component-tag ElementNode (`include_path` set), in tree order."""
     for node in nodes:
         if isinstance(node, ElementNode):
-            if node.include_path is not None or node.include_path_code is not None:
+            if node.include_path is not None:
                 yield node
             yield from _walk_includes(node.children)

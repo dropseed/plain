@@ -6,12 +6,12 @@
 - [Templates](#templates)
 - [Expressions](#expressions)
 - [Directives](#directives)
-    - [`:if`](#if)
+    - [`:if` / `:elif` / `:else`](#if--elif--else)
     - [`:for`](#for)
-    - [`:include`](#include)
+    - [`:slot`](#slot)
+- [Components](#components)
 - [Slots](#slots)
 - [Frontmatter](#frontmatter)
-- [Components](#components)
 - [Views](#views)
 - [Security](#security)
 - [CLI](#cli)
@@ -20,7 +20,7 @@
 
 ## Overview
 
-Templates are `.html` files under your app's `templates/` directory. Expressions are real Python wrapped in `{ ... }`. Components are just templates you include from other templates.
+Templates are `.html` files under your app's `templates/` directory. Expressions are real Python wrapped in `{ ... }`. Components are just other templates — you import them by name and invoke them as PascalCase tags.
 
 Here's a complete template at `app/templates/hello.html`:
 
@@ -48,7 +48,7 @@ html = render(Path("app/templates/hello.html"), {"name": "Dave"})
 
 `Template(name)` is the path-by-name wrapper used by `TemplateView`, the admin, and the toolbar. `render(path)` is the lower-level entry point — both go through the same compiler.
 
-Directives like `:for` and `:include` are inline attributes — there's no separate tag syntax. Rendering a list of tasks looks like:
+Directives like `:if` and `:for` are inline attributes — there's no separate tag syntax. Rendering a list of tasks looks like:
 
 ```html
 <ul>
@@ -77,7 +77,7 @@ Template("layouts/page")
 Template("components/Card")
 ```
 
-Names that begin with `./` or `../` are relative to the calling template (used inside `:include`). Everything else is an absolute lookup across the configured `templates/` directories.
+The same naming is used in the `components:` frontmatter key — absolute names look up across the configured `templates/` directories, and names beginning with `./` or `../` resolve relative to the calling template.
 
 See [`find_template`](./loader.py#find_template) for the full resolution rules.
 
@@ -115,15 +115,27 @@ To write a literal `{` or `}`, double it: `{{` and `}}`. That's the same f-strin
 
 ## Directives
 
-Directives are special attributes prefixed with `:`. They control rendering rather than emitting HTML.
+Directives are special attributes prefixed with `:`. They control rendering rather than emitting HTML. Every colon attribute is a directive — it's consumed and stripped, never rendered.
 
-### `:if`
+The directives are `:if`, `:elif`, `:else`, `:for`, and `:slot`.
+
+### `:if` / `:elif` / `:else`
 
 ```html
 <div :if={alert} class="alert">{alert.message}</div>
 ```
 
-The element (and its children) only renders when the expression is truthy. Use `<template :if={...}>...</template>` for a conditional block with no surrounding element.
+The element (and its children) only renders when the expression is truthy. Chain conditions with `:elif` and `:else`:
+
+```html
+<p :if={status == "open"}>Open</p>
+<p :elif={status == "pending"}>Pending</p>
+<p :else>Closed</p>
+```
+
+An `:elif` or `:else` element must be the next element sibling of its predecessor — only whitespace and HTML comments may sit between chain members.
+
+Use `<template :if={...}>...</template>` for a conditional block with no surrounding element.
 
 ### `:for`
 
@@ -133,115 +145,35 @@ The element (and its children) only renders when the expression is truthy. Use `
 </li>
 ```
 
-The element is repeated for each iteration. Tuple unpacking works: `:for={(i, item) in enumerate(items)}`.
-
-### `:include`
+The element is repeated for each iteration. The clause is a Python comprehension clause — one `for` plus any number of `if` filters:
 
 ```html
-<template :include="components/Card" title="Hello" />
+<li :for={task in tasks if task.visible}>{task.title}</li>
+<li :for={t in tasks if t.visible if not t.archived}>{t.title}</li>
 ```
 
-Includes another template at this position. The literal-string form (`:include="..."`) is resolved at compile time, so the included template is compiled alongside the parent and pulled directly into its module. The expression form (`:include={component_name}`) resolves at render time:
+Tuple unpacking works: `:for={(i, item) in enumerate(items)}`.
+
+Multiple `for` clauses are not allowed — nest a `<template :for>` instead. Putting a conditional directive (`:if` / `:elif` / `:else`) and `:for` on the **same element** is a compile error: gate a whole loop with `<template :if>`, and filter individual items with the `:for` clause's `if`.
+
+### `:slot`
+
+`:slot="name"` marks an element, on the caller side, as content for a named slot of the component it sits inside:
 
 ```html
-<template :include={card_or_panel} title="Hello" />
-```
-
-Absolute paths walk the configured `templates/` directories. Relative paths (`./Card`, `../layouts/Page`) resolve against the calling template. See [`find_template`](./loader.py#find_template).
-
-## Slots
-
-Slot values are rendered HTML. Inside a component they arrive as `Markup` — the `SafeString` type used throughout Plain for "already-escaped" content. `Markup(s)` and `mark_safe(s)` both wrap a string so the engine emits it verbatim; both names are auto-imported into every compiled template, and both are importable as `from plain.html import Markup, mark_safe` from Python.
-
-When you include a component, the body of the `<template :include="...">` tag becomes its **default slot** (also reachable as `children`). The component renders it wherever it references `{children}`:
-
-```html
-<!-- app/templates/components/Card.html -->
----
-slots:
-    default: required
----
-<section class="card">{children}</section>
-```
-
-```html
-<!-- caller -->
-<template :include="components/Card">
-    <p>Hi there.</p>
-</template>
-```
-
-Each `slots:` entry uses the shorthand `name: required` or `name: optional`. That's the value that controls whether `plain html check --typecheck` errors when a caller forgets to provide the slot.
-
-Add named slots by giving children a `slot="..."` attribute. The component references each by name:
-
-```html
-<!-- app/templates/components/Card.html -->
----
-slots:
-    header: required
-    default: required
----
-<section class="card">
-    <header>{header}</header>
-    {children}
-</section>
-```
-
-```html
-<template :include="components/Card">
-    <template slot="header"><h2>Welcome</h2></template>
+<Card>
+    <h2 :slot="header">Welcome</h2>
     <p>Body content.</p>
-</template>
+</Card>
 ```
 
-Children without a `slot=` attribute fall through to the default slot.
-
-For documentation purposes, the expanded mapping form also accepts a `yields:` type expression — the type of the binding the slot exposes to its caller (used by parametric slots that pass data back out). All three keys are optional:
-
-```html
----
-slots:
-    row:
-        required: true
-        yields: Item
----
-```
-
-## Frontmatter
-
-A template can declare its inputs at the top of the file in YAML frontmatter, between `---` lines. Three keys are recognized:
-
-```html
----
-imports:
-    - from datetime import date
-    - from app.models import Project
-attrs:
-    title: str
-    project: Project
-    updated: date = date.today()
-slots:
-    header: required
-    default: required
----
-<section>
-    <header>{header}</header>
-    <h1>{title}</h1>
-    <p>Updated {updated} · {project.name}</p>
-    {children}
-</section>
-```
-
-- **`imports:`** runs once at module load. Names you import here are available in every `{expr}` in the file.
-- **`attrs:`** declares the names you expect callers to pass — either via `render(context)` (top-level use) or as attributes on a `:include` site (component use). The short form is `name: type` or `name: type = default`. The expanded form is a mapping with `type:`, `default:`, `required:`, and `doc:` keys.
-- **`slots:`** declares which named slots the template renders. Each entry is `name: required` or `name: optional` (the shorthand), or an expanded mapping with `required:` and an optional `yields:` type expression.
-
-Frontmatter is parsed via the `python-frontmatter` package (the same loader `plain.pages` uses). All three keys feed both the runtime defaults and the static type checker described in [CLI](#cli). See [`declarations.parse`](./typecheck/declarations.py#parse) for the validation rules.
+The value is a literal string — slot names are static. `:slot` works on any element, including `<template>` when you need to group multiple elements into one slot. See [Slots](#slots) for the full picture.
 
 ## Components
 
-A component is just a template designed to be included. There's no registry and no separate file type — write a regular `.html` file, declare its inputs in frontmatter, and `:include` it.
+A component is just a template designed to be used from another template. There's no registry and no separate file type — write a regular `.html` file, declare its inputs in frontmatter, and import it.
+
+To use a component, list it under the `components:` frontmatter key, then invoke it as a PascalCase tag:
 
 ```html
 <!-- app/templates/components/Button.html -->
@@ -255,11 +187,121 @@ attrs:
 ```
 
 ```html
-<template :include="components/Button" href="/signup" label="Sign up" />
-<template :include="components/Button" href="/learn" label="Learn more" variant="ghost" />
+<!-- caller -->
+---
+components:
+    - components/Button
+---
+<Button href="/signup" label="Sign up" />
+<Button href="/learn" label="Learn more" variant="ghost" />
 ```
 
-A common convention is to capitalize component file names (`Card.html`, `Button.html`) so they read like component tags in the caller — but the engine doesn't care.
+Each `components:` entry is a template path. The tag name is the path's last segment — so `components/Button` becomes `<Button>`. Use `as Name` to rename:
+
+```html
+---
+components:
+    - components/Card
+    - base as Base
+---
+```
+
+`base.html` is now usable as `<Base>...</Base>`.
+
+Rules:
+
+- The resolved tag name **must be PascalCase** — that's how the engine tells a component apart from an HTML element. A lowercase tag is always plain HTML; you cannot shadow `<button>` with a component.
+- Component tags can be self-closing: `<Card />`.
+- Attributes you pass to a component tag become its `attrs:` values; child content becomes its slots.
+- A name collision in `components:` is a compile error.
+
+Layouts are ordinary components. There's no special `layout:` or `extends` mechanism — a page imports its layout (`base as Base`) and renders its content inside `<Base>...</Base>`, passing slot content in.
+
+## Slots
+
+A component declares which slots it accepts in its `slots:` frontmatter and reads them as bindings in its body. The default slot is `{children}`; named slots are referenced by their declared name.
+
+```html
+<!-- app/templates/components/Card.html -->
+---
+slots:
+    header: optional
+    default: required
+---
+<section class="card">
+    <header :if={header}>{header}</header>
+    {children}
+</section>
+```
+
+When you invoke the component, unmarked direct children fall through to the **default slot**. Mark content for a **named slot** with the `:slot="name"` directive:
+
+```html
+---
+components:
+    - components/Card
+---
+<Card>
+    <h2 :slot="header">Welcome</h2>
+    <p>Body content.</p>
+</Card>
+```
+
+Use `<template :slot="name">` to group multiple elements into a single slot:
+
+```html
+<Card>
+    <template :slot="header">
+        <h2>Welcome</h2>
+        <p class="subtitle">Glad you're here.</p>
+    </template>
+    <p>Body content.</p>
+</Card>
+```
+
+Each `slots:` entry uses the shorthand `name: required` or `name: optional`. A required slot arrives as `Markup`; an optional slot that the caller doesn't provide arrives as `None`. The `required` flag is also what makes `plain html check --typecheck` error when a caller forgets a required slot.
+
+Two elements with the same `:slot` value is a compile error.
+
+Slot values are rendered HTML. Inside a component they arrive as `Markup` — the `SafeString` type used throughout Plain for "already-escaped" content. `Markup(s)` and `mark_safe(s)` both wrap a string so the engine emits it verbatim; both names are auto-imported into every compiled template, and both are importable as `from plain.html import Markup, mark_safe` from Python.
+
+## Frontmatter
+
+A template can declare its inputs at the top of the file in YAML frontmatter, between `---` lines. Four keys are recognized:
+
+```html
+---
+imports:
+    - from datetime import date
+    - from app.models import Project
+components:
+    - components/Card
+    - base as Base
+attrs:
+    title: str
+    project: Project
+    updated: date = date.today()
+slots:
+    header: required
+    default: required
+---
+<Base>
+    <header :slot="title">{title}</header>
+    <Card>
+        <header :slot="header">{header}</header>
+        <h1>{title}</h1>
+        <p>Updated {updated} · {project.name}</p>
+        {children}
+    </Card>
+</Base>
+```
+
+- **`imports:`** runs once at module load. Names you import here are available in every `{expr}` in the file.
+- **`components:`** lists the templates this file invokes as component tags. Each entry is a template path, optionally with `as Name` to rename. The resolved tag name must be PascalCase.
+- **`attrs:`** declares the names you expect callers to pass — either via `render(context)` (top-level use) or as attributes on a component tag (component use). The short form is `name: type` or `name: type = default`. The expanded form is a mapping with `type:`, `default:`, `required:`, and `doc:` keys.
+- **`slots:`** declares which slots the template renders. Each entry is `name: required` or `name: optional`.
+
+Frontmatter is parsed via the `python-frontmatter` package (the same loader `plain.pages` uses). All four keys feed both the runtime defaults and the static type checker described in [CLI](#cli). See [`declarations.parse`](./typecheck/declarations.py#parse) for the validation rules.
 
 ## Views
 
@@ -339,7 +381,7 @@ plain html format       # canonicalize whitespace and attribute order in place
 plain html compile      # pre-compile every template into the on-disk cache
 ```
 
-- `plain html check --typecheck` also runs `{expr}` content through your configured Python type checker (`ty` by default; `pyright` also supported). Each template's `attrs:` and `imports:` form the local scope.
+- `plain html check --typecheck` also runs `{expr}` content through your configured Python type checker (`ty` by default; `pyright` also supported). Each template's `attrs:`, `imports:`, and `components:` form the local scope, so component tags are checked at their call sites.
 - `plain html format` is idempotent and conservative — text content and whitespace inside inline parents, `<pre>`, `<textarea>`, `<script>`, and `<style>` are preserved byte-for-byte. Run `--check` to fail without writing.
 - `plain html compile` is a deploy-time warm step: it pre-fills `<project>/.plain/html/` so the first render in production doesn't pay codegen cost.
 
@@ -352,21 +394,26 @@ All three accept paths or directories on the command line, or `-` to read source
 Jinja2 is excellent — Plain still ships it as the default engine. plain.html exists because a few specific problems are easier when the engine knows it's emitting HTML:
 
 - **Contextual autoescape.** Jinja escapes every `{{ x }}` the same way. plain.html knows whether the expression sits in text, in a URL attribute, or in an event handler, and picks the right escape (or refuses dynamic data, in the event-handler case).
-- **Components as files.** A `:include` is just another `.html` file. No `{% macro %}` blocks, no registry, no special import.
-- **Static checkability.** Because expressions are real Python and `attrs:` declares the local scope, `plain html check --typecheck` can run a Python type checker over every `{expr}` in your templates.
+- **Components as files.** A component is just another `.html` file, imported with the `components:` key and invoked as a tag. No `{% macro %}` blocks, no registry, no special import machinery.
+- **Static checkability.** Because expressions are real Python and `attrs:` declares the local scope, `plain html check --typecheck` can run a Python type checker over every `{expr}` in your templates — and over component call sites.
 
 Most Jinja constructs translate directly:
 
-| Jinja                                 | plain.html                                                                                                           |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `{{ x }}`                             | `{x}`                                                                                                                |
-| `{{ x \| filter }}`                   | `{filter(x)}` — filters are just Python calls                                                                        |
-| `{% if x %}...{% endif %}`            | `<div :if={x}>...</div>` or `<template :if={x}>...</template>`                                                       |
-| `{% for x in xs %}...{% endfor %}`    | `<li :for={x in xs}>...</li>`                                                                                        |
-| `{% include "foo.html" %}`            | `<template :include="foo" />`                                                                                        |
-| `{% block name %}...{% endblock %}`   | named slots — caller passes `<template slot="name">...</template>`                                                   |
-| `{% macro x(...) %}...{% endmacro %}` | a component file (`components/X.html` with `attrs:`) included via `:include`                                         |
-| `{% extends "base.html" %}`           | no direct equivalent — invert the relationship: the page includes a layout component and passes slot content into it |
+| Jinja                                 | plain.html                                                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `{{ x }}`                             | `{x}`                                                                                                               |
+| `{{ x \| filter }}`                   | `{filter(x)}` — filters are just Python calls                                                                       |
+| `{% if x %}...{% endif %}`            | `<div :if={x}>...</div>` or `<template :if={x}>...</template>`                                                      |
+| `{% if %}...{% elif %}...{% else %}`  | `:if` / `:elif` / `:else` on sibling elements                                                                       |
+| `{% for x in xs %}...{% endfor %}`    | `<li :for={x in xs}>...</li>`                                                                                       |
+| `{% include "foo.html" %}`            | declare `foo` under `components:`, then invoke it as `<Foo />`                                                      |
+| `{% block name %}...{% endblock %}`   | named slots — caller passes `<element :slot="name">...</element>`                                                   |
+| `{% macro x(...) %}...{% endmacro %}` | a component file (`components/X.html` with `attrs:`) invoked as `<X ... />`                                         |
+| `{% extends "base.html" %}`           | no direct equivalent — invert the relationship: the page imports a layout component and passes slot content into it |
+
+#### How do I invoke a component?
+
+List its template path under the `components:` frontmatter key, then write it as a PascalCase tag. `components/Card` becomes `<Card>`; use `as Name` to rename. Attributes on the tag become the component's `attrs:`, and child content becomes its slots. See [Components](#components).
 
 #### Can I render user-uploaded templates?
 
@@ -376,9 +423,9 @@ No. See [Security](#security) — `imports:` runs at module load and `{...}` exp
 
 Double it: `{{` renders as `{`, `}}` renders as `}`. The same escape works in attribute values.
 
-#### How does `:include` resolve paths?
+#### How do `components:` paths resolve?
 
-Absolute names (`components/Card`) walk the configured `templates/` directories — the app's own `templates/` first, then each installed package's `templates/`. Relative names (`./Card`, `../layouts/Page`) resolve against the directory of the calling template. See [`find_template`](./loader.py#find_template).
+The same way `Template(name)` does. Absolute names (`components/Card`) walk the configured `templates/` directories — the app's own `templates/` first, then each installed package's `templates/`. Relative names (`./Card`, `../layouts/Page`) resolve against the directory of the calling template. See [`find_template`](./loader.py#find_template).
 
 #### How does this interact with `plain.htmx`?
 

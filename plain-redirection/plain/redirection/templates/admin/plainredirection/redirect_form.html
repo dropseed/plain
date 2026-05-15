@@ -1,4 +1,9 @@
 ---
+components:
+  - admin/base as Base
+  - elements/admin/InputField
+  - elements/admin/CheckboxField
+  - elements/admin/Submit
 attrs:
   form: Any
   title: str = ""
@@ -12,17 +17,25 @@ attrs:
   object: Any = None
   cards: list = []
 ---
-<template :include="admin/base"
-    title={title} app_name={app_name} admin_force_theme={admin_force_theme}
-    description={description} image={image} links={links} extra_links={extra_links}
-    parent_view_classes={parent_view_classes} object={object} cards={cards}>
-<form method="post" class="space-y-4">
-    <template :include="elements/admin/InputField" label="From pattern" field={form.from_pattern} />
-    <template :include="elements/admin/InputField" label="To pattern" field={form.to_pattern} />
-    <template :include="elements/admin/CheckboxField" label="Use regular expressions" field={form.is_regex} />
-    <template :include="elements/admin/InputField" label="HTTP status code" field={form.http_status} />
-    <template :include="elements/admin/InputField" label="Order" field={form.order} />
-    <template :include="elements/admin/CheckboxField" label="Enabled" field={form.enabled} />
-    <template :include="elements/admin/Submit">Save</template>
-</form>
-</template>
+<Base
+    title={title}
+    app_name={app_name}
+    admin_force_theme={admin_force_theme}
+    description={description}
+    image={image}
+    links={links}
+    extra_links={extra_links}
+    parent_view_classes={parent_view_classes}
+    object={object}
+    cards={cards}
+>
+    <form method="post" class="space-y-4">
+        <InputField label="From pattern" field={form.from_pattern} />
+        <InputField label="To pattern" field={form.to_pattern} />
+        <CheckboxField label="Use regular expressions" field={form.is_regex} />
+        <InputField label="HTTP status code" field={form.http_status} />
+        <InputField label="Order" field={form.order} />
+        <CheckboxField label="Enabled" field={form.enabled} />
+        <Submit>Save</Submit>
+    </form>
+</Base>

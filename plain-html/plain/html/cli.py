@@ -11,6 +11,8 @@ from plain.cli.print import print_event
 
 from . import _cache
 from .compiler import CompileError, CompileSession, clear_process_cache
+from .componentcheck import check_component_files, check_component_slots
+from .components import ComponentsError, parse_components
 from .format import format_source
 from .frontmatter import split as split_frontmatter
 from .loader import get_template_dirs
@@ -163,15 +165,42 @@ def _check_stdin(
         sys.exit(1)
 
     try:
+        components = parse_components(fmdict.get("components"))
+    except ComponentsError as e:
+        click.echo(f"<stdin>:1:1: {e}", err=True)
+        sys.exit(1)
+
+    try:
         tokens = tokenize(body)
     except TokenizeError as e:
         click.echo(_format_error_with_label("<stdin>", source, body_start, e), err=True)
         sys.exit(1)
 
     try:
-        parse(tokens)
+        tree = parse(tokens, components=components)
     except ParseError as e:
         click.echo(_format_error_with_label("<stdin>", source, body_start, e), err=True)
+        sys.exit(1)
+
+    # Fix A / B — component file existence and slot usage. There's no file
+    # path in stdin mode, so relative (`./`, `../`) component paths can't
+    # be resolved — those are skipped (see `check_component_files`).
+    component_errors = check_component_files(
+        components, label="<stdin>", current_template=None
+    )
+    component_errors.extend(
+        check_component_slots(
+            tree,
+            components,
+            label="<stdin>",
+            source=source,
+            body_start=body_start,
+            current_template=None,
+        )
+    )
+    if component_errors:
+        for line in component_errors:
+            click.echo(line, err=True)
         sys.exit(1)
 
     if run_typecheck:
@@ -419,6 +448,11 @@ def _check_file(path: Path) -> list[str]:
     except DeclarationError as e:
         return [f"{path}:1:1: {e}"]
 
+    try:
+        components = parse_components(fmdict.get("components"))
+    except ComponentsError as e:
+        return [f"{path}:1:1: {e}"]
+
     body_start = body_offset(source)
 
     try:
@@ -427,11 +461,27 @@ def _check_file(path: Path) -> list[str]:
         return [_format_error_with_label(str(path), source, body_start, e)]
 
     try:
-        parse(tokens)
+        tree = parse(tokens, components=components)
     except ParseError as e:
         return [_format_error_with_label(str(path), source, body_start, e)]
 
-    return []
+    errors: list[str] = []
+    # Fix A — every `components:` entry must resolve to a real file.
+    errors.extend(
+        check_component_files(components, label=str(path), current_template=path)
+    )
+    # Fix B — slot usage at each component-tag call site must be valid.
+    errors.extend(
+        check_component_slots(
+            tree,
+            components,
+            label=str(path),
+            source=source,
+            body_start=body_start,
+            current_template=path,
+        )
+    )
+    return errors
 
 
 _OFFSET_RE = re.compile(r"\bat offset (\d+)\b")

@@ -83,7 +83,7 @@ These two constrain every other decision below. Both gate the phase.
 | **CLI surface**                   | `plain html format` (write) and `plain html format --check` (CI). Wired into `./scripts/fix` and `./scripts/check`. Not folded into `plain code` — kept distinct so the HTML formatter can be invoked standalone.               |
 | **Lint rule taxonomy**            | Ruff-style codes: `PH001`…`PH0xx` for syntax/structure (Phase 8), `PH1xx` for content-model (Phase 17 tier 2), `PH2xx` for a11y (Phase 17 tier 3). Configured under `[tool.plain.html]` in `pyproject.toml`, per-rule severity. |
 | **Performance budget**            | Format the entire monorepo's `.plain` corpus in under 2 seconds; format a single template in under 10 ms (warm). Set the budget now so we don't ship something glacial like early djLint.                                       |
-| **Editor integration**            | CLI-only in v1. LSP is a follow-up, not a blocker.                                                                                                                                                                              |
+| **Editor integration**            | CLI-only.                                                                                                                                                                                                                       |
 
 ### Conformance test strategy
 
@@ -143,21 +143,15 @@ diff /tmp/jinja.html /tmp/prototype.html
 
 The prototype is discarded after Phase 0; lessons inform Phases 1–7. Do not skip — this is the cheapest place to discover a fundamental design problem.
 
-**Status: substantial progress.** The engine in [`plain-html/`](plain-html/) covers Phase 0–7 functionality (frontmatter parser, tokenizer with opaque `<script>`/`<style>` bodies, tag-tree builder, tree-walking renderer, contextual escape, filesystem loader, includes with slots and dynamic `:include={expr}` dispatch, globals registry that pulls in Jinja env globals, Python-keyword `class_` alias). Phases 8–9 (`plain html check` and ty integration) are still TODO. Phases 10–16 (the per-package migration) are largely done:
+**Status: shipped; ready for public release.** Jinja is gone — `plain-templates` was deleted, every package has a `<pkg>/templates/` directory, the extension is `.html`, and `TemplateView`/`FormView`/`DetailView`/`ListView`/`UpdateView`/`DeleteView` live in `plain.html.views`. 119 templates across `plain`, `plain-admin`, `plain-observer`, `plain-toolbar`, `plain-flags`, `plain-jobs`, `plain-pages`, `plain-pageviews`, `plain-sessions`, `plain-email`, `plain-tailwind`, `plain-htmx`, `plain-loginlink`, `plain-oauth`, `plain-passwords`, `plain-redirection`, `plain-support`, and `example` — `plain html check --typecheck` is green across the lot. Smoke routes — `/`, `/tasks/`, `/admin/`, `/admin/ui`, `/observer/` — render end-to-end through plain.html.
 
-- **Example app (Phase 10):** every template in `example/app/templates/` has a `.plain` counterpart. Every example route returns 200 through plain.html end-to-end.
-- **`plain.templates.Template`** routes `.html` callers to `.plain` when the file exists in a `templates/` dir, so the migration is invisible to view code — no `template_name` changes needed.
-- **`plain.elements`** also goes through `plain.templates.Template`, so `<admin.X>` element tags in Jinja templates pick up `.plain` element ports transparently.
-- **`plain.admin` (Phases 11–12):** ~47/48 templates ported. Live and exercised: `base`, `_header`, `_menu_section`, `header_branding`, `page`, `index`, `list`, `detail`, `delete`, `search`, `preflight`, `setting_detail`, all elements (`Input`, `Select`, `Textarea`, `Checkbox`, the four `*Field` wrappers, `Label`, `Submit`, `FieldErrors`, `Icon`, `SearchInput`, `Help`), all card templates (`base`, `card`, `key_value`, `chart`, `table`), all value templates, and the toolbar button. Only `ui.html` (1149-line component catalog) and a handful of less-trafficked templates remain Jinja.
-- **`plain.toolbar` (Phase 14):** `toolbar`, `request`, `exception_button` ported. Toolbar panels — `session` (`plain.sessions`), `email` (`plain.email`), `observer` (`plain.observer`) — all on plain.html. The exception panel itself stays Jinja for now (renders only on errors).
-- **`plain.tailwind`, `plain.htmx`, `plain.pageviews`, `plain.sessions`, `plain.email`:** the rendered templates each package contributes are on plain.html.
-- **`plain.loginlink`, `plain.oauth`, `plain.pages`, `plain.support`, `plain.passwords`:** primary templates ported.
-- **`plain.observer`:** `trace_detail`, `partials/log`, `toolbar/observer`, both value templates ported. Main UI (`traces`, `trace`, `partials/span`, `toolbar/observer_button`) still Jinja — large, htmx-heavy; out of scope for this iteration.
-- **Remaining**: `admin/ui.html`, observer's main UI, toolbar's exception panel, a few admin-element-using package forms (`flags/admin/plainflags/flagresult_form.html`, `jobs/admin/plainqueue/jobresult_detail.html`).
+Engine work: Phases 0–6 are landed (frontmatter, tokenizer, parser, AOT compiler with static + dynamic includes, slot composition, disk cache, security hardening, contextual escape via `_runtime.py`'s `escape_html` / `escape_attr` / `escape_url` with scheme allow-list, `on*=` compile error). The tree-walking interpreter is deleted; `engine.py` is a thin entry that delegates to `compiler.get_or_compile`. Phase 8 (`plain html check`) and Phase 9 (`--typecheck` via ty, with result caching and a pyright backend) are shipped and gate pre-commit. Phase 9.5 (`plain html format`) is shipped with corpus + DOM-comparison + snapshot + performance + frontmatter + render-DOM conformance tests.
 
-Smoke verification: `/`, `/notes/`, `/tasks/`, `/tasks/1/`, `/contacts/`, `/contacts/archive/`, `/login/`, `/sse/`, `/admin/`, `/admin/p/<model>/`, `/admin/p/<model>/<id>/`, `/admin/settings/`, `/admin/settings/<name>/`, `/admin/preflight/`, `/admin/search/`, `/observer/` — all return 200, with the bulk of rendering routed through plain.html.
+Public-release prep (May 2026): typed settings registered in `default_settings.py` (`HTML_CACHE_DIR`, `HTML_CACHE_DISABLED`) with auto-bound `PLAIN_*` env-var overrides; `TemplateView` family and `TokenizeError` / `ParseError` / `CompileError` re-exported from `plain.html`; agent rule shipped at `plain-html/plain/html/agents/.claude/rules/plain-html.md`; `plain html compile` no longer crashes on bad frontmatter; tests reorganized (interpreter behavior tests moved to `internal/`, public contract tests added at `tests/public/test_template.py`, format render-equivalence promoted to `public/`, perf-gate added at `internal/test_compiler_perf.py`); parity harness deleted (migration done, interpreter deleted); 713 tests passing; `plain-html` wired into `scripts/test`. README documents views, has a Jinja translation table, and accurately describes the `Markup` / `mark_safe` relationship.
 
-The parity harness in [`plain-html/tests/parity/`](plain-html/tests/parity/) holds byte-level comparison against Jinja for the two seed fixtures from the early tracer-bullet work.
+**What's open:**
+
+- **Phase 17** (tier-2/tier-3 lint, class sorting, expression-interior formatting) — deferred as planned.
 
 ---
 
@@ -609,7 +603,6 @@ Non-deliverables (explicitly deferred):
 
 - Class-attribute sorting (Tailwind-aware or otherwise). Tracked as a follow-up.
 - Expression-interior formatting (running ruff over `{...}` contents). Tracked as a follow-up.
-- LSP / editor protocol integration. CLI is the only entry point in v1.
 - Tier-2/Tier-3 lint rules (those stay in Phase 17).
 
 ---
@@ -750,24 +743,103 @@ Success criteria:
 
 ### Phase 17 — Post-migration HTML lint tiers (deferred, optional)
 
-**Out of v1 migration scope** but explicitly on the roadmap per the spec's "HTML correctness" section.
+**Out of v1 migration scope** but explicitly on the roadmap per the spec's "HTML correctness" section. Four independent workstreams, shipped as separate sub-phases (17a–17d), not one PR. Order matters because 17a establishes the rule-engine pattern that 17b reuses; 17c/17d are formatter features and can ship in either order after 17a.
 
 Rule-code scheme (decided in the formatter/linter decisions table above):
 
 - `PH0xx` — syntax & structure (Phase 8, already shipped).
-- `PH1xx` — content model (this phase, tier 2).
-- `PH2xx` — accessibility (this phase, tier 3).
-- Config under `[tool.plain.html]` in `pyproject.toml`, per-rule severity (`error` / `warning` / `off`).
+- `PH1xx` — content model (17a).
+- `PH2xx` — accessibility (17b).
+- Config under `[tool.plain.html]` in `pyproject.toml`, per-rule severity (`error` / `warning` / `off`). Same scheme ruff uses.
 
-Deliverables (incremental):
+#### Ecosystem data sources (researched)
 
-- **Tier 2 (`PH1xx`) — content model**: WHATWG nesting rules (`<p>` content model, `<a>` non-nesting, `<button>` interactive content, `<table>` structure, `<ul>`/`<ol>` children, `<dl>`/`<head>` content), required attributes (`<a href>`, `<img alt>`, `<input type>`), attribute value validity (`<input type="...">`, `<meta charset>`, `<link rel>`), duplicate-id detection within a rendered template. Rules transcribed from WHATWG content-category tables.
-- **Tier 3 (`PH2xx`) — accessibility**: heading hierarchy, accessible names on `<button>`, ARIA attribute validity, form-label association. Warnings by default, off-able per rule.
-- **Optional Nu Html Checker backend** for CI deep-checks.
-- **Formatter follow-ups** (separate, opt-in features — not lint rules):
-    - Class-attribute sorting (Tailwind-aware initially; pluggable for other frameworks).
-    - Expression-interior formatting (run ruff over `{...}` bodies). Idempotency must still hold.
-    - LSP server so format/check work in-editor without invoking the CLI.
+| Domain              | Source                                                                                                | Integration                                                                                       |
+| ------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| HTML5 content model | `html-validate`'s `html5.json` (~150KB, MIT) — the only maintained machine-readable transcription     | Vendor under `plain-html/plain/html/lint/_data/html5.json`, document provenance, sync per release |
+| ARIA 1.2            | `aria-query`'s `roles.json` + per-characteristic JSON (MIT, A11yance org)                             | Vendor the JSON files; no maintained Python equivalent                                            |
+| Tailwind class sort | `rustywind` (Rust binary; reads canonical order from project's generated CSS via `--output-css-file`) | Shell out — reimplementing Tailwind v4 config resolution is a doomed project                      |
+| Python formatting   | `ruff format --stdin-filename foo.py -` (no public Python API per Astral discussion #12351)           | Shell out once per template, not once per expression                                              |
+
+Explicitly **not** doing: Nu HTML Checker (vnu.jar) backend — html-validate's data vendored in-process covers the same ground without a Java dep. Render-then-validate adds no signal static analysis doesn't already provide.
+
+---
+
+#### 17a — Tier-2 content-model rules (`PH1xx`)
+
+WHATWG nesting rules (`<p>` content model, `<a>` non-nesting, `<button>` interactive content, `<table>` structure, `<ul>`/`<ol>` children, `<dl>`/`<head>` content), required attributes (`<a href>`, `<img alt>`, `<input type>`), attribute value validity (`<input type="...">`, `<meta charset>`, `<link rel>`), duplicate-id detection.
+
+Rule engine: a second walker over the existing tag tree, separate from `plain html check`'s structural pass. Each rule is `(code, severity, predicate)`. Walker yields diagnostics with the existing `file:line:col` shape so output is uniform with Phase 8.
+
+plain.html-specific wrinkles (the actual design work):
+
+1. **`<template :if>` / `<template :for>` are transparent.** Their children become children of the surrounding context for content-model purposes. `<p><template :for="x in xs"><div/></template></p>` flags `<div>`-in-`<p>` as `PH101`. The walker treats `<template>` directive nodes as see-through.
+2. **`<template :include>` is opaque.** Don't recurse across include boundaries — too brittle, especially with dynamic `:include={expr}`. Document the limitation in the rule's docs. Statically-resolvable include recursion can come later as opt-in.
+3. **Dynamic IDs.** `id="{expr}"` skips duplicate-ID check. Literal `id="foo"` inside a `:for` block gets its own rule (`PH103` — "literal id inside loop"). Literals at the same template-static position dedupe normally.
+4. **Constrained attribute values with `{expr}`.** `type="{x}"` skips the enum check; `type="button"` is checked.
+
+Success criteria: rule set covering the deliverable list above runs cleanly against the in-repo corpus; each rule has unit tests for hit/miss cases plus a documented opt-out via config.
+
+---
+
+#### 17b — Tier-3 a11y rules (`PH2xx`)
+
+Warnings by default, off-able per rule. Initial small high-signal set:
+
+- `PH201` — `<img>` missing `alt` (a11y-flavored message; structurally already covered by 17a's required-attribute check)
+- `PH202` — `<button>` with no accessible name (no text content, no `aria-label`, no `aria-labelledby`)
+- `PH203` — heading-level skip within a static document (warning; skipped when conditional structure makes static analysis ambiguous)
+- `PH204` — invalid ARIA role / attribute / attribute-value
+- `PH205` — `<input>` with no associated `<label>` (matching `for=`/`id=` static pair, or wrapped)
+
+Deferred from initial cut: full role/attribute compatibility matrix from aria-query (e.g. "role=button requires tabindex" deep rules). Too much false-positive surface; revisit after 17b's small set has real-world calibration.
+
+Success criteria: each rule has unit tests; running 17b on the in-repo corpus produces a calibrated baseline (zero false positives after rule tuning, real findings on templates known to have a11y gaps).
+
+---
+
+#### 17c — Expression-interior formatting (formatter follow-up)
+
+Run ruff over `{...}` bodies. Idempotency from Phase 9.5 must still hold.
+
+Mechanics: extract every `{expr}` in the template, emit a synthesized `.py` file using the same pattern Phase 9's typecheck already uses:
+
+```python
+# line 12 col 5
+_ = (user.name)
+# line 14 col 8
+_ = (truncate(post.body, 200))
+```
+
+Shell out to `ruff format --stdin-filename <template>.py -` once per template (not once per expression). Parse the formatted output back, splice each formatted expression into the template at its original position. Source map already exists from Phase 9 — reuse it.
+
+Idempotency: ruff is idempotent on Python, the splice is byte-exact, so the round-trip is idempotent by construction. Add a property test in the existing conformance suite. Cache by template content hash + ruff version.
+
+Edge cases:
+
+- Walrus inside `{}` — ruff handles it.
+- Multi-line expressions — wrap in parens for synthesis, unwrap after.
+- Comments inside `{}` — ruff preserves them.
+
+Success criteria: every `.html` in the corpus round-trips identically after format → render-equivalence still holds → second format is a no-op.
+
+---
+
+#### 17d — Tailwind class sorting (formatter follow-up)
+
+Shell out to `rustywind` (Rust binary, single static executable). Wrap install via a vendored binary or pip wrapper.
+
+Why not Python: Tailwind v4 resolves sort order from the project's actual CSS pipeline. Reimplementing config resolution is a doomed project. `rustywind --output-css-file <project's generated css>` reads the canonical order from the rendered CSS and applies it — that's exactly the integration we want.
+
+Activation: opt-in via `[tool.plain.html] tailwind_sort = true` in `pyproject.toml`. Not default-on; many projects don't use Tailwind.
+
+Wiring: runs inside `plain html format` as a post-pass over the parsed tree's `class="..."` attribute values. Skip any value containing `{expr}` (can't sort a string we don't fully know).
+
+Idempotency: rustywind is idempotent; sort + sort = sort. Property test in the existing suite.
+
+Success criteria: opt-in flag flips behavior cleanly; format-check passes on a Tailwind project after one normalization pass; templates without Tailwind classes are unaffected.
+
+---
 
 Sequenced post-migration so the engine can stabilize first; users get a clean v1 without lint-rule churn. Promotes the "type checker for embedded Python" pitch into the spec-claimed "linter for HTML + Python."
 

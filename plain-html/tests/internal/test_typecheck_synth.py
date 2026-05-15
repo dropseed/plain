@@ -67,13 +67,6 @@ def test_if_directive_emits_truthiness_check():
     assert "if (show):" in synth.source
 
 
-def test_dynamic_include_path_typed_as_str():
-    decls = _decls(attrs={"name": "str"})
-    body = "<template :include={name}/>"
-    synth = synthesize(body, decls)
-    assert "_typed_include_path: str = (name)" in synth.source
-
-
 def test_slot_params_include_default_and_children():
     decls = _decls(slots={"header": "optional"})
     synth = synthesize("<p>{header}</p>", decls)
