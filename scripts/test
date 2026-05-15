@@ -30,6 +30,7 @@ plain-admin
 plain-oauth
 plain-auth
 plain-api
+plain-schema
 plain-elements
 plain-htmx
 plain-email

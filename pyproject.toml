@@ -33,6 +33,7 @@ dev = [
   "plain-pytest",
   "plain-redirection",
   "plain-scan",
+  "plain-schema",
   "plain-sessions",
   "plain-support",
   "plain-tailwind",
@@ -74,6 +75,7 @@ dev = [
 "plain-pytest" = { workspace = true }
 "plain-redirection" = { workspace = true }
 "plain-scan" = { workspace = true }
+"plain-schema" = { workspace = true }
 "plain-sessions" = { workspace = true }
 "plain-support" = { workspace = true }
 "plain-tailwind" = { workspace = true }
