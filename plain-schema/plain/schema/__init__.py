@@ -9,55 +9,26 @@ without `.data` indirection.
 Schemas are pure data — they don't take a request, don't render HTML,
 don't save to a database. They work in views, jobs, scripts, tests,
 anywhere a dict needs to become typed Python data.
+
+`SchemaView` and `ModelSchema` are deliberately not re-exported here —
+they pull in `plain.templates` and `plain.postgres` respectively. Import
+them from their own modules so `from plain.schema import Schema` stays
+cheap:
+
+    from plain.schema.views import SchemaView
+    from plain.schema.modelschema import ModelSchema
 """
 
 from __future__ import annotations
-
-from typing import TYPE_CHECKING, Any
 
 from .bind import BoundField, BoundSchema
 from .result import Invalid
 from .schema import Schema, make_schema
 
-if TYPE_CHECKING:
-    # Re-export for type hints. Importing at runtime triggers a cycle via
-    # plain.http → plain.internal.files.uploadhandler → plain.internal.files.uploadedfile.
-    from plain.internal.files.uploadedfile import UploadedFile  # noqa: F401
-
-    from .modelschema import ModelSchema  # noqa: F401
-    from .views import SchemaView  # noqa: F401
-
-
-def __getattr__(name: str) -> Any:
-    """Lazy attribute lookup so importing `plain.schema` stays cheap.
-
-    `UploadedFile` would otherwise trigger the plain.http import chain,
-    `SchemaView` would pull in plain.templates, and `ModelSchema` would pull
-    in plain.postgres — none belong in the load path of a plain
-    `from plain.schema import Schema`.
-    """
-    if name == "UploadedFile":
-        from plain.internal.files.uploadedfile import UploadedFile
-
-        return UploadedFile
-    if name == "SchemaView":
-        from .views import SchemaView
-
-        return SchemaView
-    if name == "ModelSchema":
-        from .modelschema import ModelSchema
-
-        return ModelSchema
-    raise AttributeError(f"module 'plain.schema' has no attribute {name!r}")
-
-
 __all__ = (
     "BoundField",
     "BoundSchema",
     "Invalid",
-    "ModelSchema",
     "Schema",
-    "SchemaView",
-    "UploadedFile",
     "make_schema",
 )

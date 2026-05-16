@@ -192,7 +192,7 @@ The bound form's duck-typed surface (`html_id`, `html_name`, `value()`, `errors`
 For full HTML pages, [`SchemaView`](./views.py#SchemaView) wraps the GET-render / POST-validate / re-render-or-redirect cycle — the schema counterpart to `plain.templates`' `FormView`. Set `schema_class` and `success_url`, and override `schema_valid()` to do something with the validated result:
 
 ```python
-from plain.schema import SchemaView
+from plain.schema.views import SchemaView
 
 from .schemas import ContactSchema
 
@@ -211,14 +211,14 @@ class ContactView(SchemaView[ContactSchema]):
 
 Parameterize as `SchemaView[ContactSchema]` so `result` is typed in `schema_valid()`. The template receives the schema as `form` (a `BoundSchema`), so it renders with the same field markup a `FormView` template uses.
 
-> `SchemaView` lives in `plain.schema` for now — while the schema view design is still being iterated on — even though it makes this package depend on `plain.templates`. Importing it is deferred (`from plain.schema import SchemaView`), so a plain `from plain.schema import Schema` still doesn't load the template layer.
+> `SchemaView` lives in `plain.schema` for now — while the schema view design is still being iterated on — even though it makes this package depend on `plain.templates`. It's imported from its own module (`from plain.schema.views import SchemaView`) and not re-exported at the package top level, so a plain `from plain.schema import Schema` doesn't load the template layer.
 
 ## ModelSchema
 
 [`ModelSchema`](./modelschema.py#ModelSchema) is the schema counterpart to `plain.postgres`' `ModelForm`. Declare a `model` and annotate the fields to expose — the metaclass derives a validating field for each one:
 
 ```python
-from plain.schema import ModelSchema
+from plain.schema.modelschema import ModelSchema
 
 from .models import Project, Tag, Task
 
@@ -251,7 +251,7 @@ TaskSchema.with_querysets(
 )
 ```
 
-> Like `SchemaView`, `ModelSchema` lives in `plain.schema` for now — it makes the package additionally depend on `plain.postgres`. Importing is deferred (`from plain.schema import ModelSchema`), so a plain `from plain.schema import Schema` doesn't load the ORM.
+> Like `SchemaView`, `ModelSchema` lives in `plain.schema` for now — it makes the package additionally depend on `plain.postgres`. It's imported from its own module (`from plain.schema.modelschema import ModelSchema`) and not re-exported at the package top level, so a plain `from plain.schema import Schema` doesn't load the ORM.
 
 ## Property tests with Hypothesis
 

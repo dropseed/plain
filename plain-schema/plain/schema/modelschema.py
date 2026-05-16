@@ -7,9 +7,10 @@ annotation — scalar columns map to `types.*` fields, a ForeignKey becomes a
 
 Like `SchemaView`, this lives in `plain.schema` for now — even though it makes
 the package depend on `plain.postgres` — so the schema/model design can be
-iterated on in one place. Importing it is deferred (`from plain.schema import
-ModelSchema`), so a plain `from plain.schema import Schema` doesn't load the
-ORM.
+iterated on in one place. It's imported from this module directly (`from
+plain.schema.modelschema import ModelSchema`) and not re-exported at the
+package top level, so a plain `from plain.schema import Schema` doesn't load
+the ORM.
 
 Per-request queryset scoping (the multi-tenant FK/M2M case) is done by
 `with_querysets()`, which returns a subclass whose relation fields are

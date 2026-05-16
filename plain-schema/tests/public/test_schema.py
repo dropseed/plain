@@ -5,7 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from plain.exceptions import ValidationError
-from plain.schema import Invalid, Schema, UploadedFile, make_schema, types
+from plain.internal.files.uploadedfile import SimpleUploadedFile, UploadedFile
+from plain.schema import Invalid, Schema, make_schema, types
 
 
 class ContactSchema(Schema):
@@ -272,8 +273,6 @@ def test_partial_empty_input_is_valid():
 
 
 def _file(name: str = "report.pdf", content: bytes = b"hello") -> UploadedFile:
-    from plain.internal.files.uploadedfile import SimpleUploadedFile
-
     return SimpleUploadedFile(name, content, "application/pdf")
 
 

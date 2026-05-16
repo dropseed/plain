@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
-from plain.schema import ModelSchema
+from plain.schema.modelschema import ModelSchema
 
 from .models import Project, Tag, Task
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from plain.http import Response
-from plain.schema import SchemaView
+from plain.schema.views import SchemaView
 from plain.templates.views import FormView, TemplateView
 from plain.urls import reverse_lazy
 

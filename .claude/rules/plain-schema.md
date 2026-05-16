@@ -56,12 +56,12 @@ If you're tempted to `request.json_data["x"]` and then check it — write a Sche
 
 ## Model-backed input
 
-For input backed by a `postgres.Model`, subclass `plain.schema.ModelSchema`: set `model = X` and annotate the fields to expose. Fields auto-derive — scalars become `types.*`, a ForeignKey becomes a `ModelChoiceField`, a ManyToMany a `ModelMultipleChoiceField`. `save(instance)` persists; `with_querysets(field=qs, ...)` returns a subclass with FK/M2M scoped (multi-tenant).
+For input backed by a `postgres.Model`, subclass `ModelSchema` (`from plain.schema.modelschema import ModelSchema` — not re-exported at the package top level, so it doesn't pull `plain.postgres` into a plain `Schema` import): set `model = X` and annotate the fields to expose. Fields auto-derive — scalars become `types.*`, a ForeignKey becomes a `ModelChoiceField`, a ManyToMany a `ModelMultipleChoiceField`. `save(instance)` persists; `with_querysets(field=qs, ...)` returns a subclass with FK/M2M scoped (multi-tenant).
 
 ## HTML rendering
 
 Pair with `BoundSchema` for template rendering — `BoundSchema(SchemaClass)` for a blank form, `BoundSchema.from_invalid(SchemaClass, result)` to re-render after a failed POST. Its field surface is duck-compatible with `plain.forms.BoundField`, so existing form templates render unchanged.
 
-For full HTML pages, use `plain.schema.SchemaView[MySchema]` — the schema counterpart to `FormView`. Set `schema_class` + `success_url`, override `schema_valid(result)` to persist.
+For full HTML pages, use `SchemaView[MySchema]` (`from plain.schema.views import SchemaView` — not re-exported at the package top level, so it doesn't pull `plain.templates` into a plain `Schema` import) — the schema counterpart to `FormView`. Set `schema_class` + `success_url`, override `schema_valid(result)` to persist.
 
 Run `uv run plain docs schema` for full patterns. Run `uv run plain docs schema --api` for the public API surface.
