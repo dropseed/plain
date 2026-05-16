@@ -19,7 +19,6 @@ narrowed — that scoped class drives both validation and the rendered
 
 from __future__ import annotations
 
-import copy
 from itertools import chain
 from typing import Any, ClassVar, Self, cast
 
@@ -37,9 +36,8 @@ __all__ = (
 )
 
 
-class ModelChoiceField(Field):
-    """Validates a primary key against a model queryset, cleaning to the
-    matching model instance."""
+class _ModelChoiceBase(Field):
+    """Shared queryset handling for ModelChoiceField and ModelMultipleChoiceField."""
 
     def __init__(
         self, queryset: Any, *, required: bool = True, initial: Any = None
@@ -47,15 +45,33 @@ class ModelChoiceField(Field):
         super().__init__(required=required, initial=initial)
         self.queryset = queryset
 
+    def _to_id(self, value: Any) -> Any:
+        """Normalize a model instance to its primary key; pass other values through."""
+        if isinstance(value, self.queryset.model):
+            return value.id
+        return value
+
+    def _with_queryset(self, queryset: Any) -> Self:
+        """A copy of this field bound to a different (e.g. owner-scoped) queryset."""
+        return type(self)(queryset, required=self.required, initial=self.initial)
+
+    @property
+    def choices(self) -> list[tuple[Any, str]]:
+        """`(id, label)` pairs for rendering a `<select>`."""
+        return [(obj.id, str(obj)) for obj in self.queryset]
+
+
+class ModelChoiceField(_ModelChoiceBase):
+    """Validates a primary key against a model queryset, cleaning to the
+    matching model instance."""
+
     def clean(self, value: Any) -> Any:
         if value in EMPTY_VALUES:
             if self.required:
                 raise ValidationError("This field is required.", code="required")
             return None
-        if isinstance(value, self.queryset.model):
-            value = value.id
         try:
-            return self.queryset.get(id=value)
+            return self.queryset.get(id=self._to_id(value))
         except (self.queryset.model.DoesNotExist, ValueError, TypeError):
             raise ValidationError(
                 "Select a valid choice. That choice is not one of the "
@@ -65,13 +81,12 @@ class ModelChoiceField(Field):
 
     @property
     def choices(self) -> list[tuple[Any, str]]:
-        """`(id, label)` pairs for rendering a `<select>`; a blank option
-        leads when the field is optional."""
+        # A blank option leads when the field is optional.
         blank: list[tuple[Any, str]] = [] if self.required else [("", "---------")]
-        return blank + [(obj.id, str(obj)) for obj in self.queryset]
+        return blank + super().choices
 
 
-class ModelMultipleChoiceField(Field):
+class ModelMultipleChoiceField(_ModelChoiceBase):
     """Validates a list of primary keys against a model queryset, cleaning to
     a list of model instances."""
 
@@ -80,8 +95,8 @@ class ModelMultipleChoiceField(Field):
     def __init__(
         self, queryset: Any, *, required: bool = False, initial: Any = None
     ) -> None:
-        super().__init__(required=required, initial=initial)
-        self.queryset = queryset
+        # M2M relations are conventionally optional.
+        super().__init__(queryset, required=required, initial=initial)
 
     def clean(self, value: Any) -> list[Any]:
         if not value:
@@ -90,9 +105,7 @@ class ModelMultipleChoiceField(Field):
             return []
         if not isinstance(value, list | tuple):
             raise ValidationError("Enter a list of values.", code="invalid_list")
-        ids = [
-            item.id if isinstance(item, self.queryset.model) else item for item in value
-        ]
+        ids = [self._to_id(item) for item in value]
         objects = list(self.queryset.filter(id__in=ids))
         found = {str(obj.id) for obj in objects}
         for item in ids:
@@ -103,10 +116,6 @@ class ModelMultipleChoiceField(Field):
                     code="invalid_choice",
                 )
         return objects
-
-    @property
-    def choices(self) -> list[tuple[Any, str]]:
-        return [(obj.id, str(obj)) for obj in self.queryset]
 
 
 def modelfield_to_schemafield(modelfield: Any) -> Field | None:
@@ -269,8 +278,8 @@ class ModelSchema(Schema, metaclass=ModelSchemaMeta):
         scoped_fields: dict[str, Field] = {}
         for fname, field in cls._schema_fields.items():
             if fname in querysets:
-                field = copy.copy(field)
-                field.queryset = querysets[fname]  # ty: ignore[unresolved-attribute]
+                # Only FK/M2M fields land here (the `unknown` check above).
+                field = field._with_queryset(querysets[fname])  # ty: ignore[unresolved-attribute]
             scoped_fields[fname] = field
 
         scoped = cast(
