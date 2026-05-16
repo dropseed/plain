@@ -13,7 +13,7 @@ A `Schema` declares fields with type annotations and validators; `.validate(data
 - [Partial validation](#partial-validation)
 - [File uploads](#file-uploads)
 - [HTML rendering with BoundSchema](#html-rendering-with-boundschema)
-- [SchemaView](#schemaview)
+- [SchemaFormView](#schemaformview)
 - [ModelSchema](#modelschema)
 - [Property tests with Hypothesis](#property-tests-with-hypothesis)
 - [Installation](#installation)
@@ -21,11 +21,11 @@ A `Schema` declares fields with type annotations and validators; `.validate(data
 ## Overview
 
 ```python
-from plain.schema import Schema, Invalid, types
+from plain.schema import Field, Schema, Invalid, types
 
 class ContactSchema(Schema):
-    email: str = types.EmailField()
-    message: str = types.TextField(max_length=2000)
+    email: Field[str] = types.EmailField()
+    message: Field[str] = types.TextField(max_length=2000)
 
 result = ContactSchema.validate({"email": "a@b.co", "message": "hi"})
 if isinstance(result, Invalid):
@@ -41,21 +41,21 @@ The Schema class is the parser; the validated instance IS the schema (no `.data`
 
 ## Declaring schemas
 
-Subclass `Schema` and declare fields with type annotations plus a `types.*` field instance:
+Subclass `Schema` and declare each field as `name: Field[T] = types.*(...)`:
 
 ```python
-from plain.schema import Schema, types
+from plain.schema import Field, Schema, types
 
 class TaskSchema(Schema):
-    title: str = types.TextField(max_length=200, min_length=1)
-    notes: str | None = types.TextField(required=False)
-    priority: str = types.ChoiceField(choices=[("low", "Low"), ("high", "High")])
-    is_complete: bool = types.BooleanField(required=False)
+    title: Field[str] = types.TextField(max_length=200, min_length=1)
+    notes: Field[str | None] = types.TextField(required=False)
+    priority: Field[str] = types.ChoiceField(choices=[("low", "Low"), ("high", "High")])
+    is_complete: Field[bool] = types.BooleanField(required=False)
 ```
 
-The annotation drives type-checker visibility into `result.<field>`; the `types.*` instance drives runtime parsing and validation. This mirrors `plain.postgres.types` for models — same pattern, same ergonomics.
+A field is a **descriptor with two faces**. On the class, `TaskSchema.title` is the typed reference `Field[str]` — used to key a `BoundSchema`. On a validated instance, `result.title` is the cleaned value `str`. The `Field[T]` annotation makes both statically checked; the `types.*` instance drives runtime parsing and validation.
 
-For optional fields, use `T | None` and `required=False` together — the `.pyi` stub overloads make this consistent.
+For optional fields, use `Field[T | None]` and `required=False` together — the `.pyi` stub overloads keep the two consistent.
 
 ## Inline schemas
 
@@ -111,9 +111,9 @@ Override `check()` as an instance method on the schema. `self` is the typed inst
 
 ```python
 class TaskSchema(Schema):
-    title: str = types.TextField(max_length=200)
-    is_complete: bool = types.BooleanField(required=False)
-    completed_at: datetime | None = types.DateTimeField(required=False)
+    title: Field[str] = types.TextField(max_length=200)
+    is_complete: Field[bool] = types.BooleanField(required=False)
+    completed_at: Field[datetime | None] = types.DateTimeField(required=False)
 
     def check(self, *, context=None):
         if self.is_complete and not self.completed_at:
@@ -146,9 +146,11 @@ def htmx_post_validate(self):
 Pass `request.files` as the `files=` kwarg to validate uploads. `FileField` and `ImageField` declarations populate from `files`; everything else continues to read from `data`.
 
 ```python
+from plain.internal.files.uploadedfile import UploadedFile
+
 class AttachmentSchema(Schema):
-    description: str = types.TextField(max_length=500)
-    document: Any = types.FileField(max_length=120)
+    description: Field[str] = types.TextField(max_length=500)
+    document: Field[UploadedFile] = types.FileField(max_length=120)
 
 class UploadView(View):
     def post(self):
@@ -187,17 +189,17 @@ class ContactView(View):
 
 The bound form's duck-typed surface (`html_id`, `html_name`, `value()`, `errors`, `field`, `non_field_errors`, `fields`) is the same surface `plain.forms.BoundField` exposes — existing form templates render against `BoundSchema` unchanged.
 
-## SchemaView
+## SchemaFormView
 
-For full HTML pages, [`SchemaView`](./views.py#SchemaView) wraps the GET-render / POST-validate / re-render-or-redirect cycle — the schema counterpart to `plain.templates`' `FormView`. Set `schema_class` and `success_url`, and override `schema_valid()` to do something with the validated result:
+For full HTML pages, [`SchemaFormView`](./views.py#SchemaFormView) wraps the GET-render / POST-validate / re-render-or-redirect cycle — the schema counterpart to `plain.templates`' `FormView`. Set `schema_class` and `success_url`, and override `schema_valid()` to do something with the validated result:
 
 ```python
-from plain.schema.views import SchemaView
+from plain.schema.views import SchemaFormView
 
 from .schemas import ContactSchema
 
 
-class ContactView(SchemaView[ContactSchema]):
+class ContactView(SchemaFormView[ContactSchema]):
     template_name = "contact.html"
     schema_class = ContactSchema
     success_url = "/thanks/"
@@ -209,9 +211,9 @@ class ContactView(SchemaView[ContactSchema]):
         return super().schema_valid(result)
 ```
 
-Parameterize as `SchemaView[ContactSchema]` so `result` is typed in `schema_valid()`. The template receives the schema as `form` (a `BoundSchema`), so it renders with the same field markup a `FormView` template uses.
+Parameterize as `SchemaFormView[ContactSchema]` so `result` is typed in `schema_valid()`. The template receives the schema as `form` (a `BoundSchema`), so it renders with the same field markup a `FormView` template uses.
 
-> `SchemaView` lives in `plain.schema` for now — while the schema view design is still being iterated on — even though it makes this package depend on `plain.templates`. It's imported from its own module (`from plain.schema.views import SchemaView`) and not re-exported at the package top level, so a plain `from plain.schema import Schema` doesn't load the template layer.
+> `SchemaFormView` lives in `plain.schema` for now — while the schema view design is still being iterated on — even though it makes this package depend on `plain.templates`. It's imported from its own module (`from plain.schema.views import SchemaFormView`) and not re-exported at the package top level, so a plain `from plain.schema import Schema` doesn't load the template layer.
 
 ## ModelSchema
 
@@ -251,7 +253,7 @@ TaskSchema.with_querysets(
 )
 ```
 
-> Like `SchemaView`, `ModelSchema` lives in `plain.schema` for now — it makes the package additionally depend on `plain.postgres`. It's imported from its own module (`from plain.schema.modelschema import ModelSchema`) and not re-exported at the package top level, so a plain `from plain.schema import Schema` doesn't load the ORM.
+> Like `SchemaFormView`, `ModelSchema` lives in `plain.schema` for now — it makes the package additionally depend on `plain.postgres`. It's imported from its own module (`from plain.schema.modelschema import ModelSchema`) and not re-exported at the package top level, so a plain `from plain.schema import Schema` doesn't load the ORM.
 
 ## Property tests with Hypothesis
 

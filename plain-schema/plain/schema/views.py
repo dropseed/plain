@@ -1,10 +1,10 @@
-"""`SchemaView` — the schema-backed counterpart to `FormView`.
+"""`SchemaFormView` — the schema-backed counterpart to `FormView`.
 
 This view lives in `plain.schema` rather than `plain.templates` on purpose,
 for now: while the schema view/render design is still in flux it's easier to
-iterate on `Schema`, `BoundSchema`, and `SchemaView` together in one package.
+iterate on `Schema`, `BoundSchema`, and `SchemaFormView` together in one package.
 The trade-off is that `plain.schema` depends on `plain.templates` here — once
-the design settles, `SchemaView` should move to `plain.templates.views` and
+the design settles, `SchemaFormView` should move to `plain.templates.views` and
 that dependency should go away.
 """
 
@@ -21,14 +21,14 @@ from .bind import BoundSchema
 from .result import Invalid
 from .schema import Schema
 
-__all__ = ("SchemaView",)
+__all__ = ("SchemaFormView",)
 
 
-class SchemaView[S: Schema](TemplateView):
+class SchemaFormView[S: Schema](TemplateView):
     """A view for displaying a schema-backed form and handling its submission.
 
     The schema-era counterpart to `FormView`. Generic over the schema type —
-    parameterize as `SchemaView[MySchema]` for a typed `result` in
+    parameterize as `SchemaFormView[MySchema]` for a typed `result` in
     `schema_valid()`. The `schema_class` attribute must still be set.
     """
 

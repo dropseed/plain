@@ -5,7 +5,7 @@ from typing import Any
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
-from plain.schema.views import SchemaView
+from plain.schema.views import SchemaFormView
 from plain.templates.views import (
     CreateView,
     DeleteView,
@@ -91,8 +91,8 @@ class TaskUpdateView(AuthView, UpdateView):
         return {**super().get_form_kwargs(), "owner": self.user}
 
 
-class TaskSchemaCreateView(AuthView, SchemaView[TaskSchema]):
-    """The plain.schema counterpart to TaskCreateView — built on SchemaView +
+class TaskSchemaCreateView(AuthView, SchemaFormView[TaskSchema]):
+    """The plain.schema counterpart to TaskCreateView — built on SchemaFormView +
     a ModelSchema instead of CreateView + a ModelForm."""
 
     template_name = "tasks/schema_create.html"

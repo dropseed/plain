@@ -6,13 +6,13 @@ import pytest
 
 from plain.exceptions import ValidationError
 from plain.internal.files.uploadedfile import SimpleUploadedFile, UploadedFile
-from plain.schema import Invalid, Schema, make_schema, types
+from plain.schema import Field, Invalid, Schema, make_schema, types
 
 
 class ContactSchema(Schema):
-    email: str = types.EmailField()
-    age: int = types.IntegerField(min_value=0, max_value=150)
-    message: str = types.TextField(max_length=2000)
+    email: Field[str] = types.EmailField()
+    age: Field[int] = types.IntegerField(min_value=0, max_value=150)
+    message: Field[str] = types.TextField(max_length=2000)
 
 
 def test_valid_returns_typed_instance():
@@ -75,7 +75,9 @@ def test_inline_schema_invalid():
 
 def test_schema_inheritance_carries_fields():
     class Extended(ContactSchema):
-        priority: str = types.ChoiceField(choices=[("low", "Low"), ("high", "High")])
+        priority: Field[str] = types.ChoiceField(
+            choices=[("low", "Low"), ("high", "High")]
+        )
 
     result = Extended.validate(
         {"email": "a@b.co", "age": "1", "message": "hi", "priority": "low"}
@@ -117,8 +119,8 @@ def test_no_form_request_required():
 
 def test_check_returning_dict_adds_errors():
     class S(Schema):
-        a: int = types.IntegerField()
-        b: int = types.IntegerField()
+        a: Field[int] = types.IntegerField()
+        b: Field[int] = types.IntegerField()
 
         def check(self, *, context=None):
             if self.a > self.b:
@@ -134,7 +136,7 @@ def test_check_returning_dict_adds_errors():
 
 def test_check_raising_validationerror_string_attaches_to_all():
     class S(Schema):
-        a: int = types.IntegerField()
+        a: Field[int] = types.IntegerField()
 
         def check(self, *, context=None):
             raise ValidationError("global problem")
@@ -146,8 +148,8 @@ def test_check_raising_validationerror_string_attaches_to_all():
 
 def test_check_raising_validationerror_dict_attaches_per_field():
     class S(Schema):
-        a: int = types.IntegerField()
-        b: int = types.IntegerField()
+        a: Field[int] = types.IntegerField()
+        b: Field[int] = types.IntegerField()
 
         def check(self, *, context=None):
             raise ValidationError({"a": ["too big"], "b": "too small"})
@@ -162,8 +164,8 @@ def test_check_does_not_run_when_field_errors_exist():
     seen: list[bool] = []
 
     class S(Schema):
-        a: int = types.IntegerField()
-        b: int = types.IntegerField()
+        a: Field[int] = types.IntegerField()
+        b: Field[int] = types.IntegerField()
 
         def check(self, *, context=None):
             seen.append(True)
@@ -178,8 +180,8 @@ def test_check_self_is_typed_instance():
     captured: list = []
 
     class S(Schema):
-        a: int = types.IntegerField()
-        name: str = types.TextField()
+        a: Field[int] = types.IntegerField()
+        name: Field[str] = types.TextField()
 
         def check(self, *, context=None):
             # `self` is a typed S instance — attribute access works.
@@ -194,7 +196,7 @@ def test_check_receives_context():
     captured: list = []
 
     class S(Schema):
-        a: int = types.IntegerField()
+        a: Field[int] = types.IntegerField()
 
         def check(self, *, context=None):
             captured.append(context)
@@ -208,7 +210,7 @@ def test_default_check_is_noop():
     """Schemas without an override pass through cleanly."""
 
     class S(Schema):
-        a: int = types.IntegerField()
+        a: Field[int] = types.IntegerField()
 
     result = S.validate({"a": "1"})
     assert not isinstance(result, Invalid)
@@ -222,8 +224,10 @@ def test_default_check_is_noop():
 
 def test_partial_skips_missing_required_fields():
     class S(Schema):
-        title: str = types.TextField(min_length=1)
-        priority: str = types.ChoiceField(choices=[("low", "Low"), ("high", "High")])
+        title: Field[str] = types.TextField(min_length=1)
+        priority: Field[str] = types.ChoiceField(
+            choices=[("low", "Low"), ("high", "High")]
+        )
 
     result = S.validate({"title": "ok"}, partial=True)
     assert not isinstance(result, Invalid)
@@ -232,8 +236,8 @@ def test_partial_skips_missing_required_fields():
 
 def test_partial_still_reports_errors_on_present_fields():
     class S(Schema):
-        title: str = types.TextField(min_length=5)
-        priority: str = types.ChoiceField(choices=[("low", "Low")])
+        title: Field[str] = types.TextField(min_length=5)
+        priority: Field[str] = types.ChoiceField(choices=[("low", "Low")])
 
     result = S.validate({"title": "x"}, partial=True)
     assert isinstance(result, Invalid)
@@ -245,8 +249,8 @@ def test_partial_skips_check_hook():
     seen: list[bool] = []
 
     class S(Schema):
-        a: int = types.IntegerField()
-        b: int = types.IntegerField()
+        a: Field[int] = types.IntegerField()
+        b: Field[int] = types.IntegerField()
 
         def check(self, *, context=None):
             seen.append(True)
@@ -261,7 +265,7 @@ def test_partial_skips_check_hook():
 
 def test_partial_empty_input_is_valid():
     class S(Schema):
-        title: str = types.TextField()
+        title: Field[str] = types.TextField()
 
     result = S.validate({}, partial=True)
     assert not isinstance(result, Invalid)
@@ -278,8 +282,8 @@ def _file(name: str = "report.pdf", content: bytes = b"hello") -> UploadedFile:
 
 def test_filefield_reads_from_files_not_data():
     class Upload(Schema):
-        title: str = types.TextField()
-        document: UploadedFile = types.FileField()
+        title: Field[str] = types.TextField()
+        document: Field[UploadedFile] = types.FileField()
 
     f = _file()
     result = Upload.validate({"title": "Q3"}, files={"document": f})
@@ -291,7 +295,7 @@ def test_filefield_reads_from_files_not_data():
 
 def test_filefield_missing_is_required_error():
     class Upload(Schema):
-        document: UploadedFile = types.FileField()
+        document: Field[UploadedFile] = types.FileField()
 
     result = Upload.validate({}, files={})
     assert isinstance(result, Invalid)
@@ -300,8 +304,8 @@ def test_filefield_missing_is_required_error():
 
 def test_filefield_optional_when_required_false():
     class Upload(Schema):
-        title: str = types.TextField()
-        avatar: UploadedFile | None = types.FileField(required=False)
+        title: Field[str] = types.TextField()
+        avatar: Field[UploadedFile | None] = types.FileField(required=False)
 
     result = Upload.validate({"title": "x"})
     assert not isinstance(result, Invalid)
@@ -310,8 +314,8 @@ def test_filefield_optional_when_required_false():
 
 def test_partial_includes_files_for_presence_check():
     class Upload(Schema):
-        title: str = types.TextField(min_length=1)
-        document: UploadedFile = types.FileField()
+        title: Field[str] = types.TextField(min_length=1)
+        document: Field[UploadedFile] = types.FileField()
 
     # Just the file present in partial mode — title missing but skipped.
     f = _file()
@@ -324,7 +328,7 @@ def test_files_default_to_empty_dict():
     """Schemas without FileField don't need files= to be passed."""
 
     class S(Schema):
-        title: str = types.TextField()
+        title: Field[str] = types.TextField()
 
     result = S.validate({"title": "x"})
     assert not isinstance(result, Invalid)
@@ -334,8 +338,8 @@ def test_filefield_with_other_field_errors():
     """File fields and regular fields error independently."""
 
     class Upload(Schema):
-        title: str = types.TextField(min_length=5)
-        document: UploadedFile = types.FileField()
+        title: Field[str] = types.TextField(min_length=5)
+        document: Field[UploadedFile] = types.FileField()
 
     result = Upload.validate({"title": "x"}, files={})
     assert isinstance(result, Invalid)
@@ -350,8 +354,8 @@ def test_filefield_with_other_field_errors():
 
 def test_apply_to_copies_validated_fields_onto_instance():
     class S(Schema):
-        title: str = types.TextField(min_length=1)
-        priority: str = types.ChoiceField(choices=[("low", "L"), ("high", "H")])
+        title: Field[str] = types.TextField(min_length=1)
+        priority: Field[str] = types.ChoiceField(choices=[("low", "L"), ("high", "H")])
 
     result = S.validate({"title": "Q3", "priority": "high"})
     assert not isinstance(result, Invalid)
@@ -370,14 +374,14 @@ def test_schema_instance_is_frozen():
     a field on the result would silently lie about what was validated."""
 
     class S(Schema):
-        a: int = types.IntegerField()
+        a: Field[int] = types.IntegerField()
 
     result = S.validate({"a": "1"})
     assert not isinstance(result, Invalid)
     assert result.a == 1
 
     with pytest.raises(AttributeError, match="frozen"):
-        result.a = 99
+        result.a = 99  # ty: ignore[invalid-assignment]  (deliberate frozen violation)
 
     with pytest.raises(AttributeError, match="frozen"):
         result.unrelated = "x"
@@ -391,8 +395,8 @@ def test_apply_to_skips_unset_fields_after_partial_validation():
     apply_to() must not zero them out on the target."""
 
     class S(Schema):
-        title: str = types.TextField()
-        priority: str = types.ChoiceField(choices=[("low", "L"), ("high", "H")])
+        title: Field[str] = types.TextField()
+        priority: Field[str] = types.ChoiceField(choices=[("low", "L"), ("high", "H")])
 
     # Validate with only `title` present, partial=True — `priority` stays unset.
     result = S.validate({"title": "Q3"}, partial=True)

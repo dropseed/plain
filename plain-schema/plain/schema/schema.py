@@ -11,49 +11,14 @@ from .result import Invalid
 __all__ = ("Schema", "make_schema")
 
 
-class SchemaMeta(type):
-    """Collect Field instances declared on the class into `_schema_fields`.
-
-    Field declarations look like `email: str = EmailField()`. The annotation
-    drives type-checker visibility into the cleaned instance attributes; the
-    Field instance drives runtime parsing/validation.
-    """
-
-    def __new__(
-        mcs: type[SchemaMeta],
-        name: str,
-        bases: tuple[type, ...],
-        namespace: dict[str, Any],
-    ) -> type:
-        fields: dict[str, Field] = {}
-
-        # Inherit fields from base classes (in MRO order).
-        for base in bases:
-            base_fields = getattr(base, "_schema_fields", None)
-            if base_fields:
-                fields.update(base_fields)
-
-        # Pop the Field instances off the class body so __init__ can later
-        # set each cleaned value as an instance attribute under the same name.
-        for key in list(namespace):
-            value = namespace[key]
-            if isinstance(value, Field):
-                fields[key] = value
-                del namespace[key]
-
-        new_cls = super().__new__(mcs, name, bases, namespace)
-        setattr(new_cls, "_schema_fields", fields)  # noqa: B010
-        return new_cls
-
-
-class Schema(metaclass=SchemaMeta):
+class Schema:
     """Pure validating parser.
 
     Subclass to declare fields:
 
         class ContactSchema(Schema):
-            email: str = EmailField()
-            message: str = TextField(max_length=2000)
+            email: Field[str] = EmailField()
+            message: Field[str] = TextField(max_length=2000)
 
     Or build inline with `make_schema(...)`:
 
@@ -75,8 +40,29 @@ class Schema(metaclass=SchemaMeta):
     runs after fields have cleaned successfully.
     """
 
-    # Populated by SchemaMeta; the empty default is for type-checker visibility.
-    _schema_fields: ClassVar[dict[str, Field]] = {}
+    # Populated by __init_subclass__; the empty default is for type-checker
+    # visibility and covers `Schema` itself, which declares no fields.
+    _schema_fields: ClassVar[dict[str, Field[Any]]] = {}
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Collect the `Field` instances declared on the class into `_schema_fields`.
+
+        Field declarations look like `email: Field[str] = EmailField()`. Each
+        field is a descriptor that stays on the class — `Schema.email` is the
+        typed reference, `instance.email` the cleaned value — so this just
+        gathers them into one ordered map for validation to walk, merging in
+        any fields inherited from base classes.
+        """
+        super().__init_subclass__(**kwargs)
+        fields: dict[str, Field[Any]] = {}
+        for base in cls.__bases__:
+            base_fields = getattr(base, "_schema_fields", None)
+            if base_fields:
+                fields.update(base_fields)
+        for key, value in vars(cls).items():
+            if isinstance(value, Field):
+                fields[key] = value
+        cls._schema_fields = fields
 
     def __init__(self, **data: Any) -> None:
         for name in self._schema_fields:
@@ -240,16 +226,12 @@ class Schema(metaclass=SchemaMeta):
         return instance
 
 
-def make_schema(name: str = "InlineSchema", /, **fields: Any) -> type[Schema]:
+def make_schema(name: str = "InlineSchema", /, **fields: Field[Any]) -> type[Schema]:
     """Construct an anonymous `Schema` subclass from keyword field definitions.
 
     Useful for one-off validation in a view body where declaring a named class
     would be ceremony. Returns an untyped result; for typed access, declare a
     real subclass.
-
-    `**fields` is typed `Any` rather than `Field` because the `types` stub
-    presents field constructors as returning their cleaned Python type — a
-    type checker sees `types.TextField()` as `str`, not `Field`.
     """
     namespace: dict[str, Any] = {"__annotations__": {}, **fields}
-    return cast(type[Schema], SchemaMeta(name, (Schema,), namespace))
+    return cast(type[Schema], type(name, (Schema,), namespace))

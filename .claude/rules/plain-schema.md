@@ -2,18 +2,18 @@
 
 `plain.schema.Schema` is a validation primitive. Pure parser — takes a dict, returns either a typed schema instance or `Invalid`. Works in views, jobs, scripts, tests; not bound to a request, doesn't render HTML, doesn't touch a database.
 
-## Declare with annotations + types
+## Declare with `Field[T]` + types
 
 ```python
-from plain.schema import Schema, types
+from plain.schema import Field, Schema, types
 
 class ContactSchema(Schema):
-    email: str = types.EmailField()
-    message: str = types.TextField(max_length=2000)
-    notes: str | None = types.TextField(required=False)
+    email: Field[str] = types.EmailField()
+    message: Field[str] = types.TextField(max_length=2000)
+    notes: Field[str | None] = types.TextField(required=False)
 ```
 
-The annotation drives type-checker visibility into `result.<field>`; `types.*` drives runtime validation. For optional fields use `T | None` with `required=False`.
+Each field is a descriptor: `ContactSchema.email` is the typed reference `Field[str]`, `result.email` is the cleaned value `str`. Annotate as `Field[T]`; `types.*` drives runtime validation. For optional fields use `Field[T | None]` with `required=False`.
 
 ## Validate and narrow
 
@@ -62,6 +62,6 @@ For input backed by a `postgres.Model`, subclass `ModelSchema` (`from plain.sche
 
 Pair with `BoundSchema` for template rendering — `BoundSchema(SchemaClass)` for a blank form, `BoundSchema.from_invalid(SchemaClass, result)` to re-render after a failed POST. Its field surface is duck-compatible with `plain.forms.BoundField`, so existing form templates render unchanged.
 
-For full HTML pages, use `SchemaView[MySchema]` (`from plain.schema.views import SchemaView` — not re-exported at the package top level, so it doesn't pull `plain.templates` into a plain `Schema` import) — the schema counterpart to `FormView`. Set `schema_class` + `success_url`, override `schema_valid(result)` to persist.
+For full HTML pages, use `SchemaFormView[MySchema]` (`from plain.schema.views import SchemaFormView` — not re-exported at the package top level, so it doesn't pull `plain.templates` into a plain `Schema` import) — the schema counterpart to `FormView`. Set `schema_class` + `success_url`, override `schema_valid(result)` to persist.
 
 Run `uv run plain docs schema` for full patterns. Run `uv run plain docs schema --api` for the public API surface.

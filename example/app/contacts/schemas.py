@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from plain.schema import Schema, types
+from plain.schema import Field, Schema, types
 
 from .models import SUBJECT_BUG, SUBJECT_CHOICES
 
@@ -17,12 +17,12 @@ class ContactSchema(Schema):
     check(), and there's no save() — persisting the result is the view's job.
     """
 
-    name: str = types.TextField(max_length=100, min_length=2)
-    email: str = types.EmailField()
-    subject: str = types.ChoiceField(choices=SUBJECT_CHOICES)
-    message: str = types.TextField(min_length=10)
-    company: str | None = types.TextField(max_length=200, required=False)
-    subscribe: bool = types.BooleanField(required=False)
+    name: Field[str] = types.TextField(max_length=100, min_length=2)
+    email: Field[str] = types.EmailField()
+    subject: Field[str] = types.ChoiceField(choices=SUBJECT_CHOICES)
+    message: Field[str] = types.TextField(min_length=10)
+    company: Field[str | None] = types.TextField(max_length=200, required=False)
+    subscribe: Field[bool] = types.BooleanField(required=False)
 
     def check(
         self, *, context: dict[str, Any] | None = None

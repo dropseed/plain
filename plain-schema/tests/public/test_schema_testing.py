@@ -17,24 +17,24 @@ pytest.importorskip("hypothesis")
 
 from hypothesis import given, settings  # noqa: E402
 
-from plain.schema import Invalid, Schema, types  # noqa: E402
+from plain.schema import Field, Invalid, Schema, types  # noqa: E402
 from plain.schema.testing import schema_strategy  # noqa: E402
 
 
 class _Wide(Schema):
     """Exercises a broad cross-section of field types."""
 
-    name: str = types.TextField(min_length=2, max_length=50)
-    email: str = types.EmailField()
-    age: int = types.IntegerField(min_value=0, max_value=150)
-    rating: float = types.FloatField(min_value=0.0, max_value=5.0)
-    priority: str = types.ChoiceField(
+    name: Field[str] = types.TextField(min_length=2, max_length=50)
+    email: Field[str] = types.EmailField()
+    age: Field[int] = types.IntegerField(min_value=0, max_value=150)
+    rating: Field[float] = types.FloatField(min_value=0.0, max_value=5.0)
+    priority: Field[str] = types.ChoiceField(
         choices=[("low", "Low"), ("med", "Medium"), ("high", "High")]
     )
-    is_active: bool = types.BooleanField()
-    when: date = types.DateField()
-    started_at: datetime = types.DateTimeField()
-    token: UUID = types.UUIDField()
+    is_active: Field[bool] = types.BooleanField()
+    when: Field[date] = types.DateField()
+    started_at: Field[datetime] = types.DateTimeField()
+    token: Field[UUID] = types.UUIDField()
 
 
 @settings(max_examples=50)
@@ -48,9 +48,9 @@ def test_strategy_always_produces_valid_payload(payload):
 
 
 class _WithOptional(Schema):
-    title: str = types.TextField(min_length=1)
-    notes: str | None = types.TextField(required=False)
-    tags: list[str] = types.MultipleChoiceField(
+    title: Field[str] = types.TextField(min_length=1)
+    notes: Field[str | None] = types.TextField(required=False)
+    tags: Field[list[str]] = types.MultipleChoiceField(
         choices=[("a", "A"), ("b", "B"), ("c", "C")],
         required=False,
     )
@@ -68,7 +68,7 @@ def test_strategy_raises_for_unsupported_field():
     """FileField has no canonical strategy; we surface that explicitly."""
 
     class _NotSupported(Schema):
-        document: object = types.FileField()  # type: ignore[assignment]
+        document: Field[object] = types.FileField()  # type: ignore[assignment]
 
     with pytest.raises(NotImplementedError, match="FileField"):
         schema_strategy(_NotSupported)

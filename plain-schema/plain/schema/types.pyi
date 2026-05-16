@@ -1,17 +1,19 @@
 """Type stubs for schema fields.
 
-These stubs tell type checkers that field constructors return their cleaned
-Python type, enabling typed schema definitions like:
+These stubs tell type checkers that each field constructor returns a typed
+`Field[T]` — a descriptor that yields the cleaned value `T` on a validated
+schema instance, and the field reference itself on the schema class:
 
     class ContactSchema(Schema):
-        email: str = types.EmailField()
-        age: int = types.IntegerField()
+        email: Field[str] = types.EmailField()
+        age:   Field[int] = types.IntegerField()
 
-At runtime these are `Field` instances; the type checker sees the primitives.
+    ContactSchema.email   # Field[str]  — the typed reference (keys a BoundSchema)
+    contact.email         # str         — the cleaned value
 
 Return type is conditional on `required`:
-- required=True (default) → returns T
-- required=False → returns T | None
+- required=True (default) → Field[T]
+- required=False          → Field[T | None]
 """
 
 import re
@@ -23,6 +25,8 @@ from uuid import UUID
 
 from plain.internal.files.uploadedfile import UploadedFile
 
+from .fields import Field
+
 # Text fields
 @overload
 def TextField(
@@ -32,7 +36,7 @@ def TextField(
     min_length: int | None = None,
     strip: bool = True,
     initial: Any = None,
-) -> str | None: ...
+) -> Field[str | None]: ...
 @overload
 def TextField(
     *,
@@ -41,7 +45,7 @@ def TextField(
     min_length: int | None = None,
     strip: bool = True,
     initial: Any = None,
-) -> str: ...
+) -> Field[str]: ...
 @overload
 def EmailField(
     *,
@@ -50,7 +54,7 @@ def EmailField(
     min_length: int | None = None,
     strip: bool = True,
     initial: Any = None,
-) -> str | None: ...
+) -> Field[str | None]: ...
 @overload
 def EmailField(
     *,
@@ -59,7 +63,7 @@ def EmailField(
     min_length: int | None = None,
     strip: bool = True,
     initial: Any = None,
-) -> str: ...
+) -> Field[str]: ...
 @overload
 def URLField(
     *,
@@ -68,7 +72,7 @@ def URLField(
     min_length: int | None = None,
     strip: bool = True,
     initial: Any = None,
-) -> str | None: ...
+) -> Field[str | None]: ...
 @overload
 def URLField(
     *,
@@ -77,7 +81,7 @@ def URLField(
     min_length: int | None = None,
     strip: bool = True,
     initial: Any = None,
-) -> str: ...
+) -> Field[str]: ...
 @overload
 def RegexField(
     regex: str | re.Pattern[str],
@@ -87,7 +91,7 @@ def RegexField(
     min_length: int | None = None,
     strip: bool = False,
     initial: Any = None,
-) -> str | None: ...
+) -> Field[str | None]: ...
 @overload
 def RegexField(
     regex: str | re.Pattern[str],
@@ -97,7 +101,7 @@ def RegexField(
     min_length: int | None = None,
     strip: bool = False,
     initial: Any = None,
-) -> str: ...
+) -> Field[str]: ...
 
 # Numeric fields
 @overload
@@ -108,7 +112,7 @@ def IntegerField(
     max_value: int | None = None,
     step_size: int | None = None,
     initial: Any = None,
-) -> int | None: ...
+) -> Field[int | None]: ...
 @overload
 def IntegerField(
     *,
@@ -117,7 +121,7 @@ def IntegerField(
     max_value: int | None = None,
     step_size: int | None = None,
     initial: Any = None,
-) -> int: ...
+) -> Field[int]: ...
 @overload
 def FloatField(
     *,
@@ -126,7 +130,7 @@ def FloatField(
     max_value: float | None = None,
     step_size: float | None = None,
     initial: Any = None,
-) -> float | None: ...
+) -> Field[float | None]: ...
 @overload
 def FloatField(
     *,
@@ -135,7 +139,7 @@ def FloatField(
     max_value: float | None = None,
     step_size: float | None = None,
     initial: Any = None,
-) -> float: ...
+) -> Field[float]: ...
 @overload
 def DecimalField(
     *,
@@ -145,7 +149,7 @@ def DecimalField(
     max_digits: int | None = None,
     decimal_places: int | None = None,
     initial: Any = None,
-) -> Decimal | None: ...
+) -> Field[Decimal | None]: ...
 @overload
 def DecimalField(
     *,
@@ -155,43 +159,51 @@ def DecimalField(
     max_digits: int | None = None,
     decimal_places: int | None = None,
     initial: Any = None,
-) -> Decimal: ...
+) -> Field[Decimal]: ...
 
 # Date / time fields
 @overload
-def DateField(*, required: Literal[False], initial: Any = None) -> date | None: ...
+def DateField(
+    *, required: Literal[False], initial: Any = None
+) -> Field[date | None]: ...
 @overload
-def DateField(*, required: Literal[True] = True, initial: Any = None) -> date: ...
+def DateField(
+    *, required: Literal[True] = True, initial: Any = None
+) -> Field[date]: ...
 @overload
-def TimeField(*, required: Literal[False], initial: Any = None) -> time | None: ...
+def TimeField(
+    *, required: Literal[False], initial: Any = None
+) -> Field[time | None]: ...
 @overload
-def TimeField(*, required: Literal[True] = True, initial: Any = None) -> time: ...
+def TimeField(
+    *, required: Literal[True] = True, initial: Any = None
+) -> Field[time]: ...
 @overload
 def DateTimeField(
     *, required: Literal[False], initial: Any = None
-) -> datetime | None: ...
+) -> Field[datetime | None]: ...
 @overload
 def DateTimeField(
     *, required: Literal[True] = True, initial: Any = None
-) -> datetime: ...
+) -> Field[datetime]: ...
 @overload
 def DurationField(
     *, required: Literal[False], initial: Any = None
-) -> timedelta | None: ...
+) -> Field[timedelta | None]: ...
 @overload
 def DurationField(
     *, required: Literal[True] = True, initial: Any = None
-) -> timedelta: ...
+) -> Field[timedelta]: ...
 
 # Choice fields
 @overload
 def ChoiceField(
     *, choices: Any, required: Literal[False], initial: Any = None
-) -> str | None: ...
+) -> Field[str | None]: ...
 @overload
 def ChoiceField(
     *, choices: Any, required: Literal[True] = True, initial: Any = None
-) -> str: ...
+) -> Field[str]: ...
 def TypedChoiceField(
     *,
     choices: Any,
@@ -199,36 +211,40 @@ def TypedChoiceField(
     empty_value: Any = "",
     required: bool = True,
     initial: Any = None,
-) -> Any: ...
+) -> Field[Any]: ...
 def MultipleChoiceField(
     *,
     choices: Any,
     required: bool = True,
     initial: Any = None,
-) -> list[str]: ...
+) -> Field[list[str]]: ...
 
 # Boolean fields
 def BooleanField(
     *,
     required: bool = True,
     initial: Any = None,
-) -> bool: ...
+) -> Field[bool]: ...
 def NullBooleanField(
     *,
     required: bool = True,
     initial: Any = None,
-) -> bool | None: ...
+) -> Field[bool | None]: ...
 
 # Other
 @overload
-def UUIDField(*, required: Literal[False], initial: Any = None) -> UUID | None: ...
+def UUIDField(
+    *, required: Literal[False], initial: Any = None
+) -> Field[UUID | None]: ...
 @overload
-def UUIDField(*, required: Literal[True] = True, initial: Any = None) -> UUID: ...
+def UUIDField(
+    *, required: Literal[True] = True, initial: Any = None
+) -> Field[UUID]: ...
 def JSONField(
     *,
     required: bool = True,
     initial: Any = None,
-) -> Any: ...
+) -> Field[Any]: ...
 
 # File fields — return UploadedFile (or None when required=False).
 @overload
@@ -238,7 +254,7 @@ def FileField(
     max_length: int | None = None,
     allow_empty_file: bool = False,
     initial: Any = None,
-) -> UploadedFile | None: ...
+) -> Field[UploadedFile | None]: ...
 @overload
 def FileField(
     *,
@@ -246,18 +262,18 @@ def FileField(
     max_length: int | None = None,
     allow_empty_file: bool = False,
     initial: Any = None,
-) -> UploadedFile: ...
+) -> Field[UploadedFile]: ...
 @overload
 def ImageField(
     *,
     required: Literal[False],
     max_length: int | None = None,
     initial: Any = None,
-) -> UploadedFile | None: ...
+) -> Field[UploadedFile | None]: ...
 @overload
 def ImageField(
     *,
     required: Literal[True] = True,
     max_length: int | None = None,
     initial: Any = None,
-) -> UploadedFile: ...
+) -> Field[UploadedFile]: ...

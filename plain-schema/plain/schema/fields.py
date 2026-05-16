@@ -5,9 +5,10 @@ Each field turns one raw value into a cleaned, typed Python value via
 are pure validators: no widgets, no HTML, no form/request binding — that's
 what keeps `plain.schema` independent of `plain.forms`.
 
-The companion `types.pyi` stub presents the constructors as returning their
-cleaned Python type, so schema declarations like `email: str = EmailField()`
-type-check.
+The companion `types.pyi` stub types each constructor as returning a
+`Field[T]` descriptor, so a declaration like `email: Field[str] =
+EmailField()` type-checks — and `ContactSchema.email` resolves to the
+typed reference while `instance.email` resolves to the cleaned value.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ import uuid
 from collections.abc import Callable
 from decimal import Decimal, DecimalException
 from io import BytesIO
-from typing import Any
+from typing import Any, Self, overload
 from urllib.parse import urlsplit, urlunsplit
 
 from plain import validators
@@ -58,12 +59,24 @@ EMPTY_VALUES = validators.EMPTY_VALUES
 REQUIRED_MESSAGE = "This field is required."
 
 
-class Field:
-    """Base validating parser.
+class Field[T]:
+    """Base validating parser — and a descriptor for typed field access.
 
     `clean()` runs `parse()` (raw → typed Python value), enforces `required`,
     then runs any constraint validators. Subclasses override `parse()` and
     append validators in `__init__`.
+
+    A field declared on a `Schema` is also a (non-data) descriptor with two
+    faces:
+
+      * accessed on the class — `ContactSchema.email` — it returns itself,
+        the typed *reference* used to key a `BoundSchema`;
+      * accessed on a validated instance — `contact.email` — it returns the
+        cleaned *value* of type `T`, which `Schema.__init__` stored in the
+        instance `__dict__`.
+
+    Defining only `__get__` (no `__set__`) keeps it a non-data descriptor,
+    so the value in the instance `__dict__` is what's actually read.
     """
 
     # Validators every instance of this field type runs. Subclasses set a
@@ -74,10 +87,28 @@ class Field:
     # `Schema.validate` reads them with `.getlist()` from multi-valued data.
     multi_value: bool = False
 
+    # The attribute name the field is declared under; set by `__set_name__`.
+    name: str = ""
+
     def __init__(self, *, required: bool = True, initial: Any = None) -> None:
         self.required = required
         self.initial = initial
         self.validators: list[Callable[[Any], None]] = list(self.default_validators)
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self.name = name
+
+    @overload
+    def __get__(self, obj: None, owner: type) -> Self: ...
+    @overload
+    def __get__(self, obj: object, owner: type | None = None) -> T: ...
+    def __get__(self, obj: object | None, owner: type | None = None) -> Self | T:
+        if obj is None:
+            return self  # class access → the typed reference
+        try:
+            return obj.__dict__[self.name]  # instance access → the cleaned value
+        except KeyError:
+            raise AttributeError(self.name) from None
 
     def parse(self, value: Any) -> Any:
         """Coerce a raw value to this field's Python type. Empty input
@@ -111,7 +142,7 @@ class Field:
             raise ValidationError(errors)
 
 
-class TextField(Field):
+class TextField(Field[str]):
     """A string field with optional length bounds."""
 
     def __init__(
@@ -189,7 +220,7 @@ class RegexField(TextField):
         self.validators.append(validators.RegexValidator(regex=self.regex))
 
 
-class NumericField(Field):
+class NumericField[T](Field[T]):
     """Base for numeric fields with min/max/step bounds."""
 
     def __init__(
@@ -213,7 +244,7 @@ class NumericField(Field):
             self.validators.append(validators.StepValueValidator(step_size))
 
 
-class IntegerField(NumericField):
+class IntegerField(NumericField[int]):
     _trailing_decimal = re.compile(r"\.0*\s*$")
 
     def parse(self, value: Any) -> int | None:
@@ -225,7 +256,7 @@ class IntegerField(NumericField):
             raise ValidationError("Enter a whole number.", code="invalid")
 
 
-class FloatField(NumericField):
+class FloatField(NumericField[float]):
     def parse(self, value: Any) -> float | None:
         if value in EMPTY_VALUES:
             return None
@@ -238,7 +269,7 @@ class FloatField(NumericField):
         return value
 
 
-class DecimalField(NumericField):
+class DecimalField(NumericField[Decimal]):
     def __init__(
         self,
         *,
@@ -271,7 +302,7 @@ class DecimalField(NumericField):
         return value
 
 
-class BooleanField(Field):
+class BooleanField(Field[bool]):
     def parse(self, value: Any) -> bool:
         # A hidden input submits the string "False" for an unchecked box.
         if isinstance(value, str) and value.lower() in ("false", "0"):
@@ -286,7 +317,7 @@ class BooleanField(Field):
         return value
 
 
-class NullBooleanField(Field):
+class NullBooleanField(Field[bool | None]):
     """A boolean that also accepts `None` — never fails the required check."""
 
     def parse(self, value: Any) -> bool | None:
@@ -300,7 +331,7 @@ class NullBooleanField(Field):
         return self.parse(value)
 
 
-class _ChoiceField(Field):
+class _ChoiceField[T](Field[T]):
     """Shared choices handling for ChoiceField and MultipleChoiceField.
 
     They're siblings, not parent/child: one cleans to `str`, the other to
@@ -334,7 +365,7 @@ class _ChoiceField(Field):
         return False
 
 
-class ChoiceField(_ChoiceField):
+class ChoiceField(_ChoiceField[str]):
     def parse(self, value: Any) -> str:
         if value in EMPTY_VALUES:
             return ""
@@ -379,7 +410,7 @@ class TypedChoiceField(ChoiceField):
             )
 
 
-class MultipleChoiceField(_ChoiceField):
+class MultipleChoiceField(_ChoiceField[list[str]]):
     multi_value = True
 
     def parse(self, value: Any) -> list[str]:
@@ -403,7 +434,7 @@ class MultipleChoiceField(_ChoiceField):
         return value
 
 
-class DateField(Field):
+class DateField(Field[datetime.date]):
     def parse(self, value: Any) -> datetime.date | None:
         if value in EMPTY_VALUES:
             return None
@@ -420,7 +451,7 @@ class DateField(Field):
         return parsed
 
 
-class TimeField(Field):
+class TimeField(Field[datetime.time]):
     def parse(self, value: Any) -> datetime.time | None:
         if value in EMPTY_VALUES:
             return None
@@ -435,7 +466,7 @@ class TimeField(Field):
         return parsed
 
 
-class DateTimeField(Field):
+class DateTimeField(Field[datetime.datetime]):
     def parse(self, value: Any) -> datetime.datetime | None:
         if value in EMPTY_VALUES:
             return None
@@ -452,7 +483,7 @@ class DateTimeField(Field):
         return parsed
 
 
-class DurationField(Field):
+class DurationField(Field[datetime.timedelta]):
     def parse(self, value: Any) -> datetime.timedelta | None:
         if value in EMPTY_VALUES:
             return None
@@ -467,7 +498,7 @@ class DurationField(Field):
         return parsed
 
 
-class UUIDField(Field):
+class UUIDField(Field[uuid.UUID]):
     def parse(self, value: Any) -> uuid.UUID | None:
         if value in EMPTY_VALUES:
             return None
@@ -479,7 +510,7 @@ class UUIDField(Field):
             raise ValidationError("Enter a valid UUID.", code="invalid")
 
 
-class JSONField(Field):
+class JSONField(Field[Any]):
     def parse(self, value: Any) -> Any:
         if value in EMPTY_VALUES:
             return None
@@ -492,7 +523,7 @@ class JSONField(Field):
             raise ValidationError("Enter valid JSON.", code="invalid")
 
 
-class FileField(Field):
+class FileField(Field[Any]):
     def __init__(
         self,
         *,

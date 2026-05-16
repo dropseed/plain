@@ -34,7 +34,7 @@ class BoundField:
     name: str
 
     @property
-    def field(self) -> Field:
+    def field(self) -> Field[Any]:
         return self.bound.schema_class._schema_fields[self.name]
 
     @property
@@ -111,7 +111,7 @@ class BoundSchema:
         )
 
     @property
-    def fields(self) -> dict[str, Field]:
+    def fields(self) -> dict[str, Field[Any]]:
         return self.schema_class._schema_fields
 
     @property
@@ -122,17 +122,6 @@ class BoundSchema:
         if name not in self.schema_class._schema_fields:
             raise KeyError(name)
         return BoundField(bound=self, name=name)
-
-    def __getattr__(self, name: str) -> BoundField:
-        # Falls through to here only when normal attribute lookup fails —
-        # so dataclass fields aren't shadowed.
-        try:
-            fields = object.__getattribute__(self, "schema_class")._schema_fields
-        except AttributeError as exc:
-            raise AttributeError(name) from exc
-        if name in fields:
-            return BoundField(bound=self, name=name)
-        raise AttributeError(name)
 
     def __iter__(self) -> Iterator[BoundField]:
         for name in self.schema_class._schema_fields:

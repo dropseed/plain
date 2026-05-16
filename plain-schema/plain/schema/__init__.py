@@ -10,24 +10,26 @@ Schemas are pure data — they don't take a request, don't render HTML,
 don't save to a database. They work in views, jobs, scripts, tests,
 anywhere a dict needs to become typed Python data.
 
-`SchemaView` and `ModelSchema` are deliberately not re-exported here —
+`SchemaFormView` and `ModelSchema` are deliberately not re-exported here —
 they pull in `plain.templates` and `plain.postgres` respectively. Import
 them from their own modules so `from plain.schema import Schema` stays
 cheap:
 
-    from plain.schema.views import SchemaView
+    from plain.schema.views import SchemaFormView
     from plain.schema.modelschema import ModelSchema
 """
 
 from __future__ import annotations
 
 from .bind import BoundField, BoundSchema
+from .fields import Field
 from .result import Invalid
 from .schema import Schema, make_schema
 
 __all__ = (
     "BoundField",
     "BoundSchema",
+    "Field",
     "Invalid",
     "Schema",
     "make_schema",

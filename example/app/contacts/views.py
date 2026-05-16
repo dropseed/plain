@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from plain.http import Response
-from plain.schema.views import SchemaView
+from plain.schema.views import SchemaFormView
 from plain.templates.views import FormView, TemplateView
 from plain.urls import reverse_lazy
 
@@ -33,9 +33,9 @@ class ContactSuccessView(TemplateView):
     template_name = "contacts/success.html"
 
 
-class ContactSchemaView(SchemaView[ContactSchema]):
+class ContactSchemaFormView(SchemaFormView[ContactSchema]):
     """The plain.schema counterpart to ContactView — same page, built on
-    SchemaView + ContactSchema instead of FormView + ContactForm."""
+    SchemaFormView + ContactSchema instead of FormView + ContactForm."""
 
     template_name = "contacts/schema_form.html"
     schema_class = ContactSchema

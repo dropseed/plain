@@ -1,11 +1,11 @@
 """ModelSchema — auto-derive Schema fields from a `postgres.Model`.
 
 The Schema-shaped equivalent of `plain.postgres.forms.ModelForm`: declare a
-`model` plus annotations, and the metaclass derives a validating field per
-annotation — scalar columns map to `types.*` fields, a ForeignKey becomes a
-`ModelChoiceField`, a ManyToMany becomes a `ModelMultipleChoiceField`.
+`model` plus annotations, and `__init_subclass__` derives a validating field
+per annotation — scalar columns map to `types.*` fields, a ForeignKey becomes
+a `ModelChoiceField`, a ManyToMany becomes a `ModelMultipleChoiceField`.
 
-Like `SchemaView`, this lives in `plain.schema` for now — even though it makes
+Like `SchemaFormView`, this lives in `plain.schema` for now — even though it makes
 the package depend on `plain.postgres` — so the schema/model design can be
 iterated on in one place. It's imported from this module directly (`from
 plain.schema.modelschema import ModelSchema`) and not re-exported at the
@@ -27,7 +27,7 @@ from plain.exceptions import ValidationError
 
 from . import fields as schema_fields
 from .fields import EMPTY_VALUES, Field
-from .schema import Schema, SchemaMeta
+from .schema import Schema
 
 __all__ = (
     "ModelChoiceField",
@@ -37,7 +37,7 @@ __all__ = (
 )
 
 
-class _ModelChoiceBase(Field):
+class _ModelChoiceBase(Field[Any]):
     """Shared queryset handling for ModelChoiceField and ModelMultipleChoiceField."""
 
     def __init__(
@@ -119,7 +119,7 @@ class ModelMultipleChoiceField(_ModelChoiceBase):
         return objects
 
 
-def modelfield_to_schemafield(modelfield: Any) -> Field | None:
+def modelfield_to_schemafield(modelfield: Any) -> Field[Any] | None:
     """Map a postgres model field to a schema field instance, or `None` for
     fields that can't be derived (the primary key, non-column fields)."""
     from plain import postgres
@@ -195,11 +195,9 @@ def modelfield_to_schemafield(modelfield: Any) -> Field | None:
     return schema_fields.TextField(required=required, initial=initial)
 
 
-def _auto_derive_fields(
-    model: Any, annotation_names: list[str], namespace: dict[str, Any]
-) -> None:
-    """Fill `namespace[name]` with an auto-derived Field for each annotation
-    that names a model field and doesn't already have a Field declared."""
+def _auto_derive_fields(model: Any, annotation_names: list[str], cls: type) -> None:
+    """Set an auto-derived Field on `cls` for each annotation that names a
+    model field and doesn't already have a Field declared on the class body."""
     by_name = {
         f.name: f
         for f in chain(
@@ -209,52 +207,43 @@ def _auto_derive_fields(
     for fname in annotation_names:
         if fname == "model":
             continue
-        if isinstance(namespace.get(fname), Field):
+        if isinstance(cls.__dict__.get(fname), Field):
             continue  # user declared a Field explicitly — leave it
         if fname not in by_name:
             continue  # not a model field — a plain extra field, leave it
         derived = modelfield_to_schemafield(by_name[fname])
         if derived is not None:
-            namespace[fname] = derived
+            setattr(cls, fname, derived)
 
 
-class ModelSchemaMeta(SchemaMeta):
-    """Schema metaclass that auto-derives fields from a `model` class attribute."""
-
-    def __new__(
-        mcs: type[ModelSchemaMeta],
-        name: str,
-        bases: tuple[type, ...],
-        namespace: dict[str, Any],
-    ) -> type:
-        model = namespace.get("model")
-        annotations = namespace.get("__annotations__") or {}
-        if model is not None and annotations:
-            _auto_derive_fields(model, list(annotations), namespace)
-
-        new_cls = super().__new__(mcs, name, bases, namespace)
-
-        if model is None:
-            for base in bases:
-                inherited = getattr(base, "model", None)
-                if inherited is not None:
-                    model = inherited
-                    break
-        setattr(new_cls, "_model_schema_model", model)  # noqa: B010
-        return new_cls
-
-
-class ModelSchema(Schema, metaclass=ModelSchemaMeta):
+class ModelSchema(Schema):
     """Schema base class backed by a model.
 
     Subclass, set `model = X`, and annotate the fields to expose. Fields
     auto-derive from the model; override one by declaring a Field explicitly.
     """
 
-    # `model` is set on subclasses; the metaclass copies it to
+    # `model` is set on subclasses; `__init_subclass__` copies it to
     # `_model_schema_model` (also following inheritance).
     model: ClassVar[Any] = None
     _model_schema_model: ClassVar[Any] = None
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Auto-derive fields from `model`, then collect them like any Schema."""
+        model = cls.__dict__.get("model")
+        annotations = cls.__dict__.get("__annotations__") or {}
+        if model is not None and annotations:
+            _auto_derive_fields(model, list(annotations), cls)
+        # Schema.__init_subclass__ collects every Field on the class — the
+        # ones just derived included — into `_schema_fields`.
+        super().__init_subclass__(**kwargs)
+        if model is None:
+            for base in cls.__bases__:
+                inherited = getattr(base, "model", None)
+                if inherited is not None:
+                    model = inherited
+                    break
+        cls._model_schema_model = model
 
     @classmethod
     def with_querysets(cls, **querysets: Any) -> type[Self]:
@@ -276,7 +265,7 @@ class ModelSchema(Schema, metaclass=ModelSchemaMeta):
                 f"{sorted(unknown)}; valid FK/M2M fields: {sorted(valid)}"
             )
 
-        scoped_fields: dict[str, Field] = {}
+        scoped_fields: dict[str, Field[Any]] = {}
         for fname, field in cls._schema_fields.items():
             if fname in querysets:
                 # Only FK/M2M fields land here (the `unknown` check above).
@@ -285,7 +274,7 @@ class ModelSchema(Schema, metaclass=ModelSchemaMeta):
 
         scoped = cast(
             type[Self],
-            ModelSchemaMeta(f"{cls.__name__}Scoped", (cls,), {"__annotations__": {}}),
+            type(f"{cls.__name__}Scoped", (cls,), {"__annotations__": {}}),
         )
         scoped._schema_fields = scoped_fields
         return scoped
