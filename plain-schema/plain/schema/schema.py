@@ -123,21 +123,21 @@ class Schema(metaclass=SchemaMeta):
         return hash(make_hashable(values))
 
     def apply_to[Instance](self, instance: Instance) -> Instance:
-        """Copy validated field values onto an existing object — typically
-        a model instance about to be saved.
+        """Copy validated field values onto an existing object, returning it.
 
         Walks `_schema_fields`, calling `setattr(instance, name, value)` for
         each field that's set on the schema. Fields missing from the schema
         instance (e.g. after `partial=True` validation) are skipped, leaving
-        the target's existing value intact. Returns `instance` for chaining.
+        the target's existing value intact.
 
-            class EditContactView(View):
-                def post(self):
-                    result = ContactSchema.validate(self.request.form_data)
-                    if isinstance(result, Invalid):
-                        return self.render(form=BoundSchema.from_invalid(...))
-                    result.apply_to(self.contact).save()
-                    return RedirectResponse(...)
+        This is a pure data move — it never persists. A schema hands its
+        cleaned values to a target; whether and how that target is saved is
+        the caller's decision:
+
+            result = ContactSchema.validate(self.request.form_data)
+            if isinstance(result, Invalid):
+                return self.render(form=BoundSchema.from_invalid(...))
+            result.apply_to(ContactSubmission()).save()
 
         Field-name mismatches (schema field doesn't exist on the target)
         raise `AttributeError` only if the target uses ``__slots__`` —
@@ -148,37 +148,6 @@ class Schema(metaclass=SchemaMeta):
         for name in self._schema_fields:
             if hasattr(self, name):
                 setattr(instance, name, getattr(self, name))
-        return instance
-
-    @classmethod
-    def initial_from(cls, instance: Any) -> dict[str, Any]:
-        """Build an `initial=` dict for `BoundSchema` from an existing object.
-
-        Default: `{name: getattr(instance, name, None)}` per declared field —
-        suitable for plain Python objects, dataclasses, and most simple
-        models. `ModelSchema` overrides to translate FKs to PK ids and M2M
-        relations to id-lists, which is what the form fields expect.
-        """
-        return {name: getattr(instance, name, None) for name in cls._schema_fields}
-
-    def save[Instance](self, instance: Instance | None = None) -> Instance:
-        """Apply validated values to `instance` and persist it.
-
-        Default behavior: `apply_to(instance)` then `instance.save()`. Suitable
-        for any object exposing a `save()` method (model instance, ORM-like
-        wrapper, custom record).
-
-        Plain `Schema` cannot construct a fresh instance — pass an existing
-        one. `ModelSchema` overrides this to support `save()` (no args, builds
-        from `model = ...`) and to handle M2M assignment ordering.
-        """
-        if instance is None:
-            raise TypeError(
-                f"{type(self).__name__}.save() requires an instance argument. "
-                f"Only ModelSchema can construct one from `model = ...`."
-            )
-        self.apply_to(instance)
-        instance.save()  # ty: ignore[unresolved-attribute]
         return instance
 
     def check(

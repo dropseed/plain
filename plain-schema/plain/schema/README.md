@@ -203,8 +203,9 @@ class ContactView(SchemaView[ContactSchema]):
     success_url = "/thanks/"
 
     def schema_valid(self, result):
-        # `result` is a validated ContactSchema — persist it, send mail, etc.
-        result.save(ContactSubmission())
+        # `result` is a validated ContactSchema — a pure parser, no `.save()`.
+        # `apply_to` copies the cleaned values onto a record; the view persists.
+        result.apply_to(ContactSubmission()).save()
         return super().schema_valid(result)
 ```
 

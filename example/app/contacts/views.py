@@ -53,9 +53,9 @@ class ContactSchemaView(SchemaView[ContactSchema]):
 
     def schema_valid(self, result: ContactSchema) -> Response:
         # Schemas are pure data — persisting is the view's job. apply_to()
-        # copies the validated fields onto a fresh model; save() then writes
-        # it. (ContactForm, by contrast, carries its own save() method.)
-        result.save(ContactSubmission())
+        # copies the validated fields onto a fresh model; the view calls
+        # save(). (ContactForm, by contrast, carries its own save() method.)
+        result.apply_to(ContactSubmission()).save()
         return super().schema_valid(result)
 
 
