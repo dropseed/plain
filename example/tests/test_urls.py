@@ -105,7 +105,7 @@ def test_task_schema_create_with_fk_and_m2m(db):
     assert response.status_code == 302
     task = Task.query.filter(owner=user, title="Write the docs").first()
     assert task is not None
-    assert task.project_id == project.id
+    assert task.project == project
     assert {tag.name for tag in task.tags.query} == {"urgent", "later"}
 
 

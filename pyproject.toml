@@ -44,6 +44,8 @@ dev = [
   # Type checking and better dev experience
   "ty>=0.0.33",
   "psycopg[binary]>=3.2.12",
+  # Optional integration exercised by plain-schema's property tests
+  "hypothesis>=6.0.0",
 ]
 
 [tool.uv.sources]

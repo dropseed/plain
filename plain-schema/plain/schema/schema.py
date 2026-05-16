@@ -271,12 +271,16 @@ class Schema(metaclass=SchemaMeta):
         return instance
 
 
-def make_schema(name: str = "InlineSchema", /, **fields: Field) -> type[Schema]:
+def make_schema(name: str = "InlineSchema", /, **fields: Any) -> type[Schema]:
     """Construct an anonymous `Schema` subclass from keyword field definitions.
 
     Useful for one-off validation in a view body where declaring a named class
     would be ceremony. Returns an untyped result; for typed access, declare a
     real subclass.
+
+    `**fields` is typed `Any` rather than `Field` because the `types` stub
+    presents field constructors as returning their cleaned Python type — a
+    type checker sees `types.TextField()` as `str`, not `Field`.
     """
     namespace: dict[str, Any] = {"__annotations__": {}, **fields}
     return cast(type[Schema], SchemaMeta(name, (Schema,), namespace))

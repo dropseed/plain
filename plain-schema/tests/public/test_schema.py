@@ -60,8 +60,9 @@ def test_inline_schema_via_make_schema():
     )
     result = PingSchema.validate({"host": "example.com", "port": "8080"})
     assert not isinstance(result, Invalid)
-    assert result.host == "example.com"
-    assert result.port == 8080
+    # make_schema() returns an untyped Schema subclass — runtime access only.
+    assert result.host == "example.com"  # ty: ignore[unresolved-attribute]
+    assert result.port == 8080  # ty: ignore[unresolved-attribute]
 
 
 def test_inline_schema_invalid():
