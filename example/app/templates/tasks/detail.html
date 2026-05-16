@@ -48,5 +48,9 @@
         <a href="{{ url('tasks:update', id=task.id) }}" class="btn-primary">Edit</a>
         <a href="{{ url('tasks:delete', id=task.id) }}" class="btn-secondary">Delete</a>
     </div>
+    <div class="mt-2 flex gap-3 text-sm">
+        <a href="{{ url('tasks:schema_update', id=task.id) }}" class="body-link">Edit (schema)</a>
+        <a href="{{ url('tasks:schema_delete', id=task.id) }}" class="body-link">Delete (schema)</a>
+    </div>
 </div>
 {% endblock %}

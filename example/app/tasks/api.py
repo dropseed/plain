@@ -4,10 +4,11 @@ from plain.api import openapi
 from plain.api.views import APIView
 from plain.auth import get_request_user
 from plain.auth.views import LoginRequired
+from plain.schema import Invalid
 from plain.urls import Router, path
 
-from .forms import TaskForm
-from .models import Task
+from .models import Project, Tag, Task
+from .schemas import TaskSchema
 
 TASK_SCHEMA = {
     "type": "object",
@@ -35,7 +36,7 @@ def _serialize(task: Task) -> dict:
 
 
 class TaskListAPIView(APIView):
-    """plain.api view that uses the same ModelForm to validate JSON input."""
+    """plain.api view that uses TaskSchema to validate JSON input."""
 
     @openapi.schema(
         {
@@ -68,7 +69,7 @@ class TaskListAPIView(APIView):
 
     @openapi.schema(
         {
-            "summary": "Create a task from a JSON body using TaskForm.",
+            "summary": "Create a task from a JSON body using TaskSchema.",
             "requestBody": openapi.json_body(
                 {"$ref": "#/components/schemas/Task"},
             ),
@@ -87,11 +88,17 @@ class TaskListAPIView(APIView):
         user = get_request_user(self.request)
         if not user:
             raise LoginRequired(login_url=None)
-        form = TaskForm(request=self.request, owner=user)
-        if not form.is_valid():
-            return 400, {"errors": form.errors}
-        form.instance.owner = user
-        task = form.save()
+        # The same Schema primitive used for HTML forms, here parsing a JSON
+        # request body — reach for this over picking values off json_data by
+        # hand. with_querysets() scopes the project/tags relations to the
+        # current user so the API can't reference another tenant's rows.
+        result = TaskSchema.with_querysets(
+            project=Project.query.filter(owner=user),
+            tags=Tag.query.filter(owner=user),
+        ).validate(self.request.json_data)
+        if isinstance(result, Invalid):
+            return 400, {"errors": result.errors}
+        task = result.save(Task(owner=user))
         return 201, _serialize(task)
 
 

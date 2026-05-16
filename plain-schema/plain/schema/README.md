@@ -6,7 +6,6 @@ A `Schema` declares fields with type annotations and validators; `.validate(data
 
 - [Overview](#overview)
 - [Declaring schemas](#declaring-schemas)
-- [Inline schemas](#inline-schemas)
 - [The `Invalid` result](#the-invalid-result)
 - [Type narrowing](#type-narrowing)
 - [Cross-field validation](#cross-field-validation)
@@ -21,11 +20,11 @@ A `Schema` declares fields with type annotations and validators; `.validate(data
 ## Overview
 
 ```python
-from plain.schema import Field, Schema, Invalid, types
+from plain.schema import Schema, Invalid, types
 
 class ContactSchema(Schema):
-    email: Field[str] = types.EmailField()
-    message: Field[str] = types.TextField(max_length=2000)
+    email = types.EmailField()
+    message = types.TextField(max_length=2000)
 
 result = ContactSchema.validate({"email": "a@b.co", "message": "hi"})
 if isinstance(result, Invalid):
@@ -39,38 +38,27 @@ contact.message   # str
 
 The Schema class is the parser; the validated instance IS the schema (no `.data` wrapper). Validation is a pure function call — no request, no `.is_valid()` dance.
 
+A declared schema is light enough to reach for instead of pulling values off `request.json_data` by hand: three lines of fields buys you per-field error reporting and a fully typed result, where manual dict access gives you neither.
+
 ## Declaring schemas
 
-Subclass `Schema` and declare each field as `name: Field[T] = types.*(...)`:
+Subclass `Schema` and declare each field as `name = types.*(...)`:
 
 ```python
-from plain.schema import Field, Schema, types
+from plain.schema import Schema, types
 
 class TaskSchema(Schema):
-    title: Field[str] = types.TextField(max_length=200, min_length=1)
-    notes: Field[str | None] = types.TextField(required=False)
-    priority: Field[str] = types.ChoiceField(choices=[("low", "Low"), ("high", "High")])
-    is_complete: Field[bool] = types.BooleanField(required=False)
+    title = types.TextField(max_length=200, min_length=1)
+    notes = types.TextField(required=False)
+    priority = types.ChoiceField(choices=[("low", "Low"), ("high", "High")])
+    is_complete = types.BooleanField(required=False)
 ```
 
-A field is a **descriptor with two faces**. On the class, `TaskSchema.title` is the typed reference `Field[str]` — used to key a `BoundSchema`. On a validated instance, `result.title` is the cleaned value `str`. The `Field[T]` annotation makes both statically checked; the `types.*` instance drives runtime parsing and validation.
+No type annotations: each `types.*` constructor is typed in the package's `.pyi` stub, so the checker infers the field's type from the value alone. `types.TextField()` is a `Field[str]`; `types.TextField(required=False)` is a `Field[str | None]`.
 
-For optional fields, use `Field[T | None]` and `required=False` together — the `.pyi` stub overloads keep the two consistent.
+A field is a **descriptor with two faces**. On the class, `TaskSchema.title` is the typed reference `Field[str]` — used to key a `BoundSchema`. On a validated instance, `result.title` is the cleaned value `str`. Both faces are statically checked, and the same `types.*` instance drives runtime parsing and validation — one declaration, no annotation to keep in sync.
 
-## Inline schemas
-
-Build a one-off schema as a value when a class would be ceremony:
-
-```python
-from plain.schema import make_schema, types
-
-result = make_schema(
-    page=types.IntegerField(min_value=1, initial=1),
-    search=types.TextField(required=False),
-).validate(request.query_params)
-```
-
-Inline schemas trade ergonomics for typing — the validated instance is opaque (`Schema`) because the class doesn't exist statically. Promote to a named class when you want typed attribute access on the result.
+> You _can_ still annotate (`title: Field[str] = types.TextField(...)`) — it's redundant but harmless. `ModelSchema` is the one place the annotation is load-bearing; see below.
 
 ## The `Invalid` result
 
@@ -111,9 +99,9 @@ Override `check()` as an instance method on the schema. `self` is the typed inst
 
 ```python
 class TaskSchema(Schema):
-    title: Field[str] = types.TextField(max_length=200)
-    is_complete: Field[bool] = types.BooleanField(required=False)
-    completed_at: Field[datetime | None] = types.DateTimeField(required=False)
+    title = types.TextField(max_length=200)
+    is_complete = types.BooleanField(required=False)
+    completed_at = types.DateTimeField(required=False)
 
     def check(self, *, context=None):
         if self.is_complete and not self.completed_at:
@@ -146,11 +134,9 @@ def htmx_post_validate(self):
 Pass `request.files` as the `files=` kwarg to validate uploads. `FileField` and `ImageField` declarations populate from `files`; everything else continues to read from `data`.
 
 ```python
-from plain.internal.files.uploadedfile import UploadedFile
-
 class AttachmentSchema(Schema):
-    description: Field[str] = types.TextField(max_length=500)
-    document: Field[UploadedFile] = types.FileField(max_length=120)
+    description = types.TextField(max_length=500)
+    document = types.FileField(max_length=120)
 
 class UploadView(View):
     def post(self):
@@ -239,7 +225,7 @@ class TaskSchema(ModelSchema):
 
 Scalar columns map to the matching `types.*` field; a `ForeignKeyField` becomes a `ModelChoiceField` (a primary key cleans to the model instance) and a `ManyToManyField` becomes a `ModelMultipleChoiceField` (a list of pks cleans to a list of instances). Declare only the fields you want exposed — unlisted columns (like an `owner` FK) are left for the caller to set.
 
-Each field is a typed reference just like a plain `Schema`'s — `TaskSchema.title` is `Field[str]`, `result.title` is `str`. The `= model_field()` value is what lets the type checker see a descriptor; an annotation alone wouldn't. Override a derived field by declaring a `types.*` field explicitly (`title: Field[str] = types.TextField(min_length=2)`), and add cross-field rules with `check()`.
+Each field is a typed reference just like a plain `Schema`'s — `TaskSchema.title` is `Field[str]`, `result.title` is `str`. Here the `Field[T]` annotation is **required**, not optional: a plain `Schema` infers the type from the `types.*` value, but `model_field()` is a placeholder that derives its real field at class-creation time, so the annotation is the only place the type is stated. Override a derived field by declaring a `types.*` field explicitly (`title = types.TextField(min_length=2)`), and add cross-field rules with `check()`.
 
 `save()` applies the validated values to a model instance and persists it (M2M relations are assigned after the row has a primary key):
 
@@ -299,5 +285,5 @@ uv add plain.schema
 `plain.schema` is a pure library — there's no `INSTALLED_PACKAGES` entry or settings to configure. Import the public surface and use it anywhere:
 
 ```python
-from plain.schema import Schema, Invalid, types, BoundSchema, make_schema
+from plain.schema import Schema, Invalid, types, BoundSchema
 ```

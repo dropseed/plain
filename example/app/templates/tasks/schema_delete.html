@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_macros.html" import back_link %}
+
+{% block title %}Delete {{ task.title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-5 py-12">
+    {{ back_link(url('tasks:detail', id=task.id), "Cancel") }}
+
+    <h1 class="page-h1">Delete this task?</h1>
+    <p class="mt-3 text-sm text-body">
+        <span class="font-semibold text-ink">{{ task.title }}</span>
+    </p>
+    <p class="mt-1 text-sm text-muted">
+        Built with <span class="font-mono text-body">SchemaDeleteView</span> —
+        an empty schema, so the POST is just a CSRF-protected confirm.
+    </p>
+
+    <form method="post" class="mt-6">
+        <button type="submit" class="btn-danger">Yes, delete</button>
+    </form>
+</div>
+{% endblock %}

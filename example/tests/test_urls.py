@@ -124,3 +124,96 @@ def test_task_schema_create_scopes_relations_to_owner(db):
     assert response.status_code == 200
     assert "field-error" in response.content.decode()
     assert Task.query.filter(title="Sneaky").count() == 0
+
+
+def test_task_schema_update_prefills_and_saves(db):
+    client = Client()
+    user = User.query.create(email="tasker@example.com", password="strongpass1")
+    client.force_login(user)
+    inbox = Project.query.create(owner=user, name="Inbox")
+    side = Project.query.create(owner=user, name="Side")
+    urgent = Tag.query.create(owner=user, name="urgent")
+    task = Task.query.create(owner=user, title="Old title", project=inbox)
+    task.tags.set([urgent])
+
+    # GET pre-fills the form from the task via ModelSchema.initial_from().
+    page = client.get(f"/tasks/schema/{task.id}/edit")
+    assert page.status_code == 200
+    assert "Old title" in page.content.decode()
+
+    # POST applies the validated values back; omitting `tags` clears the M2M.
+    response = client.post(
+        f"/tasks/schema/{task.id}/edit",
+        data={"title": "New title", "project": str(side.id), "priority": "high"},
+    )
+    assert response.status_code == 302
+    task = Task.query.get(id=task.id)
+    assert task.title == "New title"
+    assert task.project == side
+    assert task.tags.query.count() == 0
+
+
+def test_task_schema_update_404_for_another_owner(db):
+    client = Client()
+    user = User.query.create(email="tasker@example.com", password="strongpass1")
+    other = User.query.create(email="other@example.com", password="strongpass1")
+    client.force_login(user)
+    others_task = Task.query.create(owner=other, title="Not yours")
+    assert client.get(f"/tasks/schema/{others_task.id}/edit").status_code == 404
+
+
+def test_task_api_create_from_json(db):
+    """The JSON-body counterpart to the form views: TaskSchema parses
+    request.json_data directly, scoped to the current user."""
+    client = Client()
+    user = User.query.create(email="api@example.com", password="strongpass1")
+    client.force_login(user)
+    project = Project.query.create(owner=user, name="Inbox")
+    urgent = Tag.query.create(owner=user, name="urgent")
+
+    response = client.post(
+        "/tasks-api/tasks",
+        data={
+            "title": "Ship the API",
+            "project": project.id,
+            "priority": "high",
+            "tags": [urgent.id],
+        },
+        content_type="application/json",
+    )
+    assert response.status_code == 201
+    task = Task.query.filter(owner=user, title="Ship the API").first()
+    assert task is not None
+    assert task.project == project
+    assert {tag.name for tag in task.tags.query} == {"urgent"}
+
+
+def test_task_api_create_json_validation_errors(db):
+    """Invalid JSON comes back as a 400 with per-field errors — no task saved."""
+    client = Client()
+    user = User.query.create(email="api@example.com", password="strongpass1")
+    client.force_login(user)
+
+    response = client.post(
+        "/tasks-api/tasks",
+        data={"title": ""},  # required field empty
+        content_type="application/json",
+    )
+    assert response.status_code == 400
+    assert "title" in response.json()["errors"]
+    assert Task.query.count() == 0
+
+
+def test_task_schema_delete(db):
+    client = Client()
+    user = User.query.create(email="tasker@example.com", password="strongpass1")
+    client.force_login(user)
+    task = Task.query.create(owner=user, title="Doomed")
+
+    page = client.get(f"/tasks/schema/{task.id}/delete")
+    assert page.status_code == 200
+    assert "Doomed" in page.content.decode()
+
+    response = client.post(f"/tasks/schema/{task.id}/delete")
+    assert response.status_code == 302
+    assert Task.query.filter(id=task.id).count() == 0

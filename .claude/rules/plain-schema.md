@@ -2,18 +2,18 @@
 
 `plain.schema.Schema` is a validation primitive. Pure parser — takes a dict, returns either a typed schema instance or `Invalid`. Works in views, jobs, scripts, tests; not bound to a request, doesn't render HTML, doesn't touch a database.
 
-## Declare with `Field[T]` + types
+## Declare with `types`
 
 ```python
-from plain.schema import Field, Schema, types
+from plain.schema import Schema, types
 
 class ContactSchema(Schema):
-    email: Field[str] = types.EmailField()
-    message: Field[str] = types.TextField(max_length=2000)
-    notes: Field[str | None] = types.TextField(required=False)
+    email = types.EmailField()
+    message = types.TextField(max_length=2000)
+    notes = types.TextField(required=False)
 ```
 
-Each field is a descriptor: `ContactSchema.email` is the typed reference `Field[str]`, `result.email` is the cleaned value `str`. Annotate as `Field[T]`; `types.*` drives runtime validation. For optional fields use `Field[T | None]` with `required=False`.
+No annotations — the `types.*` constructors are typed, so the checker infers everything. Each field is a descriptor: `ContactSchema.email` is the typed reference `Field[str]`, `result.email` is the cleaned value `str`. `required=False` makes the cleaned value optional (`result.notes` is `str | None`).
 
 ## Validate and narrow
 
@@ -56,7 +56,7 @@ If you're tempted to `request.json_data["x"]` and then check it — write a Sche
 
 ## Model-backed input
 
-For input backed by a `postgres.Model`, subclass `ModelSchema` (`from plain.schema.modelschema import ModelSchema, model_field` — not re-exported at the package top level, so it doesn't pull `plain.postgres` into a plain `Schema` import): set `model = X` and declare each field as `name: Field[T] = model_field()`. Each derives from the model column of the same name — scalars become `types.*`, a ForeignKey a `ModelChoiceField`, a ManyToMany a `ModelMultipleChoiceField` — and `ModelSchema.name` is a typed reference like any schema field. `save(instance)` persists; `with_querysets(field=qs, ...)` returns a subclass with FK/M2M scoped (multi-tenant).
+For input backed by a `postgres.Model`, subclass `ModelSchema` (`from plain.schema.modelschema import ModelSchema, model_field` — not re-exported at the package top level, so it doesn't pull `plain.postgres` into a plain `Schema` import): set `model = X` and declare each field as `name: Field[T] = model_field()`. Unlike a plain `Schema`, the `Field[T]` annotation is required here — `model_field()` is a placeholder, so the type comes from the annotation. Each derives from the model column of the same name — scalars become `types.*`, a ForeignKey a `ModelChoiceField`, a ManyToMany a `ModelMultipleChoiceField` — and `ModelSchema.name` is a typed reference like any schema field. `save(instance)` persists; `with_querysets(field=qs, ...)` returns a subclass with FK/M2M scoped (multi-tenant).
 
 ## HTML rendering
 

@@ -315,6 +315,29 @@ class ModelSchema(Schema):
         scoped._schema_fields = scoped_fields
         return scoped
 
+    @classmethod
+    def initial_from(cls, instance: Any) -> dict[str, Any]:
+        """Build an `initial=` dict for `BoundSchema` from a model instance.
+
+        Translates a ForeignKey to its `<name>_id` value and a ManyToMany
+        relation to a list of related-object ids — what `ModelChoiceField`
+        and `ModelMultipleChoiceField` take as input. Scalar fields fall
+        through to a plain `getattr`. Used to pre-fill an edit form (see
+        `SchemaUpdateView`).
+        """
+        initial: dict[str, Any] = {}
+        for fname, field in cls._schema_fields.items():
+            if isinstance(field, ModelMultipleChoiceField):
+                related = getattr(instance, fname, None)
+                initial[fname] = (
+                    [] if related is None else [obj.id for obj in related.query]
+                )
+            elif isinstance(field, ModelChoiceField):
+                initial[fname] = getattr(instance, f"{fname}_id", None)
+            else:
+                initial[fname] = getattr(instance, fname, None)
+        return initial
+
     def save(self, instance: Any = None) -> Any:
         """Apply the validated values to a model instance and persist it.
 

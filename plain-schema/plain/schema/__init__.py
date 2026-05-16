@@ -24,7 +24,7 @@ from __future__ import annotations
 from .bind import BoundField, BoundSchema
 from .fields import Field
 from .result import Invalid
-from .schema import Schema, make_schema
+from .schema import Schema
 
 __all__ = (
     "BoundField",
@@ -32,5 +32,4 @@ __all__ = (
     "Field",
     "Invalid",
     "Schema",
-    "make_schema",
 )

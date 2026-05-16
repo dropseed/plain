@@ -5,7 +5,11 @@ from typing import Any
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
-from plain.schema.views import SchemaFormView
+from plain.schema.views import (
+    SchemaCreateView,
+    SchemaDeleteView,
+    SchemaUpdateView,
+)
 from plain.templates.views import (
     CreateView,
     DeleteView,
@@ -91,27 +95,67 @@ class TaskUpdateView(AuthView, UpdateView):
         return {**super().get_form_kwargs(), "owner": self.user}
 
 
-class TaskSchemaCreateView(AuthView, SchemaFormView[TaskSchema]):
-    """The plain.schema counterpart to TaskCreateView — built on SchemaFormView +
-    a ModelSchema instead of CreateView + a ModelForm."""
+def _owner_querysets(view: Any) -> dict[str, Any]:
+    """FK/M2M querysets scoped to the current user — the scoped schema drives
+    both validation and the rendered <select> options, so other users'
+    projects and tags are neither selectable nor visible."""
+    return {
+        "project": Project.query.filter(owner=view.user),
+        "tags": Tag.query.filter(owner=view.user),
+    }
+
+
+class TaskSchemaCreateView(AuthView, SchemaCreateView[TaskSchema]):
+    """The plain.schema counterpart to TaskCreateView — SchemaCreateView +
+    a ModelSchema instead of CreateView + a ModelForm. `schema_class` is
+    derived from the `[TaskSchema]` parameter."""
 
     template_name = "tasks/schema_create.html"
-    schema_class = TaskSchema
     success_url = reverse_lazy("tasks:list")
     login_required = True
 
-    def get_schema_class(self) -> type[TaskSchema]:
-        # Narrow the FK/M2M querysets to the current user. The scoped class
-        # drives both validation and the rendered <select> options, so other
-        # users' projects and tags are neither selectable nor visible.
-        return TaskSchema.with_querysets(
-            project=Project.query.filter(owner=self.user),
-            tags=Tag.query.filter(owner=self.user),
-        )
+    def get_querysets(self) -> dict[str, Any]:
+        return _owner_querysets(self)
 
-    def schema_valid(self, result: TaskSchema) -> Response:
-        result.save(Task(owner=self.user))
-        return super().schema_valid(result)
+    def get_instance(self) -> Task:
+        # `owner` isn't a form field — inject it on a fresh Task.
+        return Task(owner=self.user)
+
+
+class TaskSchemaUpdateView(AuthView, SchemaUpdateView[TaskSchema]):
+    """The plain.schema counterpart to TaskUpdateView — SchemaUpdateView +
+    a ModelSchema. The form is pre-filled from the task via
+    `ModelSchema.initial_from()`."""
+
+    template_name = "tasks/schema_update.html"
+    context_object_name = "task"
+    success_url = reverse_lazy("tasks:list")
+    login_required = True
+
+    def get_object(self) -> Task | None:
+        return Task.query.filter(
+            owner=self.user,
+            id=self.url_kwargs["id"],
+        ).first()
+
+    def get_querysets(self) -> dict[str, Any]:
+        return _owner_querysets(self)
+
+
+class TaskSchemaDeleteView(AuthView, SchemaDeleteView):
+    """The plain.schema counterpart to TaskDeleteView — SchemaDeleteView +
+    an empty schema for the confirm POST."""
+
+    template_name = "tasks/schema_delete.html"
+    context_object_name = "task"
+    success_url = reverse_lazy("tasks:list")
+    login_required = True
+
+    def get_object(self) -> Task | None:
+        return Task.query.filter(
+            owner=self.user,
+            id=self.url_kwargs["id"],
+        ).first()
 
 
 class TaskDeleteView(AuthView, DeleteView):

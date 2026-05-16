@@ -7,9 +7,7 @@ since plain.schema.testing is opt-in for users who want property tests.
 
 from __future__ import annotations
 
-from datetime import date, datetime
 from types import SimpleNamespace
-from uuid import UUID
 
 import pytest
 
@@ -17,24 +15,24 @@ pytest.importorskip("hypothesis")
 
 from hypothesis import given, settings  # noqa: E402
 
-from plain.schema import Field, Invalid, Schema, types  # noqa: E402
+from plain.schema import Invalid, Schema, types  # noqa: E402
 from plain.schema.testing import schema_strategy  # noqa: E402
 
 
 class _Wide(Schema):
     """Exercises a broad cross-section of field types."""
 
-    name: Field[str] = types.TextField(min_length=2, max_length=50)
-    email: Field[str] = types.EmailField()
-    age: Field[int] = types.IntegerField(min_value=0, max_value=150)
-    rating: Field[float] = types.FloatField(min_value=0.0, max_value=5.0)
-    priority: Field[str] = types.ChoiceField(
+    name = types.TextField(min_length=2, max_length=50)
+    email = types.EmailField()
+    age = types.IntegerField(min_value=0, max_value=150)
+    rating = types.FloatField(min_value=0.0, max_value=5.0)
+    priority = types.ChoiceField(
         choices=[("low", "Low"), ("med", "Medium"), ("high", "High")]
     )
-    is_active: Field[bool] = types.BooleanField()
-    when: Field[date] = types.DateField()
-    started_at: Field[datetime] = types.DateTimeField()
-    token: Field[UUID] = types.UUIDField()
+    is_active = types.BooleanField()
+    when = types.DateField()
+    started_at = types.DateTimeField()
+    token = types.UUIDField()
 
 
 @settings(max_examples=50)
@@ -48,9 +46,9 @@ def test_strategy_always_produces_valid_payload(payload):
 
 
 class _WithOptional(Schema):
-    title: Field[str] = types.TextField(min_length=1)
-    notes: Field[str | None] = types.TextField(required=False)
-    tags: Field[list[str]] = types.MultipleChoiceField(
+    title = types.TextField(min_length=1)
+    notes = types.TextField(required=False)
+    tags = types.MultipleChoiceField(
         choices=[("a", "A"), ("b", "B"), ("c", "C")],
         required=False,
     )
@@ -68,7 +66,7 @@ def test_strategy_raises_for_unsupported_field():
     """FileField has no canonical strategy; we surface that explicitly."""
 
     class _NotSupported(Schema):
-        document: Field[object] = types.FileField()  # type: ignore[assignment]
+        document = types.FileField()
 
     with pytest.raises(NotImplementedError, match="FileField"):
         schema_strategy(_NotSupported)

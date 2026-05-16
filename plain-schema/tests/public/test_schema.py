@@ -6,13 +6,13 @@ import pytest
 
 from plain.exceptions import ValidationError
 from plain.internal.files.uploadedfile import SimpleUploadedFile, UploadedFile
-from plain.schema import Field, Invalid, Schema, make_schema, types
+from plain.schema import Field, Invalid, Schema, types
 
 
 class ContactSchema(Schema):
-    email: Field[str] = types.EmailField()
-    age: Field[int] = types.IntegerField(min_value=0, max_value=150)
-    message: Field[str] = types.TextField(max_length=2000)
+    email = types.EmailField()
+    age = types.IntegerField(min_value=0, max_value=150)
+    message = types.TextField(max_length=2000)
 
 
 def test_valid_returns_typed_instance():
@@ -54,30 +54,19 @@ def test_validate_handles_none_input():
     assert isinstance(result, Invalid)
 
 
-def test_inline_schema_via_make_schema():
-    PingSchema = make_schema(
-        host=types.TextField(min_length=1),
-        port=types.IntegerField(min_value=1, max_value=65535),
-    )
-    result = PingSchema.validate({"host": "example.com", "port": "8080"})
-    assert not isinstance(result, Invalid)
-    # make_schema() returns an untyped Schema subclass — runtime access only.
-    assert result.host == "example.com"  # ty: ignore[unresolved-attribute]
-    assert result.port == 8080  # ty: ignore[unresolved-attribute]
-
-
-def test_inline_schema_invalid():
-    PingSchema = make_schema(host=types.TextField(min_length=1))
-    result = PingSchema.validate({"host": ""})
-    assert isinstance(result, Invalid)
-    assert "host" in result.errors
+def test_fields_classmethod_exposes_declared_fields():
+    """`fields()` is the public introspection surface — name -> Field."""
+    fields = ContactSchema.fields()
+    assert list(fields) == ["email", "age", "message"]
+    assert all(isinstance(f, Field) for f in fields.values())
+    # A copy — mutating it doesn't disturb the schema.
+    fields.clear()
+    assert list(ContactSchema.fields()) == ["email", "age", "message"]
 
 
 def test_schema_inheritance_carries_fields():
     class Extended(ContactSchema):
-        priority: Field[str] = types.ChoiceField(
-            choices=[("low", "Low"), ("high", "High")]
-        )
+        priority = types.ChoiceField(choices=[("low", "Low"), ("high", "High")])
 
     result = Extended.validate(
         {"email": "a@b.co", "age": "1", "message": "hi", "priority": "low"}
@@ -119,8 +108,8 @@ def test_no_form_request_required():
 
 def test_check_returning_dict_adds_errors():
     class S(Schema):
-        a: Field[int] = types.IntegerField()
-        b: Field[int] = types.IntegerField()
+        a = types.IntegerField()
+        b = types.IntegerField()
 
         def check(self, *, context=None):
             if self.a > self.b:
@@ -136,7 +125,7 @@ def test_check_returning_dict_adds_errors():
 
 def test_check_raising_validationerror_string_attaches_to_all():
     class S(Schema):
-        a: Field[int] = types.IntegerField()
+        a = types.IntegerField()
 
         def check(self, *, context=None):
             raise ValidationError("global problem")
@@ -148,8 +137,8 @@ def test_check_raising_validationerror_string_attaches_to_all():
 
 def test_check_raising_validationerror_dict_attaches_per_field():
     class S(Schema):
-        a: Field[int] = types.IntegerField()
-        b: Field[int] = types.IntegerField()
+        a = types.IntegerField()
+        b = types.IntegerField()
 
         def check(self, *, context=None):
             raise ValidationError({"a": ["too big"], "b": "too small"})
@@ -164,8 +153,8 @@ def test_check_does_not_run_when_field_errors_exist():
     seen: list[bool] = []
 
     class S(Schema):
-        a: Field[int] = types.IntegerField()
-        b: Field[int] = types.IntegerField()
+        a = types.IntegerField()
+        b = types.IntegerField()
 
         def check(self, *, context=None):
             seen.append(True)
@@ -180,8 +169,8 @@ def test_check_self_is_typed_instance():
     captured: list = []
 
     class S(Schema):
-        a: Field[int] = types.IntegerField()
-        name: Field[str] = types.TextField()
+        a = types.IntegerField()
+        name = types.TextField()
 
         def check(self, *, context=None):
             # `self` is a typed S instance — attribute access works.
@@ -196,7 +185,7 @@ def test_check_receives_context():
     captured: list = []
 
     class S(Schema):
-        a: Field[int] = types.IntegerField()
+        a = types.IntegerField()
 
         def check(self, *, context=None):
             captured.append(context)
@@ -210,7 +199,7 @@ def test_default_check_is_noop():
     """Schemas without an override pass through cleanly."""
 
     class S(Schema):
-        a: Field[int] = types.IntegerField()
+        a = types.IntegerField()
 
     result = S.validate({"a": "1"})
     assert not isinstance(result, Invalid)
@@ -224,10 +213,8 @@ def test_default_check_is_noop():
 
 def test_partial_skips_missing_required_fields():
     class S(Schema):
-        title: Field[str] = types.TextField(min_length=1)
-        priority: Field[str] = types.ChoiceField(
-            choices=[("low", "Low"), ("high", "High")]
-        )
+        title = types.TextField(min_length=1)
+        priority = types.ChoiceField(choices=[("low", "Low"), ("high", "High")])
 
     # `priority` is missing but skipped; the present field passes — no errors.
     assert S.validate_partial({"title": "ok"}) is None
@@ -235,8 +222,8 @@ def test_partial_skips_missing_required_fields():
 
 def test_partial_still_reports_errors_on_present_fields():
     class S(Schema):
-        title: Field[str] = types.TextField(min_length=5)
-        priority: Field[str] = types.ChoiceField(choices=[("low", "Low")])
+        title = types.TextField(min_length=5)
+        priority = types.ChoiceField(choices=[("low", "Low")])
 
     result = S.validate_partial({"title": "x"})
     assert isinstance(result, Invalid)
@@ -248,8 +235,8 @@ def test_partial_skips_check_hook():
     seen: list[bool] = []
 
     class S(Schema):
-        a: Field[int] = types.IntegerField()
-        b: Field[int] = types.IntegerField()
+        a = types.IntegerField()
+        b = types.IntegerField()
 
         def check(self, *, context=None):
             seen.append(True)
@@ -264,7 +251,7 @@ def test_partial_skips_check_hook():
 
 def test_partial_empty_input_is_valid():
     class S(Schema):
-        title: Field[str] = types.TextField()
+        title = types.TextField()
 
     assert S.validate_partial({}) is None
 
@@ -280,8 +267,8 @@ def _file(name: str = "report.pdf", content: bytes = b"hello") -> UploadedFile:
 
 def test_filefield_reads_from_files_not_data():
     class Upload(Schema):
-        title: Field[str] = types.TextField()
-        document: Field[UploadedFile] = types.FileField()
+        title = types.TextField()
+        document = types.FileField()
 
     f = _file()
     result = Upload.validate({"title": "Q3"}, files={"document": f})
@@ -293,7 +280,7 @@ def test_filefield_reads_from_files_not_data():
 
 def test_filefield_missing_is_required_error():
     class Upload(Schema):
-        document: Field[UploadedFile] = types.FileField()
+        document = types.FileField()
 
     result = Upload.validate({}, files={})
     assert isinstance(result, Invalid)
@@ -302,8 +289,8 @@ def test_filefield_missing_is_required_error():
 
 def test_filefield_optional_when_required_false():
     class Upload(Schema):
-        title: Field[str] = types.TextField()
-        avatar: Field[UploadedFile | None] = types.FileField(required=False)
+        title = types.TextField()
+        avatar = types.FileField(required=False)
 
     result = Upload.validate({"title": "x"})
     assert not isinstance(result, Invalid)
@@ -312,8 +299,8 @@ def test_filefield_optional_when_required_false():
 
 def test_partial_includes_files_for_presence_check():
     class Upload(Schema):
-        title: Field[str] = types.TextField(min_length=1)
-        document: Field[UploadedFile] = types.FileField()
+        title = types.TextField(min_length=1)
+        document = types.FileField()
 
     # `title` is missing but skipped; the file IS present, so it gets
     # validated — an empty upload fails, proving files join the presence check.
@@ -328,7 +315,7 @@ def test_files_default_to_empty_dict():
     """Schemas without FileField don't need files= to be passed."""
 
     class S(Schema):
-        title: Field[str] = types.TextField()
+        title = types.TextField()
 
     result = S.validate({"title": "x"})
     assert not isinstance(result, Invalid)
@@ -338,8 +325,8 @@ def test_filefield_with_other_field_errors():
     """File fields and regular fields error independently."""
 
     class Upload(Schema):
-        title: Field[str] = types.TextField(min_length=5)
-        document: Field[UploadedFile] = types.FileField()
+        title = types.TextField(min_length=5)
+        document = types.FileField()
 
     result = Upload.validate({"title": "x"}, files={})
     assert isinstance(result, Invalid)
@@ -354,8 +341,8 @@ def test_filefield_with_other_field_errors():
 
 def test_apply_to_copies_validated_fields_onto_instance():
     class S(Schema):
-        title: Field[str] = types.TextField(min_length=1)
-        priority: Field[str] = types.ChoiceField(choices=[("low", "L"), ("high", "H")])
+        title = types.TextField(min_length=1)
+        priority = types.ChoiceField(choices=[("low", "L"), ("high", "H")])
 
     result = S.validate({"title": "Q3", "priority": "high"})
     assert not isinstance(result, Invalid)
@@ -374,7 +361,7 @@ def test_schema_instance_is_frozen():
     a field on the result would silently lie about what was validated."""
 
     class S(Schema):
-        a: Field[int] = types.IntegerField()
+        a = types.IntegerField()
 
     result = S.validate({"a": "1"})
     assert not isinstance(result, Invalid)
@@ -395,8 +382,8 @@ def test_apply_to_skips_unset_fields():
     validate()) must not zero out the target's unset fields."""
 
     class S(Schema):
-        title: Field[str] = types.TextField()
-        priority: Field[str] = types.ChoiceField(choices=[("low", "L"), ("high", "H")])
+        title = types.TextField()
+        priority = types.ChoiceField(choices=[("low", "L"), ("high", "H")])
 
     # An instance with only `title` set — `priority` stays unset.
     result = S(title="Q3")

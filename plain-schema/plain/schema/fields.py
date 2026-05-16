@@ -6,8 +6,8 @@ are pure validators: no widgets, no HTML, no form/request binding — that's
 what keeps `plain.schema` independent of `plain.forms`.
 
 The companion `types.pyi` stub types each constructor as returning a
-`Field[T]` descriptor, so a declaration like `email: Field[str] =
-EmailField()` type-checks — and `ContactSchema.email` resolves to the
+`Field[T]` descriptor, so a declaration like `email = EmailField()`
+type-checks with no annotation — `ContactSchema.email` resolves to the
 typed reference while `instance.email` resolves to the cleaned value.
 """
 

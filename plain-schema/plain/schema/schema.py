@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, Self, cast
+from typing import Any, ClassVar, Self
 
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.utils.hashable import make_hashable
@@ -8,7 +8,7 @@ from plain.utils.hashable import make_hashable
 from .fields import Field, FileField
 from .result import Invalid
 
-__all__ = ("Schema", "make_schema")
+__all__ = ("Schema",)
 
 # Marks a field with no value on an instance — distinct from a field that
 # legitimately cleaned to None. A `validate()` instance always has every
@@ -21,15 +21,18 @@ _UNSET = object()
 class Schema:
     """Pure validating parser.
 
-    Subclass to declare fields:
+    Subclass and declare each field as `name = types.*(...)`:
+
+        from plain.schema import Schema, types
 
         class ContactSchema(Schema):
-            email: Field[str] = EmailField()
-            message: Field[str] = TextField(max_length=2000)
+            email = types.EmailField()
+            message = types.TextField(max_length=2000)
 
-    Or build inline with `make_schema(...)`:
-
-        ContactSchema = make_schema(email=EmailField(), message=TextField())
+    Each field is a descriptor: `ContactSchema.email` is the typed
+    `Field[str]` reference, `result.email` the cleaned `str` value. The
+    `types.*` constructors are typed, so both faces are statically
+    checked with no annotation to write.
 
     Validate a dict and dispatch on the result type. The schema class
     plays double duty: `Schema.validate()` returns either an instance of
@@ -54,8 +57,8 @@ class Schema:
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Collect the `Field` instances declared on the class into `_schema_fields`.
 
-        Field declarations look like `email: Field[str] = EmailField()`. Each
-        field is a descriptor that stays on the class — `Schema.email` is the
+        Field declarations look like `email = EmailField()`. Each field
+        is a descriptor that stays on the class — `Schema.email` is the
         typed reference, `instance.email` the cleaned value — so this just
         gathers them into one ordered map for validation to walk, merging in
         any fields inherited from base classes.
@@ -70,6 +73,16 @@ class Schema:
             if isinstance(value, Field):
                 fields[key] = value
         cls._schema_fields = fields
+
+    @classmethod
+    def fields(cls) -> dict[str, Field[Any]]:
+        """The declared fields as an ordered ``name -> Field`` map.
+
+        The public introspection surface — walk this to render a schema,
+        document it, or drive tooling, without needing a validated
+        instance. Returns a copy; the live mapping is internal.
+        """
+        return dict(cls._schema_fields)
 
     def __init__(self, **data: Any) -> None:
         for name in self._schema_fields:
@@ -288,14 +301,3 @@ class Schema:
         if errors:
             return Invalid(errors=errors, raw=raw)
         return None
-
-
-def make_schema(name: str = "InlineSchema", /, **fields: Field[Any]) -> type[Schema]:
-    """Construct an anonymous `Schema` subclass from keyword field definitions.
-
-    Useful for one-off validation in a view body where declaring a named class
-    would be ceremony. Returns an untyped result; for typed access, declare a
-    real subclass.
-    """
-    namespace: dict[str, Any] = {"__annotations__": {}, **fields}
-    return cast(type[Schema], type(name, (Schema,), namespace))
