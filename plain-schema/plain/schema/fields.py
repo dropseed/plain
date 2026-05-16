@@ -70,7 +70,7 @@ class Field[T]:
     faces:
 
       * accessed on the class — `ContactSchema.email` — it returns itself,
-        the typed *reference* used to key a `BoundSchema`;
+        the typed *reference* used to key a `SchemaForm`;
       * accessed on a validated instance — `contact.email` — it returns the
         cleaned *value* of type `T`, which `Schema.__init__` stored in the
         instance `__dict__`.

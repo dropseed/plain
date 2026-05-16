@@ -11,8 +11,7 @@ A `Schema` declares fields with type annotations and validators; `.validate(data
 - [Cross-field validation](#cross-field-validation)
 - [Partial validation](#partial-validation)
 - [File uploads](#file-uploads)
-- [HTML rendering with BoundSchema](#html-rendering-with-boundschema)
-- [SchemaFormView](#schemaformview)
+- [HTML rendering with SchemaForm](#html-rendering-with-schemaform)
 - [ModelSchema](#modelschema)
 - [Property tests with Hypothesis](#property-tests-with-hypothesis)
 - [Installation](#installation)
@@ -56,7 +55,7 @@ class TaskSchema(Schema):
 
 No type annotations: each `types.*` constructor is typed in the package's `.pyi` stub, so the checker infers the field's type from the value alone. `types.TextField()` is a `Field[str]`; `types.TextField(required=False)` is a `Field[str | None]`.
 
-A field is a **descriptor with two faces**. On the class, `TaskSchema.title` is the typed reference `Field[str]` — used to key a `BoundSchema`. On a validated instance, `result.title` is the cleaned value `str`. Both faces are statically checked, and the same `types.*` instance drives runtime parsing and validation — one declaration, no annotation to keep in sync.
+A field is a **descriptor with two faces**. On the class, `TaskSchema.title` is the typed reference `Field[str]` — used to key a `SchemaForm`. On a validated instance, `result.title` is the cleaned value `str`. Both faces are statically checked, and the same `types.*` instance drives runtime parsing and validation — one declaration, no annotation to keep in sync.
 
 > You _can_ still annotate (`title: Field[str] = types.TextField(...)`) — it's redundant but harmless. `ModelSchema` is the one place the annotation is load-bearing; see below.
 
@@ -152,56 +151,47 @@ class UploadView(View):
 
 `validate_partial()` includes `files` in its presence check, so HTMX live-validate can also handle file fields.
 
-## HTML rendering with BoundSchema
+## HTML rendering with SchemaForm
 
-When you need template binding (full HTML edit pages), pair the schema with a `BoundSchema`:
+`SchemaForm` is the HTML form-cycle primitive — it pairs a schema with the request. There is no view base class: a plain `View`/`TemplateView` holds a `SchemaForm`, renders it on GET, and calls `.submit()` on POST. The GET/POST cycle stays explicit and typed:
 
 ```python
-from plain.schema import BoundSchema, Invalid
+from plain.schema import Invalid, SchemaForm
 
-class ContactView(View):
+
+class ContactView(TemplateView):
+    template_name = "contact.html"
+
     def get(self):
-        bound = BoundSchema(schema_class=ContactSchema, initial={"email": user.email})
-        return self.render(form=bound)
+        self.form = SchemaForm(ContactSchema, self.request)
+        return Response(self.render_template())
 
     def post(self):
-        result = ContactSchema.validate(self.request.form_data)
+        self.form = SchemaForm(ContactSchema, self.request)
+        result = self.form.submit()
         if isinstance(result, Invalid):
-            bound = BoundSchema.from_invalid(ContactSchema, result)
-            return self.render(form=bound)
-        # use result.email, result.message, etc.
-        ...
-```
-
-Look a field up by its **typed reference** — `form[ContactSchema.email]` — checked against the schema: a typo like `form[ContactSchema.emial]` is an ordinary attribute error. There is no string-keyed access; a field is always reached through its typed reference, or by iterating the bound schema. `SchemaFormView` injects the schema class into the template context as `schema`, so templates write `form[schema.email]`.
-
-The bound field surface (`html_id`, `html_name`, `value()`, `errors`, `field`) plus the schema-level `non_field_errors` / `fields` mirrors what `plain.forms.BoundField` exposes — form-field markup carries over to `BoundSchema` with only the lookup changing to a typed reference.
-
-## SchemaFormView
-
-For full HTML pages, [`SchemaFormView`](./views.py#SchemaFormView) wraps the GET-render / POST-validate / re-render-or-redirect cycle — the schema counterpart to `plain.templates`' `FormView`. Set `schema_class` and `success_url`, and override `schema_valid()` to do something with the validated result:
-
-```python
-from plain.schema.views import SchemaFormView
-
-from .schemas import ContactSchema
-
-
-class ContactView(SchemaFormView[ContactSchema]):
-    template_name = "contact.html"
-    schema_class = ContactSchema
-    success_url = "/thanks/"
-
-    def schema_valid(self, result):
-        # `result` is a validated ContactSchema — a pure parser, no `.save()`.
-        # `apply_to` copies the cleaned values onto a record; the view persists.
+            return Response(self.render_template())
         result.apply_to(ContactSubmission()).save()
-        return super().schema_valid(result)
+        return RedirectResponse("/thanks/")
+
+    def get_template_context(self):
+        return {
+            **super().get_template_context(),
+            "form": self.form,
+            "schema": ContactSchema,
+        }
 ```
 
-Parameterize as `SchemaFormView[ContactSchema]` so `result` is typed in `schema_valid()`. The template receives the schema as `form` (a `BoundSchema`), so it renders with the same field markup a `FormView` template uses.
+`submit()` returns the typed schema instance or `Invalid` — and on `Invalid` the `SchemaForm` rebinds itself, so passing it back to the template re-renders with the submitted values and per-field errors.
 
-> `SchemaFormView` lives in `plain.schema` for now — while the schema view design is still being iterated on — even though it makes this package depend on `plain.templates`. It's imported from its own module (`from plain.schema.views import SchemaFormView`) and not re-exported at the package top level, so a plain `from plain.schema import Schema` doesn't load the template layer.
+For a `ModelSchema`, two optional constructor arguments do the model-form work:
+
+- `querysets={...}` scopes a FK/M2M field per request (multi-tenant) — the scoped schema drives both validation and the rendered `<select>` options.
+- `initial=ModelSchema.initial_from(instance)` pre-fills an edit form from an existing row.
+
+In the template, look a field up by its **typed reference** — `form[ContactSchema.email]`, checked against the schema: a typo like `form[ContactSchema.emial]` is an ordinary attribute error. Pass the schema class to the template (as `schema` above) so templates write `form[schema.email]`. There is no string-keyed access. Each bound field exposes `.name`, `.value()`, `.errors`, and `.field` — the template writes the `<input>` itself; the bound field only supplies the data.
+
+JSON APIs, MCP tools, and other non-HTML surfaces skip `SchemaForm` entirely — they call `Schema.validate()` on the request body directly.
 
 ## ModelSchema
 
@@ -244,7 +234,7 @@ TaskSchema.with_querysets(
 )
 ```
 
-> Like `SchemaFormView`, `ModelSchema` lives in `plain.schema` for now — it makes the package additionally depend on `plain.postgres`. It's imported from its own module (`from plain.schema.modelschema import ModelSchema`) and not re-exported at the package top level, so a plain `from plain.schema import Schema` doesn't load the ORM.
+> `ModelSchema` lives in `plain.schema` for now — it makes the package additionally depend on `plain.postgres`. It's imported from its own module (`from plain.schema.modelschema import ModelSchema`) and not re-exported at the package top level, so a plain `from plain.schema import Schema` doesn't load the ORM.
 
 ## Property tests with Hypothesis
 
@@ -266,7 +256,7 @@ The strategy walks the schema fields and emits constrained values per type — `
 
 ## When to use Schema vs inline
 
-- **`Schema`** — anything that turns a dict into typed Python data: JSON APIs, HTMX actions, job payloads, webhooks, full HTML pages backed by `BoundSchema`, CLI scripts, tests.
+- **`Schema`** — anything that turns a dict into typed Python data: JSON APIs, HTMX actions, job payloads, webhooks, full HTML pages via `SchemaForm`, CLI scripts, tests.
 - **Inline field** — trivial single-value parsing for cases where a class is overkill:
     ```python
     pin_id = types.IntegerField(min_value=1).clean(request.form_data["pin_id"])
@@ -285,5 +275,5 @@ uv add plain.schema
 `plain.schema` is a pure library — there's no `INSTALLED_PACKAGES` entry or settings to configure. Import the public surface and use it anywhere:
 
 ```python
-from plain.schema import Schema, Invalid, types, BoundSchema
+from plain.schema import Schema, Invalid, types, SchemaForm
 ```

@@ -1,6 +1,7 @@
 {# Schema form fields, rendered inline — no macros — so the typed-reference
-   access is visible. `schema` is the schema class (injected by SchemaFormView),
-   so `form[schema.title]` is checked against it. #}
+   access is visible. `schema` is the schema class (passed by the view), so
+   `form[schema.title]` is checked against it. The view writes the <input>
+   tags itself; the bound field only supplies name/value/errors. #}
 
 {% for error in form.non_field_errors %}
 <div class="nonfield-error">{{ error }}</div>
@@ -8,12 +9,12 @@
 
 {% set title = form[schema.title] %}
 <div>
-    <label class="field-label" for="{{ title.html_id }}">Title</label>
+    <label class="field-label" for="{{ title.name }}">Title</label>
     <input
         class="field-input"
         type="text"
-        name="{{ title.html_name }}"
-        id="{{ title.html_id }}"
+        name="{{ title.name }}"
+        id="{{ title.name }}"
         value="{{ title.value() or '' }}"
         required
         autofocus
@@ -25,11 +26,11 @@
 
 {% set project = form[schema.project] %}
 <div>
-    <label class="field-label" for="{{ project.html_id }}">Project</label>
+    <label class="field-label" for="{{ project.name }}">Project</label>
     <select
         class="field-input"
-        name="{{ project.html_name }}"
-        id="{{ project.html_id }}"
+        name="{{ project.name }}"
+        id="{{ project.name }}"
     >
         {% for value, label in project.field.choices %}
         <option value="{{ value }}" {% if (project.value()|string) == (value|string) %}selected{% endif %}>{{ label }}</option>
@@ -42,11 +43,11 @@
 
 {% set notes = form[schema.notes] %}
 <div>
-    <label class="field-label" for="{{ notes.html_id }}">Notes</label>
+    <label class="field-label" for="{{ notes.name }}">Notes</label>
     <textarea
         class="field-input min-h-[120px]"
-        name="{{ notes.html_name }}"
-        id="{{ notes.html_id }}"
+        name="{{ notes.name }}"
+        id="{{ notes.name }}"
     >{{ notes.value() or '' }}</textarea>
     {% for error in notes.errors %}
     <div class="field-error">⚠ {{ error }}</div>
@@ -56,12 +57,12 @@
 <div class="grid grid-cols-2 gap-4">
     {% set due_date = form[schema.due_date] %}
     <div>
-        <label class="field-label" for="{{ due_date.html_id }}">Due date</label>
+        <label class="field-label" for="{{ due_date.name }}">Due date</label>
         <input
             class="field-input"
             type="date"
-            name="{{ due_date.html_name }}"
-            id="{{ due_date.html_id }}"
+            name="{{ due_date.name }}"
+            id="{{ due_date.name }}"
             value="{{ due_date.value() or '' }}"
         >
         {% for error in due_date.errors %}
@@ -71,11 +72,11 @@
 
     {% set priority = form[schema.priority] %}
     <div>
-        <label class="field-label" for="{{ priority.html_id }}">Priority</label>
+        <label class="field-label" for="{{ priority.name }}">Priority</label>
         <select
             class="field-input"
-            name="{{ priority.html_name }}"
-            id="{{ priority.html_id }}"
+            name="{{ priority.name }}"
+            id="{{ priority.name }}"
         >
             {% for value, label in priority.field.choices %}
             <option value="{{ value }}" {% if (priority.value()|string) == (value|string) %}selected{% endif %}>{{ label }}</option>
@@ -91,8 +92,8 @@
 <label class="flex items-center gap-2 text-sm text-body">
     <input
         type="checkbox"
-        name="{{ is_complete.html_name }}"
-        id="{{ is_complete.html_id }}"
+        name="{{ is_complete.name }}"
+        id="{{ is_complete.name }}"
         {% if is_complete.value() %}checked{% endif %}
     >
     Complete
@@ -100,11 +101,11 @@
 
 {% set tags = form[schema.tags] %}
 <div>
-    <label class="field-label" for="{{ tags.html_id }}">Tags</label>
+    <label class="field-label" for="{{ tags.name }}">Tags</label>
     <select
         class="field-input h-32"
-        name="{{ tags.html_name }}"
-        id="{{ tags.html_id }}"
+        name="{{ tags.name }}"
+        id="{{ tags.name }}"
         multiple
     >
         {# value() returns ints (unbound) or strings (bound) — coerce both sides to string #}

@@ -49,7 +49,7 @@ Return a per-field errors dict (`"__all__"` for non-field errors), or `None` whe
 
 ## When to reach for Schema vs inline
 
-- **Schema** — JSON APIs, HTMX actions, job payloads, webhooks, CLI scripts, tests, HTML pages backed by `BoundSchema`.
+- **Schema** — JSON APIs, HTMX actions, job payloads, webhooks, CLI scripts, tests, HTML pages via `SchemaForm`.
 - **Inline field** — trivial single-value parsing: `types.IntegerField(min_value=1).clean(value)`.
 
 If you're tempted to `request.json_data["x"]` and then check it — write a Schema instead.
@@ -60,8 +60,11 @@ For input backed by a `postgres.Model`, subclass `ModelSchema` (`from plain.sche
 
 ## HTML rendering
 
-Pair with `BoundSchema` for template rendering — `BoundSchema(SchemaClass)` for a blank form, `BoundSchema.from_invalid(SchemaClass, result)` to re-render after a failed POST. Its field surface is duck-compatible with `plain.forms.BoundField`, so existing form templates render unchanged.
+`SchemaForm` pairs a schema with the request — the HTML form-cycle primitive. There is **no view base class**: a plain `View`/`TemplateView` holds a `SchemaForm`, renders it on GET, and calls `.submit()` on POST. Write explicit `.get()`/`.post()`.
 
-For full HTML pages, use `SchemaFormView[MySchema]` (`from plain.schema.views import SchemaFormView` — not re-exported at the package top level, so it doesn't pull `plain.templates` into a plain `Schema` import) — the schema counterpart to `FormView`. Set `schema_class` + `success_url`, override `schema_valid(result)` to persist.
+- `SchemaForm(SchemaClass, request)` — construct it. `submit()` returns `Schema | Invalid`; on `Invalid` the form rebinds, so re-rendering shows the submitted values + per-field errors.
+- For a `ModelSchema`: `querysets={...}` scopes FK/M2M (multi-tenant); `initial=ModelSchema.initial_from(instance)` pre-fills an edit form.
+- Templates index the form by typed reference — `form[schema.email]` → a bound field with `.name`, `.value()`, `.errors`, `.field`. Pass the schema class to the template as `schema`.
+- JSON/MCP and other non-HTML surfaces skip `SchemaForm` — call `Schema.validate()` directly.
 
 Run `uv run plain docs schema` for full patterns. Run `uv run plain docs schema --api` for the public API surface.

@@ -5,16 +5,13 @@ from typing import Any
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
-from plain.schema.views import (
-    SchemaCreateView,
-    SchemaDeleteView,
-    SchemaUpdateView,
-)
+from plain.schema import Invalid, SchemaForm
 from plain.templates.views import (
     CreateView,
     DeleteView,
     DetailView,
     ListView,
+    TemplateView,
     UpdateView,
 )
 from plain.urls import reverse, reverse_lazy
@@ -105,32 +102,53 @@ def _owner_querysets(view: Any) -> dict[str, Any]:
     }
 
 
-class TaskSchemaCreateView(AuthView, SchemaCreateView[TaskSchema]):
-    """The plain.schema counterpart to TaskCreateView — SchemaCreateView +
-    a ModelSchema instead of CreateView + a ModelForm. `schema_class` is
-    derived from the `[TaskSchema]` parameter."""
+class TaskSchemaCreateView(AuthView, TemplateView):
+    """The plain.schema counterpart to TaskCreateView — a plain view driving a
+    SchemaForm, instead of CreateView + a ModelForm.
+
+    `.get()` renders a blank form; `.post()` submits it. There's no schema
+    view base class — the GET/POST cycle is right here, explicit.
+    """
 
     template_name = "tasks/schema_create.html"
-    success_url = reverse_lazy("tasks:list")
     login_required = True
 
-    def get_querysets(self) -> dict[str, Any]:
-        return _owner_querysets(self)
+    form: SchemaForm[TaskSchema]
 
-    def get_instance(self) -> Task:
+    def schema_form(self) -> SchemaForm[TaskSchema]:
+        return SchemaForm(TaskSchema, self.request, querysets=_owner_querysets(self))
+
+    def get(self) -> Response:
+        self.form = self.schema_form()
+        return Response(self.render_template())
+
+    def post(self) -> Response:
+        self.form = self.schema_form()
+        result = self.form.submit()
+        if isinstance(result, Invalid):
+            return Response(self.render_template())
         # `owner` isn't a form field — inject it on a fresh Task.
-        return Task(owner=self.user)
+        result.save(Task(owner=self.user))
+        return RedirectResponse(reverse("tasks:list"))
+
+    def get_template_context(self) -> dict[str, Any]:
+        return {
+            **super().get_template_context(),
+            "form": self.form,
+            "schema": TaskSchema,
+        }
 
 
-class TaskSchemaUpdateView(AuthView, SchemaUpdateView[TaskSchema]):
-    """The plain.schema counterpart to TaskUpdateView — SchemaUpdateView +
-    a ModelSchema. The form is pre-filled from the task via
-    `ModelSchema.initial_from()`."""
+class TaskSchemaUpdateView(AuthView, DetailView):
+    """The plain.schema counterpart to TaskUpdateView. The form is pre-filled
+    from the task via `ModelSchema.initial_from()`; `.post()` applies the
+    validated values back with `result.save(self.object)`."""
 
     template_name = "tasks/schema_update.html"
     context_object_name = "task"
-    success_url = reverse_lazy("tasks:list")
     login_required = True
+
+    form: SchemaForm[TaskSchema]
 
     def get_object(self) -> Task | None:
         return Task.query.filter(
@@ -138,17 +156,40 @@ class TaskSchemaUpdateView(AuthView, SchemaUpdateView[TaskSchema]):
             id=self.url_kwargs["id"],
         ).first()
 
-    def get_querysets(self) -> dict[str, Any]:
-        return _owner_querysets(self)
+    def schema_form(self) -> SchemaForm[TaskSchema]:
+        return SchemaForm(
+            TaskSchema,
+            self.request,
+            querysets=_owner_querysets(self),
+            initial=TaskSchema.initial_from(self.object),
+        )
+
+    def get(self) -> Response:
+        self.form = self.schema_form()
+        return Response(self.render_template())
+
+    def post(self) -> Response:
+        self.form = self.schema_form()
+        result = self.form.submit()
+        if isinstance(result, Invalid):
+            return Response(self.render_template())
+        result.save(self.object)
+        return RedirectResponse(reverse("tasks:list"))
+
+    def get_template_context(self) -> dict[str, Any]:
+        return {
+            **super().get_template_context(),
+            "form": self.form,
+            "schema": TaskSchema,
+        }
 
 
-class TaskSchemaDeleteView(AuthView, SchemaDeleteView):
-    """The plain.schema counterpart to TaskDeleteView — SchemaDeleteView +
-    an empty schema for the confirm POST."""
+class TaskSchemaDeleteView(AuthView, DetailView):
+    """The plain.schema counterpart to TaskDeleteView. Delete needs no schema —
+    it's a confirmation template plus a `.post()` that deletes the object."""
 
     template_name = "tasks/schema_delete.html"
     context_object_name = "task"
-    success_url = reverse_lazy("tasks:list")
     login_required = True
 
     def get_object(self) -> Task | None:
@@ -156,6 +197,10 @@ class TaskSchemaDeleteView(AuthView, SchemaDeleteView):
             owner=self.user,
             id=self.url_kwargs["id"],
         ).first()
+
+    def post(self) -> Response:
+        self.object.delete()
+        return RedirectResponse(reverse("tasks:list"))
 
 
 class TaskDeleteView(AuthView, DeleteView):

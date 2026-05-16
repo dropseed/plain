@@ -25,12 +25,12 @@
 
         {% set name = form[schema.name] %}
         <div>
-            <label class="field-label" for="{{ name.html_id }}">Name</label>
+            <label class="field-label" for="{{ name.name }}">Name</label>
             <input
                 class="field-input"
                 type="text"
-                name="{{ name.html_name }}"
-                id="{{ name.html_id }}"
+                name="{{ name.name }}"
+                id="{{ name.name }}"
                 value="{{ name.value() or '' }}"
                 required
                 autofocus
@@ -42,12 +42,12 @@
 
         {% set email = form[schema.email] %}
         <div>
-            <label class="field-label" for="{{ email.html_id }}">Email</label>
+            <label class="field-label" for="{{ email.name }}">Email</label>
             <input
                 class="field-input"
                 type="email"
-                name="{{ email.html_name }}"
-                id="{{ email.html_id }}"
+                name="{{ email.name }}"
+                id="{{ email.name }}"
                 value="{{ email.value() or '' }}"
                 required
             >
@@ -58,11 +58,11 @@
 
         {% set subject = form[schema.subject] %}
         <div>
-            <label class="field-label" for="{{ subject.html_id }}">Subject</label>
+            <label class="field-label" for="{{ subject.name }}">Subject</label>
             <select
                 class="field-input"
-                name="{{ subject.html_name }}"
-                id="{{ subject.html_id }}"
+                name="{{ subject.name }}"
+                id="{{ subject.name }}"
                 required
             >
                 {% for value, label in subject.field.choices %}
@@ -77,12 +77,12 @@
         {% if ask_company %}
         {% set company = form[schema.company] %}
         <div>
-            <label class="field-label" for="{{ company.html_id }}">Company (optional)</label>
+            <label class="field-label" for="{{ company.name }}">Company (optional)</label>
             <input
                 class="field-input"
                 type="text"
-                name="{{ company.html_name }}"
-                id="{{ company.html_id }}"
+                name="{{ company.name }}"
+                id="{{ company.name }}"
                 value="{{ company.value() or '' }}"
             >
             {% for error in company.errors %}
@@ -93,11 +93,11 @@
 
         {% set message = form[schema.message] %}
         <div>
-            <label class="field-label" for="{{ message.html_id }}">Message</label>
+            <label class="field-label" for="{{ message.name }}">Message</label>
             <textarea
                 class="field-input min-h-[160px]"
-                name="{{ message.html_name }}"
-                id="{{ message.html_id }}"
+                name="{{ message.name }}"
+                id="{{ message.name }}"
                 required
             >{{ message.value() or '' }}</textarea>
             {% for error in message.errors %}
@@ -110,8 +110,8 @@
             <label class="flex items-center gap-2 text-sm text-body">
                 <input
                     type="checkbox"
-                    name="{{ subscribe.html_name }}"
-                    id="{{ subscribe.html_id }}"
+                    name="{{ subscribe.name }}"
+                    id="{{ subscribe.name }}"
                     {% if subscribe.value() %}checked{% endif %}
                 >
                 Subscribe to the newsletter

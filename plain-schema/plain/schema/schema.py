@@ -145,7 +145,7 @@ class Schema:
 
             result = ContactSchema.validate(self.request.form_data)
             if isinstance(result, Invalid):
-                return self.render(form=BoundSchema.from_invalid(...))
+                return self.render(...)  # re-render with errors
             result.apply_to(ContactSubmission()).save()
 
         Field-name mismatches (schema field doesn't exist on the target)

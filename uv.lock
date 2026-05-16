@@ -1408,7 +1408,6 @@ source = { editable = "plain-schema" }
 dependencies = [
     { name = "plain" },
     { name = "plain-postgres" },
-    { name = "plain-templates" },
 ]
 
 [package.dev-dependencies]
@@ -1421,7 +1420,6 @@ dev = [
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-templates", editable = "plain-templates" },
 ]
 
 [package.metadata.requires-dev]

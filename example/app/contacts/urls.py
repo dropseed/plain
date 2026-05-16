@@ -11,6 +11,6 @@ class ContactsRouter(Router):
         path("", views.ContactView, name="form"),
         path("success", views.ContactSuccessView, name="success"),
         path("archive", views.ContactArchiveView, name="archive"),
-        path("schema", views.ContactSchemaFormView, name="schema"),
+        path("schema", views.ContactSchemaView, name="schema"),
         path("schema/success", views.ContactSchemaSuccessView, name="schema_success"),
     ]

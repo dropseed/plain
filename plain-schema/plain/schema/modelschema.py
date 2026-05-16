@@ -6,9 +6,9 @@ derives a validating field from the model column of the same name — scalar
 columns map to `types.*` fields, a ForeignKey becomes a `ModelChoiceField`,
 a ManyToMany becomes a `ModelMultipleChoiceField`.
 
-Like `SchemaFormView`, this lives in `plain.schema` for now — even though it makes
-the package depend on `plain.postgres` — so the schema/model design can be
-iterated on in one place. It's imported from this module directly (`from
+This lives in `plain.schema` for now — even though it makes the package
+depend on `plain.postgres` — so the schema/model design can be iterated on
+in one place. It's imported from this module directly (`from
 plain.schema.modelschema import ModelSchema`) and not re-exported at the
 package top level, so a plain `from plain.schema import Schema` doesn't load
 the ORM.
@@ -216,7 +216,7 @@ def model_field() -> Field[Any]:
             title: Field[str] = model_field()
             project: Field[Project | None] = model_field()
 
-    `TaskSchema.title` is then a `Field[str]` (keys a `BoundSchema`) and
+    `TaskSchema.title` is then a `Field[str]` (keys a `SchemaForm`) and
     `result.title` is `str`. The annotation is statically checked; the
     actual field is derived from `Task`'s column at class creation.
 
@@ -246,7 +246,7 @@ def _auto_derive_fields(model: Any, annotation_names: list[str], cls: type) -> N
         derived = modelfield_to_schemafield(by_name[fname])
         if derived is not None:
             # `setattr` after class creation doesn't trigger `__set_name__`,
-            # so name the field explicitly — `BoundSchema` keys on `field.name`.
+            # so name the field explicitly — `SchemaForm` keys on `field.name`.
             derived.__set_name__(cls, fname)
             setattr(cls, fname, derived)
 
@@ -317,13 +317,13 @@ class ModelSchema(Schema):
 
     @classmethod
     def initial_from(cls, instance: Any) -> dict[str, Any]:
-        """Build an `initial=` dict for `BoundSchema` from a model instance.
+        """Build an `initial=` dict for a `SchemaForm` from a model instance.
 
         Translates a ForeignKey to its `<name>_id` value and a ManyToMany
         relation to a list of related-object ids — what `ModelChoiceField`
         and `ModelMultipleChoiceField` take as input. Scalar fields fall
-        through to a plain `getattr`. Used to pre-fill an edit form (see
-        `SchemaUpdateView`).
+        through to a plain `getattr`. Pass the result as
+        `SchemaForm(..., initial=...)` to pre-fill an edit form.
         """
         initial: dict[str, Any] = {}
         for fname, field in cls._schema_fields.items():
