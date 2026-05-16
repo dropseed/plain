@@ -31,7 +31,7 @@ contact.email   # str
 ```
 
 - `Invalid.errors` is `dict[str, list[str]]` (`"__all__"` holds non-field errors); `Invalid.raw` preserves the input.
-- `validate(data, partial=True)` skips missing-field errors and `check()` — for HTMX live validation.
+- `validate_partial(data)` checks only the fields present — skips missing-field errors and `check()`, returns `Invalid | None` (never a schema instance). For HTMX live validation.
 - `validate(data, files=request.files)` populates `FileField`/`ImageField` from uploads.
 
 ## Cross-field validation via `check()`
@@ -45,7 +45,7 @@ def check(self, *, context=None):
     return None
 ```
 
-Return a per-field errors dict, or raise `ValidationError`.
+Return a per-field errors dict (`"__all__"` for non-field errors), or `None` when valid. Return — don't raise: a schema is a non-raising parser, and `check()` follows the same contract as `validate()`.
 
 ## When to reach for Schema vs inline
 
@@ -56,7 +56,7 @@ If you're tempted to `request.json_data["x"]` and then check it — write a Sche
 
 ## Model-backed input
 
-For input backed by a `postgres.Model`, subclass `ModelSchema` (`from plain.schema.modelschema import ModelSchema` — not re-exported at the package top level, so it doesn't pull `plain.postgres` into a plain `Schema` import): set `model = X` and annotate the fields to expose. Fields auto-derive — scalars become `types.*`, a ForeignKey becomes a `ModelChoiceField`, a ManyToMany a `ModelMultipleChoiceField`. `save(instance)` persists; `with_querysets(field=qs, ...)` returns a subclass with FK/M2M scoped (multi-tenant).
+For input backed by a `postgres.Model`, subclass `ModelSchema` (`from plain.schema.modelschema import ModelSchema, model_field` — not re-exported at the package top level, so it doesn't pull `plain.postgres` into a plain `Schema` import): set `model = X` and declare each field as `name: Field[T] = model_field()`. Each derives from the model column of the same name — scalars become `types.*`, a ForeignKey a `ModelChoiceField`, a ManyToMany a `ModelMultipleChoiceField` — and `ModelSchema.name` is a typed reference like any schema field. `save(instance)` persists; `with_querysets(field=qs, ...)` returns a subclass with FK/M2M scoped (multi-tenant).
 
 ## HTML rendering
 

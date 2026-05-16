@@ -1,9 +1,10 @@
 """ModelSchema — auto-derive Schema fields from a `postgres.Model`.
 
 The Schema-shaped equivalent of `plain.postgres.forms.ModelForm`: declare a
-`model` plus annotations, and `__init_subclass__` derives a validating field
-per annotation — scalar columns map to `types.*` fields, a ForeignKey becomes
-a `ModelChoiceField`, a ManyToMany becomes a `ModelMultipleChoiceField`.
+`model` and a `Field[T] = model_field()` per field, and `__init_subclass__`
+derives a validating field from the model column of the same name — scalar
+columns map to `types.*` fields, a ForeignKey becomes a `ModelChoiceField`,
+a ManyToMany becomes a `ModelMultipleChoiceField`.
 
 Like `SchemaFormView`, this lives in `plain.schema` for now — even though it makes
 the package depend on `plain.postgres` — so the schema/model design can be
@@ -33,6 +34,7 @@ __all__ = (
     "ModelChoiceField",
     "ModelMultipleChoiceField",
     "ModelSchema",
+    "model_field",
     "modelfield_to_schemafield",
 )
 
@@ -54,7 +56,9 @@ class _ModelChoiceBase(Field[Any]):
 
     def _with_queryset(self, queryset: Any) -> Self:
         """A copy of this field bound to a different (e.g. owner-scoped) queryset."""
-        return type(self)(queryset, required=self.required, initial=self.initial)
+        clone = type(self)(queryset, required=self.required, initial=self.initial)
+        clone.name = self.name
+        return clone
 
     @property
     def choices(self) -> list[tuple[Any, str]]:
@@ -195,6 +199,33 @@ def modelfield_to_schemafield(modelfield: Any) -> Field[Any] | None:
     return schema_fields.TextField(required=required, initial=initial)
 
 
+class _AutoField(Field[Any]):
+    """Placeholder left by `model_field()`. `_auto_derive_fields` replaces it
+    with the real field derived from the model column of the same name."""
+
+
+def model_field() -> Field[Any]:
+    """Declare a `ModelSchema` field derived from the model column of the
+    same name — its type, validators, and constraints come from the model.
+
+    Pair it with a `Field[T]` annotation so the field is a typed reference
+    on the class and the cleaned value on a validated instance:
+
+        class TaskSchema(ModelSchema):
+            model = Task
+            title: Field[str] = model_field()
+            project: Field[Project | None] = model_field()
+
+    `TaskSchema.title` is then a `Field[str]` (keys a `BoundSchema`) and
+    `result.title` is `str`. The annotation is statically checked; the
+    actual field is derived from `Task`'s column at class creation.
+
+    The explicit `= model_field()` value is what lets the type checker see
+    a descriptor — an annotation alone (`title: Field[str]`) does not.
+    """
+    return _AutoField()
+
+
 def _auto_derive_fields(model: Any, annotation_names: list[str], cls: type) -> None:
     """Set an auto-derived Field on `cls` for each annotation that names a
     model field and doesn't already have a Field declared on the class body."""
@@ -207,20 +238,25 @@ def _auto_derive_fields(model: Any, annotation_names: list[str], cls: type) -> N
     for fname in annotation_names:
         if fname == "model":
             continue
-        if isinstance(cls.__dict__.get(fname), Field):
-            continue  # user declared a Field explicitly — leave it
+        declared = cls.__dict__.get(fname)
+        if isinstance(declared, Field) and not isinstance(declared, _AutoField):
+            continue  # a real Field declared explicitly — an override; leave it
         if fname not in by_name:
             continue  # not a model field — a plain extra field, leave it
         derived = modelfield_to_schemafield(by_name[fname])
         if derived is not None:
+            # `setattr` after class creation doesn't trigger `__set_name__`,
+            # so name the field explicitly — `BoundSchema` keys on `field.name`.
+            derived.__set_name__(cls, fname)
             setattr(cls, fname, derived)
 
 
 class ModelSchema(Schema):
     """Schema base class backed by a model.
 
-    Subclass, set `model = X`, and annotate the fields to expose. Fields
-    auto-derive from the model; override one by declaring a Field explicitly.
+    Subclass, set `model = X`, and declare each field as
+    `name: Field[T] = model_field()`. Fields derive from the model column
+    of the same name; override one by declaring a `types.*` field explicitly.
     """
 
     # `model` is set on subclasses; `__init_subclass__` copies it to

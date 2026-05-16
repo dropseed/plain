@@ -71,11 +71,11 @@ class BoundField:
 class BoundSchema:
     """A schema bound to specific input/initial/error data for template rendering.
 
-    Templates iterate it and access fields by attribute or `__getitem__`:
+    Look a field up by its typed `Field` reference, or iterate every field:
 
-        {{ form.email.html_id }}
-        {{ form.email.value() }}
-        {% for err in form.email.errors %}{{ err }}{% endfor %}
+        {{ form[ContactSchema.email].html_id }}
+        {{ form[ContactSchema.email].value() }}
+        {% for field in form %}{{ field.errors }}{% endfor %}
     """
 
     schema_class: type[Schema]
@@ -118,10 +118,17 @@ class BoundSchema:
     def non_field_errors(self) -> list[str]:
         return self.errors.get(NON_FIELD_ERRORS, [])
 
-    def __getitem__(self, name: str) -> BoundField:
-        if name not in self.schema_class._schema_fields:
-            raise KeyError(name)
-        return BoundField(bound=self, name=name)
+    def __getitem__(self, field: Field[Any]) -> BoundField:
+        """Look up one bound field by its typed `Field` reference.
+
+        `bound[ContactSchema.email]` is statically checked against the
+        schema — a typo like `ContactSchema.emial` is an ordinary
+        attribute error. A field is always reached through its typed
+        reference; there is no string-keyed form.
+        """
+        if field.name not in self.schema_class._schema_fields:
+            raise KeyError(field.name)
+        return BoundField(bound=self, name=field.name)
 
     def __iter__(self) -> Iterator[BoundField]:
         for name in self.schema_class._schema_fields:

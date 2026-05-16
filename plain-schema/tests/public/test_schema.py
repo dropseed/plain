@@ -218,7 +218,7 @@ def test_default_check_is_noop():
 
 
 # ---------------------------------------------------------------------------
-# partial=True — HTMX live-validation
+# validate_partial() — HTMX live-validation
 # ---------------------------------------------------------------------------
 
 
@@ -229,9 +229,8 @@ def test_partial_skips_missing_required_fields():
             choices=[("low", "Low"), ("high", "High")]
         )
 
-    result = S.validate({"title": "ok"}, partial=True)
-    assert not isinstance(result, Invalid)
-    assert result.title == "ok"
+    # `priority` is missing but skipped; the present field passes — no errors.
+    assert S.validate_partial({"title": "ok"}) is None
 
 
 def test_partial_still_reports_errors_on_present_fields():
@@ -239,7 +238,7 @@ def test_partial_still_reports_errors_on_present_fields():
         title: Field[str] = types.TextField(min_length=5)
         priority: Field[str] = types.ChoiceField(choices=[("low", "Low")])
 
-    result = S.validate({"title": "x"}, partial=True)
+    result = S.validate_partial({"title": "x"})
     assert isinstance(result, Invalid)
     assert "title" in result.errors
     assert "priority" not in result.errors
@@ -256,7 +255,7 @@ def test_partial_skips_check_hook():
             seen.append(True)
             return None
 
-    S.validate({"a": "1"}, partial=True)
+    S.validate_partial({"a": "1"})
     assert seen == []  # check() never called
 
     S.validate({"a": "1", "b": "2"})
@@ -267,8 +266,7 @@ def test_partial_empty_input_is_valid():
     class S(Schema):
         title: Field[str] = types.TextField()
 
-    result = S.validate({}, partial=True)
-    assert not isinstance(result, Invalid)
+    assert S.validate_partial({}) is None
 
 
 # ---------------------------------------------------------------------------
@@ -317,11 +315,13 @@ def test_partial_includes_files_for_presence_check():
         title: Field[str] = types.TextField(min_length=1)
         document: Field[UploadedFile] = types.FileField()
 
-    # Just the file present in partial mode — title missing but skipped.
-    f = _file()
-    result = Upload.validate({}, files={"document": f}, partial=True)
-    assert not isinstance(result, Invalid)
-    assert result.document.name == "report.pdf"
+    # `title` is missing but skipped; the file IS present, so it gets
+    # validated — an empty upload fails, proving files join the presence check.
+    empty = _file("empty.pdf", b"")
+    result = Upload.validate_partial({}, files={"document": empty})
+    assert isinstance(result, Invalid)
+    assert "document" in result.errors
+    assert "title" not in result.errors
 
 
 def test_files_default_to_empty_dict():
@@ -390,17 +390,16 @@ def test_schema_instance_is_frozen():
         del result.a
 
 
-def test_apply_to_skips_unset_fields_after_partial_validation():
-    """In partial mode a schema may be missing some fields entirely.
-    apply_to() must not zero them out on the target."""
+def test_apply_to_skips_unset_fields():
+    """A schema built without every field (constructed directly, not via
+    validate()) must not zero out the target's unset fields."""
 
     class S(Schema):
         title: Field[str] = types.TextField()
         priority: Field[str] = types.ChoiceField(choices=[("low", "L"), ("high", "H")])
 
-    # Validate with only `title` present, partial=True — `priority` stays unset.
-    result = S.validate({"title": "Q3"}, partial=True)
-    assert not isinstance(result, Invalid)
+    # An instance with only `title` set — `priority` stays unset.
+    result = S(title="Q3")
     assert not hasattr(result, "priority")
 
     target = SimpleNamespace(title="old", priority="low")

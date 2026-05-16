@@ -3,7 +3,8 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
-from plain.schema.modelschema import ModelSchema
+from plain.schema import Field
+from plain.schema.modelschema import ModelSchema, model_field
 
 from .models import Project, Tag, Task
 
@@ -19,13 +20,13 @@ class TaskSchema(ModelSchema):
 
     model = Task
 
-    project: Project | None
-    title: str
-    notes: str
-    due_date: datetime.date | None
-    priority: str
-    is_complete: bool
-    tags: list[Tag]
+    project: Field[Project | None] = model_field()
+    title: Field[str] = model_field()
+    notes: Field[str] = model_field()
+    due_date: Field[datetime.date | None] = model_field()
+    priority: Field[str] = model_field()
+    is_complete: Field[bool] = model_field()
+    tags: Field[list[Tag]] = model_field()
 
     def check(
         self, *, context: dict[str, Any] | None = None

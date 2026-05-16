@@ -1,0 +1,119 @@
+{# Schema form fields, rendered inline — no macros — so the typed-reference
+   access is visible. `schema` is the schema class (injected by SchemaFormView),
+   so `form[schema.title]` is checked against it. #}
+
+{% for error in form.non_field_errors %}
+<div class="nonfield-error">{{ error }}</div>
+{% endfor %}
+
+{% set title = form[schema.title] %}
+<div>
+    <label class="field-label" for="{{ title.html_id }}">Title</label>
+    <input
+        class="field-input"
+        type="text"
+        name="{{ title.html_name }}"
+        id="{{ title.html_id }}"
+        value="{{ title.value() or '' }}"
+        required
+        autofocus
+    >
+    {% for error in title.errors %}
+    <div class="field-error">⚠ {{ error }}</div>
+    {% endfor %}
+</div>
+
+{% set project = form[schema.project] %}
+<div>
+    <label class="field-label" for="{{ project.html_id }}">Project</label>
+    <select
+        class="field-input"
+        name="{{ project.html_name }}"
+        id="{{ project.html_id }}"
+    >
+        {% for value, label in project.field.choices %}
+        <option value="{{ value }}" {% if (project.value()|string) == (value|string) %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    {% for error in project.errors %}
+    <div class="field-error">⚠ {{ error }}</div>
+    {% endfor %}
+</div>
+
+{% set notes = form[schema.notes] %}
+<div>
+    <label class="field-label" for="{{ notes.html_id }}">Notes</label>
+    <textarea
+        class="field-input min-h-[120px]"
+        name="{{ notes.html_name }}"
+        id="{{ notes.html_id }}"
+    >{{ notes.value() or '' }}</textarea>
+    {% for error in notes.errors %}
+    <div class="field-error">⚠ {{ error }}</div>
+    {% endfor %}
+</div>
+
+<div class="grid grid-cols-2 gap-4">
+    {% set due_date = form[schema.due_date] %}
+    <div>
+        <label class="field-label" for="{{ due_date.html_id }}">Due date</label>
+        <input
+            class="field-input"
+            type="date"
+            name="{{ due_date.html_name }}"
+            id="{{ due_date.html_id }}"
+            value="{{ due_date.value() or '' }}"
+        >
+        {% for error in due_date.errors %}
+        <div class="field-error">⚠ {{ error }}</div>
+        {% endfor %}
+    </div>
+
+    {% set priority = form[schema.priority] %}
+    <div>
+        <label class="field-label" for="{{ priority.html_id }}">Priority</label>
+        <select
+            class="field-input"
+            name="{{ priority.html_name }}"
+            id="{{ priority.html_id }}"
+        >
+            {% for value, label in priority.field.choices %}
+            <option value="{{ value }}" {% if (priority.value()|string) == (value|string) %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        {% for error in priority.errors %}
+        <div class="field-error">⚠ {{ error }}</div>
+        {% endfor %}
+    </div>
+</div>
+
+{% set is_complete = form[schema.is_complete] %}
+<label class="flex items-center gap-2 text-sm text-body">
+    <input
+        type="checkbox"
+        name="{{ is_complete.html_name }}"
+        id="{{ is_complete.html_id }}"
+        {% if is_complete.value() %}checked{% endif %}
+    >
+    Complete
+</label>
+
+{% set tags = form[schema.tags] %}
+<div>
+    <label class="field-label" for="{{ tags.html_id }}">Tags</label>
+    <select
+        class="field-input h-32"
+        name="{{ tags.html_name }}"
+        id="{{ tags.html_id }}"
+        multiple
+    >
+        {# value() returns ints (unbound) or strings (bound) — coerce both sides to string #}
+        {% set selected_ids = (tags.value() or []) | map('string') | list %}
+        {% for value, label in tags.field.choices %}
+        <option value="{{ value }}" {% if (value|string) in selected_ids %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    {% for error in tags.errors %}
+    <div class="field-error">⚠ {{ error }}</div>
+    {% endfor %}
+</div>

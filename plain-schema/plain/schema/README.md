@@ -65,7 +65,7 @@ Build a one-off schema as a value when a class would be ceremony:
 from plain.schema import make_schema, types
 
 result = make_schema(
-    page=types.IntegerField(min_value=1, default=1),
+    page=types.IntegerField(min_value=1, initial=1),
     search=types.TextField(required=False),
 ).validate(request.query_params)
 ```
@@ -121,7 +121,7 @@ class TaskSchema(Schema):
         return None
 ```
 
-`check()` can also raise `ValidationError` — the dict-form unpacks per-field, the string-form attaches to `"__all__"`. Both styles produce the same `Invalid.errors` shape.
+`check()` returns rather than raises — the same contract as `validate()`, since a schema is a non-raising parser. Return a `{field: [messages]}` dict to flag problems, or `None` when everything checks out; use the `"__all__"` key for errors that don't belong to a single field. The result merges into `Invalid.errors` exactly as field-level errors do.
 
 The `context` kwarg flows through from the call site:
 
@@ -131,12 +131,12 @@ result = TaskSchema.validate(payload, context={"user_id": user.id})
 
 ## Partial validation
 
-For HTMX live-validation, where each keystroke sends just one field, pass `partial=True` to skip required-errors on missing fields. `check()` is also skipped (it can't run on a subset).
+For HTMX live-validation, where each keystroke sends just one field, use `validate_partial()`. It checks only the fields present in the payload — missing fields raise no required-errors — and skips the cross-field `check()` hook (it can't judge a subset). It returns `Invalid` if a present field failed, or `None` if everything sent so far is fine. Unlike `validate()`, it never returns a schema instance — a partially-checked payload can't produce a complete one.
 
 ```python
 def htmx_post_validate(self):
-    result = TaskSchema.validate(self.request.form_data, partial=True)
-    if isinstance(result, Invalid):
+    result = TaskSchema.validate_partial(self.request.form_data)
+    if result is not None:
         return JsonResponse({"valid": False, "errors": result.errors})
     return JsonResponse({"valid": True})
 ```
@@ -164,7 +164,7 @@ class UploadView(View):
         ...
 ```
 
-`partial=True` includes `files` in its presence check, so HTMX live-validate can also handle file fields.
+`validate_partial()` includes `files` in its presence check, so HTMX live-validate can also handle file fields.
 
 ## HTML rendering with BoundSchema
 
@@ -187,7 +187,9 @@ class ContactView(View):
         ...
 ```
 
-The bound form's duck-typed surface (`html_id`, `html_name`, `value()`, `errors`, `field`, `non_field_errors`, `fields`) is the same surface `plain.forms.BoundField` exposes — existing form templates render against `BoundSchema` unchanged.
+Look a field up by its **typed reference** — `form[ContactSchema.email]` — checked against the schema: a typo like `form[ContactSchema.emial]` is an ordinary attribute error. There is no string-keyed access; a field is always reached through its typed reference, or by iterating the bound schema. `SchemaFormView` injects the schema class into the template context as `schema`, so templates write `form[schema.email]`.
+
+The bound field surface (`html_id`, `html_name`, `value()`, `errors`, `field`) plus the schema-level `non_field_errors` / `fields` mirrors what `plain.forms.BoundField` exposes — form-field markup carries over to `BoundSchema` with only the lookup changing to a typed reference.
 
 ## SchemaFormView
 
@@ -217,10 +219,11 @@ Parameterize as `SchemaFormView[ContactSchema]` so `result` is typed in `schema_
 
 ## ModelSchema
 
-[`ModelSchema`](./modelschema.py#ModelSchema) is the schema counterpart to `plain.postgres`' `ModelForm`. Declare a `model` and annotate the fields to expose — the metaclass derives a validating field for each one:
+[`ModelSchema`](./modelschema.py#ModelSchema) is the schema counterpart to `plain.postgres`' `ModelForm`. Declare a `model` and, for each field to expose, a `Field[T] = model_field()` — each is derived from the model column of the same name:
 
 ```python
-from plain.schema.modelschema import ModelSchema
+from plain.schema import Field
+from plain.schema.modelschema import ModelSchema, model_field
 
 from .models import Project, Tag, Task
 
@@ -228,13 +231,15 @@ from .models import Project, Tag, Task
 class TaskSchema(ModelSchema):
     model = Task
 
-    title: str                  # scalar columns → types.* fields
-    project: Project | None      # ForeignKey      → ModelChoiceField
-    tags: list[Tag]              # ManyToMany      → ModelMultipleChoiceField
-    is_complete: bool
+    title: Field[str] = model_field()                # scalar column
+    project: Field[Project | None] = model_field()   # ForeignKey → ModelChoiceField
+    tags: Field[list[Tag]] = model_field()           # ManyToMany → ModelMultipleChoiceField
+    is_complete: Field[bool] = model_field()
 ```
 
-Scalar columns map to the matching `types.*` field; a `ForeignKeyField` becomes a `ModelChoiceField` (a primary key cleans to the model instance) and a `ManyToManyField` becomes a `ModelMultipleChoiceField` (a list of pks cleans to a list of instances). Annotate only what you want exposed — unlisted columns (like an `owner` FK) are left for the caller to set. Override an auto-derived field by declaring a `types.*` field explicitly, and add cross-field rules with `check()`.
+Scalar columns map to the matching `types.*` field; a `ForeignKeyField` becomes a `ModelChoiceField` (a primary key cleans to the model instance) and a `ManyToManyField` becomes a `ModelMultipleChoiceField` (a list of pks cleans to a list of instances). Declare only the fields you want exposed — unlisted columns (like an `owner` FK) are left for the caller to set.
+
+Each field is a typed reference just like a plain `Schema`'s — `TaskSchema.title` is `Field[str]`, `result.title` is `str`. The `= model_field()` value is what lets the type checker see a descriptor; an annotation alone wouldn't. Override a derived field by declaring a `types.*` field explicitly (`title: Field[str] = types.TextField(min_length=2)`), and add cross-field rules with `check()`.
 
 `save()` applies the validated values to a model instance and persists it (M2M relations are assigned after the row has a primary key):
 

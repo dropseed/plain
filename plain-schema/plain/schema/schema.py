@@ -10,6 +10,13 @@ from .result import Invalid
 
 __all__ = ("Schema", "make_schema")
 
+# Marks a field with no value on an instance — distinct from a field that
+# legitimately cleaned to None. A `validate()` instance always has every
+# field set, but one built directly (`Schema(**partial_data)`) can leave
+# fields unset. __repr__/__eq__/__hash__ use this so an unset field never
+# compares or hashes equal to a real None.
+_UNSET = object()
+
 
 class Schema:
     """Pure validating parser.
@@ -89,32 +96,35 @@ class Schema:
         object.__delattr__(self, name)
 
     def __repr__(self) -> str:
-        attrs = ", ".join(
-            f"{k}={getattr(self, k, '<unset>')!r}" for k in self._schema_fields
-        )
-        return f"{type(self).__name__}({attrs})"
+        parts = []
+        for k in self._schema_fields:
+            value = getattr(self, k, _UNSET)
+            parts.append(f"{k}=<unset>" if value is _UNSET else f"{k}={value!r}")
+        return f"{type(self).__name__}({', '.join(parts)})"
 
     def __eq__(self, other: object) -> bool:
         if type(self) is not type(other):
             return NotImplemented
         return all(
-            getattr(self, k, None) == getattr(other, k, None)
+            getattr(self, k, _UNSET) == getattr(other, k, _UNSET)
             for k in self._schema_fields
         )
 
     def __hash__(self) -> int:
         # make_hashable converts list-valued fields (e.g. MultipleChoiceField)
-        # into tuples so schema instances stay hashable.
-        values = tuple(getattr(self, k, None) for k in self._schema_fields)
+        # into tuples so schema instances stay hashable. _UNSET marks a field
+        # with no value — it hashes distinctly from a real None.
+        values = tuple(getattr(self, k, _UNSET) for k in self._schema_fields)
         return hash(make_hashable(values))
 
     def apply_to[Instance](self, instance: Instance) -> Instance:
         """Copy validated field values onto an existing object, returning it.
 
         Walks `_schema_fields`, calling `setattr(instance, name, value)` for
-        each field that's set on the schema. Fields missing from the schema
-        instance (e.g. after `partial=True` validation) are skipped, leaving
-        the target's existing value intact.
+        each field that's set on the schema. A `validate()` result always
+        has every field set; a schema built directly from incomplete data
+        may not — any unset field is skipped, leaving the target's existing
+        value intact.
 
         This is a pure data move — it never persists. A schema hands its
         cleaned values to a target; whether and how that target is saved is
@@ -143,40 +153,32 @@ class Schema:
 
         Runs after every field has cleaned successfully; `self` is the
         typed instance with all cleaned values set, so subclass overrides
-        get full type-checker support without a Liskov violation. Return a
-        dict of field-name → error messages (use `"__all__"` for non-field
-        errors) or `None` when there are no errors. Raising
-        `ValidationError` is also supported.
+        get full type-checker support without a Liskov violation.
+
+        The contract is return-based, matching `validate()`: return a dict
+        of field-name → error messages (use `"__all__"` for non-field
+        errors), or `None` when there are no errors. Don't raise — a schema
+        is a non-raising parser, and its cross-field hook follows suit.
+
+        (A `ValidationError` raised here is still caught and folded into the
+        result rather than escaping, but returning is the documented way.)
         """
         return None
 
     @classmethod
-    def validate(
+    def _clean_fields(
         cls,
-        data: dict[str, Any] | None,
+        raw: Any,
+        files_map: dict[str, Any],
         *,
-        files: Any = None,
-        context: dict[str, Any] | None = None,
-        partial: bool = False,
-    ) -> Self | Invalid:
-        """Validate `data` against this schema.
+        only_present: bool,
+    ) -> tuple[dict[str, Any], dict[str, list[str]]]:
+        """Run each declared field's `clean` against `raw`/`files_map`.
 
-        Returns either an instance of `cls` (cleaned, typed values set as
-        attributes) or `Invalid` (per-field errors). Never raises on
-        validation failure.
-
-        For file uploads, pass `request.files` (a `MultiValueDict[str,
-        UploadedFile]`) as `files=`. `FileField`/`ImageField` declarations
-        are populated from `files` instead of `data`; everything else
-        reads from `data` as usual.
-
-        Set `partial=True` to validate only the fields present in `data`/
-        `files` — missing required fields don't error and `check()` is
-        skipped. Useful for HTMX live-validation where each keystroke
-        sends just one field.
+        Returns `(cleaned, errors)`. With `only_present=True`, fields absent
+        from the input are skipped entirely (partial validation); otherwise
+        a missing field is cleaned with `None`, surfacing its required-error.
         """
-        raw = data or {}
-        files_map: dict[str, Any] = files if files is not None else {}
         cleaned: dict[str, Any] = {}
         errors: dict[str, list[str]] = {}
         # MultiValueDict carries multi-valued keys; plain dicts don't. For
@@ -186,7 +188,7 @@ class Schema:
         for name, field in cls._schema_fields.items():
             is_file_field = isinstance(field, FileField)
             present = name in (files_map if is_file_field else raw)
-            if partial and not present:
+            if only_present and not present:
                 continue
 
             try:
@@ -195,21 +197,48 @@ class Schema:
                     cleaned[name] = field.clean(files_map.get(name), None)
                 elif is_multi_value_dict and field.multi_value:
                     # `raw` has .getlist (verified by the is_multi_value_dict guard).
-                    cleaned[name] = field.clean(raw.getlist(name))  # ty: ignore[call-non-callable]
+                    cleaned[name] = field.clean(raw.getlist(name))
                 else:
                     cleaned[name] = field.clean(raw.get(name))
             except ValidationError as e:
                 errors[name] = list(e.messages)
+
+        return cleaned, errors
+
+    @classmethod
+    def validate(
+        cls,
+        data: dict[str, Any] | None,
+        *,
+        files: Any = None,
+        context: dict[str, Any] | None = None,
+    ) -> Self | Invalid:
+        """Validate `data` against this schema.
+
+        Returns either an instance of `cls` (cleaned, typed values set as
+        attributes) or `Invalid` (per-field errors). Never raises on
+        validation failure. A returned instance means *every* declared
+        field validated and `check()` passed — `result.<field>` is always
+        safe, there is no half-populated instance.
+
+        For file uploads, pass `request.files` (a `MultiValueDict[str,
+        UploadedFile]`) as `files=`. `FileField`/`ImageField` declarations
+        are populated from `files` instead of `data`; everything else
+        reads from `data` as usual.
+
+        For per-field checks against an incomplete payload (HTMX live
+        validation), use `validate_partial()` instead.
+        """
+        raw = data or {}
+        files_map: dict[str, Any] = files if files is not None else {}
+        cleaned, errors = cls._clean_fields(raw, files_map, only_present=False)
 
         if errors:
             return Invalid(errors=errors, raw=raw)
 
         instance = cls(**cleaned)
 
-        if partial:
-            return instance
-
-        # Cross-field hook — runs only on full validation.
+        # Cross-field hook.
         extra_errors: dict[str, list[str]] | None
         try:
             extra_errors = instance.check(context=context)
@@ -224,6 +253,41 @@ class Schema:
             return Invalid(errors=dict(extra_errors), raw=raw)
 
         return instance
+
+    @classmethod
+    def validate_partial(
+        cls,
+        data: dict[str, Any] | None,
+        *,
+        files: Any = None,
+    ) -> Invalid | None:
+        """Validate only the fields present in `data`/`files`.
+
+        Returns `Invalid` if any present field failed, or `None` if they
+        all passed. Fields absent from the input are skipped — no
+        required-errors — and the cross-field `check()` hook does not run
+        (it can't judge a subset).
+
+        For HTMX live validation, where each keystroke posts one field and
+        you only need "is what was sent OK so far":
+
+            def htmx_post_validate(self):
+                result = TaskSchema.validate_partial(self.request.form_data)
+                if result is not None:
+                    return JsonResponse(
+                        {"valid": False, "errors": result.errors}
+                    )
+                return JsonResponse({"valid": True})
+
+        Unlike `validate()`, this never returns a schema instance — a
+        partially-checked payload can't produce a complete, safe-to-use one.
+        """
+        raw = data or {}
+        files_map: dict[str, Any] = files if files is not None else {}
+        _cleaned, errors = cls._clean_fields(raw, files_map, only_present=True)
+        if errors:
+            return Invalid(errors=errors, raw=raw)
+        return None
 
 
 def make_schema(name: str = "InlineSchema", /, **fields: Field[Any]) -> type[Schema]:

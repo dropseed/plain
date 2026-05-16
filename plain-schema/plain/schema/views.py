@@ -63,11 +63,15 @@ class SchemaFormView[S: Schema](TemplateView):
         return Response(self.get_template().render(context))
 
     def get_template_context(self) -> dict[str, Any]:
-        """Insert a blank bound schema into the context as `form`."""
+        """Insert the schema class and a blank bound schema into the context.
+
+        `schema` is the schema class — templates key fields off it,
+        `form[schema.email]`; `form` is the `BoundSchema` to render.
+        """
         context = super().get_template_context()
-        context["form"] = BoundSchema(
-            self.get_schema_class(), initial=self.get_initial()
-        )
+        schema_class = self.get_schema_class()
+        context["schema"] = schema_class
+        context["form"] = BoundSchema(schema_class, initial=self.get_initial())
         return context
 
     def post(self) -> Response:

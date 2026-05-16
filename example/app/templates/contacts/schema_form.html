@@ -1,44 +1,124 @@
 {% extends "base.html" %}
-{% from "_macros.html" import field, field_errors, nonfield_errors, back_link %}
 
 {% block title %}Contact us (schema){% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto px-5 py-12">
-    {{ back_link(url('index'), "Back to index") }}
+    <div class="mb-2">
+        <a href="{{ url('index') }}" class="back-link">← Back to index</a>
+    </div>
 
     <h1 class="page-h1">Contact us</h1>
     <p class="mt-3 text-sm text-muted">
         The same form as the <a class="body-link" href="{{ url('contacts:form') }}">forms.Form version</a>,
-        built with <span class="font-mono text-body">plain.schema</span>: a
-        <span class="font-mono text-body">Schema</span> driven by a
-        <span class="font-mono text-body">SchemaFormView</span>, with the per-field and
-        cross-field rules in <span class="font-mono text-body">check()</span>, and a
-        dynamic <span class="font-mono text-body">company</span> field via
-        <a class="body-link" href="?company=1">?company=1</a>.
+        built with <span class="font-mono text-body">plain.schema</span>. Fields are
+        rendered inline — no macros — so the typed-reference access
+        (<span class="font-mono text-body">form[schema.email]</span>) is visible; this
+        is roughly what a plain.html <span class="font-mono text-body">&lt;Field&gt;</span>
+        component would expand to.
     </p>
 
     <form method="post" class="mt-6 flex flex-col gap-5">
-        {{ nonfield_errors(form) }}
-        {{ field(form.name, "Name", autofocus=True, required=True) }}
-        {{ field(form.email, "Email", type="email", required=True) }}
-        {{ field(form.subject, "Subject", type="select", required=True) }}
-        {% if ask_company %}
-        {{ field(form.company, "Company (optional)") }}
-        {% endif %}
-        {{ field(form.message, "Message", type="textarea", min_height="160px", required=True) }}
+        {% for error in form.non_field_errors %}
+        <div class="nonfield-error">{{ error }}</div>
+        {% endfor %}
 
+        {% set name = form[schema.name] %}
+        <div>
+            <label class="field-label" for="{{ name.html_id }}">Name</label>
+            <input
+                class="field-input"
+                type="text"
+                name="{{ name.html_name }}"
+                id="{{ name.html_id }}"
+                value="{{ name.value() or '' }}"
+                required
+                autofocus
+            >
+            {% for error in name.errors %}
+            <div class="field-error">⚠ {{ error }}</div>
+            {% endfor %}
+        </div>
+
+        {% set email = form[schema.email] %}
+        <div>
+            <label class="field-label" for="{{ email.html_id }}">Email</label>
+            <input
+                class="field-input"
+                type="email"
+                name="{{ email.html_name }}"
+                id="{{ email.html_id }}"
+                value="{{ email.value() or '' }}"
+                required
+            >
+            {% for error in email.errors %}
+            <div class="field-error">⚠ {{ error }}</div>
+            {% endfor %}
+        </div>
+
+        {% set subject = form[schema.subject] %}
+        <div>
+            <label class="field-label" for="{{ subject.html_id }}">Subject</label>
+            <select
+                class="field-input"
+                name="{{ subject.html_name }}"
+                id="{{ subject.html_id }}"
+                required
+            >
+                {% for value, label in subject.field.choices %}
+                <option value="{{ value }}" {% if (subject.value()|string) == (value|string) %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            {% for error in subject.errors %}
+            <div class="field-error">⚠ {{ error }}</div>
+            {% endfor %}
+        </div>
+
+        {% if ask_company %}
+        {% set company = form[schema.company] %}
+        <div>
+            <label class="field-label" for="{{ company.html_id }}">Company (optional)</label>
+            <input
+                class="field-input"
+                type="text"
+                name="{{ company.html_name }}"
+                id="{{ company.html_id }}"
+                value="{{ company.value() or '' }}"
+            >
+            {% for error in company.errors %}
+            <div class="field-error">⚠ {{ error }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% set message = form[schema.message] %}
+        <div>
+            <label class="field-label" for="{{ message.html_id }}">Message</label>
+            <textarea
+                class="field-input min-h-[160px]"
+                name="{{ message.html_name }}"
+                id="{{ message.html_id }}"
+                required
+            >{{ message.value() or '' }}</textarea>
+            {% for error in message.errors %}
+            <div class="field-error">⚠ {{ error }}</div>
+            {% endfor %}
+        </div>
+
+        {% set subscribe = form[schema.subscribe] %}
         <div>
             <label class="flex items-center gap-2 text-sm text-body">
                 <input
                     type="checkbox"
-                    name="{{ form.subscribe.html_name }}"
-                    id="{{ form.subscribe.html_id }}"
-                    {% if form.subscribe.value() %}checked{% endif %}
+                    name="{{ subscribe.html_name }}"
+                    id="{{ subscribe.html_id }}"
+                    {% if subscribe.value() %}checked{% endif %}
                 >
                 Subscribe to the newsletter
             </label>
-            {{ field_errors(form.subscribe) }}
+            {% for error in subscribe.errors %}
+            <div class="field-error">⚠ {{ error }}</div>
+            {% endfor %}
         </div>
 
         <button type="submit" class="btn-primary self-start">Send</button>
