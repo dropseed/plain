@@ -5,6 +5,7 @@ from typing import Any
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
+from plain.schema import SchemaView
 from plain.templates.views import (
     CreateView,
     DeleteView,
@@ -17,6 +18,7 @@ from plain.views import View
 
 from .forms import TaskForm, TaskTitleForm
 from .models import Project, Tag, Task
+from .schemas import TaskSchema
 
 
 class TaskListView(AuthView, ListView):
@@ -87,6 +89,29 @@ class TaskUpdateView(AuthView, UpdateView):
 
     def get_form_kwargs(self) -> dict[str, Any]:
         return {**super().get_form_kwargs(), "owner": self.user}
+
+
+class TaskSchemaCreateView(AuthView, SchemaView[TaskSchema]):
+    """The plain.schema counterpart to TaskCreateView — built on SchemaView +
+    a ModelSchema instead of CreateView + a ModelForm."""
+
+    template_name = "tasks/schema_create.html"
+    schema_class = TaskSchema
+    success_url = reverse_lazy("tasks:list")
+    login_required = True
+
+    def get_schema_class(self) -> type[TaskSchema]:
+        # Narrow the FK/M2M querysets to the current user. The scoped class
+        # drives both validation and the rendered <select> options, so other
+        # users' projects and tags are neither selectable nor visible.
+        return TaskSchema.with_querysets(
+            project=Project.query.filter(owner=self.user),
+            tags=Tag.query.filter(owner=self.user),
+        )
+
+    def schema_valid(self, result: TaskSchema) -> Response:
+        result.save(Task(owner=self.user))
+        return super().schema_valid(result)
 
 
 class TaskDeleteView(AuthView, DeleteView):

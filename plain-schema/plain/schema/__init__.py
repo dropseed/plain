@@ -24,15 +24,17 @@ if TYPE_CHECKING:
     # plain.http → plain.internal.files.uploadhandler → plain.internal.files.uploadedfile.
     from plain.internal.files.uploadedfile import UploadedFile  # noqa: F401
 
+    from .modelschema import ModelSchema  # noqa: F401
     from .views import SchemaView  # noqa: F401
 
 
 def __getattr__(name: str) -> Any:
     """Lazy attribute lookup so importing `plain.schema` stays cheap.
 
-    `UploadedFile` would otherwise trigger the plain.http import chain, and
-    `SchemaView` would pull in plain.templates — neither belongs in the load
-    path of a plain `from plain.schema import Schema`.
+    `UploadedFile` would otherwise trigger the plain.http import chain,
+    `SchemaView` would pull in plain.templates, and `ModelSchema` would pull
+    in plain.postgres — none belong in the load path of a plain
+    `from plain.schema import Schema`.
     """
     if name == "UploadedFile":
         from plain.internal.files.uploadedfile import UploadedFile
@@ -42,6 +44,10 @@ def __getattr__(name: str) -> Any:
         from .views import SchemaView
 
         return SchemaView
+    if name == "ModelSchema":
+        from .modelschema import ModelSchema
+
+        return ModelSchema
     raise AttributeError(f"module 'plain.schema' has no attribute {name!r}")
 
 
@@ -49,6 +55,7 @@ __all__ = (
     "BoundField",
     "BoundSchema",
     "Invalid",
+    "ModelSchema",
     "Schema",
     "SchemaView",
     "UploadedFile",

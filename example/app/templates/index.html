@@ -61,6 +61,7 @@
             {{ row("/contacts/", "/contacts/", "Plain <span class='font-mono'>forms.Form</span> — text, email, choice, bool, dynamic fields, prefix.") }}
             {{ row("/contacts/schema", "/contacts/schema", "The same form built with <span class='font-mono'>plain.schema</span> — <span class='font-mono'>Schema</span> + <span class='font-mono'>SchemaView</span>.") }}
             {{ row("/tasks/", "/tasks/", "<span class='font-mono'>ModelForm</span> — FK, M2M, date, choice, file. HTMX inline rename. JSON API.", "badge-info", "Auth") }}
+            {{ row("/tasks/schema/new", "/tasks/schema/new", "The same task form built with <span class='font-mono'>ModelSchema</span> — FK/M2M auto-derived from the model.", "badge-info", "Auth") }}
             {{ row("/sse/", "/sse/", "Server-sent events streaming in real time.", "badge-success", "Live") }}
         </div>
     </section>

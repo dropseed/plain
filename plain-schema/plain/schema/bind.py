@@ -51,10 +51,13 @@ class BoundField:
         """Display value: raw input on bound forms (so the user sees what they
         typed even when invalid), initial otherwise."""
         if self.bound.is_bound:
-            # Look up by html_name first (prefix-aware), fall back to bare name
-            if self.html_name in self.bound.raw:
-                return self.bound.raw[self.html_name]
-            return self.bound.raw.get(self.name)
+            raw = self.bound.raw
+            # Look up by html_name first (prefix-aware), fall back to bare name.
+            key = self.html_name if self.html_name in raw else self.name
+            if self.field.multi_value and hasattr(raw, "getlist"):
+                # `raw` has .getlist (verified by the hasattr guard).
+                return raw.getlist(key)  # ty: ignore[call-non-callable]
+            return raw.get(key)
         if self.name in self.bound.initial:
             return self.bound.initial[self.name]
         return self.field.initial

@@ -54,6 +54,10 @@ Return a per-field errors dict, or raise `ValidationError`.
 
 If you're tempted to `request.json_data["x"]` and then check it — write a Schema instead.
 
+## Model-backed input
+
+For input backed by a `postgres.Model`, subclass `plain.schema.ModelSchema`: set `model = X` and annotate the fields to expose. Fields auto-derive — scalars become `types.*`, a ForeignKey becomes a `ModelChoiceField`, a ManyToMany a `ModelMultipleChoiceField`. `save(instance)` persists; `with_querysets(field=qs, ...)` returns a subclass with FK/M2M scoped (multi-tenant).
+
 ## HTML rendering
 
 Pair with `BoundSchema` for template rendering — `BoundSchema(SchemaClass)` for a blank form, `BoundSchema.from_invalid(SchemaClass, result)` to re-render after a failed POST. Its field surface is duck-compatible with `plain.forms.BoundField`, so existing form templates render unchanged.

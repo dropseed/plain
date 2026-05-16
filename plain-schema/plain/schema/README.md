@@ -14,6 +14,7 @@ A `Schema` declares fields with type annotations and validators; `.validate(data
 - [File uploads](#file-uploads)
 - [HTML rendering with BoundSchema](#html-rendering-with-boundschema)
 - [SchemaView](#schemaview)
+- [ModelSchema](#modelschema)
 - [Property tests with Hypothesis](#property-tests-with-hypothesis)
 - [Installation](#installation)
 
@@ -210,6 +211,46 @@ class ContactView(SchemaView[ContactSchema]):
 Parameterize as `SchemaView[ContactSchema]` so `result` is typed in `schema_valid()`. The template receives the schema as `form` (a `BoundSchema`), so it renders with the same field markup a `FormView` template uses.
 
 > `SchemaView` lives in `plain.schema` for now — while the schema view design is still being iterated on — even though it makes this package depend on `plain.templates`. Importing it is deferred (`from plain.schema import SchemaView`), so a plain `from plain.schema import Schema` still doesn't load the template layer.
+
+## ModelSchema
+
+[`ModelSchema`](./modelschema.py#ModelSchema) is the schema counterpart to `plain.postgres`' `ModelForm`. Declare a `model` and annotate the fields to expose — the metaclass derives a validating field for each one:
+
+```python
+from plain.schema import ModelSchema
+
+from .models import Project, Tag, Task
+
+
+class TaskSchema(ModelSchema):
+    model = Task
+
+    title: str                  # scalar columns → types.* fields
+    project: Project | None      # ForeignKey      → ModelChoiceField
+    tags: list[Tag]              # ManyToMany      → ModelMultipleChoiceField
+    is_complete: bool
+```
+
+Scalar columns map to the matching `types.*` field; a `ForeignKeyField` becomes a `ModelChoiceField` (a primary key cleans to the model instance) and a `ManyToManyField` becomes a `ModelMultipleChoiceField` (a list of pks cleans to a list of instances). Annotate only what you want exposed — unlisted columns (like an `owner` FK) are left for the caller to set. Override an auto-derived field by declaring a `types.*` field explicitly, and add cross-field rules with `check()`.
+
+`save()` applies the validated values to a model instance and persists it (M2M relations are assigned after the row has a primary key):
+
+```python
+result = TaskSchema.validate(request.json_data)
+if not isinstance(result, Invalid):
+    result.save(Task(owner=request.user))
+```
+
+For multi-tenant FK/M2M scoping, `with_querysets()` returns a subclass whose relation querysets are narrowed — the scoped class drives both validation and the rendered `<select>` options, so a user can neither submit nor see another tenant's rows:
+
+```python
+TaskSchema.with_querysets(
+    project=Project.query.filter(owner=user),
+    tags=Tag.query.filter(owner=user),
+)
+```
+
+> Like `SchemaView`, `ModelSchema` lives in `plain.schema` for now — it makes the package additionally depend on `plain.postgres`. Importing is deferred (`from plain.schema import ModelSchema`), so a plain `from plain.schema import Schema` doesn't load the ORM.
 
 ## Property tests with Hypothesis
 

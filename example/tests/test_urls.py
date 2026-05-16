@@ -1,4 +1,5 @@
 from app.contacts.models import ContactSubmission
+from app.tasks.models import Project, Tag, Task
 from app.users.models import User
 
 from plain.test import Client
@@ -73,3 +74,53 @@ def test_contact_schema_check_runs(db):
     assert response.status_code == 200
     assert "at least 30 characters" in response.content.decode()
     assert ContactSubmission.query.count() == 0
+
+
+def test_task_schema_create_page_renders(db):
+    client = Client()
+    user = User.query.create(email="tasker@example.com", password="strongpass1")
+    client.force_login(user)
+    response = client.get("/tasks/schema/new")
+    assert response.status_code == 200
+    assert "New task" in response.content.decode()
+
+
+def test_task_schema_create_with_fk_and_m2m(db):
+    client = Client()
+    user = User.query.create(email="tasker@example.com", password="strongpass1")
+    client.force_login(user)
+    project = Project.query.create(owner=user, name="Inbox")
+    urgent = Tag.query.create(owner=user, name="urgent")
+    later = Tag.query.create(owner=user, name="later")
+
+    response = client.post(
+        "/tasks/schema/new",
+        data={
+            "title": "Write the docs",
+            "project": str(project.id),
+            "priority": "high",
+            "tags": [str(urgent.id), str(later.id)],
+        },
+    )
+    assert response.status_code == 302
+    task = Task.query.filter(owner=user, title="Write the docs").first()
+    assert task is not None
+    assert task.project_id == project.id
+    assert {tag.name for tag in task.tags.query} == {"urgent", "later"}
+
+
+def test_task_schema_create_scopes_relations_to_owner(db):
+    client = Client()
+    user = User.query.create(email="tasker@example.com", password="strongpass1")
+    other = User.query.create(email="other@example.com", password="strongpass1")
+    client.force_login(user)
+    # A project owned by someone else must not be selectable.
+    other_project = Project.query.create(owner=other, name="Secret")
+
+    response = client.post(
+        "/tasks/schema/new",
+        data={"title": "Sneaky", "project": str(other_project.id)},
+    )
+    assert response.status_code == 200
+    assert "field-error" in response.content.decode()
+    assert Task.query.filter(title="Sneaky").count() == 0

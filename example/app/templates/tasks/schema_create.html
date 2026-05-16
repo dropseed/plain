@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import back_link %}
 
-{% block title %}New task{% endblock %}
+{% block title %}New task (schema){% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto px-5 py-12">
@@ -9,9 +9,11 @@
 
     <h1 class="page-h1">New task</h1>
     <p class="mt-3 text-sm text-muted">
-        Plain <span class="font-mono text-body">ModelForm</span> — FK, M2M, date,
-        choice, boolean. See the same form built with
-        <a class="body-link" href="{{ url('tasks:schema_create') }}">plain.schema</a>.
+        The same form as the <a class="body-link" href="{{ url('tasks:create') }}">ModelForm version</a>,
+        built with <span class="font-mono text-body">plain.schema</span>: a
+        <span class="font-mono text-body">ModelSchema</span> auto-derived from the
+        <span class="font-mono text-body">Task</span> model, with the FK and M2M
+        querysets scoped to you.
     </p>
 
     <form method="post" class="mt-6 flex flex-col gap-5">

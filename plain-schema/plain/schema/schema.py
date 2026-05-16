@@ -5,7 +5,7 @@ from typing import Any, ClassVar, Self, cast
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.utils.hashable import make_hashable
 
-from .fields import Field, FileField, MultipleChoiceField
+from .fields import Field, FileField
 from .result import Invalid
 
 __all__ = ("Schema", "make_schema")
@@ -238,7 +238,7 @@ class Schema(metaclass=SchemaMeta):
                 if is_file_field:
                     # FileField.clean takes (data, initial).
                     cleaned[name] = field.clean(files_map.get(name), None)
-                elif is_multi_value_dict and isinstance(field, MultipleChoiceField):
+                elif is_multi_value_dict and field.multi_value:
                     # `raw` has .getlist (verified by the is_multi_value_dict guard).
                     cleaned[name] = field.clean(raw.getlist(name))  # ty: ignore[call-non-callable]
                 else:

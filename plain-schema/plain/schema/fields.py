@@ -70,6 +70,10 @@ class Field:
     # class-level list; __init__ copies it so per-instance appends are safe.
     default_validators: list[Callable[[Any], None]] = []
 
+    # True for fields whose raw input is a list of values rather than one —
+    # `Schema.validate` reads them with `.getlist()` from multi-valued data.
+    multi_value: bool = False
+
     def __init__(self, *, required: bool = True, initial: Any = None) -> None:
         self.required = required
         self.initial = initial
@@ -376,6 +380,8 @@ class TypedChoiceField(ChoiceField):
 
 
 class MultipleChoiceField(_ChoiceField):
+    multi_value = True
+
     def parse(self, value: Any) -> list[str]:
         if not value:
             return []

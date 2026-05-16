@@ -11,6 +11,7 @@ class TasksRouter(Router):
         path("", views.TaskListView, name="list"),
         path("seed", views.TaskSeedView, name="seed"),
         path("new", views.TaskCreateView, name="create"),
+        path("schema/new", views.TaskSchemaCreateView, name="schema_create"),
         path("<int:id>", views.TaskDetailView, name="detail"),
         path("<int:id>/edit", views.TaskUpdateView, name="update"),
         path("<int:id>/delete", views.TaskDeleteView, name="delete"),
