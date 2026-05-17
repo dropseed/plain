@@ -153,36 +153,37 @@ class UploadView(View):
 
 ## HTML rendering with SchemaForm
 
-`SchemaForm` is the HTML form-cycle primitive — it pairs a schema with the request. There is no view base class: a plain `View`/`TemplateView` holds a `SchemaForm`, renders it on GET, and calls `.submit()` on POST. The GET/POST cycle stays explicit and typed:
+`SchemaForm` is the HTML form-cycle primitive — it pairs a schema with the request. A view holds a `SchemaForm`, renders it on GET, and calls `.submit()` on POST. There is no form-specific view base class; the GET/POST cycle stays explicit and typed.
+
+Pair it with a plain [`TemplateView`](../../../plain-templates/plain/templates/README.md#templateview) and `render(**context)` — which renders the template with context **pushed in by the handler**, returning the `Response` directly. The handler already holds the form, so it passes it straight in:
 
 ```python
+from plain.http import RedirectResponse, Response
 from plain.schema import Invalid, SchemaForm
+from plain.templates.views import TemplateView
 
 
 class ContactView(TemplateView):
     template_name = "contact.html"
 
-    def get(self):
-        self.form = SchemaForm(ContactSchema, self.request)
-        return Response(self.render_template())
+    def schema_form(self) -> SchemaForm[ContactSchema]:
+        return SchemaForm(ContactSchema, self.request)
 
-    def post(self):
-        self.form = SchemaForm(ContactSchema, self.request)
-        result = self.form.submit()
+    def get(self) -> Response:
+        return self.render(form=self.schema_form(), schema=ContactSchema)
+
+    def post(self) -> Response:
+        form = self.schema_form()
+        result = form.submit()
         if isinstance(result, Invalid):
-            return Response(self.render_template())
+            return self.render(form=form, schema=ContactSchema)
         result.apply_to(ContactSubmission()).save()
         return RedirectResponse("/thanks/")
-
-    def get_template_context(self):
-        return {
-            **super().get_template_context(),
-            "form": self.form,
-            "schema": ContactSchema,
-        }
 ```
 
-`submit()` returns the typed schema instance or `Invalid` — and on `Invalid` the `SchemaForm` rebinds itself, so passing it back to the template re-renders with the submitted values and per-field errors.
+`submit()` returns the typed schema instance or `Invalid` — and on `Invalid` the `SchemaForm` rebinds itself, so passing it back to `render()` re-renders with the submitted values and per-field errors.
+
+`render(**context)` layers the handler's context over `get_template_context()` and returns the `Response` directly — no `Response(...)` wrapping, no context stashed on `self`. (A GET-only page can still override `get_template_context()` the usual way; `render()` is the convenient call for views whose `.get()` and `.post()` render the same template.)
 
 For a `ModelSchema`, two optional constructor arguments do the model-form work:
 

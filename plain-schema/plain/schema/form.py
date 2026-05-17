@@ -71,7 +71,8 @@ class SchemaForm[S: Schema]:
     """A schema bound to a request — render it, then `submit()` it.
 
     Construct one in your view, render it on GET, and call `submit()` on
-    POST:
+    POST (`TemplateView.render()` takes the context the handler pushes in —
+    no `get_template_context()` callback needed):
 
         class ContactView(TemplateView):
             template_name = "contact.html"

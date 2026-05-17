@@ -12,8 +12,9 @@
         <span class="font-semibold text-ink">{{ task.title }}</span>
     </p>
     <p class="mt-1 text-sm text-muted">
-        Built with <span class="font-mono text-body">SchemaDeleteView</span> —
-        an empty schema, so the POST is just a CSRF-protected confirm.
+        No schema needed — just a plain
+        <span class="font-mono text-body">TemplateView</span> whose
+        <span class="font-mono text-body">.post()</span> is a CSRF-protected confirm.
     </p>
 
     <form method="post" class="mt-6">

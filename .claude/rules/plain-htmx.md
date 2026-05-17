@@ -16,7 +16,7 @@ Action handlers return `Response | None`:
 - `return None` (or fall off the end) — re-render the current template/fragment. This is the default for "mutate state, send back the new fragment".
 - `return Response(...)` — only when diverging from a re-render: `RedirectResponse`, a 204 with `HX-Redirect`, JSON, etc.
 
-Never wrap `self.render_template()` in `Response(...)` yourself — just return `None`.
+Never render manually from an action handler — just return `None` and the framework re-renders.
 
 ## Testing HTMX endpoints with `plain request`
 

@@ -35,15 +35,15 @@ class ContactSuccessView(TemplateView):
 
 class ContactSchemaView(TemplateView):
     """The plain.schema counterpart to ContactView — the same page, built on a
-    plain `View` driving a `SchemaForm`, instead of `FormView` + a `Form`.
+    `TemplateView` driving a `SchemaForm`, instead of `FormView` + a `Form`.
 
     `ContactSchema` is a plain `Schema` (not model-backed) — `SchemaForm`
-    works the same; there's just no `querysets=` to scope.
+    works the same; there's just no `querysets=` to scope. Context is pushed
+    into `render()` straight from the handler — no `get_template_context()`
+    callback, no stashing the form on `self`.
     """
 
     template_name = "contacts/schema_form.html"
-
-    form: SchemaForm[ContactSchema]
 
     def schema_form(self) -> SchemaForm[ContactSchema]:
         return SchemaForm(ContactSchema, self.request, initial=self.initial())
@@ -53,27 +53,26 @@ class ContactSchemaView(TemplateView):
             return {"name": name}
         return {}
 
+    def page(self, form: SchemaForm[ContactSchema]) -> Response:
+        """Render the page for `form` — the shared GET/POST-invalid render."""
+        return self.render(
+            form=form,
+            schema=ContactSchema,
+            ask_company=self.request.query_params.get("company") == "1",
+        )
+
     def get(self) -> Response:
-        self.form = self.schema_form()
-        return Response(self.render_template())
+        return self.page(self.schema_form())
 
     def post(self) -> Response:
-        self.form = self.schema_form()
-        result = self.form.submit()
+        form = self.schema_form()
+        result = form.submit()
         if isinstance(result, Invalid):
-            return Response(self.render_template())
+            return self.page(form)
         # Schemas are pure data — persisting is the view's job. apply_to()
         # copies the validated fields onto a fresh model; the view saves it.
         result.apply_to(ContactSubmission()).save()
         return RedirectResponse(reverse("contacts:schema_success"))
-
-    def get_template_context(self) -> dict[str, Any]:
-        return {
-            **super().get_template_context(),
-            "form": self.form,
-            "schema": ContactSchema,
-            "ask_company": self.request.query_params.get("company") == "1",
-        }
 
 
 class ContactSchemaSuccessView(TemplateView):

@@ -60,8 +60,9 @@ For input backed by a `postgres.Model`, subclass `ModelSchema` (`from plain.sche
 
 ## HTML rendering
 
-`SchemaForm` pairs a schema with the request — the HTML form-cycle primitive. There is **no view base class**: a plain `View`/`TemplateView` holds a `SchemaForm`, renders it on GET, and calls `.submit()` on POST. Write explicit `.get()`/`.post()`.
+`SchemaForm` pairs a schema with the request — the HTML form-cycle primitive. There is **no form-specific view base class**: a view holds a `SchemaForm`, renders it on GET, and calls `.submit()` on POST. Write explicit `.get()`/`.post()`.
 
+- Pair with `plain.templates`' `TemplateView` — handlers push context with `render(**context)`, which returns the `Response` directly (no `get_template_context()` callback needed for the `.get()`/`.post()` cycle).
 - `SchemaForm(SchemaClass, request)` — construct it. `submit()` returns `Schema | Invalid`; on `Invalid` the form rebinds, so re-rendering shows the submitted values + per-field errors.
 - For a `ModelSchema`: `querysets={...}` scopes FK/M2M (multi-tenant); `initial=ModelSchema.initial_from(instance)` pre-fills an edit form.
 - Templates index the form by typed reference — `form[schema.email]` → a bound field with `.name`, `.value()`, `.errors`, `.field`. Pass the schema class to the template as `schema`.
