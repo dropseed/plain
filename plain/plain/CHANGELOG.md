@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.145.1](https://github.com/dropseed/plain/releases/plain@0.145.1) (2026-05-16)
+
+### What's changed
+
+- Documentation only: expanded the 0.145.0 trailing-slash upgrade notes to call out relative URLs in templates. `<form action=".">` and `<a href=".">` resolve against the request URL's last slash, so flipping a route from `/login/` to `/login` changes where `action="."` submits — the notes now explain how to spot and fix this. ([1ae963c6df](https://github.com/dropseed/plain/commit/1ae963c6df))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.145.0](https://github.com/dropseed/plain/releases/plain@0.145.0) (2026-05-13)
 
 ### What's changed
