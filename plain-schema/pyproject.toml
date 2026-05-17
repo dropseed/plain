@@ -6,9 +6,14 @@ authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.13"
-# plain.postgres is pulled in only for plain/schema/modelschema.py, which
-# lives here temporarily while the schema/model design is iterated on.
-dependencies = ["plain>=0.145.0,<1.0.0", "plain.postgres>=0.103.0,<1.0.0"]
+# plain.postgres backs plain/schema/modelschema.py and plain.templates backs
+# plain/schema/views.py — each is imported only from its own submodule, so a
+# plain `from plain.schema import Schema` loads neither.
+dependencies = [
+  "plain>=0.145.0,<1.0.0",
+  "plain.postgres>=0.103.0,<1.0.0",
+  "plain.templates>=0.1.0,<1.0.0",
+]
 
 [dependency-groups]
 dev = ["plain.pytest<1.0.0", "hypothesis>=6.0.0"]

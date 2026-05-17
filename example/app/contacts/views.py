@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from plain.http import RedirectResponse, Response
-from plain.schema import Invalid, SchemaForm
+from plain.schema import SchemaForm
+from plain.schema.views import SchemaFormView
 from plain.templates.views import FormView, TemplateView
 from plain.urls import reverse, reverse_lazy
 
@@ -33,42 +34,29 @@ class ContactSuccessView(TemplateView):
     template_name = "contacts/success.html"
 
 
-class ContactSchemaView(TemplateView):
-    """The plain.schema counterpart to ContactView — the same page, built on a
-    `TemplateView` driving a `SchemaForm`, instead of `FormView` + a `Form`.
+class ContactSchemaView(SchemaFormView[ContactSchema]):
+    """The plain.schema counterpart to ContactView — the same page, on the
+    app's `SchemaFormView` base instead of `FormView` + a `Form`.
 
-    `ContactSchema` is a plain `Schema` (not model-backed) — `SchemaForm`
-    works the same; there's just no `querysets=` to scope. Context is pushed
-    into `render()` straight from the handler — no `get_template_context()`
-    callback, no stashing the form on `self`.
+    `ContactSchema` is a plain `Schema` (not model-backed) — there's no
+    `querysets=` to scope, just `initial=` from the query string.
     """
 
     template_name = "contacts/schema_form.html"
+    schema_class = ContactSchema
 
-    def schema_form(self) -> SchemaForm[ContactSchema]:
-        return SchemaForm(ContactSchema, self.request, initial=self.initial())
-
-    def initial(self) -> dict[str, Any]:
+    def get_schema_form(self) -> SchemaForm[ContactSchema]:
+        initial = {}
         if name := self.request.query_params.get("name"):
-            return {"name": name}
-        return {}
+            initial = {"name": name}
+        return SchemaForm(ContactSchema, self.request, initial=initial)
 
-    def page(self, form: SchemaForm[ContactSchema]) -> Response:
-        """Render the page for `form` — the shared GET/POST-invalid render."""
-        return self.render(
-            form=form,
-            schema=ContactSchema,
-            ask_company=self.request.query_params.get("company") == "1",
-        )
+    def get_template_context(self) -> dict[str, Any]:
+        context = super().get_template_context()
+        context["ask_company"] = self.request.query_params.get("company") == "1"
+        return context
 
-    def get(self) -> Response:
-        return self.page(self.schema_form())
-
-    def post(self) -> Response:
-        form = self.schema_form()
-        result = form.submit()
-        if isinstance(result, Invalid):
-            return self.page(form)
+    def on_valid(self, result: ContactSchema) -> Response:
         # Schemas are pure data — persisting is the view's job. apply_to()
         # copies the validated fields onto a fresh model; the view saves it.
         result.apply_to(ContactSubmission()).save()

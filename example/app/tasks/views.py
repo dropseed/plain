@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from functools import cached_property
 from typing import Any
 
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
 from plain.http import NotFoundError404, RedirectResponse, Response
-from plain.schema import Invalid, SchemaForm
+from plain.schema import SchemaForm
+from plain.schema.views import SchemaFormView
 from plain.templates.views import (
     CreateView,
     DeleteView,
@@ -110,62 +112,51 @@ def _owner_task(view: Any) -> Task:
     return task
 
 
-class TaskSchemaCreateView(AuthView, TemplateView):
-    """The plain.schema counterpart to TaskCreateView — a plain view driving a
-    SchemaForm, instead of CreateView + a ModelForm.
-
-    `.get()` renders a blank form; `.post()` submits it. There's no schema
-    view base class — the GET/POST cycle is right here, and the template
-    context is pushed straight into `render()`.
-    """
+class TaskSchemaCreateView(AuthView, SchemaFormView[TaskSchema]):
+    """The plain.schema counterpart to TaskCreateView — the app's
+    `SchemaFormView` base instead of `CreateView` + a `ModelForm`."""
 
     template_name = "tasks/schema_create.html"
+    schema_class = TaskSchema
     login_required = True
 
-    def schema_form(self) -> SchemaForm[TaskSchema]:
+    def get_schema_form(self) -> SchemaForm[TaskSchema]:
         return SchemaForm(TaskSchema, self.request, querysets=_owner_querysets(self))
 
-    def get(self) -> Response:
-        return self.render(form=self.schema_form(), schema=TaskSchema)
-
-    def post(self) -> Response:
-        form = self.schema_form()
-        result = form.submit()
-        if isinstance(result, Invalid):
-            return self.render(form=form, schema=TaskSchema)
+    def on_valid(self, result: TaskSchema) -> Response:
         # `owner` isn't a form field — inject it on a fresh Task.
         result.save(Task(owner=self.user))
         return RedirectResponse(reverse("tasks:list"))
 
 
-class TaskSchemaUpdateView(AuthView, TemplateView):
-    """The plain.schema counterpart to TaskUpdateView. The form is pre-filled
-    from the task via `ModelSchema.initial_from()`; `.post()` applies the
-    validated values back with `result.save(task)`. The task is fetched as a
-    local and pushed into `render()` — no `DetailView`, no `self.object`."""
+class TaskSchemaUpdateView(AuthView, SchemaFormView[TaskSchema]):
+    """The plain.schema counterpart to TaskUpdateView. The task is resolved by
+    the view's own auth scoping — not a base-class pk lookup — then pre-fills
+    the form via `ModelSchema.initial_from()` and is the `save()` target."""
 
     template_name = "tasks/schema_update.html"
+    schema_class = TaskSchema
     login_required = True
 
-    def schema_form(self, task: Task) -> SchemaForm[TaskSchema]:
+    @cached_property
+    def task(self) -> Task:
+        return _owner_task(self)
+
+    def get_schema_form(self) -> SchemaForm[TaskSchema]:
         return SchemaForm(
             TaskSchema,
             self.request,
             querysets=_owner_querysets(self),
-            initial=TaskSchema.initial_from(task),
+            initial=TaskSchema.initial_from(self.task),
         )
 
-    def get(self) -> Response:
-        task = _owner_task(self)
-        return self.render(task=task, form=self.schema_form(task), schema=TaskSchema)
+    def get_template_context(self) -> dict[str, Any]:
+        context = super().get_template_context()
+        context["task"] = self.task
+        return context
 
-    def post(self) -> Response:
-        task = _owner_task(self)
-        form = self.schema_form(task)
-        result = form.submit()
-        if isinstance(result, Invalid):
-            return self.render(task=task, form=form, schema=TaskSchema)
-        result.save(task)
+    def on_valid(self, result: TaskSchema) -> Response:
+        result.save(self.task)
         return RedirectResponse(reverse("tasks:list"))
 
 

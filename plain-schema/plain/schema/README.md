@@ -153,44 +153,56 @@ class UploadView(View):
 
 ## HTML rendering with SchemaForm
 
-`SchemaForm` is the HTML form-cycle primitive — it pairs a schema with the request. A view holds a `SchemaForm`, renders it on GET, and calls `.submit()` on POST. There is no form-specific view base class; the GET/POST cycle stays explicit and typed.
+`SchemaForm` is the HTML form-cycle primitive — it pairs a schema with the request. A view renders it on GET and calls `.submit()` on POST; `submit()` returns the typed schema instance or `Invalid`, and on `Invalid` the form rebinds itself, so a re-render shows the submitted values and per-field errors.
 
-Pair it with a plain [`TemplateView`](../../../plain-templates/plain/templates/README.md#templateview) and `render(**context)` — which renders the template with context **pushed in by the handler**, returning the `Response` directly. The handler already holds the form, so it passes it straight in:
+For a view that is _just_ a form, `SchemaFormView` (from `plain.schema.views`) factors the GET/POST cycle — set `schema_class` and implement `on_valid()`:
 
 ```python
 from plain.http import RedirectResponse, Response
-from plain.schema import Invalid, SchemaForm
-from plain.templates.views import TemplateView
+from plain.schema import SchemaForm
+from plain.schema.views import SchemaFormView
 
 
-class ContactView(TemplateView):
+class ContactView(SchemaFormView[ContactSchema]):
     template_name = "contact.html"
+    schema_class = ContactSchema
 
-    def schema_form(self) -> SchemaForm[ContactSchema]:
-        return SchemaForm(ContactSchema, self.request)
-
-    def get(self) -> Response:
-        return self.render(form=self.schema_form(), schema=ContactSchema)
-
-    def post(self) -> Response:
-        form = self.schema_form()
-        result = form.submit()
-        if isinstance(result, Invalid):
-            return self.render(form=form, schema=ContactSchema)
+    def on_valid(self, result: ContactSchema) -> Response:
         result.apply_to(ContactSubmission()).save()
         return RedirectResponse("/thanks/")
 ```
 
-`submit()` returns the typed schema instance or `Invalid` — and on `Invalid` the `SchemaForm` rebinds itself, so passing it back to `render()` re-renders with the submitted values and per-field errors.
+`SchemaFormView` is a [`TemplateView`](../../../plain-templates/plain/templates/README.md#templateview) underneath, so it's an ordinary `View` — mix in `AuthView`, add `before_request()` guards as usual. The form reaches the template as `form` and the schema class as `schema`. Override `get_schema_form()` to scope or pre-fill the form, and extend `get_template_context()` for extra context:
 
-`render(**context)` layers the handler's context over `get_template_context()` and returns the `Response` directly — no `Response(...)` wrapping, no context stashed on `self`. (A GET-only page can still override `get_template_context()` the usual way; `render()` is the convenient call for views whose `.get()` and `.post()` render the same template.)
+```python
+class TaskCreateView(AuthView, SchemaFormView[TaskSchema]):
+    template_name = "tasks/new.html"
+    schema_class = TaskSchema
+    login_required = True
 
-For a `ModelSchema`, two optional constructor arguments do the model-form work:
+    def get_schema_form(self) -> SchemaForm[TaskSchema]:
+        # querysets= scopes a FK/M2M per request (multi-tenant); initial=
+        # pre-fills an edit form (initial=TaskSchema.initial_from(task)).
+        return SchemaForm(TaskSchema, self.request, querysets={"project": ...})
 
-- `querysets={...}` scopes a FK/M2M field per request (multi-tenant) — the scoped schema drives both validation and the rendered `<select>` options.
-- `initial=ModelSchema.initial_from(instance)` pre-fills an edit form from an existing row.
+    def on_valid(self, result: TaskSchema) -> Response:
+        result.save(Task(owner=self.user))
+        return RedirectResponse("/tasks/")
+```
 
-In the template, look a field up by its **typed reference** — `form[ContactSchema.email]`, checked against the schema: a typo like `form[ContactSchema.emial]` is an ordinary attribute error. Pass the schema class to the template (as `schema` above) so templates write `form[schema.email]`. There is no string-keyed access. Each bound field exposes `.name`, `.value()`, `.errors`, and `.field` — the template writes the `<input>` itself; the bound field only supplies the data.
+When a view is _more_ than a form — an HTMX action view, a multi-step flow — skip the base and drive `SchemaForm` from your own `.get()`/`.post()` on a plain `TemplateView`. `render(**context)` renders the template with context pushed straight in, no `Response(...)` wrapping:
+
+```python
+def post(self) -> Response:
+    form = SchemaForm(ContactSchema, self.request)
+    result = form.submit()
+    if isinstance(result, Invalid):
+        return self.render(form=form, schema=ContactSchema)
+    result.apply_to(ContactSubmission()).save()
+    return RedirectResponse("/thanks/")
+```
+
+In the template, look a field up by its **typed reference** — `form[ContactSchema.email]`, checked against the schema: a typo like `form[ContactSchema.emial]` is an ordinary attribute error. Pass the schema class to the template (as `schema`) so templates write `form[schema.email]`. There is no string-keyed access. Each bound field exposes `.name`, `.value()`, `.errors`, and `.field` — the template writes the `<input>` itself; the bound field only supplies the data.
 
 JSON APIs, MCP tools, and other non-HTML surfaces skip `SchemaForm` entirely — they call `Schema.validate()` on the request body directly.
 
