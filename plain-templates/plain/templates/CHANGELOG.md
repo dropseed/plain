@@ -1,5 +1,17 @@
 # plain-templates changelog
 
+## [0.3.0](https://github.com/dropseed/plain/releases/plain-templates@0.3.0) (2026-05-16)
+
+### What's changed
+
+- **`TemplateView.render_template()` replaced by `render(**context)`.** The new method returns a `Response`(not a`str`) and layers any keyword context over `get_template_context()`, so a handler can push what the template needs straight in — `self.render(product=product)`— instead of stashing it on`self`for`get_template_context()`to read back. Called with no arguments it renders`get_template_context()`as-is, which is what`get()` does. ([d88e0556b0](https://github.com/dropseed/plain/commit/d88e0556b0))
+- **`FormView.form_invalid` removed.** `post()` now re-renders an invalid form directly via `self.render(form=form)`; `form_valid` is unchanged. ([ddbbfb05dc](https://github.com/dropseed/plain/commit/ddbbfb05dc))
+
+### Upgrade instructions
+
+- Replace `render_template()` with `render()`. Since `render()` returns a `Response`, `Response(self.render_template())` becomes `self.render()`. Per-render context can be passed as keyword arguments (`self.render(form=form)`) instead of going through `get_template_context()`.
+- If you overrode `FormView.form_invalid`, move that logic into a `render()` or `post()` override — the invalid-form path now calls `self.render(form=form)`.
+
 ## [0.2.0](https://github.com/dropseed/plain/releases/plain-templates@0.2.0) (2026-05-13)
 
 ### What's changed

@@ -1,6 +1,6 @@
 [project]
 name = "plain.templates"
-version = "0.2.0"
+version = "0.3.0"
 description = "Render HTML templates using Jinja2."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
