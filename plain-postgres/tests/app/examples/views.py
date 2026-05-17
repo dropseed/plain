@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from plain.forms import BaseForm
 from plain.http import Response
 from plain.templates.views import CreateView, UpdateView
 
@@ -20,14 +19,16 @@ class _NoTemplateFormView:
     """Bypass template requirements in test views.
 
     CreateView/UpdateView normally need a template for GET and for
-    form-invalid responses. These tests only exercise POST behavior, so
-    we return plain Responses instead of rendering templates.
+    rendering an invalid form. These tests only exercise POST behavior,
+    so we return plain Responses instead of rendering templates.
     """
 
     def get(self) -> Response:
         return Response("ok")
 
-    def form_invalid(self, form: BaseForm) -> Response:
+    def render(self, **context: Any) -> Response:
+        """Invalid-form re-render: serialize the form errors as JSON."""
+        form = context["form"]
         errors: dict[str, list[str]] = {
             name: [str(err) for err in errs] for name, errs in form.errors.items()
         }

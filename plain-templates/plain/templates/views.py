@@ -159,10 +159,6 @@ class FormView[F: "BaseForm"](TemplateView):
         """If the form is valid, redirect to the supplied URL."""
         return RedirectResponse(self.get_success_url(form))
 
-    def form_invalid(self, form: F) -> Response:
-        """If the form is invalid, render the invalid form."""
-        return self.render(form=form)
-
     def get_template_context(self) -> dict[str, Any]:
         """Insert the form into the context dict."""
         context = super().get_template_context()
@@ -170,15 +166,11 @@ class FormView[F: "BaseForm"](TemplateView):
         return context
 
     def post(self) -> Response:
-        """
-        Handle POST requests: instantiate a form instance with the passed
-        POST variables and then check if it's valid.
-        """
+        """Hand a valid form to `form_valid`; re-render an invalid one."""
         form = self.get_form()
         if form.is_valid():
             return self.form_valid(form)
-        else:
-            return self.form_invalid(form)
+        return self.render(form=form)
 
 
 class CreateView(FormView):

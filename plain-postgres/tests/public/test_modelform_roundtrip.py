@@ -115,7 +115,7 @@ class TestFormsExampleCreate:
         assert "event_date" in errors
 
     def test_blank_required_field_returns_400_with_error(self, db):
-        """Required field sent as empty string → form_invalid path with errors."""
+        """Required field sent as empty string → invalid-form path with errors."""
         client = Client()
         data = _valid_post_data()
         data["name"] = ""
