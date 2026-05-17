@@ -182,6 +182,18 @@ The context is then available in your template:
 </ul>
 ```
 
+`get_template_context()` is a _pull_ — the framework calls it at render time, so the data has to be reachable from `self`. When a view writes its own handlers (a `.get()` and `.post()` that render the same template), `render(**context)` is the _push_ alternative: the handler passes context straight in, and gets the `Response` back.
+
+```python
+class ProductView(TemplateView):
+    template_name = "product.html"
+
+    def get(self):
+        return self.render(product=Product.query.get(id=self.url_kwargs["id"]))
+```
+
+`render(**context)` layers `context` over `get_template_context()`, so the base context (`request`, `DEBUG`, `template_names`) and anything the view's `get_template_context()` adds are still present.
+
 ## Built-in globals
 
 Plain provides several [global functions](./jinja/globals.py) available in all templates:

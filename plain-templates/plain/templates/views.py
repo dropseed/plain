@@ -67,11 +67,20 @@ class TemplateView(View):
 
         raise TemplateFileMissing(template_names)
 
-    def render_template(self) -> str:
-        return self.get_template().render(self.get_template_context())
+    def render(self, **context: Any) -> Response:
+        """Render the template to a `Response`, layering `context` over `get_template_context()`.
+
+        A handler passes what the template needs straight in —
+        `self.render(form=form)` — rather than stashing it on `self` for
+        `get_template_context()` to read back. Called with no arguments it
+        renders `get_template_context()` as-is, which is what `get()` does.
+        """
+        return Response(
+            self.get_template().render({**self.get_template_context(), **context})
+        )
 
     def get(self) -> Response:
-        return Response(self.render_template())
+        return self.render()
 
     def handle_exception(self, exc: Exception) -> Response:
         """Render `{status}.html` for the exception, falling through on missing template."""
@@ -152,11 +161,7 @@ class FormView[F: "BaseForm"](TemplateView):
 
     def form_invalid(self, form: F) -> Response:
         """If the form is invalid, render the invalid form."""
-        context = {
-            **self.get_template_context(),
-            "form": form,
-        }
-        return Response(self.get_template().render(context))
+        return self.render(form=form)
 
     def get_template_context(self) -> dict[str, Any]:
         """Insert the form into the context dict."""

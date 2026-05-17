@@ -22,22 +22,22 @@ class HTMXView(TemplateView):
     e.g. a redirect, a 204, or a custom payload.
     """
 
-    def render_template(self) -> str:
-        template = self.get_template()
-        context = self.get_template_context()
-
-        if self.is_htmx_request() and self.get_htmx_fragment_name():
-            return render_template_fragment(
-                template=template._jinja_template,
-                fragment_name=self.get_htmx_fragment_name(),
-                context=context,
+    def render(self, **context: Any) -> Response:
+        """Render the active fragment on a fragment request, the full template otherwise."""
+        if self.is_htmx_request() and (fragment_name := self.get_htmx_fragment_name()):
+            return Response(
+                render_template_fragment(
+                    template=self.get_template()._jinja_template,
+                    fragment_name=fragment_name,
+                    context={**self.get_template_context(), **context},
+                )
             )
 
-        return template.render(context)
+        return super().render(**context)
 
     def convert_result_to_response(self, result: Response | None) -> Response:
         if result is None:
-            return Response(self.render_template())
+            return self.render()
         if isinstance(result, Response):
             return result
         raise TypeError(
