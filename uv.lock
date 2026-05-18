@@ -1130,11 +1130,23 @@ dependencies = [
     { name = "plain-templates" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "plain-auth" },
+    { name = "plain-pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-email", editable = "plain-email" },
     { name = "plain-templates", editable = "plain-templates" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "plain-auth", editable = "plain-auth" },
+    { name = "plain-pytest", editable = "plain-pytest" },
 ]
 
 [[package]]
@@ -1271,10 +1283,24 @@ dependencies = [
     { name = "plain-templates" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "plain-auth" },
+    { name = "plain-email" },
+    { name = "plain-pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-templates", editable = "plain-templates" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "plain-auth", editable = "plain-auth" },
+    { name = "plain-email", editable = "plain-email" },
+    { name = "plain-pytest", editable = "plain-pytest" },
 ]
 
 [[package]]
@@ -1436,6 +1462,12 @@ dependencies = [
     { name = "plain-templates" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "plain-email" },
+    { name = "plain-pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
@@ -1443,6 +1475,12 @@ requires-dist = [
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-templates", editable = "plain-templates" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "plain-email", editable = "plain-email" },
+    { name = "plain-pytest", editable = "plain-pytest" },
 ]
 
 [[package]]

@@ -14,6 +14,10 @@ dependencies = [
   "plain.templates>=0.1.0,<1.0.0",
 ]
 
+[dependency-groups]
+# Test-only: the form sends notification email via plain.email.
+dev = ["plain.pytest<1.0.0", "plain.email<1.0.0"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]
 

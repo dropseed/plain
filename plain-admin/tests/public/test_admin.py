@@ -20,10 +20,10 @@ def test_admin_login_required(db):
     user.is_admin = True
     user.save()
 
-    # Now admin (currently redirects to the first view)
+    # Now admin — redirected into the admin (to the first registered list view)
     resp = client.get("/admin")
     assert resp.status_code == 302
-    assert resp.url == "/admin/p/session"
+    assert resp.url.startswith("/admin/p/")
 
 
 def test_has_permission_on_view(db):

@@ -29,6 +29,9 @@ plain-flags
 plain-admin
 plain-oauth
 plain-auth
+plain-passwords
+plain-loginlink
+plain-support
 plain-api
 plain-elements
 plain-htmx

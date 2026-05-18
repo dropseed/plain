@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<form method="post">
+  {% for field in form %}
+  <p>
+    <label for="{{ field.html_id }}">{{ field.html_name }}</label>
+    <input
+      type="text"
+      name="{{ field.html_name }}"
+      id="{{ field.html_id }}"
+      value="{{ field.value() or '' }}"
+      >
+    {% for error in field.errors %}
+    <span class="form-error" data-field-error="{{ field.html_name }}">{{ error }}</span>
+    {% endfor %}
+  </p>
+  {% endfor %}
+  {% for error in form.non_field_errors %}
+  <span class="form-error" data-form-error="1">{{ error }}</span>
+  {% endfor %}
+  <button type="submit">Submit</button>
+</form>
+{% endblock %}

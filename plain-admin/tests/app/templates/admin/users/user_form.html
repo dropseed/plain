@@ -1,0 +1,12 @@
+{% extends "admin/base.html" %}
+
+{% use_elements %}
+
+{% block content %}
+<form method="post" class="space-y-4">
+    <admin.InputField label="Username" field={form.username} />
+    <admin.CheckboxField label="Is admin" field={form.is_admin} />
+
+    <admin.Submit>Save</admin.Submit>
+</form>
+{% endblock %}
