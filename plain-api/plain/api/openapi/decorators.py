@@ -2,8 +2,7 @@ from collections.abc import Callable
 from http import HTTPStatus
 from typing import Any, TypeVar
 
-from plain.forms import fields
-from plain.forms.forms import BaseForm
+from plain.forms import Form, fields
 
 from .helpers import json_content
 from .utils import merge_data, schema_from_type
@@ -69,7 +68,7 @@ def response_typed_dict(
     return decorator
 
 
-def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
+def request_form(form_class: type[Form]) -> Callable[[F], F]:
     """
     Create OpenAPI parameters from a form class.
     """
@@ -123,10 +122,6 @@ def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
             fields.TextField: {
                 "type": "string",
             },
-            fields.EmailField: {
-                "type": "string",
-                "format": "email",
-            },
         }
         json_schema: dict[str, Any] = {
             "type": "object",
@@ -142,7 +137,7 @@ def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
 
         required_fields = []
 
-        for field_name, field in form_class.base_fields.items():
+        for field_name, field in form_class.fields().items():
             field_schema = field_mappings[field.__class__].copy()
             json_schema["properties"][field_name] = field_schema
 

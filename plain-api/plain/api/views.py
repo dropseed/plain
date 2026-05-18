@@ -4,7 +4,6 @@ from http.client import responses as http_status_phrases
 from typing import Any, cast
 
 from plain.exceptions import ValidationError
-from plain.forms.exceptions import FormFieldMissingError
 from plain.http import (
     HTTPException,
     JsonResponse,
@@ -216,12 +215,6 @@ class APIView(View[APIResult]):
                 message=message,
                 status_code=400,
                 errors=errors,
-            )
-        if isinstance(exc, FormFieldMissingError):
-            return _error_response(
-                error_id="missing_field",
-                message=f"Missing field: {exc.field_name}",
-                status_code=400,
             )
         if isinstance(exc, HTTPException):
             error_id = _STATUS_ERROR_IDS.get(exc.status_code, "http_error")

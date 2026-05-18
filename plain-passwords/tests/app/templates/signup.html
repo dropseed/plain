@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% for error in errors if error.field is none %}
+<p class="form-error">{{ error.message }}</p>
+{% endfor %}
+<form method="post">
+  <p>
+    <input
+      type="email"
+      name="email"
+      placeholder="Email"
+      value="{{ values.get('email', '') }}"
+      >
+    {% for error in errors if error.field == "email" %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <p>
+    <input
+      type="password"
+      name="password"
+      placeholder="Password"
+      >
+    {% for error in errors if error.field == "password" %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <p>
+    <input
+      type="password"
+      name="confirm_password"
+      placeholder="Confirm password"
+      >
+    {% for error in errors if error.field == "confirm_password" %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <button type="submit">Sign up</button>
+</form>
+{% endblock %}

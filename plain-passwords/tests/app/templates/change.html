@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% for error in errors if error.field is none %}
+<p class="form-error">{{ error.message }}</p>
+{% endfor %}
+<form method="post">
+  <p>
+    <input
+      type="password"
+      name="current_password"
+      placeholder="Current password"
+      >
+    {% for error in errors if error.field == "current_password" %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <p>
+    <input
+      type="password"
+      name="new_password1"
+      placeholder="New password"
+      >
+    {% for error in errors if error.field == "new_password1" %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <p>
+    <input
+      type="password"
+      name="new_password2"
+      placeholder="Confirm new password"
+      >
+    {% for error in errors if error.field == "new_password2" %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <button type="submit">Change password</button>
+</form>
+{% endblock %}

@@ -1,330 +1,286 @@
-"""
-Form classes
-"""
-
 from __future__ import annotations
 
-import copy
-from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import Any, ClassVar, Literal, Self
 
-from plain.exceptions import NON_FIELD_ERRORS
-from plain.utils.datastructures import MultiValueDict
+from plain.exceptions import NON_FIELD_ERRORS, ValidationError
+from plain.utils.hashable import make_hashable
 
-from .exceptions import ValidationError
 from .fields import Field, FileField
+from .result import Error, Invalid
 
-if TYPE_CHECKING:
-    from plain.http import Request
+__all__ = ("Form",)
 
-    from .boundfield import BoundField
-
-__all__ = ("BaseForm", "Form")
-
-
-class DeclarativeFieldsMetaclass(type):
-    """Collect Fields declared on the base classes."""
-
-    def __new__(
-        mcs: type[DeclarativeFieldsMetaclass],
-        name: str,
-        bases: tuple[type, ...],
-        attrs: dict[str, Any],
-    ) -> type:
-        # Collect fields from current class and remove them from attrs.
-        attrs["declared_fields"] = {
-            key: attrs.pop(key)
-            for key, value in list(attrs.items())
-            if isinstance(value, Field)
-        }
-
-        new_class = super().__new__(mcs, name, bases, attrs)
-
-        # Walk through the MRO.
-        declared_fields: dict[str, Field] = {}
-        for base in reversed(new_class.__mro__):
-            # Collect fields from base class.
-            if hasattr(base, "declared_fields"):
-                declared_fields.update(getattr(base, "declared_fields"))
-
-            # Field shadowing.
-            for attr, value in base.__dict__.items():
-                if value is None and attr in declared_fields:
-                    declared_fields.pop(attr)
-
-        setattr(new_class, "base_fields", declared_fields)
-        setattr(new_class, "declared_fields", declared_fields)
-
-        return new_class
+# Marks a field with no value on an instance — distinct from a field that
+# legitimately cleaned to None. A `validate()` instance always has every
+# field set, but one built directly (`Form(**partial_data)`) can leave
+# fields unset. __repr__/__eq__/__hash__ use this so an unset field never
+# compares or hashes equal to a real None.
+_UNSET = object()
 
 
-class BaseForm:
+def _leaf_to_error(leaf: ValidationError, field: str | None) -> Error:
+    """Build an `Error` from a single (leaf) `ValidationError`."""
+    message = leaf.message
+    if leaf.params:
+        message %= leaf.params
+    return Error(message=str(message), code=leaf.code or "invalid", field=field)
+
+
+def _errors_from_exception(
+    exc: ValidationError, *, field: str | None = None
+) -> list[Error]:
+    """Flatten a raised `ValidationError` into a flat list of `Error`s.
+
+    A field's `clean()` raises errors that all belong to one field, named
+    by `field`. A `check()` override may instead raise a dict-shaped
+    `ValidationError` keyed by field name — there each key supplies the
+    field, and the `"__all__"` key maps to a form-level error (`field=None`).
     """
-    The main implementation of all the Form logic. Note that this class is
-    different than Form. See the comments by the Form class for more info. Any
-    improvements to the form API should be made to this class, not to the Form
-    class.
+    if hasattr(exc, "error_dict"):
+        errors: list[Error] = []
+        for key, leaves in exc.error_dict.items():
+            key_field = None if key == NON_FIELD_ERRORS else key
+            errors.extend(_leaf_to_error(leaf, key_field) for leaf in leaves)
+        return errors
+    return [_leaf_to_error(leaf, field) for leaf in exc.error_list]
+
+
+class Form:
+    """Pure validating parser.
+
+    Subclass and declare each field as `name = types.*(...)`:
+
+        from plain.forms import Form, types
+
+        class ContactForm(Form):
+            email = types.EmailField()
+            message = types.TextField(max_length=2000)
+
+    Each field is a descriptor: `ContactForm.email` is the typed
+    `Field[str]` reference, `result.email` the cleaned `str` value. The
+    `types.*` constructors are typed, so both faces are statically
+    checked with no annotation to write.
+
+    Validate a dict and branch on the result. `Form.validate()` returns
+    either an instance of the form (success — truthy) or `Invalid`
+    (failure — falsy):
+
+        result = ContactForm.validate(data)
+        if not result:
+            return ...                # handle errors — result is Invalid
+        # result is the typed form instance — no `.data` indirection
+        result.email                  # str
+
+    Override `check()` (instance method) for cross-field validation that
+    runs after fields have cleaned successfully.
     """
 
-    # Set by DeclarativeFieldsMetaclass
-    base_fields: dict[str, Field]
+    # Populated by __init_subclass__; the empty default is for type-checker
+    # visibility and covers `Form` itself, which declares no fields.
+    _form_fields: ClassVar[dict[str, Field[Any]]] = {}
 
-    prefix: str | None = None
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Collect the `Field` instances declared on the class into `_form_fields`.
 
-    def __init__(
-        self,
-        *,
-        request: Request,
-        auto_id: str | bool = "id_%s",
-        prefix: str | None = None,
-        initial: dict[str, Any] | None = None,
-    ):
-        # Forms can handle both JSON and form data
-        self.is_json_request = request.headers.get("Content-Type", "").startswith(
-            "application/json"
-        )
-        if self.is_json_request:
-            self.data = request.json_data
-            self.files = MultiValueDict()
-        else:
-            self.data = request.form_data
-            self.files = request.files
+        Field declarations look like `email = EmailField()`. Each field
+        is a descriptor that stays on the class — `Form.email` is the
+        typed reference, `instance.email` the cleaned value — so this just
+        gathers them into one ordered map for validation to walk, merging in
+        any fields inherited from base classes.
+        """
+        super().__init_subclass__(**kwargs)
+        fields: dict[str, Field[Any]] = {}
+        for base in cls.__bases__:
+            base_fields = getattr(base, "_form_fields", None)
+            if base_fields:
+                fields.update(base_fields)
+        for key, value in vars(cls).items():
+            if isinstance(value, Field):
+                fields[key] = value
+        cls._form_fields = fields
 
-        self.is_bound = request.method in ("POST", "PUT", "PATCH")
+    @classmethod
+    def fields(cls) -> dict[str, Field[Any]]:
+        """The declared fields as an ordered ``name -> Field`` map.
 
-        self._auto_id = auto_id
-        if prefix is not None:
-            self.prefix = prefix
-        self.initial = initial or {}
-        self._errors: dict[str, list[str]] | None = (
-            None  # Stores the errors after clean() has been called.
-        )
+        The public introspection surface — walk this to render a form,
+        document it, or drive tooling, without needing a validated
+        instance. Returns a copy; the live mapping is internal.
+        """
+        return dict(cls._form_fields)
 
-        # The base_fields class attribute is the *class-wide* definition of
-        # fields. Because a particular *instance* of the class might want to
-        # alter self.fields, we create self.fields here by copying base_fields.
-        # Instances should always modify self.fields; they should not modify
-        # self.base_fields.
-        self.fields: dict[str, Field] = copy.deepcopy(self.base_fields)
-        self._bound_fields_cache: dict[str, BoundField] = {}
+    def __init__(self, **data: Any) -> None:
+        for name in self._form_fields:
+            if name in data:
+                object.__setattr__(self, name, data[name])
+        object.__setattr__(self, "_frozen", True)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        # Forms are frozen after construction. Mutating a validated
+        # instance defeats the contract — `result.email` is supposed to
+        # carry the cleaned value, not whatever someone assigned later.
+        if getattr(self, "_frozen", False):
+            raise AttributeError(
+                f"{type(self).__name__} is frozen — form instances are "
+                f"immutable after validation; cannot set {name!r}."
+            )
+        object.__setattr__(self, name, value)
+
+    def __delattr__(self, name: str) -> None:
+        if getattr(self, "_frozen", False):
+            raise AttributeError(
+                f"{type(self).__name__} is frozen — cannot delete {name!r}."
+            )
+        object.__delattr__(self, name)
 
     def __repr__(self) -> str:
-        if self._errors is None:
-            is_valid = "Unknown"
-        else:
-            is_valid = self.is_bound and not self._errors
-        return "<{cls} bound={bound}, valid={valid}, fields=({fields})>".format(
-            cls=self.__class__.__name__,
-            bound=self.is_bound,
-            valid=is_valid,
-            fields=";".join(self.fields),
+        parts = []
+        for k in self._form_fields:
+            value = getattr(self, k, _UNSET)
+            parts.append(f"{k}=<unset>" if value is _UNSET else f"{k}={value!r}")
+        return f"{type(self).__name__}({', '.join(parts)})"
+
+    def __eq__(self, other: object) -> bool:
+        if type(self) is not type(other):
+            return NotImplemented
+        return all(
+            getattr(self, k, _UNSET) == getattr(other, k, _UNSET)
+            for k in self._form_fields
         )
 
-    def _bound_items(self) -> Any:
-        """Yield (name, bf) pairs, where bf is a BoundField object."""
-        for name in self.fields:
-            yield name, self[name]
+    def __hash__(self) -> int:
+        # make_hashable converts list-valued fields (e.g. MultipleChoiceField)
+        # into tuples so form instances stay hashable. _UNSET marks a field
+        # with no value — it hashes distinctly from a real None.
+        values = tuple(getattr(self, k, _UNSET) for k in self._form_fields)
+        return hash(make_hashable(values))
 
-    def __iter__(self) -> Any:
-        """Yield the form's fields as BoundField objects."""
-        for name in self.fields:
-            yield self[name]
+    def __bool__(self) -> Literal[True]:
+        """Always truthy — a `Form` instance is the success result.
+        `Invalid` is the falsy counterpart, so a view branches with
+        `if not result:` rather than an `isinstance` check."""
+        return True
 
-    def __getitem__(self, name: str) -> BoundField:
-        """Return a BoundField with the given name."""
-        try:
-            field = self.fields[name]
-        except KeyError:
-            raise KeyError(
-                "Key '{}' not found in '{}'. Choices are: {}.".format(
-                    name,
-                    self.__class__.__name__,
-                    ", ".join(sorted(self.fields)),
-                )
-            )
-        if name not in self._bound_fields_cache:
-            self._bound_fields_cache[name] = field.get_bound_field(self, name)
-        return self._bound_fields_cache[name]
+    def apply_to[Instance](self, instance: Instance) -> Instance:
+        """Copy validated field values onto an existing object, returning it.
 
-    @property
-    def errors(self) -> dict[str, list[str]]:
-        """Return an error dict for the data provided for the form."""
-        if self._errors is None:
-            self.full_clean()
-        assert self._errors is not None, "full_clean should initialize _errors"
-        return self._errors
+        Walks `_form_fields`, calling `setattr(instance, name, value)` for
+        each field that's set on the form. A `validate()` result always
+        has every field set; a form built directly from incomplete data
+        may not — any unset field is skipped, leaving the target's existing
+        value intact.
 
-    def is_valid(self) -> bool:
-        """Return True if the form has no errors, or False otherwise."""
-        return self.is_bound and not self.errors
+        This is a pure data move — it never persists. A form hands its
+        cleaned values to a target; whether and how that target is saved is
+        the caller's decision:
 
-    def add_prefix(self, field_name: str) -> str:
+            result = ContactForm.validate(self.request.form_data)
+            if not result:
+                return self.render(form=result)  # re-render with errors
+            result.apply_to(ContactSubmission()).save()
+
+        Field-name mismatches (form field doesn't exist on the target)
+        raise `AttributeError` only if the target uses ``__slots__`` —
+        regular Python objects accept arbitrary attribute assignment, so
+        the caller is responsible for keeping form and target field
+        names aligned.
         """
-        Return the field name with a prefix appended, if this Form has a
-        prefix set.
+        for name in self._form_fields:
+            if hasattr(self, name):
+                setattr(instance, name, getattr(self, name))
+        return instance
 
-        Subclasses may wish to override.
+    def check(self) -> list[Error] | None:
+        """Cross-field validation hook. Override in subclasses.
+
+        Runs after every field has cleaned successfully; `self` is the
+        typed instance with all cleaned values set, so an override gets
+        full type-checker support without a Liskov violation.
+
+        Sees only the form's own fields. Validation that needs request or
+        database state — the current user, a uniqueness check — is the
+        caller's job, kept out of the form so it stays a pure parser.
+
+        The contract is return-based, matching `validate()`: return a list
+        of `Error`s — set each one's `field` to the field it concerns, or
+        leave it `None` for a form-level error — or `None` when nothing is
+        wrong. Don't raise — a form is a non-raising parser, and its
+        cross-field hook follows suit.
+
+        (A `ValidationError` raised here is still caught and folded into the
+        result rather than escaping, but returning is the documented way.)
         """
-        return f"{self.prefix}-{field_name}" if self.prefix else field_name
+        return None
 
-    @property
-    def non_field_errors(self) -> list[str]:
+    @classmethod
+    def _clean_fields(
+        cls,
+        raw: Any,
+        files_map: dict[str, Any],
+    ) -> tuple[dict[str, Any], list[Error]]:
+        """Run each declared field's `clean` against `raw`/`files_map`.
+
+        Returns `(cleaned, errors)`. A field absent from the input is
+        cleaned with `None`, surfacing its required-error.
         """
-        Return a list of errors that aren't associated with a particular
-        field -- i.e., from Form.clean(). Return an empty list if there
-        are none.
-        """
-        return self.errors.get(
-            NON_FIELD_ERRORS,
-            [],
-        )
+        cleaned: dict[str, Any] = {}
+        errors: list[Error] = []
+        # MultiValueDict carries multi-valued keys; plain dicts don't. For
+        # multi-select fields we need to pull all values, not just the last.
+        is_multi_value_dict = hasattr(raw, "getlist")
 
-    def add_error(self, field: str | None, error: ValidationError) -> None:
-        """
-        Update the content of `self._errors`.
-
-        The `field` argument is the name of the field to which the errors
-        should be added. If it's None, treat the errors as NON_FIELD_ERRORS.
-
-        The `error` argument can be a single error, a list of errors, or a
-        dictionary that maps field names to lists of errors. An "error" can be
-        either a simple string or an instance of ValidationError with its
-        message attribute set and a "list or dictionary" can be an actual
-        `list` or `dict` or an instance of ValidationError with its
-        `error_list` or `error_dict` attribute set.
-
-        If `error` is a dictionary, the `field` argument *must* be None and
-        errors will be added to the fields that correspond to the keys of the
-        dictionary.
-        """
-        if not isinstance(error, ValidationError):
-            raise TypeError(
-                "The argument `error` must be an instance of "
-                f"`ValidationError`, not `{type(error).__name__}`."
-            )
-
-        error_dict: dict[str, Any]
-        if hasattr(error, "error_dict"):
-            if field is not None:
-                raise TypeError(
-                    "The argument `field` must be `None` when the `error` "
-                    "argument contains errors for multiple fields."
-                )
-            else:
-                error_dict = error.error_dict
-        else:
-            error_dict = {field or NON_FIELD_ERRORS: error.error_list}
-
-        class ValidationErrors(list):
-            def __iter__(self) -> Any:
-                for err in super().__iter__():
-                    # TODO make sure this works...
-                    yield next(iter(err))
-
-        for field_key, error_list in error_dict.items():
-            # Accessing self.errors ensures _errors is initialized
-            if field_key not in self.errors:
-                if field_key != NON_FIELD_ERRORS and field_key not in self.fields:
-                    raise ValueError(
-                        f"'{self.__class__.__name__}' has no field named '{field_key}'."
-                    )
-                assert self._errors is not None, "errors property initializes _errors"
-                self._errors[field_key] = ValidationErrors()
-
-            assert self._errors is not None, "errors property initializes _errors"
-            self._errors[field_key].extend(error_list)
-
-            # The field had an error, so removed it from the final data
-            # (we use getattr here so errors can be added to uncleaned forms)
-            if field_key in getattr(self, "cleaned_data", {}):
-                del self.cleaned_data[field_key]
-
-    def full_clean(self) -> None:
-        """
-        Clean all of self.data and populate self._errors and self.cleaned_data.
-        """
-        self._errors = {}
-        if not self.is_bound:  # Stop further processing.
-            return None
-        self.cleaned_data = {}
-
-        self._clean_fields()
-        self._clean_form()
-        self._post_clean()
-
-    def _field_data_value(self, field: Field, html_name: str) -> Any:
-        if hasattr(self, f"parse_{html_name}"):
-            # Allow custom parsing from form data/files at the form level
-            return getattr(self, f"parse_{html_name}")()
-
-        if self.is_json_request:
-            return field.value_from_json_data(self.data, self.files, html_name)
-        else:
-            return field.value_from_form_data(self.data, self.files, html_name)
-
-    def _clean_fields(self) -> None:
-        for name, bf in self._bound_items():
-            field = bf.field
-
-            value = self._field_data_value(bf.field, bf.html_name)
-
+        for name, field in cls._form_fields.items():
             try:
                 if isinstance(field, FileField):
-                    value = field.clean(value, bf.initial)
+                    # FileField.clean takes (data, initial).
+                    cleaned[name] = field.clean(files_map.get(name), None)
+                elif is_multi_value_dict and field.multi_value:
+                    # `raw` has .getlist (verified by the is_multi_value_dict guard).
+                    cleaned[name] = field.clean(raw.getlist(name))
                 else:
-                    value = field.clean(value)
-                self.cleaned_data[name] = value
-                if hasattr(self, f"clean_{name}"):
-                    value = getattr(self, f"clean_{name}")()
-                    self.cleaned_data[name] = value
+                    cleaned[name] = field.clean(raw.get(name))
             except ValidationError as e:
-                self.add_error(name, e)
+                errors.extend(_errors_from_exception(e, field=name))
 
-    def _clean_form(self) -> None:
+        return cleaned, errors
+
+    @classmethod
+    def validate(
+        cls,
+        data: dict[str, Any] | None,
+        *,
+        files: Any = None,
+    ) -> Self | Invalid:
+        """Validate `data` against this form.
+
+        Returns either an instance of `cls` (cleaned, typed values set as
+        attributes) or `Invalid` (a list of `Error`s). Never raises on
+        validation failure. A returned instance means *every* declared
+        field validated and `check()` passed — `result.<field>` is always
+        safe, there is no half-populated instance.
+
+        For file uploads, pass `request.files` (a `MultiValueDict[str,
+        UploadedFile]`) as `files=`. `FileField`/`ImageField` declarations
+        are populated from `files` instead of `data`; everything else
+        reads from `data` as usual.
+        """
+        raw = data or {}
+        files_map: dict[str, Any] = files if files is not None else {}
+        cleaned, errors = cls._clean_fields(raw, files_map)
+
+        if errors:
+            return Invalid(errors=errors, raw=raw)
+
+        instance = cls(**cleaned)
+
+        # Cross-field hook.
+        extra_errors: list[Error] | None
         try:
-            cleaned_data = self.clean()
+            extra_errors = instance.check()
         except ValidationError as e:
-            self.add_error(None, e)
-        else:
-            if cleaned_data is not None:
-                self.cleaned_data = cleaned_data
+            extra_errors = _errors_from_exception(e)
 
-    def _post_clean(self) -> None:
-        """
-        An internal hook for performing additional cleaning after form cleaning
-        is complete. Used for model validation in model forms.
-        """
-        pass
+        if extra_errors:
+            return Invalid(errors=extra_errors, raw=raw)
 
-    def clean(self) -> dict[str, Any]:
-        """
-        Hook for doing any extra form-wide cleaning after Field.clean() has been
-        called on every field. Any ValidationError raised by this method will
-        not be associated with a particular field; it will have a special-case
-        association with the field named '__all__'.
-        """
-        return self.cleaned_data
-
-    @cached_property
-    def changed_data(self) -> list[str]:
-        return [name for name, bf in self._bound_items() if bf._has_changed()]
-
-    def get_initial_for_field(self, field: Field, field_name: str) -> Any:
-        """
-        Return initial data for field on form. Use initial data from the form
-        or the field, in that order. Evaluate callable values.
-        """
-        value = self.initial.get(field_name, field.initial)
-        if callable(value):
-            value = value()
-        return value
-
-
-class Form(BaseForm, metaclass=DeclarativeFieldsMetaclass):
-    "A collection of Fields, plus their associated data."
-
-    # This is a separate class from BaseForm in order to abstract the way
-    # self.fields is specified. This class (Form) is the one that does the
-    # fancy metaclass stuff purely for the semantic sugar -- it allows one
-    # to define a form using declarative syntax.
-    # BaseForm itself has no way of designating self.fields.
+        return instance

@@ -4,21 +4,23 @@ from typing import Any
 
 from plain.assets.urls import get_asset_url
 from plain.auth.views import AuthView
-from plain.forms import Form
 from plain.http import RedirectResponse, Response
 from plain.runtime import settings
-from plain.templates.views import FormView
+from plain.templates.views import TemplateView
 from plain.utils.module_loading import import_string
 from plain.views import View
 
+from .core import find_user, notify_support
+from .forms import SupportForm
+from .models import SupportFormEntry
 
-class SupportFormView(AuthView, FormView):
+
+class SupportFormView(AuthView, TemplateView):
     template_name = "support/page.html"
 
-    def get_form(self) -> Form:
+    def get_form_class(self) -> type[SupportForm]:
         form_slug = self.url_kwargs["form_slug"]
-        form_class = import_string(settings.SUPPORT_FORMS[form_slug])
-        return form_class(**self.get_form_kwargs())
+        return import_string(settings.SUPPORT_FORMS[form_slug])
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
@@ -29,21 +31,26 @@ class SupportFormView(AuthView, FormView):
         context["success"] = self.request.query_params.get("success") == "true"
         return context
 
-    def get_form_kwargs(self) -> dict[str, Any]:
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.user
-        kwargs["form_slug"] = self.url_kwargs["form_slug"]
-        return kwargs
+    def get(self) -> Response:
+        # Pre-fill the email for an authed user; otherwise start blank.
+        values: dict[str, str] = {"email": self.user.email} if self.user else {}
+        return self.render(errors=[], values=values)
 
-    def form_valid(self, form: Any) -> Response:
-        entry = form.save()
-        form.notify(entry)
-        return super().form_valid(form)
-
-    def get_success_url(self, form: Any) -> str:
-        # Redirect to the same view and template so we
-        # don't have to create two additional views for iframe and non-iframe.
-        return "?success=true"
+    def post(self) -> Response:
+        result = self.get_form_class().validate(
+            self.request.form_data, files=self.request.files
+        )
+        if not result:
+            return self.render(errors=result.errors, values=result.raw)
+        entry = SupportFormEntry(
+            user=self.user or find_user(result.email),
+            form_slug=self.url_kwargs["form_slug"],
+        )
+        result.save(entry)
+        notify_support(entry)
+        # Redirect to the same view and template so we don't need separate
+        # iframe and non-iframe success views.
+        return RedirectResponse("?success=true")
 
 
 class SupportIFrameView(SupportFormView):
