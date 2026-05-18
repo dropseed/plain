@@ -67,4 +67,9 @@ if [ -z "$DATABASE_URL" ]; then
       exit 1
     fi
   fi
+
+  # Ensure the target database exists. Only a fresh Docker container creates
+  # it via POSTGRES_DB; an already-running server, a reused container, or a
+  # local cluster do not. createdb is a no-op if the database already exists.
+  PGPASSWORD=postgres createdb -h localhost -U postgres "$DB_NAME" 2>/dev/null || true
 fi
