@@ -94,6 +94,51 @@ def test_whoami_after_login(runner, mock_api):
     assert "acme" in result.output
 
 
+def test_whoami_requests_me_without_trailing_slash(runner, mock_api):
+    """The API route is /me — a trailing slash hits a non-API path that
+    returns an empty 200, which used to crash whoami."""
+    save(Credentials(api_url="https://example.com", token="tok"))
+    captured: list[httpx.Request] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        captured.append(req)
+        return httpx.Response(200, json={"email": "user@example.com"})
+
+    mock_api(handler)
+
+    result = runner.invoke(cli, ["whoami"])
+
+    assert result.exit_code == 0, result.output
+    assert captured[0].url.path == "/api/me"
+
+
+def test_whoami_handles_empty_response_body(runner, mock_api):
+    """An empty 200 body must produce a clear error, not an AttributeError."""
+    save(Credentials(api_url="https://example.com", token="tok"))
+    mock_api(lambda req: httpx.Response(200))
+
+    result = runner.invoke(cli, ["whoami"])
+
+    assert result.exit_code == 1
+    assert "Unexpected response" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_login_handles_empty_response_body(runner, mock_api, fake_keyring):
+    """A non-dict /me response means the token is unverified — don't save it."""
+    save_target = "https://example.com"
+    mock_api(lambda req: httpx.Response(200))
+
+    result = runner.invoke(
+        cli,
+        ["login", "--api-url", save_target, "--token", "some-token"],
+    )
+
+    assert result.exit_code == 1
+    assert "Unexpected response" in result.output
+    assert fake_keyring.get_password(SERVICE, save_target) is None
+
+
 def test_apps_list_empty(runner, mock_api):
     save(Credentials(api_url="https://example.com", token="tok"))
     mock_api(lambda req: httpx.Response(200, json={"apps": []}))
@@ -313,6 +358,24 @@ def test_api_field_at_file_reads_string_from_disk(runner, mock_api, tmp_path):
     assert result.exit_code == 0, result.output
     body = json.loads(captured[0].content)
     assert body == {"note": "hello from disk"}
+
+
+def test_api_follows_redirects(runner, mock_api):
+    """A 308 (e.g. the API's trailing-slash redirect) must resolve to the
+    real response, not surface as an empty 3xx body that parses to None."""
+    save(Credentials(api_url="https://example.com", token="tok"))
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/api/me/":
+            return httpx.Response(308, headers={"Location": "/api/me"})
+        return httpx.Response(200, json={"email": "user@example.com"})
+
+    mock_api(handler)
+
+    result = runner.invoke(cli, ["api", "/me/"])
+
+    assert result.exit_code == 0, result.output
+    assert "user@example.com" in result.output
 
 
 def test_api_non_2xx_exits_1(runner, mock_api):

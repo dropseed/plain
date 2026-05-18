@@ -41,6 +41,10 @@ class Client:
                 "Accept": "application/json",
             },
             timeout=httpx.Timeout(30.0),
+            # Follow redirects so a trailing-slash mismatch (the API serves
+            # /me, not /me/) or a server-side route move resolves to the real
+            # response instead of an empty 3xx body that parses to None.
+            follow_redirects=True,
             transport=transport,
         )
 
