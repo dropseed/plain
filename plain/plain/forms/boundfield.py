@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from .fields import Field
     from .forms import BaseForm
 
-__all__ = ("BoundField",)
+__all__ = ["BoundField"]
 
 
 class BoundField:

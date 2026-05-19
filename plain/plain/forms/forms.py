@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from .boundfield import BoundField
 
-__all__ = ("BaseForm", "Form")
+__all__ = ["BaseForm", "Form"]
 
 
 class DeclarativeFieldsMetaclass(type):

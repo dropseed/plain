@@ -31,7 +31,7 @@ from .exceptions import FormFieldMissingError
 if TYPE_CHECKING:
     from .forms import BaseForm
 
-__all__ = (
+__all__ = [
     "Field",
     "TextField",
     "IntegerField",
@@ -53,7 +53,7 @@ __all__ = (
     "JSONField",
     "TypedChoiceField",
     "UUIDField",
-)
+]
 
 
 _FILE_INPUT_CONTRADICTION = object()

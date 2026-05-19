@@ -23,14 +23,14 @@ from plain.postgres.fields.base import ColumnField, DefaultableField
 if TYPE_CHECKING:
     from plain.postgres.fields import Field as ModelField
 
-__all__ = (
+__all__ = [
     "ModelForm",
     "BaseModelForm",
     "model_to_dict",
     "fields_for_model",
     "ModelChoiceField",
     "ModelMultipleChoiceField",
-)
+]
 
 
 def construct_instance(
