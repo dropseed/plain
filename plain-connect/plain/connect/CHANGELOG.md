@@ -1,5 +1,16 @@
 # plain-connect changelog
 
+## [0.5.0](https://github.com/dropseed/plain/releases/plain-connect@0.5.0) (2026-05-19)
+
+### What's changed
+
+- Pageview beacons now carry the matched URL route pattern (e.g. `/blog/<slug>/`) on the server-rendered initial load, mirroring the `http.route` span attribute. This lets pageviews aggregate by view instead of by raw URL. SPA navigations send a blank route. ([93f12bc8c6](https://github.com/dropseed/plain/commit/93f12bc8c6))
+- Docs now note that a strict `Content-Security-Policy` must allow the pageview ingest host in `connect-src` — beacons are sent with `navigator.sendBeacon`, and the browser blocks them otherwise. ([2cab277d3e](https://github.com/dropseed/plain/commit/2cab277d3e))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.4.0](https://github.com/dropseed/plain/releases/plain-connect@0.4.0) (2026-05-18)
 
 ### What's changed
