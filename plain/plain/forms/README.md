@@ -257,7 +257,33 @@ ContactForm.validate(payload)                            # a job argument, a tes
 ContactForm.validate(request.form_data, files=request.files)  # with file uploads
 ```
 
-On an `Invalid`, serialize `result.errors` straight into a JSON response — each `Error`'s `field`, `code`, and `message` are already structured.
+An `Invalid` is already structured for JSON — each `Error` carries a `field`, `code`, and `message`, so a JSON view doesn't need `FormDisplay` (that's the HTML render adapter). Serialize `result.errors` straight into the response:
+
+```python
+from dataclasses import asdict
+
+from plain.http import JsonResponse
+
+
+def post(self):
+    result = ContactForm.validate(self.request.json_data)
+    if not result:
+        return JsonResponse({"errors": [asdict(e) for e in result.errors]}, status_code=400)
+    send_contact_email(result.email, result.message)
+    return JsonResponse({"ok": True})
+```
+
+The response body then looks like:
+
+```json
+{
+    "errors": [
+        {"message": "Enter a valid email address.", "code": "invalid", "field": "email"}
+    ]
+}
+```
+
+The stable `code` is what a JSON client branches on — the `message` is for display, the `field` pairs the error with its input, and a form-level error has `"field": null`.
 
 ## Model-backed forms
 

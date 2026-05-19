@@ -14,6 +14,7 @@ from app.examples.models.forms import FormsExample
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 
 from plain.forms import fields as form_fields
+from plain.forms import types
 from plain.postgres.forms import (
     ModelChoiceField,
     ModelForm,
@@ -138,6 +139,27 @@ class TestScopingAndInitial:
         assert initial["name"] == "W"
         assert initial["tags"] == [red.id]
 
+    def test_with_querysets_can_be_re_scoped(self, db):
+        """A scoped form is itself a `ModelForm` subclass, so `with_querysets`
+        chains — the second scoping narrows the queryset further from the
+        first, not from the original."""
+        keep = Tag.query.create(name="keep")
+        also_keep = Tag.query.create(name="also-keep")
+        hide = Tag.query.create(name="hide")
+
+        first = WidgetForm.with_querysets(
+            tags=Tag.query.filter(id__in=[keep.id, also_keep.id])
+        )
+        second = first.with_querysets(tags=Tag.query.filter(id=keep.id))
+
+        assert second.validate({"name": "A", "size": "S", "tags": [keep.id]})
+        # `also_keep` was inside `first`'s scope but not `second`'s.
+        assert not second.validate({"name": "A", "size": "S", "tags": [also_keep.id]})
+        # `hide` was never in scope.
+        assert not second.validate({"name": "A", "size": "S", "tags": [hide.id]})
+        # The original `WidgetForm` is untouched — scoping does not mutate it.
+        assert WidgetForm.validate({"name": "A", "size": "S", "tags": [hide.id]})
+
 
 class TestDatabaseDefaults:
     """A column the database fills itself isn't user input — `model_field`
@@ -149,3 +171,20 @@ class TestDatabaseDefaults:
             model_field(DBDefaultsExample.db_uuid)  # UUIDField(generate=True)
         with pytest.raises(TypeError, match="declare the field explicitly"):
             model_field(DBDefaultsExample.created_at)  # DateTimeField(create_now=True)
+
+    def test_explicit_blank_does_not_clobber_db_default(self, db):
+        """If a user declares a DB-default column explicitly with `types.*`
+        and submits no value, `update_from` must leave the DATABASE_DEFAULT
+        sentinel intact so Postgres fills the column itself."""
+
+        class ExplicitForm(ModelForm):
+            name = model_field(DBDefaultsExample.name)
+            # Deliberately bypass `model_field`'s guard.
+            db_uuid = types.UUIDField(required=False)
+
+        result = ExplicitForm.validate({"name": "row"})  # db_uuid omitted
+        assert result
+        row = create_from(DBDefaultsExample, result)
+        # If the empty value had been written, db_uuid would be None and the
+        # row would have failed full_clean / a NOT NULL violation.
+        assert row.db_uuid is not None

@@ -61,7 +61,10 @@ class _ModelChoiceBase(Field[Any]):
     @property
     def choices(self) -> list[tuple[Any, str]]:
         """`(id, label)` pairs for rendering a `<select>`."""
-        return [(obj.id, str(obj)) for obj in self.queryset]
+        # `.all()` clones the queryset — iterating `self.queryset` would
+        # populate a shared `_result_cache` on the class-level field instance
+        # and return stale rows on every later render.
+        return [(obj.id, str(obj)) for obj in self.queryset.all()]
 
 
 class ModelChoiceField(_ModelChoiceBase):
@@ -317,8 +320,8 @@ def update_from[T: Model](instance: T, result: ModelForm) -> T:
     fields that aren't columns of the instance's model are ignored — a
     `ModelForm` may carry an extra non-model field (e.g. a confirm-password).
     """
-    column_names = {
-        f.name
+    columns = {
+        f.name: f
         for f in chain(
             instance._model_meta.concrete_fields,
             instance._model_meta.many_to_many,
@@ -327,13 +330,18 @@ def update_from[T: Model](instance: T, result: ModelForm) -> T:
 
     m2m: list[tuple[str, Any]] = []
     for fname, field in type(result).fields().items():
-        if fname not in column_names:
+        if fname not in columns:
             continue
         value = getattr(result, fname)
         if isinstance(field, ModelMultipleChoiceField):
             m2m.append((fname, value))
-        else:
-            setattr(instance, fname, value)
+            continue
+        # Skip empty submissions for DB-filled columns (generate/create_now)
+        # so the DATABASE_DEFAULT sentinel survives and Postgres produces it.
+        column = columns[fname]
+        if value in EMPTY_VALUES and (column.db_returning or column.auto_fills_on_save):
+            continue
+        setattr(instance, fname, value)
 
     instance.save()
 

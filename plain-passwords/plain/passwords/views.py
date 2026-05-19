@@ -151,14 +151,13 @@ class PasswordResetView(AuthView, TemplateView):
         )
         if not result:
             return self.render(form=FormDisplay(self.form_class, result))
-        if password_errors := get_password_errors(user, result.new_password2):
+        if password_errors := get_password_errors(
+            user, result.new_password2, field="new_password2"
+        ):
             return self.render(
                 form=FormDisplay(
                     self.form_class,
-                    errors=[
-                        Error(message, code="invalid", field="new_password2")
-                        for message in password_errors
-                    ],
+                    errors=password_errors,
                     values=self.request.form_data,
                 )
             )
@@ -202,14 +201,13 @@ class PasswordChangeView(AuthView, TemplateView):
                     values=self.request.form_data,
                 )
             )
-        if password_errors := get_password_errors(user, result.new_password2):
+        if password_errors := get_password_errors(
+            user, result.new_password2, field="new_password2"
+        ):
             return self.render(
                 form=FormDisplay(
                     self.form_class,
-                    errors=[
-                        Error(message, code="invalid", field="new_password2")
-                        for message in password_errors
-                    ],
+                    errors=password_errors,
                     values=self.request.form_data,
                 )
             )
