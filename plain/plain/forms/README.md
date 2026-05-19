@@ -1,8 +1,12 @@
 # Forms
 
-**HTML form handling, validation, and data parsing.**
+**Validating parsers that turn untrusted input into typed Python data.**
 
 - [Overview](#overview)
+- [Validation](#validation)
+    - [The result is a typed form or `Invalid`](#the-result-is-a-typed-form-or-invalid)
+    - [Cross-field validation with `check()`](#cross-field-validation-with-check)
+    - [Where validation lives](#where-validation-lives)
 - [Fields](#fields)
     - [Text fields](#text-fields)
     - [Numeric fields](#numeric-fields)
@@ -10,494 +14,365 @@
     - [Choice fields](#choice-fields)
     - [File fields](#file-fields)
     - [Other fields](#other-fields)
-- [Validation](#validation)
-    - [Field-level validation](#field-level-validation)
-    - [Form-level validation](#form-level-validation)
-    - [Custom error messages](#custom-error-messages)
 - [Rendering forms in templates](#rendering-forms-in-templates)
-- [JSON data](#json-data)
+- [JSON and other input](#json-and-other-input)
+- [Model-backed forms](#model-backed-forms)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
 ## Overview
 
-You can define a form by subclassing `Form` and declaring fields as class attributes. Each field handles parsing, validation, and type coercion for a specific input type.
+A form is a typed schema. You subclass `Form` and declare each field with a `types.*` constructor:
 
 ```python
-from plain import forms
-from plain.views import FormView
+from plain.forms import Form, types
 
 
-class ContactForm(forms.Form):
-    email = forms.EmailField()
-    message = forms.TextField()
-
-
-class ContactView(FormView):
-    form_class = ContactForm
-    template_name = "contact.html"
-
-    def form_valid(self, form):
-        # form.cleaned_data contains validated data
-        email = form.cleaned_data["email"]
-        message = form.cleaned_data["message"]
-        # Do something with the data...
-        return super().form_valid(form)
+class ContactForm(Form):
+    email = types.EmailField()
+    message = types.TextField(max_length=2000)
 ```
 
-When the form is submitted, you access validated data through `form.cleaned_data`. Each field converts the raw input to an appropriate Python type (strings, integers, dates, etc.).
+`ContactForm.validate(data)` turns a dict of untrusted input into either a typed `ContactForm` instance or an `Invalid`:
+
+```python
+result = ContactForm.validate(request.form_data)
+if not result:
+    ...                  # result is Invalid — handle the errors
+result.email             # str — every field cleaned and typed
+result.message           # str
+```
+
+`validate()` **never raises** on bad input. A `Form` instance is truthy and `Invalid` is falsy, so `if not result:` branches to the failure case and otherwise leaves you the validated instance directly — no `cleaned_data` dict, no `.is_valid()` call.
+
+A form is pure data. It doesn't take a request, render HTML, or touch a database — so the same form validates an HTML submission, a JSON body, a job payload, or a dict in a test.
+
+## Validation
+
+### The result is a typed form or `Invalid`
+
+`validate()` returns a tagged union — a `Form` subclass instance on success, an [`Invalid`](./result.py#Invalid) on failure:
+
+```python
+result = ContactForm.validate(data)
+if not result:
+    for error in result.errors:
+        print(error.field, error.code, error.message)
+    print(result.raw)        # the original submitted input
+```
+
+`Invalid.errors` is one flat list of [`Error`](./result.py#Error). Each `Error` carries:
+
+- `message` — human-readable text
+- `code` — a stable machine identifier (`"required"`, `"invalid"`, `"max_length"`, …) — match on this in tests and handlers, not the wording
+- `field` — the field name, or `None` for a form-level error
+
+`Invalid.raw` keeps the original input, which is what re-rendering a rejected form reads from.
+
+A returned instance means _every_ field validated, so `result.<field>` is always safe — there is no half-populated form.
+
+### Cross-field validation with `check()`
+
+A field validates its own shape. For a rule that spans fields, override `check()` — it runs after every field has cleaned, with `self` as the typed instance, and returns a list of `Error`s (or `None`):
+
+```python
+from plain.forms import Error, Form, types
+
+
+class SignupForm(Form):
+    password = types.TextField()
+    password_confirm = types.TextField()
+
+    def check(self):
+        if self.password != self.password_confirm:
+            return [Error("Passwords do not match.", code="mismatch", field="password_confirm")]
+        return None
+```
+
+Set each `Error`'s `field` to the field it concerns, or leave it `None` for a form-level error. Return — don't raise.
+
+### Where validation lives
+
+The form validates _shape_. Everything else lives elsewhere:
+
+- **Cross-field rules over the form's own fields** → `check()`.
+- **Validation needing external state** (the current user, a database uniqueness check) → the view, or a function the view calls — not the form.
+- **Side effects** (send an email, create related rows) → a function the view calls after `validate()` succeeds.
+- **Persisting a model** → a validated [`ModelForm`](#model-backed-forms) feeds `create_from()` / `update_from()` from `plain.postgres.forms`.
 
 ## Fields
 
-All fields accept these common parameters:
-
-- `required` - Whether the field is required (default: `True`)
-- `initial` - Initial value for unbound forms
-- `error_messages` - Dict of custom error messages
-- `validators` - List of additional validator functions
+Every field accepts `required` (default `True`) and `initial`. A field declared `required=False` cleans to `None` when absent, and its type reflects that — `types.IntegerField(required=False)` makes `result.count` an `int | None`.
 
 ### Text fields
 
 **[`TextField`](./fields.py#TextField)** accepts text input with optional length constraints.
 
 ```python
-name = forms.TextField(max_length=100, min_length=2)
-bio = forms.TextField(required=False, strip=True)  # strip=True is the default
+name = types.TextField(max_length=100, min_length=2)
+bio = types.TextField(required=False, strip=False)  # strip defaults to True
 ```
 
-**[`EmailField`](./fields.py#EmailField)** validates email addresses.
+**[`EmailField`](./fields.py#EmailField)** validates email addresses. **[`URLField`](./fields.py#URLField)** validates URLs.
 
 ```python
-email = forms.EmailField()
-```
-
-**[`URLField`](./fields.py#URLField)** validates URLs and normalizes them (adds `http://` if missing).
-
-```python
-website = forms.URLField(required=False)
+email = types.EmailField()
+website = types.URLField(required=False)
 ```
 
 **[`RegexField`](./fields.py#RegexField)** validates against a regular expression.
 
 ```python
-phone = forms.RegexField(regex=r"^\d{3}-\d{4}$")
+phone = types.RegexField(r"^\d{3}-\d{4}$")
 ```
 
 ### Numeric fields
 
-**[`IntegerField`](./fields.py#IntegerField)** parses integers with optional min/max/step validation.
+**[`IntegerField`](./fields.py#IntegerField)** and **[`FloatField`](./fields.py#FloatField)** parse numbers with optional `min_value`, `max_value`, and `step_size`.
 
 ```python
-age = forms.IntegerField(min_value=0, max_value=150)
-quantity = forms.IntegerField(min_value=1, step_size=1)
-```
-
-**[`FloatField`](./fields.py#FloatField)** parses floating-point numbers.
-
-```python
-price = forms.FloatField(min_value=0)
+age = types.IntegerField(min_value=0, max_value=150)
+price = types.FloatField(min_value=0)
 ```
 
 **[`DecimalField`](./fields.py#DecimalField)** parses `Decimal` values with precision control.
 
 ```python
-amount = forms.DecimalField(max_digits=10, decimal_places=2)
+amount = types.DecimalField(max_digits=10, decimal_places=2)
 ```
 
 ### Date and time fields
 
-**[`DateField`](./fields.py#DateField)** parses dates in various formats (e.g., `2024-01-15`, `01/15/2024`).
+**[`DateField`](./fields.py#DateField)**, **[`TimeField`](./fields.py#TimeField)**, and **[`DateTimeField`](./fields.py#DateTimeField)** parse dates and times into the matching `datetime` objects. **[`DurationField`](./fields.py#DurationField)** parses a duration into a `timedelta`.
 
 ```python
-birthday = forms.DateField()
-```
-
-**[`TimeField`](./fields.py#TimeField)** parses times (e.g., `14:30`, `14:30:59`).
-
-```python
-start_time = forms.TimeField()
-```
-
-**[`DateTimeField`](./fields.py#DateTimeField)** parses combined date and time values.
-
-```python
-scheduled_at = forms.DateTimeField()
-```
-
-**[`DurationField`](./fields.py#DurationField)** parses time durations into `timedelta` objects.
-
-```python
-duration = forms.DurationField()  # e.g., "1 day, 2:30:00"
+birthday = types.DateField()
+scheduled_at = types.DateTimeField()
+duration = types.DurationField()
 ```
 
 ### Choice fields
 
-**[`ChoiceField`](./fields.py#ChoiceField)** validates against a list of choices.
+**[`ChoiceField`](./fields.py#ChoiceField)** validates against a list of `(value, label)` choices.
 
 ```python
-PRIORITY_CHOICES = [
-    ("low", "Low"),
-    ("medium", "Medium"),
-    ("high", "High"),
-]
-priority = forms.ChoiceField(choices=PRIORITY_CHOICES)
+PRIORITY_CHOICES = [("low", "Low"), ("medium", "Medium"), ("high", "High")]
+priority = types.ChoiceField(choices=PRIORITY_CHOICES)
 ```
 
-You can also use Python enums directly.
+A Python `Enum` works as `choices` too. **[`TypedChoiceField`](./fields.py#TypedChoiceField)** coerces the validated value with a `coerce` callable, and **[`MultipleChoiceField`](./fields.py#MultipleChoiceField)** cleans to a `list`.
 
 ```python
-from enum import Enum
-
-class Priority(Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-
-priority = forms.ChoiceField(choices=Priority)
-```
-
-**[`TypedChoiceField`](./fields.py#TypedChoiceField)** coerces the value to a specific type after validation.
-
-```python
-year = forms.TypedChoiceField(
-    choices=[(str(y), str(y)) for y in range(2020, 2030)],
-    coerce=int,
-)
-```
-
-**[`MultipleChoiceField`](./fields.py#MultipleChoiceField)** allows selecting multiple options.
-
-```python
-tags = forms.MultipleChoiceField(choices=[("a", "A"), ("b", "B"), ("c", "C")])
+year = types.TypedChoiceField(choices=[(str(y), str(y)) for y in range(2020, 2030)], coerce=int)
+tags = types.MultipleChoiceField(choices=[("a", "A"), ("b", "B")])
 ```
 
 ### File fields
 
-**[`FileField`](./fields.py#FileField)** handles file uploads.
+**[`FileField`](./fields.py#FileField)** handles uploads; **[`ImageField`](./fields.py#ImageField)** also checks the upload is a valid image (requires Pillow). Pass uploads to `validate()` as `files=` — see [JSON and other input](#json-and-other-input).
 
 ```python
-document = forms.FileField(max_length=255)  # max_length applies to filename
-```
-
-**[`ImageField`](./fields.py#ImageField)** validates that the upload is a valid image (requires Pillow).
-
-```python
-avatar = forms.ImageField(required=False)
+document = types.FileField(max_length=255)  # max_length applies to the filename
+avatar = types.ImageField(required=False)
 ```
 
 ### Other fields
 
-**[`BooleanField`](./fields.py#BooleanField)** parses boolean values (handles HTML checkbox behavior).
+**[`BooleanField`](./fields.py#BooleanField)** parses HTML checkbox values. **[`NullBooleanField`](./fields.py#NullBooleanField)** allows `True`, `False`, or `None`. **[`UUIDField`](./fields.py#UUIDField)** parses UUID strings, and **[`JSONField`](./fields.py#JSONField)** parses JSON.
 
 ```python
-subscribe = forms.BooleanField(required=False)  # unchecked = False
-terms = forms.BooleanField()  # must be checked
-```
-
-**[`NullBooleanField`](./fields.py#NullBooleanField)** allows `True`, `False`, or `None`.
-
-```python
-preference = forms.NullBooleanField()
-```
-
-**[`UUIDField`](./fields.py#UUIDField)** parses UUID strings into `uuid.UUID` objects.
-
-```python
-token = forms.UUIDField()
-```
-
-**[`JSONField`](./fields.py#JSONField)** parses and validates JSON strings.
-
-```python
-config = forms.JSONField()
-metadata = forms.JSONField(indent=2, sort_keys=True)  # for display formatting
-```
-
-## Validation
-
-### Field-level validation
-
-You can add custom validation for a specific field by defining a `clean_<fieldname>` method. This runs after the field's built-in validation.
-
-```python
-class SignupForm(forms.Form):
-    username = forms.TextField(max_length=30)
-    email = forms.EmailField()
-
-    def clean_username(self):
-        username = self.cleaned_data["username"]
-        if username.lower() in ["admin", "root", "system"]:
-            raise forms.ValidationError("This username is reserved.")
-        return username.lower()  # Return the cleaned value
-```
-
-### Form-level validation
-
-Override the `clean()` method for validation that involves multiple fields.
-
-```python
-class PasswordForm(forms.Form):
-    password = forms.TextField()
-    password_confirm = forms.TextField()
-
-    def clean(self):
-        cleaned_data = super().clean()
-        password = cleaned_data.get("password")
-        confirm = cleaned_data.get("password_confirm")
-
-        if password and confirm and password != confirm:
-            raise forms.ValidationError("Passwords do not match.")
-
-        return cleaned_data
-```
-
-Errors raised in `clean()` are stored in `form.non_field_errors` since they are not associated with a specific field.
-
-### Custom error messages
-
-You can customize error messages per field.
-
-```python
-email = forms.EmailField(
-    error_messages={
-        "required": "We need your email address.",
-        "invalid": "Please enter a valid email.",
-    }
-)
+subscribe = types.BooleanField(required=False)  # unchecked = False
+token = types.UUIDField()
+config = types.JSONField()
 ```
 
 ## Rendering forms in templates
 
-Forms provide access to field data through [`BoundField`](./boundfield.py#BoundField) objects. You render the HTML inputs yourself, giving you full control over markup and styling.
+The core types — `Form`, `validate`, `Invalid` — carry no rendering interface. To render a form, a view wraps the outcome in a [`FormDisplay`](./display.py#FormDisplay), the opt-in render adapter, and the template reads each field through it.
+
+The view is explicit `get`/`post`:
+
+```python
+from plain.forms import FormDisplay
+from plain.http import RedirectResponse
+from plain.templates.views import TemplateView
+
+
+class ContactView(TemplateView):
+    template_name = "contact.html"
+
+    def get(self):
+        return self.render(form=FormDisplay(ContactForm))
+
+    def post(self):
+        result = ContactForm.validate(self.request.form_data)
+        if not result:
+            # re-render with the submitted values and their errors
+            return self.render(form=FormDisplay(ContactForm, result))
+        send_contact_email(result.email, result.message)
+        return RedirectResponse("/thanks/")
+```
+
+`FormDisplay` is built three ways:
+
+```python
+FormDisplay(ContactForm)                              # blank — shows each field's initial
+FormDisplay(ContactForm, result)                      # a failed validate() — values + errors
+FormDisplay(ContactForm, values={"email": user.email})  # pre-filled
+```
+
+In the template, each field is a [`FieldDisplay`](./display.py#FieldDisplay) — `name`, `value`, `errors`, `required`, `choices`, and a stable `html_id`:
 
 ```html
 <form method="post">
-    <!-- Non-field errors (from form.clean()) -->
-    {% for error in form.non_field_errors %}
-    <div class="error">{{ error }}</div>
+    {% for error in form.errors %}
+    <div class="error">{{ error.message }}</div>
     {% endfor %}
 
-    <div>
-        <label for="{{ form.email.html_id }}">Email</label>
-        <input
-            type="email"
-            name="{{ form.email.html_name }}"
-            id="{{ form.email.html_id }}"
-            value="{{ form.email.value }}"
-            {% if form.email.field.required %}required{% endif %}>
-
-        {% for error in form.email.errors %}
-        <div class="field-error">{{ error }}</div>
-        {% endfor %}
-    </div>
-
-    <div>
-        <label for="{{ form.message.html_id }}">Message</label>
-        <textarea
-            name="{{ form.message.html_name }}"
-            id="{{ form.message.html_id }}"
-            {% if form.message.field.required %}required{% endif %}>{{ form.message.value }}</textarea>
-
-        {% for error in form.message.errors %}
-        <div class="field-error">{{ error }}</div>
-        {% endfor %}
-    </div>
+    <label for="{{ form.email.html_id }}">Email</label>
+    <input
+        type="email"
+        name="{{ form.email.name }}"
+        id="{{ form.email.html_id }}"
+        value="{{ form.email.value }}"
+        {% if form.email.required %}required{% endif %}>
+    {% for error in form.email.errors %}
+    <div class="field-error">{{ error.message }}</div>
+    {% endfor %}
 
     <button type="submit">Send</button>
 </form>
 ```
 
-Each bound field provides:
+`{% for field in form %}` iterates every field, and `'email' in form` tests membership. For large apps, reduce repetition with Jinja [macros](https://jinja.palletsprojects.com/en/stable/templates/#macros) or [plain.elements](/plain-elements/README.md).
 
-- `html_name` - The input's `name` attribute
-- `html_id` - The input's `id` attribute
-- `value` - The current value (initial or submitted)
-- `errors` - List of validation error messages
-- `field` - The underlying [`Field`](./fields.py#Field) instance
-- `initial` - The field's initial value
+## JSON and other input
 
-For large applications, you can reduce repetition by creating reusable patterns with Jinja [includes](https://jinja.palletsprojects.com/en/stable/templates/#include), [macros](https://jinja.palletsprojects.com/en/stable/templates/#macros), or [plain.elements](/plain-elements/README.md).
-
-## JSON data
-
-Forms automatically handle JSON request bodies when the `Content-Type` header is `application/json`. The same form class works for both HTML form submissions and JSON API requests.
+`validate()` takes any dict, so one form class serves an HTML page and a JSON API:
 
 ```python
-class ApiForm(forms.Form):
-    name = forms.TextField()
-    count = forms.IntegerField()
+ContactForm.validate(request.form_data)                  # an HTML form POST
+ContactForm.validate(request.json_data)                  # a JSON request body
+ContactForm.validate(payload)                            # a job argument, a test
+ContactForm.validate(request.form_data, files=request.files)  # with file uploads
 ```
 
-For HTML form data:
+On an `Invalid`, serialize `result.errors` straight into a JSON response — each `Error`'s `field`, `code`, and `message` are already structured.
 
-```
-POST /submit
-Content-Type: application/x-www-form-urlencoded
+## Model-backed forms
 
-name=Example&count=42
-```
+When a form's fields mirror a database model, use `ModelForm` — it lives in [`plain.postgres`](../../../plain-postgres/plain/postgres/README.md) because it depends on the ORM. Declare each field with `model_field(Model.column)`; its type and validation are copied from that column, so `result.title` is typed exactly as `Note.title` and a column typo is a type error:
 
-For JSON data:
+```python
+from plain.postgres.forms import ModelForm, model_field
 
-```
-POST /submit
-Content-Type: application/json
 
-{"name": "Example", "count": 42}
+class NoteForm(ModelForm):
+    title = model_field(Note.title)
+    body = model_field(Note.body)
 ```
 
-Both will validate the same way and populate `cleaned_data` with the same values.
+`NoteForm` validates like any form — `ModelForm` itself never writes. To persist a validated result, pass it to the `create_from()` / `update_from()` functions in `plain.postgres.forms`: `create_from(Note, result)` inserts a new row — pass any columns the form doesn't carry as keyword arguments, e.g. `create_from(Note, result, author=user)` — and `update_from(note, result)` writes it onto an existing row.
 
 ## FAQs
 
 #### How do I make a field optional?
 
-Set `required=False` on the field.
+Set `required=False`. The cleaned value becomes `None` when the field is absent, and the type reflects it.
 
 ```python
-notes = forms.TextField(required=False)
+notes = types.TextField(required=False)   # result.notes is str | None
 ```
 
-#### How do I pre-populate a form with existing data?
+#### How do I pre-populate a form?
 
-Pass an `initial` dict when creating the form in your view.
+Pass a `values` dict to `FormDisplay`:
 
 ```python
-form = ContactForm(request=request, initial={"email": user.email})
+FormDisplay(ContactForm, values={"email": user.email})
 ```
+
+For a blank form, `FormDisplay(ContactForm)` already shows each field's `initial` value.
 
 #### How do I access the raw submitted data?
 
-Use `form.data` to access the raw data dict before validation.
+`Invalid.raw` holds the original input that was passed to `validate()`.
 
-```python
-if form.is_bound:
-    raw_email = form.data.get("email")
-```
+#### Why is my checkbox always `False`?
 
-#### How do I add custom validators to a field?
+An HTML checkbox submits nothing when unchecked. `BooleanField` returns `False` for a missing value — declare it `required=False` so an unchecked box is allowed.
 
-Pass a list of validator functions to the `validators` parameter.
+#### How do I put two forms on one page?
 
-```python
-from plain.validators import MinLengthValidator
+Give them distinct field names, or use two separate `Form` classes. Validate whichever one the request submitted.
 
-username = forms.TextField(validators=[MinLengthValidator(3)])
-```
+#### How do I run validation that needs the database or current user?
 
-#### Why is my checkbox field always `False`?
-
-HTML checkboxes don't submit any value when unchecked. `BooleanField` handles this by returning `False` when the field is missing from form data. Make sure you use `required=False` if the checkbox is optional.
-
-#### How do I handle multiple forms on one page?
-
-Use the `prefix` parameter to namespace each form's fields.
-
-```python
-contact_form = ContactForm(request=request, prefix="contact")
-signup_form = SignupForm(request=request, prefix="signup")
-```
-
-This prefixes field names like `contact-email` and `signup-email`.
+Not in the form — a form is a pure parser. Do it in the view (or a function the view calls) after `validate()` succeeds. See [Where validation lives](#where-validation-lives).
 
 ## Installation
 
-Add `plain.forms` to your `INSTALLED_PACKAGES` in `app/settings.py`.
-
-```python
-INSTALLED_PACKAGES = [
-    # ...
-    "plain.forms",
-]
-```
-
-Create a form class in your app.
+`plain.forms` is part of Plain core — there's nothing to add to `INSTALLED_PACKAGES`. Import it directly:
 
 ```python
 # app/forms.py
-from plain import forms
+from plain.forms import Form, types
 
 
-class ContactForm(forms.Form):
-    name = forms.TextField(max_length=100)
-    email = forms.EmailField()
-    message = forms.TextField()
+class ContactForm(Form):
+    name = types.TextField(max_length=100)
+    email = types.EmailField()
+    message = types.TextField()
 ```
 
-Use the form with a view. The [`FormView`](/plain-views/README.md) base class handles GET/POST logic automatically.
+Wire it to a view with explicit `get`/`post`:
 
 ```python
 # app/views.py
-from plain.views import FormView
+from plain.forms import FormDisplay
+from plain.http import RedirectResponse
+from plain.templates.views import TemplateView
 
 from .forms import ContactForm
 
 
-class ContactView(FormView):
-    form_class = ContactForm
+class ContactView(TemplateView):
     template_name = "contact.html"
 
-    def form_valid(self, form):
-        # Process the validated data
-        name = form.cleaned_data["name"]
-        email = form.cleaned_data["email"]
-        message = form.cleaned_data["message"]
-        # Send email, save to database, etc.
-        return super().form_valid(form)
+    def get(self):
+        return self.render(form=FormDisplay(ContactForm))
+
+    def post(self):
+        result = ContactForm.validate(self.request.form_data)
+        if not result:
+            return self.render(form=FormDisplay(ContactForm, result))
+        # result is the typed ContactForm — do the work, then redirect
+        return RedirectResponse("/thanks/")
 ```
 
-Create the template to render the form.
+And render it (see [Rendering forms in templates](#rendering-forms-in-templates) for the full field markup):
 
 ```html
 <!-- app/templates/contact.html -->
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Contact Us</h1>
-
 <form method="post">
-    {% for error in form.non_field_errors %}
-    <div class="error">{{ error }}</div>
+    {% for error in form.errors %}
+    <div class="error">{{ error.message }}</div>
     {% endfor %}
 
-    <div>
-        <label for="{{ form.name.html_id }}">Name</label>
-        <input
-            type="text"
-            name="{{ form.name.html_name }}"
-            id="{{ form.name.html_id }}"
-            value="{{ form.name.value }}"
-            required>
-        {% for error in form.name.errors %}
-        <div class="field-error">{{ error }}</div>
-        {% endfor %}
-    </div>
+    <label for="{{ form.email.html_id }}">Email</label>
+    <input
+        type="email"
+        name="{{ form.email.name }}"
+        id="{{ form.email.html_id }}"
+        value="{{ form.email.value }}">
+    {% for error in form.email.errors %}
+    <div class="field-error">{{ error.message }}</div>
+    {% endfor %}
 
-    <div>
-        <label for="{{ form.email.html_id }}">Email</label>
-        <input
-            type="email"
-            name="{{ form.email.html_name }}"
-            id="{{ form.email.html_id }}"
-            value="{{ form.email.value }}"
-            required>
-        {% for error in form.email.errors %}
-        <div class="field-error">{{ error }}</div>
-        {% endfor %}
-    </div>
-
-    <div>
-        <label for="{{ form.message.html_id }}">Message</label>
-        <textarea
-            name="{{ form.message.html_name }}"
-            id="{{ form.message.html_id }}"
-            required>{{ form.message.value }}</textarea>
-        {% for error in form.message.errors %}
-        <div class="field-error">{{ error }}</div>
-        {% endfor %}
-    </div>
-
-    <button type="submit">Send Message</button>
+    <button type="submit">Send</button>
 </form>
 {% endblock %}
 ```
