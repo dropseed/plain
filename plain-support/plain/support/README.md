@@ -47,24 +47,24 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 ## Custom forms
 
-You can create custom support forms by extending [`SupportForm`](./forms.py#SupportForm). The form uses [ModelForm](/plain-postgres/plain/postgres/README.md#forms) from `plain.postgres.forms`.
+[`SupportForm`](./forms.py#SupportForm) is a [`ModelForm`](/plain-postgres/plain/postgres/README.md#forms) over [`SupportFormEntry`](./models.py#SupportFormEntry). Create your own by subclassing it — adding cross-field validation with [`check()`](/plain/plain/forms/README.md), for example:
 
 ```python
 # app/forms.py
+from plain.forms import Error
 from plain.support.forms import SupportForm
-from plain.support.models import SupportFormEntry
-from plain import forms
 
 
 class BugReportForm(SupportForm):
-    browser = forms.TextField(max_length=100, required=False)
-
-    class Meta:
-        model = SupportFormEntry
-        fields = ["name", "email", "message", "browser"]
+    def check(self) -> list[Error] | None:
+        if len(self.message) < 30:
+            return [
+                Error("Please add more detail.", code="too_short", field="message")
+            ]
+        return None
 ```
 
-Then register it in your settings:
+Then register it under a slug:
 
 ```python
 # app/settings.py
@@ -74,18 +74,7 @@ SUPPORT_FORMS = {
 }
 ```
 
-The form will be available at `/support/form/bug-report/`.
-
-You can also customize the email notification by overriding the [`notify`](./forms.py#SupportForm) method:
-
-```python
-class BugReportForm(SupportForm):
-    # ...
-
-    def notify(self, instance):
-        # Send to a different channel, create a ticket, etc.
-        pass
-```
+The form is then available at `/support/form/bug-report/`.
 
 ## Views
 

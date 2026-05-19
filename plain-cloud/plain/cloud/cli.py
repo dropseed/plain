@@ -98,9 +98,15 @@ def login(api_url: str, token: str | None) -> None:
     creds = Credentials(api_url=api_url, token=token)
     with Client(creds) as client:
         try:
-            me = client.get("/me/")
+            me = client.get("/me")
         except httpx.HTTPError as exc:
             _die(f"Could not reach {api_url}: {exc}")
+
+    if not isinstance(me, dict):
+        _die(
+            f"Unexpected response from {api_url} when verifying the token. "
+            "The token was not saved."
+        )
 
     try:
         backend = save(creds)
@@ -128,7 +134,14 @@ def whoami() -> None:
     """Show the user the current token belongs to."""
     creds = require()
     with Client(creds) as client:
-        me = client.get("/me/")
+        me = client.get("/me")
+    if not isinstance(me, dict):
+        # require() already caught a missing token, so we have credentials —
+        # an empty/unexpected body here is a server-side problem, not logout.
+        _die(
+            f"Unexpected response from {creds.api_url} — could not read your identity.\n"
+            "If this persists, re-authenticate with `plain-cloud login`."
+        )
     if email := me.get("email"):
         identity = click.style(email, bold=True)
     else:

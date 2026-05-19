@@ -1,55 +1,52 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any
 
 from app.users.models import User
-from plain import forms
-from plain.postgres.forms import ModelForm, ModelMultipleChoiceField
+from plain.forms import Error, Form, types
+from plain.postgres.forms import ModelForm, model_field
 
 from .models import Project, Tag, Task
 
 
 class TaskForm(ModelForm):
-    """ModelForm exercising FK, M2M, date, choice, and boolean fields plus
-    cross-field clean(). Owner is excluded — set on the instance before save.
+    """A ModelForm over Task — exercises an FK (`project`), an M2M (`tags`),
+    plus date, choice, and boolean fields, and a cross-field `check()`.
+
+    `owner` is not a form field; the view passes it to `create_from()`. Use
+    `TaskForm.for_owner(user)` to get a copy whose `project`/`tags` choices
+    are scoped to that user's rows.
     """
 
-    class Meta:
-        model = Task
-        fields = (
-            "project",
-            "title",
-            "notes",
-            "due_date",
-            "priority",
-            "is_complete",
-            "tags",
+    project = model_field(Task.project)
+    title = model_field(Task.title)
+    notes = model_field(Task.notes)
+    due_date = model_field(Task.due_date)
+    priority = model_field(Task.priority)
+    is_complete = model_field(Task.is_complete)
+    tags = model_field(Task.tags)
+
+    @classmethod
+    def for_owner(cls, owner: User) -> type[TaskForm]:
+        """A TaskForm whose `project`/`tags` choices are scoped to one owner."""
+        return cls.with_querysets(
+            project=Project.query.filter(owner=owner),
+            tags=Tag.query.filter(owner=owner),
         )
 
-    def __init__(self, *, owner: User, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        # FK auto-builds as ModelChoiceField with an unscoped queryset — narrow it.
-        self.fields["project"].queryset = Project.query.filter(owner=owner)  # ty: ignore[unresolved-attribute]
-        # M2M doesn't auto-build (modelfield_to_formfield returns None for non-ColumnField),
-        # so construct the field by hand. Meta.fields still lists "tags" so save_m2m runs.
-        self.fields["tags"] = ModelMultipleChoiceField(
-            queryset=Tag.query.filter(owner=owner),
-            required=False,
-        )
-
-    def clean(self) -> dict[str, Any]:
-        cleaned = super().clean()
-        is_complete = cleaned.get("is_complete")
-        due_date = cleaned.get("due_date")
-        if is_complete and due_date and due_date > datetime.date.today():
-            raise forms.ValidationError(
-                "A task that's already complete can't have a future due date."
-            )
-        return cleaned
+    def check(self) -> list[Error] | None:
+        if self.is_complete and self.due_date and self.due_date > datetime.date.today():
+            return [
+                Error(
+                    "A task that's already complete can't have a future due date.",
+                    code="future_due_date",
+                    field="due_date",
+                )
+            ]
+        return None
 
 
-class TaskTitleForm(forms.Form):
-    """Single-field form used by the HTMX inline-title edit."""
+class TaskTitleForm(Form):
+    """The single-field form behind the HTMX inline-title edit."""
 
-    title = forms.TextField(max_length=200, min_length=1)
+    title = types.TextField(max_length=200, min_length=1)

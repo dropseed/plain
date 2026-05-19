@@ -8,6 +8,10 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = ["plain>=0.143.0,<1.0.0", "plain.html<1.0.0"]
 
+# Ships the `mailoutbox` pytest fixture (see plain/email/test/pytest.py).
+[project.entry-points."pytest11"]
+"plain.email" = "plain.email.test.pytest"
+
 [dependency-groups]
 dev = ["plain.pytest<1.0.0"]
 

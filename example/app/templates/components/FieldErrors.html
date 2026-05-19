@@ -3,5 +3,5 @@ attrs:
   bf: Any
 ---
 {% for error in bf.errors %}
-    <div class="field-error">⚠ {{ error }}</div>
+    <div class="field-error">⚠ {{ error.message }}</div>
 {% endfor %}

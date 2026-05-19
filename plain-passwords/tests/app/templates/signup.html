@@ -1,0 +1,45 @@
+---
+components:
+  - base as Base
+attrs:
+  form: Any
+---
+<Base>
+{% for error in form.errors %}
+<p class="form-error">{{ error.message }}</p>
+{% endfor %}
+<form method="post">
+  <p>
+    <input
+      type="email"
+      name="email"
+      placeholder="Email"
+      value="{{ form.email.value }}"
+      >
+    {% for error in form.email.errors %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <p>
+    <input
+      type="password"
+      name="password"
+      placeholder="Password"
+      >
+    {% for error in form.password.errors %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <p>
+    <input
+      type="password"
+      name="confirm_password"
+      placeholder="Confirm password"
+      >
+    {% for error in form.confirm_password.errors %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <button type="submit">Sign up</button>
+</form>
+</Base>

@@ -10,9 +10,8 @@ from plain.postgres import types
 
 @postgres.register_model
 class FormsExample(postgres.Model):
-    """Exercises the ModelForm → POST → save round-trip across a broad
-    set of postgres field types. Used by tests/test_modelform_roundtrip.py
-    to guard against regressions in modelfield_to_formfield().
+    """A broad spread of postgres field types — exercises `model_field`
+    derivation across field kinds in tests/public/test_modelform.py.
     """
 
     name: str = types.TextField(max_length=100)

@@ -1,0 +1,44 @@
+---
+components:
+  - base as Base
+attrs:
+  form: Any
+---
+<Base>
+{% for error in form.errors %}
+<p class="form-error">{{ error.message }}</p>
+{% endfor %}
+<form method="post">
+  <p>
+    <input
+      type="password"
+      name="current_password"
+      placeholder="Current password"
+      >
+    {% for error in form.current_password.errors %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <p>
+    <input
+      type="password"
+      name="new_password1"
+      placeholder="New password"
+      >
+    {% for error in form.new_password1.errors %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <p>
+    <input
+      type="password"
+      name="new_password2"
+      placeholder="Confirm new password"
+      >
+    {% for error in form.new_password2.errors %}
+    <span class="form-error">{{ error.message }}</span>
+    {% endfor %}
+  </p>
+  <button type="submit">Change password</button>
+</form>
+</Base>

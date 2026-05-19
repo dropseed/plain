@@ -5,39 +5,51 @@ attrs:
 ---
 <div class="flex justify-center p-2">
     <form class="max-w-2xl w-full" method="post" action="{{ form_action }}">
+        {% for error in form.errors %}
+            <p class="form-error text-red-600">{{ error.message }}</p>
+        {% endfor %}
         <div class="flex space-x-4">
             <div class="flex-1 space-y-1">
-                <label class="font-medium" for="{{ form.name.html_id }}">Name</label>
+                <label class="font-medium" for="id-name">Name</label>
                 <input
-                    id="{{ form.name.html_id }}"
+                    id="id-name"
                     class="block w-full rounded-sm text-black border-gray-300 border"
                     required
                     type="text"
-                    name="{{ form.name.html_name }}"
-                    value="{{ form.name.value() or '' }}"
+                    name="{{ form.name.name }}"
+                    value="{{ form.name.value or '' }}"
                 >
+                {% for error in form.name.errors %}
+                    <span class="form-error text-red-600">{{ error.message }}</span>
+                {% endfor %}
             </div>
             <div class="flex-1 space-y-1">
-                <label class="font-medium" for="{{ form.email.html_id }}">Email</label>
+                <label class="font-medium" for="id-email">Email</label>
                 <input
-                    id="{{ form.email.html_id }}"
+                    id="id-email"
                     class="block w-full rounded-sm text-black border-gray-300 border"
                     required
                     type="email"
-                    name="{{ form.email.html_name }}"
-                    value="{{ form.email.value() or '' }}"
+                    name="{{ form.email.name }}"
+                    value="{{ form.email.value or '' }}"
                 >
+                {% for error in form.email.errors %}
+                    <span class="form-error text-red-600">{{ error.message }}</span>
+                {% endfor %}
             </div>
         </div>
         <div class="mt-4 space-y-1">
-            <label class="font-medium" for="{{ form.message.html_id }}">Message</label>
+            <label class="font-medium" for="id-message">Message</label>
             <textarea
-                id="{{ form.message.html_id }}"
+                id="id-message"
                 class="block w-full text-black rounded-sm border-gray-300 border"
                 rows="10"
                 required
-                name="{{ form.message.html_name }}"
-            >{{ form.message.value() or '' }}</textarea>
+                name="{{ form.message.name }}"
+            >{{ form.message.value or "" }}</textarea>
+            {% for error in form.message.errors %}
+                <span class="form-error text-red-600">{{ error.message }}</span>
+            {% endfor %}
         </div>
         <button
             class="mt-8 text-lg text-white block text-center bg-black hover:bg-black/80 w-full py-2 px-3 rounded-sm"

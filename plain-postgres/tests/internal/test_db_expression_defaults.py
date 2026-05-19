@@ -307,76 +307,19 @@ def test_alter_field_literal_default_skips_drop_before_type_change(db):
 
 
 def test_modelfield_to_formfield_excludes_expression_defaults():
-    """Auto-generated form fields for DB-expression defaults must not carry
-    the expression instance as `initial` (it's a Func object, not a UUID/
-    datetime), and must not be `required` so the user can omit them and let
-    the DB fill the value on INSERT."""
-    from plain.postgres.forms import modelfield_to_formfield
+    """A column the database fills itself (a `generate`/`create_now`
+    expression default) isn't user input — `_modelfield_to_formfield`
+    returns None, so it can't be auto-derived onto a form."""
+    from plain.postgres.forms import _modelfield_to_formfield
 
     db_uuid_field = DBDefaultsExample._model_meta.get_forward_field("db_uuid")
-    form_field = modelfield_to_formfield(db_uuid_field)
-    assert form_field is not None
-    assert form_field.initial is None
-    assert form_field.required is False
+    assert _modelfield_to_formfield(db_uuid_field) is None
 
-    # And it doesn't break the usual path for static defaults.
+    # A static (literal) default still derives, carrying its value as initial.
     status_field = DefaultsExample._model_meta.get_forward_field("status")
-    form_field = modelfield_to_formfield(status_field)
+    form_field = _modelfield_to_formfield(status_field)
     assert form_field is not None
     assert form_field.initial == "pending"
-
-
-def test_model_to_dict_omits_database_default_fields(db):
-    """model_to_dict is commonly used to seed a Form's `initial` from an
-    instance. If a DATABASE_DEFAULT sentinel leaked into that dict, it
-    would override the formfield's own initial=None and render the
-    repr `<DatabaseDefault>` in the rendered field."""
-    from plain.postgres.forms import model_to_dict
-
-    inst = DBDefaultsExample(name="x")
-    as_dict = model_to_dict(inst)
-
-    assert "name" in as_dict
-    assert as_dict["name"] == "x"
-    assert "db_uuid" not in as_dict
-    assert "created_at" not in as_dict
-
-
-def test_construct_instance_preserves_db_default_on_blank_submission(db):
-    """A blank HTML input for a DDE-defaulted field comes through as an
-    entry in form.data with a cleaned value of None/empty. construct_instance
-    must not overwrite DATABASE_DEFAULT with None in that case — the whole
-    point is to let Postgres evaluate the DEFAULT on INSERT."""
-    from plain.postgres.forms import construct_instance
-
-    # Minimal stand-in: construct_instance only reads `cleaned_data`, `data`,
-    # `files`, and `form[name].field.empty_values` + `add_prefix`.
-    class _FormField:
-        empty_values = [None, "", [], (), {}]
-
-    class _Bound:
-        field = _FormField()
-
-    class _Form:
-        cleaned_data = {"name": "from-form", "db_uuid": None, "created_at": None}
-        data = {"name": "from-form", "db_uuid": "", "created_at": ""}
-        files: dict = {}
-
-        def add_prefix(self, name: str) -> str:
-            return name
-
-        def __getitem__(self, name: str) -> _Bound:
-            return _Bound()
-
-    instance = DBDefaultsExample()
-    assert instance.db_uuid is DATABASE_DEFAULT
-
-    construct_instance(_Form(), instance)  # ty: ignore[invalid-argument-type]
-
-    # Blank submission must NOT overwrite the sentinel with None.
-    assert instance.db_uuid is DATABASE_DEFAULT
-    assert instance.created_at is DATABASE_DEFAULT
-    assert instance.name == "from-form"
 
 
 def test_database_default_singleton_survives_pickling(db):

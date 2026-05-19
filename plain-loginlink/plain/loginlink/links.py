@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from app.users.models import User
 
+from plain.email import TemplateEmail
 from plain.signing import BadSignature, SignatureExpired
 from plain.urls import reverse
 
@@ -37,6 +38,37 @@ def generate_link_url(
     )
 
     return request.build_absolute_uri(reverse("loginlink:login", token=token))
+
+
+def send_login_link(
+    *,
+    email: str,
+    request: Request,
+    next_url: str | None = None,
+    expires_in: int = 60 * 60,
+) -> int | None:
+    """Email a login link to the user with this address, if one exists.
+
+    Returns `None` and sends nothing when no user matches — callers must not
+    reveal whether an address is registered.
+    """
+    try:
+        user = User.query.get(email__iexact=email)
+    except User.DoesNotExist:
+        return None
+
+    url = generate_link_url(
+        request=request, user=user, email=email, expires_in=expires_in
+    )
+    if next_url:
+        url += f"?next={next_url}"
+
+    return TemplateEmail(
+        template="loginlink",
+        subject="Your link to log in",
+        to=[email],
+        context={"user": user, "url": url, "expires_in": expires_in},
+    ).send()
 
 
 def get_link_token_user(token: str) -> User:

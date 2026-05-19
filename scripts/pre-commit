@@ -2,9 +2,9 @@
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
-# Disable cloud OTLP export for every `plain` command in this script (tests,
+# Disable OTLP export for every `plain` command in this script (tests,
 # preflight, etc.). See scripts/test for the full rationale.
-export PLAIN_CLOUD_EXPORT_ENABLED=false
+export PLAIN_CONNECT_EXPORT_ENABLED=false
 
 echo "${BOLD}Checking formatting and linting${NORMAL}"
 ./scripts/fix --check

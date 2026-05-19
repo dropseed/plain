@@ -4,11 +4,12 @@ attrs:
 ---
 <select
     id="{{ field.html_id }}"
-    name="{{ field.html_name }}"
+    name="{{ field.name }}"
     class="admin-select"
-    required="{{ field.field.required }}"
+    required="{{ field.required }}"
+    aria-invalid="{{ 'true' if field.errors else None }}"
 >
-    {% for (value, label) in field.field.choices %}
-        <option value="{{ value }}" selected="{{ value == field.value() }}">{{ label }}</option>
+    {% for (value, label) in field.choices %}
+        <option value="{{ value }}" selected="{{ value == field.value }}">{{ label }}</option>
     {% endfor %}
 </select>

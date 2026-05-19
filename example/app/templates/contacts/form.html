@@ -37,7 +37,7 @@ attrs:
             type="select"
             required="{{ True }}"
         />
-        {% if 'company' in form.fields %}
+        {% if 'company' in form %}
             <Field bf="{{ form.company }}" label="Company (optional)" />
         {% endif %}<Field
             bf="{{ form.message }}"
@@ -51,9 +51,9 @@ attrs:
             <label class="flex items-center gap-2 text-sm text-body">
                 <input
                     type="checkbox"
-                    name="{{ form.subscribe.html_name }}"
+                    name="{{ form.subscribe.name }}"
                     id="{{ form.subscribe.html_id }}"
-                    checked="{{ form.subscribe.value() }}"
+                    checked="{{ bool(form.subscribe.value) }}"
                 >
                 Subscribe to the newsletter
             </label>

@@ -1,21 +1,21 @@
+from __future__ import annotations
+
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain.html.views import (
-    CreateView,
-    DeleteView,
-    DetailView,
-    UpdateView,
-)
+from plain.forms import FormDisplay
+from plain.html.views import DetailView
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
 from plain.paginator import Paginator
 from plain.postgres import QuerySet
+from plain.postgres.forms import create_from, update_from
 
 from .base import AdminView
 
 if TYPE_CHECKING:
-    from plain.forms import BaseForm
+    from plain.postgres import Model
+    from plain.postgres.forms import ModelForm
 
 
 _LABEL_ACRONYMS = {
@@ -261,9 +261,18 @@ class AdminListView(HTMXView, AdminView):
         return links
 
 
-class AdminCreateView(AdminView, CreateView):
+class AdminCreateView(AdminView):
+    """Render a form on GET; validate, save, and redirect on POST.
+
+    Set `model`, `form_class` (a `ModelForm`), and `template_name`. A valid
+    POST creates the object via `create_from()` and redirects; an invalid one
+    re-renders the template with the submitted values and errors.
+    """
+
     template_name = None
     nav_section = None
+    model: type[Model]
+    form_class: type[ModelForm]
 
     def get_list_url(self) -> str:
         return ""
@@ -280,11 +289,24 @@ class AdminCreateView(AdminView, CreateView):
     def get_delete_url(self, obj: Any) -> str:
         return ""
 
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get(self) -> Response:
+        return self.render(form=FormDisplay(self.form_class))
+
+    def post(self) -> Response:
+        result = self.form_class.validate(
+            self.request.form_data, files=self.request.files
+        )
+        if not result:
+            return self.render(form=FormDisplay(self.form_class, result))
+
+        obj = create_from(self.model, result)
+        return RedirectResponse(self.get_success_url(obj))
+
+    def get_success_url(self, obj: Any) -> str:
         if list_url := self.get_list_url():
             return list_url
 
-        return super().get_success_url(form)
+        return obj.get_absolute_url()
 
 
 class AdminDetailView(AdminView, DetailView):
@@ -339,9 +361,17 @@ class AdminDetailView(AdminView, DetailView):
         return links
 
 
-class AdminUpdateView(AdminView, UpdateView):
+class AdminUpdateView(AdminView, DetailView):
+    """Render a form pre-filled from an object on GET; validate and save on POST.
+
+    Set `form_class` (a `ModelForm`), `template_name`, and `get_object()`. A
+    valid POST writes the submitted values onto the existing object; an
+    invalid one re-renders with errors.
+    """
+
     template_name = None
     nav_section = None
+    form_class: type[ModelForm]
 
     def get_list_url(self) -> str:
         return ""
@@ -358,6 +388,22 @@ class AdminUpdateView(AdminView, UpdateView):
     def get_delete_url(self, obj: Any) -> str:
         return ""
 
+    def get(self) -> Response:
+        form = FormDisplay(
+            self.form_class, values=self.form_class.initial_from(self.object)
+        )
+        return self.render(form=form)
+
+    def post(self) -> Response:
+        result = self.form_class.validate(
+            self.request.form_data, files=self.request.files
+        )
+        if not result:
+            return self.render(form=FormDisplay(self.form_class, result))
+
+        update_from(self.object, result)
+        return RedirectResponse(self.get_success_url())
+
     def get_links(self) -> dict[str, str]:
         links = super().get_links()
 
@@ -372,20 +418,25 @@ class AdminUpdateView(AdminView, UpdateView):
 
         return links
 
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get_success_url(self) -> str:
         if detail_url := self.get_detail_url(self.object):
             return detail_url
 
         if list_url := self.get_list_url():
             return list_url
 
-        if update_url := self.get_update_url(self.object):
-            return update_url
-
-        return super().get_success_url(form)
+        # No detail or list view — fall back to the update page itself.
+        return "."
 
 
-class AdminDeleteView(AdminView, DeleteView):
+class AdminDeleteView(AdminView, DetailView):
+    """Confirm-and-delete an object.
+
+    GET renders the `admin/delete.html` confirmation page; POST deletes the
+    object and redirects to the list. Set `get_object()` to point at the
+    object — no form is involved.
+    """
+
     template_name = "admin/delete.html"
     nav_section = None
 
@@ -404,6 +455,10 @@ class AdminDeleteView(AdminView, DeleteView):
     def get_delete_url(self, obj: Any) -> str:
         return ""
 
+    def post(self) -> Response:
+        self.object.delete()
+        return RedirectResponse(self.get_success_url())
+
     def get_links(self) -> dict[str, str]:
         links = super().get_links()
 
@@ -418,8 +473,6 @@ class AdminDeleteView(AdminView, DeleteView):
 
         return links
 
-    def get_success_url(self, form: "BaseForm") -> str:
-        if list_url := self.get_list_url():
-            return list_url
-
-        return super().get_success_url(form)
+    def get_success_url(self) -> str:
+        # The deleted object's own detail page is gone — go up to the list.
+        return self.get_list_url() or ".."

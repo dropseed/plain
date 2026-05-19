@@ -11,13 +11,13 @@ class V(HTMXView):
 
 
 class ActionView(HTMXView):
-    """HTMXView with stubbed render_template so the dispatch path can be exercised
+    """HTMXView with stubbed render so the dispatch path can be exercised
     end-to-end without setting up a real template environment."""
 
     rendered_body = "<p>rendered</p>"
 
-    def render_template(self) -> str:
-        return self.rendered_body
+    def render(self, **context) -> Response:
+        return Response(self.rendered_body)
 
     def htmx_post_save(self) -> None:
         # Explicit None — should trigger a re-render of the current template.
@@ -36,11 +36,13 @@ class ActionView(HTMXView):
 
 
 class FragmentActionView(HTMXView):
-    """Surfaces the request state observed by render_template so the fragment
+    """Surfaces the request state observed by render so the fragment
     header can be verified end-to-end."""
 
-    def render_template(self) -> str:
-        return f"htmx={self.is_htmx_request()};fragment={self.get_htmx_fragment_name()}"
+    def render(self, **context) -> Response:
+        return Response(
+            f"htmx={self.is_htmx_request()};fragment={self.get_htmx_fragment_name()}"
+        )
 
     def htmx_post_save(self) -> None:
         return None
@@ -118,7 +120,7 @@ def test_action_returning_response_passes_through():
 
 
 def test_convert_result_to_response_none_renders_template():
-    """convert_result_to_response wraps None by calling render_template."""
+    """convert_result_to_response wraps None by calling render."""
     request = RequestFactory().post("/", headers={"HX-Request": "true"})
     view = ActionView(request=request)
     response = view.convert_result_to_response(None)
@@ -150,7 +152,7 @@ def test_action_with_implicit_return_rerenders():
 
 
 def test_rerender_observes_fragment_header():
-    """When re-rendering on None, render_template sees the active fragment header
+    """When re-rendering on None, render sees the active fragment header
     so fragment-aware rendering still kicks in."""
     request = RequestFactory().post(
         "/",

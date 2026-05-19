@@ -1,6 +1,5 @@
 ---
 imports:
-  - from plain.pageviews.html import pageviews_js
   - from plain.tailwind.html import tailwind_css
   - from plain.toolbar.html import toolbar
 attrs:
@@ -28,7 +27,6 @@ slots:
     <body class="font-sans text-body bg-white antialiased">
     {{ children }}
 
-    {{ pageviews_js(request) }}
     {{ toolbar(request) }}
 </body>
 </html>

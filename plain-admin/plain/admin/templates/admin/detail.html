@@ -36,9 +36,9 @@ slots:
     object="{{ object }}"
     cards="{{ cards }}"
 >
-    {% if actions %}
-        {% slot "actions" %}{{ actions }}{% endslot %}
-    {% endif %}
+    {% slot "actions" %}
+        {% if actions %}{{ actions }}{% endif %}
+    {% endslot %}
     <details class="admin-card group" open>
         <summary
             class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4"

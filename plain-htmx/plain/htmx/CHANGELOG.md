@@ -1,5 +1,16 @@
 # plain-htmx changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-htmx@0.20.0) (2026-05-16)
+
+### What's changed
+
+- `HTMXView.render_template()` is replaced by `render(**context)`, tracking the same rename in `plain.templates` 0.3.0. The new method returns a `Response` (previously `render_template()` returned a `str`) and still renders the active fragment on a fragment request, the full template otherwise. `convert_result_to_response` calls `self.render()` directly. ([d88e0556b0](https://github.com/dropseed/plain/commit/d88e0556b0))
+- Requires `plain.templates>=0.3.0`.
+
+### Upgrade instructions
+
+- If you overrode `HTMXView.render_template()`, rename it to `render(self, **context)` and return a `Response` instead of a `str`. Most apps don't override it and need no changes.
+
 ## [0.19.2](https://github.com/dropseed/plain/releases/plain-htmx@0.19.2) (2026-05-12)
 
 ### What's changed

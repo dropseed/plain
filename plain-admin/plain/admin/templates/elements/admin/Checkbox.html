@@ -6,7 +6,7 @@ attrs:
     id="{{ field.html_id }}"
     class="admin-input"
     type="checkbox"
-    name="{{ field.html_name }}"
-    checked="{{ bool(field.value()) }}"
-    required="{{ field.field.required }}"
+    name="{{ field.name }}"
+    checked="{{ bool(field.value) }}"
+    required="{{ field.required }}"
 >

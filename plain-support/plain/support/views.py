@@ -4,55 +4,78 @@ from typing import Any
 
 from plain.assets.urls import get_asset_url
 from plain.auth.views import AuthView
-from plain.forms import Form
+from plain.forms import FormDisplay
 from plain.html import Markup, Template
-from plain.html.views import FormView
+from plain.html.views import TemplateView
 from plain.http import RedirectResponse, Response
+from plain.postgres.forms import create_from
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
 from plain.views import View
 
+from .core import find_user, notify_support
+from .forms import SupportForm
+from .models import SupportFormEntry
 
-class SupportFormView(AuthView, FormView):
+
+class SupportFormView(AuthView, TemplateView):
     template_name = "support/page.html"
 
-    def get_form(self) -> Form:
+    def get_form_class(self) -> type[SupportForm]:
         form_slug = self.url_kwargs["form_slug"]
-        form_class = import_string(settings.SUPPORT_FORMS[form_slug])
-        return form_class(**self.get_form_kwargs())
+        return import_string(settings.SUPPORT_FORMS[form_slug])
 
-    def get_template_context(self) -> dict[str, Any]:
-        context = super().get_template_context()
-        form_slug = self.url_kwargs["form_slug"]
-        context["form_action"] = self.request.build_absolute_uri()
-        success = self.request.query_params.get("success") == "true"
-        context["success"] = success
-
+    def _render_panel(self, *, form: FormDisplay, success: bool) -> Markup:
         # Render the configurable form/success template into a single
         # pre-rendered panel. The set of sub-templates a template includes
         # must be statically knowable, so this dispatch happens here.
+        form_slug = self.url_kwargs["form_slug"]
         if success:
             panel_template_name = f"support/success/{form_slug}.html"
         else:
             panel_template_name = f"support/forms/{form_slug}.html"
-        context["panel"] = Markup(Template(panel_template_name).render(context))
-        return context
+        panel_context = {
+            **self.get_template_context(),
+            "form": form,
+            "form_action": self.request.build_absolute_uri(),
+            "success": success,
+        }
+        return Markup(Template(panel_template_name).render(panel_context))
 
-    def get_form_kwargs(self) -> dict[str, Any]:
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.user
-        kwargs["form_slug"] = self.url_kwargs["form_slug"]
-        return kwargs
+    def _shared_context(self, *, form: FormDisplay, success: bool) -> dict[str, Any]:
+        return {
+            "form": form,
+            "form_action": self.request.build_absolute_uri(),
+            "success": success,
+            "panel": self._render_panel(form=form, success=success),
+        }
 
-    def form_valid(self, form: Any) -> Response:
-        entry = form.save()
-        form.notify(entry)
-        return super().form_valid(form)
+    def get(self) -> Response:
+        # Pre-fill the email for an authed user; otherwise start blank.
+        values: dict[str, str] = {"email": self.user.email} if self.user else {}
+        form = FormDisplay(self.get_form_class(), values=values)
+        success = self.request.query_params.get("success") == "true"
+        return self.render(**self._shared_context(form=form, success=success))
 
-    def get_success_url(self, form: Any) -> str:
-        # Redirect to the same view and template so we
-        # don't have to create two additional views for iframe and non-iframe.
-        return "?success=true"
+    def post(self) -> Response:
+        form_class = self.get_form_class()
+        result = form_class.validate(self.request.form_data, files=self.request.files)
+        if not result:
+            return self.render(
+                **self._shared_context(
+                    form=FormDisplay(form_class, result), success=False
+                )
+            )
+        entry = create_from(
+            SupportFormEntry,
+            result,
+            user=self.user or find_user(result.email),
+            form_slug=self.url_kwargs["form_slug"],
+        )
+        notify_support(entry)
+        # Redirect to the same view and template so we don't need separate
+        # iframe and non-iframe success views.
+        return RedirectResponse("?success=true")
 
 
 class SupportIFrameView(SupportFormView):

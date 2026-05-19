@@ -23,9 +23,9 @@ attrs:
 <label class="flex items-center gap-2 text-sm text-body">
     <input
         type="checkbox"
-        name="{{ form.is_complete.html_name }}"
+        name="{{ form.is_complete.name }}"
         id="{{ form.is_complete.html_id }}"
-        checked="{{ form.is_complete.value() }}"
+        checked="{{ bool(form.is_complete.value) }}"
     >
     Complete
 </label>
@@ -33,14 +33,14 @@ attrs:
     <label class="field-label" for="{{ form.tags.html_id }}">Tags</label>
     <select
         class="field-input h-32"
-        name="{{ form.tags.html_name }}"
+        name="{{ form.tags.name }}"
         id="{{ form.tags.html_id }}"
         multiple
     >
-        {% for (value, label) in form.tags.field.choices %}
+        {% for (value, label) in form.tags.choices %}
             <option
                 value="{{ value }}"
-                selected="{{ str(value) in [str(v) for v in (form.tags.value() or [])] }}"
+                selected="{{ str(value) in [str(v) for v in (form.tags.value or [])] }}"
             >{{ label }}</option>
         {% endfor %}
     </select>

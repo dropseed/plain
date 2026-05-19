@@ -28,7 +28,6 @@ dev = [
   "plain-oauth",
   "plain-observer",
   "plain-pages",
-  "plain-pageviews",
   "plain-passwords",
   "plain-pytest",
   "plain-redirection",
@@ -68,7 +67,6 @@ dev = [
 "plain-oauth" = { workspace = true }
 "plain-observer" = { workspace = true }
 "plain-pages" = { workspace = true }
-"plain-pageviews" = { workspace = true }
 "plain-passwords" = { workspace = true }
 "plain-pytest" = { workspace = true }
 "plain-redirection" = { workspace = true }

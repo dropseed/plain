@@ -12,22 +12,15 @@ from .parser import ParseError
 from .template import Template
 from .tokenizer import TokenizeError
 from .views import (
-    CreateView,
-    DeleteView,
     DetailView,
-    FormView,
     ListView,
     NotFoundView,
     TemplateView,
-    UpdateView,
 )
 
 __all__ = [
     "CompileError",
-    "CreateView",
-    "DeleteView",
     "DetailView",
-    "FormView",
     "ListView",
     "Markup",
     "NotFoundView",
@@ -36,7 +29,6 @@ __all__ = [
     "TemplateFileMissing",
     "TemplateView",
     "TokenizeError",
-    "UpdateView",
     "mark_safe",
     "render",
     "render_source",

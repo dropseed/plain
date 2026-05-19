@@ -62,7 +62,7 @@ The [base `View` class](./base.py#View) provides default `options` and `head` be
 
 ## Template-rendering views
 
-Views that render HTML templates (`TemplateView`, `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) live in the [`plain.html`](../../../plain-html/plain/html/README.md) package. Install `plain.html` and import them from `plain.html.views`:
+Views that render HTML templates (`TemplateView`, `DetailView`, `ListView`) live in the [`plain.html`](../../../plain-html/plain/html/README.md) package. Install `plain.html` and import them from `plain.html.views`:
 
 ```python
 from plain.html.views import TemplateView

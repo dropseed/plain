@@ -1,0 +1,12 @@
+---
+imports:
+  - from plain.connect.templates import connect_pageviews
+attrs:
+  request: Any
+---
+<!doctype html>
+<html>
+  <body>
+    {{ connect_pageviews(request) }}
+  </body>
+</html>

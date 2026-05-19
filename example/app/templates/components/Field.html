@@ -17,29 +17,29 @@ attrs:
     {% if type == "textarea" %}
     <textarea
         class="{{ ["field-input", f"min-h-[{min_height}]" if min_height else None] }}"
-        name="{{ bf.html_name }}"
+        name="{{ bf.name }}"
         id="{{ bf.html_id }}"
         required="{{ required }}"
         autofocus="{{ autofocus }}"
-    >{{ bf.value() or '' }}</textarea>
+    >{{ bf.value or '' }}</textarea>
 {% endif %}{% if type == "select" %}
         <select
     class="field-input"
-    name="{{ bf.html_name }}"
+    name="{{ bf.name }}"
     id="{{ bf.html_id }}"
     required="{{ required }}"
 >
-    {% for (value, choice_label) in bf.field.choices %}
-        <option value="{{ value }}" selected="{{ str(bf.value()) == str(value) }}">{{ choice_label }}</option>
+    {% for (value, choice_label) in bf.choices %}
+        <option value="{{ value }}" selected="{{ str(bf.value) == str(value) }}">{{ choice_label }}</option>
     {% endfor %}
 </select>
     {% endif %}{% if type not in ("textarea", "select") %}
         <input
     class="field-input"
     type="{{ type }}"
-    name="{{ bf.html_name }}"
+    name="{{ bf.name }}"
     id="{{ bf.html_id }}"
-    value="{{ bf.value() or '' }}"
+    value="{{ bf.value or '' }}"
     required="{{ required }}"
     autofocus="{{ autofocus }}"
     autocomplete="{{ autocomplete or None }}"

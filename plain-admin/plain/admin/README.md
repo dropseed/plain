@@ -48,15 +48,13 @@ from plain.admin.views import (
     AdminViewset,
     register_viewset,
 )
-from plain.postgres.forms import ModelForm
+from plain.postgres.forms import ModelForm, model_field
 
 from .models import User
 
 
 class UserForm(ModelForm):
-    class Meta:
-        model = User
-        fields = ["email"]
+    email = model_field(User.email)
 
 
 @register_viewset
@@ -313,14 +311,15 @@ For a single object's full field set, use a [model detail view](#model-views) in
 Admin forms work with standard [plain.forms](/plain/plain/forms/README.md). For model-based forms, use [`ModelForm`](/plain-postgres/plain/postgres/forms.py#ModelForm).
 
 ```python
-from plain.postgres.forms import ModelForm
+from plain.postgres.forms import ModelForm, model_field
 from plain.admin.views import AdminModelUpdateView
 
 
 class UserForm(ModelForm):
-    class Meta:
-        model = User
-        fields = ["email", "first_name", "last_name", "is_active"]
+    email = model_field(User.email)
+    first_name = model_field(User.first_name)
+    last_name = model_field(User.last_name)
+    is_active = model_field(User.is_active)
 
 
 class UpdateView(AdminModelUpdateView):

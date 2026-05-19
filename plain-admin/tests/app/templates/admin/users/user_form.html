@@ -1,0 +1,16 @@
+---
+components:
+  - admin/base as Base
+  - elements/admin/InputField
+  - elements/admin/CheckboxField
+  - elements/admin/Submit
+attrs:
+  form: Any
+---
+<Base>
+    <form method="post" class="space-y-4">
+        <InputField label="Username" field="{{ form.username }}" />
+        <CheckboxField label="Is admin" field="{{ form.is_admin }}" />
+        <Submit>Save</Submit>
+    </form>
+</Base>

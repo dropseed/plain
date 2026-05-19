@@ -8,22 +8,18 @@ from plain.admin.views import (
     AdminViewset,
     register_viewset,
 )
-from plain.postgres.forms import ModelForm
+from plain.postgres.forms import ModelForm, model_field
 
 from .models import NotFoundLog, Redirect, RedirectLog
 
 
 class RedirectForm(ModelForm):
-    class Meta:
-        model = Redirect
-        fields = [
-            "from_pattern",
-            "to_pattern",
-            "http_status",
-            "order",
-            "enabled",
-            "is_regex",
-        ]
+    from_pattern = model_field(Redirect.from_pattern)
+    to_pattern = model_field(Redirect.to_pattern)
+    http_status = model_field(Redirect.http_status)
+    order = model_field(Redirect.order)
+    enabled = model_field(Redirect.enabled)
+    is_regex = model_field(Redirect.is_regex)
 
 
 @register_viewset

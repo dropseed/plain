@@ -20,14 +20,15 @@ class HTMXView(TemplateView):
     e.g. a redirect, a 204, or a custom payload.
     """
 
-    def render_template(self) -> str:
+    def render(self, **context: Any) -> Response:
+        """Render the active fragment on a fragment request, the full template otherwise."""
         if self.is_htmx_request() and self.get_htmx_fragment_name():
             # The original `{% htmxfragment %}` mechanism was a Jinja
             # extension that walked the template's AST to find a named
             # fragment and render just that subtree. plain.html doesn't
-            # have an equivalent yet — see the rip-out plan, step 6.
-            # Templates that want fragment-style updates can hand-emit
-            # the same wrapper div the tag used to produce.
+            # have an equivalent yet. Templates that want fragment-style
+            # updates can hand-emit the same wrapper div the tag used to
+            # produce.
             raise NotImplementedError(
                 "HTMX fragment rendering ({% htmxfragment %}) is not yet "
                 "implemented in plain.html. Hand-emit the "
@@ -35,11 +36,11 @@ class HTMXView(TemplateView):
                 "wrapper for now."
             )
 
-        return self.get_template().render(self.get_template_context())
+        return super().render(**context)
 
     def convert_result_to_response(self, result: Response | None) -> Response:
         if result is None:
-            return Response(self.render_template())
+            return self.render()
         if isinstance(result, Response):
             return result
         raise TypeError(

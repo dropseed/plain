@@ -12,6 +12,8 @@
     - [SMTP backend](#smtp-backend)
     - [Console backend](#console-backend)
     - [Preview backend](#preview-backend)
+    - [In-memory backend](#in-memory-backend)
+- [Testing](#testing)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -144,7 +146,7 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 ## Email backends
 
-The `EMAIL_BACKEND` setting controls how emails are sent. Plain includes three backends.
+The `EMAIL_BACKEND` setting controls how emails are sent. Plain includes four backends.
 
 ### SMTP backend
 
@@ -173,6 +175,31 @@ EMAIL_BACKEND = "plain.email.backends.preview.EmailBackend"
 Or via env var: `PLAIN_EMAIL_BACKEND=plain.email.backends.preview.EmailBackend`.
 
 When [`plain.toolbar`](../../plain-toolbar/plain/toolbar/README.md) is installed, the toolbar gains an **Email** panel that lists recent captured messages and renders their HTML bodies inline. You can also open any `.eml` file directly in Mail.app.
+
+### In-memory backend
+
+Captures sent messages in a list instead of delivering them — intended for tests. See [Testing](#testing) for the `mailoutbox` fixture built on it.
+
+```python
+EMAIL_BACKEND = "plain.email.backends.locmem.EmailBackend"
+```
+
+## Testing
+
+`plain.email` ships a `mailoutbox` pytest fixture. It routes email to the in-memory backend for the duration of a test and yields the captured messages:
+
+```python
+from plain.email import send_mail
+
+
+def test_sends_email(mailoutbox):
+    send_mail("Subject", "Body", "from@example.com", ["person@example.com"])
+
+    assert len(mailoutbox) == 1
+    assert mailoutbox[0].to == ["person@example.com"]
+```
+
+The fixture clears the outbox around each test (so messages never leak between tests) and restores the original `EMAIL_BACKEND` afterward. It registers automatically — no pytest plugin configuration needed.
 
 ## FAQs
 

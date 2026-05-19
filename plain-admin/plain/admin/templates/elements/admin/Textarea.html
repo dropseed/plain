@@ -7,9 +7,9 @@ attrs:
 <textarea
     id="{{ field.html_id }}"
     class="admin-textarea"
-    name="{{ field.html_name }}"
+    name="{{ field.name }}"
     rows="{{ rows }}"
     spellcheck="{{ spellcheck }}"
-    required="{{ field.field.required }}"
-    aria-invalid="{{ bool(field.errors) or None }}"
->{{ field.value() or "" }}</textarea>
+    required="{{ field.required }}"
+    aria-invalid="{{ 'true' if field.errors else None }}"
+>{{ field.value or "" }}</textarea>
