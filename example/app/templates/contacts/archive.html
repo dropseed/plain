@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import field, back_link %}
+{% from "_macros.html" import back_link %}
 
 {% block title %}Contact archive{% endblock %}
 
@@ -9,20 +9,37 @@
 
     <h1 class="page-h1">Contact archive</h1>
     <p class="mt-3 text-sm text-muted">
-        Two GET forms on one page — proves <span class="font-mono text-body">prefix</span>
-        keeps their fields disjoint.
+        GET filters read straight from <span class="font-mono text-body">query_params</span> —
+        read-only filtering needs no <span class="font-mono text-body">Form</span>.
     </p>
 
     <form method="get" class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-        {{ field(search_form.text, "Search message", placeholder="Contains…") }}
-        {{ field(filter_form.subject, "Subject", type="select") }}
+        <div>
+            <label class="field-label" for="search">Search message</label>
+            <input
+                class="field-input"
+                type="text"
+                name="search"
+                id="search"
+                value="{{ search }}"
+                placeholder="Contains…"
+            >
+        </div>
+        <div>
+            <label class="field-label" for="subject">Subject</label>
+            <select class="field-input" name="subject" id="subject">
+                <option value="">All subjects</option>
+                {% for value, label in subject_choices %}
+                <option value="{{ value }}" {% if value == subject %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="flex items-center gap-3">
             <label class="flex items-center gap-2 text-sm text-body">
                 <input
                     type="checkbox"
-                    name="{{ filter_form.subscribed_only.html_name }}"
-                    id="{{ filter_form.subscribed_only.html_id }}"
-                    {% if filter_form.subscribed_only.value() %}checked{% endif %}
+                    name="subscribed_only"
+                    {% if subscribed_only %}checked{% endif %}
                 >
                 Subscribed only
             </label>

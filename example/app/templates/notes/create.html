@@ -11,7 +11,7 @@
 
     <form method="post" class="mt-6 flex flex-col gap-5">
         {{ nonfield_errors(form) }}
-        {{ field(form.title, "Title", autofocus=True, required=True) }}
+        {{ field(form.title, "Title", autofocus=True) }}
         {{ field(form.body, "Body", type="textarea", min_height="200px") }}
         <button type="submit" class="btn-primary self-start">Create</button>
     </form>

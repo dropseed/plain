@@ -4,6 +4,7 @@ from plain.api import openapi
 from plain.api.views import APIView
 from plain.auth import get_request_user
 from plain.auth.views import LoginRequired
+from plain.postgres.forms import create_from
 from plain.urls import Router, path
 
 from .forms import TaskForm
@@ -87,11 +88,16 @@ class TaskListAPIView(APIView):
         user = get_request_user(self.request)
         if not user:
             raise LoginRequired(login_url=None)
-        form = TaskForm(request=self.request, owner=user)
-        if not form.is_valid():
-            return 400, {"errors": form.errors}
-        form.instance.owner = user
-        task = form.save()
+        result = TaskForm.for_owner(user).validate(self.request.json_data)
+        if not result:
+            return 400, {
+                "errors": [
+                    {"field": e.field, "code": e.code, "message": e.message}
+                    for e in result.errors
+                ]
+            }
+        # `owner` isn't a form field — pass it to create_from() as an extra.
+        task = create_from(Task, result, owner=user)
         return 201, _serialize(task)
 
 

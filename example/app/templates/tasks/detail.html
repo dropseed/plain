@@ -14,9 +14,9 @@
                 aria-label="Task title"
                 class="flex-1 page-h1 bg-transparent border border-transparent hover:border-outline focus:border-ink focus:ring-[3px] focus:ring-ink/15 rounded px-2 py-1 outline-none"
                 type="text"
-                name="{{ title_form.title.html_name }}"
+                name="{{ title_form.title.name }}"
                 id="{{ title_form.title.html_id }}"
-                value="{{ title_form.title.value() or task.title }}"
+                value="{{ title_form.title.value or task.title }}"
             >
             <button type="submit" class="btn-primary">Rename</button>
         </form>

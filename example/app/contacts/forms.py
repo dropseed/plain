@@ -1,74 +1,55 @@
 from __future__ import annotations
 
-from typing import Any
+from plain.forms import Error, Form, types
 
-from plain import forms
-
-from .models import SUBJECT_BUG, SUBJECT_CHOICES, ContactSubmission
+from .models import SUBJECT_BUG, SUBJECT_CHOICES
 
 BLOCKED_EMAIL_DOMAINS = {"blocked.test", "spam.example"}
 
 
-class ContactForm(forms.Form):
-    """Plain (non-Model) Form exercising every common field type and clean hook.
-
-    Used by ContactView on /contacts/.
+class ContactForm(Form):
+    """A plain (non-model) Form exercising common field types and the
+    cross-field `check()` hook. `ContactView` validates it, then copies the
+    cleaned values onto a `ContactSubmission`.
     """
 
-    name = forms.TextField(max_length=100, min_length=2)
-    email = forms.EmailField()
-    subject = forms.ChoiceField(choices=SUBJECT_CHOICES)
-    message = forms.TextField(min_length=10)
-    subscribe = forms.BooleanField(required=False, initial=False)
+    name = types.TextField(max_length=100, min_length=2)
+    email = types.EmailField()
+    subject = types.ChoiceField(choices=SUBJECT_CHOICES)
+    message = types.TextField(min_length=10)
+    subscribe = types.BooleanField(required=False)
 
-    def __init__(self, *, ask_company: bool = False, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        if ask_company:
-            self.fields["company"] = forms.TextField(max_length=200, required=False)
+    def check(self) -> list[Error] | None:
+        """Validation that spans fields, or that a single field can't express
+        on its own — run after every field has cleaned."""
+        errors: list[Error] = []
 
-    def clean_email(self) -> str:
-        email: str = self.cleaned_data["email"]
-        domain = email.rsplit("@", 1)[-1].lower()
+        domain = self.email.rsplit("@", 1)[-1].lower()
         if domain in BLOCKED_EMAIL_DOMAINS:
-            raise forms.ValidationError(f"Email domain '{domain}' is not allowed.")
-        return email
-
-    def clean(self) -> dict[str, Any]:
-        cleaned = super().clean()
-        subject = cleaned.get("subject")
-        message = cleaned.get("message", "")
-        if subject == SUBJECT_BUG and len(message) < 30:
-            raise forms.ValidationError(
-                "Bug reports need at least 30 characters of detail."
+            errors.append(
+                Error(
+                    f"Email domain '{domain}' is not allowed.",
+                    code="blocked_domain",
+                    field="email",
+                )
             )
-        return cleaned
 
-    def save(self) -> ContactSubmission:
-        return ContactSubmission.query.create(
-            name=self.cleaned_data["name"],
-            email=self.cleaned_data["email"],
-            subject=self.cleaned_data["subject"],
-            message=self.cleaned_data["message"],
-            company=self.cleaned_data.get("company", ""),
-            subscribe=self.cleaned_data["subscribe"],
-        )
+        if self.subject == SUBJECT_BUG and len(self.message) < 30:
+            errors.append(
+                Error(
+                    "Bug reports need at least 30 characters of detail.",
+                    code="too_short",
+                    field="message",
+                )
+            )
 
-
-class ArchiveSearchForm(forms.Form):
-    """Plain Form used as a GET search box on the archive page. Uses prefix."""
-
-    prefix = "q"
-
-    text = forms.TextField(required=False)
+        return errors or None
 
 
-class ArchiveFilterForm(forms.Form):
-    """A second form on the same page as ArchiveSearchForm — proves prefix works."""
+class ContactFormWithCompany(ContactForm):
+    """`ContactForm` plus an optional `company` field. `ContactView` swaps to
+    this when `?company=1` — a conditional field is a subclass now, not a
+    per-instance `self.fields[...]` mutation.
+    """
 
-    prefix = "f"
-
-    subject = forms.ChoiceField(
-        choices=[("", "All subjects")] + SUBJECT_CHOICES,
-        required=False,
-    )
-    subscribed_only = forms.BooleanField(required=False)
+    company = types.TextField(max_length=200, required=False)
