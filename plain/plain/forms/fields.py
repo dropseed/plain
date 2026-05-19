@@ -86,6 +86,10 @@ class Field[T]:
     # `Form.validate` reads them with `.getlist()` from multi-valued data.
     multi_value: bool = False
 
+    # `(value, label)` options when the field renders as a <select> — empty
+    # for a field with no fixed choice set; choice fields set their own.
+    choices: list[tuple[Any, Any]] = []
+
     # The attribute name the field is declared under; set by `__set_name__`.
     name: str = ""
 

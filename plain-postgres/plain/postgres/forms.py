@@ -33,7 +33,6 @@ __all__ = (
     "ModelMultipleChoiceField",
     "create_from",
     "model_field",
-    "modelfield_to_formfield",
     "update_from",
 )
 
@@ -122,9 +121,10 @@ class ModelMultipleChoiceField(_ModelChoiceBase):
         return objects
 
 
-def modelfield_to_formfield(modelfield: Any) -> Field[Any] | None:
-    """Map a postgres model field to a form field instance, or `None` for
-    fields that can't be derived (the primary key, non-column fields)."""
+def _modelfield_to_formfield(modelfield: Any) -> Field[Any] | None:
+    """Map a postgres model field to a form field instance, or `None` when
+    the column isn't user input: the primary key, a non-column field, or a
+    column the database fills itself (`generate`/`create_now`/`update_now`)."""
     from plain import postgres
     from plain.postgres.fields import ChoicesField
     from plain.postgres.fields.base import ColumnField, DefaultableField
@@ -140,16 +140,15 @@ def modelfield_to_formfield(modelfield: Any) -> Field[Any] | None:
         return None
     if isinstance(modelfield, postgres.PrimaryKeyField):
         return None
+    # A column the database fills itself is never user input — keep it off
+    # the form so a blank submission can't fight the database default.
+    if modelfield.db_returning or modelfield.auto_fills_on_save:
+        return None
 
-    # `create_now`/`generate`/`update_now` columns fill themselves in, so the
-    # form must let the caller omit them.
-    auto_filled = modelfield.db_returning or modelfield.auto_fills_on_save
-    required = modelfield.required and not auto_filled
+    required = modelfield.required
     initial = (
         modelfield.get_default()
-        if isinstance(modelfield, DefaultableField)
-        and modelfield.has_default()
-        and not auto_filled
+        if isinstance(modelfield, DefaultableField) and modelfield.has_default()
         else None
     )
 
@@ -231,9 +230,13 @@ def model_field(column: Any) -> Field[Any]:
     typed exactly as the column, and a column typo (`Note.titel`) is a type
     error. A ForeignKey becomes a `ModelChoiceField`, a ManyToMany a
     `ModelMultipleChoiceField`.
+
+    The primary key and database-filled columns (`generate`/`create_now`)
+    aren't user input; `model_field` rejects them — declare such a field
+    explicitly with a `types.*` field if a form genuinely needs it.
     """
     modelfield = _resolve_model_field(column)
-    derived = modelfield_to_formfield(modelfield)
+    derived = _modelfield_to_formfield(modelfield)
     if derived is None:
         raise TypeError(
             f"{modelfield!r} can't be derived into a form field — declare the "
@@ -247,8 +250,8 @@ class ModelForm(Form):
 
     Declare each field with `model_field(Model.column)`. `ModelForm` adds two
     model-aware helpers to `Form` — `with_querysets()` and `initial_from()` —
-    but does not itself persist: `QuerySet.create_from()` and
-    `Model.update_from()` write a validated result to the database.
+    but does not itself persist: the `create_from()` and `update_from()`
+    functions write a validated result to the database.
     """
 
     @classmethod
@@ -313,11 +316,7 @@ def update_from[T: Model](instance: T, result: ModelForm) -> T:
     relations (which need a primary key first). Returns the instance. Form
     fields that aren't columns of the instance's model are ignored — a
     `ModelForm` may carry an extra non-model field (e.g. a confirm-password).
-    A blank value for a database-filled column (`generate`/`create_now`) is
-    skipped, so the database default still applies on INSERT.
     """
-    from plain.postgres.fields import DATABASE_DEFAULT
-
     column_names = {
         f.name
         for f in chain(
@@ -328,17 +327,13 @@ def update_from[T: Model](instance: T, result: ModelForm) -> T:
 
     m2m: list[tuple[str, Any]] = []
     for fname, field in type(result).fields().items():
-        if fname not in column_names or not hasattr(result, fname):
+        if fname not in column_names:
             continue
         value = getattr(result, fname)
         if isinstance(field, ModelMultipleChoiceField):
             m2m.append((fname, value))
-            continue
-        # A blank value for a column the database fills itself must leave the
-        # DATABASE_DEFAULT sentinel intact, so Postgres evaluates the DEFAULT.
-        if value in EMPTY_VALUES and getattr(instance, fname, None) is DATABASE_DEFAULT:
-            continue
-        setattr(instance, fname, value)
+        else:
+            setattr(instance, fname, value)
 
     instance.save()
 

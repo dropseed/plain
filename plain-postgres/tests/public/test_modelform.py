@@ -8,9 +8,7 @@ stays independent of any app's view layer. Covers what only this layer proves:
 
 from __future__ import annotations
 
-import datetime
-import uuid
-
+import pytest
 from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.forms import FormsExample
 from app.examples.models.relationships import Tag, Widget, WidgetTag
@@ -142,30 +140,12 @@ class TestScopingAndInitial:
 
 
 class TestDatabaseDefaults:
-    """A column the database fills itself (`generate`/`create_now`) can still
-    be a form field — omitting it must leave the database default to apply."""
+    """A column the database fills itself isn't user input — `model_field`
+    refuses to derive one rather than letting a blank submission fight the
+    database default."""
 
-    def test_create_from_leaves_db_generated_columns_to_the_database(self, db):
-        class DBDefaultsForm(ModelForm):
-            name = model_field(DBDefaultsExample.name)
-            db_uuid = model_field(DBDefaultsExample.db_uuid)
-            created_at = model_field(DBDefaultsExample.created_at)
-
-        # `db_uuid` / `created_at` derive as optional fields; omitting them
-        # must not overwrite the sentinel with None before the INSERT.
-        result = DBDefaultsForm.validate({"name": "row"})
-        assert result
-        obj = create_from(DBDefaultsExample, result)
-        assert isinstance(obj.db_uuid, uuid.UUID)
-        assert isinstance(obj.created_at, datetime.datetime)
-
-    def test_create_from_keeps_an_explicit_value_for_a_db_generated_column(self, db):
-        class DBDefaultsForm(ModelForm):
-            name = model_field(DBDefaultsExample.name)
-            db_uuid = model_field(DBDefaultsExample.db_uuid)
-
-        supplied = uuid.UUID("11111111-1111-1111-1111-111111111111")
-        result = DBDefaultsForm.validate({"name": "row", "db_uuid": str(supplied)})
-        assert result
-        obj = create_from(DBDefaultsExample, result)
-        assert obj.db_uuid == supplied
+    def test_model_field_rejects_a_database_filled_column(self):
+        with pytest.raises(TypeError, match="declare the field explicitly"):
+            model_field(DBDefaultsExample.db_uuid)  # UUIDField(generate=True)
+        with pytest.raises(TypeError, match="declare the field explicitly"):
+            model_field(DBDefaultsExample.created_at)  # DateTimeField(create_now=True)

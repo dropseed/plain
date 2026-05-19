@@ -307,21 +307,17 @@ def test_alter_field_literal_default_skips_drop_before_type_change(db):
 
 
 def test_modelfield_to_formfield_excludes_expression_defaults():
-    """Auto-generated form fields for DB-expression defaults must not carry
-    the expression instance as `initial` (it's a Func object, not a UUID/
-    datetime), and must not be `required` so the user can omit them and let
-    the DB fill the value on INSERT."""
-    from plain.postgres.forms import modelfield_to_formfield
+    """A column the database fills itself (a `generate`/`create_now`
+    expression default) isn't user input — `_modelfield_to_formfield`
+    returns None, so it can't be auto-derived onto a form."""
+    from plain.postgres.forms import _modelfield_to_formfield
 
     db_uuid_field = DBDefaultsExample._model_meta.get_forward_field("db_uuid")
-    form_field = modelfield_to_formfield(db_uuid_field)
-    assert form_field is not None
-    assert form_field.initial is None
-    assert form_field.required is False
+    assert _modelfield_to_formfield(db_uuid_field) is None
 
-    # And it doesn't break the usual path for static defaults.
+    # A static (literal) default still derives, carrying its value as initial.
     status_field = DefaultsExample._model_meta.get_forward_field("status")
-    form_field = modelfield_to_formfield(status_field)
+    form_field = _modelfield_to_formfield(status_field)
     assert form_field is not None
     assert form_field.initial == "pending"
 

@@ -13,6 +13,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from plain.utils.datastructures import MultiValueDict
+
 if TYPE_CHECKING:
     from .fields import Field
     from .forms import Form
@@ -95,8 +97,8 @@ class FormDisplay:
         # A multi-value field (multi-select) needs every submitted value, not
         # just the last — pull the list when the source is a multi-valued
         # mapping, as a re-rendered `Invalid.raw` is.
-        if field.multi_value and hasattr(self._values, "getlist"):
-            value: Any = self._values.getlist(name)  # ty: ignore[call-non-callable]
+        if field.multi_value and isinstance(self._values, MultiValueDict):
+            value: Any = self._values.getlist(name)
         else:
             # A field with no value displays empty — `None` is not text.
             value = self._values.get(name, "")
@@ -107,7 +109,7 @@ class FormDisplay:
             value=value,
             errors=[error for error in self._errors if error.field == name],
             required=field.required,
-            choices=getattr(field, "choices", []),
+            choices=field.choices,
         )
 
     def __getattr__(self, name: str) -> FieldDisplay:

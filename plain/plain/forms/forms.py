@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, ClassVar, Literal, Self
 
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
+from plain.utils.datastructures import MultiValueDict
 from plain.utils.hashable import make_hashable
 
 from .fields import Field, FileField
@@ -198,7 +199,7 @@ class Form:
         errors: list[Error] = []
         # MultiValueDict carries multi-valued keys; plain dicts don't. For
         # multi-select fields we need to pull all values, not just the last.
-        is_multi_value_dict = hasattr(raw, "getlist")
+        is_multi_value_dict = isinstance(raw, MultiValueDict)
 
         for name, field in cls._form_fields.items():
             try:
