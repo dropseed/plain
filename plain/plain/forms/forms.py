@@ -161,35 +161,6 @@ class Form:
         `if not result:` rather than an `isinstance` check."""
         return True
 
-    def apply_to[Instance](self, instance: Instance) -> Instance:
-        """Copy validated field values onto an existing object, returning it.
-
-        Walks `_form_fields`, calling `setattr(instance, name, value)` for
-        each field that's set on the form. A `validate()` result always
-        has every field set; a form built directly from incomplete data
-        may not — any unset field is skipped, leaving the target's existing
-        value intact.
-
-        This is a pure data move — it never persists. A form hands its
-        cleaned values to a target; whether and how that target is saved is
-        the caller's decision:
-
-            result = ContactForm.validate(self.request.form_data)
-            if not result:
-                return self.render(form=result)  # re-render with errors
-            result.apply_to(ContactSubmission()).save()
-
-        Field-name mismatches (form field doesn't exist on the target)
-        raise `AttributeError` only if the target uses ``__slots__`` —
-        regular Python objects accept arbitrary attribute assignment, so
-        the caller is responsible for keeping form and target field
-        names aligned.
-        """
-        for name in self._form_fields:
-            if hasattr(self, name):
-                setattr(instance, name, getattr(self, name))
-        return instance
-
     def check(self) -> list[Error] | None:
         """Cross-field validation hook. Override in subclasses.
 

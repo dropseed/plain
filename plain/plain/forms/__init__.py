@@ -13,12 +13,17 @@ become typed Python data.
 An `Invalid` carries a flat list of `Error`s; each `Error` names the `field`
 it concerns (or `None` for a form-level error) and carries a stable `code`.
 
+To render a form, a view wraps the outcome in a `FormDisplay` — the opt-in
+adapter that gives a template per-field `value` and `errors`. The core types
+above stay render-agnostic.
+
 `ModelForm` — a form backed by a model — lives in `plain.postgres`.
 """
 
 from __future__ import annotations
 
 from . import types
+from .display import FieldDisplay, FormDisplay
 from .fields import Field
 from .forms import Form
 from .result import Error, Invalid
@@ -26,7 +31,9 @@ from .result import Error, Invalid
 __all__ = (
     "Error",
     "Field",
+    "FieldDisplay",
     "Form",
+    "FormDisplay",
     "Invalid",
     "types",
 )
