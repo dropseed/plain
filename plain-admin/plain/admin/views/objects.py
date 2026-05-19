@@ -265,8 +265,8 @@ class AdminCreateView(AdminView):
     """Render a form on GET; validate, save, and redirect on POST.
 
     Set `model`, `form_class` (a `ModelForm`), and `template_name`. A valid
-    POST creates the object via `model.query.create_from()` and redirects; an
-    invalid one re-renders the template with the submitted values and errors.
+    POST creates the object via `create_from()` and redirects; an invalid one
+    re-renders the template with the submitted values and errors.
     """
 
     template_name = None
