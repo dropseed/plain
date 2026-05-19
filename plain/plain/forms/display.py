@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from .forms import Form
     from .result import Error, Invalid
 
-__all__ = ("FieldDisplay", "FormDisplay")
+__all__ = ["FieldDisplay", "FormDisplay"]
 
 
 @dataclass(frozen=True)

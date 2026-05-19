@@ -116,7 +116,11 @@ class LLMDocs:
 
     @staticmethod
     def _get_all_names(parsed: ast.Module) -> set[str]:
-        """Extract names from a module's `__all__` — a list or a tuple."""
+        """Extract names from __all__ in a parsed module.
+
+        Plain's convention is a list, but a tuple is equally valid Python —
+        accept both so a stray tuple doesn't silently drop a module's API.
+        """
         for node in parsed.body:
             if not isinstance(node, ast.Assign):
                 continue

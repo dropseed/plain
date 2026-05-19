@@ -28,7 +28,7 @@ from plain import validators
 from plain.exceptions import ValidationError
 from plain.utils.dateparse import parse_date, parse_datetime, parse_duration, parse_time
 
-__all__ = (
+__all__ = [
     "Field",
     "TextField",
     "EmailField",
@@ -50,7 +50,7 @@ __all__ = (
     "JSONField",
     "FileField",
     "ImageField",
-)
+]
 
 # Values that count as "no input" — an empty one fails a required field.
 EMPTY_VALUES = validators.EMPTY_VALUES

@@ -38,7 +38,7 @@ from .fields import (
     UUIDField,
 )
 
-__all__ = (
+__all__ = [
     "BooleanField",
     "ChoiceField",
     "DateField",
@@ -59,4 +59,4 @@ __all__ = (
     "TypedChoiceField",
     "URLField",
     "UUIDField",
-)
+]

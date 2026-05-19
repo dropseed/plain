@@ -391,6 +391,36 @@ def test_deregister_heartbeat_deletes_row(db, worker: Worker) -> None:
     assert not WorkerHeartbeat.query.filter(worker_id=worker.worker_id).exists()
 
 
+def test_run_loop_returns_connection_each_tick(
+    db, worker: Worker, settings, monkeypatch
+) -> None:
+    """The worker loop returns its pooled connection at the start of every
+    tick. Holding one connection for the worker's whole life would let a
+    server-side close wedge the loop reusing a dead connection forever."""
+    settings.JOBS_HEARTBEAT_INTERVAL = 0
+    worker.register_heartbeat()
+    worker._heartbeat_registered = True
+
+    # The no-job branch sleeps a second per tick — skip the real wait.
+    monkeypatch.setattr("plain.jobs.workers.time.sleep", lambda *a, **kw: None)
+
+    ticks = 0
+
+    def _stop_after_two() -> None:
+        nonlocal ticks
+        ticks += 1
+        if ticks >= 2:
+            worker._is_shutting_down = True
+
+    monkeypatch.setattr(
+        "plain.jobs.workers.return_database_connection", _stop_after_two
+    )
+
+    worker._run_loop()
+
+    assert ticks == 2
+
+
 def test_future_finished_callback_rescues_orphan_jobprocess(db) -> None:
     """If a future completes "successfully" but the JobProcess row survives
     (because process_job's outer except-Exception swallowed a framework error

@@ -27,14 +27,14 @@ if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.fields.related_managers import ManyToManyManager
 
-__all__ = (
+__all__ = [
     "ModelChoiceField",
     "ModelForm",
     "ModelMultipleChoiceField",
     "create_from",
     "model_field",
     "update_from",
-)
+]
 
 
 class _ModelChoiceBase(Field[Any]):

@@ -28,7 +28,7 @@ from .fields import Field
 from .forms import Form
 from .result import Error, Invalid
 
-__all__ = (
+__all__ = [
     "Error",
     "Field",
     "FieldDisplay",
@@ -36,4 +36,4 @@ __all__ = (
     "FormDisplay",
     "Invalid",
     "types",
-)
+]

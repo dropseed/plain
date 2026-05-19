@@ -9,7 +9,7 @@ from plain.utils.hashable import make_hashable
 from .fields import Field, FileField
 from .result import Error, Invalid
 
-__all__ = ("Form",)
+__all__ = ["Form"]
 
 # Marks a field with no value on an instance — distinct from a field that
 # legitimately cleaned to None. A `validate()` instance always has every

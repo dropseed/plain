@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-__all__ = ("Error", "Invalid")
+__all__ = ["Error", "Invalid"]
 
 
 @dataclass(frozen=True)

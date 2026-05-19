@@ -25,11 +25,11 @@ if TYPE_CHECKING:
     from plain.http import Response
     from plain.urls import ResolverMatch
 
-__all__ = (
+__all__ = [
     "Client",
     "ClientResponse",
     "RequestFactory",
-)
+]
 
 
 _BOUNDARY = "BoUnDaRyStRiNg"
