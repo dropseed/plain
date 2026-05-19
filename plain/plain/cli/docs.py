@@ -33,7 +33,6 @@ KNOWN_PACKAGES = {
     "plain-oauth": "OAuth provider login",
     "plain-observer": "On-page telemetry and observability",
     "plain-pages": "Serve static pages, markdown, and assets",
-    "plain-pageviews": "Client-side pageview tracking",
     "plain-passwords": "Password authentication",
     "plain-pytest": "Test with pytest",
     "plain-redirection": "URL redirection with admin and logging",

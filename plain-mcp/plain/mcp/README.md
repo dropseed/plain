@@ -237,25 +237,25 @@ urls = [
 
 ## Attaching tools to a shared MCP
 
-Packages that need to contribute tools to an MCP they don't own (for example, adding a page-views tool to `plain.admin.mcp.AdminMCP`) use the `register_tool()` classmethod:
+Packages that need to contribute tools to an MCP they don't own (for example, adding a feature-flag tool to `plain.admin.mcp.AdminMCP`) use the `register_tool()` classmethod:
 
 ```python
-# plain/pageviews/mcp.py
+# plain/flags/mcp.py
 from plain.admin.mcp import AdminMCP
 from plain.mcp import MCPTool
 
 
-class PageViewStats(MCPTool):
-    """Page view summary for the last N days."""
+class FlagStatus(MCPTool):
+    """Whether a feature flag is currently enabled."""
 
-    def __init__(self, days: int = 7):
-        self.days = days
+    def __init__(self, name: str):
+        self.name = name
 
     def run(self) -> dict:
         ...
 
 
-AdminMCP.register_tool(PageViewStats)
+AdminMCP.register_tool(FlagStatus)
 ```
 
 `register_tool()` accepts an `MCPTool` subclass. The attached tool inherits the host MCP's auth policy; tighter gating goes on the tool itself via `allowed_for()` (see [Authorization](#authorization)).

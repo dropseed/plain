@@ -25,7 +25,6 @@ dependencies = [
   "plain-postgres",
   "plain-oauth",
   "plain-pages",
-  "plain-pageviews",
   "plain-passwords",
   "plain-pytest",
   "plain-redirection",

@@ -20,7 +20,6 @@ INSTALLED_PACKAGES = [
     "plain.postgres",
     "plain.oauth",
     "plain.pages",
-    "plain.pageviews",
     "plain.passwords",
     "plain.sessions",
     "plain.support",

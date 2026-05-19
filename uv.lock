@@ -26,7 +26,6 @@ members = [
     "plain-oauth",
     "plain-observer",
     "plain-pages",
-    "plain-pageviews",
     "plain-passwords",
     "plain-portal",
     "plain-postgres",
@@ -233,7 +232,6 @@ dependencies = [
     { name = "plain-oauth" },
     { name = "plain-observer" },
     { name = "plain-pages" },
-    { name = "plain-pageviews" },
     { name = "plain-passwords" },
     { name = "plain-portal" },
     { name = "plain-postgres" },
@@ -271,7 +269,6 @@ requires-dist = [
     { name = "plain-oauth", editable = "plain-oauth" },
     { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
-    { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-portal", editable = "plain-portal" },
     { name = "plain-postgres", editable = "plain-postgres" },
@@ -1270,21 +1267,6 @@ requires-dist = [
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
-name = "plain-pageviews"
-version = "0.35.8"
-source = { editable = "plain-pageviews" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-postgres" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-postgres", editable = "plain-postgres" },
-]
-
-[[package]]
 name = "plain-passwords"
 version = "0.26.1"
 source = { editable = "plain-passwords" }
@@ -1616,7 +1598,6 @@ dev = [
     { name = "plain-oauth" },
     { name = "plain-observer" },
     { name = "plain-pages" },
-    { name = "plain-pageviews" },
     { name = "plain-passwords" },
     { name = "plain-portal" },
     { name = "plain-postgres" },
@@ -1659,7 +1640,6 @@ dev = [
     { name = "plain-oauth", editable = "plain-oauth" },
     { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
-    { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-portal", editable = "plain-portal" },
     { name = "plain-postgres", editable = "plain-postgres" },
