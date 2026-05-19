@@ -18,6 +18,13 @@ def _data_identity(content: bytes) -> str:
     return match.group(1).decode()
 
 
+def _data_route(content: bytes) -> str:
+    """Pull the `data-route` attribute out of the rendered <script> tag."""
+    match = re.search(rb'data-route="([^"]*)"', content)
+    assert match, f"no data-route attribute in: {content!r}"
+    return match.group(1).decode()
+
+
 def _decrypt(token: str, identity_key: str) -> str:
     key = hashlib.sha256(identity_key.encode()).digest()
     raw = base64.urlsafe_b64decode(token)
@@ -46,6 +53,16 @@ def test_anonymous_visitor_carries_no_identity(db, settings):
     response = Client().get("/")
     assert response.status_code == 200
     assert _data_identity(response.content) == ""
+
+
+def test_matched_route_is_rendered_into_the_tag(db, settings):
+    # The "/" URL is registered as path("", ...), so its route pattern is the
+    # empty string — _current_route prepends the leading slash to match the
+    # http.route span attribute.
+    settings.CONNECT_PAGEVIEWS_TOKEN = TOKEN
+    response = Client().get("/")
+    assert response.status_code == 200
+    assert _data_route(response.content) == "/"
 
 
 def test_signed_in_user_identity_is_encrypted_into_the_tag(db, settings):

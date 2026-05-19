@@ -28,7 +28,20 @@ class ConnectPageviewsExtension(InclusionTagExtension):
             "connect_pageviews_url": settings.CONNECT_PAGEVIEWS_URL,
             "connect_pageviews_identity": _identity_token(request) if token else "",
             "connect_pageviews_trace_id": _current_trace_id() if token else "",
+            "connect_pageviews_route": _current_route(request) if token else "",
         }
+
+
+def _current_route(request: Any) -> str:
+    # The matched URL route pattern (e.g. "/blog/<slug>/"), resolved before the
+    # template renders. Lets pageviews aggregate by view instead of by raw URL.
+    # Mirrors the http.route span attribute, including the leading slash.
+    if request is None:
+        return ""
+    resolver_match = request.resolver_match
+    if resolver_match is None or resolver_match.route is None:
+        return ""
+    return f"/{resolver_match.route}"
 
 
 def _identity_token(request: Any) -> str:
