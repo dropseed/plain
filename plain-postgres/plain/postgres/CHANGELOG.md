@@ -1,5 +1,16 @@
 # plain-postgres changelog
 
+## [0.103.5](https://github.com/dropseed/plain/releases/plain-postgres@0.103.5) (2026-05-19)
+
+### What's changed
+
+- **Pooled connections are now validated on checkout.** The connection pool runs `check_connection` on each `getconn()`, so a connection closed server-side while idle in the pool (a server or pooler idle timeout) is discarded and replaced rather than handed out dead. This closes a class of `OperationalError: the connection is closed` failures on the first query of a request after an idle period. ([31ad84f423](https://github.com/dropseed/plain/commit/31ad84f423))
+- Standardized `__all__` in `forms.py` to a list for consistency with the rest of the codebase. ([64ee8a4de0](https://github.com/dropseed/plain/commit/64ee8a4de0))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.103.4](https://github.com/dropseed/plain/releases/plain-postgres@0.103.4) (2026-05-12)
 
 ### What's changed
