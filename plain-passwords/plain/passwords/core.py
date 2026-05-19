@@ -7,6 +7,7 @@ from app.users.models import User
 
 from plain.email import TemplateEmail
 from plain.exceptions import ValidationError
+from plain.forms import Error
 
 from .hashers import check_password, hash_password
 from .utils import unicode_ci_compare
@@ -27,18 +28,30 @@ def check_user_password(user: Any, password: str) -> bool:
     return password_is_correct
 
 
-def get_password_errors(user: Any, password: str) -> list[str]:
+def get_password_errors(
+    user: Any, password: str, *, field: str | None = None
+) -> list[Error]:
     """Validate a new password against the password field's validators.
 
     Some validators compare the password against the user's other
-    attributes, so the user is required. Returns the error messages, or
-    an empty list when the password is acceptable.
+    attributes, so the user is required. Returns the validators' own
+    `Error`s — each carrying its `code` so callers can branch on which
+    rule failed — or an empty list when the password is acceptable. The
+    caller passes `field` to attach the errors to a form field.
     """
     try:
         # Clean it as if it were being assigned to the model field directly.
         user._model_meta.get_field("password").clean(password, user)
     except ValidationError as e:
-        return list(e.messages)
+        errors: list[Error] = []
+        for leaf in e.error_list:
+            message = leaf.message
+            if leaf.params:
+                message %= leaf.params
+            errors.append(
+                Error(message=str(message), code=leaf.code or "invalid", field=field)
+            )
+        return errors
     return []
 
 

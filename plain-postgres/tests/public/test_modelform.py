@@ -139,6 +139,27 @@ class TestScopingAndInitial:
         assert initial["name"] == "W"
         assert initial["tags"] == [red.id]
 
+    def test_with_querysets_can_be_re_scoped(self, db):
+        """A scoped form is itself a `ModelForm` subclass, so `with_querysets`
+        chains — the second scoping narrows the queryset further from the
+        first, not from the original."""
+        keep = Tag.query.create(name="keep")
+        also_keep = Tag.query.create(name="also-keep")
+        hide = Tag.query.create(name="hide")
+
+        first = WidgetForm.with_querysets(
+            tags=Tag.query.filter(id__in=[keep.id, also_keep.id])
+        )
+        second = first.with_querysets(tags=Tag.query.filter(id=keep.id))
+
+        assert second.validate({"name": "A", "size": "S", "tags": [keep.id]})
+        # `also_keep` was inside `first`'s scope but not `second`'s.
+        assert not second.validate({"name": "A", "size": "S", "tags": [also_keep.id]})
+        # `hide` was never in scope.
+        assert not second.validate({"name": "A", "size": "S", "tags": [hide.id]})
+        # The original `WidgetForm` is untouched — scoping does not mutate it.
+        assert WidgetForm.validate({"name": "A", "size": "S", "tags": [hide.id]})
+
 
 class TestDatabaseDefaults:
     """A column the database fills itself isn't user input — `model_field`

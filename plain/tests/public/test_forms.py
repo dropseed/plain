@@ -170,3 +170,39 @@ class TestFormIntrospection:
         assert result
         with pytest.raises(AttributeError):
             result.email = "changed@b.com"  # ty: ignore[invalid-assignment]
+
+
+class TestEqualityAndHashing:
+    """A `Form` instance carries the cleaned values, so two results from the
+    same input compare equal and hash the same — usable as a dict key or in a
+    set. A different form class with the same fields never compares equal."""
+
+    def test_same_input_compares_equal(self):
+        a = ContactForm.validate({"email": "a@b.com", "age": "7"})
+        b = ContactForm.validate({"email": "a@b.com", "age": "7"})
+        assert a == b
+        assert hash(a) == hash(b)
+
+    def test_different_input_compares_unequal(self):
+        a = ContactForm.validate({"email": "a@b.com"})
+        b = ContactForm.validate({"email": "c@d.com"})
+        assert a != b
+
+    def test_different_form_classes_never_compare_equal(self):
+        class OtherForm(Form):
+            email = types.EmailField()
+            age = types.IntegerField(required=False)
+
+        assert ContactForm.validate({"email": "a@b.com"}) != OtherForm.validate(
+            {"email": "a@b.com"}
+        )
+
+    def test_multi_value_field_stays_hashable(self):
+        # MultipleChoiceField cleans to a list — make_hashable converts it to
+        # a tuple so the result still hashes.
+        class Picker(Form):
+            picks = types.MultipleChoiceField(choices=[("a", "A"), ("b", "B")])
+
+        result = Picker.validate({"picks": ["a", "b"]})
+        assert result
+        assert hash(result) == hash(Picker.validate({"picks": ["a", "b"]}))
