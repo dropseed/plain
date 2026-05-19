@@ -74,6 +74,8 @@ PLAIN_CONNECT_PAGEVIEWS_TOKEN=plain_pv_...
 
 The tag renders nothing until the token is set. Once enabled, it reports the URL, title, referrer, and a first-party anonymous id on each page load and SPA navigation (History `pushState` / back-forward).
 
+If your app sends a `Content-Security-Policy`, add the pageview ingest host to `connect-src` — the script beacons to `CONNECT_PAGEVIEWS_URL` (`https://beacon.plainframework.com` by default). Without it, the browser blocks every pageview beacon.
+
 ### User attribution
 
 To attribute pageviews to your signed-in users, also set the secret identity key:
