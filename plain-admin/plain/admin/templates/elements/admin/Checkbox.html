@@ -2,7 +2,7 @@
     id="{{ field.html_id }}"
     class="admin-input"
     type="checkbox"
-    name="{{ field.html_name }}"
-    {% if field.value() %}checked{% endif %}
-    {% if field.field.required %}required{% endif %}
+    name="{{ field.name }}"
+    {% if field.value %}checked{% endif %}
+    {% if field.required %}required{% endif %}
     >

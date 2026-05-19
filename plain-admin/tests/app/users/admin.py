@@ -7,15 +7,14 @@ from plain.admin.views import (
     AdminViewset,
     register_viewset,
 )
-from plain.postgres.forms import ModelForm
+from plain.postgres.forms import ModelForm, model_field
 
 from .models import User
 
 
 class UserForm(ModelForm):
-    class Meta:
-        model = User
-        fields = ["username", "is_admin"]
+    username = model_field(User.username)
+    is_admin = model_field(User.is_admin)
 
 
 @register_viewset

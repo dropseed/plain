@@ -1,11 +1,11 @@
 <select
     id="{{ field.html_id }}"
-    name="{{ field.html_name }}"
+    name="{{ field.name }}"
     class="admin-select"
-    {% if field.value() != None %}value="{{ field.value() }}"{% endif %}
-    {% if field.field.required %}required{% endif %}
+    {% if field.required %}required{% endif %}
+    {% if field.errors %}aria-invalid="true"{% endif %}
     >
-    {% for value, label in field.field.choices %}
-    <option value="{{ value }}" {% if value == field.value() %}selected{% endif %}>{{ label }}</option>
+    {% for value, label in field.choices %}
+    <option value="{{ value }}" {% if value == field.value %}selected{% endif %}>{{ label }}</option>
     {% endfor %}
 </select>
