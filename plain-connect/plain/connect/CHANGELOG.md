@@ -1,5 +1,17 @@
 # plain-connect changelog
 
+## [0.4.0](https://github.com/dropseed/plain/releases/plain-connect@0.4.0) (2026-05-18)
+
+### What's changed
+
+- New `{% connect_pageviews %}` template tag for first-party pageview tracking, independent of the OTLP export. Drop it into your base template before `</body>` and set `CONNECT_PAGEVIEWS_TOKEN` to enable it — it reports the URL, title, referrer, and an anonymous id on each page load and SPA navigation (`pushState` / back-forward). The tag renders nothing until the token is set. ([ab468e6bf9](https://github.com/dropseed/plain/commit/ab468e6bf9))
+- Optional signed-in user attribution: set `CONNECT_PAGEVIEWS_IDENTITY_KEY` and the tag encrypts the authenticated user's id (AES-256-GCM) into an opaque token, so the raw id never appears in page HTML. The user is read from `plain.auth` when installed; apps without it still get anonymous pageviews. ([ab468e6bf9](https://github.com/dropseed/plain/commit/ab468e6bf9))
+- New `CONNECT_PAGEVIEWS_TOKEN`, `CONNECT_PAGEVIEWS_IDENTITY_KEY`, and `CONNECT_PAGEVIEWS_URL` settings. ([ab468e6bf9](https://github.com/dropseed/plain/commit/ab468e6bf9))
+
+### Upgrade instructions
+
+- No changes required. Pageview tracking is opt-in — it stays off until you add the `{% connect_pageviews %}` tag and set `CONNECT_PAGEVIEWS_TOKEN`.
+
 ## [0.3.5](https://github.com/dropseed/plain/releases/plain-connect@0.3.5) (2026-05-08)
 
 ### What's changed
