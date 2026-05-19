@@ -1,0 +1,1 @@
+{% if connect_pageviews_token %}<script src="{{ asset('connect/pageviews.js') }}" data-token="{{ connect_pageviews_token }}" data-pageviews-url="{{ connect_pageviews_url }}" data-identity="{{ connect_pageviews_identity }}" data-trace-id="{{ connect_pageviews_trace_id }}" async nonce="{{ request.csp_nonce }}"></script>{% endif %}
