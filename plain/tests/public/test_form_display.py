@@ -124,6 +124,22 @@ class TestAccess:
         assert form.picks.value == ["a", "b"]
 
 
+class TestErrorFieldGuard:
+    """An Error referencing a non-existent field used to disappear silently —
+    it matched neither per-field rendering nor the form-level errors list.
+    Construction now rejects it so the typo surfaces at the view→template seam."""
+
+    def test_unknown_field_in_errors_raises(self):
+        with pytest.raises(ValueError, match="unknown field"):
+            FormDisplay(
+                ProfileForm,
+                errors=[Error("Bad.", code="invalid", field="emial")],
+            )
+
+    def test_form_level_error_still_allowed(self):
+        FormDisplay(ProfileForm, errors=[Error("Bad.", code="invalid")])
+
+
 class TestFieldDisplay:
     def test_attributes(self):
         field = FormDisplay(ProfileForm, values={"name": "Dave"}).name

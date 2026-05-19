@@ -141,6 +141,17 @@ class TestCheck:
         assert result.errors[0].code == "raised"
 
 
+class TestReservedFieldNames:
+    """`_frozen` is used internally as the immutability sentinel — a user
+    field with that name would silently lose its cleaned value."""
+
+    def test_reserved_name_raises_at_declaration(self):
+        with pytest.raises(TypeError, match="reserved by Form internals"):
+
+            class Bad(Form):
+                _frozen = types.TextField()
+
+
 class TestFormIntrospection:
     def test_fields_lists_declared_fields_in_order(self):
         assert list(ContactForm.fields()) == ["email", "age"]

@@ -98,6 +98,13 @@ class Form:
         for key, value in vars(cls).items():
             if isinstance(value, Field):
                 fields[key] = value
+        # `_frozen` is the instance-immutability sentinel — a field with this
+        # name would silently lose its cleaned value on every validate().
+        if "_frozen" in fields:
+            raise TypeError(
+                f"{cls.__name__}._frozen is reserved by Form internals; "
+                f"rename the field."
+            )
         cls._form_fields = fields
 
     @classmethod

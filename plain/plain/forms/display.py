@@ -89,10 +89,21 @@ class FormDisplay:
             }
         self._errors: list[Error] = errors if errors is not None else []
         self._values: dict[str, Any] = values if values is not None else {}
+        self._bound: dict[str, FieldDisplay] = {}
+        if self._errors:
+            for err in self._errors:
+                if err.field is not None and err.field not in self._fields:
+                    raise ValueError(
+                        f"{self._form_name}: Error references unknown field "
+                        f"{err.field!r}. Known fields: {sorted(self._fields)}. "
+                        f"Use field=None for form-level errors."
+                    )
 
     def _bind(self, name: str) -> FieldDisplay:
         if name not in self._fields:
             raise KeyError(f"{self._form_name} has no field {name!r}.")
+        if name in self._bound:
+            return self._bound[name]
         field = self._fields[name]
         # A multi-value field (multi-select) needs every submitted value, not
         # just the last — pull the list when the source is a multi-valued
@@ -104,13 +115,15 @@ class FormDisplay:
             value = self._values.get(name, "")
             if value is None:
                 value = ""
-        return FieldDisplay(
+        bound = FieldDisplay(
             name=name,
             value=value,
             errors=[error for error in self._errors if error.field == name],
             required=field.required,
             choices=field.choices,
         )
+        self._bound[name] = bound
+        return bound
 
     def __getattr__(self, name: str) -> FieldDisplay:
         # Only reached for names not found normally — i.e. field lookups.

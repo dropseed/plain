@@ -317,6 +317,7 @@ class BooleanField(Field[bool]):
         # `required` here means "must be true" (a checkbox that must be ticked).
         if not value and self.required:
             raise ValidationError(REQUIRED_MESSAGE, code="required")
+        self._run_validators(value)
         return value
 
 
@@ -383,6 +384,7 @@ class ChoiceField(_ChoiceField[str]):
                 f"Select a valid choice. {value} is not one of the available choices.",
                 code="invalid_choice",
             )
+        self._run_validators(value)
         return value
 
 
@@ -434,6 +436,7 @@ class MultipleChoiceField(_ChoiceField[list[str]]):
                     "available choices.",
                     code="invalid_choice",
                 )
+        self._run_validators(value)
         return value
 
 

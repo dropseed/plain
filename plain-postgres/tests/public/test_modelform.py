@@ -14,6 +14,7 @@ from app.examples.models.forms import FormsExample
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 
 from plain.forms import fields as form_fields
+from plain.forms import types
 from plain.postgres.forms import (
     ModelChoiceField,
     ModelForm,
@@ -149,3 +150,20 @@ class TestDatabaseDefaults:
             model_field(DBDefaultsExample.db_uuid)  # UUIDField(generate=True)
         with pytest.raises(TypeError, match="declare the field explicitly"):
             model_field(DBDefaultsExample.created_at)  # DateTimeField(create_now=True)
+
+    def test_explicit_blank_does_not_clobber_db_default(self, db):
+        """If a user declares a DB-default column explicitly with `types.*`
+        and submits no value, `update_from` must leave the DATABASE_DEFAULT
+        sentinel intact so Postgres fills the column itself."""
+
+        class ExplicitForm(ModelForm):
+            name = model_field(DBDefaultsExample.name)
+            # Deliberately bypass `model_field`'s guard.
+            db_uuid = types.UUIDField(required=False)
+
+        result = ExplicitForm.validate({"name": "row"})  # db_uuid omitted
+        assert result
+        row = create_from(DBDefaultsExample, result)
+        # If the empty value had been written, db_uuid would be None and the
+        # row would have failed full_clean / a NOT NULL violation.
+        assert row.db_uuid is not None
