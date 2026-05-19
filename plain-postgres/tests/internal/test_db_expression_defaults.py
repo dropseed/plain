@@ -326,59 +326,6 @@ def test_modelfield_to_formfield_excludes_expression_defaults():
     assert form_field.initial == "pending"
 
 
-def test_model_to_dict_omits_database_default_fields(db):
-    """model_to_dict is commonly used to seed a Form's `initial` from an
-    instance. If a DATABASE_DEFAULT sentinel leaked into that dict, it
-    would override the formfield's own initial=None and render the
-    repr `<DatabaseDefault>` in the rendered field."""
-    from plain.postgres.forms import model_to_dict
-
-    inst = DBDefaultsExample(name="x")
-    as_dict = model_to_dict(inst)
-
-    assert "name" in as_dict
-    assert as_dict["name"] == "x"
-    assert "db_uuid" not in as_dict
-    assert "created_at" not in as_dict
-
-
-def test_construct_instance_preserves_db_default_on_blank_submission(db):
-    """A blank HTML input for a DDE-defaulted field comes through as an
-    entry in form.data with a cleaned value of None/empty. construct_instance
-    must not overwrite DATABASE_DEFAULT with None in that case — the whole
-    point is to let Postgres evaluate the DEFAULT on INSERT."""
-    from plain.postgres.forms import construct_instance
-
-    # Minimal stand-in: construct_instance only reads `cleaned_data`, `data`,
-    # `files`, and `form[name].field.empty_values` + `add_prefix`.
-    class _FormField:
-        empty_values = [None, "", [], (), {}]
-
-    class _Bound:
-        field = _FormField()
-
-    class _Form:
-        cleaned_data = {"name": "from-form", "db_uuid": None, "created_at": None}
-        data = {"name": "from-form", "db_uuid": "", "created_at": ""}
-        files: dict = {}
-
-        def add_prefix(self, name: str) -> str:
-            return name
-
-        def __getitem__(self, name: str) -> _Bound:
-            return _Bound()
-
-    instance = DBDefaultsExample()
-    assert instance.db_uuid is DATABASE_DEFAULT
-
-    construct_instance(_Form(), instance)  # ty: ignore[invalid-argument-type]
-
-    # Blank submission must NOT overwrite the sentinel with None.
-    assert instance.db_uuid is DATABASE_DEFAULT
-    assert instance.created_at is DATABASE_DEFAULT
-    assert instance.name == "from-form"
-
-
 def test_database_default_singleton_survives_pickling(db):
     """`Model().save()` after `pickle.dumps`/`loads` round-trip must still
     work — the sentinel identity check (`is DATABASE_DEFAULT`) drives both

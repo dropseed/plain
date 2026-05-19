@@ -1,36 +1,40 @@
-"""ModelForm — auto-derive `Form` fields from a `postgres.Model`.
+"""ModelForm — a `Form` whose fields are declared from postgres model columns.
 
-Declare a `model` and a `Field[T] = model_field()` per field, and
-`__init_subclass__` derives a validating field from the model column of the
-same name — scalar columns map to `plain.forms` fields, a ForeignKey becomes
-a `ModelChoiceField`, a ManyToMany becomes a `ModelMultipleChoiceField`.
-Override one by declaring a `types.*` field explicitly.
+Declare each field with `model_field(Model.column)`; it copies the column's
+type, validators, and constraints into a `plain.forms` field. A scalar column
+maps to the matching `plain.forms` field, a ForeignKey to a `ModelChoiceField`,
+a ManyToMany to a `ModelMultipleChoiceField`.
 
-`ModelForm` lives in `plain.postgres` because it depends on the ORM —
-`from plain.forms import Form` stays free of it.
+`ModelForm` does not persist — it validates like any `Form`. To write a
+validated result back to the database, the `create_from()` / `update_from()`
+functions here consume it.
 
-Per-request queryset scoping (the multi-tenant FK/M2M case) is done by
-`with_querysets()`, which returns a subclass whose relation fields are
-narrowed — that scoped class drives both validation and the rendered
-`<select>` options.
+`with_querysets()` scopes FK/M2M choices per request (the multi-tenant case);
+`initial_from()` builds an edit form's initial values from a model instance.
 """
 
 from __future__ import annotations
 
 from itertools import chain
-from typing import Any, ClassVar, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast, overload
 
 from plain.exceptions import ValidationError
 from plain.forms import Form
 from plain.forms import fields as form_fields
 from plain.forms.fields import EMPTY_VALUES, Field
 
+if TYPE_CHECKING:
+    from plain.postgres.base import Model
+    from plain.postgres.fields.related_managers import ManyToManyManager
+
 __all__ = (
     "ModelChoiceField",
     "ModelForm",
     "ModelMultipleChoiceField",
+    "create_from",
     "model_field",
     "modelfield_to_formfield",
+    "update_from",
 )
 
 
@@ -194,87 +198,58 @@ def modelfield_to_formfield(modelfield: Any) -> Field[Any] | None:
     return form_fields.TextField(required=required, initial=initial)
 
 
-class _AutoField(Field[Any]):
-    """Placeholder left by `model_field()`. `_auto_derive_fields` replaces it
-    with the real field derived from the model column of the same name."""
+def _resolve_model_field(column: Any) -> Any:
+    """Normalize a model-column reference to its underlying field.
 
-
-def model_field() -> Field[Any]:
-    """Declare a `ModelForm` field derived from the model column of the
-    same name — its type, validators, and constraints come from the model.
-
-    Pair it with a `Field[T]` annotation so the field is a typed reference
-    on the class and the cleaned value on a validated instance:
-
-        class TaskForm(ModelForm):
-            model = Task
-            title: Field[str] = model_field()
-            project: Field[Project | None] = model_field()
-
-    `TaskForm.title` is then a `Field[str]` (keys the form when rendering) and
-    `result.title` is `str`. The annotation is statically checked; the
-    actual field is derived from `Task`'s column at class creation.
-
-    The explicit `= model_field()` value is what lets the type checker see
-    a descriptor — an annotation alone (`title: Field[str]`) does not.
+    A scalar column accessed on the class (`Note.title`) is the field itself.
+    A ForeignKey or ManyToMany installs a forward descriptor in its place;
+    both wrap the field as `.field`.
     """
-    return _AutoField()
+    from plain.postgres.fields.related_descriptors import (
+        ForwardForeignKeyDescriptor,
+        ForwardManyToManyDescriptor,
+    )
+
+    if isinstance(column, ForwardForeignKeyDescriptor | ForwardManyToManyDescriptor):
+        return column.field
+    return column
 
 
-def _auto_derive_fields(model: Any, annotation_names: list[str], cls: type) -> None:
-    """Set an auto-derived Field on `cls` for each annotation that names a
-    model field and doesn't already have a Field declared on the class body."""
-    by_name = {
-        f.name: f
-        for f in chain(
-            model._model_meta.concrete_fields, model._model_meta.many_to_many
+@overload
+def model_field[M: Model](column: ManyToManyManager[M]) -> Field[list[M]]: ...
+@overload
+def model_field[T](column: T) -> Field[T]: ...
+def model_field(column: Any) -> Field[Any]:
+    """Declare a `ModelForm` field derived from a model column.
+
+        class NoteForm(ModelForm):
+            title = model_field(Note.title)
+            body = model_field(Note.body)
+
+    Pass the model column itself — `Note.title`. The form field's type,
+    validators, and constraints are copied from it, so `result.title` is
+    typed exactly as the column, and a column typo (`Note.titel`) is a type
+    error. A ForeignKey becomes a `ModelChoiceField`, a ManyToMany a
+    `ModelMultipleChoiceField`.
+    """
+    modelfield = _resolve_model_field(column)
+    derived = modelfield_to_formfield(modelfield)
+    if derived is None:
+        raise TypeError(
+            f"{modelfield!r} can't be derived into a form field — declare the "
+            f"field explicitly with a `types.*` field instead."
         )
-    }
-    for fname in annotation_names:
-        if fname == "model":
-            continue
-        declared = cls.__dict__.get(fname)
-        if isinstance(declared, Field) and not isinstance(declared, _AutoField):
-            continue  # a real Field declared explicitly — an override; leave it
-        if fname not in by_name:
-            continue  # not a model field — a plain extra field, leave it
-        derived = modelfield_to_formfield(by_name[fname])
-        if derived is not None:
-            # `setattr` after class creation doesn't trigger `__set_name__`,
-            # so name the field explicitly — rendering keys on `field.name`.
-            derived.__set_name__(cls, fname)
-            setattr(cls, fname, derived)
+    return derived
 
 
 class ModelForm(Form):
-    """Form base class backed by a model.
+    """A `Form` whose fields are declared from postgres model columns.
 
-    Subclass, set `model = X`, and declare each field as
-    `name: Field[T] = model_field()`. Fields derive from the model column
-    of the same name; override one by declaring a `types.*` field explicitly.
+    Declare each field with `model_field(Model.column)`. `ModelForm` adds two
+    model-aware helpers to `Form` — `with_querysets()` and `initial_from()` —
+    but does not itself persist: `QuerySet.create_from()` and
+    `Model.update_from()` write a validated result to the database.
     """
-
-    # `model` is set on subclasses; `__init_subclass__` copies it to
-    # `_model_form_model` (also following inheritance).
-    model: ClassVar[Any] = None
-    _model_form_model: ClassVar[Any] = None
-
-    def __init_subclass__(cls, **kwargs: Any) -> None:
-        """Auto-derive fields from `model`, then collect them like any Form."""
-        model = cls.__dict__.get("model")
-        annotations = cls.__dict__.get("__annotations__") or {}
-        if model is not None and annotations:
-            _auto_derive_fields(model, list(annotations), cls)
-        # Form.__init_subclass__ collects every Field on the class — the
-        # ones just derived included — into `_form_fields`.
-        super().__init_subclass__(**kwargs)
-        if model is None:
-            for base in cls.__bases__:
-                inherited = getattr(base, "model", None)
-                if inherited is not None:
-                    model = inherited
-                    break
-        cls._model_form_model = model
 
     @classmethod
     def with_querysets(cls, **querysets: Any) -> type[Self]:
@@ -303,10 +278,7 @@ class ModelForm(Form):
                 field = field._with_queryset(querysets[fname])  # ty: ignore[unresolved-attribute]
             scoped_fields[fname] = field
 
-        scoped = cast(
-            type[Self],
-            type(f"{cls.__name__}Scoped", (cls,), {"__annotations__": {}}),
-        )
+        scoped = cast(type[Self], type(f"{cls.__name__}Scoped", (cls,), {}))
         scoped._form_fields = scoped_fields
         return scoped
 
@@ -317,8 +289,8 @@ class ModelForm(Form):
         Translates a ForeignKey to its `<name>_id` value and a ManyToMany
         relation to a list of related-object ids — what `ModelChoiceField`
         and `ModelMultipleChoiceField` take as input. Scalar fields fall
-        through to a plain `getattr`. Construct a form from the result —
-        `TaskForm(**TaskForm.initial_from(obj))` — to pre-fill an edit form.
+        through to a plain `getattr`. Pass the result as `FormDisplay`'s
+        `values=` to pre-fill an edit form.
         """
         initial: dict[str, Any] = {}
         for fname, field in cls._form_fields.items():
@@ -333,46 +305,53 @@ class ModelForm(Form):
                 initial[fname] = getattr(instance, fname, None)
         return initial
 
-    def save(self, instance: Any = None) -> Any:
-        """Apply the validated values to a model instance and persist it.
 
-        Pass an existing instance to update a row, or omit it to build a fresh
-        one from `model = ...`. Scalar and FK values are set, the row is
-        saved, then M2M relations are assigned (they need a primary key).
-        """
-        if instance is None:
-            model = type(self)._model_form_model
-            if model is None:
-                raise TypeError(
-                    f"{type(self).__name__}.save() needs `model = ...` set, "
-                    f"or an explicit instance."
-                )
-            instance = model()
+def update_from[T: Model](instance: T, result: ModelForm) -> T:
+    """Apply a validated `ModelForm` result onto a model instance and save it.
 
-        # Only fields backed by a model column or relation are persisted; a
-        # ModelForm may also declare extra non-model fields (e.g. a confirm-
-        # password field) that are validated but never reach the model.
-        model_field_names = {
-            f.name
-            for f in chain(
-                instance._model_meta.concrete_fields,
-                instance._model_meta.many_to_many,
-            )
-        }
+    Sets the column and FK values, saves the row, then assigns the M2M
+    relations (which need a primary key first). Returns the instance. Form
+    fields that aren't columns of the instance's model are ignored — a
+    `ModelForm` may carry an extra non-model field (e.g. a confirm-password).
+    A blank value for a database-filled column (`generate`/`create_now`) is
+    skipped, so the database default still applies on INSERT.
+    """
+    from plain.postgres.fields import DATABASE_DEFAULT
 
-        m2m: list[tuple[str, Any]] = []
-        for fname, field in type(self)._form_fields.items():
-            if fname not in model_field_names or not hasattr(self, fname):
-                continue
-            value = getattr(self, fname)
-            if isinstance(field, ModelMultipleChoiceField):
-                m2m.append((fname, value))
-            else:
-                setattr(instance, fname, value)
+    column_names = {
+        f.name
+        for f in chain(
+            instance._model_meta.concrete_fields,
+            instance._model_meta.many_to_many,
+        )
+    }
 
-        instance.save()
+    m2m: list[tuple[str, Any]] = []
+    for fname, field in type(result).fields().items():
+        if fname not in column_names or not hasattr(result, fname):
+            continue
+        value = getattr(result, fname)
+        if isinstance(field, ModelMultipleChoiceField):
+            m2m.append((fname, value))
+            continue
+        # A blank value for a column the database fills itself must leave the
+        # DATABASE_DEFAULT sentinel intact, so Postgres evaluates the DEFAULT.
+        if value in EMPTY_VALUES and getattr(instance, fname, None) is DATABASE_DEFAULT:
+            continue
+        setattr(instance, fname, value)
 
-        for fname, value in m2m:
-            getattr(instance, fname).set(list(value))
+    instance.save()
 
-        return instance
+    for fname, value in m2m:
+        getattr(instance, fname).set(list(value))
+
+    return instance
+
+
+def create_from[T: Model](model: type[T], result: ModelForm, /, **extra: Any) -> T:
+    """Create and save a new model instance from a validated `ModelForm` result.
+
+    Column values come from `result`; `extra` kwargs (e.g. `author=user`)
+    populate columns the form doesn't carry.
+    """
+    return update_from(model(**extra), result)
