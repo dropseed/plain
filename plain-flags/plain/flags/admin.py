@@ -9,7 +9,7 @@ from plain.admin.views import (
     register_viewset,
 )
 from plain.postgres import QuerySet
-from plain.postgres.forms import ModelForm
+from plain.postgres.forms import ModelForm, model_field
 from plain.preflight import PreflightResult
 
 from .models import Flag, FlagResult
@@ -45,9 +45,8 @@ class FlagAdmin(AdminViewset):
 
 
 class FlagResultForm(ModelForm):
-    class Meta:
-        model = FlagResult
-        fields = ["key", "value"]
+    key = model_field(FlagResult.key)
+    value = model_field(FlagResult.value)
 
 
 @register_viewset

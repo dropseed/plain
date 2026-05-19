@@ -9,11 +9,12 @@ from app.users.models import User
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthView
-from plain.forms import Error
+from plain.forms import Error, FormDisplay
 from plain.http import (
     BadRequestError400,
     RedirectResponse,
 )
+from plain.postgres.forms import create_from
 from plain.signing import BadSignature, SignatureExpired, TimestampSigner
 from plain.templates.views import TemplateView
 from plain.urls import reverse
@@ -61,14 +62,14 @@ class PasswordForgotView(TemplateView):
         return self.request.build_absolute_uri(url)
 
     def get(self) -> Response:
-        return self.render(errors=[], values={})
+        return self.render(form=FormDisplay(self.form_class))
 
     def post(self) -> Response:
         result = self.form_class.validate(
             self.request.form_data, files=self.request.files
         )
         if not result:
-            return self.render(errors=result.errors, values=result.raw)
+            return self.render(form=FormDisplay(self.form_class, result))
         send_password_reset(
             email=result.email, generate_reset_url=self.generate_password_reset_url
         )
@@ -141,7 +142,7 @@ class PasswordResetView(AuthView, TemplateView):
 
         # 400s if the reset token is missing or no longer valid.
         self.get_user()
-        return self.render(errors=[], values={})
+        return self.render(form=FormDisplay(self.form_class))
 
     def post(self) -> Response:
         user = self.get_user()
@@ -149,14 +150,17 @@ class PasswordResetView(AuthView, TemplateView):
             self.request.form_data, files=self.request.files
         )
         if not result:
-            return self.render(errors=result.errors, values=result.raw)
+            return self.render(form=FormDisplay(self.form_class, result))
         if password_errors := get_password_errors(user, result.new_password2):
             return self.render(
-                errors=[
-                    Error(message, code="invalid", field="new_password2")
-                    for message in password_errors
-                ],
-                values=self.request.form_data,
+                form=FormDisplay(
+                    self.form_class,
+                    errors=[
+                        Error(message, code="invalid", field="new_password2")
+                        for message in password_errors
+                    ],
+                    values=self.request.form_data,
+                )
             )
         set_user_password(user, result.new_password1)
         del self.session[self._reset_token_session_key]
@@ -171,7 +175,7 @@ class PasswordChangeView(AuthView, TemplateView):
     login_required = True
 
     def get(self) -> Response:
-        return self.render(errors=[], values={})
+        return self.render(form=FormDisplay(self.form_class))
 
     def post(self) -> Response:
         # login_required = True guarantees an authenticated user here.
@@ -182,26 +186,32 @@ class PasswordChangeView(AuthView, TemplateView):
             self.request.form_data, files=self.request.files
         )
         if not result:
-            return self.render(errors=result.errors, values=result.raw)
+            return self.render(form=FormDisplay(self.form_class, result))
         if not check_user_password(user, result.current_password):
             return self.render(
-                errors=[
-                    Error(
-                        "Your old password was entered incorrectly. "
-                        "Please enter it again.",
-                        code="incorrect_password",
-                        field="current_password",
-                    )
-                ],
-                values=self.request.form_data,
+                form=FormDisplay(
+                    self.form_class,
+                    errors=[
+                        Error(
+                            "Your old password was entered incorrectly. "
+                            "Please enter it again.",
+                            code="incorrect_password",
+                            field="current_password",
+                        )
+                    ],
+                    values=self.request.form_data,
+                )
             )
         if password_errors := get_password_errors(user, result.new_password2):
             return self.render(
-                errors=[
-                    Error(message, code="invalid", field="new_password2")
-                    for message in password_errors
-                ],
-                values=self.request.form_data,
+                form=FormDisplay(
+                    self.form_class,
+                    errors=[
+                        Error(message, code="invalid", field="new_password2")
+                        for message in password_errors
+                    ],
+                    values=self.request.form_data,
+                )
             )
         set_user_password(user, result.new_password1)
         # Updating the password logs out all other sessions for the user
@@ -218,25 +228,28 @@ class PasswordLoginView(AuthView, TemplateView):
         # Redirect if the user is already logged in
         if self.user:
             return RedirectResponse(self.success_url)
-        return self.render(errors=[], values={})
+        return self.render(form=FormDisplay(self.form_class))
 
     def post(self) -> Response:
         result = self.form_class.validate(
             self.request.form_data, files=self.request.files
         )
         if not result:
-            return self.render(errors=result.errors, values=result.raw)
+            return self.render(form=FormDisplay(self.form_class, result))
         user = authenticate(email=result.email, password=result.password)
         if user is None:
             return self.render(
-                errors=[
-                    Error(
-                        "Please enter a correct email and password. Note "
-                        "that both fields may be case-sensitive.",
-                        code="invalid_login",
-                    )
-                ],
-                values=self.request.form_data,
+                form=FormDisplay(
+                    self.form_class,
+                    errors=[
+                        Error(
+                            "Please enter a correct email and password. Note "
+                            "that both fields may be case-sensitive.",
+                            code="invalid_login",
+                        )
+                    ],
+                    values=self.request.form_data,
+                )
             )
         auth_login(self.request, user)
         return RedirectResponse(self.success_url)
@@ -247,15 +260,15 @@ class PasswordSignupView(TemplateView):
     success_url = "/"
 
     def get(self) -> Response:
-        return self.render(errors=[], values={})
+        return self.render(form=FormDisplay(self.form_class))
 
     def post(self) -> Response:
         result = self.form_class.validate(
             self.request.form_data, files=self.request.files
         )
         if not result:
-            return self.render(errors=result.errors, values=result.raw)
-        result.save()
-        # To sign the new user in immediately, capture result.save()'s
+            return self.render(form=FormDisplay(self.form_class, result))
+        create_from(User, result)
+        # To sign the new user in immediately, capture create_from()'s
         # return value and pass it to auth_login(self.request, user).
         return RedirectResponse(self.success_url)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.users.models import User
 
-from plain.forms import Error, Field, Form, types
+from plain.forms import Error, Form, types
 from plain.postgres.forms import ModelForm, model_field
 
 
@@ -40,10 +40,8 @@ class PasswordLoginForm(Form):
 
 
 class PasswordSignupForm(ModelForm):
-    model = User
-
-    email: Field[str] = model_field()
-    password: Field[str] = model_field()
+    email = model_field(User.email)
+    password = model_field(User.password)
     confirm_password = types.TextField(strip=False)
 
     def check(self) -> list[Error] | None:
