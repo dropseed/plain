@@ -899,7 +899,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-cloud"
-version = "0.4.1"
+version = "0.4.2"
 source = { editable = "plain-cloud" }
 dependencies = [
     { name = "click" },
