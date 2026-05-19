@@ -175,6 +175,10 @@ class PoolSource(ConnectionSource):
             kwargs=params,
             open=False,
             reset=_reset_pooled_connection,
+            # Validate each connection on checkout. One closed server-side
+            # while idle in the pool (server or pooler idle timeout) is
+            # discarded and replaced rather than handed out dead.
+            check=ConnectionPool.check_connection,
             min_size=plain_settings.POSTGRES_POOL_MIN_SIZE,
             max_size=plain_settings.POSTGRES_POOL_MAX_SIZE,
             max_lifetime=plain_settings.POSTGRES_POOL_MAX_LIFETIME,

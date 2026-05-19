@@ -605,3 +605,29 @@ def test_running_counts_started_jobprocess_rows_by_queue(metrics) -> None:
     process.save(update_fields=["started_at"])
 
     assert _by_queue(otel.WorkerMetrics._gauge_running) == {"default": 1}
+
+
+@pytest.mark.usefixtures("db")
+def test_db_gauge_callbacks_release_their_connection(metrics, monkeypatch) -> None:
+    """Each DB-touching gauge callback returns its pooled connection when it
+    finishes (see `_release_db_connection` for why this matters)."""
+    released = 0
+
+    def _counting_release(*args, **kwargs) -> None:
+        nonlocal released
+        released += 1
+
+    monkeypatch.setattr(otel, "return_database_connection", _counting_release)
+
+    metrics(_WorkerStub(queues=["default"]))
+    db_callbacks = (
+        otel.WorkerMetrics._gauge_queue_depth,
+        otel.WorkerMetrics._gauge_queue_oldest_age,
+        otel.WorkerMetrics._gauge_queue_scheduled,
+        otel.WorkerMetrics._gauge_running,
+        otel.WorkerMetrics._gauge_workers,
+    )
+    for callback in db_callbacks:
+        list(callback(CallbackOptions()))
+
+    assert released == len(db_callbacks)

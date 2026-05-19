@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import importlib.metadata
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from functools import wraps
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from opentelemetry import metrics, trace
@@ -24,6 +25,7 @@ from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 
 from plain.postgres import Q
 from plain.postgres.aggregates import Count, Min
+from plain.postgres.db import return_database_connection
 from plain.utils import timezone
 from plain.utils.otel import format_exception_type
 
@@ -100,6 +102,33 @@ def record_consumed(result: JobResult, *, error_type: str | None = None) -> None
     if error_type is not None:
         attrs[ERROR_TYPE] = error_type
     consumed_messages_counter.add(1, attrs)
+
+
+def _release_db_connection(
+    callback: Callable[..., Iterable[Observation]],
+) -> Callable[..., Iterable[Observation]]:
+    """Return a gauge callback's database connection to the pool once its
+    observation has been collected.
+
+    OTel runs observable-gauge callbacks on the PeriodicExportingMetricReader
+    thread, which has no request or job lifecycle to recycle connections.
+    Left unreturned, that thread's connection wrapper holds a single pooled
+    connection idle between export intervals — long enough for the server (or
+    a pooler) to close it. The next interval then reuses the dead connection
+    and raises `OperationalError: the connection is closed`. Returning it each
+    interval means every callback starts from a freshly checked-out connection.
+    """
+
+    @wraps(callback)
+    def wrapper(
+        cls: type[WorkerMetrics], options: CallbackOptions
+    ) -> Iterable[Observation]:
+        try:
+            return callback(cls, options)
+        finally:
+            return_database_connection()
+
+    return wrapper
 
 
 class WorkerMetrics:
@@ -194,6 +223,7 @@ class WorkerMetrics:
         return [Observation(n)]
 
     @classmethod
+    @_release_db_connection
     def _gauge_queue_depth(cls, options: CallbackOptions) -> Iterable[Observation]:
         active = cls._current
         if active is None:
@@ -204,6 +234,7 @@ class WorkerMetrics:
         return _count_per_queue(JobRequest.query.ready_to_run(), active.worker.queues)
 
     @classmethod
+    @_release_db_connection
     def _gauge_queue_oldest_age(cls, options: CallbackOptions) -> Iterable[Observation]:
         active = cls._current
         if active is None:
@@ -231,6 +262,7 @@ class WorkerMetrics:
         ]
 
     @classmethod
+    @_release_db_connection
     def _gauge_queue_scheduled(cls, options: CallbackOptions) -> Iterable[Observation]:
         active = cls._current
         if active is None:
@@ -240,6 +272,7 @@ class WorkerMetrics:
         return _count_per_queue(JobRequest.query.scheduled(), active.worker.queues)
 
     @classmethod
+    @_release_db_connection
     def _gauge_running(cls, options: CallbackOptions) -> Iterable[Observation]:
         active = cls._current
         if active is None:
@@ -254,6 +287,7 @@ class WorkerMetrics:
     # is shared across both observations so a row landing exactly at the
     # boundary can't be counted in both states (or neither).
     @classmethod
+    @_release_db_connection
     def _gauge_workers(cls, options: CallbackOptions) -> Iterable[Observation]:
         from .models import WorkerHeartbeat, heartbeat_cutoff
 
