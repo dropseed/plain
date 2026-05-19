@@ -116,13 +116,13 @@ class LLMDocs:
 
     @staticmethod
     def _get_all_names(parsed: ast.Module) -> set[str]:
-        """Extract names from __all__ list in a parsed module."""
+        """Extract names from a module's `__all__` — a list or a tuple."""
         for node in parsed.body:
             if not isinstance(node, ast.Assign):
                 continue
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == "__all__":
-                    if isinstance(node.value, ast.List):
+                    if isinstance(node.value, ast.List | ast.Tuple):
                         return {
                             elt.value
                             for elt in node.value.elts
