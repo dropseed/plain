@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import field, field_errors, nonfield_errors, back_link %}
+{% from "_macros.html" import field, field_error_list, nonfield_errors, back_link %}
 
 {% block title %}Contact us{% endblock %}
 
@@ -17,25 +17,25 @@
 
     <form method="post" class="mt-6 flex flex-col gap-5">
         {{ nonfield_errors(form) }}
-        {{ field(form.name, "Name", autofocus=True) }}
-        {{ field(form.email, "Email", type="email") }}
-        {{ field(form.subject, "Subject", type="select") }}
-        {% if 'company' in form %}
-        {{ field(form.company, "Company (optional)") }}
+        {{ field(form, form_class.name, "Name", autofocus=True) }}
+        {{ field(form, form_class.email, "Email", type="email") }}
+        {{ field(form, form_class.subject, "Subject", type="select") }}
+        {% if 'company' in form_class.fields() %}
+        {{ field(form, form_class.company, "Company (optional)") }}
         {% endif %}
-        {{ field(form.message, "Message", type="textarea", min_height="160px") }}
+        {{ field(form, form_class.message, "Message", type="textarea", min_height="160px") }}
 
         <div>
             <label class="flex items-center gap-2 text-sm text-body">
                 <input
                     type="checkbox"
-                    name="{{ form.subscribe.name }}"
-                    id="{{ form.subscribe.html_id }}"
-                    {% if form.subscribe.value %}checked{% endif %}
+                    name="{{ form_class.subscribe.name }}"
+                    id="{{ form_class.subscribe.html_id }}"
+                    {% if field_value(form, form_class.subscribe) %}checked{% endif %}
                 >
                 Subscribe to the newsletter
             </label>
-            {{ field_errors(form.subscribe) }}
+            {{ field_error_list(form, form_class.subscribe) }}
         </div>
 
         <button type="submit" class="btn-primary self-start">Send</button>

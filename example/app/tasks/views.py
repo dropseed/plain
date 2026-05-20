@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from plain.auth.views import AuthView
-from plain.forms import FormDisplay
+from plain.forms import Form, Invalid
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
 from plain.postgres.forms import create_from, update_from
@@ -40,7 +40,7 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
 
     # Set by htmx_post_rename on a rejected rename, so the re-rendered
     # fragment shows the submitted value and its error.
-    _title_form: FormDisplay | None = None
+    _title_form: Form | Invalid | None = None
 
     def get_object(self) -> Task | None:
         return Task.query.filter(
@@ -50,13 +50,14 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
-        context["title_form"] = self._title_form or FormDisplay(TaskTitleForm)
+        context["title_form_class"] = TaskTitleForm
+        context["title_form"] = self._title_form or TaskTitleForm()
         return context
 
     def htmx_post_rename(self) -> None:
         result = TaskTitleForm.validate(self.request.form_data)
         if not result:
-            self._title_form = FormDisplay(TaskTitleForm, result)
+            self._title_form = result
             return
         self.object.title = result.title
         self.object.save()

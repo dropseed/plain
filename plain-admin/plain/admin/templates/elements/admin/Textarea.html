@@ -5,5 +5,5 @@
     rows="{{ rows|default(3) }}"
     spellcheck="{{ spellcheck|default('default') }}"
     {% if field.required %}required{% endif %}
-    {% if field.errors %}aria-invalid="true"{% endif %}
-    >{{ field.value }}</textarea>
+    {% if field_errors(form, field) %}aria-invalid="true"{% endif %}
+    >{{ field_value(form, field) }}</textarea>

@@ -3,6 +3,6 @@
     class="admin-input"
     type="checkbox"
     name="{{ field.name }}"
-    {% if field.value %}checked{% endif %}
+    {% if field_value(form, field) %}checked{% endif %}
     {% if field.required %}required{% endif %}
     >

@@ -5,7 +5,7 @@ from functools import cached_property
 from typing import Any, NoReturn
 
 from plain.exceptions import ImproperlyConfigured
-from plain.forms import Error, Form, FormDisplay, Invalid
+from plain.forms import Form, Invalid
 from plain.http import HTTPException, NotFoundError404, Response
 from plain.logs import get_framework_logger
 from plain.runtime import settings
@@ -84,27 +84,39 @@ class TemplateView(View):
     def render_form[F: Form](
         self,
         form_class: type[F],
-        invalid: Invalid | None = None,
+        result: F | Invalid | None = None,
         *,
-        errors: list[Error] | None = None,
         values: dict[str, Any] | None = None,
         **context: Any,
     ) -> Response:
-        """Render the template with `form` bound to a `FormDisplay`.
+        """Render the template with `form_class` and a `form` result.
 
-        A thin wrapper around `self.render(form=FormDisplay(...))` that lets
-        a view skip importing `FormDisplay` directly. The arguments mirror
-        `FormDisplay.__init__`; extra `**context` is passed straight to the
-        template.
+        The template receives `form_class` (for metadata: `form_class.email.required`)
+        and `form` (a `Form | Invalid` for per-field value/errors via
+        `field_value` / `field_errors`).
 
-            self.render_form(NoteForm)                    # blank (GET)
-            self.render_form(NoteForm, values=initial)    # pre-filled (edit GET)
-            self.render_form(NoteForm, invalid_result)    # failed validate() (POST)
+        `result` is whatever `validate()` returned (success or `Invalid`), or
+        `None` for a blank render. `values` pre-fills a blank render with
+        each field's `initial` applied first.
+
+            self.render_form(NoteForm)                       # blank (GET)
+            self.render_form(NoteForm, values=initial)       # pre-filled (edit GET)
+            self.render_form(NoteForm, invalid_result)       # failed validate() (POST)
+
+        For a custom failure (e.g. an authentication rejection that ran after
+        `validate()` succeeded), construct an `Invalid` directly and pass it
+        as `result`: `render_form(LoginForm, Invalid(errors=[...], raw=data))`.
         """
-        return self.render(
-            form=FormDisplay(form_class, invalid, errors=errors, values=values),
-            **context,
-        )
+        if result is None:
+            data: dict[str, Any] = {
+                name: field.initial
+                for name, field in form_class.fields().items()
+                if field.initial is not None
+            }
+            if values:
+                data.update(values)
+            result = form_class(**data)
+        return self.render(form_class=form_class, form=result, **context)
 
     def validate_form[F: Form](self, form_class: type[F]) -> F | Response:
         """Validate the request against `form_class`. Returns the typed form

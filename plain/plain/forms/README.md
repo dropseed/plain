@@ -188,12 +188,11 @@ config = types.JSONField()
 
 ## Rendering forms in templates
 
-The core types — `Form`, `validate`, `Invalid` — carry no rendering interface. To render a form, a view wraps the outcome in a [`FormDisplay`](./display.py#FormDisplay), the opt-in render adapter, and the template reads each field through it.
+The core types — `Form`, `validate`, `Invalid` — carry no rendering interface. To render a form, a view passes the `form_class` and the `Form | Invalid` result to the template; the template reads each field through the `field_value`, `field_errors`, and `form_errors` helpers from `plain.forms`.
 
 The view is explicit `get`/`post`:
 
 ```python
-from plain.forms import FormDisplay
 from plain.http import RedirectResponse
 from plain.templates.views import TemplateView
 
@@ -202,41 +201,41 @@ class ContactView(TemplateView):
     template_name = "contact.html"
 
     def get(self):
-        return self.render(form=FormDisplay(ContactForm))
+        return self.render_form(ContactForm)
 
     def post(self):
         result = ContactForm.validate(self.request.form_data)
         if not result:
             # re-render with the submitted values and their errors
-            return self.render(form=FormDisplay(ContactForm, result))
+            return self.render_form(ContactForm, result)
         send_contact_email(result.email, result.message)
         return RedirectResponse("/thanks/")
 ```
 
-`FormDisplay` is built three ways:
+`self.render_form(form_class, result=None, *, values=None, errors=None, **context)` passes both `form_class` and `form` into the template context. Three modes:
 
 ```python
-FormDisplay(ContactForm)                              # blank — shows each field's initial
-FormDisplay(ContactForm, result)                      # a failed validate() — values + errors
-FormDisplay(ContactForm, values={"email": user.email})  # pre-filled
+self.render_form(ContactForm)                              # blank — shows each field's initial
+self.render_form(ContactForm, result)                      # a failed validate() — values + errors
+self.render_form(ContactForm, values={"email": user.email})  # pre-filled
 ```
 
-In the template, each field is a [`FieldDisplay`](./display.py#FieldDisplay) — `name`, `value`, `errors`, `required`, `choices`, and a stable `html_id`:
+In the template, helpers take `form` (the result) plus a field reference (`form_class.email`). Field metadata is on the field reference itself — `form_class.email.required`, `.choices`, `.html_id`, `.name`:
 
 ```html
 <form method="post">
-    {% for error in form.errors %}
+    {% for error in form_errors(form) %}
     <div class="error">{{ error.message }}</div>
     {% endfor %}
 
-    <label for="{{ form.email.html_id }}">Email</label>
+    <label for="{{ form_class.email.html_id }}">Email</label>
     <input
         type="email"
-        name="{{ form.email.name }}"
-        id="{{ form.email.html_id }}"
-        value="{{ form.email.value }}"
-        {% if form.email.required %}required{% endif %}>
-    {% for error in form.email.errors %}
+        name="{{ form_class.email.name }}"
+        id="{{ form_class.email.html_id }}"
+        value="{{ field_value(form, form_class.email) }}"
+        {% if form_class.email.required %}required{% endif %}>
+    {% for error in field_errors(form, form_class.email) %}
     <div class="field-error">{{ error.message }}</div>
     {% endfor %}
 
@@ -244,7 +243,9 @@ In the template, each field is a [`FieldDisplay`](./display.py#FieldDisplay) —
 </form>
 ```
 
-`{% for field in form %}` iterates every field, and `'email' in form` tests membership. For large apps, reduce repetition with Jinja [macros](https://jinja.palletsprojects.com/en/stable/templates/#macros) or [plain.elements](/plain-elements/README.md).
+`{% for name, field in form_class.fields().items() %}` iterates every declared field. For large apps, reduce repetition with Jinja [macros](https://jinja.palletsprojects.com/en/stable/templates/#macros) or [plain.elements](/plain-elements/README.md).
+
+The helpers are typed through the field reference — `field_value(form, ContactForm.email)` narrows to `str | None`, `field_value(form, ContactForm.age)` to `int | None`, and so on. Python's type system can't dispatch attribute lookup by literal name, so the function-call shape is what carries the type through.
 
 ## JSON and other input
 
@@ -257,7 +258,7 @@ ContactForm.validate(payload)                            # a job argument, a tes
 ContactForm.validate(request.form_data, files=request.files)  # with file uploads
 ```
 
-An `Invalid` is already structured for JSON — each `Error` carries a `field`, `code`, and `message`, so a JSON view doesn't need `FormDisplay` (that's the HTML render adapter). Serialize `result.errors` straight into the response:
+An `Invalid` is already structured for JSON — each `Error` carries a `field`, `code`, and `message`, so a JSON view skips the template helpers entirely. Serialize `result.errors` straight into the response:
 
 ```python
 from dataclasses import asdict
@@ -312,13 +313,13 @@ notes = types.TextField(required=False)   # result.notes is str | None
 
 #### How do I pre-populate a form?
 
-Pass a `values` dict to `FormDisplay`:
+Pass a `values` dict to `render_form`:
 
 ```python
-FormDisplay(ContactForm, values={"email": user.email})
+self.render_form(ContactForm, values={"email": user.email})
 ```
 
-For a blank form, `FormDisplay(ContactForm)` already shows each field's `initial` value.
+For a blank form, `self.render_form(ContactForm)` already shows each field's `initial` value.
 
 #### How do I access the raw submitted data?
 
@@ -355,7 +356,6 @@ Wire it to a view with explicit `get`/`post`:
 
 ```python
 # app/views.py
-from plain.forms import FormDisplay
 from plain.http import RedirectResponse
 from plain.templates.views import TemplateView
 
@@ -366,12 +366,12 @@ class ContactView(TemplateView):
     template_name = "contact.html"
 
     def get(self):
-        return self.render(form=FormDisplay(ContactForm))
+        return self.render_form(ContactForm)
 
     def post(self):
         result = ContactForm.validate(self.request.form_data)
         if not result:
-            return self.render(form=FormDisplay(ContactForm, result))
+            return self.render_form(ContactForm, result)
         # result is the typed ContactForm — do the work, then redirect
         return RedirectResponse("/thanks/")
 ```
@@ -384,17 +384,17 @@ And render it (see [Rendering forms in templates](#rendering-forms-in-templates)
 
 {% block content %}
 <form method="post">
-    {% for error in form.errors %}
+    {% for error in form_errors(form) %}
     <div class="error">{{ error.message }}</div>
     {% endfor %}
 
-    <label for="{{ form.email.html_id }}">Email</label>
+    <label for="{{ form_class.email.html_id }}">Email</label>
     <input
         type="email"
-        name="{{ form.email.name }}"
-        id="{{ form.email.html_id }}"
-        value="{{ form.email.value }}">
-    {% for error in form.email.errors %}
+        name="{{ form_class.email.name }}"
+        id="{{ form_class.email.html_id }}"
+        value="{{ field_value(form, form_class.email) }}">
+    {% for error in field_errors(form, form_class.email) %}
     <div class="field-error">{{ error.message }}</div>
     {% endfor %}
 

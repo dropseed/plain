@@ -4,7 +4,7 @@
     type="{{ type|default('text') }}"
     name="{{ field.name }}"
     {% if list is defined %}list="{{ list }}"{% endif %}
-    value="{{ field.value }}"
+    value="{{ field_value(form, field) }}"
     {% if field.required %}required{% endif %}
-    {% if field.errors %}aria-invalid="true"{% endif %}
+    {% if field_errors(form, field) %}aria-invalid="true"{% endif %}
     >

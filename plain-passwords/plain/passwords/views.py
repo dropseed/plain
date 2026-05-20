@@ -9,7 +9,7 @@ from app.users.models import User
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthView
-from plain.forms import Error
+from plain.forms import Error, Invalid
 from plain.http import (
     BadRequestError400,
     RedirectResponse,
@@ -150,8 +150,7 @@ class PasswordResetView(AuthView, TemplateView):
         ):
             return self.render_form(
                 self.form_class,
-                errors=password_errors,
-                values=self.request.form_data,
+                Invalid(errors=password_errors, raw=self.request.form_data),
             )
         set_user_password(user, result.new_password1)
         del self.session[self._reset_token_session_key]
@@ -179,23 +178,24 @@ class PasswordChangeView(AuthView, TemplateView):
         if not check_user_password(user, result.current_password):
             return self.render_form(
                 self.form_class,
-                errors=[
-                    Error(
-                        "Your old password was entered incorrectly. "
-                        "Please enter it again.",
-                        code="incorrect_password",
-                        field="current_password",
-                    )
-                ],
-                values=self.request.form_data,
+                Invalid(
+                    errors=[
+                        Error(
+                            "Your old password was entered incorrectly. "
+                            "Please enter it again.",
+                            code="incorrect_password",
+                            field="current_password",
+                        )
+                    ],
+                    raw=self.request.form_data,
+                ),
             )
         if password_errors := get_password_errors(
             user, result.new_password2, field="new_password2"
         ):
             return self.render_form(
                 self.form_class,
-                errors=password_errors,
-                values=self.request.form_data,
+                Invalid(errors=password_errors, raw=self.request.form_data),
             )
         set_user_password(user, result.new_password1)
         # Updating the password logs out all other sessions for the user
@@ -222,14 +222,16 @@ class PasswordLoginView(AuthView, TemplateView):
         if user is None:
             return self.render_form(
                 self.form_class,
-                errors=[
-                    Error(
-                        "Please enter a correct email and password. Note "
-                        "that both fields may be case-sensitive.",
-                        code="invalid_login",
-                    )
-                ],
-                values=self.request.form_data,
+                Invalid(
+                    errors=[
+                        Error(
+                            "Please enter a correct email and password. Note "
+                            "that both fields may be case-sensitive.",
+                            code="invalid_login",
+                        )
+                    ],
+                    raw=self.request.form_data,
+                ),
             )
         auth_login(self.request, user)
         return RedirectResponse(self.success_url)

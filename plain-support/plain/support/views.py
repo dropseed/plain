@@ -4,7 +4,6 @@ from typing import Any
 
 from plain.assets.urls import get_asset_url
 from plain.auth.views import AuthView
-from plain.forms import FormDisplay
 from plain.http import RedirectResponse, Response
 from plain.postgres.forms import create_from
 from plain.runtime import settings
@@ -36,13 +35,13 @@ class SupportFormView(AuthView, TemplateView):
     def get(self) -> Response:
         # Pre-fill the email for an authed user; otherwise start blank.
         values: dict[str, str] = {"email": self.user.email} if self.user else {}
-        return self.render(form=FormDisplay(self.get_form_class(), values=values))
+        return self.render_form(self.get_form_class(), values=values)
 
     def post(self) -> Response:
         form_class = self.get_form_class()
         result = form_class.validate(self.request.form_data, files=self.request.files)
         if not result:
-            return self.render(form=FormDisplay(form_class, result))
+            return self.render_form(form_class, result)
         entry = create_from(
             SupportFormEntry,
             result,

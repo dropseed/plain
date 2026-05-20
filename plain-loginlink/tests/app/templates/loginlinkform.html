@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-{% for error in form.errors %}
+{% for error in form_errors(form) %}
 <p class="form-error">{{ error.message }}</p>
 {% endfor %}
 <form method="post">
@@ -10,13 +10,13 @@
       type="email"
       name="email"
       placeholder="Email"
-      value="{{ form.email.value }}"
+      value="{{ field_value(form, form_class.email) }}"
       >
-    {% for error in form.email.errors %}
+    {% for error in field_errors(form, form_class.email) %}
     <span class="form-error">{{ error.message }}</span>
     {% endfor %}
   </p>
-  <input type="hidden" name="next" value="{{ form.next.value }}">
+  <input type="hidden" name="next" value="{{ field_value(form, form_class.next) }}">
   <button type="submit">Send login link</button>
 </form>
 {% endblock %}

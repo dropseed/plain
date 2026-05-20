@@ -204,14 +204,14 @@ def ChoiceField(
 def ChoiceField(
     *, choices: Any, required: Literal[True] = True, initial: Any = None
 ) -> Field[str]: ...
-def TypedChoiceField(
+def TypedChoiceField[T](
     *,
     choices: Any,
-    coerce: Callable[[Any], Any] = ...,
+    coerce: Callable[[Any], T],
     empty_value: Any = "",
     required: bool = True,
     initial: Any = None,
-) -> Field[Any]: ...
+) -> Field[T]: ...
 def MultipleChoiceField(
     *,
     choices: Any,

@@ -371,20 +371,20 @@ The [Jinja2 documentation](https://jinja.palletsprojects.com/en/stable/) covers 
 
 ## Forms
 
-A view builds a [`FormDisplay`](../../../plain/plain/forms/README.md) from a form class and passes it to the template, which reads each field through it:
+A view calls `self.render_form(MyForm, result)` and the template reads each field through the `field_value`, `field_errors`, and `form_errors` globals (from `plain.forms`) plus the field reference on the form class:
 
 ```html
 <form method="post">
     <div>
-        <label for="{{ form.email.html_id }}">Email</label>
+        <label for="{{ form_class.email.html_id }}">Email</label>
         <input
             type="email"
-            name="{{ form.email.name }}"
-            id="{{ form.email.html_id }}"
-            value="{{ form.email.value }}"
-            {% if form.email.required %}required{% endif %}
+            name="{{ form_class.email.name }}"
+            id="{{ form_class.email.html_id }}"
+            value="{{ field_value(form, form_class.email) }}"
+            {% if form_class.email.required %}required{% endif %}
         >
-        {% for error in form.email.errors %}
+        {% for error in field_errors(form, form_class.email) %}
         <p>{{ error.message }}</p>
         {% endfor %}
     </div>
@@ -392,7 +392,7 @@ A view builds a [`FormDisplay`](../../../plain/plain/forms/README.md) from a for
 </form>
 ```
 
-Each field exposes `name`, `value`, `errors`, `required`, `choices`, and `html_id`. `form.errors` holds form-level errors, and `{% for field in form %}` iterates every field. See [`plain.forms`](../../../plain/plain/forms/README.md) for building the `FormDisplay` and the full field reference.
+Field metadata lives on the field reference (`form_class.email.name`, `.html_id`, `.required`, `.choices`). The helpers are typed through the field reference — `field_value(form, form_class.email)` narrows to `str | None`. See [`plain.forms`](../../../plain/plain/forms/README.md) for full patterns and the field reference.
 
 ## Installation
 

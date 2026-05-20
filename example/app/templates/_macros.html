@@ -1,51 +1,52 @@
 {% macro nonfield_errors(form) %}
-{% for error in form.errors %}
+{% for error in form_errors(form) %}
 <div class="nonfield-error">{{ error.message }}</div>
 {% endfor %}
 {% endmacro %}
 
-{% macro field_errors(field) %}
-{% for error in field.errors %}
+{% macro field_error_list(form, field_ref) %}
+{% for error in field_errors(form, field_ref) %}
 <div class="field-error">⚠ {{ error.message }}</div>
 {% endfor %}
 {% endmacro %}
 
-{% macro field(field, label, type="text", autofocus=False, autocomplete=None, placeholder=None, min_height=None) %}
+{% macro field(form, field_ref, label, type="text", autofocus=False, autocomplete=None, placeholder=None, min_height=None) %}
 <div>
-    <label class="field-label" for="{{ field.html_id }}">{{ label }}</label>
+    <label class="field-label" for="{{ field_ref.html_id }}">{{ label }}</label>
     {% if type == "textarea" %}
     <textarea
         class="field-input{% if min_height %} min-h-[{{ min_height }}]{% endif %}"
-        name="{{ field.name }}"
-        id="{{ field.html_id }}"
-        {% if field.required %}required{% endif %}
+        name="{{ field_ref.name }}"
+        id="{{ field_ref.html_id }}"
+        {% if field_ref.required %}required{% endif %}
         {% if autofocus %}autofocus{% endif %}
-    >{{ field.value }}</textarea>
+    >{{ field_value(form, field_ref) }}</textarea>
     {% elif type == "select" %}
     <select
         class="field-input"
-        name="{{ field.name }}"
-        id="{{ field.html_id }}"
-        {% if field.required %}required{% endif %}
+        name="{{ field_ref.name }}"
+        id="{{ field_ref.html_id }}"
+        {% if field_ref.required %}required{% endif %}
     >
-        {% for value, choice_label in field.choices %}
-        <option value="{{ value }}" {% if (field.value|string) == (value|string) %}selected{% endif %}>{{ choice_label }}</option>
+        {% set current = field_value(form, field_ref) %}
+        {% for value, choice_label in field_ref.choices %}
+        <option value="{{ value }}" {% if (current|string) == (value|string) %}selected{% endif %}>{{ choice_label }}</option>
         {% endfor %}
     </select>
     {% else %}
     <input
         class="field-input"
         type="{{ type }}"
-        name="{{ field.name }}"
-        id="{{ field.html_id }}"
-        value="{{ field.value }}"
-        {% if field.required %}required{% endif %}
+        name="{{ field_ref.name }}"
+        id="{{ field_ref.html_id }}"
+        value="{{ field_value(form, field_ref) }}"
+        {% if field_ref.required %}required{% endif %}
         {% if autofocus %}autofocus{% endif %}
         {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
         {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
     >
     {% endif %}
-    {{ field_errors(field) }}
+    {{ field_error_list(form, field_ref) }}
 </div>
 {% endmacro %}
 

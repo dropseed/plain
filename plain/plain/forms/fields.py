@@ -101,6 +101,11 @@ class Field[T]:
     def __set_name__(self, owner: type, name: str) -> None:
         self.name = name
 
+    @property
+    def html_id(self) -> str:
+        """The `id`/`for` value pairing the field's input with its label."""
+        return f"id_{self.name}"
+
     @overload
     def __get__(self, obj: None, owner: type) -> Self: ...
     @overload

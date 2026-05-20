@@ -2,7 +2,7 @@
 
 <div class="space-y-1">
     <admin.Label field={field}>{{ label }}</admin.Label>
-    <admin.Select field={field} />
+    <admin.Select form={form} field={field} />
     {% if help is defined %}<admin.Help help={help} />{% endif %}
-    <admin.FieldErrors field={field} />
+    <admin.FieldErrors form={form} field={field} />
 </div>

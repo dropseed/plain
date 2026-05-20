@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import back_link, field_errors %}
+{% from "_macros.html" import back_link, field_error_list %}
 
 {% block title %}{{ task.title }}{% endblock %}
 
@@ -14,13 +14,13 @@
                 aria-label="Task title"
                 class="flex-1 page-h1 bg-transparent border border-transparent hover:border-outline focus:border-ink focus:ring-[3px] focus:ring-ink/15 rounded px-2 py-1 outline-none"
                 type="text"
-                name="{{ title_form.title.name }}"
-                id="{{ title_form.title.html_id }}"
-                value="{{ title_form.title.value or task.title }}"
+                name="{{ title_form_class.title.name }}"
+                id="{{ title_form_class.title.html_id }}"
+                value="{{ field_value(title_form, title_form_class.title) or task.title }}"
             >
             <button type="submit" class="btn-primary">Rename</button>
         </form>
-        {{ field_errors(title_form.title) }}
+        {{ field_error_list(title_form, title_form_class.title) }}
     </div>
     {% endhtmxfragment %}
 

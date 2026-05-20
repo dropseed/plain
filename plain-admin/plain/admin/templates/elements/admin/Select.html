@@ -1,11 +1,12 @@
+{% set current = field_value(form, field) %}
 <select
     id="{{ field.html_id }}"
     name="{{ field.name }}"
     class="admin-select"
     {% if field.required %}required{% endif %}
-    {% if field.errors %}aria-invalid="true"{% endif %}
+    {% if field_errors(form, field) %}aria-invalid="true"{% endif %}
     >
     {% for value, label in field.choices %}
-    <option value="{{ value }}" {% if value == field.value %}selected{% endif %}>{{ label }}</option>
+    <option value="{{ value }}" {% if value == current %}selected{% endif %}>{{ label }}</option>
     {% endfor %}
 </select>
