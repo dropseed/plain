@@ -5,6 +5,7 @@ from functools import cached_property
 from typing import Any, NoReturn
 
 from plain.exceptions import ImproperlyConfigured
+from plain.forms import Error, Form, FormDisplay, Invalid
 from plain.http import HTTPException, NotFoundError404, Response
 from plain.logs import get_framework_logger
 from plain.runtime import settings
@@ -79,6 +80,51 @@ class TemplateView(View):
 
     def get(self) -> Response:
         return self.render()
+
+    def render_form[F: Form](
+        self,
+        form_class: type[F],
+        invalid: Invalid | None = None,
+        *,
+        errors: list[Error] | None = None,
+        values: dict[str, Any] | None = None,
+        **context: Any,
+    ) -> Response:
+        """Render the template with `form` bound to a `FormDisplay`.
+
+        A thin wrapper around `self.render(form=FormDisplay(...))` that lets
+        a view skip importing `FormDisplay` directly. The arguments mirror
+        `FormDisplay.__init__`; extra `**context` is passed straight to the
+        template.
+
+            self.render_form(NoteForm)                    # blank (GET)
+            self.render_form(NoteForm, values=initial)    # pre-filled (edit GET)
+            self.render_form(NoteForm, invalid_result)    # failed validate() (POST)
+        """
+        return self.render(
+            form=FormDisplay(form_class, invalid, errors=errors, values=values),
+            **context,
+        )
+
+    def validate_form[F: Form](self, form_class: type[F]) -> F | Response:
+        """Validate the request against `form_class`. Returns the typed form
+        instance on success, or a re-rendered template `Response` (with the
+        submission and its errors) on failure.
+
+            result = self.validate_form(NoteForm)
+            if isinstance(result, Response):
+                return result
+            # result is the typed NoteForm — every field cleaned
+
+        Reads `request.form_data` and `request.files`, so it covers the
+        ordinary HTML POST case without arguments. For other shapes (a JSON
+        body, or a custom failure response) call `form_class.validate()`
+        directly — this helper is the one-line case, not a wrapper.
+        """
+        result = form_class.validate(self.request.form_data, files=self.request.files)
+        if not result:
+            return self.render_form(form_class, result)
+        return result
 
     def handle_exception(self, exc: Exception) -> Response:
         """Render `{status}.html` for the exception, falling through on missing template."""

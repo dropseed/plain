@@ -68,14 +68,13 @@ class TaskCreateView(AuthView, TemplateView):
 
     def get(self) -> Response:
         assert self.user is not None  # login_required
-        return self.render(form=FormDisplay(TaskForm.for_owner(self.user)))
+        return self.render_form(TaskForm.for_owner(self.user))
 
     def post(self) -> Response:
         assert self.user is not None  # login_required
-        form_class = TaskForm.for_owner(self.user)
-        result = form_class.validate(self.request.form_data)
-        if not result:
-            return self.render(form=FormDisplay(form_class, result))
+        result = self.validate_form(TaskForm.for_owner(self.user))
+        if isinstance(result, Response):
+            return result
         # `owner` isn't a form field — pass it to create_from() as an extra.
         create_from(Task, result, owner=self.user)
         return RedirectResponse(reverse("tasks:list"))
@@ -95,15 +94,13 @@ class TaskUpdateView(AuthView, DetailView):
     def get(self) -> Response:
         assert self.user is not None  # login_required
         form_class = TaskForm.for_owner(self.user)
-        form = FormDisplay(form_class, values=form_class.initial_from(self.object))
-        return self.render(form=form)
+        return self.render_form(form_class, values=form_class.initial_from(self.object))
 
     def post(self) -> Response:
         assert self.user is not None  # login_required
-        form_class = TaskForm.for_owner(self.user)
-        result = form_class.validate(self.request.form_data)
-        if not result:
-            return self.render(form=FormDisplay(form_class, result))
+        result = self.validate_form(TaskForm.for_owner(self.user))
+        if isinstance(result, Response):
+            return result
         update_from(self.object, result)
         return RedirectResponse(reverse("tasks:detail", id=self.object.id))
 
