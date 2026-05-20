@@ -164,3 +164,39 @@ class TestFieldDisplay:
             color = types.ChoiceField(choices=[("r", "Red"), ("g", "Green")])
 
         assert FormDisplay(Picker).color.choices == [("r", "Red"), ("g", "Green")]
+
+
+class TestTypedAccess:
+    """`FormDisplay` is generic over the form class and `FieldDisplay` over
+    the field's cleaned type, so the type information from `Form.validate()`
+    survives the view→template boundary. Indexing with a `Field` reference
+    gives a typed `FieldDisplay[T]`; string-keyed access stays loose."""
+
+    def test_indexed_by_field_reference_returns_typed_field_display(self):
+        # `ProfileForm.name` is a `Field[str]` at the class level, so
+        # `form[ProfileForm.name]` is typed `FieldDisplay[str]`.
+        form: FormDisplay[ProfileForm] = FormDisplay(
+            ProfileForm, values={"name": "Dave"}
+        )
+        field = form[ProfileForm.name]
+        assert isinstance(field, FieldDisplay)
+        assert field.value == "Dave"
+        assert field.name == "name"
+
+    def test_indexed_by_field_reference_returns_same_object_as_attr(self):
+        # Both pathways resolve to the same bound FieldDisplay (the cache
+        # keys by field name, not by access style).
+        form = FormDisplay(ProfileForm, values={"name": "Dave"})
+        assert form[ProfileForm.name] is form.name
+
+    def test_field_reference_membership(self):
+        form = FormDisplay(ProfileForm)
+        assert ProfileForm.name in form
+        assert ProfileForm.email in form
+
+    def test_form_class_is_accessible(self):
+        # `form.form_class` lets a downstream renderer recover the form for
+        # introspection (e.g. iterating its declared fields) without keeping
+        # the class around separately.
+        form = FormDisplay(ProfileForm)
+        assert form.form_class is ProfileForm

@@ -4,7 +4,6 @@ from typing import Any
 
 from plain.auth import login, logout
 from plain.auth.views import AuthView
-from plain.forms import FormDisplay
 from plain.html.views import TemplateView
 from plain.http import RedirectResponse, Response
 from plain.runtime import settings
@@ -38,14 +37,12 @@ class LoginLinkFormView(AuthView, TemplateView):
             return RedirectResponse(
                 self.sent_url(self.request.query_params.get("next"))
             )
-        return self.render(form=FormDisplay(self.form_class))
+        return self.render_form(self.form_class)
 
     def post(self) -> Response:
-        result = self.form_class.validate(
-            self.request.form_data, files=self.request.files
-        )
-        if not result:
-            return self.render(form=FormDisplay(self.form_class, result))
+        result = self.validate_form(self.form_class)
+        if isinstance(result, Response):
+            return result
         send_login_link(email=result.email, request=self.request, next_url=result.next)
         return RedirectResponse(self.sent_url(result.next or None))
 

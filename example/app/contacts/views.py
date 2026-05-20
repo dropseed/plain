@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from plain.forms import FormDisplay
 from plain.html.views import TemplateView
 from plain.http import RedirectResponse, Response
 from plain.urls import reverse
@@ -27,13 +26,13 @@ class ContactView(TemplateView):
         values: dict[str, Any] = {}
         if name := self.request.query_params.get("name"):
             values["name"] = name
-        return self.render(form=FormDisplay(self.get_form_class(), values=values))
+        return self.render_form(self.get_form_class(), values=values)
 
     def post(self) -> Response:
         form_class = self.get_form_class()
-        result = form_class.validate(self.request.form_data)
-        if not result:
-            return self.render(form=FormDisplay(form_class, result))
+        result = self.validate_form(form_class)
+        if isinstance(result, Response):
+            return result
         # ContactForm is a plain Form, not a ModelForm — build the row
         # explicitly from the validated, typed values.
         submission = ContactSubmission(

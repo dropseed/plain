@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from plain.auth.views import AuthView
-from plain.forms import FormDisplay
 from plain.html.views import DetailView, ListView, TemplateView
 from plain.http import RedirectResponse, Response
 from plain.postgres.forms import create_from, update_from
@@ -37,12 +36,12 @@ class NoteCreateView(AuthView, TemplateView):
     login_required = True
 
     def get(self) -> Response:
-        return self.render(form=FormDisplay(NoteForm))
+        return self.render_form(NoteForm)
 
     def post(self) -> Response:
-        result = NoteForm.validate(self.request.form_data)
-        if not result:
-            return self.render(form=FormDisplay(NoteForm, result))
+        result = self.validate_form(NoteForm)
+        if isinstance(result, Response):
+            return result
         # `author` isn't a form field — pass it to create_from() as an extra.
         note = create_from(Note, result, author=self.user)
         return RedirectResponse(note.get_absolute_url())
@@ -60,14 +59,12 @@ class NoteUpdateView(AuthView, DetailView):
         ).first()
 
     def get(self) -> Response:
-        return self.render(
-            form=FormDisplay(NoteForm, values=NoteForm.initial_from(self.object))
-        )
+        return self.render_form(NoteForm, values=NoteForm.initial_from(self.object))
 
     def post(self) -> Response:
-        result = NoteForm.validate(self.request.form_data)
-        if not result:
-            return self.render(form=FormDisplay(NoteForm, result))
+        result = self.validate_form(NoteForm)
+        if isinstance(result, Response):
+            return result
         update_from(self.object, result)
         return RedirectResponse(self.object.get_absolute_url())
 

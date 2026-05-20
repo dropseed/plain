@@ -11,12 +11,13 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 from plain.utils.datastructures import MultiValueDict
 
+from .fields import Field
+
 if TYPE_CHECKING:
-    from .fields import Field
     from .forms import Form
     from .result import Error, Invalid
 
@@ -24,16 +25,22 @@ __all__ = ["FieldDisplay", "FormDisplay"]
 
 
 @dataclass(frozen=True)
-class FieldDisplay:
+class FieldDisplay[T]:
     """One field, prepared for rendering.
 
     Carries what a template needs to draw an input: the field's `name`, the
     `value` to show, the `Error`s attached to it, whether it's `required`,
     and its `choices` (`[]` for a non-choice field).
+
+    Generic over `T`, the field's cleaned value type — `form[ContactForm.email]`
+    is `FieldDisplay[str]`, so `field.value` keeps its static type at the
+    view→template seam. Attribute-style access (`form.email`) stays
+    `FieldDisplay[Any]` because Python's type system can't dispatch attribute
+    lookup by literal name without per-form stubs.
     """
 
     name: str
-    value: Any
+    value: T
     errors: list[Error]
     required: bool
     choices: list[tuple[Any, Any]]
@@ -44,7 +51,7 @@ class FieldDisplay:
         return f"id_{self.name}"
 
 
-class FormDisplay:
+class FormDisplay[F: Form]:
     """A form prepared for a template.
 
     A view builds one from the form class plus what to render:
@@ -61,18 +68,26 @@ class FormDisplay:
         {% for error in form.errors %}...{% endfor %}   {# form-level #}
         {% for field in form %}...{% endfor %}          {# every field #}
 
+    Generic over the form class `F`: `FormDisplay(ContactForm)` is inferred
+    as `FormDisplay[ContactForm]`, so the form class survives the boundary
+    that templates and other consumers read through. For per-field static
+    typing, index with the field reference — `form[ContactForm.email]` is
+    `FieldDisplay[str]`; the loose-typed `form.email` (and `form["email"]`)
+    stay `FieldDisplay[Any]`.
+
     The core types stay render-agnostic — this only ever *reads* a flat
     `Invalid` (or hand-passed errors/values) and exposes it per field.
     """
 
     def __init__(
         self,
-        form_class: type[Form],
+        form_class: type[F],
         invalid: Invalid | None = None,
         *,
         errors: list[Error] | None = None,
         values: dict[str, Any] | None = None,
     ) -> None:
+        self._form_class: type[F] = form_class
         self._fields: dict[str, Field[Any]] = form_class.fields()
         self._form_name = form_class.__name__
         if invalid is not None:
@@ -89,7 +104,7 @@ class FormDisplay:
             }
         self._errors: list[Error] = errors if errors is not None else []
         self._values: dict[str, Any] = values if values is not None else {}
-        self._bound: dict[str, FieldDisplay] = {}
+        self._bound: dict[str, FieldDisplay[Any]] = {}
         if self._errors:
             for err in self._errors:
                 if err.field is not None and err.field not in self._fields:
@@ -99,7 +114,12 @@ class FormDisplay:
                         f"Use field=None for form-level errors."
                     )
 
-    def _bind(self, name: str) -> FieldDisplay:
+    @property
+    def form_class(self) -> type[F]:
+        """The form class this display was built from."""
+        return self._form_class
+
+    def _bind(self, name: str) -> FieldDisplay[Any]:
         if name not in self._fields:
             raise KeyError(f"{self._form_name} has no field {name!r}.")
         if name in self._bound:
@@ -115,7 +135,7 @@ class FormDisplay:
             value = self._values.get(name, "")
             if value is None:
                 value = ""
-        bound = FieldDisplay(
+        bound: FieldDisplay[Any] = FieldDisplay(
             name=name,
             value=value,
             errors=[error for error in self._errors if error.field == name],
@@ -125,7 +145,7 @@ class FormDisplay:
         self._bound[name] = bound
         return bound
 
-    def __getattr__(self, name: str) -> FieldDisplay:
+    def __getattr__(self, name: str) -> FieldDisplay[Any]:
         # Only reached for names not found normally — i.e. field lookups.
         if name.startswith("_"):
             raise AttributeError(name)
@@ -134,14 +154,26 @@ class FormDisplay:
         except KeyError as exc:
             raise AttributeError(str(exc)) from None
 
-    def __getitem__(self, name: str) -> FieldDisplay:
-        return self._bind(name)
+    @overload
+    def __getitem__[T](self, key: Field[T]) -> FieldDisplay[T]: ...
+    @overload
+    def __getitem__(self, key: str) -> FieldDisplay[Any]: ...
+    def __getitem__(self, key: Field[Any] | str) -> FieldDisplay[Any]:
+        # A Field reference (`ContactForm.email`) carries its declared type,
+        # so indexed access here returns a typed FieldDisplay; a string name
+        # is the loose-typed escape hatch.
+        if isinstance(key, Field):
+            return self._bind(key.name)
+        return self._bind(key)
 
-    def __contains__(self, name: str) -> bool:
-        """Whether `name` is one of the form's fields — `'email' in form`."""
-        return name in self._fields
+    def __contains__(self, key: Field[Any] | str) -> bool:
+        """Whether `key` is one of the form's fields — `'email' in form` or
+        `ContactForm.email in form`."""
+        if isinstance(key, Field):
+            return key.name in self._fields
+        return key in self._fields
 
-    def __iter__(self) -> Iterator[FieldDisplay]:
+    def __iter__(self) -> Iterator[FieldDisplay[Any]]:
         for name in self._fields:
             yield self._bind(name)
 

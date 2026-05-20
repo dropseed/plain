@@ -3,7 +3,6 @@ from __future__ import annotations
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain.forms import FormDisplay
 from plain.html.views import DetailView
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
@@ -290,15 +289,12 @@ class AdminCreateView(AdminView):
         return ""
 
     def get(self) -> Response:
-        return self.render(form=FormDisplay(self.form_class))
+        return self.render_form(self.form_class)
 
     def post(self) -> Response:
-        result = self.form_class.validate(
-            self.request.form_data, files=self.request.files
-        )
-        if not result:
-            return self.render(form=FormDisplay(self.form_class, result))
-
+        result = self.validate_form(self.form_class)
+        if isinstance(result, Response):
+            return result
         obj = create_from(self.model, result)
         return RedirectResponse(self.get_success_url(obj))
 
@@ -389,18 +385,14 @@ class AdminUpdateView(AdminView, DetailView):
         return ""
 
     def get(self) -> Response:
-        form = FormDisplay(
+        return self.render_form(
             self.form_class, values=self.form_class.initial_from(self.object)
         )
-        return self.render(form=form)
 
     def post(self) -> Response:
-        result = self.form_class.validate(
-            self.request.form_data, files=self.request.files
-        )
-        if not result:
-            return self.render(form=FormDisplay(self.form_class, result))
-
+        result = self.validate_form(self.form_class)
+        if isinstance(result, Response):
+            return result
         update_from(self.object, result)
         return RedirectResponse(self.get_success_url())
 
