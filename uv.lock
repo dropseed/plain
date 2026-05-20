@@ -34,7 +34,6 @@ members = [
     "plain-scan",
     "plain-sessions",
     "plain-start",
-    "plain-support",
     "plain-tailwind",
     "plain-templates",
     "plain-toolbar",
@@ -239,7 +238,6 @@ dependencies = [
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
-    { name = "plain-support" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
     { name = "plain-toolbar" },
@@ -276,7 +274,6 @@ requires-dist = [
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
-    { name = "plain-support", editable = "plain-support" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-templates", editable = "plain-templates" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
@@ -1443,39 +1440,6 @@ dependencies = [
 requires-dist = [{ name = "click", specifier = ">=8.0.0" }]
 
 [[package]]
-name = "plain-support"
-version = "0.34.9"
-source = { editable = "plain-support" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-assets" },
-    { name = "plain-auth" },
-    { name = "plain-postgres" },
-    { name = "plain-templates" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "plain-email" },
-    { name = "plain-pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-assets", editable = "plain-assets" },
-    { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-templates", editable = "plain-templates" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "plain-email", editable = "plain-email" },
-    { name = "plain-pytest", editable = "plain-pytest" },
-]
-
-[[package]]
 name = "plain-tailwind"
 version = "0.23.1"
 source = { editable = "plain-tailwind" }
@@ -1605,7 +1569,6 @@ dev = [
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
-    { name = "plain-support" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
     { name = "plain-toolbar" },
@@ -1647,7 +1610,6 @@ dev = [
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
-    { name = "plain-support", editable = "plain-support" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-templates", editable = "plain-templates" },
     { name = "plain-toolbar", editable = "plain-toolbar" },

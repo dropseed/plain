@@ -39,7 +39,6 @@ KNOWN_PACKAGES = {
     "plain-scan": "Test for production best practices",
     "plain-sessions": "Database-backed sessions",
     "plain-start": "Bootstrap a new project from templates",
-    "plain-support": "Support forms for your application",
     "plain-tailwind": "Tailwind CSS without JavaScript or npm",
     "plain-templates": "Render HTML templates using Jinja2",
     "plain-toolbar": "Debug toolbar",

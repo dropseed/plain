@@ -30,7 +30,6 @@ dependencies = [
   "plain-redirection",
   "plain-scan",
   "plain-sessions",
-  "plain-support",
   "plain-tailwind",
   "plain-templates",
   "plain-toolbar",

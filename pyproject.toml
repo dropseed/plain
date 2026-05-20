@@ -33,7 +33,6 @@ dev = [
   "plain-redirection",
   "plain-scan",
   "plain-sessions",
-  "plain-support",
   "plain-tailwind",
   "plain-templates",
   "plain-toolbar",
@@ -73,7 +72,6 @@ dev = [
 "plain-redirection" = { workspace = true }
 "plain-scan" = { workspace = true }
 "plain-sessions" = { workspace = true }
-"plain-support" = { workspace = true }
 "plain-tailwind" = { workspace = true }
 "plain-templates" = { workspace = true }
 "plain-toolbar" = { workspace = true }
