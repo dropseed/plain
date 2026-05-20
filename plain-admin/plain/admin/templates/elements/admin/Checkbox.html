@@ -1,5 +1,8 @@
 ---
+imports:
+  - from plain.forms import field_value
 attrs:
+  form: Any
   field: Any
 ---
 <input
@@ -7,6 +10,6 @@ attrs:
     class="admin-input"
     type="checkbox"
     name="{{ field.name }}"
-    checked="{{ bool(field.value) }}"
+    checked="{{ bool(field_value(form, field)) }}"
     required="{{ field.required }}"
 >

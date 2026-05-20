@@ -1,7 +1,10 @@
 ---
+imports:
+  - from plain.forms import field_errors
 attrs:
-  bf: Any
+  form: Any
+  field: Any
 ---
-{% for error in bf.errors %}
+{% for error in field_errors(form, field) %}
     <div class="field-error">⚠ {{ error.message }}</div>
 {% endfor %}

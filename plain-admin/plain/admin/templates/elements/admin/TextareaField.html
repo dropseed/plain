@@ -5,15 +5,16 @@ components:
   - elements/admin/Help
   - elements/admin/FieldErrors
 attrs:
+  form: Any
   field: Any
   label: str
   help: str = ""
 ---
 <div class="space-y-1">
     <Label field="{{ field }}">{{ label }}</Label>
-    <Textarea field="{{ field }}" />
+    <Textarea form="{{ form }}" field="{{ field }}" />
     {% if help %}
         <Help help="{{ help }}" />
     {% endif %}
-    <FieldErrors field="{{ field }}" />
+    <FieldErrors form="{{ form }}" field="{{ field }}" />
 </div>

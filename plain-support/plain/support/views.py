@@ -4,7 +4,7 @@ from typing import Any
 
 from plain.assets.urls import get_asset_url
 from plain.auth.views import AuthView
-from plain.forms import FormDisplay
+from plain.forms import Form, Invalid
 from plain.html import Markup, Template
 from plain.html.views import TemplateView
 from plain.http import RedirectResponse, Response
@@ -25,7 +25,13 @@ class SupportFormView(AuthView, TemplateView):
         form_slug = self.url_kwargs["form_slug"]
         return import_string(settings.SUPPORT_FORMS[form_slug])
 
-    def _render_panel(self, *, form: FormDisplay, success: bool) -> Markup:
+    def _render_panel(
+        self,
+        *,
+        form_class: type[SupportForm],
+        form: Form | Invalid,
+        success: bool,
+    ) -> Markup:
         # Render the configurable form/success template into a single
         # pre-rendered panel. The set of sub-templates a template includes
         # must be statically knowable, so this dispatch happens here.
@@ -36,26 +42,39 @@ class SupportFormView(AuthView, TemplateView):
             panel_template_name = f"support/forms/{form_slug}.html"
         panel_context = {
             **self.get_template_context(),
+            "form_class": form_class,
             "form": form,
             "form_action": self.request.build_absolute_uri(),
             "success": success,
         }
         return Markup(Template(panel_template_name).render(panel_context))
 
-    def _shared_context(self, *, form: FormDisplay, success: bool) -> dict[str, Any]:
+    def _shared_context(
+        self,
+        *,
+        form_class: type[SupportForm],
+        form: Form | Invalid,
+        success: bool,
+    ) -> dict[str, Any]:
         return {
+            "form_class": form_class,
             "form": form,
             "form_action": self.request.build_absolute_uri(),
             "success": success,
-            "panel": self._render_panel(form=form, success=success),
+            "panel": self._render_panel(
+                form_class=form_class, form=form, success=success
+            ),
         }
 
     def get(self) -> Response:
         # Pre-fill the email for an authed user; otherwise start blank.
-        values: dict[str, str] = {"email": self.user.email} if self.user else {}
-        form = FormDisplay(self.get_form_class(), values=values)
+        form_class = self.get_form_class()
+        values: dict[str, Any] = {"email": self.user.email} if self.user else {}
+        form = form_class(**values)
         success = self.request.query_params.get("success") == "true"
-        return self.render(**self._shared_context(form=form, success=success))
+        return self.render(
+            **self._shared_context(form_class=form_class, form=form, success=success)
+        )
 
     def post(self) -> Response:
         form_class = self.get_form_class()
@@ -63,7 +82,7 @@ class SupportFormView(AuthView, TemplateView):
         if not result:
             return self.render(
                 **self._shared_context(
-                    form=FormDisplay(form_class, result), success=False
+                    form_class=form_class, form=result, success=False
                 )
             )
         entry = create_from(

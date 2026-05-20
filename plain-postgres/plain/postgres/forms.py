@@ -295,7 +295,7 @@ class ModelForm(Form):
         Translates a ForeignKey to its `<name>_id` value and a ManyToMany
         relation to a list of related-object ids — what `ModelChoiceField`
         and `ModelMultipleChoiceField` take as input. Scalar fields fall
-        through to a plain `getattr`. Pass the result as `FormDisplay`'s
+        through to a plain `getattr`. Pass the result as `render_form`'s
         `values=` to pre-fill an edit form.
         """
         initial: dict[str, Any] = {}

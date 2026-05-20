@@ -8,6 +8,7 @@ components:
   - components/Field
 attrs:
   form: Any
+  form_class: Any
 ---
 <Base>
     {% slot "title" %}New note{% endslot %}
@@ -17,12 +18,13 @@ attrs:
         <form method="post" class="mt-6 flex flex-col gap-5">
         <NonfieldErrors form="{{ form }}" />
         <Field
-            bf="{{ form.title }}"
+            form="{{ form }}"
+            field="{{ form_class.title }}"
             label="Title"
             autofocus="{{ True }}"
             required="{{ True }}"
         />
-        <Field bf="{{ form.body }}" label="Body" type="textarea" min_height="200px" />
+        <Field form="{{ form }}" field="{{ form_class.body }}" label="Body" type="textarea" min_height="200px" />
         <button type="submit" class="btn-primary self-start">Create</button>
     </form>
     </div>

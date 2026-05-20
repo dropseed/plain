@@ -7,7 +7,7 @@ paths:
 
 - Plain uses Jinja2 — run `uv run plain docs templates` for full documentation
 - Break HTML tags with many attributes onto multiple lines, closing `>` on its own line
-- Render form fields via the `FormDisplay` the view passes — `form.field.value`, `.errors`, `.required`, `.html_id`, `.name` (see the `plain-forms` rule)
+- Render form fields via the helpers + field references — `field_value(form, form_class.email)`, `field_errors(form, form_class.email)`, `form_errors(form)`. Field metadata is on the field itself: `form_class.email.required`, `.choices`, `.html_id`, `.name` (see the `plain-forms` rule)
 - Never call `.query` in templates — all data should come from the view context
 
 ## Differences from Django

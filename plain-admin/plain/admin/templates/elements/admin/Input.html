@@ -1,5 +1,8 @@
 ---
+imports:
+  - from plain.forms import field_errors, field_value
 attrs:
+  form: Any
   field: Any
   type: str = "text"
   list: str = ""
@@ -10,7 +13,7 @@ attrs:
     type="{{ type }}"
     name="{{ field.name }}"
     list="{{ list or None }}"
-    value="{{ field.value if field.value is not None else None }}"
+    value="{{ field_value(form, field) if field_value(form, field) is not None else None }}"
     required="{{ field.required }}"
-    aria-invalid="{{ 'true' if field.errors else None }}"
+    aria-invalid="{{ 'true' if field_errors(form, field) else None }}"
 >

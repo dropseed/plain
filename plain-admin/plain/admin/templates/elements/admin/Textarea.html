@@ -1,5 +1,8 @@
 ---
+imports:
+  - from plain.forms import field_errors, field_value
 attrs:
+  form: Any
   field: Any
   rows: int = 3
   spellcheck: str = "default"
@@ -11,5 +14,5 @@ attrs:
     rows="{{ rows }}"
     spellcheck="{{ spellcheck }}"
     required="{{ field.required }}"
-    aria-invalid="{{ 'true' if field.errors else None }}"
->{{ field.value or "" }}</textarea>
+    aria-invalid="{{ 'true' if field_errors(form, field) else None }}"
+>{{ field_value(form, field) or "" }}</textarea>

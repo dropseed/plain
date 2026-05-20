@@ -5,17 +5,18 @@ components:
   - elements/admin/Help
   - elements/admin/FieldErrors
 attrs:
+  form: Any
   field: Any
   label: str
   help: str = ""
 ---
 <div>
     <div class="flex items-center space-x-2">
-        <Checkbox field="{{ field }}" />
+        <Checkbox form="{{ form }}" field="{{ field }}" />
         <Label field="{{ field }}">{{ label }}</Label>
         {% if help %}
             <Help help="{{ help }}" />
         {% endif %}
     </div>
-    <FieldErrors field="{{ field }}" />
+    <FieldErrors form="{{ form }}" field="{{ field }}" />
 </div>

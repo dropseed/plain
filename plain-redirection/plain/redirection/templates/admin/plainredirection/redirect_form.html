@@ -6,6 +6,7 @@ components:
   - elements/admin/Submit
 attrs:
   form: Any
+  form_class: Any
   title: str = ""
   app_name: str = "Plain"
   admin_force_theme: str = ""
@@ -30,12 +31,12 @@ attrs:
     cards="{{ cards }}"
 >
     <form method="post" class="space-y-4">
-        <InputField label="From pattern" field="{{ form.from_pattern }}" />
-        <InputField label="To pattern" field="{{ form.to_pattern }}" />
-        <CheckboxField label="Use regular expressions" field="{{ form.is_regex }}" />
-        <InputField label="HTTP status code" field="{{ form.http_status }}" />
-        <InputField label="Order" field="{{ form.order }}" />
-        <CheckboxField label="Enabled" field="{{ form.enabled }}" />
+        <InputField form="{{ form }}" field="{{ form_class.from_pattern }}" label="From pattern" />
+        <InputField form="{{ form }}" field="{{ form_class.to_pattern }}" label="To pattern" />
+        <CheckboxField form="{{ form }}" field="{{ form_class.is_regex }}" label="Use regular expressions" />
+        <InputField form="{{ form }}" field="{{ form_class.http_status }}" label="HTTP status code" />
+        <InputField form="{{ form }}" field="{{ form_class.order }}" label="Order" />
+        <CheckboxField form="{{ form }}" field="{{ form_class.enabled }}" label="Enabled" />
         <Submit>Save</Submit>
     </form>
 </Base>

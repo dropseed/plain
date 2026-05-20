@@ -1,8 +1,11 @@
 ---
+imports:
+  - from plain.forms import field_errors
 attrs:
+  form: Any
   field: Any
 ---
-{% for error in field.errors %}
+{% for error in field_errors(form, field) %}
     <div class="mt-2 flex items-center space-x-1.5 text-sm text-admin-danger">
     <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
         <path

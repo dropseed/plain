@@ -13,9 +13,10 @@ become typed Python data.
 An `Invalid` carries a flat list of `Error`s; each `Error` names the `field`
 it concerns (or `None` for a form-level error) and carries a stable `code`.
 
-To render a form, a view wraps the outcome in a `FormDisplay` — the opt-in
-adapter that gives a template per-field `value` and `errors`. The core types
-above stay render-agnostic.
+To render a form, a view passes the `Form | Invalid` result straight to the
+template; the template reads each field through `field_value` and
+`field_errors` (typed via the field reference) plus the field's own
+metadata properties (`.required`, `.choices`, `.html_id`, `.name`).
 
 `ModelForm` — a form backed by a model — lives in `plain.postgres`.
 """
@@ -23,17 +24,18 @@ above stay render-agnostic.
 from __future__ import annotations
 
 from . import types
-from .display import FieldDisplay, FormDisplay
 from .fields import Field
 from .forms import Form
+from .helpers import field_errors, field_value, form_errors
 from .result import Error, Invalid
 
 __all__ = [
     "Error",
     "Field",
-    "FieldDisplay",
     "Form",
-    "FormDisplay",
     "Invalid",
+    "field_errors",
+    "field_value",
+    "form_errors",
     "types",
 ]

@@ -1,8 +1,9 @@
 """Smoke tests for the example app's form views.
 
 Drives notes / contacts / tasks end-to-end through `plain.test.Client` to
-confirm the rebuilt `plain.forms` API (validate → FormDisplay → save) holds
-together across a plain Form, a ModelForm, an FK/M2M ModelForm, and HTMX.
+confirm the rebuilt `plain.forms` API (validate → field_value/field_errors
+helpers → save) holds together across a plain Form, a ModelForm, an
+FK/M2M ModelForm, and HTMX.
 """
 
 from __future__ import annotations

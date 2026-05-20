@@ -1,7 +1,9 @@
 ---
+imports:
+  - from plain.forms import form_errors
 attrs:
   form: Any
 ---
-{% for error in form.errors %}
+{% for error in form_errors(form) %}
     <div class="nonfield-error">{{ error.message }}</div>
 {% endfor %}

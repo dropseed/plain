@@ -5,6 +5,7 @@ components:
   - elements/admin/Submit
 attrs:
   form: Any
+  form_class: Any
   title: str = ""
   app_name: str = "Plain"
   admin_force_theme: str = ""
@@ -29,8 +30,8 @@ attrs:
     cards="{{ cards }}"
 >
     <form method="post" class="space-y-4">
-        <InputField label="Key" field="{{ form.key }}" />
-        <InputField label="Value" field="{{ form.value }}" />
+        <InputField form="{{ form }}" field="{{ form_class.key }}" label="Key" />
+        <InputField form="{{ form }}" field="{{ form_class.value }}" label="Value" />
         <Submit>Save</Submit>
     </form>
 </Base>

@@ -6,11 +6,12 @@ components:
   - elements/admin/Submit
 attrs:
   form: Any
+  form_class: Any
 ---
 <Base>
     <form method="post" class="space-y-4">
-        <InputField label="Username" field="{{ form.username }}" />
-        <CheckboxField label="Is admin" field="{{ form.is_admin }}" />
+        <InputField label="Username" form="{{ form }}" field="{{ form_class.username }}" />
+        <CheckboxField label="Is admin" form="{{ form }}" field="{{ form_class.is_admin }}" />
         <Submit>Save</Submit>
     </form>
 </Base>

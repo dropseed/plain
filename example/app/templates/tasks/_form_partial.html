@@ -1,48 +1,52 @@
 ---
+imports:
+  - from plain.forms import field_value
 components:
   - components/NonfieldErrors
   - components/Field
   - components/FieldErrors
 attrs:
   form: Any
+  form_class: Any
   value: Any = None
 ---
 <NonfieldErrors form="{{ form }}" />
 <Field
-    bf="{{ form.title }}"
+    form="{{ form }}"
+    field="{{ form_class.title }}"
     label="Title"
     autofocus="{{ True }}"
     required="{{ True }}"
 />
-<Field bf="{{ form.project }}" label="Project" type="select" />
-<Field bf="{{ form.notes }}" label="Notes" type="textarea" min_height="120px" />
+<Field form="{{ form }}" field="{{ form_class.project }}" label="Project" type="select" />
+<Field form="{{ form }}" field="{{ form_class.notes }}" label="Notes" type="textarea" min_height="120px" />
 <div class="grid grid-cols-2 gap-4">
-    <Field bf="{{ form.due_date }}" label="Due date" type="date" />
-    <Field bf="{{ form.priority }}" label="Priority" type="select" />
+    <Field form="{{ form }}" field="{{ form_class.due_date }}" label="Due date" type="date" />
+    <Field form="{{ form }}" field="{{ form_class.priority }}" label="Priority" type="select" />
 </div>
 <label class="flex items-center gap-2 text-sm text-body">
     <input
         type="checkbox"
-        name="{{ form.is_complete.name }}"
-        id="{{ form.is_complete.html_id }}"
-        checked="{{ bool(form.is_complete.value) }}"
+        name="{{ form_class.is_complete.name }}"
+        id="{{ form_class.is_complete.html_id }}"
+        checked="{{ bool(field_value(form, form_class.is_complete)) }}"
     >
     Complete
 </label>
 <div>
-    <label class="field-label" for="{{ form.tags.html_id }}">Tags</label>
+    <label class="field-label" for="{{ form_class.tags.html_id }}">Tags</label>
     <select
         class="field-input h-32"
-        name="{{ form.tags.name }}"
-        id="{{ form.tags.html_id }}"
+        name="{{ form_class.tags.name }}"
+        id="{{ form_class.tags.html_id }}"
         multiple
     >
-        {% for (value, label) in form.tags.choices %}
+        {% for (value, label) in form_class.tags.choices %}
             <option
                 value="{{ value }}"
-                selected="{{ str(value) in [str(v) for v in (form.tags.value or [])] }}"
+                selected="{{ str(value) in [str(v) for v in (field_value(form, form_class.tags) or [])] }}"
             >{{ label }}</option>
         {% endfor %}
     </select>
-    <FieldErrors bf="{{ form.tags }}" />
+    <FieldErrors form="{{ form }}" field="{{ form_class.tags }}" />
 </div>

@@ -1,5 +1,8 @@
 ---
+imports:
+  - from plain.forms import field_errors, field_value
 attrs:
+  form: Any
   field: Any
 ---
 <select
@@ -7,9 +10,9 @@ attrs:
     name="{{ field.name }}"
     class="admin-select"
     required="{{ field.required }}"
-    aria-invalid="{{ 'true' if field.errors else None }}"
+    aria-invalid="{{ 'true' if field_errors(form, field) else None }}"
 >
     {% for (value, label) in field.choices %}
-        <option value="{{ value }}" selected="{{ value == field.value }}">{{ label }}</option>
+        <option value="{{ value }}" selected="{{ value == field_value(form, field) }}">{{ label }}</option>
     {% endfor %}
 </select>

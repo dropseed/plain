@@ -7,6 +7,7 @@ components:
   - tasks/_form_partial as TaskFormFields
 attrs:
   form: Any
+  form_class: Any
 ---
 <Base>
     {% slot "title" %}New task{% endslot %}
@@ -14,7 +15,7 @@ attrs:
         <BackLink href="{{ url('tasks:list') }}" label="Back to tasks" />
         <h1 class="page-h1">New task</h1>
         <form method="post" class="mt-6 flex flex-col gap-5">
-        <TaskFormFields form="{{ form }}" />
+        <TaskFormFields form="{{ form }}" form_class="{{ form_class }}" />
         <button type="submit" class="btn-primary self-start">Create</button>
     </form>
     </div>

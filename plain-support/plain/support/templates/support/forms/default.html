@@ -1,11 +1,14 @@
 ---
+imports:
+  - from plain.forms import field_errors, field_value, form_errors
 attrs:
   form: Any
+  form_class: Any
   form_action: str = ""
 ---
 <div class="flex justify-center p-2">
     <form class="max-w-2xl w-full" method="post" action="{{ form_action }}">
-        {% for error in form.errors %}
+        {% for error in form_errors(form) %}
             <p class="form-error text-red-600">{{ error.message }}</p>
         {% endfor %}
         <div class="flex space-x-4">
@@ -16,10 +19,10 @@ attrs:
                     class="block w-full rounded-sm text-black border-gray-300 border"
                     required
                     type="text"
-                    name="{{ form.name.name }}"
-                    value="{{ form.name.value or '' }}"
+                    name="{{ form_class.name.name }}"
+                    value="{{ field_value(form, form_class.name) or '' }}"
                 >
-                {% for error in form.name.errors %}
+                {% for error in field_errors(form, form_class.name) %}
                     <span class="form-error text-red-600">{{ error.message }}</span>
                 {% endfor %}
             </div>
@@ -30,10 +33,10 @@ attrs:
                     class="block w-full rounded-sm text-black border-gray-300 border"
                     required
                     type="email"
-                    name="{{ form.email.name }}"
-                    value="{{ form.email.value or '' }}"
+                    name="{{ form_class.email.name }}"
+                    value="{{ field_value(form, form_class.email) or '' }}"
                 >
-                {% for error in form.email.errors %}
+                {% for error in field_errors(form, form_class.email) %}
                     <span class="form-error text-red-600">{{ error.message }}</span>
                 {% endfor %}
             </div>
@@ -45,9 +48,9 @@ attrs:
                 class="block w-full text-black rounded-sm border-gray-300 border"
                 rows="10"
                 required
-                name="{{ form.message.name }}"
-            >{{ form.message.value or "" }}</textarea>
-            {% for error in form.message.errors %}
+                name="{{ form_class.message.name }}"
+            >{{ field_value(form, form_class.message) or "" }}</textarea>
+            {% for error in field_errors(form, form_class.message) %}
                 <span class="form-error text-red-600">{{ error.message }}</span>
             {% endfor %}
         </div>

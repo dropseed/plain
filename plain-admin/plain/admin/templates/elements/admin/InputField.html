@@ -5,6 +5,7 @@ components:
   - elements/admin/Help
   - elements/admin/FieldErrors
 attrs:
+  form: Any
   field: Any
   label: str
   type: str = "text"
@@ -12,9 +13,9 @@ attrs:
 ---
 <div class="space-y-1">
     <Label field="{{ field }}">{{ label }}</Label>
-    <Input field="{{ field }}" type="{{ type }}" />
+    <Input form="{{ form }}" field="{{ field }}" type="{{ type }}" />
     {% if help %}
         <Help help="{{ help }}" />
     {% endif %}
-    <FieldErrors field="{{ field }}" />
+    <FieldErrors form="{{ form }}" field="{{ field }}" />
 </div>

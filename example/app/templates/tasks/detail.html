@@ -1,5 +1,6 @@
 ---
 imports:
+  - from plain.forms import field_value
   - from plain.urls import reverse as url
 components:
   - base as Base
@@ -9,6 +10,7 @@ components:
 attrs:
   task: app.tasks.models.Task
   title_form: Any
+  title_form_class: Any
 ---
 <Base>
     {% slot "title" %}{{ task.title }}{% endslot %}
@@ -21,13 +23,13 @@ attrs:
                     aria-label="Task title"
                     class="flex-1 page-h1 bg-transparent border border-transparent hover:border-outline focus:border-ink focus:ring-[3px] focus:ring-ink/15 rounded px-2 py-1 outline-none"
                     type="text"
-                    name="{{ title_form.title.name }}"
-                    id="{{ title_form.title.html_id }}"
-                    value="{{ title_form.title.value or task.title }}"
+                    name="{{ title_form_class.title.name }}"
+                    id="{{ title_form_class.title.html_id }}"
+                    value="{{ field_value(title_form, title_form_class.title) or task.title }}"
                 >
                 <button type="submit" class="btn-primary">Rename</button>
             </form>
-                <FieldErrors bf="{{ title_form.title }}" />
+                <FieldErrors form="{{ title_form }}" field="{{ title_form_class.title }}" />
             </div>
         </HtmxFragment>
         <div class="mt-3 text-[12px] text-muted">

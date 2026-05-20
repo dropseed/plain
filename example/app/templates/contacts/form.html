@@ -1,5 +1,6 @@
 ---
 imports:
+  - from plain.forms import field_value
   - from plain.urls import reverse as url
 components:
   - base as Base
@@ -9,6 +10,7 @@ components:
   - components/FieldErrors
 attrs:
   form: Any
+  form_class: Any
 ---
 <Base>
     {% slot "title" %}Contact us{% endslot %}
@@ -25,22 +27,25 @@ attrs:
         <form method="post" class="mt-6 flex flex-col gap-5">
         <NonfieldErrors form="{{ form }}" />
         <Field
-            bf="{{ form.name }}"
+            form="{{ form }}"
+            field="{{ form_class.name }}"
             label="Name"
             autofocus="{{ True }}"
             required="{{ True }}"
         />
-        <Field bf="{{ form.email }}" label="Email" type="email" required="{{ True }}" />
+        <Field form="{{ form }}" field="{{ form_class.email }}" label="Email" type="email" required="{{ True }}" />
         <Field
-            bf="{{ form.subject }}"
+            form="{{ form }}"
+            field="{{ form_class.subject }}"
             label="Subject"
             type="select"
             required="{{ True }}"
         />
-        {% if 'company' in form %}
-            <Field bf="{{ form.company }}" label="Company (optional)" />
+        {% if 'company' in form_class.fields() %}
+            <Field form="{{ form }}" field="{{ form_class.company }}" label="Company (optional)" />
         {% endif %}<Field
-            bf="{{ form.message }}"
+            form="{{ form }}"
+            field="{{ form_class.message }}"
             label="Message"
             type="textarea"
             min_height="160px"
@@ -51,13 +56,13 @@ attrs:
             <label class="flex items-center gap-2 text-sm text-body">
                 <input
                     type="checkbox"
-                    name="{{ form.subscribe.name }}"
-                    id="{{ form.subscribe.html_id }}"
-                    checked="{{ bool(form.subscribe.value) }}"
+                    name="{{ form_class.subscribe.name }}"
+                    id="{{ form_class.subscribe.html_id }}"
+                    checked="{{ bool(field_value(form, form_class.subscribe)) }}"
                 >
                 Subscribe to the newsletter
             </label>
-            <FieldErrors bf="{{ form.subscribe }}" />
+            <FieldErrors form="{{ form }}" field="{{ form_class.subscribe }}" />
         </div>
 
         <button type="submit" class="btn-primary self-start">Send</button>
