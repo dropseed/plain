@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.146.0](https://github.com/dropseed/plain/releases/plain@0.146.0) (2026-05-20)
+
+### What's changed
+
+- `plain docs --search` now substring-matches by default; pass `--regex` to opt into regex patterns (with alternation, anchors, etc.). The previous default treated the search term as a regex, which silently broke any search containing regex metacharacters (`.`, `?`, `[`, `(`, etc.). ([c8c1a2bd7b](https://github.com/dropseed/plain/commit/c8c1a2bd7b))
+- The `request` object is no longer attached as a log extra on the 400 host-validation warning, the 405 method-not-allowed warning, or `log_exception()`'s base context. Downstream log processors that called methods on the live request were a footgun — the request lifecycle had often already ended by the time the log was processed. ([6324e21a67](https://github.com/dropseed/plain/commit/6324e21a67))
+
+### Upgrade instructions
+
+- If a saved `plain docs --search` invocation relied on regex behavior, add `--regex` to it.
+- If your logging configuration consumed `record.request` from these entries, switch to another extra field — `request.path` is still attached where it was before.
+
 ## [0.145.3](https://github.com/dropseed/plain/releases/plain@0.145.3) (2026-05-20)
 
 ### What's changed
