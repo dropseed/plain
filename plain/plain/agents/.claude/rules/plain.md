@@ -93,7 +93,7 @@ Trace-context-only (not error attribution): template render (`plain-templates`),
 **Discovery** — find what's available and where things are:
 
 - `uv run plain docs --list` — all packages and core modules with descriptions
-- `uv run plain docs --search <term>` — find which modules/sections mention a term (compact, one line per section)
+- `uv run plain docs --search <term>` — find which modules/sections mention a term (compact, one line per section). Substring by default; add `--regex` for regex patterns (alternation, anchors, etc.)
 
 **Reading** — get full content:
 
