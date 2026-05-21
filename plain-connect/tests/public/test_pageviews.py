@@ -49,7 +49,7 @@ def test_tag_renders_the_beacon_script_when_token_is_set(db, settings):
 
 def test_anonymous_visitor_carries_no_identity(db, settings):
     settings.CONNECT_PAGEVIEWS_TOKEN = TOKEN
-    settings.CONNECT_PAGEVIEWS_IDENTITY_KEY = IDENTITY_KEY
+    settings.CONNECT_SECRET_KEY = IDENTITY_KEY
     response = Client().get("/")
     assert response.status_code == 200
     assert _data_identity(response.content) == ""
@@ -69,7 +69,7 @@ def test_signed_in_user_identity_is_encrypted_into_the_tag(db, settings):
     # Regression test: the user is read via plain.auth, not request.user.
     # With request.user the attribute would render empty for a logged-in user.
     settings.CONNECT_PAGEVIEWS_TOKEN = TOKEN
-    settings.CONNECT_PAGEVIEWS_IDENTITY_KEY = IDENTITY_KEY
+    settings.CONNECT_SECRET_KEY = IDENTITY_KEY
 
     user = User.query.create(username="dave")
     client = Client()

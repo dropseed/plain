@@ -15,7 +15,9 @@
   const initialTraceId = script.dataset.traceId || "";
   const initialRoute = script.dataset.route || "";
 
-  const ANONYMOUS_ID_KEY = "plain_pageviews_anonymous_id";
+  // Shared across plain.connect features so submissions from different
+  // widgets on the same browser stitch together.
+  const ANONYMOUS_ID_KEY = "plain_anonymous_id";
 
   function anonymousId() {
     try {
