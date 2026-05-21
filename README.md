@@ -10,7 +10,7 @@ Ready for the era of agents.
 Start with an agent (Claude, Codex, Amp, OpenCode, or your agent of choice):
 
 ```
-mkdir my-app && cd my-app && claude "$(curl -sSf https://plainframework.com/start.md)"
+mkdir my-app && cd my-app && claude "$( curl -sSf https://plainframework.com/start.md )"
 ```
 
 Or start with uv directly:
