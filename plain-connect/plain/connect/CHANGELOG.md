@@ -1,5 +1,15 @@
 # plain-connect changelog
 
+## [0.6.1](https://github.com/dropseed/plain/releases/plain-connect@0.6.1) (2026-05-20)
+
+### What's changed
+
+- Support-form README fix: replaced the non-functional `referrerpolicy="strict-origin-when-cross-origin"` attribute on the `<form>` example with `<meta name="referrer" content="strict-origin-when-cross-origin">`. `referrerpolicy` is not a valid attribute on `<form>` — browsers silently ignored it and Plain Cloud kept rejecting submissions with `Origin: null`. The meta-tag override actually works. ([dcd05214ff](https://github.com/dropseed/plain/commit/dcd05214ff))
+
+### Upgrade instructions
+
+- If you copied the previous example and your support form was failing with `Origin: null`, update the page to use the meta-tag pattern from the README.
+
 ## [0.6.0](https://github.com/dropseed/plain/releases/plain-connect@0.6.0) (2026-05-20)
 
 ### What's changed
