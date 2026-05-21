@@ -123,7 +123,6 @@ class View[HandlerResult = Response]:
                         "method": self.request.method,
                         "path": self.request.path,
                         "status_code": 405,
-                        "request": self.request,
                     },
                 )
                 response: Response = NotAllowedResponse(self._allowed_methods())

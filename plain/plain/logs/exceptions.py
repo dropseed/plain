@@ -46,7 +46,7 @@ def log_exception(request: Request, exc: Exception) -> None:
     if isinstance(exc, NotFoundError404):
         return
 
-    base = {"path": request.path, "request": request}
+    base = {"path": request.path}
 
     if isinstance(exc, SuspiciousOperationError400):
         security_logger = logging.getLogger(f"plain.security.{type(exc).__name__}")
