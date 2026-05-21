@@ -176,8 +176,6 @@ plain docs --search "queryset"         # search across all packages
 - [plain.connect](https://plainframework.com/docs/plain-connect/plain/connect/) — OTLP export to Plain Cloud
 - [plain.flags](https://plainframework.com/docs/plain-flags/plain/flags/) — feature flags
 - [plain.scan](https://plainframework.com/docs/plain-scan/plain/scan/) — security scanning
-- [plain.pageviews](https://plainframework.com/docs/plain-pageviews/plain/pageviews/) — analytics
-- [plain.support](https://plainframework.com/docs/plain-support/plain/support/) — support tickets
 
 **Users:**
 

@@ -1,5 +1,16 @@
 # plain-cloud changelog
 
+## [0.4.2](https://github.com/dropseed/plain/releases/plain-cloud@0.4.2) (2026-05-19)
+
+### What's changed
+
+- Fixed `plain-cloud whoami` and `login` crashing when the API redirected `/me/` to `/me`. The HTTP client now follows redirects, so a trailing-slash mismatch resolves to the real response instead of an empty 3xx body that parsed to `None`. ([1d8e10d247](https://github.com/dropseed/plain/commit/1d8e10d247))
+- `login` and `whoami` now exit with a clear message if the identity endpoint returns an unexpected body, instead of raising an `AttributeError`. ([1d8e10d247](https://github.com/dropseed/plain/commit/1d8e10d247))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.4.1](https://github.com/dropseed/plain/releases/plain-cloud@0.4.1) (2026-05-08)
 
 ### What's changed

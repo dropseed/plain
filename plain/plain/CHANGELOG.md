@@ -1,5 +1,26 @@
 # plain changelog
 
+## [0.145.3](https://github.com/dropseed/plain/releases/plain@0.145.3) (2026-05-20)
+
+### What's changed
+
+- The `plain-support` package has been removed and no longer appears in the package docs list or the `plain docs` CLI. Customer support forms now live in `plain.connect` via the `{% connect_support_fields %}` template tag. ([a1a1da39c5](https://github.com/dropseed/plain/commit/a1a1da39c5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.145.2](https://github.com/dropseed/plain/releases/plain@0.145.2) (2026-05-19)
+
+### What's changed
+
+- The `plain-pageviews` package has been removed and no longer appears in the package docs list or the `plain docs` CLI. First-party pageview tracking now lives in `plain.connect` via the `{% connect_pageviews %}` template tag. ([8fa042fc19](https://github.com/dropseed/plain/commit/8fa042fc19))
+- `plain docs --api` now reads `__all__` whether it is declared as a list or a tuple, so a module using a tuple no longer silently drops its API surface from the output. ([64ee8a4de0](https://github.com/dropseed/plain/commit/64ee8a4de0))
+
+### Upgrade instructions
+
+- No changes required. If you depended on `plain.pageviews`, migrate to `plain.connect`'s pageview tracking.
+
 ## [0.145.1](https://github.com/dropseed/plain/releases/plain@0.145.1) (2026-05-16)
 
 ### What's changed

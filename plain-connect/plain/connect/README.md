@@ -7,6 +7,7 @@
 - [Sampling](#sampling)
 - [What gets exported](#what-gets-exported)
 - [Pageview tracking](#pageview-tracking)
+- [Support forms](#support-forms)
 - [Observer coexistence](#observer-coexistence)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -25,16 +26,17 @@ If `CONNECT_EXPORT_TOKEN` is not set, the package is a no-op — safe to install
 
 ## Settings
 
-| Setting                          | Default                               | Description                                                               |
-| -------------------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
-| `CONNECT_EXPORT_URL`             | `"https://ingest.plainframework.com"` | OTLP ingest endpoint (override to use a custom endpoint)                  |
-| `CONNECT_EXPORT_TOKEN`           | `""`                                  | Auth token for the export endpoint                                        |
-| `CONNECT_TRACE_SAMPLE_RATE`      | `1.0`                                 | Probability of exporting a trace (0.0–1.0)                                |
-| `CONNECT_EXPORT_LOGS`            | `True`                                | Set to `False` to disable OTLP log export                                 |
-| `CONNECT_LOG_LEVEL`              | `"INFO"`                              | Minimum severity exported via OTLP logs (level name or int)               |
-| `CONNECT_PAGEVIEWS_TOKEN`        | `""`                                  | Public pageview-endpoint token; enables the `{% connect_pageviews %}` tag |
-| `CONNECT_PAGEVIEWS_IDENTITY_KEY` | `""`                                  | Secret key for encrypting the logged-in user id into the identity token   |
-| `CONNECT_PAGEVIEWS_URL`          | `"https://beacon.plainframework.com"` | Pageview ingest endpoint                                                  |
+| Setting                     | Default                               | Description                                                                                                |
+| --------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `CONNECT_EXPORT_URL`        | `"https://ingest.plainframework.com"` | OTLP ingest endpoint (override to use a custom endpoint)                                                   |
+| `CONNECT_EXPORT_TOKEN`      | `""`                                  | Auth token for the export endpoint                                                                         |
+| `CONNECT_TRACE_SAMPLE_RATE` | `1.0`                                 | Probability of exporting a trace (0.0–1.0)                                                                 |
+| `CONNECT_EXPORT_LOGS`       | `True`                                | Set to `False` to disable OTLP log export                                                                  |
+| `CONNECT_LOG_LEVEL`         | `"INFO"`                              | Minimum severity exported via OTLP logs (level name or int)                                                |
+| `CONNECT_SECRET_KEY`        | `""`                                  | Shared secret with Plain Cloud (from the App settings page). Encrypts identity tokens, signs render tokens |
+| `CONNECT_PAGEVIEWS_TOKEN`   | `""`                                  | Public pageview-endpoint token; enables the `{% connect_pageviews %}` tag                                  |
+| `CONNECT_PAGEVIEWS_URL`     | `"https://beacon.plainframework.com"` | Pageview ingest endpoint                                                                                   |
+| `CONNECT_FORMS_URL`         | `"https://plainframework.com/forms"`  | Base URL for support form submissions                                                                      |
 
 All settings can be set via `PLAIN_`-prefixed environment variables or in `app/settings.py`.
 
@@ -74,15 +76,59 @@ PLAIN_CONNECT_PAGEVIEWS_TOKEN=plain_pv_...
 
 The tag renders nothing until the token is set. Once enabled, it reports the URL, title, referrer, and a first-party anonymous id on each page load and SPA navigation (History `pushState` / back-forward).
 
+If your app sends a `Content-Security-Policy`, add the pageview ingest host to `connect-src` — the script beacons to `CONNECT_PAGEVIEWS_URL` (`https://beacon.plainframework.com` by default). Without it, the browser blocks every pageview beacon.
+
 ### User attribution
 
-To attribute pageviews to your signed-in users, also set the secret identity key:
+To attribute pageviews to your signed-in users, also set the shared secret:
 
 ```
-PLAIN_CONNECT_PAGEVIEWS_IDENTITY_KEY=...
+PLAIN_CONNECT_SECRET_KEY=...
 ```
 
-When set, the tag encrypts the signed-in user's id (AES-256-GCM) into an opaque token that only the pageview endpoint can decrypt — the raw id never appears in your HTML. The user is read from [plain.auth](../../plain-auth/plain/auth/README.md); apps without it (or anonymous visitors) are still counted, their pageviews simply carry no user id.
+When set, the tag encrypts the signed-in user's id (AES-256-GCM) into an opaque token that only Plain Cloud can decrypt — the raw id never appears in your HTML. The user is read from [plain.auth](../../plain-auth/plain/auth/README.md); apps without it (or anonymous visitors) are still counted, their pageviews simply carry no user id.
+
+The same `CONNECT_SECRET_KEY` is used by the `{% connect_support_fields %}` widget below — one secret per app.
+
+## Support forms
+
+plain.connect ships a tag for sending contact-form submissions to a support endpoint on Plain Cloud. You create the endpoint in the App's Support settings (it gives you an id like `plain_sf_abc123`), then drop a normal HTML form into your template:
+
+```html
+<form action="{{ connect_support_url('plain_sf_abc123') }}" method="POST">
+  {% connect_support_fields %}
+  <input name="name" placeholder="Your name">
+  <input name="email" type="email" placeholder="Email">
+  <textarea name="message" required></textarea>
+  <button type="submit">Send</button>
+</form>
+```
+
+The `{% connect_support_fields %}` tag injects three hidden inputs:
+
+- `plain_connect_render_token` — HMAC-signed timestamp; rejected if it's too fresh (bots that submit instantly) or too stale (rendered hours ago)
+- `plain_connect_identity` — encrypted user id when `plain.auth` is installed and the visitor is signed in
+- `plain_connect_check` — honeypot field; submissions that fill it are silently discarded
+
+Both anti-spam signals require `CONNECT_SECRET_KEY`. Without it the inputs still render (as empty values), so the form remains submittable — you just lose render-token verification and identity attribution.
+
+### Field names
+
+A few field names are reserved — the platform reads them directly:
+
+| Name        | Purpose                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------ |
+| `name`      | Submitter name                                                                                   |
+| `email`     | Submitter email                                                                                  |
+| `message`   | Body of the submission (required)                                                                |
+| `form_slug` | Identifier surfaced in notifications and the inbox (lets one endpoint serve multiple form types) |
+| `_next`     | Redirect target after a form-action POST; ignored unless it matches the endpoint's allow-list    |
+
+Any other field name is captured into the conversation's `extras` JSON dict automatically — no extra configuration needed.
+
+### JSON vs form-action
+
+The endpoint accepts either `application/x-www-form-urlencoded` (the standard `<form action="...">` path) or `application/json` (for fetch-driven submissions). The field names are the same in both shapes. On the form-action path `_next` redirects the browser on success; on the JSON path the response is `{"ok": true, "conversation": "<uuid>"}`.
 
 ## Observer coexistence
 

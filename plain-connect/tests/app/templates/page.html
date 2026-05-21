@@ -2,5 +2,12 @@
 <html>
   <body>
     {% connect_pageviews %}
+    <form action="{{ connect_support_url('plain_sf_testid') }}" method="POST">
+      {% connect_support_fields %}
+      <input name="name">
+      <input name="email">
+      <textarea name="message"></textarea>
+      <button type="submit">Send</button>
+    </form>
   </body>
 </html>

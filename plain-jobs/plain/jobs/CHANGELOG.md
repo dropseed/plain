@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.53.1](https://github.com/dropseed/plain/releases/plain-jobs@0.53.1) (2026-05-19)
+
+### What's changed
+
+- **Background loops no longer wedge on a dead database connection.** The worker maintenance loop and the OTel observable-gauge callbacks each ran on a long-lived thread that held one pooled connection idle between ticks/export intervals — long enough for the server or pooler to close it. The next tick then reused the dead connection and raised `OperationalError: the connection is closed`, with no path to recover. The worker loop now returns its connection at the start of every tick, and the five DB-touching gauge callbacks return theirs once each observation is collected, so the next checkout always starts from a fresh, validated connection. ([31ad84f423](https://github.com/dropseed/plain/commit/31ad84f423))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.53.0](https://github.com/dropseed/plain/releases/plain-jobs@0.53.0) (2026-05-12)
 
 ### What's changed

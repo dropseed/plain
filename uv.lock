@@ -26,7 +26,6 @@ members = [
     "plain-oauth",
     "plain-observer",
     "plain-pages",
-    "plain-pageviews",
     "plain-passwords",
     "plain-portal",
     "plain-postgres",
@@ -35,7 +34,6 @@ members = [
     "plain-scan",
     "plain-sessions",
     "plain-start",
-    "plain-support",
     "plain-tailwind",
     "plain-templates",
     "plain-toolbar",
@@ -233,7 +231,6 @@ dependencies = [
     { name = "plain-oauth" },
     { name = "plain-observer" },
     { name = "plain-pages" },
-    { name = "plain-pageviews" },
     { name = "plain-passwords" },
     { name = "plain-portal" },
     { name = "plain-postgres" },
@@ -241,7 +238,6 @@ dependencies = [
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
-    { name = "plain-support" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
     { name = "plain-toolbar" },
@@ -271,7 +267,6 @@ requires-dist = [
     { name = "plain-oauth", editable = "plain-oauth" },
     { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
-    { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-portal", editable = "plain-portal" },
     { name = "plain-postgres", editable = "plain-postgres" },
@@ -279,7 +274,6 @@ requires-dist = [
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
-    { name = "plain-support", editable = "plain-support" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-templates", editable = "plain-templates" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
@@ -756,7 +750,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.145.1"
+version = "0.145.3"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -902,7 +896,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-cloud"
-version = "0.4.1"
+version = "0.4.2"
 source = { editable = "plain-cloud" }
 dependencies = [
     { name = "click" },
@@ -940,7 +934,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-connect"
-version = "0.4.0"
+version = "0.6.0"
 source = { editable = "plain-connect" }
 dependencies = [
     { name = "cryptography" },
@@ -1021,7 +1015,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-email"
-version = "0.19.3"
+version = "0.20.0"
 source = { editable = "plain-email" }
 dependencies = [
     { name = "plain" },
@@ -1105,7 +1099,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-jobs"
-version = "0.53.0"
+version = "0.53.1"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
@@ -1270,21 +1264,6 @@ requires-dist = [
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
-name = "plain-pageviews"
-version = "0.35.8"
-source = { editable = "plain-pageviews" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-postgres" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-postgres", editable = "plain-postgres" },
-]
-
-[[package]]
 name = "plain-passwords"
 version = "0.26.1"
 source = { editable = "plain-passwords" }
@@ -1334,7 +1313,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-postgres"
-version = "0.103.4"
+version = "0.103.5"
 source = { editable = "plain-postgres" }
 dependencies = [
     { name = "plain" },
@@ -1461,39 +1440,6 @@ dependencies = [
 requires-dist = [{ name = "click", specifier = ">=8.0.0" }]
 
 [[package]]
-name = "plain-support"
-version = "0.34.9"
-source = { editable = "plain-support" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-assets" },
-    { name = "plain-auth" },
-    { name = "plain-postgres" },
-    { name = "plain-templates" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "plain-email" },
-    { name = "plain-pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-assets", editable = "plain-assets" },
-    { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-templates", editable = "plain-templates" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "plain-email", editable = "plain-email" },
-    { name = "plain-pytest", editable = "plain-pytest" },
-]
-
-[[package]]
 name = "plain-tailwind"
 version = "0.23.1"
 source = { editable = "plain-tailwind" }
@@ -1616,7 +1562,6 @@ dev = [
     { name = "plain-oauth" },
     { name = "plain-observer" },
     { name = "plain-pages" },
-    { name = "plain-pageviews" },
     { name = "plain-passwords" },
     { name = "plain-portal" },
     { name = "plain-postgres" },
@@ -1624,7 +1569,6 @@ dev = [
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
-    { name = "plain-support" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
     { name = "plain-toolbar" },
@@ -1659,7 +1603,6 @@ dev = [
     { name = "plain-oauth", editable = "plain-oauth" },
     { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
-    { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-portal", editable = "plain-portal" },
     { name = "plain-postgres", editable = "plain-postgres" },
@@ -1667,7 +1610,6 @@ dev = [
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
-    { name = "plain-support", editable = "plain-support" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-templates", editable = "plain-templates" },
     { name = "plain-toolbar", editable = "plain-toolbar" },

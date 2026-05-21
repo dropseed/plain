@@ -1,5 +1,31 @@
 # plain-connect changelog
 
+## [0.6.0](https://github.com/dropseed/plain/releases/plain-connect@0.6.0) (2026-05-20)
+
+### What's changed
+
+- New `{% connect_support_fields %}` template tag and `connect_support_url(endpoint_id)` global for posting contact forms to a Plain Cloud support endpoint. The tag injects three hidden inputs into your own `<form>`: an HMAC-signed render token, an encrypted identity token (when `plain.auth` is installed and the visitor is signed in), and a honeypot field. Any non-reserved field name is captured into the conversation's `extras` automatically — no extra configuration needed. ([f1a692e985](https://github.com/dropseed/plain/commit/f1a692e985))
+- New `CONNECT_SECRET_KEY` setting consolidates the per-feature identity key into a single shared secret used by both pageviews and the support widget. Get the value from the App settings page on Plain Cloud. ([f1a692e985](https://github.com/dropseed/plain/commit/f1a692e985))
+- New `CONNECT_FORMS_URL` setting (default `https://plainframework.com/forms`) for the support submission base URL. ([f1a692e985](https://github.com/dropseed/plain/commit/f1a692e985))
+- New preflight check `connect.secret_key` warns when `CONNECT_PAGEVIEWS_TOKEN` is set without `CONNECT_SECRET_KEY` — pageviews still work, but signed-in user attribution silently won't. ([f1a692e985](https://github.com/dropseed/plain/commit/f1a692e985))
+- The anonymous-visitor id is now stored under `plain_anonymous_id` in `localStorage` so future plain.connect widgets can stitch submissions from the same browser together. ([f1a692e985](https://github.com/dropseed/plain/commit/f1a692e985))
+
+### Upgrade instructions
+
+- **Rename `CONNECT_PAGEVIEWS_IDENTITY_KEY` to `CONNECT_SECRET_KEY`** (env var: `PLAIN_CONNECT_PAGEVIEWS_IDENTITY_KEY` → `PLAIN_CONNECT_SECRET_KEY`). Same value, single setting now shared across connect features.
+- Returning anonymous visitors will get a fresh id on their next page load — the localStorage key changed from `plain_pageviews_anonymous_id` to `plain_anonymous_id`, and the migration was removed before release. Expect a one-time discontinuity in returning-visitor counts.
+
+## [0.5.0](https://github.com/dropseed/plain/releases/plain-connect@0.5.0) (2026-05-19)
+
+### What's changed
+
+- Pageview beacons now carry the matched URL route pattern (e.g. `/blog/<slug>/`) on the server-rendered initial load, mirroring the `http.route` span attribute. This lets pageviews aggregate by view instead of by raw URL. SPA navigations send a blank route. ([93f12bc8c6](https://github.com/dropseed/plain/commit/93f12bc8c6))
+- Docs now note that a strict `Content-Security-Policy` must allow the pageview ingest host in `connect-src` — beacons are sent with `navigator.sendBeacon`, and the browser blocks them otherwise. ([2cab277d3e](https://github.com/dropseed/plain/commit/2cab277d3e))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.4.0](https://github.com/dropseed/plain/releases/plain-connect@0.4.0) (2026-05-18)
 
 ### What's changed

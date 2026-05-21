@@ -188,6 +188,12 @@ class Worker:
         from .models import JobRequest
 
         while not self._is_shutting_down:
+            # Return last tick's pooled connection so the next checkout
+            # re-validates it. Holding one connection for the worker's whole
+            # life means a server-side close (PG restart, failover) wedges
+            # the loop reusing a dead connection on every tick.
+            return_database_connection()
+
             with tracer.start_as_current_span(
                 "worker loop", kind=trace.SpanKind.CONSUMER
             ) as span:
