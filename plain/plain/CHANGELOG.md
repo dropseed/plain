@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.147.0](https://github.com/dropseed/plain/releases/plain@0.147.0) (2026-05-21)
+
+### What's changed
+
+- The `plain.utils.dotenv` module has moved to `plain.dev.dotenv`. Production deployments (which don't install `plain.dev`) no longer ship dotenv parsing code at all — load environment variables via your deployment platform instead. ([9932738450](https://github.com/dropseed/plain/commit/9932738450))
+- The CLI dispatcher now sets `PLAIN_ENV` automatically based on the active command: `plain dev` → `dev`, `plain test` → `test`. Export `PLAIN_ENV` yourself to override. This lets `plain.dev`'s new `.env` precedence loader pick up the right env-specific files without users having to set `PLAIN_ENV` manually. ([9932738450](https://github.com/dropseed/plain/commit/9932738450))
+- `SuspiciousOperationError400` exceptions are now logged at `WARNING` without an attached `exc_info`. The rejection is working-as-designed (same noise category as 404s once a scanner is probing), so the full traceback was just adding noise to error trackers. ([7727f0545c](https://github.com/dropseed/plain/commit/7727f0545c))
+
+### Upgrade instructions
+
+- If you imported `load_dotenv` or `parse_dotenv` from `plain.utils.dotenv`, install `plain.dev` and import from `plain.dev.dotenv` instead.
+- If you were filtering `SuspiciousOperationError400` events out of your error tracker by exception type, switch to filtering by log level (warnings vs. errors) or by the `plain.security.*` logger namespace.
+
 ## [0.146.0](https://github.com/dropseed/plain/releases/plain@0.146.0) (2026-05-20)
 
 ### What's changed
