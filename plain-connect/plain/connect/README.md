@@ -95,7 +95,11 @@ The same `CONNECT_SECRET_KEY` is used by the `{% connect_support_fields %}` widg
 plain.connect ships a tag for sending contact-form submissions to a support endpoint on Plain Cloud. You create the endpoint in the App's Support settings (it gives you an id like `plain_sf_abc123`), then drop a normal HTML form into your template:
 
 ```html
-<form action="{{ connect_support_url('plain_sf_abc123') }}" method="POST">
+<form
+  action="{{ connect_support_url('plain_sf_abc123') }}"
+  method="POST"
+  referrerpolicy="strict-origin-when-cross-origin"
+>
   {% connect_support_fields %}
   <input name="name" placeholder="Your name">
   <input name="email" type="email" placeholder="Email">
@@ -111,6 +115,12 @@ The `{% connect_support_fields %}` tag injects three hidden inputs:
 - `plain_connect_check` — honeypot field; submissions that fill it are silently discarded
 
 Both anti-spam signals require `CONNECT_SECRET_KEY`. Without it the inputs still render (as empty values), so the form remains submittable — you just lose render-token verification and identity attribution.
+
+### Cross-origin Origin header
+
+The form posts cross-origin to Plain Cloud, so the browser's `Origin` header serialization is governed by the page's `Referrer-Policy`. Plain ships `Referrer-Policy: same-origin` by default, which causes Chrome and Firefox to send `Origin: null` on no-cors cross-origin POSTs — and Plain Cloud rejects submissions with a null origin.
+
+Setting `referrerpolicy="strict-origin-when-cross-origin"` on the `<form>` element (as in the example above) overrides the document policy for that submission only, so the browser sends `Origin: https://yourapp.com` and the submission goes through. Your app's global `Referrer-Policy` is unaffected.
 
 ### Field names
 
