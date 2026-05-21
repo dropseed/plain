@@ -1,5 +1,17 @@
 # plain-pytest changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-pytest@0.19.0) (2026-05-21)
+
+### What's changed
+
+- The plugin now sets `PLAIN_ENV=test` in `pytest_configure` so the dotenv loader picks the right files even when `pytest` is invoked directly (without `plain test`). Under `PLAIN_ENV=test`, the new precedence ladder skips `.env.local` to keep CI runs deterministic. ([9932738450](https://github.com/dropseed/plain/commit/9932738450))
+- Dotenv loading delegates to `plain.dev.dotenv.load_dotenv_files()` instead of the old direct `load_dotenv(".env.test", override=True)` call. plain.pytest opportunistically imports the loader — if `plain.dev` is installed, the full `.env.test.local` → `.env.test` → `.env` ladder loads (first-wins, `override=False`); if not, dotenv loading is silently skipped. ([9932738450](https://github.com/dropseed/plain/commit/9932738450))
+
+### Upgrade instructions
+
+- If your CI relied on `.env.test` overriding values exported in the environment (the old loader used `override=True`), the new behavior is first-wins — exported env vars now take precedence over `.env.test`. Either drop the conflicting export from CI, or override values in CI directly.
+- If you ran `pytest` directly in a project without `plain.dev` installed and depended on `.env.test` being read, install `plain.dev` (as a dev dep) or load `.env.test` yourself before invoking pytest.
+
 ## [0.18.1](https://github.com/dropseed/plain/releases/plain-pytest@0.18.1) (2026-05-05)
 
 ### What's changed
