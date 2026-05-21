@@ -1,5 +1,4 @@
 app/assets/tailwind.min.css
 /db.sqlite3
-.env
 .claude/skills
 .claude/rules
