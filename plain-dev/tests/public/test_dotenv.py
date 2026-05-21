@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from plain.utils.dotenv import load_dotenv, parse_dotenv
+from plain.dev.dotenv import load_dotenv, parse_dotenv
 
 
 @pytest.fixture

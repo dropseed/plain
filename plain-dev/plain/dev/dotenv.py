@@ -1,7 +1,11 @@
-"""
-Custom .env file parser targeting bash `source` compatibility.
+"""Bash-compatible `.env` file parsing and Plain dev/test dotenv loading.
 
-Supports:
+`plain.dev` owns all dotenv code so that production deployments (which don't
+install plain.dev) never load `.env` files. plain.pytest opportunistically
+imports `load_dotenv_files` — if plain.dev is installed, `.env.test*` loads
+under pytest; if not, the plugin skips dotenv loading entirely.
+
+Parser supports:
 - KEY=value (basic unquoted)
 - KEY="double quoted value" (with escape handling and multiline)
 - KEY='single quoted value' (literal, including multiline)
@@ -19,13 +23,61 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-__all__ = ["load_dotenv", "parse_dotenv"]
+import click
+
+__all__ = ["load_dotenv", "load_dotenv_files", "parse_dotenv"]
 
 # Match ${VAR} or $VAR (VAR must start with letter/underscore, then alphanumeric/underscore)
 _VAR_BRACE_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _VAR_BARE_RE = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)")
 # Placeholder for escaped $ (to prevent expansion)
 _ESCAPED_DOLLAR = "\x00DOLLAR\x00"
+
+_PLAIN_ENV_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]*$")
+_files_loaded = False
+
+
+def load_dotenv_files() -> None:
+    """Load `.env` files using Next.js / Vite-style precedence.
+
+    Files loaded (highest precedence first — `load_dotenv()` doesn't override
+    existing keys, so the first file to bind a key wins):
+
+      1. `.env.{PLAIN_ENV}.local`  — gitignored, env-specific personal
+      2. `.env.local`              — gitignored, personal; SKIPPED in test
+      3. `.env.{PLAIN_ENV}`        — gitignored or committed, env-specific
+      4. `.env`                    — committed baseline
+
+    `PLAIN_ENV` is set by the CLI dispatcher (`plain.cli.core`) based on the
+    active command — `plain dev` → `dev`, `plain test` → `test`. Export
+    `PLAIN_ENV` yourself to override.
+
+    Idempotent within a process — repeat calls are a no-op.
+    """
+    global _files_loaded
+    if _files_loaded:
+        return
+    _files_loaded = True
+
+    plain_env = os.environ.get("PLAIN_ENV", "")
+    if plain_env and not _PLAIN_ENV_RE.fullmatch(plain_env):
+        raise ValueError(
+            f"PLAIN_ENV must match {_PLAIN_ENV_RE.pattern}, got {plain_env!r}"
+        )
+
+    def _load(path: str) -> None:
+        if load_dotenv(path):
+            click.secho(f"Loading {path}...", dim=True, italic=True, err=True)
+
+    if plain_env:
+        _load(f".env.{plain_env}.local")
+    if plain_env != "test":
+        # Skipped under test (Next.js / Rails dotenv convention) so CI runs
+        # stay deterministic and personal creds don't leak into the suite.
+        _load(".env.local")
+    if plain_env:
+        _load(f".env.{plain_env}")
+    _load(".env")
 
 
 def load_dotenv(
