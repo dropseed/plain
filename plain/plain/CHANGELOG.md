@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.145.3](https://github.com/dropseed/plain/releases/plain@0.145.3) (2026-05-20)
+
+### What's changed
+
+- The `plain-support` package has been removed and no longer appears in the package docs list or the `plain docs` CLI. Customer support forms now live in `plain.connect` via the `{% connect_support_fields %}` template tag. ([a1a1da39c5](https://github.com/dropseed/plain/commit/a1a1da39c5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.145.2](https://github.com/dropseed/plain/releases/plain@0.145.2) (2026-05-19)
 
 ### What's changed
