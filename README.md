@@ -81,7 +81,6 @@ class UserDetail(DetailView):
 Templates are Jinja:
 
 {% raw %}
-
 ```html
 {# app/users/templates/users/detail.html #}
 {% extends "base.html" %}
@@ -91,7 +90,6 @@ Templates are Jinja:
 <p>Joined {{ user.created_at.strftime("%B %Y") }}</p>
 {% endblock %}
 ```
-
 {% endraw %}
 
 ## An opinionated stack
