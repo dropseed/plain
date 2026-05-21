@@ -95,11 +95,8 @@ The same `CONNECT_SECRET_KEY` is used by the `{% connect_support_fields %}` widg
 plain.connect ships a tag for sending contact-form submissions to a support endpoint on Plain Cloud. You create the endpoint in the App's Support settings (it gives you an id like `plain_sf_abc123`), then drop a normal HTML form into your template:
 
 ```html
-<form
-  action="{{ connect_support_url('plain_sf_abc123') }}"
-  method="POST"
-  referrerpolicy="strict-origin-when-cross-origin"
->
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<form action="{{ connect_support_url('plain_sf_abc123') }}" method="POST">
   {% connect_support_fields %}
   <input name="name" placeholder="Your name">
   <input name="email" type="email" placeholder="Email">
@@ -120,7 +117,7 @@ Both anti-spam signals require `CONNECT_SECRET_KEY`. Without it the inputs still
 
 The form posts cross-origin to Plain Cloud, so the browser's `Origin` header serialization is governed by the page's `Referrer-Policy`. Plain ships `Referrer-Policy: same-origin` by default, which causes Chrome and Firefox to send `Origin: null` on no-cors cross-origin POSTs — and Plain Cloud rejects submissions with a null origin.
 
-Setting `referrerpolicy="strict-origin-when-cross-origin"` on the `<form>` element (as in the example above) overrides the document policy for that submission only, so the browser sends `Origin: https://yourapp.com` and the submission goes through. Your app's global `Referrer-Policy` is unaffected.
+The `<meta name="referrer">` tag in the example above overrides the document's policy to `strict-origin-when-cross-origin`, so the browser sends `Origin: https://yourapp.com` and the submission goes through. Putting it in `<head>` is preferable when you can — it applies before any subresources load — but inline next to the form still works for the form submission. Your app's global `Referrer-Policy` header is unaffected.
 
 ### Field names
 
