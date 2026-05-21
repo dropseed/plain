@@ -13,6 +13,7 @@ dependencies = [
   "requests>=2.0.0",
   "rich",
   "inotify",
+  "tomlkit>=0.13.0",
 ]
 
 [project.entry-points."plain.setup"]

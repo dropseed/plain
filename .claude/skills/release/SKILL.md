@@ -89,6 +89,15 @@ Only update constraints when there's an actual compatibility requirement — don
 
 For each package to release, sequentially:
 
+**If `future_exists` is true for this package** — this is a future-channel graduation. Use the FUTURE.md content as the basis for the release notes instead of re-deriving from the diff:
+
+1. Read `<future_path>` — its body is already structured as `### What's changed` + `### Upgrade instructions`.
+2. Prepend a new release entry to `<changelog_path>` using that content directly under a new version heading (see format below).
+3. Delete `<future_path>` (`rm` is fine — `commit-and-push` stages the deletion).
+4. Cross-check the diff briefly for anything the author may have missed in FUTURE.md; if you find something material, add it.
+
+**If `future_exists` is false** — normal stable release:
+
 1. Get the file changes since the last release:
 
     ```
@@ -97,7 +106,9 @@ For each package to release, sequentially:
 
 2. Read the existing `<changelog_path>` file.
 
-3. Prepend a new release entry to the changelog with this format:
+3. Prepend a new release entry to the changelog. Summarize user-facing changes from the diff.
+
+**Entry format (both paths):**
 
 ```
 ## [<new_version>](https://github.com/dropseed/plain/releases/<name>@<new_version>) (<today's date>)

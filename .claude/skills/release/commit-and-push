@@ -34,6 +34,22 @@ def run(cmd: list[str], cwd: Path | None = None, check: bool = True) -> subproce
     return result
 
 
+def tracked_future_paths(root: Path, package_name: str) -> list[str]:
+    """Return git-tracked FUTURE.md paths under a package dir.
+
+    Includes files that exist in HEAD even if they have been deleted in the working
+    tree — `git add` on a deleted-but-tracked path stages the deletion, so the same
+    list works for both modified and deleted FUTURE.md files.
+    """
+    result = subprocess.run(
+        ["git", "ls-files", f"{package_name}/**/FUTURE.md"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    return [line for line in result.stdout.splitlines() if line.strip()]
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: commit-and-push <package>:<version> [<package>:<version> ...]")
@@ -80,6 +96,9 @@ def main():
                 [sys.executable, str(skill_dir / "add-hunks"), "uv.lock", "--grep", dot_name, "--context"],
                 cwd=root,
             )
+
+        for fm in tracked_future_paths(root, name):
+            run(["git", "add", fm], cwd=root)
 
         run(
             ["git", "commit", "-m", f"Release {name} {version}", "-n"],

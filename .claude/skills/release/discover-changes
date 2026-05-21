@@ -103,6 +103,11 @@ def get_changelog_path(package: Path) -> str:
         return f"{package.name}/plain/{subpackage}/CHANGELOG.md"
 
 
+def get_future_path(package: Path) -> str:
+    """Get the path to the FUTURE.md file for a package (only exists on the future branch)."""
+    return get_changelog_path(package).replace("CHANGELOG.md", "FUTURE.md")
+
+
 def get_last_release_tag(package: Path) -> str | None:
     """Get the most recent release tag for a package."""
     output = run(["git", "tag", "-l", f"{package.name}@*", "--sort=-v:refname"])
@@ -126,6 +131,7 @@ def main():
 
         current_version = get_current_version(package)
         changelog_path = get_changelog_path(package)
+        future_path = get_future_path(package)
         last_tag = get_last_release_tag(package)
 
         packages_with_changes.append({
@@ -133,6 +139,8 @@ def main():
             "path": str(package),
             "current_version": current_version,
             "changelog_path": changelog_path,
+            "future_path": future_path,
+            "future_exists": (Path.cwd() / future_path).exists(),
             "last_tag": last_tag,
             "last_version_commit": last_version_commit[:12],
             "commits": commits

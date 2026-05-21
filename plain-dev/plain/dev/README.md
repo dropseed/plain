@@ -13,6 +13,7 @@
     - [`plain dev logs`](#plain-dev-logs)
     - [`plain dev backups`](#plain-dev-backups)
     - [`plain pre-commit`](#plain-pre-commit)
+    - [`plain future`](#plain-future)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -124,6 +125,21 @@ Custom commands can be defined in `pyproject.toml` at `tool.plain.check.run` and
 [tool.plain.check.run]
 my-check = {cmd = "echo 'running my check'"}
 ```
+
+### `plain future`
+
+Opt a project into Plain's **future channel** — a rolling unstable release stream pulled from a branch on `dropseed/plain` (default: `future`). Use this to test in-progress framework work before it lands in a stable PyPI release.
+
+```bash
+plain future enable                          # point all plain packages at the future branch
+plain future enable --branch forms-rebuild   # test a specific feature branch
+plain future upgrade                         # pull latest commits and read FUTURE.md updates
+plain future disable                         # revert to stable PyPI releases
+```
+
+`enable` rewrites `pyproject.toml` to add `[tool.uv.sources]` git entries for all installed plain packages, then runs `uv sync`. `upgrade` advances the tracked commits and prints each updated package's `FUTURE.md` so you can apply the listed upgrade instructions. `disable` removes the source overrides.
+
+Use the `/plain-future` agent skill for the guided upgrade workflow — it reads the printed FUTURE.md output and applies the code changes for you.
 
 ## Settings
 

@@ -978,6 +978,7 @@ dependencies = [
     { name = "plain-assets" },
     { name = "requests" },
     { name = "rich" },
+    { name = "tomlkit" },
 ]
 
 [package.metadata]
@@ -988,6 +989,7 @@ requires-dist = [
     { name = "plain-assets", editable = "plain-assets" },
     { name = "requests", specifier = ">=2.0.0" },
     { name = "rich" },
+    { name = "tomlkit", specifier = ">=0.13.0" },
 ]
 
 [[package]]
