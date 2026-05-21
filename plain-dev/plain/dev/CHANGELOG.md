@@ -1,5 +1,20 @@
 # plain-dev changelog
 
+## [0.63.0](https://github.com/dropseed/plain/releases/plain-dev@0.63.0) (2026-05-21)
+
+### What's changed
+
+- `plain.dev` now owns all dotenv code. The bash-compatible parser (`load_dotenv`, `parse_dotenv`) moved here from `plain.utils.dotenv`, joined by a new ladder loader (`load_dotenv_files`). Production deployments without `plain.dev` installed no longer ship any dotenv code. ([9932738450](https://github.com/dropseed/plain/commit/9932738450))
+- New Next.js / Vite–style `.env` precedence ladder. Files load in this order (first to bind a key wins): `.env.{PLAIN_ENV}.local`, `.env.local`, `.env.{PLAIN_ENV}`, `.env`. Under `PLAIN_ENV=test`, `.env.local` is skipped so CI runs stay deterministic. ([9932738450](https://github.com/dropseed/plain/commit/9932738450))
+- `PLAIN_ENV` is auto-set by the CLI dispatcher in `plain.cli.core` — `plain dev` → `dev`, `plain test` → `test` — so the right `.env.{env}*` files load without users having to export `PLAIN_ENV` themselves. Export it yourself to override (e.g., `PLAIN_ENV=staging plain shell`). Requires `plain>=0.147.0`. ([9932738450](https://github.com/dropseed/plain/commit/9932738450))
+- `PLAIN_ENV` values are validated against `^[a-zA-Z][a-zA-Z0-9_-]*$`, so typos like `PLAIN_ENV=staging/prod` fail fast with a clear error instead of silently loading nothing.
+- Load notices ("Loading .env.test...") now go to stderr instead of stdout, so commands like `plain preflight --format json` keep stdout clean for parsing. The loader is idempotent within a process.
+
+### Upgrade instructions
+
+- If you imported `load_dotenv` or `parse_dotenv` from `plain.utils.dotenv`, switch to `from plain.dev.dotenv import load_dotenv, parse_dotenv`.
+- If you relied on `PLAIN_ENV=prod` loading only `.env.prod` (the old behavior loaded a single file), the new ladder also loads `.env.local` and `.env` as baselines. Either gitignore `.env.local` and move dev-only values out of `.env`, or stop using a `PLAIN_ENV` value on machines where you didn't intend the local/baseline files to apply.
+
 ## [0.62.0](https://github.com/dropseed/plain/releases/plain-dev@0.62.0) (2026-05-12)
 
 ### What's changed
