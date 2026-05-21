@@ -20,7 +20,7 @@ from plain.postgres.expressions import F
 from plain.runtime import settings
 from plain.utils import timezone
 
-from .exceptions import DeferError, DeferJob
+from .exceptions import DeferJob
 from .otel import (
     operation_duration_histogram,
     process_metric_attributes,
@@ -326,24 +326,18 @@ class JobProcess(postgres.Model):
                                 "job_process_uuid": self.uuid,
                             },
                         )
-                        return self.defer(job=job, defer_exception=e)
+                        result = self.defer(job=job, defer_exception=e)
+                        if result.retry_job_request_uuid is None:
+                            # Re-enqueue was blocked by should_enqueue() —
+                            # either the default uniqueness rule (a peer
+                            # exists) or a user override (rate limit, custom
+                            # rule). Same treatment as the initial-enqueue
+                            # path's `job.enqueue.skipped`: not an error,
+                            # just visibility on the consumer span.
+                            span.set_attribute("plain.jobs.defer.skipped", True)
+                        return result
 
                     return self.convert_to_result(status=JobResultStatuses.SUCCESSFUL)
-
-                except DeferError as e:
-                    # Defer failed (e.g., concurrency limit reached during re-enqueue)
-                    # The transaction was rolled back, so the JobProcess still exists in DB.
-                    # The pk was restored in defer() before raising, so we can proceed normally.
-                    logger.warning(
-                        "Defer failed",
-                        extra={"job_class": self.job_class, "error": str(e)},
-                    )
-                    error_type = record_span_error(span, e, metric_attributes)
-                    return self.convert_to_result(
-                        status=JobResultStatuses.ERRORED,
-                        error=str(e),
-                        error_type=error_type,
-                    )
 
                 except Exception as e:
                     # Note: if a rescuer already wrote JobResult(LOST) for this
@@ -367,12 +361,17 @@ class JobProcess(postgres.Model):
         """Defer this job by re-enqueueing it for later execution.
 
         Atomically deletes the JobProcess, re-enqueues the job, and creates
-        a JobResult linking to the new request. This ensures the concurrency
-        slot is released before attempting to re-enqueue.
+        a JobResult. The concurrency slot is released before re-enqueue so
+        the new request's own `should_enqueue()` check can pass.
 
-        Raises:
-            DeferError: If the job cannot be re-enqueued (e.g., due to concurrency limits).
-                       The transaction will be rolled back and the JobProcess will remain.
+        If `should_enqueue()` blocks the re-enqueue, the framework honors
+        that signal — same convention as `run_in_worker()` and `retry_job()`,
+        which both return `None` silently in the same situation. The
+        JobResult is still `DEFERRED` but `retry_job_request_uuid` is
+        `None`, the error message records that the re-enqueue was skipped,
+        and the caller stamps `plain.jobs.defer.skipped=True` on the
+        consumer span so this case is queryable in APM without surfacing
+        as an exception.
         """
         # Calculate new retry_attempt based on increment_retries
         retry_attempt = (
@@ -383,7 +382,6 @@ class JobProcess(postgres.Model):
 
         with transaction.atomic():
             # 1. Save JobProcess state and delete (releases concurrency slot)
-            saved_id = self.id
             job_process_uuid = self.uuid
             job_request_uuid = self.job_request_uuid
             requested_at = self.requested_at
@@ -400,21 +398,23 @@ class JobProcess(postgres.Model):
                 concurrency_key=self.concurrency_key,
             )
 
-            # Check if re-enqueue failed
             if new_job_request is None:
-                # Restore id since transaction will roll back and object still exists
-                self.id = saved_id
-                raise DeferError(
-                    f"Failed to re-enqueue deferred job {self.job_class}: "
-                    f"concurrency limit reached for key '{self.concurrency_key}'"
+                error = (
+                    f"Deferred for {defer_exception.delay} seconds "
+                    f"(re-enqueue skipped: should_enqueue() returned False "
+                    f"for concurrency_key '{self.concurrency_key}')"
                 )
+                retry_job_request_uuid = None
+            else:
+                error = f"Deferred for {defer_exception.delay} seconds"
+                retry_job_request_uuid = new_job_request.uuid
 
-            # 3. Create JobResult linking to new request
+            # 3. Create JobResult (linking to new request if one was created)
             result = JobResult.query.create(
                 ended_at=timezone.now(),
-                error=f"Deferred for {defer_exception.delay} seconds",
+                error=error,
                 status=JobResultStatuses.DEFERRED,
-                retry_job_request_uuid=new_job_request.uuid,
+                retry_job_request_uuid=retry_job_request_uuid,
                 # From the JobProcess
                 job_process_uuid=job_process_uuid,
                 started_at=started_at,
