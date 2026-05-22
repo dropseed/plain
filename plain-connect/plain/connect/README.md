@@ -8,6 +8,7 @@
 - [What gets exported](#what-gets-exported)
 - [Pageview tracking](#pageview-tracking)
 - [Support forms](#support-forms)
+- [Toolbar](#toolbar)
 - [Observer coexistence](#observer-coexistence)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -29,6 +30,7 @@ If `CONNECT_EXPORT_TOKEN` is not set, the package is a no-op — safe to install
 | Setting                     | Default                               | Description                                                                                                |
 | --------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `CONNECT_EXPORT_URL`        | `"https://ingest.plainframework.com"` | OTLP ingest endpoint (override to use a custom endpoint)                                                   |
+| `CONNECT_DASHBOARD_URL`     | `"https://plainframework.com"`        | Plain Cloud dashboard base URL — used for the toolbar's trace links                                        |
 | `CONNECT_EXPORT_TOKEN`      | `""`                                  | Auth token for the export endpoint                                                                         |
 | `CONNECT_TRACE_SAMPLE_RATE` | `1.0`                                 | Probability of exporting a trace (0.0–1.0)                                                                 |
 | `CONNECT_EXPORT_LOGS`       | `True`                                | Set to `False` to disable OTLP log export                                                                  |
@@ -136,6 +138,14 @@ Any other field name is captured into the conversation's `extras` JSON dict auto
 ### JSON vs form-action
 
 The endpoint accepts either `application/x-www-form-urlencoded` (the standard `<form action="...">` path) or `application/json` (for fetch-driven submissions). The field names are the same in both shapes. On the form-action path `_next` redirects the browser on success; on the JSON path the response is `{"ok": true, "conversation": "<uuid>"}`.
+
+## Toolbar
+
+If you have [plain.toolbar](../../plain-toolbar/plain/toolbar/README.md) installed, plain.connect adds a **Trace** button that links the current request straight to its trace in Plain Cloud.
+
+The button only appears when export is active (`CONNECT_EXPORT_TOKEN` is set), so it stays out of the way in local dev. It links to a short `/t/<trace_id>` URL on `CONNECT_DASHBOARD_URL`, which resolves the trace to its app and redirects you to the full trace view — no app slug needed in the link.
+
+If a request wasn't sampled for export (see [Sampling](#sampling)), the button shows "Not sampled" instead. Because traces export in a background batch, a freshly-clicked link may briefly land on a "locating trace" page that retries until the trace arrives.
 
 ## Observer coexistence
 

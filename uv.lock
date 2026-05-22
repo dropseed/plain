@@ -949,6 +949,7 @@ dev = [
     { name = "plain-auth" },
     { name = "plain-pytest" },
     { name = "plain-templates" },
+    { name = "plain-toolbar" },
 ]
 
 [package.metadata]
@@ -965,6 +966,7 @@ dev = [
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-pytest", editable = "plain-pytest" },
     { name = "plain-templates", editable = "plain-templates" },
+    { name = "plain-toolbar", editable = "plain-toolbar" },
 ]
 
 [[package]]

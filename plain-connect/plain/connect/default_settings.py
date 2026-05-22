@@ -2,6 +2,9 @@ from plain.runtime import Secret
 
 CONNECT_EXPORT_ENABLED: bool = True  # Set to False to disable all OTEL reporting
 CONNECT_EXPORT_URL: str = "https://ingest.plainframework.com"
+# Base URL of the Plain Cloud dashboard. Used to build links back to exported
+# traces — the `/t/<trace_id>` short URL surfaced in the toolbar.
+CONNECT_DASHBOARD_URL: str = "https://plainframework.com"
 CONNECT_EXPORT_TOKEN: Secret[str] = ""  # Auth token for the export endpoint
 CONNECT_TRACE_SAMPLE_RATE: float = 1.0  # 0.0–1.0, probability of exporting a trace
 CONNECT_EXPORT_LOGS: bool = True  # Set to False to disable OTLP log export
