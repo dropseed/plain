@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 from jinja2.runtime import Context
-from opentelemetry import trace
 
 from plain.runtime import settings
 from plain.templates import register_template_extension, register_template_global
 from plain.templates.jinja.extensions import InclusionTagExtension
 
 from .identity import encrypt_identity, sign_render_token
+from .tracing import current_trace
 
 if TYPE_CHECKING:
     from plain.http import Request
@@ -43,7 +43,7 @@ class ConnectPageviewsExtension(InclusionTagExtension):
             "connect_pageviews_identity": _identity_token(request, secret)
             if token
             else "",
-            "connect_pageviews_trace_id": _current_trace_id() if token else "",
+            "connect_pageviews_trace_id": current_trace().trace_id if token else "",
             "connect_pageviews_route": _current_route(request) if token else "",
         }
 
@@ -89,10 +89,3 @@ def _identity_token(request: Request | None, secret: str) -> str:
     if user is None:
         return ""
     return encrypt_identity(user.id, secret)
-
-
-def _current_trace_id() -> str:
-    span_context = trace.get_current_span().get_span_context()
-    if not span_context.trace_id:
-        return ""
-    return format(span_context.trace_id, "032x")
