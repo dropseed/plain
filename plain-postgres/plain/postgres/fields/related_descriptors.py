@@ -128,11 +128,6 @@ class ForwardForeignKeyDescriptor:
             False,
         )
 
-    def get_object(self, instance: Any) -> Any:
-        qs = self.get_queryset()
-        # Assuming the database enforces foreign keys, this won't fail.
-        return qs.get(self.field.get_reverse_related_filter(instance))
-
     def __get__(
         self, instance: Any | None, cls: type | None = None
     ) -> ForwardForeignKeyDescriptor | Any | None:
@@ -148,92 +143,111 @@ class ForwardForeignKeyDescriptor:
         if instance is None:
             return self
 
-        # The related instance is loaded from the database and then cached
-        # by the field on the model instance state. It can also be pre-cached
-        # by the reverse accessor.
+        # The related object is cached on the model state -- by select_related,
+        # prefetch, the reverse accessor, a prior access, or assignment.
         try:
             rel_obj = self.field.get_cached_value(instance)
         except KeyError:
-            has_value = None not in self.field.get_local_related_value(instance)
-            rel_obj = None
+            attname = self.field.attname
+            # The foreign key column itself can be deferred (.only()/.defer());
+            # load it before reading the raw key value.
+            if attname not in instance.__dict__:
+                instance.refresh_from_db(fields=[attname])
 
-            if rel_obj is None and has_value:
-                rel_obj = self.get_object(instance)
-                remote_field = self.field.remote_field
-                # If this is a one-to-one relation, set the reverse accessor
-                # cache on the related object to the current instance to avoid
-                # an extra SQL query if it's accessed later on.
-                if not remote_field.multiple:
-                    remote_field.set_cached_value(rel_obj, instance)
+            pk_value = instance.__dict__.get(attname)
+            rel_obj = None
+            if pk_value is not None:
+                # Build a partial related instance with only its primary key
+                # loaded -- no query. Accessing any other field triggers the
+                # full-row deferred load.
+                remote_model = self.field.remote_field.model
+                target_attname = self.field.target_field.attname
+                rel_obj = remote_model.from_db([target_attname], [pk_value])
+                # For a one-to-one relation, prime the reverse cache too.
+                if not self.field.remote_field.multiple:
+                    self.field.remote_field.set_cached_value(rel_obj, instance)
             self.field.set_cached_value(instance, rel_obj)
 
+        # Checked on every access, including a cached None: a non-nullable
+        # foreign key with no value must raise consistently, not just once.
         if rel_obj is None and not self.field.allow_null:
             raise self.RelatedObjectDoesNotExist(
                 f"{self.field.model.__name__} has no {self.field.name}."
             )
-        else:
-            return rel_obj
+        return rel_obj
 
     def __set__(self, instance: Any, value: Any) -> None:
         """
-        Set the related instance through the forward relation.
+        Set the related object (or its raw key) through the forward relation.
 
-        With the example above, when setting ``child.parent = parent``:
+        Accepts a related model instance, a bare primary key value, or None::
 
-        - ``self`` is the descriptor managing the ``parent`` attribute
-        - ``instance`` is the ``child`` instance
-        - ``value`` is the ``parent`` instance on the right of the equal sign
+            child.parent = parent_instance
+            child.parent = 5
+            child.parent = None
         """
-        # If value is a LazyObject, force its evaluation. For ForeignKeyField fields,
-        # the value should only be None or a model instance, never a boolean or
-        # other type.
+        from plain.postgres.base import Model
+
+        # A LazyObject (e.g. request.user) must be evaluated before use.
         if isinstance(value, LazyObject):
-            # This forces evaluation: if it's None, value becomes None;
-            # if it's a User instance, value becomes that instance.
             value = value if value else None
 
-        # An object must be an instance of the related class.
-        if value is not None and not isinstance(value, self.field.remote_field.model):
-            raise ValueError(
-                f'Cannot assign "{value!r}": "{instance.model_options.object_name}.{self.field.name}" must be a "{self.field.remote_field.model.model_options.object_name}" instance.'
-            )
+        attname = self.field.attname
         remote_field = self.field.remote_field
-        # If we're setting the value of a OneToOneField to None, we need to clear
-        # out the cache on any old related object. Otherwise, deleting the
-        # previously-related object will also cause this object to be deleted,
-        # which is wrong.
+
         if value is None:
-            # Look up the previously-related object, which may still be available
-            # since we've not yet cleared out the related field.
-            # Use the cache directly, instead of the accessor; if we haven't
-            # populated the cache, then we don't care - we're only accessing
-            # the object to invalidate the accessor cache, so there's no
-            # need to populate the cache just to expire it again.
+            # Clear the reverse cache on any previously-related object so a
+            # later delete of it does not cascade into this instance.
             related = self.field.get_cached_value(instance, default=None)
-
-            # If we've got an old related object, we need to clear out its
-            # cache. This cache also might not exist if the related object
-            # hasn't been accessed yet.
-            if related is not None:
+            if related is not None and not remote_field.multiple:
                 remote_field.set_cached_value(related, None)
+            instance.__dict__[attname] = None
+            self.field.set_cached_value(instance, None)
+            return
 
-            for lh_field, rh_field in self.field.related_fields:
-                setattr(instance, lh_field.attname, None)
+        if isinstance(value, remote_field.model):
+            # A related model instance: store its key, cache the object.
+            instance.__dict__[attname] = getattr(value, self.field.target_field.attname)
+            self.field.set_cached_value(instance, value)
+            # For a one-to-one relation, prime the reverse cache.
+            if not remote_field.multiple:
+                remote_field.set_cached_value(value, instance)
+            return
 
-        # Set the values of the related field.
-        else:
-            for lh_field, rh_field in self.field.related_fields:
-                setattr(instance, lh_field.attname, getattr(value, rh_field.attname))
+        if isinstance(value, Model | bool):
+            # A wrong-model instance, or a bool (which would silently coerce to
+            # the key 0/1 via int) -- reject rather than store a bogus key.
+            raise ValueError(
+                f'Cannot assign "{value!r}": '
+                f'"{instance.model_options.object_name}.{self.field.name}" must be a '
+                f'"{remote_field.model.model_options.object_name}" instance or a '
+                f"primary key value."
+            )
 
-        # Set the related instance cache used by __get__ to avoid an SQL query
-        # when accessing the attribute we just set.
-        self.field.set_cached_value(instance, value)
+        # A bare related key value (e.g. child.parent = 5).
+        new_value = self.field.to_python(value)
+        if instance.__dict__.get(attname) != new_value:
+            # The key actually changed -- clear the reverse cache on any
+            # previously-related object and drop the now-stale forward cache.
+            # Re-storing the same key (e.g. by clean_fields) keeps the cache.
+            related = self.field.get_cached_value(instance, default=None)
+            if related is not None and not remote_field.multiple:
+                remote_field.set_cached_value(related, None)
+            if self.field.is_cached(instance):
+                self.field.delete_cached_value(instance)
+        instance.__dict__[attname] = new_value
 
-        # If this is a one-to-one relation, set the reverse accessor cache on
-        # the related object to the current instance to avoid an extra SQL
-        # query if it's accessed later on.
-        if value is not None and not remote_field.multiple:
-            remote_field.set_cached_value(value, instance)
+    def __delete__(self, instance: Any) -> None:
+        """Delete the foreign key value, clearing any cached related object."""
+        if self.field.is_cached(instance):
+            self.field.delete_cached_value(instance)
+        try:
+            del instance.__dict__[self.field.attname]
+        except KeyError:
+            raise AttributeError(
+                f"{instance.__class__.__name__!r} object has no attribute "
+                f"{self.field.name!r}"
+            )
 
     def __reduce__(self) -> tuple[Any, tuple[Any, str]]:
         """

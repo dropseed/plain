@@ -47,7 +47,6 @@ class ChildSetNull(postgres.Model):
         on_delete=postgres.SET_NULL,
         allow_null=True,
     )
-    parent_id: int | None
 
     query: postgres.QuerySet[ChildSetNull] = postgres.QuerySet()
 
@@ -169,8 +168,6 @@ class CircA(postgres.Model):
         allow_null=True,
         required=False,
     )
-    partner_id: int | None
-
     query: postgres.QuerySet[CircA] = postgres.QuerySet()
 
 
@@ -183,6 +180,4 @@ class CircB(postgres.Model):
         allow_null=True,
         required=False,
     )
-    partner_id: int | None
-
     query: postgres.QuerySet[CircB] = postgres.QuerySet()

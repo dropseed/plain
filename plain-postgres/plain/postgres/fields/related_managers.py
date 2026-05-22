@@ -89,7 +89,10 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         assert field.name is not None, "Field must have a name"
         self.model = cast(type[T], related_model)
         self.instance = instance
-        self.field = field
+        # ForeignKeyField is itself a descriptor type (it inherits the field
+        # descriptor protocol), so ty reads this plain attribute as a
+        # descriptor slot; storing the field object on it is fine.
+        self.field = field  # ty: ignore[invalid-assignment]
         self.core_filters = {self.field.name: instance}
         self.allow_null = self.field.allow_null
 
@@ -582,8 +585,8 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
                     self.through(
                         **through_defaults,
                         **{
-                            f"{source_field_name}_id": self.related_val[0],
-                            f"{target_field_name}_id": target_id,
+                            source_field_name: self.related_val[0],
+                            target_field_name: target_id,
                         },
                     )
                     for target_id in missing_target_ids

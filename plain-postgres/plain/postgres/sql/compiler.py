@@ -1498,7 +1498,7 @@ class SQLInsertCompiler(SQLCompiler):
         things like update_now on DateTimeField. Skip it if this is a raw query.
         """
         if self.query.raw:
-            return getattr(obj, field.attname)
+            return field.value_from_object(obj)
         return field.pre_save(obj, add=True)
 
     def assemble_as_sql(

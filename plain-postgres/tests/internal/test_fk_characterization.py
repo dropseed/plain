@@ -11,6 +11,8 @@ from __future__ import annotations
 import pytest
 from app.examples.models.delete import ChildCascade, CircA, DeleteParent
 
+from plain.postgres.exceptions import FieldDoesNotExist, FieldError
+
 # ===========================================================================
 # Forward relation -- accessing the related object.
 # ===========================================================================
@@ -80,58 +82,75 @@ def test_save_roundtrip(db):
 
 
 def test_id_attribute_read(db):
+    # WAS: child.parent_id returned the raw key int.
+    # NOW: there is no parent_id attribute -- read child.parent.id.
     parent = DeleteParent.query.create(name="P")
-    child = ChildCascade.query.create(parent=parent)
-    # parent_id is not visible to the type checker (the field is typed as the
-    # related object) -- exercised here for runtime behavior only.
-    assert ChildCascade.query.get(id=child.id).parent_id == parent.id  # ty: ignore[unresolved-attribute]
+    child = ChildCascade.query.get(id=ChildCascade.query.create(parent=parent).id)
+    with pytest.raises(AttributeError, match="parent_id"):
+        _ = child.parent_id  # ty: ignore[unresolved-attribute]
+    assert child.parent.id == parent.id
 
 
 def test_construct_with_id_kwarg(db):
+    # WAS: ChildCascade(parent_id=n) constructed by raw key.
+    # NOW: TypeError -- pass the field name, which also accepts a bare key.
     parent = DeleteParent.query.create(name="P")
-    child = ChildCascade(parent_id=parent.id)
+    with pytest.raises(TypeError, match="unexpected keyword"):
+        ChildCascade(parent_id=parent.id)
+    child = ChildCascade(parent=parent.id)
     child.save()
     assert ChildCascade.query.get(id=child.id).parent == parent
 
 
 def test_id_attribute_write(db):
+    # WAS: child.parent_id = n updated the foreign key.
+    # NOW: it neither errors nor updates the key -- it sets an ignored
+    # attribute. This is the one breaking change that fails silently; assign
+    # the field directly (child.parent = n) instead.
     p1 = DeleteParent.query.create(name="P1")
     p2 = DeleteParent.query.create(name="P2")
     child = ChildCascade.query.create(parent=p1)
     child.parent_id = p2.id  # ty: ignore[unresolved-attribute]
     child.save()
-    assert ChildCascade.query.get(id=child.id).parent == p2
+    assert ChildCascade.query.get(id=child.id).parent == p1  # unchanged!
 
 
 def test_assign_bare_int(db):
+    # WAS: child.parent = <int> raised ValueError (only instances allowed).
+    # NOW: a bare primary key value is accepted.
     parent = DeleteParent.query.create(name="P")
     child = ChildCascade.query.create(parent=parent)
-    # Assigning a bare key value is rejected -- only instances are accepted.
-    with pytest.raises(ValueError, match="Cannot assign"):
-        child.parent = parent.id  # ty: ignore[invalid-assignment]
+    child.parent = parent.id  # ty: ignore[invalid-assignment]
+    assert child.parent.id == parent.id
 
 
 def test_filter_by_id(db):
+    # WAS: .filter(parent_id=n) resolved. NOW: FieldError -- use `parent`.
     parent = DeleteParent.query.create(name="P")
-    child = ChildCascade.query.create(parent=parent)
-    assert ChildCascade.query.filter(parent_id=parent.id).get() == child
+    ChildCascade.query.create(parent=parent)
+    with pytest.raises(FieldError):
+        ChildCascade.query.filter(parent_id=parent.id).exists()
 
 
 def test_values_id(db):
+    # WAS: .values("parent_id") resolved. NOW: it does not -- use "parent".
     parent = DeleteParent.query.create(name="P")
     ChildCascade.query.create(parent=parent)
-    rows = list(ChildCascade.query.values("parent_id"))
-    assert rows[0]["parent_id"] == parent.id
+    with pytest.raises((FieldError, FieldDoesNotExist)):
+        list(ChildCascade.query.values("parent_id"))
 
 
 def test_values_list_id(db):
+    # WAS: .values_list("parent_id") resolved. NOW: it does not.
     parent = DeleteParent.query.create(name="P")
     ChildCascade.query.create(parent=parent)
-    assert list(ChildCascade.query.values_list("parent_id", flat=True)) == [parent.id]
+    with pytest.raises((FieldError, FieldDoesNotExist)):
+        list(ChildCascade.query.values_list("parent_id", flat=True))
 
 
 def test_only_id(db):
+    # WAS: .only("parent_id") resolved. NOW: it does not -- use "parent".
     parent = DeleteParent.query.create(name="P")
     child = ChildCascade.query.create(parent=parent)
-    fetched = ChildCascade.query.only("parent_id").get(id=child.id)
-    assert fetched.parent_id == parent.id  # ty: ignore[unresolved-attribute]
+    with pytest.raises((FieldError, FieldDoesNotExist)):
+        ChildCascade.query.only("parent_id").get(id=child.id)

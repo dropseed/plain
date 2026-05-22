@@ -58,12 +58,13 @@ def test_refresh_from_db_reloads_values(db):
 
 
 def test_deferred_field_access_query_count(db):
-    # Each deferred field is loaded in its own query: reading two deferred
-    # fields costs two queries.
+    # WAS: each deferred field loaded in its own query (two fields = two
+    # queries). NOW: the first deferred access hydrates every still-missing
+    # field, so the second field needs no further query.
     Widget.query.create(name="W", size="L")
     widget = Widget.query.only("id").get()
 
     _, first = _count_queries(lambda: widget.name)
     assert first == 1
     _, second = _count_queries(lambda: widget.size)
-    assert second == 1
+    assert second == 0

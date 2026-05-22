@@ -321,7 +321,7 @@ class Model(metaclass=ModelBase):
             if field.attname in non_loaded_fields:
                 # This field wasn't refreshed - skip ahead.
                 continue
-            setattr(self, field.attname, getattr(db_instance, field.attname))
+            setattr(self, field.attname, field.value_from_object(db_instance))
             # Clear cached foreign keys.
             if isinstance(field, RelatedField) and field.is_cached(self):
                 field.delete_cached_value(self)
@@ -346,7 +346,7 @@ class Model(metaclass=ModelBase):
             field = self._model_meta.get_forward_field(field_name)
         except FieldDoesNotExist:
             return getattr(self, field_name)
-        return getattr(self, field.attname)
+        return field.value_from_object(self)
 
     def save(
         self,
@@ -488,7 +488,7 @@ class Model(metaclass=ModelBase):
         if id_set and not force_insert:
             base_qs = meta.base_queryset
             values = [
-                (f, (getattr(self, f.attname) if raw else f.pre_save(self, False)))
+                (f, (f.value_from_object(self) if raw else f.pre_save(self, False)))
                 for f in non_pks
             ]
             # DATABASE_DEFAULT fields represent "let the DB produce this on
@@ -592,14 +592,16 @@ class Model(metaclass=ModelBase):
                         f"{operation_name}() prohibited to prevent data loss due to unsaved "
                         f"related object '{field.name}'."
                     )
-                elif getattr(self, field.attname) in field.empty_values:
+                elif field.value_from_object(self) in field.empty_values:
                     # Set related object if it has been saved after an
                     # assignment.
                     setattr(self, field.name, obj)
                 # If the relationship's pk/to_field was changed, clear the
-                # cached relationship.
-                if getattr(obj, field.target_field.attname) != getattr(
-                    self, field.attname
+                # cached relationship. Compare the cached object's key against
+                # the raw key value -- not getattr(self, field.attname), which
+                # for a foreign key returns the related object, not the key.
+                if getattr(obj, field.target_field.attname) != field.value_from_object(
+                    self
                 ):
                     field.delete_cached_value(self)
 
@@ -631,7 +633,7 @@ class Model(metaclass=ModelBase):
         """Get the display value for a field, especially useful for fields with choices."""
         # Get the field object from the field name
         field = self._model_meta.get_forward_field(field_name)
-        value = getattr(self, field.attname)
+        value = field.value_from_object(self)
 
         # If field has no choices, just return the value as string
         if not hasattr(field, "flatchoices") or not field.flatchoices:
@@ -650,7 +652,7 @@ class Model(metaclass=ModelBase):
             exclude = set()
         meta = meta or self._model_meta
         return {
-            field.name: Value(getattr(self, field.attname), field)
+            field.name: Value(field.value_from_object(self), field)
             for field in meta.local_concrete_fields
             if field.name not in exclude
         }
@@ -722,7 +724,7 @@ class Model(metaclass=ModelBase):
             lookup_kwargs = {}
             for field_name in unique_check:
                 f = self._model_meta.get_forward_field(field_name)
-                lookup_value = getattr(self, f.attname)
+                lookup_value = f.value_from_object(self)
                 if lookup_value is None:
                     # no value, skip the lookup
                     continue
@@ -896,7 +898,7 @@ class Model(metaclass=ModelBase):
                 continue
             # Skip validation for empty fields with required=False. The developer
             # is responsible for making sure they have a valid value.
-            raw_value = getattr(self, f.attname)
+            raw_value = f.value_from_object(self)
             if not f.required and raw_value in f.empty_values:
                 continue
             try:

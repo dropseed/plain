@@ -193,7 +193,7 @@ class TestForeignKeyRoundTrip:
 
         assert response.status_code == 302, response.content
         child = ChildCascade.query.get()
-        assert child.parent_id == parent.id  # ty: ignore[unresolved-attribute]
+        assert child.parent.id == parent.id
 
     def test_create_with_nonexistent_fk_returns_400(self, db):
         client = Client()

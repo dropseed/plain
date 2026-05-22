@@ -424,23 +424,6 @@ class ForeignKeyField(ColumnField, RelatedField):
         obj.__dict__.pop("reverse_path_infos", None)
         return obj
 
-    def __set__(self, instance: Any, value: Any) -> None:
-        """
-        Override Field's __set__ to clear cached related object when FK value changes.
-
-        This ensures that when you change obj.user_id, the cached obj.user is invalidated.
-        """
-        # Check if value is changing and clear cache if needed
-        if (
-            hasattr(self, "attname")
-            and instance.__dict__.get(self.attname) != value
-            and self.is_cached(instance)
-        ):
-            self.delete_cached_value(instance)
-
-        # Call parent's __set__ to do the actual assignment
-        super().__set__(instance, value)
-
     @cached_property
     def related_fields(self) -> list[tuple[ForeignKeyField, Field]]:
         return self.resolve_related_fields()
@@ -481,17 +464,19 @@ class ForeignKeyField(ColumnField, RelatedField):
         """
         return Q.create(
             [
-                (rh_field.attname, getattr(obj, lh_field.attname))
+                # lh_field is the foreign key itself; use its raw key value,
+                # not the related object the descriptor would return.
+                (rh_field.attname, lh_field._get_raw_value(obj))
                 for lh_field, rh_field in self.related_fields
             ]
         )
 
     def get_local_related_value(self, instance: Model) -> tuple[Any, ...]:
-        # Always returns the value of the single local field
-        field = self.local_related_fields[0]
-        if field.primary_key:
+        # The single local field is the foreign key itself.
+        if self.primary_key:
             return (instance.id,)
-        return (getattr(instance, field.attname),)
+        # Read the raw key value, not the related object the descriptor returns.
+        return (self._get_raw_value(instance),)
 
     def get_foreign_related_value(self, instance: Model) -> tuple[Any, ...]:
         # Always returns the id of the foreign instance
@@ -655,8 +640,33 @@ class ForeignKeyField(ColumnField, RelatedField):
                 )
         return related_fields
 
-    def get_attname(self) -> str:
-        return f"{self.name}_id"
+    def set_attributes_from_name(self, name: str) -> None:
+        super().set_attributes_from_name(name)
+        # attname is the field name itself ("author"). The raw key value lives
+        # in instance.__dict__ under that name, reached only through the
+        # ForwardForeignKeyDescriptor -- there is no separate "author_id"
+        # attribute. The database column keeps the historical _id suffix.
+        self.column = f"{self.name}_id"
+
+    def _get_raw_value(self, instance: Model) -> Any:
+        """Return the raw related key stored on the instance.
+
+        Reads instance.__dict__ directly -- never through the descriptor, which
+        would yield the related object. If the foreign key column was deferred
+        (.only()/.defer()) it is loaded first, so save/serialize/validate paths
+        never mistake a deferred column for a NULL value.
+        """
+        if self.attname not in instance.__dict__:
+            instance.refresh_from_db(fields=[self.attname])
+        return instance.__dict__.get(self.attname)
+
+    def pre_save(self, model_instance: Model, add: bool) -> Any:
+        # Return the raw related key for INSERT/UPDATE, not the related object
+        # that attribute access yields.
+        return self._get_raw_value(model_instance)
+
+    def value_from_object(self, obj: Model) -> Any:
+        return self._get_raw_value(obj)
 
     def get_db_prep_save(self, value: Any, connection: DatabaseConnection) -> Any:
         if value is None or (

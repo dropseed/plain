@@ -929,6 +929,19 @@ class Book(postgres.Model):
     tags = types.ManyToManyField("Tag")
 ```
 
+### Foreign key access
+
+Accessing a foreign key gives you the related object without a query — only its primary key is loaded up front:
+
+```python
+book = Book.query.get(id=1)
+book.author        # no query — a partial Author instance
+book.author.id     # no query — the foreign key value
+book.author.name   # one query — loads the rest of the row
+```
+
+The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `select_related()` to load related rows up front and avoid a query per row.
+
 ### Reverse relationships
 
 When you define a `ForeignKey` or `ManyToManyField`, Plain automatically creates a reverse accessor on the related model (like `author.book_set`). You can explicitly declare these reverse relationships using [`ReverseForeignKey`](./fields/reverse_descriptors.py#ReverseForeignKey) and [`ReverseManyToMany`](./fields/reverse_descriptors.py#ReverseManyToMany):

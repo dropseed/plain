@@ -49,6 +49,7 @@ Run `uv run plain docs postgres` for full workflow details.
 Use `Model.query` to build querysets (e.g., `User.query.filter(is_active=True)`).
 
 - Use `select_related()` for FK access in loops, `prefetch_related()` for reverse/M2N
+- A foreign key returns a partial related object: `obj.author` and `obj.author.id` are query-free; other fields load on first access. There is no `obj.author_id` — use `obj.author.id`
 - Use `.annotate(Count(...))` instead of calling `.count()` per row
 - Fetch all data in the view — templates should never trigger queries
 - Use `.exists()` not `.count() > 0`, `.count()` not `len(qs)`

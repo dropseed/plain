@@ -104,7 +104,9 @@ class ModelIterable(BaseIterable):
             (
                 field,
                 related_objs,
-                operator.attrgetter(field.attname),
+                # The raw key value, not the related object the descriptor
+                # would return -- the dict below is keyed by raw key.
+                field.value_from_object,
             )
             for field, related_objs in queryset._known_related_objects.items()
         ]
@@ -811,7 +813,7 @@ class QuerySet[T: "Model"]:
             for field in fields_list:
                 when_statements = []
                 for obj in batch_objs:
-                    attr = getattr(obj, field.attname)
+                    attr = field.value_from_object(obj)
                     if not isinstance(attr, ResolvableExpression):
                         attr = Value(attr, output_field=field)
                     when_statements.append(When(id=obj.id, then=attr))

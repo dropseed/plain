@@ -106,7 +106,7 @@ def test_set_null_instance(db):
     child = ChildSetNull.query.create(parent=parent)
     parent.delete()
     child.refresh_from_db()
-    assert child.parent_id is None
+    assert child.parent is None
 
 
 def test_set_null_queryset(db):
@@ -117,7 +117,7 @@ def test_set_null_queryset(db):
     DeleteParent.query.filter(id=parent.id).delete()
 
     for cid in child_ids:
-        assert ChildSetNull.query.get(id=cid).parent_id is None
+        assert ChildSetNull.query.get(id=cid).parent is None
 
 
 def test_set_null_bulk(db):
@@ -128,7 +128,7 @@ def test_set_null_bulk(db):
 
     parent.delete()
 
-    nulls = ChildSetNull.query.filter(id__in=child_ids, parent_id__isnull=True).count()
+    nulls = ChildSetNull.query.filter(id__in=child_ids, parent__isnull=True).count()
     assert nulls == 100
 
 
@@ -288,7 +288,7 @@ def test_delete_and_reinsert_replacement_in_one_atomic(db):
         parent.delete()
 
     child.refresh_from_db()
-    assert child.parent_id == DeleteParent.query.get(name="replacement").id
+    assert child.parent.id == DeleteParent.query.get(name="replacement").id
 
 
 def test_child_insert_before_parent_in_one_atomic(db):
@@ -308,14 +308,14 @@ def test_child_insert_before_parent_in_one_atomic(db):
             assert row is not None
             (new_id,) = row
 
-        child = ChildCascade(parent_id=new_id)
+        child = ChildCascade(parent=new_id)
         child.save(clean_and_validate=False)
 
         parent = DeleteParent(id=new_id, name="late")
         parent.save(clean_and_validate=False)
 
     assert DeleteParent.query.filter(id=new_id).exists()
-    assert ChildCascade.query.filter(parent_id=new_id).exists()
+    assert ChildCascade.query.filter(parent=new_id).exists()
 
 
 # ===========================================================================
@@ -455,9 +455,7 @@ def test_m2m_set_reconciles_through_rows(db):
 
     widget.tags.set([b, c])
 
-    tag_ids = set(
-        WidgetTag.query.filter(widget=widget).values_list("tag_id", flat=True)
-    )
+    tag_ids = set(WidgetTag.query.filter(widget=widget).values_list("tag", flat=True))
     assert tag_ids == {b.id, c.id}
 
 

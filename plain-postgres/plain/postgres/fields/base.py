@@ -424,10 +424,17 @@ class Field[T](RegisterLookupMixin):
         data = instance.__dict__
         field_name = self.attname
 
-        # If value not in dict, lazy load from database
+        # If value not in dict, lazy load from database. Hydrate every
+        # currently-missing concrete field in one query rather than one query
+        # per field accessed -- this is what makes a foreign key partial
+        # instance cheap to use beyond its primary key.
         if field_name not in data:
-            # Deferred field - load it from the database
-            instance.refresh_from_db(fields=[field_name])
+            missing = [
+                f.attname
+                for f in instance._model_meta.concrete_fields
+                if f.attname not in data
+            ]
+            instance.refresh_from_db(fields=missing)
 
         return cast(T, data.get(field_name))
 

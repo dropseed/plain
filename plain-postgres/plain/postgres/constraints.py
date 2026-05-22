@@ -363,7 +363,7 @@ class UniqueConstraint(BaseConstraint):
                 if exclude and field_name in exclude:
                     return
                 field = model._model_meta.get_forward_field(field_name)
-                lookup_value = getattr(instance, field.attname)
+                lookup_value = field.value_from_object(instance)
                 if lookup_value is None:
                     # A composite constraint containing NULL value cannot cause
                     # a violation since NULL != NULL in SQL.

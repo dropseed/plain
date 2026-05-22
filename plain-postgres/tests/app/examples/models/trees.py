@@ -12,6 +12,5 @@ class TreeNode(postgres.Model):
     parent: TreeNode | None = types.ForeignKeyField(
         "self", on_delete=postgres.CASCADE, allow_null=True
     )
-    parent_id: int | None
 
     query: postgres.QuerySet[TreeNode] = postgres.QuerySet()
