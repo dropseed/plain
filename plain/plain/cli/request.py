@@ -289,8 +289,14 @@ def request(
                 "status": response.status_code,
                 "request_id": response.request.unique_id,
             }
-            if getattr(response, "user", None):
-                response_data["user"] = str(response.user)
+            response_data["user"] = (
+                str(response.user) if getattr(response, "user", None) else None
+            )
+            redirects = getattr(response, "redirect_chain", None)
+            if redirects:
+                response_data["redirects"] = [
+                    {"url": url, "status": status} for url, status in redirects
+                ]
             if response.resolver_match:
                 resolver_match = response.resolver_match
                 url_name = getattr(
@@ -322,9 +328,13 @@ def request(
         # Request ID
         click.echo(f"  Request ID: {response.request.unique_id}")
 
-        # User
-        if getattr(response, "user", None):
-            click.echo(f"  Authenticated user: {response.user}")
+        # Surface followed redirects — a 200 may not be the path you asked for.
+        redirects = getattr(response, "redirect_chain", None)
+        if redirects:
+            hops = " → ".join(
+                [path] + [f"{url} ({status})" for url, status in redirects]
+            )
+            click.secho(f"  Redirected: {hops}", fg="yellow")
 
         # URL pattern
         if response.resolver_match:
@@ -334,6 +344,12 @@ def request(
             url_name = namespaced_url_name or url_name_attr
             if url_name:
                 click.echo(f"  URL pattern: {url_name}")
+
+        # Always show auth state — authed vs anonymous should never be ambiguous.
+        if getattr(response, "user", None):
+            click.echo(f"  User: {response.user}")
+        else:
+            click.echo("  User: anonymous")
 
         # Trace — its own section, paralleling the JSON `trace` key
         click.echo()
