@@ -449,11 +449,7 @@ class Model(metaclass=ModelBase):
         non_pks = [f for f in meta.local_concrete_fields if not f.primary_key]
 
         if update_fields:
-            non_pks = [
-                f
-                for f in non_pks
-                if f.name in update_fields or f.attname in update_fields
-            ]
+            non_pks = [f for f in non_pks if f.name in update_fields]
 
         id_field = meta.get_forward_field("id")
         id_val = self.id
@@ -997,12 +993,12 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def _check_field_name_clashes(cls) -> list[PreflightResult]:
-        """Reject fields that share a name or attname within the same model."""
+        """Reject fields that share a name within the same model."""
         errors: list[PreflightResult] = []
-        used_fields = {}  # name or attname -> field
+        used_fields = {}  # name -> field
 
         for f in cls._model_meta.local_fields:
-            clash = used_fields.get(f.name) or used_fields.get(f.attname) or None
+            clash = used_fields.get(f.name)
             # Note that we may detect clash between user-defined non-unique
             # field "id" and automatically added unique field "id", both
             # defined at the same model. This special case is considered in
@@ -1020,7 +1016,6 @@ class Model(metaclass=ModelBase):
                     )
                 )
             used_fields[f.name] = f
-            used_fields[f.attname] = f
 
         return errors
 
@@ -1274,7 +1269,7 @@ class Model(metaclass=ModelBase):
         meta = cls._model_meta
         valid_fields = set(
             chain.from_iterable(
-                (f.name, f.attname)
+                (f.name,)
                 if not (f.auto_created and not f.concrete)
                 else (f.field.related_query_name(),)
                 for f in chain(meta.fields, meta.related_objects)

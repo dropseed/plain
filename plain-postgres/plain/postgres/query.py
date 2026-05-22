@@ -9,7 +9,7 @@ import operator
 import warnings
 from collections.abc import Callable, Iterator, Sequence
 from functools import cached_property
-from itertools import chain, islice
+from itertools import islice
 from typing import TYPE_CHECKING, Any, Never, Self, overload
 
 import psycopg
@@ -906,8 +906,6 @@ class QuerySet[T: "Model"]:
                         field.primary_key or field.__class__.pre_save is Field.pre_save
                     ):
                         update_fields.add(field.name)
-                        if field.name != field.attname:
-                            update_fields.add(field.attname)
                 obj.save(update_fields=update_fields)
             else:
                 obj.save()
@@ -1318,14 +1316,7 @@ class QuerySet[T: "Model"]:
         clone = self._chain()
         names = self._fields
         if names is None:
-            names = set(
-                chain.from_iterable(
-                    (field.name, field.attname)
-                    if hasattr(field, "attname")
-                    else (field.name,)
-                    for field in self.model._model_meta.get_fields()
-                )
-            )
+            names = {field.name for field in self.model._model_meta.get_fields()}
 
         for alias, annotation in annotations.items():
             if alias in names:

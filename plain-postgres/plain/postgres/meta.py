@@ -540,8 +540,6 @@ class Meta:
         for field in self.concrete_fields:
             if not field.primary_key:
                 names.append(field.name)
-                if field.name != field.attname:
-                    names.append(field.attname)
         return frozenset(names)
 
     @cached_property

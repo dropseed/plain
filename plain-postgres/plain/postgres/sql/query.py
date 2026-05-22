@@ -98,11 +98,7 @@ EXPLAIN_OPTIONS_PATTERN = _lazy_re_compile(r"[\w\-]+")
 def get_field_names_from_opts(meta: Meta | None) -> set[str]:
     if meta is None:
         return set()
-    return set(
-        chain.from_iterable(
-            (f.name, f.attname) if f.concrete else (f.name,) for f in meta.get_fields()
-        )
-    )
+    return {f.name for f in meta.get_fields()}
 
 
 def get_children_from_q(q: Q) -> TypingIterator[tuple[str, Any]]:
