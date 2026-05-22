@@ -108,8 +108,6 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         """
         Filter the queryset for the instance this manager is bound to.
         """
-        from plain.postgres.exceptions import FieldError
-
         queryset._defer_next_filter = True
         queryset = queryset.filter(**self.core_filters)
         for field in self.field.foreign_related_fields:
@@ -117,19 +115,8 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
             if val is None:
                 return queryset.none()
 
-        try:
-            target_field = self.field.target_field
-        except FieldError:
-            # The relationship has multiple target fields. Use a tuple
-            # for related object id.
-            rel_obj_id = tuple(
-                [
-                    getattr(self.instance, target_field.attname)
-                    for target_field in self.field.path_infos[-1].target_fields
-                ]
-            )
-        else:
-            rel_obj_id = getattr(self.instance, target_field.attname)
+        target_field = self.field.target_field
+        rel_obj_id = getattr(self.instance, target_field.attname)
         queryset._known_related_objects = {self.field: {rel_obj_id: self.instance}}
         return queryset
 

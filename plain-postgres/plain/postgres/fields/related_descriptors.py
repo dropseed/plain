@@ -98,19 +98,10 @@ class ForwardForeignKeyDescriptor:
         related_field = self.field.foreign_related_fields[0]
         remote_field = self.field.remote_field
 
-        # FIXME: This will need to be revisited when we introduce support for
-        # composite fields. In the meantime we take this practical approach.
-        # Refs #21410.
-        # The check for len(...) == 1 is a special case that allows the query
-        # to be join-less and smaller. Refs #21760.
-        if len(self.field.foreign_related_fields) == 1:
-            query = {
-                f"{related_field.name}__in": {
-                    instance_attr(inst)[0] for inst in instances
-                }
-            }
-        else:
-            query = {f"{self.field.related_query_name()}__in": instances}
+        # A foreign key is single-column, so prefetch with a join-less IN query.
+        query = {
+            f"{related_field.name}__in": {instance_attr(inst)[0] for inst in instances}
+        }
         queryset = queryset.filter(**query)
 
         # Since we're going to assign directly in the cache,
