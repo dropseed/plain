@@ -1,5 +1,10 @@
 import pytest
-from app.examples.models.delete import ChildCascade, ChildSetNull, DeleteParent
+from app.examples.models.delete import (
+    ChildCascade,
+    ChildSetNull,
+    DeleteParent,
+    UnconstrainedChild,
+)
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 
 from plain.postgres import QuerySet
@@ -639,3 +644,29 @@ class TestForeignKeyPartialInstance:
         del child.parent
 
         assert "parent" not in child.__dict__
+
+    def test_unconstrained_fk_is_queried_on_access(self, db):
+        # A db_constraint=False foreign key has no database guarantee that the
+        # row exists, so it is queried on access rather than synthesized.
+        parent = DeleteParent.query.create(name="Parent")
+        created = UnconstrainedChild.query.create(parent=parent)
+        child = UnconstrainedChild.query.get(id=created.id)
+
+        related, queries = self._count_queries(lambda: child.parent)
+        assert queries == 1
+        assert related == parent
+
+    def test_unconstrained_fk_raises_on_missing_target(self, db):
+        # Without a database FK constraint the target row can disappear. The
+        # stale key must raise on access -- not return a phantom partial
+        # instance that looks valid until a non-key field is read.
+        parent = DeleteParent.query.create(name="Parent")
+        created = UnconstrainedChild.query.create(parent=parent)
+        parent.delete()  # NO_ACTION + no DB constraint: the child now dangles
+
+        child = UnconstrainedChild.query.get(id=created.id)
+        with pytest.raises(DeleteParent.DoesNotExist):
+            _ = child.parent
+        # Same exception family as an empty foreign key -- also an
+        # AttributeError -- so hasattr() reports False rather than propagating.
+        assert not hasattr(child, "parent")

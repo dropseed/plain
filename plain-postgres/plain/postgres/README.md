@@ -942,6 +942,8 @@ book.author.name   # one query — loads the rest of the row
 
 The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `select_related()` to load related rows up front and avoid a query per row.
 
+The partial-instance shortcut relies on the database guaranteeing the row exists. A foreign key declared with `db_constraint=False` has no such guarantee, so it is queried on access instead — a stale key raises `DoesNotExist` right away rather than yielding a placeholder.
+
 ### Reverse relationships
 
 When you define a `ForeignKey` or `ManyToManyField`, Plain automatically creates a reverse accessor on the related model (like `author.book_set`). You can explicitly declare these reverse relationships using [`ReverseForeignKey`](./fields/reverse_descriptors.py#ReverseForeignKey) and [`ReverseManyToMany`](./fields/reverse_descriptors.py#ReverseManyToMany):
