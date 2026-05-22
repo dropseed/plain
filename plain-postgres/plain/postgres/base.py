@@ -1079,7 +1079,7 @@ class Model(metaclass=ModelBase):
         errors: list[PreflightResult] = []
         property_names = cls._model_meta._property_names
         related_field_accessors = (
-            f.get_attname()
+            f.name
             for f in cls._model_meta._get_fields(reverse=False)
             if isinstance(f, RelatedField)
         )

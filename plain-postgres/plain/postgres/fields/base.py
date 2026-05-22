@@ -377,7 +377,9 @@ class Field[T](RegisterLookupMixin):
 
     def set_attributes_from_name(self, name: str) -> None:
         self.name = self.name or name
-        self.attname = self.get_attname()
+        # A field's attname (its instance __dict__ key) is its name. A foreign
+        # key overrides this method only to keep the "_id" suffix on `column`.
+        self.attname = self.name
         self.column = self.attname
         self.concrete = self.column is not None
 
@@ -474,10 +476,6 @@ class Field[T](RegisterLookupMixin):
             raise AttributeError(
                 f"{instance.__class__.__name__!r} object has no attribute {self.attname!r}"
             )
-
-    def get_attname(self) -> str:
-        assert self.name is not None  # Field name must be set
-        return self.name
 
     def pre_save(self, model_instance: Model, add: bool) -> T | None:
         """Return field's value just before saving."""
