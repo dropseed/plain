@@ -429,10 +429,6 @@ class ForeignKeyField(ColumnField, RelatedField):
         return self.resolve_related_fields()
 
     @cached_property
-    def reverse_related_fields(self) -> list[tuple[Field, Field]]:
-        return [(rhs_field, lhs_field) for lhs_field, rhs_field in self.related_fields]
-
-    @cached_property
     def local_related_fields(self) -> tuple[Field, ...]:
         return tuple(lhs_field for lhs_field, rhs_field in self.related_fields)
 
