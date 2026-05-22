@@ -66,8 +66,8 @@ class ConnectSupportFieldsExtension(InclusionTagExtension):
 @register_template_global
 def connect_support_url(endpoint_id: str) -> str:
     """Build the form-action URL for a support endpoint."""
-    base = settings.CONNECT_FORMS_URL.rstrip("/")
-    return f"{base}/{quote(endpoint_id, safe='')}"
+    base = str(settings.CONNECT_CLOUD_URL).rstrip("/")
+    return f"{base}/forms/{quote(endpoint_id, safe='')}"
 
 
 def _current_route(request: Request | None) -> str:

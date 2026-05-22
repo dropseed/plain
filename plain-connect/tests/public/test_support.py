@@ -43,7 +43,7 @@ def test_url_tag_renders_endpoint_id_into_action(db):
 
 
 def test_url_tag_uses_configured_base(db, settings):
-    settings.CONNECT_FORMS_URL = "https://custom.example/forms"
+    settings.CONNECT_CLOUD_URL = "https://custom.example"
     response = Client().get("/")
     assert (
         _form_action(response.content) == f"https://custom.example/forms/{ENDPOINT_ID}"

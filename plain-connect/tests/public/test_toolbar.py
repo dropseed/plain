@@ -43,11 +43,11 @@ def test_trace_button_links_to_the_dashboard(db, settings, real_tracing):
     assert match, f"no trace link in toolbar: {response.content!r}"
 
 
-def test_trace_link_uses_the_configured_dashboard_url(db, settings, real_tracing):
+def test_trace_link_uses_the_configured_cloud_url(db, settings, real_tracing):
     settings.DEBUG = True
     settings.CONNECT_EXPORT_ENABLED = True
     settings.CONNECT_EXPORT_TOKEN = "test-token"
-    settings.CONNECT_DASHBOARD_URL = "https://cloud.example.com"
+    settings.CONNECT_CLOUD_URL = "https://cloud.example.com"
     response = Client().get("/")
     assert response.status_code == 200
     assert re.search(rb"https://cloud\.example\.com/t/[0-9a-f]{32}", response.content)

@@ -32,8 +32,8 @@ class ConnectToolbarItem(ToolbarItem):
         trace = current_trace()
         context["sampled"] = trace.sampled
         if trace.sampled:
-            dashboard_url = str(settings.CONNECT_DASHBOARD_URL).rstrip("/")
-            context["trace_url"] = f"{dashboard_url}/t/{trace.trace_id}"
+            cloud_url = str(settings.CONNECT_CLOUD_URL).rstrip("/")
+            context["trace_url"] = f"{cloud_url}/t/{trace.trace_id}"
         else:
             context["trace_url"] = ""
 

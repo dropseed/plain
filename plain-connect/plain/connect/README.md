@@ -30,7 +30,7 @@ If `CONNECT_EXPORT_TOKEN` is not set, the package is a no-op — safe to install
 | Setting                     | Default                               | Description                                                                                                |
 | --------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `CONNECT_EXPORT_URL`        | `"https://ingest.plainframework.com"` | OTLP ingest endpoint (override to use a custom endpoint)                                                   |
-| `CONNECT_DASHBOARD_URL`     | `"https://plainframework.com"`        | Plain Cloud dashboard base URL — used for the toolbar's trace links                                        |
+| `CONNECT_CLOUD_URL`         | `"https://plainframework.com"`        | Plain Cloud web app base URL — builds toolbar trace links and support form URLs                            |
 | `CONNECT_EXPORT_TOKEN`      | `""`                                  | Auth token for the export endpoint                                                                         |
 | `CONNECT_TRACE_SAMPLE_RATE` | `1.0`                                 | Probability of exporting a trace (0.0–1.0)                                                                 |
 | `CONNECT_EXPORT_LOGS`       | `True`                                | Set to `False` to disable OTLP log export                                                                  |
@@ -38,7 +38,6 @@ If `CONNECT_EXPORT_TOKEN` is not set, the package is a no-op — safe to install
 | `CONNECT_SECRET_KEY`        | `""`                                  | Shared secret with Plain Cloud (from the App settings page). Encrypts identity tokens, signs render tokens |
 | `CONNECT_PAGEVIEWS_TOKEN`   | `""`                                  | Public pageview-endpoint token; enables the `{% connect_pageviews %}` tag                                  |
 | `CONNECT_PAGEVIEWS_URL`     | `"https://beacon.plainframework.com"` | Pageview ingest endpoint                                                                                   |
-| `CONNECT_FORMS_URL`         | `"https://plainframework.com/forms"`  | Base URL for support form submissions                                                                      |
 
 All settings can be set via `PLAIN_`-prefixed environment variables or in `app/settings.py`.
 
@@ -143,7 +142,7 @@ The endpoint accepts either `application/x-www-form-urlencoded` (the standard `<
 
 If you have [plain.toolbar](../../plain-toolbar/plain/toolbar/README.md) installed, plain.connect adds a **Trace** button that links the current request straight to its trace in Plain Cloud.
 
-The button only appears when export is active (`CONNECT_EXPORT_TOKEN` is set), so it stays out of the way in local dev. It links to a short `/t/<trace_id>` URL on `CONNECT_DASHBOARD_URL`, which resolves the trace to its app and redirects you to the full trace view — no app slug needed in the link.
+The button only appears when export is active (`CONNECT_EXPORT_TOKEN` is set), so it stays out of the way in local dev. It links to a short `/t/<trace_id>` URL on `CONNECT_CLOUD_URL`, which resolves the trace to its app and redirects you to the full trace view — no app slug needed in the link.
 
 If a request wasn't sampled for export (see [Sampling](#sampling)), the button shows "Not sampled" instead. Because traces export in a background batch, a freshly-clicked link may briefly land on a "locating trace" page that retries until the trace arrives.
 
