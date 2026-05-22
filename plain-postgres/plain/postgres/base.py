@@ -119,15 +119,12 @@ class Model(metaclass=ModelBase):
                 field.remote_field, ForeignObjectRel
             ):
                 try:
-                    # Assume object instance was passed in.
+                    # A foreign key is given by name -- either a related
+                    # instance or a bare primary key value.
                     rel_obj = kwargs.pop(field.name)
                     is_related_object = True
                 except KeyError:
-                    try:
-                        # Object instance wasn't passed in -- must be an ID.
-                        val = kwargs.pop(field.attname)
-                    except KeyError:
-                        val = field.get_default()
+                    val = field.get_default()
             else:
                 try:
                     val = kwargs.pop(field.attname)
@@ -145,10 +142,8 @@ class Model(metaclass=ModelBase):
                         val = field.get_default()
 
             if is_related_object:
-                # If we are passed a related instance, set it using the
-                # field.name instead of field.attname (e.g. "user" instead of
-                # "user_id") so that the object gets properly cached (and type
-                # checked) by the RelatedObjectDescriptor.
+                # Assign through the descriptor so a related instance is
+                # cached and a bare key value is stored correctly.
                 if rel_obj is not _DEFERRED:
                     _setattr(self, field.name, rel_obj)
             else:

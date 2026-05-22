@@ -83,11 +83,12 @@ def _load_field(
 # A guide to Field parameters:
 #
 #   * name:      The name of the field specified in the model.
-#   * attname:   The attribute to use on the model object. This is the same as
-#                "name", except in the case of ForeignKeys, where "_id" is
-#                appended.
-#   * column:    The database column for this field. This is the same as
-#                "attname".
+#   * attname:   The attribute / instance __dict__ key for this field. The same
+#                as "name" for every field, foreign keys included -- a foreign
+#                key stores its raw key under the field name and is reached
+#                through its descriptor.
+#   * column:    The database column for this field. The same as "attname",
+#                except for ForeignKeys, where the "_id" suffix is appended.
 #
 # Code that introspects values, or does other dynamic things, should use
 # attname.

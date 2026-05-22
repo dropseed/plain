@@ -10,7 +10,7 @@ from plain import exceptions
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.deletion import NO_ACTION, SET_NULL, OnDelete
 from plain.postgres.exceptions import FieldDoesNotExist, FieldError
-from plain.postgres.query_utils import PathInfo, Q
+from plain.postgres.query_utils import PathInfo
 from plain.postgres.utils import make_model_tuple
 from plain.preflight import PreflightResult
 
@@ -440,35 +440,6 @@ class ForeignKeyField(ColumnField, RelatedField):
     def foreign_related_fields(self) -> tuple[Field, ...]:
         return tuple(
             rhs_field for lhs_field, rhs_field in self.related_fields if rhs_field
-        )
-
-    def get_forward_related_filter(self, obj: Model) -> dict[str, Any]:
-        """
-        Return the keyword arguments that when supplied to
-        self.model.object.filter(), would select all instances related through
-        this field to the remote obj. This is used to build the querysets
-        returned by related descriptors. obj is an instance of
-        self.related_field.model.
-        """
-        return {
-            f"{self.name}__{rh_field.name}": getattr(obj, rh_field.attname)
-            for _, rh_field in self.related_fields
-        }
-
-    def get_reverse_related_filter(self, obj: Model) -> Q:
-        """
-        Complement to get_forward_related_filter(). Return the keyword
-        arguments that when passed to self.related_field.model.object.filter()
-        select all instances of self.related_field.model related through
-        this field to obj. obj is an instance of self.model.
-        """
-        return Q.create(
-            [
-                # lh_field is the foreign key itself; use its raw key value,
-                # not the related object the descriptor would return.
-                (rh_field.attname, lh_field._get_raw_value(obj))
-                for lh_field, rh_field in self.related_fields
-            ]
         )
 
     def get_local_related_value(self, instance: Model) -> tuple[Any, ...]:
