@@ -8,7 +8,6 @@
     - [Persist mode](#persist-mode)
     - [Disabled mode](#disabled-mode)
 - [Toolbar integration](#toolbar-integration)
-- [Admin integration](#admin-integration)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -87,17 +86,6 @@ The toolbar panel displays:
 - Query count with duplicate detection
 - Total request duration
 - Link to view persisted traces
-
-## Admin integration
-
-When `plain.admin` is installed, Observer registers viewsets for browsing Traces, Spans, and Logs. You can find these under the "Observer" section in the admin navigation.
-
-The admin views let you:
-
-- Browse and search traces by request ID, user ID, or session ID
-- View span hierarchies and timing
-- Filter spans by parent status
-- Search and filter log entries by level or message
 
 ## Settings
 
