@@ -6,6 +6,7 @@ from typing import Any
 
 import click
 
+from plain.preflight import set_check_counts
 from plain.runtime import settings
 from plain.test import Client
 
@@ -239,6 +240,10 @@ def request(
             kwargs["data"] = data
             if content_type:
                 kwargs["content_type"] = content_type
+
+        # The admin toolbar's preflight badge otherwise runs the full preflight
+        # suite on first render, landing those queries in the captured trace.
+        set_check_counts(errors=0, warnings=0)
 
         # Dispatch the request, capturing a trace when the OpenTelemetry SDK
         # is available (it ships with plain.observer / plain.connect /
