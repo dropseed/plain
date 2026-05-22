@@ -313,7 +313,7 @@ class RelatedField(FieldCacheMixin, Field):
         limit_choices_to = limit_choices_to or self.get_limit_choices_to()
         get_related_field = getattr(self.remote_field, "get_related_field", None)
         related_field_name = (
-            get_related_field().attname if get_related_field is not None else "id"
+            get_related_field().name if get_related_field is not None else "id"
         )
         choice_func = operator.attrgetter(related_field_name)
         qs = rel_model.query.complex_filter(limit_choices_to)
@@ -609,10 +609,10 @@ class ForeignKeyField(ColumnField, RelatedField):
 
     def set_attributes_from_name(self, name: str) -> None:
         super().set_attributes_from_name(name)
-        # attname is the field name itself ("author"). The raw key value lives
-        # in instance.__dict__ under that name, reached only through the
-        # ForwardForeignKeyDescriptor -- there is no separate "author_id"
-        # attribute. The database column keeps the historical _id suffix.
+        # The raw key value lives in instance.__dict__ under the field name
+        # ("author"), reached only through the ForwardForeignKeyDescriptor --
+        # there is no separate "author_id" attribute. The database column
+        # keeps the historical _id suffix.
         self.column = f"{self.name}_id"
 
     def _get_raw_value(self, instance: Model) -> Any:
@@ -623,9 +623,10 @@ class ForeignKeyField(ColumnField, RelatedField):
         (.only()/.defer()) it is loaded first, so save/serialize/validate paths
         never mistake a deferred column for a NULL value.
         """
-        if self.attname not in instance.__dict__:
-            instance.refresh_from_db(fields=[self.attname])
-        return instance.__dict__.get(self.attname)
+        assert self.name is not None
+        if self.name not in instance.__dict__:
+            instance.refresh_from_db(fields=[self.name])
+        return instance.__dict__.get(self.name)
 
     def pre_save(self, model_instance: Model, add: bool) -> Any:
         # Return the raw related key for INSERT/UPDATE, not the related object
@@ -1151,10 +1152,12 @@ class ManyToManyField(RelatedField):
         pass
 
     def value_from_object(self, obj: Model) -> list[Any]:
-        return [] if obj.id is None else list(getattr(obj, self.attname).query)
+        assert self.name is not None
+        return [] if obj.id is None else list(getattr(obj, self.name).query)
 
     def save_form_data(self, instance: Model, data: Any) -> None:
-        getattr(instance, self.attname).set(data)
+        assert self.name is not None
+        getattr(instance, self.name).set(data)
 
     def db_type(self) -> None:
         # A ManyToManyField is not represented by a single column,

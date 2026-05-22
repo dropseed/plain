@@ -580,7 +580,7 @@ class Query(BaseExpression):
             if q.group_by is True:
                 assert self.model is not None, "GROUP BY requires a model"
                 q.add_fields(
-                    (f.attname for f in self.model._model_meta.concrete_fields), False
+                    (f.name for f in self.model._model_meta.concrete_fields), False
                 )
                 # Disable GROUP BY aliases to avoid orphaning references to the
                 # SELECT clause which is about to be cleared.
@@ -2475,14 +2475,14 @@ class Query(BaseExpression):
             selected = frozenset(field_names + extra_names + annotation_names)
         else:
             assert self.model is not None, "Default values query requires a model"
-            field_names = [f.attname for f in self.model._model_meta.concrete_fields]
+            field_names = [f.name for f in self.model._model_meta.concrete_fields]
             selected = frozenset(field_names)
         # Selected annotations must be known before setting the GROUP BY
         # clause.
         if self.group_by is True:
             assert self.model is not None, "GROUP BY True requires a model"
             self.add_fields(
-                (f.attname for f in self.model._model_meta.concrete_fields), False
+                (f.name for f in self.model._model_meta.concrete_fields), False
             )
             # Disable GROUP BY aliases to avoid orphaning references to the
             # SELECT clause which is about to be cleared.
@@ -2764,7 +2764,7 @@ class DeleteQuery(Query):
         for offset in range(0, len(id_list), GET_ITERATOR_CHUNK_SIZE):
             self.clear_where()
             self.add_filter(
-                f"{field.attname}__in",
+                f"{field.name}__in",
                 id_list[offset : offset + GET_ITERATOR_CHUNK_SIZE],
             )
             num_deleted += self.do_query(self.model.model_options.db_table, self.where)

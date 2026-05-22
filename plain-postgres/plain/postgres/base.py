@@ -113,7 +113,7 @@ class Model(metaclass=ModelBase):
 
             is_related_object = False
             # Virtual field
-            if field.attname not in kwargs and field.column is None:
+            if field.name not in kwargs and field.column is None:
                 continue
             if isinstance(field, RelatedField) and isinstance(
                 field.remote_field, ForeignObjectRel
@@ -127,7 +127,7 @@ class Model(metaclass=ModelBase):
                     val = field.get_default()
             else:
                 try:
-                    val = kwargs.pop(field.attname)
+                    val = kwargs.pop(field.name)
                 except KeyError:
                     # This is done with an exception rather than the
                     # default argument on pop because we don't want
@@ -148,7 +148,7 @@ class Model(metaclass=ModelBase):
                     _setattr(self, field.name, rel_obj)
             else:
                 if val is not _DEFERRED:
-                    _setattr(self, field.attname, val)
+                    _setattr(self, field.name, val)
 
         # Handle any remaining kwargs (properties or virtual fields)
         property_names = meta._property_names
@@ -180,12 +180,12 @@ class Model(metaclass=ModelBase):
         if len(values) != len(cls._model_meta.concrete_fields):
             values_iter = iter(values)
             values = [
-                next(values_iter) if f.attname in field_names else DEFERRED
+                next(values_iter) if f.name in field_names else DEFERRED
                 for f in cls._model_meta.concrete_fields
             ]
         # Build kwargs dict from field names and values
         field_dict = dict(
-            zip((f.attname for f in cls._model_meta.concrete_fields), values)
+            zip((f.name for f in cls._model_meta.concrete_fields), values)
         )
         new = cls(**field_dict)
         new._state.adding = False
@@ -264,9 +264,9 @@ class Model(metaclass=ModelBase):
         Return a set containing names of deferred fields for this instance.
         """
         return {
-            f.attname
+            f.name
             for f in self._model_meta.concrete_fields
-            if f.attname not in self.__dict__
+            if f.name not in self.__dict__
         }
 
     def refresh_from_db(self, fields: list[str] | None = None) -> None:
@@ -304,19 +304,19 @@ class Model(metaclass=ModelBase):
             db_instance_qs = db_instance_qs.only(*fields)
         elif deferred_fields:
             fields = [
-                f.attname
+                f.name
                 for f in self._model_meta.concrete_fields
-                if f.attname not in deferred_fields
+                if f.name not in deferred_fields
             ]
             db_instance_qs = db_instance_qs.only(*fields)
 
         db_instance = db_instance_qs.get()
         non_loaded_fields = db_instance.get_deferred_fields()
         for field in self._model_meta.concrete_fields:
-            if field.attname in non_loaded_fields:
+            if field.name in non_loaded_fields:
                 # This field wasn't refreshed - skip ahead.
                 continue
-            setattr(self, field.attname, field.value_from_object(db_instance))
+            setattr(self, field.name, field.value_from_object(db_instance))
             # Clear cached foreign keys.
             if isinstance(field, RelatedField) and field.is_cached(self):
                 field.delete_cached_value(self)
@@ -388,7 +388,7 @@ class Model(metaclass=ModelBase):
             field_names = set()
             for field in self._model_meta.concrete_fields:
                 if not field.primary_key and not hasattr(field, "through"):
-                    field_names.add(field.attname)
+                    field_names.add(field.name)
             loaded_fields = field_names.difference(deferred_fields)
             if loaded_fields:
                 update_fields = frozenset(loaded_fields)
@@ -460,7 +460,7 @@ class Model(metaclass=ModelBase):
             # stays None and the INSERT emits DEFAULT.
             if isinstance(id_field, DefaultableField) and id_field.has_default():
                 id_val = id_field.get_default()
-            setattr(self, id_field.attname, id_val)
+            setattr(self, id_field.name, id_val)
         id_set = id_val is not None
         if not id_set and (force_update or update_fields):
             raise ValueError("Cannot force an update in save() with no primary key.")
@@ -488,9 +488,7 @@ class Model(metaclass=ModelBase):
             # below handles them correctly. If the UPDATE *does* succeed, we
             # need to refresh those fields from the DB so the in-memory
             # instance doesn't keep the sentinel.
-            db_default_attnames = [
-                v[0].attname for v in values if v[1] is DATABASE_DEFAULT
-            ]
+            db_default_names = [v[0].name for v in values if v[1] is DATABASE_DEFAULT]
             values = [v for v in values if v[1] is not DATABASE_DEFAULT]
             forced_update = bool(update_fields or force_update)
             updated = self._do_update(
@@ -502,8 +500,8 @@ class Model(metaclass=ModelBase):
                 raise psycopg.DatabaseError(
                     "Save with update_fields did not affect any rows."
                 )
-            if updated and db_default_attnames:
-                self.refresh_from_db(fields=db_default_attnames)
+            if updated and db_default_names:
+                self.refresh_from_db(fields=db_default_names)
         if not updated:
             fields = meta.local_concrete_fields
             if not id_set:
@@ -514,7 +512,8 @@ class Model(metaclass=ModelBase):
             results = self._do_insert(meta.base_queryset, fields, returning_fields, raw)
             if results:
                 for value, field in zip(results[0], returning_fields):
-                    setattr(self, field.attname, value)
+                    assert field.name is not None
+                    setattr(self, field.name, value)
         return updated
 
     def _do_update(
@@ -589,9 +588,9 @@ class Model(metaclass=ModelBase):
                     setattr(self, field.name, obj)
                 # If the relationship's pk/to_field was changed, clear the
                 # cached relationship. Compare the cached object's key against
-                # the raw key value -- not getattr(self, field.attname), which
+                # the raw key value -- not getattr(self, field.name), which
                 # for a foreign key returns the related object, not the key.
-                if getattr(obj, field.target_field.attname) != field.value_from_object(
+                if getattr(obj, field.target_field.name) != field.value_from_object(
                     self
                 ):
                     field.delete_cached_value(self)
@@ -617,7 +616,9 @@ class Model(metaclass=ModelBase):
         # blocks see the abort state even if the caller catches IntegrityError.
         with transaction.mark_for_rollback_on_error():
             count = self._model_meta.base_queryset.filter(id=self.id)._raw_delete()
-        setattr(self, self._model_meta.get_forward_field("id").attname, None)
+        id_field = self._model_meta.get_forward_field("id")
+        assert id_field.name is not None
+        setattr(self, id_field.name, None)
         return count
 
     def get_field_display(self, field_name: str) -> str:
@@ -653,7 +654,7 @@ class Model(metaclass=ModelBase):
             raise ValueError(
                 f"Unsaved model instance {self!r} cannot be used in an ORM query."
             )
-        return getattr(self, field.remote_field.get_related_field().attname)
+        return getattr(self, field.remote_field.get_related_field().name)
 
     def clean(self) -> None:
         """
@@ -835,7 +836,7 @@ class Model(metaclass=ModelBase):
         for f in self._model_meta.fields:
             if f.name in exclude:
                 continue
-            if self.__dict__.get(f.attname) is DATABASE_DEFAULT:
+            if self.__dict__.get(f.name) is DATABASE_DEFAULT:
                 exclude.add(f.name)
             elif f.auto_fills_on_save:
                 exclude.add(f.name)
@@ -893,7 +894,7 @@ class Model(metaclass=ModelBase):
             if not f.required and raw_value in f.empty_values:
                 continue
             try:
-                setattr(self, f.attname, f.clean(raw_value, self))
+                setattr(self, f.name, f.clean(raw_value, self))
             except ValidationError as e:
                 errors[f.name] = e.error_list
 
@@ -1156,8 +1157,6 @@ class Model(metaclass=ModelBase):
         forward_fields_map: dict[str, Field] = {}
         for field in cls._model_meta._get_fields(reverse=False):
             forward_fields_map[field.name] = field
-            if hasattr(field, "attname"):
-                forward_fields_map[field.attname] = field
 
         errors: list[PreflightResult] = []
         for field_name in fields:

@@ -98,10 +98,10 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
 
     def _check_fk_val(self) -> None:
         for field in self.field.foreign_related_fields:
-            if getattr(self.instance, field.attname) is None:
+            if getattr(self.instance, field.name) is None:
                 raise ValueError(
                     f'"{self.instance!r}" needs to have a value for field '
-                    f'"{field.attname}" before this relationship can be used.'
+                    f'"{field.name}" before this relationship can be used.'
                 )
 
     def _apply_rel_filters(self, queryset: QuerySet) -> QuerySet:
@@ -111,12 +111,12 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         queryset._defer_next_filter = True
         queryset = queryset.filter(**self.core_filters)
         for field in self.field.foreign_related_fields:
-            val = getattr(self.instance, field.attname)
+            val = getattr(self.instance, field.name)
             if val is None:
                 return queryset.none()
 
         target_field = self.field.target_field
-        rel_obj_id = getattr(self.instance, target_field.attname)
+        rel_obj_id = getattr(self.instance, target_field.name)
         queryset._known_related_objects = {self.field: {rel_obj_id: self.instance}}
         return queryset
 
@@ -355,8 +355,10 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         self.core_filters = {}
         self.id_field_names = {}
         for lh_field, rh_field in self.source_field.related_fields:
-            core_filter_key = f"{self.query_field_name}__{rh_field.name}"
-            self.core_filters[core_filter_key] = getattr(instance, rh_field.attname)
+            rh_name = rh_field.name
+            assert rh_name is not None
+            core_filter_key = f"{self.query_field_name}__{rh_name}"
+            self.core_filters[core_filter_key] = getattr(instance, rh_name)
             self.id_field_names[lh_field.name] = rh_field.name  # ty: ignore[invalid-assignment]
 
         self.related_val = self.source_field.get_foreign_related_value(instance)
@@ -416,7 +418,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         qn = quote_name
         queryset = queryset.extra(
             select={
-                f"_prefetch_related_val_{f.attname}": f"{qn(join_table)}.{qn(f.column)}"
+                f"_prefetch_related_val_{f.name}": f"{qn(join_table)}.{qn(f.column)}"
                 for f in fk.local_related_fields
             }
         )
@@ -424,11 +426,11 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         return (
             queryset,
             lambda result: tuple(
-                getattr(result, f"_prefetch_related_val_{f.attname}")
+                getattr(result, f"_prefetch_related_val_{f.name}")
                 for f in fk.local_related_fields
             ),
             lambda inst: tuple(
-                f.get_db_prep_value(getattr(inst, f.attname), conn)
+                f.get_db_prep_value(f.value_from_object(inst), conn)
                 for f in fk.foreign_related_fields
             ),
             False,
@@ -458,11 +460,9 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
                 self.clear()
                 self.add(*objs, through_defaults=through_defaults)
             else:
-                old_ids = set(
-                    self.query.values_list(
-                        self.target_field.target_field.attname, flat=True
-                    )
-                )
+                target_name = self.target_field.target_field.name
+                assert target_name is not None
+                old_ids = set(self.query.values_list(target_name, flat=True))
 
                 new_objs = []
                 for obj in objs:
@@ -599,7 +599,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
             target_model_qs = self.model.query
             if target_model_qs._has_filters():
                 old_vals = target_model_qs.filter(
-                    **{f"{self.target_field.target_field.attname}__in": old_ids}
+                    **{f"{self.target_field.target_field.name}__in": old_ids}
                 )
             else:
                 old_vals = old_ids

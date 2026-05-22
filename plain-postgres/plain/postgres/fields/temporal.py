@@ -267,11 +267,12 @@ class DateTimeField(ColumnField[datetime.datetime]):
         )
 
     def pre_save(self, model_instance: Model, add: bool) -> datetime.datetime | None:
+        assert self.name is not None
         if self.update_now:
             value = timezone.now()
-            setattr(model_instance, self.attname, value)
+            setattr(model_instance, self.name, value)
             return value
-        return getattr(model_instance, self.attname)
+        return getattr(model_instance, self.name)
 
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)

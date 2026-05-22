@@ -307,7 +307,7 @@ class SQLCompiler:
           position of the select clause).
         - related_klass_infos: [f, klass_info] to descent into
 
-        The annotations is a dictionary of {'attname': column position} values.
+        The annotations is a dictionary of {'name': column position} values.
         """
         select = []
         klass_info = None
@@ -900,7 +900,7 @@ class SQLCompiler:
         if (
             isinstance(field, RelatedField)
             and meta.model.model_options.ordering
-            and getattr(field, "attname", None) != pieces[-1]
+            and field.name != pieces[-1]
             and not getattr(transform_function, "has_transforms", False)
         ):
             # Firstly, avoid infinite loops.

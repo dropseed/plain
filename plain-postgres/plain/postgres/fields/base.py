@@ -82,16 +82,12 @@ def _load_field(
 
 # A guide to Field parameters:
 #
-#   * name:      The name of the field specified in the model.
-#   * attname:   The attribute / instance __dict__ key for this field. The same
-#                as "name" for every field, foreign keys included -- a foreign
-#                key stores its raw key under the field name and is reached
-#                through its descriptor.
-#   * column:    The database column for this field. The same as "attname",
+#   * name:      The name of the field specified in the model. This is also the
+#                attribute and instance __dict__ key for the field's value -- a
+#                foreign key stores its raw key under the field name and is
+#                reached through its descriptor.
+#   * column:    The database column for this field. The same as "name",
 #                except for ForeignKeys, where the "_id" suffix is appended.
-#
-# Code that introspects values, or does other dynamic things, should use
-# attname.
 
 
 def _empty(of_cls: type) -> Empty:
@@ -116,7 +112,6 @@ class Field[T](RegisterLookupMixin):
     # Set by __init__
     name: str | None
     # Set by set_attributes_from_name (called by contribute_to_class)
-    attname: str
     column: str
     concrete: bool
     # Set by contribute_to_class
@@ -377,10 +372,9 @@ class Field[T](RegisterLookupMixin):
 
     def set_attributes_from_name(self, name: str) -> None:
         self.name = self.name or name
-        # A field's attname (its instance __dict__ key) is its name. A foreign
-        # key overrides this method only to keep the "_id" suffix on `column`.
-        self.attname = self.name
-        self.column = self.attname
+        # The database column is the field name. A foreign key overrides this
+        # method only to append the "_id" suffix to `column`.
+        self.column = self.name
         self.concrete = self.column is not None
 
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
@@ -397,7 +391,8 @@ class Field[T](RegisterLookupMixin):
         # Field is its own descriptor; make sure it is set on the class so
         # attribute access hits __get__/__set__.
         if self.column:
-            setattr(cls, self.attname, self)
+            assert self.name is not None
+            setattr(cls, self.name, self)
 
     # Descriptor protocol implementation
     @overload
@@ -420,12 +415,13 @@ class Field[T](RegisterLookupMixin):
 
         # If field hasn't been contributed to a class yet (e.g., used standalone
         # as an output_field in aggregates), just return self
-        if not hasattr(self, "attname"):
+        if not hasattr(self, "column"):
             return self
 
         # Instance access - get value from instance dict
+        assert self.name is not None
         data = instance.__dict__
-        field_name = self.attname
+        field_name = self.name
 
         # If value not in dict, lazy load from database. Hydrate every
         # currently-missing concrete field in one query rather than one query
@@ -433,9 +429,9 @@ class Field[T](RegisterLookupMixin):
         # instance cheap to use beyond its primary key.
         if field_name not in data:
             missing = [
-                f.attname
+                f.name
                 for f in instance._model_meta.concrete_fields
-                if f.attname not in data
+                if f.name not in data
             ]
             instance.refresh_from_db(fields=missing)
 
@@ -446,10 +442,10 @@ class Field[T](RegisterLookupMixin):
         Descriptor __set__ for attribute assignment.
 
         Validates and converts the value using to_python(), then stores it
-        in instance.__dict__[attname].
+        in instance.__dict__[name].
         """
         # Safety check: ensure field has been properly initialized
-        if not hasattr(self, "attname"):
+        if not hasattr(self, "column"):
             raise AttributeError(
                 f"Field {self.__class__.__name__} has not been initialized properly. "
                 f"The field's contribute_to_class() has not been called yet. "
@@ -462,7 +458,8 @@ class Field[T](RegisterLookupMixin):
             value = self.to_python(value)
 
         # Store in instance dict
-        instance.__dict__[self.attname] = value
+        assert self.name is not None
+        instance.__dict__[self.name] = value
 
     def __delete__(self, instance: Model) -> None:
         """
@@ -470,16 +467,18 @@ class Field[T](RegisterLookupMixin):
 
         Removes the value from instance.__dict__.
         """
+        assert self.name is not None
         try:
-            del instance.__dict__[self.attname]
+            del instance.__dict__[self.name]
         except KeyError:
             raise AttributeError(
-                f"{instance.__class__.__name__!r} object has no attribute {self.attname!r}"
+                f"{instance.__class__.__name__!r} object has no attribute {self.name!r}"
             )
 
     def pre_save(self, model_instance: Model, add: bool) -> T | None:
         """Return field's value just before saving."""
-        return getattr(model_instance, self.attname)
+        assert self.name is not None
+        return getattr(model_instance, self.name)
 
     def get_prep_value(self, value: Any) -> Any:
         """Perform preliminary non-db specific value checks and conversions."""
@@ -536,7 +535,8 @@ class Field[T](RegisterLookupMixin):
 
     def value_from_object(self, obj: Model) -> T | None:
         """Return the value of this field in the given model instance."""
-        return getattr(obj, self.attname)
+        assert self.name is not None
+        return getattr(obj, self.name)
 
 
 class ColumnField[T](Field[T]):

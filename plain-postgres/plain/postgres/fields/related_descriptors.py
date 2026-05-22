@@ -139,21 +139,23 @@ class ForwardForeignKeyDescriptor:
         try:
             rel_obj = self.field.get_cached_value(instance)
         except KeyError:
-            attname = self.field.attname
+            name = self.field.name
+            assert name is not None
             # The foreign key column itself can be deferred (.only()/.defer());
             # load it before reading the raw key value.
-            if attname not in instance.__dict__:
-                instance.refresh_from_db(fields=[attname])
+            if name not in instance.__dict__:
+                instance.refresh_from_db(fields=[name])
 
-            pk_value = instance.__dict__.get(attname)
+            pk_value = instance.__dict__.get(name)
             rel_obj = None
             if pk_value is not None:
                 # Build a partial related instance with only its primary key
                 # loaded -- no query. Accessing any other field triggers the
                 # full-row deferred load.
                 remote_model = self.field.remote_field.model
-                target_attname = self.field.target_field.attname
-                rel_obj = remote_model.from_db([target_attname], [pk_value])
+                target_name = self.field.target_field.name
+                assert target_name is not None
+                rel_obj = remote_model.from_db([target_name], [pk_value])
                 # For a one-to-one relation, prime the reverse cache too.
                 if not self.field.remote_field.multiple:
                     self.field.remote_field.set_cached_value(rel_obj, instance)
@@ -183,7 +185,8 @@ class ForwardForeignKeyDescriptor:
         if isinstance(value, LazyObject):
             value = value if value else None
 
-        attname = self.field.attname
+        name = self.field.name
+        assert name is not None
         remote_field = self.field.remote_field
 
         if value is None:
@@ -192,13 +195,13 @@ class ForwardForeignKeyDescriptor:
             related = self.field.get_cached_value(instance, default=None)
             if related is not None and not remote_field.multiple:
                 remote_field.set_cached_value(related, None)
-            instance.__dict__[attname] = None
+            instance.__dict__[name] = None
             self.field.set_cached_value(instance, None)
             return
 
         if isinstance(value, remote_field.model):
             # A related model instance: store its key, cache the object.
-            instance.__dict__[attname] = getattr(value, self.field.target_field.attname)
+            instance.__dict__[name] = getattr(value, self.field.target_field.name)
             self.field.set_cached_value(instance, value)
             # For a one-to-one relation, prime the reverse cache.
             if not remote_field.multiple:
@@ -217,7 +220,7 @@ class ForwardForeignKeyDescriptor:
 
         # A bare related key value (e.g. child.parent = 5).
         new_value = self.field.to_python(value)
-        if instance.__dict__.get(attname) != new_value:
+        if instance.__dict__.get(name) != new_value:
             # The key actually changed -- clear the reverse cache on any
             # previously-related object and drop the now-stale forward cache.
             # Re-storing the same key (e.g. by clean_fields) keeps the cache.
@@ -226,14 +229,14 @@ class ForwardForeignKeyDescriptor:
                 remote_field.set_cached_value(related, None)
             if self.field.is_cached(instance):
                 self.field.delete_cached_value(instance)
-        instance.__dict__[attname] = new_value
+        instance.__dict__[name] = new_value
 
     def __delete__(self, instance: Any) -> None:
         """Delete the foreign key value, clearing any cached related object."""
         if self.field.is_cached(instance):
             self.field.delete_cached_value(instance)
         try:
-            del instance.__dict__[self.field.attname]
+            del instance.__dict__[self.field.name]
         except KeyError:
             raise AttributeError(
                 f"{instance.__class__.__name__!r} object has no attribute "

@@ -97,7 +97,7 @@ class ModelIterable(BaseIterable):
         select_fields = klass_info["select_fields"]
         model_fields_start, model_fields_end = select_fields[0], select_fields[-1] + 1
         init_list = [
-            f[0].target.attname for f in select[model_fields_start:model_fields_end]
+            f[0].target.name for f in select[model_fields_start:model_fields_end]
         ]
         related_populators = get_related_populators(klass_info, select)
         known_related_objects = [
@@ -748,7 +748,8 @@ class QuerySet[T: "Model"]:
                 for obj_with_id, results in zip(objs_with_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
                         if field != id_field:
-                            setattr(obj_with_id, field.attname, result)
+                            assert field.name is not None
+                            setattr(obj_with_id, field.name, result)
                 for obj_with_id in objs_with_id:
                     obj_with_id._state.adding = False
             if objs_without_id:
@@ -765,7 +766,8 @@ class QuerySet[T: "Model"]:
                     assert len(returned_columns) == len(objs_without_id)
                 for obj_without_id, results in zip(objs_without_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
-                        setattr(obj_without_id, field.attname, result)
+                        assert field.name is not None
+                        setattr(obj_without_id, field.name, result)
                     obj_without_id._state.adding = False
 
         return objs
@@ -820,7 +822,7 @@ class QuerySet[T: "Model"]:
                 case_statement = Case(*when_statements, output_field=field)
                 # PostgreSQL requires casted CASE in updates
                 case_statement = Cast(case_statement, output_field=field)
-                update_kwargs[field.attname] = case_statement
+                update_kwargs[field.name] = case_statement
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
         queryset = self._chain()
@@ -1670,7 +1672,7 @@ class RawQuerySet:
             if column not in self.model_fields
         ]
         model_init_order = [self.columns.index(f.column) for f in model_init_fields]
-        model_init_names = [f.attname for f in model_init_fields]
+        model_init_names = [f.name for f in model_init_fields]
         return model_init_names, model_init_order, annotation_fields
 
     def prefetch_related(self, *lookups: str | Prefetch | None) -> RawQuerySet:
@@ -2198,8 +2200,8 @@ class RelatedPopulator:
         #      in the order __init__ expects it.
         #  - id_idx: the index of the primary key field in the reordered
         #    model data. Used to check if a related object exists at all.
-        #  - init_list: the field attnames fetched from the database. For
-        #    deferred models this isn't the same as all attnames of the
+        #  - init_list: the field names fetched from the database. For
+        #    deferred models this isn't the same as all names of the
         #    model's fields.
         #  - related_populators: a list of RelatedPopulator instances if
         #    select_related() descends to related models from this model.
@@ -2211,7 +2213,7 @@ class RelatedPopulator:
         self.cols_start = select_fields[0]
         self.cols_end = select_fields[-1] + 1
         self.init_list = [
-            f[0].target.attname for f in select[self.cols_start : self.cols_end]
+            f[0].target.name for f in select[self.cols_start : self.cols_end]
         ]
         self.reorder_for_init = None
 
