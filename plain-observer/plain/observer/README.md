@@ -31,9 +31,10 @@ if observer.is_enabled():
 if observer.is_persisting():
     print("Traces will be saved to the database")
 
-# Get a summary of the current trace
-summary = observer.get_current_trace_summary()
-# Returns something like: "5 queries (2 duplicates) • 45.2ms"
+# Get performance stats for the current trace
+stats = observer.get_current_trace_stats()
+# Returns a dict like:
+# {"query_count": 5, "duplicate_count": 2, "duration_ms": 45.2, "response_body_size": 1024}
 ```
 
 The [`Observer`](./core.py#Observer) class provides methods to check the current mode and enable/disable tracing via cookies.
@@ -110,13 +111,13 @@ Yes. Observer uses the [`ObserverSampler`](./otel.py#ObserverSampler) and [`Obse
 
 Observer ignores certain URL patterns by default (assets, observer routes, etc.) to reduce noise. You can customize this with the `OBSERVER_IGNORE_URL_PATTERNS` setting.
 
-#### How do I get the trace summary in a template?
+#### How do I get the trace stats in a template?
 
-In persist or summary mode, you can access the summary from the Observer instance:
+In persist or summary mode, you can access the stats from the Observer instance:
 
 ```python
 # In your view
-context["trace_summary"] = Observer.from_request(request).get_current_trace_summary()
+context["trace_stats"] = Observer.from_request(request).get_current_trace_stats()
 ```
 
 #### What data is stored when persisting traces?
@@ -162,7 +163,7 @@ Sync the database to create the necessary tables:
 plain postgres sync
 ```
 
-After installation, Observer will automatically integrate with your application's toolbar (if using `plain.toolbar`). You can access the web interface at `/observer/traces/` or use the CLI commands to analyze traces.
+After installation, Observer will automatically integrate with your application's toolbar (if using `plain.toolbar`). You can access the web interface at `/observer/traces/`.
 
 ### Content Security Policy (CSP)
 

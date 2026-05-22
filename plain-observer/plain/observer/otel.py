@@ -188,7 +188,7 @@ class ObserverSpanProcessor(SpanProcessor):
     """Collects spans in real-time for current trace performance monitoring.
 
     This processor keeps spans in memory for traces that have the 'summary' or 'persist'
-    cookie set. These spans can be accessed via get_current_trace_summary() for
+    cookie set. These spans can be accessed via get_current_trace_stats() for
     real-time debugging. Spans with 'persist' cookie will also be persisted to the
     database.
     """

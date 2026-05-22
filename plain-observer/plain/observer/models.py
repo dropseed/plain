@@ -406,16 +406,6 @@ class Span(postgres.Model):
         """Get links from span_data."""
         return cast(list[Mapping[str, Any]], self.span_data.get("links", []))
 
-    @property
-    def resource(self) -> Mapping[str, Any]:
-        """Get resource from span_data."""
-        return cast(Mapping[str, Any], self.span_data.get("resource", {}))
-
-    @property
-    def context(self) -> Mapping[str, Any]:
-        """Get context from span_data."""
-        return cast(Mapping[str, Any], self.span_data.get("context", {}))
-
     def duration_ms(self) -> float:
         if self.start_time and self.end_time:
             return (self.end_time - self.start_time).total_seconds() * 1000
