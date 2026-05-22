@@ -1,12 +1,90 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 import click
 
 from plain.runtime import settings
 from plain.test import Client
+
+from ._trace import (
+    TraceAnalysis,
+    TraceResult,
+    analyze_trace,
+    capture_available,
+    capture_spans,
+)
+
+_HTTP_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE")
+
+_TRACE_UNAVAILABLE = (
+    "Trace capture skipped — opentelemetry-sdk is not installed. "
+    "It ships with plain.observer, plain.connect, or plain.pytest."
+)
+
+# Cap on per-query lines shown in the text Trace section; the full list is
+# always in --json.
+_QUERY_LIST_LIMIT = 10
+
+
+def _dispatch_request(
+    client: Client, method: str, path: str, kwargs: dict[str, Any]
+) -> Any:
+    """Call the test client method matching the HTTP method."""
+    if method not in _HTTP_METHODS:
+        click.secho(f"Unsupported HTTP method: {method}", fg="red", err=True)
+        raise SystemExit(1)
+    return getattr(client, method.lower())(path, **kwargs)
+
+
+def _truncate(value: str, length: int) -> str:
+    return value if len(value) <= length else value[: length - 1] + "…"
+
+
+def _format_source(source: str) -> str:
+    """Shorten an absolute source path relative to the working directory."""
+    cwd = os.getcwd()
+    if source.startswith(cwd + os.sep):
+        return source[len(cwd) + 1 :]
+    return source
+
+
+def _render_trace(analysis: TraceAnalysis) -> None:
+    """Render the Trace section body — metrics, queries, and flagged issues."""
+    click.echo(f"  Duration: {analysis['duration_ms']}ms")
+    click.echo(f"  Spans: {analysis['span_count']}")
+
+    duplicates = analysis["duplicate_query_count"]
+    queries_line = f"  Queries: {analysis['query_count']}"
+    if duplicates:
+        plural = "" if duplicates == 1 else "s"
+        queries_line += f" ({duplicates} duplicate{plural})"
+    click.echo(queries_line)
+
+    queries = analysis["queries"]
+    for query in queries[:_QUERY_LIST_LIMIT]:
+        sql = _truncate(" ".join(query["sql"].split()), 64)
+        click.echo(f"    {query['count']}×  {query['total_duration_ms']}ms  {sql}")
+    if len(queries) > _QUERY_LIST_LIMIT:
+        click.echo(f"    + {len(queries) - _QUERY_LIST_LIMIT} more — see --json")
+
+    issues = analysis["issues"]
+    if issues:
+        click.secho("  Issues:", fg="red", bold=True)
+        for issue in issues:
+            if issue["type"] == "n_plus_one":
+                location = (
+                    f"  {_format_source(issue['sources'][0])}"
+                    if issue["sources"]
+                    else ""
+                )
+                sql = _truncate(" ".join(issue["sql"].split()), 64)
+                click.secho(f"    ⚠ N+1: {sql} ×{issue['count']}{location}", fg="red")
+            elif issue["type"] == "exception":
+                error_type = issue["error_type"] or "Exception"
+                click.secho(f"    ⚠ {issue['description']} ({error_type})", fg="red")
 
 
 @click.command()
@@ -69,6 +147,12 @@ from plain.test import Client
     multiple=True,
     help="Assert response body does not contain this text (repeatable)",
 )
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output response metadata and trace analysis as JSON (no body)",
+)
 def request(
     path: str,
     method: str,
@@ -82,6 +166,7 @@ def request(
     assert_status: int | None,
     assert_contains: tuple[str, ...],
     assert_not_contains: tuple[str, ...],
+    output_json: bool,
 ) -> None:
     """Make HTTP requests against the dev database"""
 
@@ -155,89 +240,22 @@ def request(
             if content_type:
                 kwargs["content_type"] = content_type
 
-        # Call the appropriate client method
-        if method == "GET":
-            response = client.get(path, **kwargs)
-        elif method == "POST":
-            response = client.post(path, **kwargs)
-        elif method == "PUT":
-            response = client.put(path, **kwargs)
-        elif method == "PATCH":
-            response = client.patch(path, **kwargs)
-        elif method == "DELETE":
-            response = client.delete(path, **kwargs)
-        elif method == "HEAD":
-            response = client.head(path, **kwargs)
-        elif method == "OPTIONS":
-            response = client.options(path, **kwargs)
-        elif method == "TRACE":
-            response = client.trace(path, **kwargs)
+        # Dispatch the request, capturing a trace when the OpenTelemetry SDK
+        # is available (it ships with plain.observer / plain.connect /
+        # plain.pytest, but is not a Plain core dependency).
+        trace_result: TraceResult | None
+        if capture_available():
+            with capture_spans() as otel_exporter:
+                response = _dispatch_request(client, method, path, kwargs)
+            trace_result = analyze_trace(
+                otel_exporter.get_finished_spans(), app_root=os.getcwd()
+            )
         else:
-            click.secho(f"Unsupported HTTP method: {method}", fg="red", err=True)
-            raise SystemExit(1)
+            response = _dispatch_request(client, method, path, kwargs)
+            trace_result = None
 
-        # Display response information
-        click.secho("Response:", fg="yellow", bold=True)
-
-        # Status code
-        click.echo(f"  Status: {response.status_code}")
-
-        # Request ID
-        click.echo(f"  Request ID: {response.request.unique_id}")
-
-        # User
-        if getattr(response, "user", None):
-            click.echo(f"  Authenticated user: {response.user}")
-
-        # URL pattern
-        if response.resolver_match:
-            match = response.resolver_match
-            namespaced_url_name = getattr(match, "namespaced_url_name", None)
-            url_name_attr = getattr(match, "url_name", None)
-            url_name = namespaced_url_name or url_name_attr
-            if url_name:
-                click.echo(f"  URL pattern: {url_name}")
-
-        click.echo()
-
-        # Show headers
-        if response.headers and not no_headers:
-            click.secho("Response Headers:", fg="yellow", bold=True)
-            for key, value in response.headers.items():
-                click.echo(f"  {key}: {value}")
-            click.echo()
-
-        # Show response content last
-        if response.content and not no_body:
-            content_type = response.headers.get("Content-Type", "")
-
-            if "json" in content_type.lower():
-                try:
-                    # The test client adds a json() method to the response
-                    json_method = getattr(response, "json", None)
-                    if json_method and callable(json_method):
-                        json_data: Any = json_method()
-                        click.secho("Response Body (JSON):", fg="yellow", bold=True)
-                        click.echo(json.dumps(json_data, indent=2))
-                    else:
-                        click.secho("Response Body:", fg="yellow", bold=True)
-                        click.echo(response.content.decode("utf-8", errors="replace"))
-                except Exception:
-                    click.secho("Response Body:", fg="yellow", bold=True)
-                    click.echo(response.content.decode("utf-8", errors="replace"))
-            elif "html" in content_type.lower():
-                click.secho("Response Body (HTML):", fg="yellow", bold=True)
-                content = response.content.decode("utf-8", errors="replace")
-                click.echo(content)
-            else:
-                click.secho("Response Body:", fg="yellow", bold=True)
-                content = response.content.decode("utf-8", errors="replace")
-                click.echo(content)
-        elif not no_body:
-            click.secho("(No response body)", fg="yellow", dim=True)
-
-        # Run assertions
-        failed = []
+        # Run assertions (shared by text and JSON output)
+        failed: list[str] = []
 
         if assert_status is not None:
             if response.status_code != assert_status:
@@ -261,6 +279,104 @@ def request(
             if text in body_text:
                 failed.append(f"Response body contains: {text}")
 
+        if output_json:
+            response_data: dict[str, Any] = {
+                "status": response.status_code,
+                "request_id": response.request.unique_id,
+            }
+            if getattr(response, "user", None):
+                response_data["user"] = str(response.user)
+            if response.resolver_match:
+                resolver_match = response.resolver_match
+                url_name = getattr(
+                    resolver_match, "namespaced_url_name", None
+                ) or getattr(resolver_match, "url_name", None)
+                if url_name:
+                    response_data["url_pattern"] = url_name
+            if response.headers:
+                response_data["headers"] = dict(response.headers)
+            json_output: dict[str, Any] = {
+                "response": response_data,
+                "trace": trace_result,
+            }
+            if trace_result is None:
+                json_output["trace_note"] = _TRACE_UNAVAILABLE
+            if failed:
+                json_output["assertion_failures"] = failed
+            click.echo(json.dumps(json_output, indent=2))
+            if failed:
+                raise SystemExit(1)
+            return
+
+        # Display response information
+        click.secho("Response:", fg="yellow", bold=True)
+
+        # Status code
+        click.echo(f"  Status: {response.status_code}")
+
+        # Request ID
+        click.echo(f"  Request ID: {response.request.unique_id}")
+
+        # User
+        if getattr(response, "user", None):
+            click.echo(f"  Authenticated user: {response.user}")
+
+        # URL pattern
+        if response.resolver_match:
+            match = response.resolver_match
+            namespaced_url_name = getattr(match, "namespaced_url_name", None)
+            url_name_attr = getattr(match, "url_name", None)
+            url_name = namespaced_url_name or url_name_attr
+            if url_name:
+                click.echo(f"  URL pattern: {url_name}")
+
+        # Trace — its own section, paralleling the JSON `trace` key
+        click.echo()
+        click.secho("Trace:", fg="yellow", bold=True)
+        if trace_result is not None:
+            _render_trace(trace_result["analysis"])
+        else:
+            click.echo("  skipped — opentelemetry-sdk not installed")
+
+        click.echo()
+
+        # Show headers
+        if response.headers and not no_headers:
+            click.secho("Response Headers:", fg="yellow", bold=True)
+            for key, value in response.headers.items():
+                click.echo(f"  {key}: {value}")
+            click.echo()
+
+        # Show response content last
+        if response.content and not no_body:
+            response_content_type = response.headers.get("Content-Type", "")
+
+            if "json" in response_content_type.lower():
+                try:
+                    # The test client adds a json() method to the response
+                    json_method = getattr(response, "json", None)
+                    if json_method and callable(json_method):
+                        json_data: Any = json_method()
+                        click.secho("Response Body (JSON):", fg="yellow", bold=True)
+                        click.echo(json.dumps(json_data, indent=2))
+                    else:
+                        click.secho("Response Body:", fg="yellow", bold=True)
+                        click.echo(response.content.decode("utf-8", errors="replace"))
+                except Exception:
+                    click.secho("Response Body:", fg="yellow", bold=True)
+                    click.echo(response.content.decode("utf-8", errors="replace"))
+            elif "html" in response_content_type.lower():
+                click.secho("Response Body (HTML):", fg="yellow", bold=True)
+                content = response.content.decode("utf-8", errors="replace")
+                click.echo(content)
+            else:
+                click.secho("Response Body:", fg="yellow", bold=True)
+                content = response.content.decode("utf-8", errors="replace")
+                click.echo(content)
+        elif not no_body:
+            click.secho("(No response body)", fg="yellow", dim=True)
+
+        # Report assertion failures
         if failed:
             click.echo()
             click.secho("Assertions failed:", fg="red", bold=True)
