@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.148.0](https://github.com/dropseed/plain/releases/plain@0.148.0) (2026-05-22)
+
+### What's changed
+
+- **`plain request` now captures the OpenTelemetry spans emitted during the request and prints a trace analysis** — query counts, duplicate-query (N+1) detection grouped by SQL with source locations, recorded exceptions, and a span tree. The text output gains a Trace section; `--json` returns structured response metadata plus the same analysis under a top-level `trace` key (with both derived `analysis` and raw `spans`). Use `--json` for context-frugal agent output — no response body, just metadata and trace data. The `/plain-optimize` skill moves from `plain.observer` to core now that trace analysis lives there. ([afba897157](https://github.com/dropseed/plain/commit/afba897157))
+- **`plain request` now surfaces followed redirects and auth state.** A request to an auth-gated view used to silently follow the 302 to the login page and leave the trace looking empty for no obvious reason. The output now prints a `Redirected:` line listing the hop chain (status → path) when redirects were followed, and always reports the resolved user (or `anonymous`) — in both text and `--json` output. ([c4283e48a6](https://github.com/dropseed/plain/commit/c4283e48a6))
+- **Preflight queries are no longer counted in `plain request` traces.** The admin toolbar's preflight badge lazy-runs the full preflight suite on first render (`pg_class` introspection, migration-state queries), and those were landing in captured traces — inflating query counts and duration in ways that looked like real request work. The check counts are now pre-seeded before dispatch so the badge skips the run. ([6e18fc4361](https://github.com/dropseed/plain/commit/6e18fc4361))
+
+### Upgrade instructions
+
+- If you were running `plain observer request /path` for trace analysis, switch to `plain request /path --json` — same JSON shape philosophy, no observer install required.
+- No code changes required. The `/plain-optimize` skill now ships with `plain` itself — `plain.observer` no longer needs to be installed for the workflow.
+
 ## [0.147.0](https://github.com/dropseed/plain/releases/plain@0.147.0) (2026-05-21)
 
 ### What's changed
