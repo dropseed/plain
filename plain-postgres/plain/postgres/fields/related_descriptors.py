@@ -139,14 +139,9 @@ class ForwardForeignKeyDescriptor:
         try:
             rel_obj = self.field.get_cached_value(instance)
         except KeyError:
-            name = self.field.name
-            assert name is not None
-            # The foreign key column itself can be deferred (.only()/.defer());
-            # load it before reading the raw key value.
-            if name not in instance.__dict__:
-                instance.refresh_from_db(fields=[name])
-
-            pk_value = instance.__dict__.get(name)
+            # _get_raw_value loads the foreign key column on demand if it was
+            # deferred (.only()/.defer()), so we always see the real key here.
+            pk_value = self.field._get_raw_value(instance)
             rel_obj = None
             if pk_value is not None:
                 remote_model = self.field.remote_field.model
