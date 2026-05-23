@@ -661,6 +661,21 @@ class TestForeignKeyPartialInstance:
 
         assert "parent" not in child.__dict__
 
+    def test_del_missing_foreign_key_keeps_cache_intact(self, db):
+        # If the raw key is missing from __dict__, `del` must raise without
+        # mutating the field cache -- otherwise the caller catches the
+        # AttributeError thinking nothing changed while the cache is gone.
+        parent = DeleteParent.query.create(name="Parent")
+        child = ChildCascade.query.create(parent=parent)
+        _ = child.parent  # populate the cache
+        del child.__dict__["parent"]  # leave the cache, drop the raw key
+
+        fk_field = ChildCascade._model_meta.get_forward_field("parent")
+        assert fk_field.is_cached(child)  # ty: ignore[unresolved-attribute]
+        with pytest.raises(AttributeError):
+            del child.parent
+        assert fk_field.is_cached(child)  # ty: ignore[unresolved-attribute]
+
     def test_unconstrained_fk_is_queried_on_access(self, db):
         # A db_constraint=False foreign key has no database guarantee that the
         # row exists, so it is queried on access rather than synthesized.

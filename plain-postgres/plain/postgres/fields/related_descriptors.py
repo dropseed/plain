@@ -247,8 +247,6 @@ class ForwardForeignKeyDescriptor:
 
     def __delete__(self, instance: Any) -> None:
         """Delete the foreign key value, clearing any cached related object."""
-        if self.field.is_cached(instance):
-            self.field.delete_cached_value(instance)
         try:
             del instance.__dict__[self.field.name]
         except KeyError:
@@ -256,6 +254,8 @@ class ForwardForeignKeyDescriptor:
                 f"{instance.__class__.__name__!r} object has no attribute "
                 f"{self.field.name!r}"
             )
+        if self.field.is_cached(instance):
+            self.field.delete_cached_value(instance)
 
     def __reduce__(self) -> tuple[Any, tuple[Any, str]]:
         """
