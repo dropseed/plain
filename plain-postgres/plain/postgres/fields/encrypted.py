@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Never
 
 try:
     from cryptography.fernet import Fernet, InvalidToken, MultiFernet
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.lookups import Lookup, Transform
+    from plain.postgres.query_utils import Q
     from plain.preflight.results import PreflightResult
 
 __all__ = [
@@ -135,6 +136,34 @@ class EncryptedFieldMixin:
         self, lookup_name: str
     ) -> type[Transform] | Callable[..., Any] | None:
         return None
+
+    # Block typed-query comparison methods. Ciphertext is non-deterministic,
+    # so equality/ordering against a Python value can't match anything
+    # meaningful. The parameter type is `Never` so a type checker rejects any
+    # call site, and the runtime raises if someone bypasses the type checker.
+    def equals(self, value: Never) -> Q:
+        raise TypeError(self._lookup_unsupported_message("equals"))
+
+    def not_equal(self, value: Never) -> Q:
+        raise TypeError(self._lookup_unsupported_message("not_equal"))
+
+    def gt(self, value: Never) -> Q:
+        raise TypeError(self._lookup_unsupported_message("gt"))
+
+    def gte(self, value: Never) -> Q:
+        raise TypeError(self._lookup_unsupported_message("gte"))
+
+    def lt(self, value: Never) -> Q:
+        raise TypeError(self._lookup_unsupported_message("lt"))
+
+    def lte(self, value: Never) -> Q:
+        raise TypeError(self._lookup_unsupported_message("lte"))
+
+    def _lookup_unsupported_message(self, method: str) -> str:
+        return (
+            f"Encrypted field {self.name!r} does not support .{method}() — "
+            "ciphertext is non-deterministic. Use .is_null() instead."
+        )
 
     def _check_encrypted_constraints(self) -> list[PreflightResult]:
         errors: list[PreflightResult] = []

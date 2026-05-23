@@ -144,6 +144,34 @@ class TestLookupBlocking:
         assert field.get_transform("lower") is None  # ty: ignore[unresolved-attribute]
 
 
+class TestTypedQueryMethodsBlocked:
+    """Encrypted fields must not expose typed-query comparison methods.
+
+    The class-level overrides accept `Never`, so type checkers reject any
+    call site. The runtime also raises TypeError as a safety net for callers
+    that bypass type checking (e.g. dynamic code).
+    """
+
+    def test_equals_raises(self):
+        with pytest.raises(TypeError, match=r"api_key.*does not support \.equals\("):
+            SecretStore.api_key.equals("anything")  # ty: ignore[invalid-argument-type]
+
+    def test_not_equal_raises(self):
+        with pytest.raises(TypeError, match=r"does not support \.not_equal\("):
+            SecretStore.api_key.not_equal("x")  # ty: ignore[invalid-argument-type]
+
+    def test_ordering_comparisons_raise(self):
+        for method in ("gt", "gte", "lt", "lte"):
+            with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
+                getattr(SecretStore.api_key, method)("x")
+
+    def test_is_null_still_works(self):
+        """is_null is the one comparison that makes sense on ciphertext."""
+        from plain.postgres.query_utils import Q
+
+        assert isinstance(SecretStore.api_key.is_null(), Q)
+
+
 class TestKeyRotation:
     def test_decrypt_with_fallback_key(self):
         """Data encrypted with an old key should decrypt when that key is in fallbacks."""
