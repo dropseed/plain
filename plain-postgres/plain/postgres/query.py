@@ -116,7 +116,9 @@ class ModelIterable(BaseIterable):
                 rel_populator.populate(row, obj)
             if annotation_col_map:
                 for attr_name, col_pos in annotation_col_map.items():
-                    setattr(obj, attr_name, row[col_pos])
+                    # SPIKE: annotation aliases aren't declared on the class.
+                    # The framework is allowed to attach them anyway.
+                    object.__setattr__(obj, attr_name, row[col_pos])
 
             # Add the known related objects to the model.
             for field, rel_objs, rel_getter in known_related_objects:

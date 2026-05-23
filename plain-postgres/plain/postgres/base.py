@@ -92,6 +92,17 @@ class Model(metaclass=ModelBase):
     DoesNotExist = DoesNotExistDescriptor()
     MultipleObjectsReturned = MultipleObjectsReturnedDescriptor()
 
+    # SPIKE: strict instance attributes -- reject any setattr for a name that
+    # isn't declared on the class and isn't underscore-prefixed. Throwaway.
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name.startswith("_") or hasattr(type(self), name):
+            object.__setattr__(self, name, value)
+            return
+        raise AttributeError(
+            f"SPIKE strict-attrs: {type(self).__name__!r} has no attribute "
+            f"{name!r} -- declare on the class or prefix with underscore."
+        )
+
     def __init__(self, **kwargs: Any):
         # Alias some things as locals to avoid repeat global lookups
         cls = self.__class__
