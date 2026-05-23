@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.26.2](https://github.com/dropseed/plain/releases/plain-passwords@0.26.2) (2026-05-22)
+
+### What's changed
+
+- Internal: `PasswordField.pre_save` no longer references `Field.attname` (removed in `plain.postgres` 0.104.0); the immediate re-set of the hashed value back on the instance now uses `self.name`. ([6a462a874c](https://github.com/dropseed/plain/commit/6a462a874c))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.26.1](https://github.com/dropseed/plain/releases/plain-passwords@0.26.1) (2026-05-12)
 
 ### What's changed
