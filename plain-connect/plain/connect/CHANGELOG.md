@@ -1,5 +1,16 @@
 # plain-connect changelog
 
+## [0.7.0](https://github.com/dropseed/plain/releases/plain-connect@0.7.0) (2026-05-22)
+
+### What's changed
+
+- **New toolbar item links the current request to its exported trace in Plain Cloud.** When `plain.toolbar` is installed and `CONNECT_EXPORT_TOKEN` is set, a "Trace" button appears in the dev toolbar pointing at a short `/t/<trace_id>` URL that resolves the trace back to its app and redirects to the full waterfall view. Requests dropped by `CONNECT_TRACE_SAMPLE_RATE` show a muted "Not sampled" badge instead, so it's clear why no link is available. ([1fe612bf96](https://github.com/dropseed/plain/commit/1fe612bf96), [66d2cdc20e](https://github.com/dropseed/plain/commit/66d2cdc20e))
+- **`CONNECT_FORMS_URL` is replaced by `CONNECT_CLOUD_URL`** (default `https://plainframework.com`). The new setting is the single Plain Cloud base URL — used to build both the toolbar's `/t/<trace_id>` link and the support submission `/forms/<endpoint_id>` URL. Two settings collapsed into one. ([cbd6d7195a](https://github.com/dropseed/plain/commit/cbd6d7195a))
+
+### Upgrade instructions
+
+- **Rename `CONNECT_FORMS_URL` to `CONNECT_CLOUD_URL`** in `app/settings.py` (and `PLAIN_CONNECT_FORMS_URL` → `PLAIN_CONNECT_CLOUD_URL` if set via env var). The default value changes from `https://plainframework.com/forms` to `https://plainframework.com` — the `/forms` suffix is now appended internally by `connect_support_url()`. If you were pointing `CONNECT_FORMS_URL` at a custom endpoint, set `CONNECT_CLOUD_URL` to the same base (without the `/forms` suffix).
+
 ## [0.6.1](https://github.com/dropseed/plain/releases/plain-connect@0.6.1) (2026-05-20)
 
 ### What's changed
