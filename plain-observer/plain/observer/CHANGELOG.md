@@ -1,5 +1,22 @@
 # plain-observer changelog
 
+## [0.35.0](https://github.com/dropseed/plain/releases/plain-observer@0.35.0) (2026-05-22)
+
+### What's changed
+
+- **The `plain observer` CLI commands are removed.** `plain observer request`, `traces`, `trace`, `spans`, `span`, and `clear` no longer exist. Trace capture and analysis moved to the core `plain request --json` command in `plain` 0.148.0, which doesn't require observer to be installed. The toolbar panel and the `/observer/traces/` web view remain — observer continues to own the local-dev persisted-trace experience. ([035df61716](https://github.com/dropseed/plain/commit/035df61716))
+- **The admin integration is removed.** Observer no longer registers `Trace`, `Span`, and `Log` viewsets under the Admin "Observer" section. Use the `/observer/traces/` web UI to browse persisted traces; admin-style filtering and trend cards are gone. ([39cfff7c39](https://github.com/dropseed/plain/commit/39cfff7c39))
+- **`Observer.get_current_trace_summary()` is replaced by `get_current_trace_stats()`** returning a `dict` (`query_count`, `duplicate_count`, `duration_ms`, `response_body_size`) instead of a preformatted string. Templates and views that need the old "5 queries (2 duplicates) • 45.2ms" rendering can build it from the dict; the structured shape is friendlier for programmatic use. ([8ef02dc2af](https://github.com/dropseed/plain/commit/8ef02dc2af))
+- Migrated observer models to the new foreign-key access pattern in `plain.postgres` 0.104.0 — removed the `Trace.trace_id` and `Log.span_id` shadow attribute annotations and switched internal reads to `log.span.id`. ([4399a1a3ec](https://github.com/dropseed/plain/commit/4399a1a3ec))
+- Pins `plain.postgres>=0.104.0`.
+
+### Upgrade instructions
+
+- **Replace `plain observer request /path` with `plain request /path --json`** — same structured JSON shape, no observer install required.
+- **Replace `plain observer traces` / `trace` / `spans` / `span` / `clear`** with the `/observer/traces/` web UI (still served by observer) for persisted-trace browsing. There is no scriptable replacement for these — file an issue if you relied on them programmatically.
+- **Rename `Observer.get_current_trace_summary()` calls to `get_current_trace_stats()`** and format the returned dict yourself. The previous summary string was `f"{query_count} queries ({duplicate_count} duplicates) • {duration_ms:.1f}ms"`.
+- **Remove any references to the observer admin viewsets** (e.g., links pointing at `/admin/observer/`) — the views are gone.
+
 ## [0.34.12](https://github.com/dropseed/plain/releases/plain-observer@0.34.12) (2026-05-13)
 
 ### What's changed

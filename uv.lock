@@ -1213,7 +1213,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-observer"
-version = "0.34.12"
+version = "0.35.0"
 source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },
