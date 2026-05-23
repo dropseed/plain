@@ -218,7 +218,7 @@ class Trace(postgres.Model):
                 "timestamp": log.timestamp.isoformat(),
                 "level": log.level,
                 "message": log.message,
-                "span_id": log.span_id,
+                "span_id": log.span.id if log.span else None,
             }
             for log in self.logs.query.all().order_by("timestamp")
         ]
@@ -507,14 +507,12 @@ class Span(postgres.Model):
 @postgres.register_model
 class Log(postgres.Model):
     trace: Trace = types.ForeignKeyField(Trace, on_delete=postgres.CASCADE)
-    trace_id: int
     span: Span | None = types.ForeignKeyField(
         Span,
         on_delete=postgres.SET_NULL,
         allow_null=True,
         required=False,
     )
-    span_id: int | None
 
     timestamp: datetime = types.DateTimeField()
     level: str = types.TextField(max_length=20)
