@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    username: str = types.TextField(max_length=100)
+    email = types.EmailField()
+    username = types.TextField(max_length=100)
 
     # Explicit reverse relation for OAuth connections
     oauth_connections: types.ReverseForeignKey[OAuthConnection] = (

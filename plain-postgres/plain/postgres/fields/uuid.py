@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from plain.postgres.expressions import Func
 
 
-class UUIDField(ColumnField[UUID]):
+class UUIDField[T: (UUID, UUID | None) = UUID](ColumnField[T]):
     db_type_sql = "uuid"
     empty_strings_allowed = False
 

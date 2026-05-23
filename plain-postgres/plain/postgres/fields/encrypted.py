@@ -178,7 +178,9 @@ class EncryptedFieldMixin:
         return errors
 
 
-class EncryptedTextField(EncryptedFieldMixin, ColumnField[str]):
+class EncryptedTextField[T: (str, str | None) = str](
+    EncryptedFieldMixin, ColumnField[T]
+):
     """A text field that encrypts its value before storing in the database.
 
     Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key

@@ -6,7 +6,7 @@ from plain.postgres import types
 
 @postgres.register_model
 class Tag(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query: postgres.QuerySet[Tag] = postgres.QuerySet()
 
@@ -27,8 +27,8 @@ class WidgetTag(postgres.Model):
 
 @postgres.register_model
 class Widget(postgres.Model):
-    name: str = types.TextField(max_length=100)
-    size: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
+    size = types.TextField(max_length=100)
     tags: types.ManyToManyManager[Tag] = types.ManyToManyField(Tag, through=WidgetTag)
 
     query: postgres.QuerySet[Widget] = postgres.QuerySet()

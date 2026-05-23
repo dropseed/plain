@@ -19,12 +19,12 @@ def test_add_not_null_field_without_default_raises() -> None:
     from_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("name", types.TextField(max_length=100))],  # ty: ignore[invalid-argument-type]
+        fields=[("name", types.TextField(max_length=100))],
     )
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[  # ty: ignore[invalid-argument-type]
+        fields=[
             ("name", types.TextField(max_length=100)),
             ("status", types.TextField(max_length=50)),
         ],
@@ -41,12 +41,12 @@ def test_add_not_null_field_with_default_succeeds() -> None:
     from_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("name", types.TextField(max_length=100))],  # ty: ignore[invalid-argument-type]
+        fields=[("name", types.TextField(max_length=100))],
     )
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[  # ty: ignore[invalid-argument-type]
+        fields=[
             ("name", types.TextField(max_length=100)),
             ("status", types.TextField(max_length=50, default="active")),
         ],
@@ -66,12 +66,12 @@ def test_add_nullable_field_without_default_succeeds() -> None:
     from_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("name", types.TextField(max_length=100))],  # ty: ignore[invalid-argument-type]
+        fields=[("name", types.TextField(max_length=100))],
     )
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[  # ty: ignore[invalid-argument-type]
+        fields=[
             ("name", types.TextField(max_length=100)),
             (
                 "status",
@@ -90,7 +90,7 @@ def test_create_model_with_not_null_field_no_default_succeeds() -> None:
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[  # ty: ignore[invalid-argument-type]
+        fields=[
             ("id", types.PrimaryKeyField()),
             ("status", types.TextField(max_length=50)),
         ],
@@ -112,7 +112,7 @@ def test_alter_nullable_to_not_null_is_autodetector_no_op() -> None:
     from_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[  # ty: ignore[invalid-argument-type]
+        fields=[
             (
                 "status",
                 types.TextField(max_length=50, allow_null=True, required=False),
@@ -122,7 +122,7 @@ def test_alter_nullable_to_not_null_is_autodetector_no_op() -> None:
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("status", types.TextField(max_length=50))],  # ty: ignore[invalid-argument-type]
+        fields=[("status", types.TextField(max_length=50))],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
     assert autodetector._detect_changes() == {}
@@ -135,7 +135,7 @@ def test_alter_nullable_to_not_null_with_default_is_autodetector_no_op() -> None
     from_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[  # ty: ignore[invalid-argument-type]
+        fields=[
             (
                 "status",
                 types.TextField(max_length=50, allow_null=True, required=False),
@@ -145,7 +145,7 @@ def test_alter_nullable_to_not_null_with_default_is_autodetector_no_op() -> None
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("status", types.TextField(max_length=50, default="active"))],  # ty: ignore[invalid-argument-type]
+        fields=[("status", types.TextField(max_length=50, default="active"))],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
     assert autodetector._detect_changes() == {}
@@ -160,7 +160,7 @@ def test_rename_combined_with_null_change_raises() -> None:
     from_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[  # ty: ignore[invalid-argument-type]
+        fields=[
             (
                 "old_name",
                 types.TextField(max_length=50, allow_null=True, required=False),
@@ -170,7 +170,7 @@ def test_rename_combined_with_null_change_raises() -> None:
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("new_name", types.TextField(max_length=50))],  # ty: ignore[invalid-argument-type]
+        fields=[("new_name", types.TextField(max_length=50))],
     )
     questioner = MigrationQuestioner(defaults={"ask_rename": True})
     autodetector = MigrationAutodetector(
@@ -192,12 +192,12 @@ def test_multiple_new_fields_without_default_reports_first() -> None:
     from_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("name", types.TextField(max_length=100))],  # ty: ignore[invalid-argument-type]
+        fields=[("name", types.TextField(max_length=100))],
     )
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[  # ty: ignore[invalid-argument-type]
+        fields=[
             ("name", types.TextField(max_length=100)),
             ("a_status", types.TextField(max_length=50)),
             ("z_status", types.TextField(max_length=50)),

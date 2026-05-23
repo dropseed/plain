@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import datetime
-
 from plain import postgres
 from plain.postgres import types
 
@@ -20,13 +18,13 @@ SUBJECT_CHOICES = [
 
 @postgres.register_model
 class ContactSubmission(postgres.Model):
-    name: str = types.TextField(max_length=100)
-    email: str = types.EmailField()
-    subject: str = types.TextField(max_length=20, choices=SUBJECT_CHOICES)
-    message: str = types.TextField()
-    company: str = types.TextField(max_length=200, default="", required=False)
-    subscribe: bool = types.BooleanField(default=False)
-    created_at: datetime.datetime = types.DateTimeField(create_now=True)
+    name = types.TextField(max_length=100)
+    email = types.EmailField()
+    subject = types.TextField(max_length=20, choices=SUBJECT_CHOICES)
+    message = types.TextField()
+    company = types.TextField(max_length=200, default="", required=False)
+    subscribe = types.BooleanField(default=False)
+    created_at = types.DateTimeField(create_now=True)
 
     query: postgres.QuerySet[ContactSubmission] = postgres.QuerySet()
 

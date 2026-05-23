@@ -13,7 +13,7 @@ from plain.postgres.query_utils import Q
 
 @postgres.register_model
 class DeleteParent(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query: postgres.QuerySet[DeleteParent] = postgres.QuerySet()
 
@@ -89,7 +89,7 @@ class _HideGhostsQuerySet(postgres.QuerySet):
 
 @postgres.register_model
 class HideableItem(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query = _HideGhostsQuerySet()
 
@@ -101,7 +101,7 @@ class HideableItem(postgres.Model):
 
 @postgres.register_model
 class Grandparent(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query: postgres.QuerySet[Grandparent] = postgres.QuerySet()
 
@@ -129,14 +129,14 @@ class Grandchild(postgres.Model):
 
 @postgres.register_model
 class DiamondParentA(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query: postgres.QuerySet[DiamondParentA] = postgres.QuerySet()
 
 
 @postgres.register_model
 class DiamondParentB(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query: postgres.QuerySet[DiamondParentB] = postgres.QuerySet()
 
@@ -161,7 +161,7 @@ class DiamondChild(postgres.Model):
 
 @postgres.register_model
 class CircA(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
     partner: CircB | None = types.ForeignKeyField(
         "CircB",
         on_delete=postgres.CASCADE,
@@ -173,7 +173,7 @@ class CircA(postgres.Model):
 
 @postgres.register_model
 class CircB(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
     partner: CircA | None = types.ForeignKeyField(
         CircA,
         on_delete=postgres.CASCADE,

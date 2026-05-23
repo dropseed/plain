@@ -13,8 +13,8 @@ class ConstraintExample(postgres.Model):
     fixture without polluting other models' schemas.
     """
 
-    name: str = types.TextField(max_length=100)
-    description: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
+    description = types.TextField(max_length=100)
 
     query: postgres.QuerySet[ConstraintExample] = postgres.QuerySet()
 

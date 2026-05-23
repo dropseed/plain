@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
 
 
-class GenericIPAddressField(DefaultableField[str]):
+class GenericIPAddressField[T: (str, str | None) = str](DefaultableField[T]):
     db_type_sql = "inet"
     empty_strings_allowed = False
 

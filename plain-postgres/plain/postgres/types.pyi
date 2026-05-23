@@ -1,32 +1,59 @@
 """
 Type stubs for typed model fields.
 
-These stubs tell type checkers that field constructors return primitive types,
-enabling typed model definitions like:
-    name: str = types.TextField()
+These stubs tell type checkers that each field constructor returns the
+typed *descriptor* (`XField[T]`), not the primitive `T`. Combined with
+`Field.__get__`'s overloads, this gives you:
 
-At runtime, these are Field instances (descriptors), but type checkers see the primitives.
+    class User(postgres.Model):
+        email = types.EmailField()
+        age = types.IntegerField(allow_null=True)
 
-The return type is conditional on allow_null:
-- allow_null=False (default) returns the primitive type (e.g., str)
-- allow_null=True returns the primitive type | None (e.g., str | None)
+    User.email   # EmailField[str]        — typed reference, has .equals(), .contains(), ...
+    user.email   # str                    — the loaded value
+    User.age     # IntegerField[int | None]
+    user.age     # int | None
+
+The return type is parameterized by nullability:
+- allow_null=False (default) → XField[T]
+- allow_null=True            → XField[T | None]
 """
 
 from collections.abc import Callable, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from json import JSONDecoder, JSONEncoder
 from typing import Any, Literal, overload
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-# Import manager types from runtime (will be Generic[T, QS] there)
 from plain.postgres.base import Model
 from plain.postgres.deletion import OnDelete
+from plain.postgres.fields.binary import BinaryField as _BinaryField
+from plain.postgres.fields.boolean import BooleanField as _BooleanField
+from plain.postgres.fields.duration import DurationField as _DurationField
+from plain.postgres.fields.encrypted import EncryptedTextField as _EncryptedTextField
+from plain.postgres.fields.network import (
+    GenericIPAddressField as _GenericIPAddressField,
+)
+from plain.postgres.fields.numeric import BigIntegerField as _BigIntegerField
+from plain.postgres.fields.numeric import DecimalField as _DecimalField
+from plain.postgres.fields.numeric import FloatField as _FloatField
+from plain.postgres.fields.numeric import IntegerField as _IntegerField
+from plain.postgres.fields.numeric import SmallIntegerField as _SmallIntegerField
+from plain.postgres.fields.primary_key import PrimaryKeyField as _PrimaryKeyField
 from plain.postgres.fields.related_managers import (
     ManyToManyManager,
     ReverseForeignKeyManager,
 )
+from plain.postgres.fields.temporal import DateField as _DateField
+from plain.postgres.fields.temporal import DateTimeField as _DateTimeField
+from plain.postgres.fields.temporal import TimeField as _TimeField
+from plain.postgres.fields.text import EmailField as _EmailField
+from plain.postgres.fields.text import RandomStringField as _RandomStringField
+from plain.postgres.fields.text import TextField as _TextField
+from plain.postgres.fields.text import URLField as _URLField
+from plain.postgres.fields.timezones import TimeZoneField as _TimeZoneField
+from plain.postgres.fields.uuid import UUIDField as _UUIDField
 from plain.postgres.query import QuerySet
 
 # String fields
@@ -39,7 +66,7 @@ def TextField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-) -> str | None: ...
+) -> _TextField[str | None]: ...
 @overload
 def TextField(
     *,
@@ -49,7 +76,7 @@ def TextField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-) -> str: ...
+) -> _TextField[str]: ...
 @overload
 def EmailField(
     *,
@@ -59,7 +86,7 @@ def EmailField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-) -> str | None: ...
+) -> _EmailField[str | None]: ...
 @overload
 def EmailField(
     *,
@@ -69,7 +96,7 @@ def EmailField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-) -> str: ...
+) -> _EmailField[str]: ...
 @overload
 def URLField(
     *,
@@ -79,7 +106,7 @@ def URLField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-) -> str | None: ...
+) -> _URLField[str | None]: ...
 @overload
 def URLField(
     *,
@@ -89,7 +116,7 @@ def URLField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-) -> str: ...
+) -> _URLField[str]: ...
 
 # Integer fields
 @overload
@@ -99,7 +126,7 @@ def IntegerField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> int | None: ...
+) -> _IntegerField[int | None]: ...
 @overload
 def IntegerField(
     *,
@@ -107,7 +134,7 @@ def IntegerField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> int: ...
+) -> _IntegerField[int]: ...
 @overload
 def BigIntegerField(
     *,
@@ -115,7 +142,7 @@ def BigIntegerField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> int | None: ...
+) -> _BigIntegerField[int | None]: ...
 @overload
 def BigIntegerField(
     *,
@@ -123,7 +150,7 @@ def BigIntegerField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> int: ...
+) -> _BigIntegerField[int]: ...
 @overload
 def SmallIntegerField(
     *,
@@ -131,7 +158,7 @@ def SmallIntegerField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> int | None: ...
+) -> _SmallIntegerField[int | None]: ...
 @overload
 def SmallIntegerField(
     *,
@@ -139,8 +166,8 @@ def SmallIntegerField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> int: ...
-def PrimaryKeyField() -> int: ...
+) -> _SmallIntegerField[int]: ...
+def PrimaryKeyField() -> _PrimaryKeyField: ...
 
 # Numeric fields
 @overload
@@ -150,7 +177,7 @@ def FloatField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> float | None: ...
+) -> _FloatField[float | None]: ...
 @overload
 def FloatField(
     *,
@@ -158,7 +185,7 @@ def FloatField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> float: ...
+) -> _FloatField[float]: ...
 @overload
 def DecimalField(
     *,
@@ -168,7 +195,7 @@ def DecimalField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> Decimal | None: ...
+) -> _DecimalField[Decimal | None]: ...
 @overload
 def DecimalField(
     *,
@@ -178,7 +205,7 @@ def DecimalField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> Decimal: ...
+) -> _DecimalField[Decimal]: ...
 
 # Boolean field
 @overload
@@ -188,7 +215,7 @@ def BooleanField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> bool | None: ...
+) -> _BooleanField[bool | None]: ...
 @overload
 def BooleanField(
     *,
@@ -196,7 +223,7 @@ def BooleanField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> bool: ...
+) -> _BooleanField[bool]: ...
 
 # Date/time fields
 @overload
@@ -206,7 +233,7 @@ def DateField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> date | None: ...
+) -> _DateField[date | None]: ...
 @overload
 def DateField(
     *,
@@ -214,7 +241,7 @@ def DateField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> date: ...
+) -> _DateField[date]: ...
 @overload
 def DateTimeField(
     *,
@@ -223,7 +250,7 @@ def DateTimeField(
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
-) -> datetime | None: ...
+) -> _DateTimeField[datetime | None]: ...
 @overload
 def DateTimeField(
     *,
@@ -232,7 +259,7 @@ def DateTimeField(
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
-) -> datetime: ...
+) -> _DateTimeField[datetime]: ...
 @overload
 def TimeField(
     *,
@@ -240,7 +267,7 @@ def TimeField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> time | None: ...
+) -> _TimeField[time | None]: ...
 @overload
 def TimeField(
     *,
@@ -248,7 +275,7 @@ def TimeField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> time: ...
+) -> _TimeField[time]: ...
 @overload
 def DurationField(
     *,
@@ -256,7 +283,7 @@ def DurationField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> timedelta | None: ...
+) -> _DurationField[timedelta | None]: ...
 @overload
 def DurationField(
     *,
@@ -264,7 +291,7 @@ def DurationField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> timedelta: ...
+) -> _DurationField[timedelta]: ...
 @overload
 def TimeZoneField(
     *,
@@ -272,7 +299,7 @@ def TimeZoneField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> ZoneInfo | None: ...
+) -> _TimeZoneField[ZoneInfo | None]: ...
 @overload
 def TimeZoneField(
     *,
@@ -280,7 +307,7 @@ def TimeZoneField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> ZoneInfo: ...
+) -> _TimeZoneField[ZoneInfo]: ...
 
 # Other fields
 @overload
@@ -290,7 +317,7 @@ def UUIDField(
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
-) -> UUID | None: ...
+) -> _UUIDField[UUID | None]: ...
 @overload
 def UUIDField(
     *,
@@ -298,7 +325,7 @@ def UUIDField(
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
-) -> UUID: ...
+) -> _UUIDField[UUID]: ...
 @overload
 def RandomStringField(
     *,
@@ -306,7 +333,7 @@ def RandomStringField(
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
-) -> str | None: ...
+) -> _RandomStringField[str | None]: ...
 @overload
 def RandomStringField(
     *,
@@ -314,7 +341,7 @@ def RandomStringField(
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
-) -> str: ...
+) -> _RandomStringField[str]: ...
 @overload
 def BinaryField(
     *,
@@ -322,7 +349,7 @@ def BinaryField(
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
-) -> bytes | None: ...
+) -> _BinaryField[bytes | memoryview | None]: ...
 @overload
 def BinaryField(
     *,
@@ -330,7 +357,7 @@ def BinaryField(
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
-) -> bytes: ...
+) -> _BinaryField[bytes | memoryview]: ...
 @overload
 def GenericIPAddressField(
     *,
@@ -340,7 +367,7 @@ def GenericIPAddressField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> str | None: ...
+) -> _GenericIPAddressField[str | None]: ...
 @overload
 def GenericIPAddressField(
     *,
@@ -350,12 +377,12 @@ def GenericIPAddressField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> str: ...
+) -> _GenericIPAddressField[str]: ...
 @overload
 def JSONField(
     *,
-    encoder: type[JSONEncoder] | None = None,
-    decoder: type[JSONDecoder] | None = None,
+    encoder: Any = None,
+    decoder: Any = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -364,8 +391,8 @@ def JSONField(
 @overload
 def JSONField(
     *,
-    encoder: type[JSONEncoder] | None = None,
-    decoder: type[JSONDecoder] | None = None,
+    encoder: Any = None,
+    decoder: Any = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -380,7 +407,7 @@ def EncryptedTextField(
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
-) -> str | None: ...
+) -> _EncryptedTextField[str | None]: ...
 @overload
 def EncryptedTextField(
     *,
@@ -388,12 +415,12 @@ def EncryptedTextField(
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
-) -> str: ...
+) -> _EncryptedTextField[str]: ...
 @overload
 def EncryptedJSONField(
     *,
-    encoder: type[JSONEncoder] | None = None,
-    decoder: type[JSONDecoder] | None = None,
+    encoder: Any = None,
+    decoder: Any = None,
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
@@ -401,8 +428,8 @@ def EncryptedJSONField(
 @overload
 def EncryptedJSONField(
     *,
-    encoder: type[JSONEncoder] | None = None,
-    decoder: type[JSONDecoder] | None = None,
+    encoder: Any = None,
+    decoder: Any = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),

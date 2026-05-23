@@ -11,9 +11,10 @@ from .base import NOT_PROVIDED, ChoicesField, ColumnField
 
 if TYPE_CHECKING:
     from plain.postgres.functions.random import RandomString
+    from plain.postgres.query_utils import Q
 
 
-class TextField(ChoicesField[str]):
+class TextField[T: (str, str | None) = str](ChoicesField[T]):
     db_type_sql = "text"
 
     def __init__(
@@ -86,16 +87,28 @@ class TextField(ChoicesField[str]):
         value = super().get_prep_value(value)
         return self.to_python(value)
 
+    def contains(self, value: str) -> Q:
+        return self._build_q("contains", value)
 
-class EmailField(TextField):
+    def icontains(self, value: str) -> Q:
+        return self._build_q("icontains", value)
+
+    def startswith(self, value: str) -> Q:
+        return self._build_q("startswith", value)
+
+    def endswith(self, value: str) -> Q:
+        return self._build_q("endswith", value)
+
+
+class EmailField[T: (str, str | None) = str](TextField[T]):
     default_validators = [validators.validate_email]
 
 
-class URLField(TextField):
+class URLField[T: (str, str | None) = str](TextField[T]):
     default_validators = [validators.URLValidator()]
 
 
-class RandomStringField(ColumnField[str]):
+class RandomStringField[T: (str, str | None) = str](ColumnField[T]):
     """Text column whose value is a Postgres-generated random hex string.
 
     The column carries a ``DEFAULT`` that evaluates per row, so raw SQL and

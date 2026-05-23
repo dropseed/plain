@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import datetime
-
 from app.users.models import User
 from plain import postgres
 from plain.postgres import types
@@ -15,12 +13,10 @@ class Note(postgres.Model):
         on_delete=postgres.CASCADE,
         related_query_name="notes",
     )
-    title: str = types.TextField(max_length=200)
-    body: str = types.TextField(default="", required=False)
-    created_at: datetime.datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime.datetime = types.DateTimeField(
-        create_now=True, update_now=True
-    )
+    title = types.TextField(max_length=200)
+    body = types.TextField(default="", required=False)
+    created_at = types.DateTimeField(create_now=True)
+    updated_at = types.DateTimeField(create_now=True, update_now=True)
 
     query: postgres.QuerySet[Note] = postgres.QuerySet()
 

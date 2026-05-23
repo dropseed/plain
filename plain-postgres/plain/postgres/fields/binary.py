@@ -15,7 +15,9 @@ if TYPE_CHECKING:
     from plain.postgres.sql.compiler import SQLCompiler
 
 
-class BinaryField(ColumnField[bytes | memoryview]):
+class BinaryField[
+    T: (bytes | memoryview, bytes | memoryview | None) = bytes | memoryview
+](ColumnField[T]):
     db_type_sql = "bytea"
     empty_values = [None, b""]
     _default_empty_value = b""

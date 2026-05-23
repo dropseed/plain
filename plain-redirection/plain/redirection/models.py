@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from plain import postgres
@@ -15,16 +14,16 @@ __all__ = ["NotFoundLog", "Redirect", "RedirectLog"]
 
 @postgres.register_model
 class Redirect(postgres.Model):
-    from_pattern: str = types.TextField(max_length=255)
-    to_pattern: str = types.TextField(max_length=255)
-    http_status: int = types.SmallIntegerField(
+    from_pattern = types.TextField(max_length=255)
+    to_pattern = types.TextField(max_length=255)
+    http_status = types.SmallIntegerField(
         default=301
     )  # Default to permanent - could be choices?
-    created_at: datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime = types.DateTimeField(create_now=True, update_now=True)
-    order: int = types.SmallIntegerField(default=0)
-    enabled: bool = types.BooleanField(default=True)
-    is_regex: bool = types.BooleanField(default=False)
+    created_at = types.DateTimeField(create_now=True)
+    updated_at = types.DateTimeField(create_now=True, update_now=True)
+    order = types.SmallIntegerField(default=0)
+    enabled = types.BooleanField(default=True)
+    is_regex = types.BooleanField(default=False)
 
     # query params?
     # logged in or not? auth not required necessarily...
@@ -97,16 +96,16 @@ class RedirectLog(postgres.Model):
     redirect: Redirect = types.ForeignKeyField(Redirect, on_delete=postgres.CASCADE)
 
     # The actuals that were used to redirect
-    from_url: str = types.URLField(max_length=512)
-    to_url: str = types.URLField(max_length=512)
-    http_status: int = types.SmallIntegerField(default=301)
+    from_url = types.URLField(max_length=512)
+    to_url = types.URLField(max_length=512)
+    http_status = types.SmallIntegerField(default=301)
 
     # Request metadata
-    ip_address: str = types.GenericIPAddressField()
-    user_agent: str = types.TextField(required=False, max_length=512)
-    referrer: str = types.TextField(required=False, max_length=512)
+    ip_address = types.GenericIPAddressField()
+    user_agent = types.TextField(required=False, max_length=512)
+    referrer = types.TextField(required=False, max_length=512)
 
-    created_at: datetime = types.DateTimeField(create_now=True)
+    created_at = types.DateTimeField(create_now=True)
 
     query: postgres.QuerySet[RedirectLog] = postgres.QuerySet()
 
@@ -154,14 +153,14 @@ class RedirectLog(postgres.Model):
 
 @postgres.register_model
 class NotFoundLog(postgres.Model):
-    url: str = types.URLField(max_length=512)
+    url = types.URLField(max_length=512)
 
     # Request metadata
-    ip_address: str = types.GenericIPAddressField()
-    user_agent: str = types.TextField(required=False, max_length=512)
-    referrer: str = types.TextField(required=False, max_length=512)
+    ip_address = types.GenericIPAddressField()
+    user_agent = types.TextField(required=False, max_length=512)
+    referrer = types.TextField(required=False, max_length=512)
 
-    created_at: datetime = types.DateTimeField(create_now=True)
+    created_at = types.DateTimeField(create_now=True)
 
     query: postgres.QuerySet[NotFoundLog] = postgres.QuerySet()
 

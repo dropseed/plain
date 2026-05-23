@@ -1171,6 +1171,18 @@ class QuerySet[T: "Model"]:
         """
         return self._filter_or_exclude(True, args, kwargs)
 
+    def where(self, *conditions: Q) -> Self:
+        """
+        Return a new QuerySet narrowed by typed field conditions.
+
+        Conditions are produced by field methods like `Model.field.equals(...)`
+        and combine with `|` and `&`. Unlike `filter()`, this accepts no
+        keyword arguments — every condition is a typed expression, so a
+        type checker can reject typos and value-type mismatches at the call
+        site.
+        """
+        return self._filter_or_exclude(False, conditions, {})
+
     def _filter_or_exclude(
         self, negate: bool, args: tuple[Any, ...], kwargs: dict[str, Any]
     ) -> Self:

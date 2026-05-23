@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
 
 
-class FloatField(DefaultableField[float]):
+class FloatField[T: (float, float | None) = float](DefaultableField[T]):
     db_type_sql = "double precision"
     empty_strings_allowed = False
 
@@ -44,7 +44,7 @@ class FloatField(DefaultableField[float]):
             )
 
 
-class IntegerField(DefaultableField[int]):
+class IntegerField[T: (int, int | None) = int](DefaultableField[T]):
     db_type_sql = "integer"
     integer_range: tuple[int, int] = (-2147483648, 2147483647)
     psycopg_type: type = numeric.Int4
@@ -118,19 +118,21 @@ class IntegerField(DefaultableField[int]):
             )
 
 
-class BigIntegerField(IntegerField):
+class BigIntegerField[T: (int, int | None) = int](IntegerField[T]):
     db_type_sql = "bigint"
     integer_range = (-9223372036854775808, 9223372036854775807)
     psycopg_type = numeric.Int8
 
 
-class SmallIntegerField(IntegerField):
+class SmallIntegerField[T: (int, int | None) = int](IntegerField[T]):
     db_type_sql = "smallint"
     integer_range = (-32768, 32767)
     psycopg_type = numeric.Int2
 
 
-class DecimalField(DefaultableField[decimal.Decimal]):
+class DecimalField[T: (decimal.Decimal, decimal.Decimal | None) = decimal.Decimal](
+    DefaultableField[T]
+):
     db_type_sql = "numeric(%(max_digits)s,%(decimal_places)s)"
     empty_strings_allowed = False
 

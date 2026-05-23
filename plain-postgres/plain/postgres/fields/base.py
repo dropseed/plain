@@ -17,7 +17,7 @@ from plain import exceptions, validators
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import quote_name
 from plain.postgres.enums import ChoicesMeta
-from plain.postgres.query_utils import RegisterLookupMixin
+from plain.postgres.query_utils import Q, RegisterLookupMixin
 from plain.preflight import PreflightResult
 from plain.utils.datastructures import DictWrapper
 from plain.utils.functional import Promise
@@ -152,6 +152,42 @@ class Field[T](RegisterLookupMixin):
         if name is not None:
             return f"<{path}: {name}>"
         return f"<{path}>"
+
+    # Typed query conditions. Available on every field; subclasses extend
+    # with type-specific lookups (comparison on numeric, string ops on text).
+    def equals(self, value: T) -> Q:
+        return self._build_q("", value)
+
+    def not_equal(self, value: T) -> Q:
+        return ~self._build_q("", value)
+
+    def gt(self, value: T) -> Q:
+        return self._build_q("gt", value)
+
+    def gte(self, value: T) -> Q:
+        return self._build_q("gte", value)
+
+    def lt(self, value: T) -> Q:
+        return self._build_q("lt", value)
+
+    def lte(self, value: T) -> Q:
+        return self._build_q("lte", value)
+
+    def is_null(self, value: bool = True) -> Q:
+        return self._build_q("isnull", value)
+
+    def _build_q(self, suffix: str, value: Any) -> Q:
+        """Build a Q from a lookup suffix + value, bypassing Q's reserved
+        `_connector`/`_negated` kwargs that confuse the type checker on
+        `**{name: value}` expansion."""
+        assert self.name is not None, (
+            "Field name must be set before building a query condition; "
+            "the field must be attached to a model."
+        )
+        name = f"{self.name}__{suffix}" if suffix else self.name
+        q = Q()
+        q.children.append((name, value))
+        return q
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [*self._check_field_name()]
