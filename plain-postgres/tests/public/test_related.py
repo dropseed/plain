@@ -637,6 +637,22 @@ class TestForeignKeyPartialInstance:
         with pytest.raises(ValueError, match="Cannot assign"):
             child.parent = True  # ty: ignore[invalid-assignment]
 
+    def test_reassign_by_bare_pk_evicts_cached_object(self, db):
+        # When a cached foreign key is reassigned by bare primary key to a
+        # different target, the cached related object must be evicted -- a
+        # later read must see the new target, not the stale cached one.
+        p1 = DeleteParent.query.create(name="P1")
+        p2 = DeleteParent.query.create(name="P2")
+        child = ChildCascade.query.create(parent=p1)
+        # Prime the forward cache so we can prove it gets evicted.
+        assert child.parent.name == "P1"
+
+        child.parent = p2.id  # ty: ignore[invalid-assignment]
+
+        # The cached p1 must be gone -- a fresh read returns the new target.
+        assert child.parent.id == p2.id
+        assert child.parent.name == "P2"
+
     def test_del_clears_foreign_key(self, db):
         parent = DeleteParent.query.create(name="Parent")
         child = ChildCascade.query.create(parent=parent)
