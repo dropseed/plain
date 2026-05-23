@@ -7,7 +7,7 @@ that access costs -- so a future change shows up as a diff to these tests.
 
 from __future__ import annotations
 
-from app.examples.models.relationships import Widget
+from app.examples.models.relationships import Tag, Widget, WidgetTag
 
 from plain.postgres.db import get_connection
 
@@ -68,3 +68,24 @@ def test_deferred_field_access_query_count(db):
     assert first == 1
     _, second = _count_queries(lambda: widget.size)
     assert second == 0
+
+
+def test_deferred_fk_column_loads_only_the_fk(db):
+    # The foreign key descriptor is the partial-related-instance fast path:
+    # hydrating other deferred columns just to materialize a related-object
+    # handle would defeat the optimization. So accessing a deferred FK loads
+    # only the FK column, not the whole source row -- the contrast to the
+    # scalar-field rule pinned by test_deferred_field_access_query_count.
+    tag = Tag.query.create(name="t")
+    widget = Widget.query.create(name="W", size="L")
+    WidgetTag.query.create(widget=widget, tag=tag)
+
+    widget_tag = WidgetTag.query.only("id").get()
+    assert widget_tag.get_deferred_fields() == {"widget", "tag"}
+
+    # Accessing the deferred FK loads exactly one column (the FK column).
+    _, queries = _count_queries(lambda: widget_tag.widget)
+    assert queries == 1
+    # The other deferred FK column is still deferred -- not hydrated as a
+    # side effect of the first FK access.
+    assert "tag" in widget_tag.get_deferred_fields()

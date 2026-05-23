@@ -410,6 +410,8 @@ posts = Post.query.all()
 posts = Post.query.defer("body").all()
 ```
 
+Reading any deferred field on an instance loads every still-missing column in a single query, not just the field you asked for. Defer columns you don't intend to access on that instance, and prefer `.values()` / `.values_list()` when you want one column without ever materializing the rest. The foreign key column is the exception: accessing a deferred foreign key loads only the foreign key column, so the partial-related-instance shortcut stays cheap.
+
 #### Use `.iterator()` for large result sets
 
 Process rows in chunks instead of loading everything into memory.
