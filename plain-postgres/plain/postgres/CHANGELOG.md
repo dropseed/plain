@@ -1,5 +1,19 @@
 # plain-postgres changelog
 
+## [0.105.0](https://github.com/dropseed/plain/releases/plain-postgres@0.105.0) (2026-05-25)
+
+### What's changed
+
+- **Field constructors in `plain.postgres.types` are now typed as parameterized descriptors.** Stubs return `XField[T]` (e.g. `TextField[str]`, `IntegerField[int | None]` when `allow_null=True`) instead of the primitive value. Combined with `Field[T]`'s overloaded `__get__`, class-level access (`User.email`) sees the descriptor and instance access (`user.email`) sees the value — no annotation needed on model declarations. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+- **`Field.__set__` is now typed as `value: T`** instead of `Any`, so a type checker flags `row.name = 123` on a `TextField` at the call site. Runtime conversion via `to_python()` is unchanged. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+- **`ForeignKeyField` overloads split by `to=` argument shape.** Passing a model class (`to=Author`) returns `_ForeignKeyDescriptor[T, V]` and accepts bare-PK assignment (`book.author = 5`) via `__set__`. Passing a string forward reference (`to="Author"`) returns the bare value type and requires an LHS annotation so the type can bind. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+- `JSONField` and `EncryptedJSONField` keep explicit annotations on model declarations — their runtime classes aren't generic, so the stubs return `Any`. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- **Drop primitive type annotations on model field declarations.** `name: str = types.TextField()` will now fail type checking because the right-hand side is typed `TextField[str]`, not `str`. Change to `name = types.TextField()` — type checkers still infer `str` at instance access through the descriptor's `__get__`. Runtime is unchanged either way.
+- **Keep explicit annotations for `JSONField` / `EncryptedJSONField`** — these still return `Any` from the stubs, so the declared type is what flows through. Example: `parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)`.
+
 ## [0.104.0](https://github.com/dropseed/plain/releases/plain-postgres@0.104.0) (2026-05-22)
 
 ### What's changed
