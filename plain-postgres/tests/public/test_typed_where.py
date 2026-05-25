@@ -7,7 +7,7 @@ First slice of the typed query API: field descriptors expose `equals`,
 
 from __future__ import annotations
 
-from typing import assert_type
+from typing import TYPE_CHECKING, assert_type
 
 from app.examples.models.defaults import DefaultsExample
 
@@ -33,6 +33,31 @@ def test_instance_access_yields_value_type() -> None:
     assert_type(row.name, str)
     assert_type(row.note, str | None)
     assert_type(row.priority, int)
+
+
+def test_assignment_typing_accepts_value_type() -> None:
+    """Assignment to a field instance accepts the declared value type."""
+    row = DefaultsExample(name="x", note=None, priority=1)
+    row.name = "y"  # str → str: OK
+    row.priority = 99  # int → int: OK
+    row.note = None  # None → str | None: OK (nullable)
+    row.note = "set"  # str → str | None: OK
+
+
+if TYPE_CHECKING:
+    # Type-check only: these assignments must be flagged by ty. The ignore
+    # markers are load-bearing — if Field.__set__ were typed loosely
+    # (e.g. value: Any), ty would report them as unused suppressions.
+    # Their presence here proves the type checker enforces T. We avoid
+    # running the assignments at runtime because Field.__set__ also calls
+    # to_python() which raises ValidationError on unconvertible input.
+    def _typed_check_rejects_wrong_assignment() -> None:
+        row = DefaultsExample(name="x", note=None, priority=1)
+        row.name = 123  # ty: ignore[invalid-assignment]
+        row.priority = "no"  # ty: ignore[invalid-assignment]
+        # Non-nullable field rejects None at type-check time even though the
+        # runtime would store it (and only fail later at validate/save).
+        row.name = None  # ty: ignore[invalid-assignment]
 
 
 def test_field_methods_return_q_objects():

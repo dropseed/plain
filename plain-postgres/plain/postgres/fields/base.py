@@ -473,12 +473,18 @@ class Field[T](RegisterLookupMixin):
 
         return cast(T, data.get(field_name))
 
-    def __set__(self, instance: Model, value: Any) -> None:
+    def __set__(self, instance: Model, value: T) -> None:
         """
         Descriptor __set__ for attribute assignment.
 
         Validates and converts the value using to_python(), then stores it
         in instance.__dict__[name].
+
+        The parameter is typed `T` (the field's value type) so a type checker
+        rejects assigning incompatible types — `row.name = 123` on a
+        TextField is caught at the call site. The runtime is more permissive
+        (to_python converts strings → ints etc.), but encouraging explicit
+        conversion at the boundary is the better default.
         """
         # Safety check: ensure field has been properly initialized
         if not hasattr(self, "column"):
@@ -490,12 +496,17 @@ class Field[T](RegisterLookupMixin):
 
         # Convert/validate the value. The DATABASE_DEFAULT sentinel is stored
         # as-is so the INSERT compiler can emit `DEFAULT` in the VALUES clause.
-        if value is not None and value is not DATABASE_DEFAULT:
-            value = self.to_python(value)
+        # Use a separate local so the parameter's narrow `T` type isn't
+        # widened by to_python's `T | None` return.
+        stored: Any
+        if value is None or value is DATABASE_DEFAULT:
+            stored = value
+        else:
+            stored = self.to_python(value)
 
         # Store in instance dict
         assert self.name is not None
-        instance.__dict__[self.name] = value
+        instance.__dict__[self.name] = stored
 
     def __delete__(self, instance: Model) -> None:
         """
