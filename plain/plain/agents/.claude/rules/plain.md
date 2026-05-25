@@ -104,7 +104,7 @@ Trace-context-only (not error attribution): template render (`plain-templates`),
 
 **Workflow**: Use `--search <term>` to find which module has what you need, then read the full doc, or run `<name> --search <term>` to print just the matching sections.
 
-Packages: plain, plain-admin, plain-api, plain-assets, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-observer, plain-pages, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-tailwind, plain-templates, plain-toolbar, plain-tunnel, plain-vendor
+Packages: plain, plain-admin, plain-api, plain-assets, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-pages, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-tailwind, plain-templates, plain-toolbar, plain-tunnel, plain-vendor
 
 Core modules: agents, chores, cli, csrf, forms, http, logs, packages, preflight, runtime, server, test, urls, utils, views
 

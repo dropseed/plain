@@ -31,7 +31,6 @@ KNOWN_PACKAGES = {
     "plain-portal": "Remote Python shell and file transfer via encrypted tunnel",
     "plain-postgres": "Model data and store it in a database",
     "plain-oauth": "OAuth provider login",
-    "plain-observer": "On-page telemetry and observability",
     "plain-pages": "Serve static pages, markdown, and assets",
     "plain-passwords": "Password authentication",
     "plain-pytest": "Test with pytest",

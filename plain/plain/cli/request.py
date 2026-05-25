@@ -22,7 +22,7 @@ _HTTP_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TR
 
 _TRACE_UNAVAILABLE = (
     "Trace capture skipped — opentelemetry-sdk is not installed. "
-    "It ships with plain.observer, plain.connect, or plain.pytest."
+    "It ships with plain.connect or plain.pytest."
 )
 
 # Cap on per-query lines shown in the text Trace section; the full list is
@@ -246,8 +246,8 @@ def request(
         set_check_counts(errors=0, warnings=0)
 
         # Dispatch the request, capturing a trace when the OpenTelemetry SDK
-        # is available (it ships with plain.observer / plain.connect /
-        # plain.pytest, but is not a Plain core dependency).
+        # is available (it ships with plain.connect / plain.pytest, but is
+        # not a Plain core dependency).
         trace_result: TraceResult | None
         if capture_available():
             with capture_spans() as otel_exporter:

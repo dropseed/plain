@@ -58,14 +58,6 @@ _KNOWN_HTTP_METHODS = frozenset(
     {"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"}
 )
 
-# Context keys for passing request data to the observer sampler.
-# Uses context.set_value (process-local) — NOT baggage, which propagates
-# across process boundaries and would leak cookies/auth-tokens downstream.
-# Uses plain strings (like plain-postgres's _SUPPRESS_KEY) so the observer
-# can look them up by the same string without needing to import these.
-_REQUEST_COOKIES_KEY = "plain.request.cookies"
-_REQUEST_HEADERS_KEY = "plain.request.headers"
-
 tracer = trace.get_tracer("plain")
 
 meter = metrics.get_meter("plain")
@@ -163,13 +155,6 @@ class BaseHandler:
         if user_agent := request.headers.get("User-Agent"):
             span_attributes[user_agent_attributes.USER_AGENT_ORIGINAL] = user_agent
 
-        # Pass request data to observer sampler via process-local context
-        # (not baggage, which would propagate to downstream services).
-        span_context = context.set_value(_REQUEST_COOKIES_KEY, request.cookies)
-        span_context = context.set_value(
-            _REQUEST_HEADERS_KEY, request.headers, span_context
-        )
-
         # Start with just the method; updated to "{method} {route}" after
         # URL resolution in _resolve_request. Avoids high-cardinality span
         # names from raw paths when resolution fails (404, middleware errors).
@@ -177,7 +162,6 @@ class BaseHandler:
 
         return tracer.start_as_current_span(
             span_name,
-            context=span_context,
             attributes=span_attributes,
             kind=trace.SpanKind.SERVER,
         )

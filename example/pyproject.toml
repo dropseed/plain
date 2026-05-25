@@ -35,7 +35,6 @@ dependencies = [
   "plain-toolbar",
   "plain-tunnel",
   "plain-vendor",
-  "plain-observer",
 ]
 
 [tool.plain.tailwind]

@@ -9,7 +9,6 @@
 - [Pageview tracking](#pageview-tracking)
 - [Support forms](#support-forms)
 - [Toolbar](#toolbar)
-- [Observer coexistence](#observer-coexistence)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -146,15 +145,7 @@ The button only appears when export is active (`CONNECT_EXPORT_TOKEN` is set), s
 
 If a request wasn't sampled for export (see [Sampling](#sampling)), the button shows "Not sampled" instead. Because traces export in a background batch, a freshly-clicked link may briefly land on a "locating trace" page that retries until the trace arrives.
 
-## Observer coexistence
-
-If [plain.observer](../../plain-observer/plain/observer/README.md) is also installed, both work simultaneously. plain.connect handles production export while observer provides the local dev toolbar and admin trace viewer. Observer detects the existing TracerProvider and layers its sampler and span processor on top.
-
 ## FAQs
-
-#### Do I need plain.observer to use plain.connect?
-
-No. plain.connect works independently. Observer is for local dev tooling; plain.connect is for production export.
 
 #### What happens if the export endpoint is unreachable?
 
@@ -173,5 +164,3 @@ INSTALLED_PACKAGES = [
     # ...
 ]
 ```
-
-Place `plain.connect` **before** `plain.observer` in `INSTALLED_PACKAGES` so it sets up the TracerProvider first.

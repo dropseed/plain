@@ -24,7 +24,6 @@ members = [
     "plain-loginlink",
     "plain-mcp",
     "plain-oauth",
-    "plain-observer",
     "plain-pages",
     "plain-passwords",
     "plain-portal",
@@ -229,7 +228,6 @@ dependencies = [
     { name = "plain-loginlink" },
     { name = "plain-mcp" },
     { name = "plain-oauth" },
-    { name = "plain-observer" },
     { name = "plain-pages" },
     { name = "plain-passwords" },
     { name = "plain-portal" },
@@ -265,7 +263,6 @@ requires-dist = [
     { name = "plain-loginlink", editable = "plain-loginlink" },
     { name = "plain-mcp", editable = "plain-mcp" },
     { name = "plain-oauth", editable = "plain-oauth" },
-    { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-portal", editable = "plain-portal" },
@@ -1212,35 +1209,6 @@ requires-dist = [
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
-name = "plain-observer"
-version = "0.35.1"
-source = { editable = "plain-observer" }
-dependencies = [
-    { name = "opentelemetry-sdk" },
-    { name = "plain" },
-    { name = "plain-postgres" },
-    { name = "plain-templates" },
-    { name = "sqlparse" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "plain-pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
-    { name = "plain", editable = "plain" },
-    { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-templates", editable = "plain-templates" },
-    { name = "sqlparse", specifier = ">=0.3.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
-
-[[package]]
 name = "plain-pages"
 version = "0.19.6"
 source = { editable = "plain-pages" }
@@ -1568,7 +1536,6 @@ dev = [
     { name = "plain-loginlink" },
     { name = "plain-mcp" },
     { name = "plain-oauth" },
-    { name = "plain-observer" },
     { name = "plain-pages" },
     { name = "plain-passwords" },
     { name = "plain-portal" },
@@ -1609,7 +1576,6 @@ dev = [
     { name = "plain-loginlink", editable = "plain-loginlink" },
     { name = "plain-mcp", editable = "plain-mcp" },
     { name = "plain-oauth", editable = "plain-oauth" },
-    { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-portal", editable = "plain-portal" },
@@ -2095,15 +2061,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c5/4b/32ad65f8ff5c49254e218ccaae8fc16900cfc289954fb372686159ebe315/spake2-0.9.tar.gz", hash = "sha256:421fc4a8d5ac395af7af0206ffd9e6cdf188c105cb1b883d9d683312bb5a9334", size = 55092, upload-time = "2024-09-25T00:24:07.372Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d2/42/a4e93badf46c20d862ce298d8873451e19f18141c6811ae7fdfaef0ea107/spake2-0.9-py3-none-any.whl", hash = "sha256:2d7cbe936519c4172866649ddceefdec08e3d9b3ce4c8a75bbf84d6bdd07a2fb", size = 31748, upload-time = "2024-09-25T00:24:05.513Z" },
-]
-
-[[package]]
-name = "sqlparse"
-version = "0.5.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e5/40/edede8dd6977b0d3da179a342c198ed100dd2aba4be081861ee5911e4da4/sqlparse-0.5.3.tar.gz", hash = "sha256:09f67787f56a0b16ecdbde1bfc7f5d9c3371ca683cfeaa8e6ff60b4807ec9272", size = 84999, upload-time = "2024-12-10T12:05:30.728Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/5c/bfd6bd0bf979426d405cc6e71eceb8701b148b16c21d2dc3c261efc61c7b/sqlparse-0.5.3-py3-none-any.whl", hash = "sha256:cf2196ed3418f3ba5de6af7e82c694a9fbdbfecccdfc72e281548517081f16ca", size = 44415, upload-time = "2024-12-10T12:05:27.824Z" },
 ]
 
 [[package]]

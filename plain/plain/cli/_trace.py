@@ -326,8 +326,8 @@ def analyze_trace(
 def capture_available() -> bool:
     """Whether `capture_spans` can run — the OpenTelemetry SDK must be installed.
 
-    The SDK is not a Plain core dependency; it ships with `plain.observer`,
-    `plain.connect`, and `plain.pytest`.
+    The SDK is not a Plain core dependency; it ships with `plain.connect`
+    and `plain.pytest`.
     """
     return find_spec("opentelemetry.sdk") is not None
 
@@ -339,9 +339,9 @@ def capture_spans() -> Generator[InMemorySpanExporter]:
     For the duration of the block the active tracer provider records every
     span (its sampler is forced on) and delivers spans *only* to an in-memory
     exporter. Span processors an installed package configured —
-    `plain.observer`'s database writer, `plain.connect`'s OTLP exporter — are
-    detached, so a captured request is neither persisted nor shipped anywhere.
-    The sampler and processors are restored on exit.
+    `plain.connect`'s OTLP exporter — are detached, so a captured request
+    is neither persisted nor shipped anywhere. The sampler and processors
+    are restored on exit.
 
     Requires the OpenTelemetry SDK — guard calls with `capture_available()`.
     For one-shot, single-threaded callers such as CLI commands; it mutates
@@ -367,8 +367,8 @@ def capture_spans() -> Generator[InMemorySpanExporter]:
         # one-shot, so this provider stays for the life of the process, but
         # the `finally` below strips its processors, leaving it inert. This
         # branch is only reached when no OTel package is installed at all:
-        # plain.connect and plain.observer both install a provider during
-        # app startup, before any CLI command runs.
+        # plain.connect installs a provider during app startup, before any
+        # CLI command runs.
         trace.set_tracer_provider(TracerProvider())
 
     # From here a real provider exists either way — capture by mutating it.

@@ -26,7 +26,6 @@ dev = [
   "plain-portal",
   "plain-postgres",
   "plain-oauth",
-  "plain-observer",
   "plain-pages",
   "plain-passwords",
   "plain-pytest",
@@ -65,7 +64,6 @@ dev = [
 "plain-portal" = { workspace = true }
 "plain-postgres" = { workspace = true }
 "plain-oauth" = { workspace = true }
-"plain-observer" = { workspace = true }
 "plain-pages" = { workspace = true }
 "plain-passwords" = { workspace = true }
 "plain-pytest" = { workspace = true }
