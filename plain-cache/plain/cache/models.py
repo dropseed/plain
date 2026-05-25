@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Self
+from typing import Any, Self
 
 from plain import postgres
 from plain.postgres import types
@@ -24,7 +24,7 @@ class CachedItemQuerySet(postgres.QuerySet["CachedItem"]):
 @postgres.register_model
 class CachedItem(postgres.Model):
     key = types.TextField(max_length=255)
-    value = types.JSONField(required=False, allow_null=True)
+    value: Any = types.JSONField(required=False, allow_null=True)
     expires_at = types.DateTimeField(required=False, allow_null=True)
     created_at = types.DateTimeField(create_now=True)
     updated_at = types.DateTimeField(create_now=True, update_now=True)

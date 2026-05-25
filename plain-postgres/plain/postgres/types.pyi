@@ -437,31 +437,42 @@ def EncryptedJSONField(
 
 # Related fields
 #
-# At the type level, the ForeignKeyField stub returns a descriptor whose
-# `__get__` overloads do double duty:
-#   * Class access (User.parent) → type[T] so the related model's typed
-#     field surface (e.g. `User.parent.name.equals(...)`) is visible to
-#     the type checker for typed where() chaining.
-#   * Instance access (user.parent) → T (or T | None for nullable FKs) so
-#     reading the loaded related instance has the value type.
-# The runtime is a Field instance + a ForwardForeignKeyDescriptor, which
-# is structurally compatible — only the typing-side shape differs.
+# Two overload families:
+#
+# 1. Class-argument FK (`to=SomeModel`) — T is inferred from the class.
+#    Returns `_ForeignKeyDescriptor[T, V]` whose `__get__` overloads do
+#    double duty: class-access (`Child.parent`) yields `type[T]` so the
+#    related model's typed field surface (e.g. `Child.parent.name.equals(...)`)
+#    is visible for typed where() chaining; instance-access (`child.parent`)
+#    yields V (T or T | None for nullable FKs).
+#
+# 2. String-argument FK (`to="SomeModel"`, `to="self"`) — T can't be
+#    inferred from the string, so the return type falls back to bare `T`.
+#    This requires an explicit LHS annotation (`parent: TreeNode | None = …`)
+#    but preserves instance-access typing for forward references and
+#    self-references. Type-level FK traversal isn't available through
+#    string-arg FKs — the runtime `RelatedFieldRef` still resolves
+#    `Child.parent.name` regardless.
+#
+# `__set__` accepts the related instance, None (via V), or a bare PK
+# value (int) — matching what `ForwardForeignKeyDescriptor` already
+# accepts at runtime.
+#
+# NOTE: `bool` is a subclass of `int` in Python, so `child.parent = True`
+# type-checks here. The runtime `ForwardForeignKeyDescriptor.__set__`
+# explicitly rejects bool with `ValueError`, so this language quirk is
+# caught at runtime rather than silently coerced to PK 0/1.
 class _ForeignKeyDescriptor[T: Model, V]:
     @overload
     def __get__(self, instance: None, owner: type) -> type[T]: ...
     @overload
     def __get__(self, instance: Model, owner: type) -> V: ...
-    # __set__ accepts the related instance, None (for nullable FKs via V),
-    # or a bare PK value (int). NOTE: `bool` is a subclass of `int` in Python,
-    # so `child.parent = True` type-checks here. The runtime
-    # `ForwardForeignKeyDescriptor.__set__` explicitly rejects bool with
-    # `ValueError` so this language quirk is caught at runtime, not silently
-    # coerced to PK 0/1.
     def __set__(self, instance: Model, value: V | int) -> None: ...
 
+# Class-argument FK overloads
 @overload
 def ForeignKeyField[T: Model](
-    to: type[T] | str,
+    to: type[T],
     on_delete: OnDelete,
     *,
     related_query_name: str | None = None,
@@ -473,7 +484,7 @@ def ForeignKeyField[T: Model](
 ) -> _ForeignKeyDescriptor[T, T | None]: ...
 @overload
 def ForeignKeyField[T: Model](
-    to: type[T] | str,
+    to: type[T],
     on_delete: OnDelete,
     *,
     related_query_name: str | None = None,
@@ -483,6 +494,32 @@ def ForeignKeyField[T: Model](
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _ForeignKeyDescriptor[T, T]: ...
+
+# String-argument FK overloads (forward refs, self-refs) — T inferred from LHS annotation
+@overload
+def ForeignKeyField[T: Model](
+    to: str,
+    on_delete: OnDelete,
+    *,
+    related_query_name: str | None = None,
+    limit_choices_to: Any = None,
+    db_constraint: bool = True,
+    required: bool = True,
+    allow_null: Literal[True],
+    validators: Sequence[Callable[..., Any]] = (),
+) -> T | None: ...
+@overload
+def ForeignKeyField[T: Model](
+    to: str,
+    on_delete: OnDelete,
+    *,
+    related_query_name: str | None = None,
+    limit_choices_to: Any = None,
+    db_constraint: bool = True,
+    required: bool = True,
+    allow_null: Literal[False] = False,
+    validators: Sequence[Callable[..., Any]] = (),
+) -> T: ...
 def ManyToManyField[T: Model](
     to: type[T] | str,
     *,

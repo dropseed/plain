@@ -67,7 +67,7 @@ class JobRequest(postgres.Model):
     uuid = types.UUIDField(generate=True)
 
     job_class = types.TextField(max_length=255)
-    parameters = types.JSONField(required=False, allow_null=True)
+    parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
     priority = types.SmallIntegerField(default=0)
     source = types.TextField(required=False)
     queue = types.TextField(default="default", max_length=255)
@@ -179,7 +179,7 @@ class JobProcess(postgres.Model):
     job_request_uuid = types.UUIDField()
     requested_at = types.DateTimeField(required=False, allow_null=True)
     job_class = types.TextField(max_length=255)
-    parameters = types.JSONField(required=False, allow_null=True)
+    parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
     priority = types.SmallIntegerField(default=0)
     source = types.TextField(required=False)
     queue = types.TextField(default="default", max_length=255)
@@ -287,7 +287,10 @@ class JobProcess(postgres.Model):
                 },
                 links=links,
             ) as span:
-                # This is how we know it has been picked up
+                # This is how we know it has been picked up.
+                # Keep `started_at` as a local: reading `self.started_at` back
+                # through the descriptor types as `datetime | None` (the field
+                # is `allow_null=True`), which doesn't subtract cleanly below.
                 started_at = timezone.now()
                 self.started_at = started_at
                 self.save(update_fields=["started_at"])
@@ -598,7 +601,7 @@ class JobResult(postgres.Model):
     job_request_uuid = types.UUIDField()
     requested_at = types.DateTimeField(required=False, allow_null=True)
     job_class = types.TextField(max_length=255)
-    parameters = types.JSONField(required=False, allow_null=True)
+    parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
     priority = types.SmallIntegerField(default=0)
     source = types.TextField(required=False)
     queue = types.TextField(default="default", max_length=255)
@@ -725,7 +728,7 @@ class WorkerHeartbeat(postgres.Model):
     worker_id = types.UUIDField()
     hostname = types.TextField(max_length=255)
     pid = types.IntegerField()
-    queues = types.JSONField()
+    queues: list[str] = types.JSONField()
     started_at = types.DateTimeField(create_now=True)
     last_heartbeat_at = types.DateTimeField()
 

@@ -11,6 +11,6 @@ class SecretStore(postgres.Model):
     name = types.TextField(max_length=100)
     api_key = types.EncryptedTextField(max_length=200)
     notes = types.EncryptedTextField(required=False)
-    config = types.EncryptedJSONField(required=False, allow_null=True)
+    config: dict | None = types.EncryptedJSONField(required=False, allow_null=True)
 
     query: postgres.QuerySet[SecretStore] = postgres.QuerySet()
