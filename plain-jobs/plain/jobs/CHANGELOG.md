@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.54.1](https://github.com/dropseed/plain/releases/plain-jobs@0.54.1) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. The queue-wait calculation in `JobProcess.run_job` now keeps `started_at` as a local since the descriptor reads back as `datetime | None`. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.54.0](https://github.com/dropseed/plain/releases/plain-jobs@0.54.0) (2026-05-20)
 
 ### What's changed
