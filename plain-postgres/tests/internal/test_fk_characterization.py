@@ -120,7 +120,7 @@ def test_assign_bare_int(db):
     # NOW: a bare primary key value is accepted.
     parent = DeleteParent.query.create(name="P")
     child = ChildCascade.query.create(parent=parent)
-    child.parent = parent.id  # ty: ignore[invalid-assignment]
+    child.parent = parent.id
     assert child.parent.id == parent.id
 
 

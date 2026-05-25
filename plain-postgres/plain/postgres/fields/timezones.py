@@ -47,7 +47,9 @@ def _get_canonical_timezones() -> frozenset[str]:
     )
 
 
-class TimeZoneField(ChoicesField[zoneinfo.ZoneInfo]):
+class TimeZoneField[
+    T: (zoneinfo.ZoneInfo, zoneinfo.ZoneInfo | None) = zoneinfo.ZoneInfo
+](ChoicesField[T]):
     """
     A model field that stores timezone names as strings but provides ZoneInfo objects.
 

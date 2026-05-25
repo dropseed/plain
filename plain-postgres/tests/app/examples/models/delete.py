@@ -13,7 +13,7 @@ from plain.postgres.query_utils import Q
 
 @postgres.register_model
 class DeleteParent(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query: postgres.QuerySet[DeleteParent] = postgres.QuerySet()
 
@@ -24,25 +24,21 @@ class DeleteParent(postgres.Model):
 
 @postgres.register_model
 class ChildCascade(postgres.Model):
-    parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.CASCADE
-    )
+    parent = types.ForeignKeyField(DeleteParent, on_delete=postgres.CASCADE)
 
     query: postgres.QuerySet[ChildCascade] = postgres.QuerySet()
 
 
 @postgres.register_model
 class ChildRestrict(postgres.Model):
-    parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.RESTRICT
-    )
+    parent = types.ForeignKeyField(DeleteParent, on_delete=postgres.RESTRICT)
 
     query: postgres.QuerySet[ChildRestrict] = postgres.QuerySet()
 
 
 @postgres.register_model
 class ChildSetNull(postgres.Model):
-    parent: DeleteParent | None = types.ForeignKeyField(
+    parent = types.ForeignKeyField(
         DeleteParent,
         on_delete=postgres.SET_NULL,
         allow_null=True,
@@ -53,9 +49,7 @@ class ChildSetNull(postgres.Model):
 
 @postgres.register_model
 class ChildNoAction(postgres.Model):
-    parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.NO_ACTION
-    )
+    parent = types.ForeignKeyField(DeleteParent, on_delete=postgres.NO_ACTION)
 
     query: postgres.QuerySet[ChildNoAction] = postgres.QuerySet()
 
@@ -64,7 +58,7 @@ class ChildNoAction(postgres.Model):
 class UnconstrainedChild(postgres.Model):
     """FK with db_constraint=False — no DB constraint, convergence should ignore."""
 
-    parent: DeleteParent = types.ForeignKeyField(
+    parent = types.ForeignKeyField(
         DeleteParent, on_delete=postgres.NO_ACTION, db_constraint=False
     )
 
@@ -89,7 +83,7 @@ class _HideGhostsQuerySet(postgres.QuerySet):
 
 @postgres.register_model
 class HideableItem(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query = _HideGhostsQuerySet()
 
@@ -101,23 +95,21 @@ class HideableItem(postgres.Model):
 
 @postgres.register_model
 class Grandparent(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query: postgres.QuerySet[Grandparent] = postgres.QuerySet()
 
 
 @postgres.register_model
 class MidParent(postgres.Model):
-    grandparent: Grandparent = types.ForeignKeyField(
-        Grandparent, on_delete=postgres.CASCADE
-    )
+    grandparent = types.ForeignKeyField(Grandparent, on_delete=postgres.CASCADE)
 
     query: postgres.QuerySet[MidParent] = postgres.QuerySet()
 
 
 @postgres.register_model
 class Grandchild(postgres.Model):
-    mid_parent: MidParent = types.ForeignKeyField(MidParent, on_delete=postgres.CASCADE)
+    mid_parent = types.ForeignKeyField(MidParent, on_delete=postgres.CASCADE)
 
     query: postgres.QuerySet[Grandchild] = postgres.QuerySet()
 
@@ -129,26 +121,22 @@ class Grandchild(postgres.Model):
 
 @postgres.register_model
 class DiamondParentA(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query: postgres.QuerySet[DiamondParentA] = postgres.QuerySet()
 
 
 @postgres.register_model
 class DiamondParentB(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query: postgres.QuerySet[DiamondParentB] = postgres.QuerySet()
 
 
 @postgres.register_model
 class DiamondChild(postgres.Model):
-    parent_a: DiamondParentA = types.ForeignKeyField(
-        DiamondParentA, on_delete=postgres.CASCADE
-    )
-    parent_b: DiamondParentB = types.ForeignKeyField(
-        DiamondParentB, on_delete=postgres.CASCADE
-    )
+    parent_a = types.ForeignKeyField(DiamondParentA, on_delete=postgres.CASCADE)
+    parent_b = types.ForeignKeyField(DiamondParentB, on_delete=postgres.CASCADE)
 
     query: postgres.QuerySet[DiamondChild] = postgres.QuerySet()
 
@@ -161,7 +149,7 @@ class DiamondChild(postgres.Model):
 
 @postgres.register_model
 class CircA(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
     partner: CircB | None = types.ForeignKeyField(
         "CircB",
         on_delete=postgres.CASCADE,
@@ -173,8 +161,8 @@ class CircA(postgres.Model):
 
 @postgres.register_model
 class CircB(postgres.Model):
-    name: str = types.TextField(max_length=100)
-    partner: CircA | None = types.ForeignKeyField(
+    name = types.TextField(max_length=100)
+    partner = types.ForeignKeyField(
         CircA,
         on_delete=postgres.CASCADE,
         allow_null=True,

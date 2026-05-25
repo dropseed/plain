@@ -8,7 +8,7 @@ from plain.postgres import types
 class TreeNode(postgres.Model):
     """Self-referential FK for testing convergence with circular references."""
 
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
     parent: TreeNode | None = types.ForeignKeyField(
         "self", on_delete=postgres.CASCADE, allow_null=True
     )

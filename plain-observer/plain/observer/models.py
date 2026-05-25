@@ -46,19 +46,19 @@ from .formatting import format_bytes
 
 @postgres.register_model
 class Trace(postgres.Model):
-    trace_id: str = types.TextField(max_length=255)
-    start_time: datetime = types.DateTimeField()
-    end_time: datetime = types.DateTimeField()
+    trace_id = types.TextField(max_length=255)
+    start_time = types.DateTimeField()
+    end_time = types.DateTimeField()
 
-    root_span_name: str = types.TextField(default="", required=False)
-    summary: str = types.TextField(max_length=255, default="", required=False)
+    root_span_name = types.TextField(default="", required=False)
+    summary = types.TextField(max_length=255, default="", required=False)
 
     # Plain fields
-    request_id: str = types.TextField(max_length=255, default="", required=False)
-    session_id: str = types.TextField(max_length=255, default="", required=False)
-    user_id: str = types.TextField(max_length=255, default="", required=False)
-    app_name: str = types.TextField(max_length=255, default="", required=False)
-    app_version: str = types.TextField(max_length=255, default="", required=False)
+    request_id = types.TextField(max_length=255, default="", required=False)
+    session_id = types.TextField(max_length=255, default="", required=False)
+    user_id = types.TextField(max_length=255, default="", required=False)
+    app_name = types.TextField(max_length=255, default="", required=False)
+    app_version = types.TextField(max_length=255, default="", required=False)
 
     # Explicit reverse relations
     spans: types.ReverseForeignKey[Span] = types.ReverseForeignKey(
@@ -328,16 +328,16 @@ class SpanQuerySet(postgres.QuerySet["Span"]):
 
 @postgres.register_model
 class Span(postgres.Model):
-    trace: Trace = types.ForeignKeyField(Trace, on_delete=postgres.CASCADE)
+    trace = types.ForeignKeyField(Trace, on_delete=postgres.CASCADE)
 
-    span_id: str = types.TextField(max_length=255)
+    span_id = types.TextField(max_length=255)
 
-    name: str = types.TextField(max_length=255)
-    kind: str = types.TextField(max_length=50)
-    parent_id: str = types.TextField(max_length=255, default="", required=False)
-    start_time: datetime = types.DateTimeField()
-    end_time: datetime = types.DateTimeField()
-    status: str = types.TextField(max_length=50, default="", required=False)
+    name = types.TextField(max_length=255)
+    kind = types.TextField(max_length=50)
+    parent_id = types.TextField(max_length=255, default="", required=False)
+    start_time = types.DateTimeField()
+    end_time = types.DateTimeField()
+    status = types.TextField(max_length=50, default="", required=False)
     span_data: dict = types.JSONField(default={}, required=False)
 
     # Explicit reverse relation
@@ -506,17 +506,17 @@ class Span(postgres.Model):
 
 @postgres.register_model
 class Log(postgres.Model):
-    trace: Trace = types.ForeignKeyField(Trace, on_delete=postgres.CASCADE)
-    span: Span | None = types.ForeignKeyField(
+    trace = types.ForeignKeyField(Trace, on_delete=postgres.CASCADE)
+    span = types.ForeignKeyField(
         Span,
         on_delete=postgres.SET_NULL,
         allow_null=True,
         required=False,
     )
 
-    timestamp: datetime = types.DateTimeField()
-    level: str = types.TextField(max_length=20)
-    message: str = types.TextField()
+    timestamp = types.DateTimeField()
+    level = types.TextField(max_length=20)
+    message = types.TextField()
 
     query: postgres.QuerySet[Log] = postgres.QuerySet()
 

@@ -63,31 +63,25 @@ class JobRequest(postgres.Model):
     Keep all pending job requests in a single table.
     """
 
-    created_at: datetime.datetime = types.DateTimeField(create_now=True)
-    uuid: UUID = types.UUIDField(generate=True)
+    created_at = types.DateTimeField(create_now=True)
+    uuid = types.UUIDField(generate=True)
 
-    job_class: str = types.TextField(max_length=255)
+    job_class = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
-    priority: int = types.SmallIntegerField(default=0)
-    source: str = types.TextField(required=False)
-    queue: str = types.TextField(default="default", max_length=255)
+    priority = types.SmallIntegerField(default=0)
+    source = types.TextField(required=False)
+    queue = types.TextField(default="default", max_length=255)
 
-    retries: int = types.SmallIntegerField(default=0)
-    retry_attempt: int = types.SmallIntegerField(default=0)
+    retries = types.SmallIntegerField(default=0)
+    retry_attempt = types.SmallIntegerField(default=0)
 
-    concurrency_key: str = types.TextField(max_length=255, required=False)
+    concurrency_key = types.TextField(max_length=255, required=False)
 
-    start_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
+    start_at = types.DateTimeField(required=False, allow_null=True)
 
     # OpenTelemetry trace context
-    trace_id: str | None = types.TextField(
-        max_length=34, required=False, allow_null=True
-    )
-    span_id: str | None = types.TextField(
-        max_length=18, required=False, allow_null=True
-    )
+    trace_id = types.TextField(max_length=34, required=False, allow_null=True)
+    span_id = types.TextField(max_length=18, required=False, allow_null=True)
 
     # expires_at = postgres.DateTimeField(required=False, allow_null=True)
 
@@ -177,35 +171,27 @@ class JobProcess(postgres.Model):
     All active jobs are stored in this table.
     """
 
-    uuid: UUID = types.UUIDField(generate=True)
-    created_at: datetime.datetime = types.DateTimeField(create_now=True)
-    started_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
+    uuid = types.UUIDField(generate=True)
+    created_at = types.DateTimeField(create_now=True)
+    started_at = types.DateTimeField(required=False, allow_null=True)
 
     # From the JobRequest
-    job_request_uuid: UUID = types.UUIDField()
-    requested_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
-    job_class: str = types.TextField(max_length=255)
+    job_request_uuid = types.UUIDField()
+    requested_at = types.DateTimeField(required=False, allow_null=True)
+    job_class = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
-    priority: int = types.SmallIntegerField(default=0)
-    source: str = types.TextField(required=False)
-    queue: str = types.TextField(default="default", max_length=255)
-    retries: int = types.SmallIntegerField(default=0)
-    retry_attempt: int = types.SmallIntegerField(default=0)
-    concurrency_key: str = types.TextField(max_length=255, required=False)
+    priority = types.SmallIntegerField(default=0)
+    source = types.TextField(required=False)
+    queue = types.TextField(default="default", max_length=255)
+    retries = types.SmallIntegerField(default=0)
+    retry_attempt = types.SmallIntegerField(default=0)
+    concurrency_key = types.TextField(max_length=255, required=False)
 
     # OpenTelemetry trace context
-    trace_id: str | None = types.TextField(
-        max_length=34, required=False, allow_null=True
-    )
-    span_id: str | None = types.TextField(
-        max_length=18, required=False, allow_null=True
-    )
+    trace_id = types.TextField(max_length=34, required=False, allow_null=True)
+    span_id = types.TextField(max_length=18, required=False, allow_null=True)
 
-    worker_id: UUID = types.UUIDField()
+    worker_id = types.UUIDField()
 
     query: JobQuerySet = JobQuerySet()
 
@@ -301,12 +287,16 @@ class JobProcess(postgres.Model):
                 },
                 links=links,
             ) as span:
-                # This is how we know it has been picked up
-                self.started_at = timezone.now()
+                # This is how we know it has been picked up.
+                # Keep `started_at` as a local: reading `self.started_at` back
+                # through the descriptor types as `datetime | None` (the field
+                # is `allow_null=True`), which doesn't subtract cleanly below.
+                started_at = timezone.now()
+                self.started_at = started_at
                 self.save(update_fields=["started_at"])
 
                 if self.requested_at:
-                    queue_wait = (self.started_at - self.requested_at).total_seconds()
+                    queue_wait = (started_at - self.requested_at).total_seconds()
                     queue_wait_duration_histogram.record(queue_wait, metric_attributes)
 
                 try:
@@ -594,49 +584,37 @@ class JobResult(postgres.Model):
     All in-process and completed jobs are stored in this table.
     """
 
-    uuid: UUID = types.UUIDField(generate=True)
-    created_at: datetime.datetime = types.DateTimeField(create_now=True)
+    uuid = types.UUIDField(generate=True)
+    created_at = types.DateTimeField(create_now=True)
 
     # From the Job
-    job_process_uuid: UUID = types.UUIDField()
-    started_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
-    ended_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
-    error: str = types.TextField(required=False)
-    status: str = types.TextField(
+    job_process_uuid = types.UUIDField()
+    started_at = types.DateTimeField(required=False, allow_null=True)
+    ended_at = types.DateTimeField(required=False, allow_null=True)
+    error = types.TextField(required=False)
+    status = types.TextField(
         max_length=20,
         choices=JobResultStatuses.choices,
     )
 
     # From the JobRequest
-    job_request_uuid: UUID = types.UUIDField()
-    requested_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
-    job_class: str = types.TextField(max_length=255)
+    job_request_uuid = types.UUIDField()
+    requested_at = types.DateTimeField(required=False, allow_null=True)
+    job_class = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
-    priority: int = types.SmallIntegerField(default=0)
-    source: str = types.TextField(required=False)
-    queue: str = types.TextField(default="default", max_length=255)
-    retries: int = types.SmallIntegerField(default=0)
-    retry_attempt: int = types.SmallIntegerField(default=0)
-    concurrency_key: str = types.TextField(max_length=255, required=False)
+    priority = types.SmallIntegerField(default=0)
+    source = types.TextField(required=False)
+    queue = types.TextField(default="default", max_length=255)
+    retries = types.SmallIntegerField(default=0)
+    retry_attempt = types.SmallIntegerField(default=0)
+    concurrency_key = types.TextField(max_length=255, required=False)
 
     # Retries
-    retry_job_request_uuid: UUID | None = types.UUIDField(
-        required=False, allow_null=True
-    )
+    retry_job_request_uuid = types.UUIDField(required=False, allow_null=True)
 
     # OpenTelemetry trace context
-    trace_id: str | None = types.TextField(
-        max_length=34, required=False, allow_null=True
-    )
-    span_id: str | None = types.TextField(
-        max_length=18, required=False, allow_null=True
-    )
+    trace_id = types.TextField(max_length=34, required=False, allow_null=True)
+    span_id = types.TextField(max_length=18, required=False, allow_null=True)
 
     query: JobResultQuerySet = JobResultQuerySet()
 
@@ -747,12 +725,12 @@ class WorkerHeartbeat(postgres.Model):
     in-flight jobs.
     """
 
-    worker_id: UUID = types.UUIDField()
-    hostname: str = types.TextField(max_length=255)
-    pid: int = types.IntegerField()
+    worker_id = types.UUIDField()
+    hostname = types.TextField(max_length=255)
+    pid = types.IntegerField()
     queues: list[str] = types.JSONField()
-    started_at: datetime.datetime = types.DateTimeField(create_now=True)
-    last_heartbeat_at: datetime.datetime = types.DateTimeField()
+    started_at = types.DateTimeField(create_now=True)
+    last_heartbeat_at = types.DateTimeField()
 
     model_options = postgres.Options(
         ordering=["-last_heartbeat_at"],

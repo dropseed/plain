@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Self
 
 from plain import postgres
@@ -24,11 +23,11 @@ class CachedItemQuerySet(postgres.QuerySet["CachedItem"]):
 
 @postgres.register_model
 class CachedItem(postgres.Model):
-    key: str = types.TextField(max_length=255)
+    key = types.TextField(max_length=255)
     value: Any = types.JSONField(required=False, allow_null=True)
-    expires_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
-    created_at: datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime = types.DateTimeField(create_now=True, update_now=True)
+    expires_at = types.DateTimeField(required=False, allow_null=True)
+    created_at = types.DateTimeField(create_now=True)
+    updated_at = types.DateTimeField(create_now=True, update_now=True)
 
     query: CachedItemQuerySet = CachedItemQuerySet()
 

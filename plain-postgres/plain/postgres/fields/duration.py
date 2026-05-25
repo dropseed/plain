@@ -13,7 +13,9 @@ if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
 
 
-class DurationField(DefaultableField[datetime.timedelta]):
+class DurationField[
+    T: (datetime.timedelta, datetime.timedelta | None) = datetime.timedelta
+](DefaultableField[T]):
     """Store timedelta objects using PostgreSQL's interval type."""
 
     db_type_sql = "interval"

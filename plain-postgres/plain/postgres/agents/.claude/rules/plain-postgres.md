@@ -7,13 +7,32 @@ paths:
 
 ## Field Imports
 
-Import fields via `from plain.postgres import types` and annotate with Python types:
+Import fields via `from plain.postgres import types`. Don't add primitive
+annotations — the field stubs return typed descriptors that resolve to the
+right value type on instance access:
 
 ```python
 from plain.postgres import types
 
-name: str = types.TextField(max_length=100)
-car: Car = types.ForeignKeyField("Car", on_delete=postgres.CASCADE)
+name = types.TextField(max_length=100)
+car = types.ForeignKeyField(Car, on_delete=postgres.CASCADE)
+```
+
+For string forward references (`"self"`, `"OtherModel"`), the type checker
+can't infer the target type from the string — annotate explicitly so
+instance access keeps its type:
+
+```python
+parent: TreeNode | None = types.ForeignKeyField("self", on_delete=postgres.CASCADE, allow_null=True)
+```
+
+For `JSONField` and `EncryptedJSONField`, the stub returns `Any` (the
+runtime class isn't generic over its value shape), so annotate explicitly
+to preserve typing:
+
+```python
+parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
+config: dict | None = types.EncryptedJSONField(required=False, allow_null=True)
 ```
 
 Do NOT import field classes directly from `plain.postgres` or `plain.postgres.fields`.

@@ -83,7 +83,7 @@ class ModelState:
 
 class Model(metaclass=ModelBase):
     # Every model gets an automatic id field
-    id: int = types.PrimaryKeyField()
+    id = types.PrimaryKeyField()
 
     # Descriptors for other model behavior
     query: QuerySet[Self] = QuerySet()
