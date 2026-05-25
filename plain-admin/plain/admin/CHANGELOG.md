@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.82.3](https://github.com/dropseed/plain/releases/plain-admin@0.82.3) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.82.2](https://github.com/dropseed/plain/releases/plain-admin@0.82.2) (2026-05-22)
 
 ### What's changed
