@@ -451,6 +451,12 @@ class _ForeignKeyDescriptor[T: Model, V]:
     def __get__(self, instance: None, owner: type) -> type[T]: ...
     @overload
     def __get__(self, instance: Model, owner: type) -> V: ...
+    # __set__ accepts the related instance, None (for nullable FKs via V),
+    # or a bare PK value (int). NOTE: `bool` is a subclass of `int` in Python,
+    # so `child.parent = True` type-checks here. The runtime
+    # `ForwardForeignKeyDescriptor.__set__` explicitly rejects bool with
+    # `ValueError` so this language quirk is caught at runtime, not silently
+    # coerced to PK 0/1.
     def __set__(self, instance: Model, value: V | int) -> None: ...
 
 @overload

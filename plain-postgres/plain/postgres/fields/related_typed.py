@@ -24,6 +24,23 @@ class RelatedFieldRef:
     Yielded by `ForwardForeignKeyDescriptor.__getattr__` for the first hop;
     chained traversal (`Order.user.profile.city`) builds nested
     `RelatedFieldRef` instances until a concrete field is reached.
+
+    Known limitation — descriptor attribute shadowing
+    -------------------------------------------------
+    For the first hop, `Child.parent` is the FK descriptor itself.
+    `__getattr__` only fires when normal attribute lookup *fails*, so if a
+    related model defines a field whose name collides with a public
+    attribute on `ForwardForeignKeyDescriptor` — currently `field`,
+    `is_cached`, `get_queryset`, `get_prefetch_queryset`, or
+    `RelatedObjectDoesNotExist` — `Child.parent.<that_name>` silently
+    returns the descriptor's attribute instead of building a `PrefixedFieldRef`.
+    The typed-where call against it then produces wrong SQL.
+
+    The architectural fix is to return a fresh proxy object from
+    `ForwardForeignKeyDescriptor.__get__(instance=None)` instead of `self`,
+    so the descriptor's own attributes aren't reachable through class
+    access. That's a bigger change with a wider blast radius (framework
+    code reads `Child.parent.field` etc.) and is deferred.
     """
 
     def __init__(self, model: type[Model], prefix: str) -> None:
@@ -88,21 +105,27 @@ class PrefixedFieldRef:
     # the base Field methods produce via _build_q, so SQL resolution is the
     # same as for a direct field reference.
     def equals(self, value: Any) -> Q:
+        self._reject_if_blocked("equals")
         return self._q("", value)
 
     def not_equal(self, value: Any) -> Q:
+        self._reject_if_blocked("not_equal")
         return ~self._q("", value)
 
     def gt(self, value: Any) -> Q:
+        self._reject_if_blocked("gt")
         return self._q("gt", value)
 
     def gte(self, value: Any) -> Q:
+        self._reject_if_blocked("gte")
         return self._q("gte", value)
 
     def lt(self, value: Any) -> Q:
+        self._reject_if_blocked("lt")
         return self._q("lt", value)
 
     def lte(self, value: Any) -> Q:
+        self._reject_if_blocked("lte")
         return self._q("lte", value)
 
     def is_null(self, value: bool = True) -> Q:
@@ -115,15 +138,19 @@ class PrefixedFieldRef:
     # query time, which is the same failure mode as a manual
     # `filter(user__priority__contains=...)`.
     def contains(self, value: str) -> Q:
+        self._reject_if_blocked("contains")
         return self._q("contains", value)
 
     def icontains(self, value: str) -> Q:
+        self._reject_if_blocked("icontains")
         return self._q("icontains", value)
 
     def startswith(self, value: str) -> Q:
+        self._reject_if_blocked("startswith")
         return self._q("startswith", value)
 
     def endswith(self, value: str) -> Q:
+        self._reject_if_blocked("endswith")
         return self._q("endswith", value)
 
     def _q(self, suffix: str, value: Any) -> Q:
@@ -131,3 +158,19 @@ class PrefixedFieldRef:
         q = Q()
         q.children.append((key, value))
         return q
+
+    def _reject_if_blocked(self, method_name: str) -> None:
+        """Forward the typed-query block from fields that reject value
+        comparisons (currently EncryptedFieldMixin). Direct access raises
+        TypeError at the call site; without this hook, traversing through
+        a relation (Order.user.api_token.equals(...)) would silently build
+        a Q that only errors later at SQL build time."""
+        from plain.postgres.fields.encrypted import EncryptedFieldMixin
+
+        if isinstance(self._field, EncryptedFieldMixin):
+            field_name = getattr(self._field, "name", None) or "<encrypted>"
+            raise TypeError(
+                f"Encrypted field {field_name!r} (reached via "
+                f"{self._prefix!r}) does not support .{method_name}() — "
+                "ciphertext is non-deterministic. Use .is_null() instead."
+            )
