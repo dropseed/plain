@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.28.1](https://github.com/dropseed/plain/releases/plain-cache@0.28.1) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-cache@0.28.0) (2026-05-06)
 
 ### What's changed
