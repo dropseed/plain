@@ -328,7 +328,7 @@ class SpanQuerySet(postgres.QuerySet["Span"]):
 
 @postgres.register_model
 class Span(postgres.Model):
-    trace: Trace = types.ForeignKeyField(Trace, on_delete=postgres.CASCADE)
+    trace = types.ForeignKeyField(Trace, on_delete=postgres.CASCADE)
 
     span_id = types.TextField(max_length=255)
 
@@ -506,8 +506,8 @@ class Span(postgres.Model):
 
 @postgres.register_model
 class Log(postgres.Model):
-    trace: Trace = types.ForeignKeyField(Trace, on_delete=postgres.CASCADE)
-    span: Span | None = types.ForeignKeyField(
+    trace = types.ForeignKeyField(Trace, on_delete=postgres.CASCADE)
+    span = types.ForeignKeyField(
         Span,
         on_delete=postgres.SET_NULL,
         allow_null=True,

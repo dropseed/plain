@@ -436,6 +436,23 @@ def EncryptedJSONField(
 ) -> Any: ...
 
 # Related fields
+#
+# At the type level, the ForeignKeyField stub returns a descriptor whose
+# `__get__` overloads do double duty:
+#   * Class access (User.parent) → type[T] so the related model's typed
+#     field surface (e.g. `User.parent.name.equals(...)`) is visible to
+#     the type checker for typed where() chaining.
+#   * Instance access (user.parent) → T (or T | None for nullable FKs) so
+#     reading the loaded related instance has the value type.
+# The runtime is a Field instance + a ForwardForeignKeyDescriptor, which
+# is structurally compatible — only the typing-side shape differs.
+class _ForeignKeyDescriptor[T: Model, V]:
+    @overload
+    def __get__(self, instance: None, owner: type) -> type[T]: ...
+    @overload
+    def __get__(self, instance: Model, owner: type) -> V: ...
+    def __set__(self, instance: Model, value: V | int) -> None: ...
+
 @overload
 def ForeignKeyField[T: Model](
     to: type[T] | str,
@@ -447,7 +464,7 @@ def ForeignKeyField[T: Model](
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
-) -> T | None: ...
+) -> _ForeignKeyDescriptor[T, T | None]: ...
 @overload
 def ForeignKeyField[T: Model](
     to: type[T] | str,
@@ -459,7 +476,7 @@ def ForeignKeyField[T: Model](
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
-) -> T: ...
+) -> _ForeignKeyDescriptor[T, T]: ...
 def ManyToManyField[T: Model](
     to: type[T] | str,
     *,

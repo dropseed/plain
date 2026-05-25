@@ -288,6 +288,7 @@ def test_delete_and_reinsert_replacement_in_one_atomic(db):
         parent.delete()
 
     child.refresh_from_db()
+    assert child.parent is not None
     assert child.parent.id == DeleteParent.query.get(name="replacement").id
 
 

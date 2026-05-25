@@ -8,7 +8,7 @@ from plain.urls import reverse
 
 @postgres.register_model
 class Note(postgres.Model):
-    author: User = types.ForeignKeyField(
+    author = types.ForeignKeyField(
         User,
         on_delete=postgres.CASCADE,
         related_query_name="notes",

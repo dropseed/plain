@@ -15,7 +15,7 @@ PRIORITY_CHOICES = [
 
 @postgres.register_model
 class Project(postgres.Model):
-    owner: User = types.ForeignKeyField(
+    owner = types.ForeignKeyField(
         User,
         on_delete=postgres.CASCADE,
         related_query_name="projects",
@@ -40,7 +40,7 @@ class Project(postgres.Model):
 
 @postgres.register_model
 class Tag(postgres.Model):
-    owner: User = types.ForeignKeyField(
+    owner = types.ForeignKeyField(
         User,
         on_delete=postgres.CASCADE,
         related_query_name="tags",
@@ -66,9 +66,9 @@ class Tag(postgres.Model):
 class TaskTag(postgres.Model):
     """Through model for Task ↔ Tag M2M."""
 
-    task: Task = types.ForeignKeyField("Task", on_delete=postgres.CASCADE)
+    task = types.ForeignKeyField("Task", on_delete=postgres.CASCADE)
     task_id: int
-    tag: Tag = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
+    tag = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
     tag_id: int
 
     query: postgres.QuerySet[TaskTag] = postgres.QuerySet()
@@ -84,12 +84,12 @@ class TaskTag(postgres.Model):
 
 @postgres.register_model
 class Task(postgres.Model):
-    owner: User = types.ForeignKeyField(
+    owner = types.ForeignKeyField(
         User,
         on_delete=postgres.CASCADE,
         related_query_name="tasks",
     )
-    project: Project | None = types.ForeignKeyField(
+    project = types.ForeignKeyField(
         Project,
         on_delete=postgres.SET_NULL,
         related_query_name="tasks",

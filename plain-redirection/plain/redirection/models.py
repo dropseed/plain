@@ -93,7 +93,7 @@ class Redirect(postgres.Model):
 
 @postgres.register_model
 class RedirectLog(postgres.Model):
-    redirect: Redirect = types.ForeignKeyField(Redirect, on_delete=postgres.CASCADE)
+    redirect = types.ForeignKeyField(Redirect, on_delete=postgres.CASCADE)
 
     # The actuals that were used to redirect
     from_url = types.URLField(max_length=512)

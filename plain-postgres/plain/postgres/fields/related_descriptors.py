@@ -119,6 +119,32 @@ class ForwardForeignKeyDescriptor:
             False,
         )
 
+    def __getattr__(self, name: str) -> Any:
+        """Proxy class-level attribute access to the related model so typed
+        where() can traverse the relation:
+
+            Child.parent.name.equals("x")    →    Q(parent__name="x")
+
+        Only triggers for attributes not found on the descriptor itself.
+        Returns AttributeError for dunders / private names so pickling,
+        copy.deepcopy, and hasattr() probes fail cleanly.
+        """
+        if name.startswith("_"):
+            raise AttributeError(name)
+        from plain.postgres.fields.related_typed import RelatedFieldRef
+
+        remote_model = self.field.remote_field.model
+        if isinstance(remote_model, str):
+            # Relation not yet resolved (still a lazy string ref). Fail
+            # loudly rather than silently producing wrong-shaped queries.
+            raise AttributeError(
+                f"Cannot traverse {self.field.name!r}: related model has "
+                "not been registered yet."
+            )
+        return getattr(
+            RelatedFieldRef(model=remote_model, prefix=self.field.name), name
+        )
+
     def __get__(
         self, instance: Any | None, cls: type | None = None
     ) -> ForwardForeignKeyDescriptor | Any | None:

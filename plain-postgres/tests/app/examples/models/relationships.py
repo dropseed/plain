@@ -19,8 +19,8 @@ class Tag(postgres.Model):
 class WidgetTag(postgres.Model):
     """Through model for Widget-Tag many-to-many relationship."""
 
-    widget: Widget = types.ForeignKeyField("Widget", on_delete=postgres.CASCADE)
-    tag: Tag = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
+    widget = types.ForeignKeyField("Widget", on_delete=postgres.CASCADE)
+    tag = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
 
     query: postgres.QuerySet[WidgetTag] = postgres.QuerySet()
 
