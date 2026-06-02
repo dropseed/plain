@@ -421,16 +421,51 @@ class Model(metaclass=ModelBase):
         assert update_fields is None or update_fields
         cls = self.__class__
 
-        with transaction.mark_for_rollback_on_error():
-            self._save_table(
-                raw=raw,
-                cls=cls,
-                force_insert=force_insert,
-                force_update=force_update,
-                update_fields=update_fields,
-            )
+        try:
+            with transaction.mark_for_rollback_on_error():
+                self._save_table(
+                    raw=raw,
+                    cls=cls,
+                    force_insert=force_insert,
+                    force_update=force_update,
+                    update_fields=update_fields,
+                )
+        except psycopg.IntegrityError as exc:
+            # A constraint the in-Python check didn't catch — a raced unique
+            # insert, or a save that skipped validation — reached the
+            # database. Re-raise it as the ValidationError that check would
+            # have produced; leave anything we can't map as the original error.
+            if (error := self._integrity_error_to_validation_error(exc)) is not None:
+                raise error from exc
+            raise
         # Once saved, this is no longer a to-be-added instance.
         self._state.adding = False
+
+    def _integrity_error_to_validation_error(
+        self, exc: psycopg.IntegrityError
+    ) -> ValidationError | None:
+        """
+        Map a Postgres constraint violation back to the constraint that raised
+        it and return the ValidationError the in-Python check produces for that
+        constraint, or None when the violation doesn't correspond to a declared
+        constraint that can describe it (PK collisions, FK violations, and NOT
+        NULL — which carries no constraint name — all fall through to None and
+        re-raise as the original IntegrityError).
+        """
+        constraint_name = exc.diag.constraint_name
+        if not constraint_name:
+            return None
+        constraint = self._model_meta.constraints_by_name.get(constraint_name)
+        if constraint is None:
+            return None
+        error = constraint._db_violation_error(self, self.__class__)
+        if error is None:
+            return None
+        # Normalize to the same dict shape validate_constraints() produces so
+        # the error routes identically whether it was caught before or after
+        # the write: flat errors land under NON_FIELD_ERRORS, field-routed
+        # errors keep their field.
+        return ValidationError(error.update_error_dict({}))
 
     def _save_table(
         self,

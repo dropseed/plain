@@ -4,11 +4,14 @@ constraint errors."""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from app.examples.models.constraints import ConstraintExample
 
-from plain.exceptions import ValidationError
+from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import CheckConstraint, Q, UniqueConstraint
+from plain.postgres.constraints import BaseConstraint
 from plain.postgres.expressions import F
 from plain.postgres.forms import ModelForm
 from plain.test import RequestFactory
@@ -257,3 +260,55 @@ def test_unique_constraint_single_field_string_routes_to_field(
     assert any("That name is taken." in m for m in form.errors.get("name", [])), (
         form.errors
     )
+
+
+# MARK: IntegrityError -> ValidationError mapping (registry + mapper)
+
+
+def test_constraints_by_name_registry(db: None) -> None:
+    """The Meta registry keys each declared constraint by the name Postgres
+    reports in err.diag.constraint_name."""
+    registry = ConstraintExample._model_meta.constraints_by_name
+    constraint = registry["unique_constraintexample_name_description"]
+    assert isinstance(constraint, UniqueConstraint)
+    assert constraint.name == "unique_constraintexample_name_description"
+
+
+def test_mapper_builds_validation_error_for_known_constraint(db: None) -> None:
+    instance = ConstraintExample(name="x", description="y")
+    exc = SimpleNamespace(
+        diag=SimpleNamespace(
+            constraint_name="unique_constraintexample_name_description"
+        )
+    )
+    error = instance._integrity_error_to_validation_error(exc)  # ty: ignore[invalid-argument-type]
+    assert isinstance(error, ValidationError)
+    # Composite unique normalizes to dict form under NON_FIELD_ERRORS, matching
+    # validate_constraints() rather than returning a flat error.
+    assert NON_FIELD_ERRORS in error.error_dict
+
+
+def test_mapper_returns_none_for_unknown_constraint(db: None) -> None:
+    """A violation whose constraint isn't a declared unique/check constraint
+    (a PK collision, an FK violation) is left for the caller — the mapper
+    returns None so save_base re-raises the original IntegrityError."""
+    instance = ConstraintExample(name="x", description="y")
+    exc = SimpleNamespace(
+        diag=SimpleNamespace(constraint_name="constraintexample_pkey")
+    )
+    assert instance._integrity_error_to_validation_error(exc) is None  # ty: ignore[invalid-argument-type]
+
+
+def test_mapper_returns_none_without_constraint_name(db: None) -> None:
+    instance = ConstraintExample(name="x", description="y")
+    exc = SimpleNamespace(diag=SimpleNamespace(constraint_name=None))
+    assert instance._integrity_error_to_validation_error(exc) is None  # ty: ignore[invalid-argument-type]
+
+
+def test_base_constraint_db_violation_error_defaults_to_none(db: None) -> None:
+    """The polymorphic hook returns None by default, so a constraint type that
+    doesn't describe its own DB violations leaves the original IntegrityError to
+    propagate rather than silently swallowing it."""
+    instance = ConstraintExample(name="x", description="y")
+    constraint = BaseConstraint(name="some_constraint")
+    assert constraint._db_violation_error(instance, ConstraintExample) is None

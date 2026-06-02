@@ -1041,6 +1041,21 @@ class User(postgres.Model):
 
 Field-level validation happens automatically based on field types and constraints.
 
+Validation is a pre-check, not the only guard. If a violation slips past it — a raced unique insert, or a `save(clean_and_validate=False)` — it still reaches the database, and `save()`/`create()` translate that `IntegrityError` into the **same `ValidationError`** the pre-check would have raised (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). So an instance write surfaces a constraint violation the same way whether it's caught before or after the write hits the database.
+
+This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to. If you retry on a unique conflict, catch both:
+
+```python
+try:
+    obj.save()
+except (psycopg.IntegrityError, ValidationError):
+    ...  # lost a race — reload and retry, or report it
+```
+
+For a plain insert-or-update with no per-row logic, `bulk_create(..., update_conflicts=True, unique_fields=[...])` is an atomic upsert with no race to catch.
+
+Two caveats. The mapping covers **immediate** constraints — the default. An explicitly deferred constraint (`UniqueConstraint(deferrable=Deferrable.DEFERRED)`) is checked at commit, _after_ the write returns, so its violation still surfaces as a raw `psycopg.IntegrityError`. And when a row violates several constraints at once, the pre-check reports them all, while the database stops at the first one it hits — so a post-write `ValidationError` carries a single violation.
+
 ### Indexes and constraints
 
 You can optimize queries and ensure data integrity with indexes and constraints. These are managed automatically by [convergence](#convergence) — just declare them on the model and run `postgres sync`.

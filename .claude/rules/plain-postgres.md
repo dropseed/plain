@@ -75,6 +75,7 @@ Use `Model.query` to build querysets (e.g., `User.query.filter(is_active=True)`)
 - Use `bulk_create`/`bulk_update` for batch ops, `.update()`/`.delete()` for mass ops
 - Use `.values_list()` when you only need specific columns
 - Wrap multi-step writes in `transaction.atomic()`
+- `save()`/`create()` raise `ValidationError` (not raw `psycopg.IntegrityError`) on a unique/check violation, even a raced one; `update()`/`bulk_create()` raise raw `psycopg.IntegrityError`. Retrying on conflict? `except (psycopg.IntegrityError, ValidationError)`, or use `bulk_create(..., update_conflicts=True)`
 - Always paginate list queries — unbounded querysets get slower as data grows
 
 Run `uv run plain docs postgres` for full patterns with code examples.

@@ -6,6 +6,7 @@ from typing import Any
 
 import psycopg
 
+from plain.exceptions import ValidationError
 from plain.utils import timezone
 
 
@@ -83,9 +84,11 @@ class Cached:
             item, _ = self._model_class.query.update_or_create(
                 key=self.key, defaults=defaults
             )
-        except psycopg.IntegrityError:
-            # Most likely a race condition in creating the item,
-            # so trying again should do an update
+        except (psycopg.IntegrityError, ValidationError):
+            # Most likely a race condition in creating the item, so trying
+            # again should do an update. A raced unique-key violation now
+            # surfaces as a ValidationError (mapped at the save boundary), not
+            # just a raw IntegrityError, so catch both.
             item, _ = self._model_class.query.update_or_create(
                 key=self.key, defaults=defaults
             )

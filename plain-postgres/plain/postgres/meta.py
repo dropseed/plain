@@ -14,6 +14,7 @@ from plain.utils.datastructures import ImmutableList
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
+    from plain.postgres.constraints import BaseConstraint
     from plain.postgres.fields import Field
     from plain.postgres.fields.related import ManyToManyField, RelatedField
     from plain.postgres.fields.reverse_related import ForeignObjectRel
@@ -553,3 +554,20 @@ class Meta:
             for field in self._get_fields(forward=True, reverse=False)
             if field.db_returning
         ]
+
+    @property
+    def constraints_by_name(self) -> dict[str, BaseConstraint]:
+        """
+        Map each named constraint to its definition, keyed by the name
+        Postgres reports in ``err.diag.constraint_name`` — used on the write
+        path to translate an IntegrityError back to the constraint that raised
+        it.
+
+        A plain ``property``, not ``cached_property``: only read on the error
+        path, so recomputing is free, and it can never serve a stale map if
+        ``model_options.constraints`` is mutated.
+        """
+        return {
+            constraint.name: constraint
+            for constraint in self.model.model_options.constraints
+        }

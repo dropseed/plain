@@ -67,6 +67,18 @@ class BaseConstraint:
             return self.violation_error
         return ValidationError(self.violation_error)
 
+    def _db_violation_error(
+        self, instance: Model, model: type[Model]
+    ) -> ValidationError | None:
+        """The ValidationError to raise when the database reports a violation
+        of this constraint (mapped from an IntegrityError at the write
+        boundary), or None if this constraint type can't be mapped — the
+        caller then re-raises the original IntegrityError.
+
+        Subclasses that can describe their own violations override this.
+        """
+        return None
+
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         path = f"{self.__class__.__module__}.{self.__class__.__name__}"
         path = path.replace("plain.postgres.constraints", "plain.postgres")
@@ -145,6 +157,11 @@ class CheckConstraint(BaseConstraint):
                 raise self._build_violation_error()
         except FieldError:
             pass
+
+    def _db_violation_error(
+        self, instance: Model, model: type[Model]
+    ) -> ValidationError | None:
+        return self._build_violation_error()
 
     def __repr__(self) -> str:
         return "<{}: check={} name={}{}>".format(
@@ -436,3 +453,8 @@ class UniqueConstraint(BaseConstraint):
                 return ValidationError({single_field: [err]})
             return err
         return ValidationError(f'Constraint "{self.name}" is violated.')
+
+    def _db_violation_error(
+        self, instance: Model, model: type[Model]
+    ) -> ValidationError | None:
+        return self._build_unique_violation(instance, model)
