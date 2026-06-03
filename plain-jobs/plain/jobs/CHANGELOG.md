@@ -1,5 +1,17 @@
 # plain-jobs changelog
 
+## [0.54.2](https://github.com/dropseed/plain/releases/plain-jobs@0.54.2) (2026-06-03)
+
+### What's changed
+
+- **Dropped several unused single-column indexes** from the job models: `trace_id` on `JobRequest`, `JobProcess`, and `JobResult`, plus `started_at`, `ended_at`, `job_request_uuid`, `job_class`, and `queue` on `JobResult`. They weren't serving query paths and cost write overhead and storage on every job. ([c7882f0a08](https://github.com/dropseed/plain/commit/c7882f0a08))
+- Internal: model writes adopt plain.postgres's new `create()`/`update()` API. As a side effect the per-write uniqueness pre-check `SELECT` that dominated the jobs write path is gone — the database enforces the constraint. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- Requires `plain.postgres>=0.106.0`.
+- The dropped indexes are removed automatically by schema convergence on your next `plain postgres sync` / deploy — no manual migration. If you query `JobResult` by any of those columns in your own dashboards, add an index on your side.
+
 ## [0.54.1](https://github.com/dropseed/plain/releases/plain-jobs@0.54.1) (2026-05-25)
 
 ### What's changed
