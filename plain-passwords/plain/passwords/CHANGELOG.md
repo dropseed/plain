@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.26.3](https://github.com/dropseed/plain/releases/plain-passwords@0.26.3) (2026-06-03)
+
+### What's changed
+
+- Internal: the password-rehash setter in `check_user_password` and `PasswordSetForm.save` now write via `user.update(...)` instead of `user.save(...)`. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- No changes required. Your `User` model must be on `plain.postgres>=0.106.0` (which provides `update()`).
+
 ## [0.26.2](https://github.com/dropseed/plain/releases/plain-passwords@0.26.2) (2026-05-22)
 
 ### What's changed
