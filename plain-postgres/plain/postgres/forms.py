@@ -264,10 +264,6 @@ class BaseModelForm(BaseForm):
         # if initial was provided, it should override the values from instance
         if initial is not None:
             object_data.update(initial)
-        # self._validate_unique will be set to True by BaseModelForm.clean().
-        # It is False by default so overriding self.clean() and failing to call
-        # super will stop validate_unique from being called.
-        self._validate_unique = False
         super().__init__(
             request=request,
             auto_id=auto_id,
@@ -318,10 +314,6 @@ class BaseModelForm(BaseForm):
                     exclude.add(f.name)
         return exclude
 
-    def clean(self) -> dict[str, Any]:
-        self._validate_unique = True
-        return self.cleaned_data
-
     def _update_errors(self, errors: ValidationError) -> None:
         # Override any validation error messages raised during model clean
         # with the form field's error_messages when the error code matches.
@@ -354,22 +346,11 @@ class BaseModelForm(BaseForm):
             self._update_errors(e)
 
         try:
-            self.instance.full_clean(exclude=exclude, validate_unique=False)
-        except ValidationError as e:
-            self._update_errors(e)
-
-        # Validate uniqueness if needed.
-        if self._validate_unique:
-            self.validate_unique()
-
-    def validate_unique(self) -> None:
-        """
-        Call the instance's validate_unique() method and update the form's
-        validation errors if any were raised.
-        """
-        exclude = self._get_validation_exclusions()
-        try:
-            self.instance.validate_unique(exclude=exclude)
+            # Forms pre-check constraints (unlike save(), which lets the DB
+            # enforce them) so they can surface every violation at once. Pin
+            # validate_constraints explicitly so this survives any change to
+            # full_clean's default.
+            self.instance.full_clean(exclude=exclude, validate_constraints=True)
         except ValidationError as e:
             self._update_errors(e)
 

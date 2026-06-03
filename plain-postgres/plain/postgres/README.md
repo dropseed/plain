@@ -1041,7 +1041,7 @@ class User(postgres.Model):
 
 Field-level validation happens automatically based on field types and constraints.
 
-**The database is authoritative for constraints.** `save()`/`create()` don't pre-check your declared unique/check constraints — they attempt the write, and if Postgres rejects it, translate the `IntegrityError` into a `ValidationError` (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). You get the same field-level error you'd expect, the write costs no per-constraint `SELECT`, and a raced concurrent insert can't slip through as a 500. (FK violations and `NOT NULL` have no declared constraint to map to and re-raise as the original `IntegrityError`.)
+**The database is authoritative for constraints.** `save()`/`create()` don't pre-check your declared unique/check constraints — they attempt the write, and if Postgres rejects it, translate the `IntegrityError` into a `ValidationError` (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). You get the same field-level error you'd expect, the write costs no per-constraint `SELECT`, and a raced concurrent insert can't slip through as a 500. (FK violations, `NOT NULL`, and a hand-set primary-key collision have no declared constraint to map to and re-raise as the original `IntegrityError`. Assigning the auto `id` on a new instance takes the explicit `save(force_insert=True)` path — Postgres owns it, so a plain `save()` with a stray `id` is rejected before the write.)
 
 Because the rejected write reaches the database, it aborts the surrounding transaction. If you catch the `ValidationError` and want to keep using the transaction, wrap the write in `transaction.atomic()` so it rolls back to a savepoint:
 

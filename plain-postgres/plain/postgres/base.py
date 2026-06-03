@@ -4,7 +4,7 @@ import copy
 import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
     from plain.postgres.meta import Meta
@@ -72,9 +72,11 @@ class ModelState:
     """Store model instance state."""
 
     # True until the instance is first persisted (cleared by from_db and after
-    # save_base). Two things read it: uniqueness validation treats the instance
-    # as new, and _save_table force-INSERTs it -- an unsaved object has no row
-    # to UPDATE.
+    # save_base). Two things read it: save_base gates writes that need a
+    # persisted row (force_update / update_fields require one, and a new
+    # instance with a hand-set id must opt in with force_insert to INSERT it --
+    # Postgres otherwise owns the auto `id`), and UniqueConstraint.validate
+    # excludes the current row from its uniqueness lookup when editing.
     adding = True
 
     def __init__(self) -> None:
@@ -411,18 +413,11 @@ class Model(metaclass=ModelBase):
             # Validate the instance's shape (fields + clean()), but not its
             # constraints. The database is authoritative for unique/check
             # violations, and save_base maps the resulting IntegrityError back
-            # to the same ValidationError a pre-check would have raised — so
+            # to the same ValidationError a pre-check would have raised -- so
             # skipping validate_constraints here drops a SELECT-per-constraint
             # from every write without losing the field-level error. Forms keep
-            # their own pre-check (full_clean in _post_clean) to surface every
-            # violation at once.
-            #
-            # validate_unique stays on (full_clean's default) and is
-            # load-bearing — it's the one pre-check the database can't replace.
-            # A new instance saved with a manually-set, already-existing PK
-            # would otherwise reach _save_table's UPDATE-first path and
-            # silently overwrite that row instead of raising. It's a no-op for
-            # auto PKs; don't drop it while manually-set PKs are still allowed.
+            # their own pre-check (full_clean runs validate_constraints in
+            # _post_clean) to surface every violation at once.
             self.full_clean(exclude=deferred_fields, validate_constraints=False)
 
         self.save_base(
@@ -443,6 +438,36 @@ class Model(metaclass=ModelBase):
         assert not (force_insert and (force_update or update_fields))
         assert update_fields is None or update_fields
         cls = self.__class__
+
+        # Reject incoherent writes here, above the transaction-marking block --
+        # these are pure-precondition errors with no SQL behind them, so they
+        # must not mark an enclosing atomic() for rollback (the way a real
+        # IntegrityError from the write below legitimately would).
+        id_set = self.id is not None
+        # An explicit UPDATE request (force_update / update_fields) needs a row
+        # already in the database. A new instance has never been persisted, and
+        # delete() clears the id of one that was -- either way there's no row to
+        # target, so reject rather than silently fall through to an INSERT. This
+        # comes first so a new instance with a hand-set id gets this accurate
+        # message instead of being steered toward force_insert by the guard
+        # below (force_insert can't even combine with force_update/update_fields).
+        if (force_update or update_fields) and (self._state.adding or not id_set):
+            raise ValueError(
+                f"Cannot use force_update or update_fields on this {cls.__name__} "
+                "-- it has no persisted row to update (it's new, or its row was "
+                "deleted). Load the row with query.get(id=...) first, or drop "
+                "force_update/update_fields to INSERT a new row."
+            )
+        # A new instance must let Postgres generate the id; a hand-set id only
+        # reaches the database through the explicit force_insert opt-in.
+        if self._state.adding and id_set and not force_insert:
+            raise ValueError(
+                f"Cannot save a new {cls.__name__} with a hand-set primary key "
+                "'id'. Postgres generates 'id' on INSERT; to assign it yourself "
+                "(e.g. a sequence-reserved id for a deferred FK) pass "
+                "force_insert=True, or use query.get(id=...) to load an existing "
+                "row."
+            )
 
         try:
             with transaction.mark_for_rollback_on_error():
@@ -472,7 +497,9 @@ class Model(metaclass=ModelBase):
         constraint, or None when the violation doesn't correspond to a declared
         constraint that can describe it (PK collisions, FK violations, and NOT
         NULL — which carries no constraint name — all fall through to None and
-        re-raise as the original IntegrityError).
+        re-raise as the original IntegrityError). A PK collision reaches here
+        only on the explicit save(force_insert=True) path; a plain save() with
+        a hand-set id is rejected before the write.
         """
         constraint_name = exc.diag.constraint_name
         if not constraint_name:
@@ -510,49 +537,26 @@ class Model(metaclass=ModelBase):
         id_field = meta.get_forward_field("id")
         id_val = self.id
         id_set = id_val is not None
-        if not id_set and (force_update or update_fields):
-            raise ValueError("Cannot force an update in save() with no primary key.")
         updated = False
-        # An instance still in its "adding" state has never been persisted, so
-        # a plain save() must INSERT, not UPDATE -- even when a primary key is
-        # already present (an id assigned by hand). Routing it through the
-        # UPDATE-first path below would silently overwrite whatever row holds
-        # that id; forcing the INSERT lets the database reject a collision
-        # instead. Callers that explicitly asked for an UPDATE via force_update
-        # / update_fields are exempt -- those honor the requested UPDATE.
-        if (
-            not force_insert
-            and not force_update
-            and not update_fields
-            and self._state.adding
-            and id_set
-        ):
-            force_insert = True
         # If possible, try an UPDATE. If that doesn't update anything, do an INSERT.
         if id_set and not force_insert:
             base_qs = meta.base_queryset
             values = [(f, f.pre_save(self, False)) for f in non_pks]
-            # A DATABASE_DEFAULT sentinel means "let the DB produce this on
-            # INSERT"; it has no UPDATE form (the UPDATE compiler can't emit the
-            # DEFAULT keyword), so drop those fields here. An adding instance
-            # can still reach this path via an explicit force_update /
-            # update_fields; if the UPDATE then matches a row, refresh the
-            # dropped fields so the instance holds the DB's value rather than
-            # the sentinel.
-            db_default_names = [v[0].name for v in values if v[1] is DATABASE_DEFAULT]
-            values = [v for v in values if v[1] is not DATABASE_DEFAULT]
-            forced_update = bool(update_fields or force_update)
-            updated = self._do_update(
-                base_qs, id_val, values, update_fields, forced_update
-            )
-            if force_update and not updated:
-                raise psycopg.DatabaseError("Forced update did not affect any rows.")
-            if update_fields and not updated:
+            # Only already-persisted instances reach this UPDATE path (new-with-id
+            # goes via force_insert; force_update/update_fields without a row is
+            # rejected in save_base). In the normal lifecycle such an instance
+            # holds no DATABASE_DEFAULT sentinel -- every INSERT fills DB-default
+            # fields via RETURNING, so by now its values are real and need no
+            # filtering. (Manually reassigning the sentinel to a field on a
+            # persisted instance is not supported here: the UPDATE compiler can't
+            # emit the DEFAULT keyword the way SQLInsertCompiler does.)
+            updated = self._do_update(base_qs, id_val, values, update_fields)
+            if not updated and (force_update or update_fields):
+                requested = "force_update" if force_update else "update_fields"
                 raise psycopg.DatabaseError(
-                    "Save with update_fields did not affect any rows."
+                    f"Save with {requested} affected no rows -- the target row "
+                    "no longer exists."
                 )
-            if updated and db_default_names:
-                self.refresh_from_db(fields=db_default_names)
         if not updated:
             fields = meta.local_concrete_fields
             if not id_set:
@@ -572,7 +576,6 @@ class Model(metaclass=ModelBase):
         id_val: Any,
         values: list[tuple[Any, Any]],
         update_fields: Iterable[str] | None,
-        forced_update: bool,
     ) -> bool:
         """
         Try to update the model. Return True if the model was updated (if an
@@ -713,130 +716,6 @@ class Model(metaclass=ModelBase):
         """
         pass
 
-    def validate_unique(self, exclude: set[str] | None = None) -> None:
-        """
-        Check unique constraints on the model and raise ValidationError if any
-        failed.
-        """
-        unique_checks = self._get_unique_checks(exclude=exclude)
-
-        if errors := self._perform_unique_checks(unique_checks):
-            raise ValidationError(errors)
-
-    def _get_unique_checks(
-        self, exclude: set[str] | None = None
-    ) -> list[tuple[type[Model], tuple[str, ...]]]:
-        """
-        Return a list of checks to perform. Since validate_unique() could be
-        called from a ModelForm, some fields may have been excluded; we can't
-        perform a unique check on a model that is missing fields involved
-        in that check. Fields that did not validate should also be excluded,
-        but they need to be passed in via the exclude argument.
-        """
-        if exclude is None:
-            exclude = set()
-        unique_checks = []
-
-        # Gather a list of checks for fields declared as unique and add them to
-        # the list of checks.
-
-        fields_with_class = [(self.__class__, self._model_meta.local_fields)]
-
-        for model_class, fields in fields_with_class:
-            for f in fields:
-                name = f.name
-                if name in exclude:
-                    continue
-                if f.primary_key:
-                    unique_checks.append((model_class, (name,)))
-
-        return unique_checks
-
-    def _perform_unique_checks(
-        self, unique_checks: list[tuple[type[Model], tuple[str, ...]]]
-    ) -> dict[str, list[ValidationError]]:
-        errors = {}
-
-        for model_class, unique_check in unique_checks:
-            # Try to look up an existing object with the same values as this
-            # object's values for all the unique field.
-
-            lookup_kwargs = {}
-            for field_name in unique_check:
-                f = self._model_meta.get_forward_field(field_name)
-                lookup_value = f.value_from_object(self)
-                if lookup_value is None:
-                    # no value, skip the lookup
-                    continue
-                if f.primary_key and not self._state.adding:
-                    # no need to check for unique primary key when editing
-                    continue
-                lookup_kwargs[str(field_name)] = lookup_value
-
-            # some fields were skipped, no reason to do the check
-            if len(unique_check) != len(lookup_kwargs):
-                continue
-
-            qs = model_class.query.filter(**lookup_kwargs)
-
-            # Exclude the current object from the query if we are editing an
-            # instance (as opposed to creating a new one).
-            model_class_id = getattr(self, "id")
-            if not self._state.adding and model_class_id is not None:
-                qs = qs.exclude(id=model_class_id)
-            if qs.exists():
-                if len(unique_check) == 1:
-                    key = unique_check[0]
-                else:
-                    key = NON_FIELD_ERRORS
-                errors.setdefault(key, []).append(
-                    self.unique_error_message(model_class, unique_check)
-                )
-
-        return errors
-
-    def unique_error_message(
-        self, model_class: type[Model], unique_check: tuple[str, ...]
-    ) -> ValidationError:
-        meta = model_class._model_meta
-
-        params = {
-            "model": self,
-            "model_class": model_class,
-            "model_name": model_class.model_options.model_name,
-            "unique_check": unique_check,
-        }
-
-        if len(unique_check) == 1:
-            field = meta.get_forward_field(unique_check[0])
-            params["field_label"] = field.name  # ty: ignore[invalid-assignment]
-            return ValidationError(
-                message=field.unique_error_message,
-                code="unique",
-                params=params,
-            )
-        else:
-            field_names = [meta.get_forward_field(f).name for f in unique_check]
-
-            # Put an "and" before the last one
-            field_names[-1] = f"and {field_names[-1]}"
-
-            if len(field_names) > 2:
-                # Comma join if more than 2
-                params["field_label"] = ", ".join(cast(list[str], field_names))
-            else:
-                # Just a space if there are only 2
-                params["field_label"] = " ".join(cast(list[str], field_names))
-
-            # Use the first field as the message format...
-            message = meta.get_forward_field(unique_check[0]).unique_error_message
-
-            return ValidationError(
-                message=message,
-                code="unique",
-                params=params,
-            )
-
     def get_constraints(self) -> list[tuple[type[Model], list[Any]]]:
         constraints: list[tuple[type[Model], list[Any]]] = [
             (self.__class__, list(self.model_options.constraints))
@@ -860,13 +739,11 @@ class Model(metaclass=ModelBase):
         self,
         *,
         exclude: set[str] | Iterable[str] | None = None,
-        validate_unique: bool = True,
         validate_constraints: bool = True,
     ) -> None:
         """
-        Call clean_fields(), clean(), validate_unique(), and
-        validate_constraints() on the model. Raise a ValidationError for any
-        errors that occur.
+        Call clean_fields(), clean(), and validate_constraints() on the model.
+        Raise a ValidationError for any errors that occur.
         """
         errors = {}
         if exclude is None:
@@ -875,12 +752,12 @@ class Model(metaclass=ModelBase):
             exclude = set(exclude)
 
         # Fields holding the DATABASE_DEFAULT sentinel will be produced by
-        # the database on INSERT — there's no Python value to clean,
-        # uniqueness-check, or feed into a constraint lookup. Exclude them
-        # from every validation step until the value is populated. Read via
-        # __dict__ to avoid triggering refresh_from_db on deferred fields.
-        # Also exclude fields that pre_save fills in (e.g. update_now) —
-        # the value isn't present yet but will be before the INSERT/UPDATE.
+        # the database on INSERT — there's no Python value to clean or feed
+        # into a constraint lookup. Exclude them from every validation step
+        # until the value is populated. Read via __dict__ to avoid triggering
+        # refresh_from_db on deferred fields. Also exclude fields that pre_save
+        # fills in (e.g. update_now) — the value isn't present yet but will be
+        # before the INSERT/UPDATE.
         for f in self._model_meta.fields:
             if f.name in exclude:
                 continue
@@ -900,16 +777,6 @@ class Model(metaclass=ModelBase):
             self.clean()
         except ValidationError as e:
             errors = e.update_error_dict(errors)
-
-        # Run unique checks, but only for fields that passed validation.
-        if validate_unique:
-            for name in errors:
-                if name != NON_FIELD_ERRORS and name not in exclude:
-                    exclude.add(name)
-            try:
-                self.validate_unique(exclude=exclude)
-            except ValidationError as e:
-                errors = e.update_error_dict(errors)
 
         # Run constraints checks, but only for fields that passed validation.
         if validate_constraints:
