@@ -87,6 +87,8 @@ Only update constraints when there's an actual compatibility requirement — don
 
 ### Phase 4: Generate Release Notes
 
+Apply maximum reasoning effort to this phase — `ultrathink` while reading each diff and writing its notes. Release notes are user-facing and can't be quietly revised after publishing, so accuracy and completeness matter more than speed here.
+
 For each package to release, sequentially:
 
 1. Get the file changes since the last release:
