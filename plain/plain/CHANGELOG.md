@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.148.1](https://github.com/dropseed/plain/releases/plain@0.148.1) (2026-06-03)
+
+### What's changed
+
+- **`plain.observer` has been retired.** Its references are removed from core: the package listing, the `plain docs` known-packages list, and the internal request-span plumbing that passed cookies/headers to the observer sampler. ([1bab9f784a](https://github.com/dropseed/plain/commit/1bab9f784a))
+- The `plain-upgrade` skill now summarizes what changed in each release, not just the upgrade steps. ([bfdfb9a45a](https://github.com/dropseed/plain/commit/bfdfb9a45a))
+- Docs: model write examples updated to `create()`/`update()`. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- No changes required. If you used `plain.observer`, switch to `plain.connect` for production telemetry export and `plain.pytest`/`plain.connect` for the OpenTelemetry SDK — observer is no longer published.
+
 ## [0.148.0](https://github.com/dropseed/plain/releases/plain@0.148.0) (2026-05-22)
 
 ### What's changed
