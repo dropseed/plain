@@ -2868,12 +2868,9 @@ class InsertQuery(Query):
         self.update_fields: list[Field] = update_fields or []
         self.unique_fields: list[Field] = unique_fields or []
 
-    def insert_values(
-        self, fields: list[Any], objs: list[Any], raw: bool = False
-    ) -> None:
+    def insert_values(self, fields: list[Any], objs: list[Any]) -> None:
         self.fields = fields
         self.objs = objs
-        self.raw = raw
 
 
 class AggregateQuery(Query):

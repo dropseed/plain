@@ -12,10 +12,11 @@ from __future__ import annotations
 import datetime
 import uuid
 
+import psycopg
 import pytest
 from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
 
-from plain.postgres import get_connection
+from plain.postgres import get_connection, transaction
 from plain.postgres.fields import DATABASE_DEFAULT
 from plain.postgres.functions import GenRandomUUID, Now
 
@@ -395,36 +396,31 @@ def test_database_default_singleton_survives_pickling(db):
     assert isinstance(restored.db_uuid, uuid.UUID)
 
 
-def test_save_with_explicit_pk_refreshes_db_default_fields_after_update(db):
-    """When save() takes the UPDATE path against an existing row, fields
-    that hold the DATABASE_DEFAULT sentinel must be refreshed from the DB
-    so the in-memory instance doesn't keep the sentinel."""
-    # First, create a row so the explicit-PK save below hits an UPDATE.
-    original = DBDefaultsExample(name="original")
-    original.save()
+def test_explicit_pk_collision_inserts_not_overwrites(db):
+    """A new (adding) instance whose id already exists force-INSERTs rather
+    than silently UPDATE-ing the existing row. The database rejects the
+    colliding insert -- even with validate_unique bypassed -- so the original
+    row is never overwritten."""
+    original = DBDefaultsExample.query.create(name="original")
 
-    # New unsaved instance with the SAME id and no value for db_uuid. The id
-    # is assigned after construction — the constructor rejects a manual `id`,
-    # and this setattr path is what reaches _save_table's UPDATE-first
-    # fallback. Skip clean_and_validate so validate_unique doesn't reject the
-    # colliding id before the write.
-    same_id = DBDefaultsExample(name="updated")
-    same_id.id = original.id
-    assert same_id.db_uuid is DATABASE_DEFAULT
+    clash = DBDefaultsExample(name="overwrite-attempt")
+    clash.id = original.id
 
-    same_id.save(clean_and_validate=False)
+    # clean_and_validate=False bypasses validate_unique, so the write reaches
+    # the database. Before the force-INSERT this UPDATE-ed (overwrote) the
+    # existing row and returned silently.
+    with pytest.raises(psycopg.IntegrityError):
+        with transaction.atomic():
+            clash.save(clean_and_validate=False)
 
-    # The UPDATE succeeded; db_uuid should now hold the DB's value, not
-    # the sentinel.
-    assert same_id.db_uuid is not DATABASE_DEFAULT
-    assert same_id.db_uuid == original.db_uuid
-    assert isinstance(same_id.db_uuid, uuid.UUID)
+    reloaded = DBDefaultsExample.query.get(id=original.id)
+    assert reloaded.name == "original"
 
 
-def test_save_with_explicit_pk_falls_back_to_insert(db):
-    """When id is set but the row doesn't exist, save() tries UPDATE first
-    then INSERT. The DATABASE_DEFAULT sentinel must not leak into the UPDATE
-    path — only the INSERT can meaningfully evaluate a DB default."""
+def test_explicit_pk_on_new_instance_inserts_and_fills_db_defaults(db):
+    """A new instance with an id set by hand (and no existing row) force-
+    INSERTs. The DB-expression defaults (db_uuid, created_at) are filled by
+    the INSERT's RETURNING, not left as the DATABASE_DEFAULT sentinel."""
     inst = DBDefaultsExample(name="explicit-pk")
     inst.id = 999_999
     inst.save()
@@ -435,6 +431,42 @@ def test_save_with_explicit_pk_falls_back_to_insert(db):
 
     reloaded = DBDefaultsExample.query.get(id=999_999)
     assert reloaded.db_uuid == inst.db_uuid
+
+
+def test_force_update_on_adding_instance_honors_update_not_insert(db):
+    """save(force_update=True) on a new instance honors the UPDATE-only
+    request rather than force-INSERT. With no matching row the forced UPDATE
+    raises -- it does not fall through and silently INSERT a brand-new row."""
+    inst = DBDefaultsExample(name="x")
+    inst.id = 987_654
+    # The raise is the contract: a silent force-INSERT would return normally
+    # and create the row, so pytest.raises failing IS the regression. A
+    # post-hoc row check can't add anything -- the error rolls the write back,
+    # so the row would be gone either way.
+    with pytest.raises(psycopg.DatabaseError, match="Forced update did not affect"):
+        with transaction.atomic():
+            inst.save(clean_and_validate=False, force_update=True)
+
+
+def test_adding_instance_reaching_update_filters_and_refreshes_sentinel(db):
+    """When an adding instance reaches the UPDATE path (here via force_update
+    against an existing row), a DATABASE_DEFAULT sentinel field is dropped from
+    the UPDATE (the UPDATE compiler can't emit DEFAULT) and refreshed from the
+    row afterward -- not bound as a parameter."""
+    original = DBDefaultsExample.query.create(name="original")
+
+    overlay = DBDefaultsExample(name="overlay")
+    overlay.id = original.id
+    assert overlay.db_uuid is DATABASE_DEFAULT
+
+    overlay.save(clean_and_validate=False, force_update=True)
+
+    # The sentinel field was filtered out of the UPDATE, then refreshed to the
+    # row's real value; the named field was updated on the existing row.
+    assert overlay.db_uuid == original.db_uuid
+    assert isinstance(overlay.db_uuid, uuid.UUID)
+    reloaded = DBDefaultsExample.query.get(id=original.id)
+    assert reloaded.name == "overlay"
 
 
 def test_datetime_update_now_requires_backfill_companion():

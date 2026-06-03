@@ -637,18 +637,10 @@ class QuerySet[T: "Model"]:
         return obj
 
     def _prepare_for_bulk_create(self, objs: list[T]) -> None:
-        from plain.postgres.fields.base import DefaultableField
-
-        id_field = self.model._model_meta.get_forward_field("id")
-        has_id_default = (
-            isinstance(id_field, DefaultableField) and id_field.has_default()
-        )
+        # The identity PK is the only PK type, so there's no literal Python
+        # default to materialize -- obj.id stays None and the INSERT takes the
+        # DB's DEFAULT path.
         for obj in objs:
-            if obj.id is None and has_id_default:
-                # User-declared literal default on the PK — materialize it
-                # so the INSERT carries a Python value. Identity PKs take the
-                # DB's DEFAULT path and leave obj.id as None.
-                obj.id = id_field.get_default()
             obj._prepare_related_fields_for_save(operation_name="bulk_create")
 
     def _check_bulk_create_options(
@@ -1466,7 +1458,6 @@ class QuerySet[T: "Model"]:
         objs: list[T],
         fields: list[Field],
         returning_fields: list[Field] | None = None,
-        raw: bool = False,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
@@ -1482,7 +1473,7 @@ class QuerySet[T: "Model"]:
             update_fields=update_fields,
             unique_fields=unique_fields,
         )
-        query.insert_values(fields, objs, raw=raw)
+        query.insert_values(fields, objs)
         # InsertQuery returns SQLInsertCompiler which has different execute_sql signature
         return query.get_compiler().execute_sql(returning_fields)
 

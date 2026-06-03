@@ -25,8 +25,8 @@ from plain.postgres.exceptions import (
     MultipleObjectsReturnedDescriptor,
 )
 from plain.postgres.expressions import RawSQL, Value
-from plain.postgres.fields import DATABASE_DEFAULT, NOT_PROVIDED, Field
-from plain.postgres.fields.base import ColumnField, DefaultableField
+from plain.postgres.fields import DATABASE_DEFAULT, Field
+from plain.postgres.fields.base import ColumnField
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ForeignObjectRel
 from plain.postgres.meta import Meta
@@ -71,10 +71,10 @@ class ModelBase(type):
 class ModelState:
     """Store model instance state."""
 
-    # If true, uniqueness validation checks will consider this a new, unsaved
-    # object. Necessary for correct validation of new instances of objects with
-    # explicit (non-auto) PKs. This impacts validation only; it has no effect
-    # on the actual save.
+    # True until the instance is first persisted (cleared by from_db and after
+    # save_base). Two things read it: uniqueness validation treats the instance
+    # as new, and _save_table force-INSERTs it -- an unsaved object has no row
+    # to UPDATE.
     adding = True
 
     def __init__(self) -> None:
@@ -103,22 +103,19 @@ class Model(metaclass=ModelBase):
         # Set up the storage for instance state
         self._state = ModelState()
 
-        # Postgres owns the identity primary key — it's generated on INSERT.
+        # Postgres owns the identity primary key -- it's generated on INSERT.
         # Passing `id` to the constructor almost always means "give me the
-        # existing row with this id", which is a query, not a constructor
-        # argument. It's also a silent footgun: a new instance carrying an
-        # already-used id reaches _save_table's UPDATE-first path on save()
-        # and overwrites that row instead of failing. Reject it at the
-        # source. from_db() loads real rows and passes _from_db=True to skip
-        # this.
+        # existing row with this id", which is a query (query.get), not a
+        # constructor argument. Reject it so a freshly constructed instance is
+        # unambiguously new. from_db() loads real rows and passes _from_db=True
+        # to skip this.
         if not _from_db and kwargs.get("id") is not None:
-            if meta.get_forward_field("id").auto_created:
-                raise ValueError(
-                    f"Cannot set the auto-generated primary key 'id' when "
-                    f"constructing a {cls.__name__}. To load an existing row, "
-                    f"use {cls.__name__}.query.get(id=...); to create a new "
-                    f"one, omit 'id' and let the database assign it."
-                )
+            raise ValueError(
+                f"Cannot set the auto-generated primary key 'id' when "
+                f"constructing a {cls.__name__}. To load an existing row, "
+                f"use {cls.__name__}.query.get(id=...); to create a new "
+                f"one, omit 'id' and let the database assign it."
+            )
 
         # Process all fields from kwargs or use defaults
         for field in meta.fields:
@@ -437,18 +434,12 @@ class Model(metaclass=ModelBase):
     def save_base(
         self,
         *,
-        raw: bool = False,
         force_insert: bool = False,
         force_update: bool = False,
         update_fields: Iterable[str] | None = None,
     ) -> None:
-        """
-        Handle the parts of saving shared between the normal and raw paths.
-
-        The 'raw' argument tells save_base to skip per-field value
-        conversions — used by fixture loading, which has already produced
-        values in their final form.
-        """
+        """Handle the lower-level parts of saving: the table write and the
+        integrity-error mapping. Shared with the save() entry point."""
         assert not (force_insert and (force_update or update_fields))
         assert update_fields is None or update_fields
         cls = self.__class__
@@ -456,7 +447,6 @@ class Model(metaclass=ModelBase):
         try:
             with transaction.mark_for_rollback_on_error():
                 self._save_table(
-                    raw=raw,
                     cls=cls,
                     force_insert=force_insert,
                     force_update=force_update,
@@ -502,7 +492,6 @@ class Model(metaclass=ModelBase):
     def _save_table(
         self,
         *,
-        raw: bool,
         cls: type[Model],
         force_insert: bool = False,
         force_update: bool = False,
@@ -520,41 +509,36 @@ class Model(metaclass=ModelBase):
 
         id_field = meta.get_forward_field("id")
         id_val = self.id
-        if id_val is None:
-            # User-declared literal default on the PK? Materialize it so the
-            # INSERT carries the Python value rather than letting the DB
-            # generate one. Identity PKs have no such default, so id_val
-            # stays None and the INSERT emits DEFAULT.
-            if isinstance(id_field, DefaultableField) and id_field.has_default():
-                id_val = id_field.get_default()
-            setattr(self, id_field.name, id_val)
         id_set = id_val is not None
         if not id_set and (force_update or update_fields):
             raise ValueError("Cannot force an update in save() with no primary key.")
         updated = False
-        # Skip an UPDATE when adding an instance and primary key has a default.
+        # An instance still in its "adding" state has never been persisted, so
+        # a plain save() must INSERT, not UPDATE -- even when a primary key is
+        # already present (an id assigned by hand). Routing it through the
+        # UPDATE-first path below would silently overwrite whatever row holds
+        # that id; forcing the INSERT lets the database reject a collision
+        # instead. Callers that explicitly asked for an UPDATE via force_update
+        # / update_fields are exempt -- those honor the requested UPDATE.
         if (
-            not raw
-            and not force_insert
+            not force_insert
+            and not force_update
+            and not update_fields
             and self._state.adding
-            and isinstance(id_field, DefaultableField)
-            and id_field.default
-            and id_field.default is not NOT_PROVIDED
+            and id_set
         ):
             force_insert = True
         # If possible, try an UPDATE. If that doesn't update anything, do an INSERT.
         if id_set and not force_insert:
             base_qs = meta.base_queryset
-            values = [
-                (f, (f.value_from_object(self) if raw else f.pre_save(self, False)))
-                for f in non_pks
-            ]
-            # DATABASE_DEFAULT fields represent "let the DB produce this on
-            # INSERT" — they have no meaningful UPDATE semantic, so skip them
-            # on the UPDATE path. If the row doesn't exist the INSERT fallback
-            # below handles them correctly. If the UPDATE *does* succeed, we
-            # need to refresh those fields from the DB so the in-memory
-            # instance doesn't keep the sentinel.
+            values = [(f, f.pre_save(self, False)) for f in non_pks]
+            # A DATABASE_DEFAULT sentinel means "let the DB produce this on
+            # INSERT"; it has no UPDATE form (the UPDATE compiler can't emit the
+            # DEFAULT keyword), so drop those fields here. An adding instance
+            # can still reach this path via an explicit force_update /
+            # update_fields; if the UPDATE then matches a row, refresh the
+            # dropped fields so the instance holds the DB's value rather than
+            # the sentinel.
             db_default_names = [v[0].name for v in values if v[1] is DATABASE_DEFAULT]
             values = [v for v in values if v[1] is not DATABASE_DEFAULT]
             forced_update = bool(update_fields or force_update)
@@ -572,11 +556,10 @@ class Model(metaclass=ModelBase):
         if not updated:
             fields = meta.local_concrete_fields
             if not id_set:
-                id_field = meta.get_forward_field("id")
                 fields = [f for f in fields if f is not id_field]
 
             returning_fields = meta.db_returning_fields
-            results = self._do_insert(meta.base_queryset, fields, returning_fields, raw)
+            results = self._do_insert(meta.base_queryset, fields, returning_fields)
             if results:
                 for value, field in zip(results[0], returning_fields):
                     assert field.name is not None
@@ -608,7 +591,6 @@ class Model(metaclass=ModelBase):
         manager: QuerySet,
         fields: Sequence[Any],
         returning_fields: Sequence[Any],
-        raw: bool,
     ) -> list[tuple[Any, ...]] | None:
         """
         Do an INSERT. If returning_fields is defined then this method should
@@ -618,7 +600,6 @@ class Model(metaclass=ModelBase):
             [self],
             fields=list(fields),
             returning_fields=list(returning_fields) if returning_fields else None,
-            raw=raw,
         )
 
     def _prepare_related_fields_for_save(
