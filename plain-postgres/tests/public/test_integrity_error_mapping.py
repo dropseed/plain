@@ -23,9 +23,9 @@ def test_constraint_violation_reaching_db_raises_validation_error(db: None) -> N
 def test_caught_violation_matches_pre_check_and_recovers_in_atomic(db: None) -> None:
     ConstraintExample(name="dup", description="same").save(clean_and_validate=False)
 
-    # The pre-check (full_clean) raises this for the duplicate...
+    # The pre-check (validate_constraints) raises this for the duplicate...
     with pytest.raises(ValidationError) as pre_check:
-        ConstraintExample(name="dup", description="same").full_clean()
+        ConstraintExample(name="dup", description="same").validate_constraints()
 
     # ...and the database catch raises the same thing when the pre-check is
     # bypassed. Wrapping in atomic() rolls back to a savepoint, so the caller

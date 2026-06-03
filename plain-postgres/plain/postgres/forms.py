@@ -345,12 +345,22 @@ class BaseModelForm(BaseForm):
         except ValidationError as e:
             self._update_errors(e)
 
+        # Shape validation: clean_fields() + the model clean() hook.
         try:
-            # Forms pre-check constraints (unlike save(), which lets the DB
-            # enforce them) so they can surface every violation at once. Pin
-            # validate_constraints explicitly so this survives any change to
-            # full_clean's default.
-            self.instance.full_clean(exclude=exclude, validate_constraints=True)
+            self.instance.full_clean(exclude=exclude)
+        except ValidationError as e:
+            self._update_errors(e)
+
+        # Constraint pre-check, explicit: forms surface every violation at once,
+        # unlike save() which leaves constraints to the database. Recompute the
+        # exclusions so any field that just failed shape validation is skipped --
+        # _get_validation_exclusions() reads self._errors, so the failures we
+        # just recorded are now excluded, and a constraint over an invalid value
+        # is neither double-reported nor crashed on.
+        try:
+            self.instance.validate_constraints(
+                exclude=self._get_validation_exclusions()
+            )
         except ValidationError as e:
             self._update_errors(e)
 

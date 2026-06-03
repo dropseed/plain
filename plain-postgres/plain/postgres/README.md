@@ -1053,7 +1053,7 @@ except ValidationError:
     ...  # report it — the transaction is still usable
 ```
 
-Forms are the exception: a `ModelForm` pre-checks constraints explicitly (its own `full_clean`) so it can surface every violation at once, then saves with validation already done. A direct `save()` reports the first violation Postgres hits.
+Forms are the exception: a `ModelForm` pre-checks constraints explicitly (a `validate_constraints()` call in its `_post_clean`) so it can surface every violation at once, then saves with validation already done. A direct `save()` reports the first violation Postgres hits.
 
 This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to. If you retry on a unique conflict, catch both:
 
@@ -1066,7 +1066,7 @@ except (psycopg.IntegrityError, ValidationError):
 
 For a plain insert-or-update with no per-row logic, `bulk_create(..., update_conflicts=True, unique_fields=[...])` is an atomic upsert with no race to catch.
 
-Two caveats. The mapping covers **immediate** constraints — the default. An explicitly deferred constraint (`UniqueConstraint(deferrable=Deferrable.DEFERRED)`) is checked at commit, _after_ the write returns, so its violation still surfaces as a raw `psycopg.IntegrityError`. And when a row violates several constraints at once, a form's pre-check (or an explicit `full_clean()`) reports them all, while a direct `save()` gets only the first one the database hits.
+Two caveats. The mapping covers **immediate** constraints — the default. An explicitly deferred constraint (`UniqueConstraint(deferrable=Deferrable.DEFERRED)`) is checked at commit, _after_ the write returns, so its violation still surfaces as a raw `psycopg.IntegrityError`. And when a row violates several constraints at once, a form's pre-check (or an explicit `validate_constraints()`) reports them all, while a direct `save()` gets only the first one the database hits.
 
 ### Indexes and constraints
 
@@ -1090,7 +1090,7 @@ class User(postgres.Model):
     )
 ```
 
-Constraints are checked during `full_clean()` — run by a `ModelForm` and any explicit `full_clean()` call, but **not** by a direct `save()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
+Constraints are checked by `validate_constraints()` — run by a `ModelForm` (and any explicit `validate_constraints()` call), but **not** by `full_clean()` (which validates shape only) or a direct `save()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
 
 ```python
 # Simple message — lands on NON_FIELD_ERRORS

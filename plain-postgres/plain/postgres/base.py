@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 import psycopg
 
 import plain.runtime
-from plain.exceptions import NON_FIELD_ERRORS, ValidationError
+from plain.exceptions import ValidationError
 from plain.postgres import models_registry, transaction, types
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.constraints import CheckConstraint, UniqueConstraint
@@ -410,15 +410,14 @@ class Model(metaclass=ModelBase):
                 update_fields = frozenset(loaded_fields)
 
         if clean_and_validate:
-            # Validate the instance's shape (fields + clean()), but not its
-            # constraints. The database is authoritative for unique/check
-            # violations, and save_base maps the resulting IntegrityError back
-            # to the same ValidationError a pre-check would have raised -- so
-            # skipping validate_constraints here drops a SELECT-per-constraint
-            # from every write without losing the field-level error. Forms keep
-            # their own pre-check (full_clean runs validate_constraints in
-            # _post_clean) to surface every violation at once.
-            self.full_clean(exclude=deferred_fields, validate_constraints=False)
+            # Validate the instance's shape (fields + clean()) only. The database
+            # is authoritative for unique/check violations, and save_base maps
+            # the resulting IntegrityError back to the same ValidationError a
+            # pre-check would have raised -- so not pre-checking constraints here
+            # drops a SELECT-per-constraint from every write without losing the
+            # field-level error. Forms still pre-check explicitly
+            # (validate_constraints in _post_clean) to surface every violation.
+            self.full_clean(exclude=deferred_fields)
 
         self.save_base(
             force_insert=force_insert,
@@ -722,7 +721,22 @@ class Model(metaclass=ModelBase):
         ]
         return constraints
 
+    def _unresolved_field_names(self) -> set[str]:
+        """Field names whose Python value isn't resolved yet -- either a
+        DATABASE_DEFAULT sentinel (the database fills it on INSERT) or an
+        auto_fills_on_save field (pre_save fills it just before the write).
+        Neither shape validation nor a constraint lookup can use such a value,
+        so both exclude these. Read via __dict__ to avoid triggering
+        refresh_from_db on deferred fields."""
+        names = set()
+        for f in self._model_meta.fields:
+            if self.__dict__.get(f.name) is DATABASE_DEFAULT or f.auto_fills_on_save:
+                names.add(f.name)
+        return names
+
     def validate_constraints(self, exclude: set[str] | None = None) -> None:
+        exclude = set(exclude) if exclude else set()
+        exclude |= self._unresolved_field_names()
         constraints = self.get_constraints()
 
         errors: dict[str, list[ValidationError]] = {}
@@ -739,54 +753,31 @@ class Model(metaclass=ModelBase):
         self,
         *,
         exclude: set[str] | Iterable[str] | None = None,
-        validate_constraints: bool = True,
     ) -> None:
         """
-        Call clean_fields(), clean(), and validate_constraints() on the model.
-        Raise a ValidationError for any errors that occur.
+        Validate the instance's *shape*: clean_fields() + the clean() hook.
+        Raise a ValidationError aggregating any field- or model-level errors.
+
+        Constraint checks are deliberately separate -- call
+        validate_constraints() for those. save() leaves them to the database
+        (the save_base IntegrityError mapper turns a violation into the same
+        ValidationError a pre-check would raise); forms call
+        validate_constraints() in _post_clean to surface every violation at once.
         """
         errors = {}
-        if exclude is None:
-            exclude = set()
-        else:
-            exclude = set(exclude)
-
-        # Fields holding the DATABASE_DEFAULT sentinel will be produced by
-        # the database on INSERT — there's no Python value to clean or feed
-        # into a constraint lookup. Exclude them from every validation step
-        # until the value is populated. Read via __dict__ to avoid triggering
-        # refresh_from_db on deferred fields. Also exclude fields that pre_save
-        # fills in (e.g. update_now) — the value isn't present yet but will be
-        # before the INSERT/UPDATE.
-        for f in self._model_meta.fields:
-            if f.name in exclude:
-                continue
-            if self.__dict__.get(f.name) is DATABASE_DEFAULT:
-                exclude.add(f.name)
-            elif f.auto_fills_on_save:
-                exclude.add(f.name)
+        exclude = set(exclude) if exclude else set()
+        exclude |= self._unresolved_field_names()
 
         try:
             self.clean_fields(exclude=exclude)
         except ValidationError as e:
             errors = e.update_error_dict(errors)
 
-        # Form.clean() is run even if other validation fails, so do the
-        # same with Model.clean() for consistency.
+        # clean() runs even if clean_fields() failed, mirroring Form.clean().
         try:
             self.clean()
         except ValidationError as e:
             errors = e.update_error_dict(errors)
-
-        # Run constraints checks, but only for fields that passed validation.
-        if validate_constraints:
-            for name in errors:
-                if name != NON_FIELD_ERRORS and name not in exclude:
-                    exclude.add(name)
-            try:
-                self.validate_constraints(exclude=exclude)
-            except ValidationError as e:
-                errors = e.update_error_dict(errors)
 
         if errors:
             raise ValidationError(errors)

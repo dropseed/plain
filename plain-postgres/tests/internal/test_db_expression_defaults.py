@@ -156,14 +156,16 @@ def test_refresh_from_db_returns_persisted_value(db):
     assert inst.db_uuid == original_uuid
 
 
-def test_full_clean_skips_constraints_on_sentinel_fields(db):
-    """A UniqueConstraint over an expression-default field shouldn't trigger
-    a SELECT lookup using the sentinel during save's full_clean — the value
-    doesn't exist in Python yet."""
+def test_validation_skips_sentinel_fields(db):
+    """A field still holding the DATABASE_DEFAULT sentinel has no Python value
+    yet, so neither shape validation (full_clean) nor the constraint pre-check
+    (validate_constraints) may touch it — the UniqueConstraint over db_uuid
+    must not run a SELECT lookup with the sentinel."""
     inst = DBDefaultsExample(name="constrained")
-    # If validate_constraints didn't exclude the sentinel field, this would
-    # raise (UUIDField rejects non-UUID values) before the INSERT could run.
+    # If either step didn't exclude the sentinel field, this would raise
+    # (UUIDField rejects the non-UUID sentinel) before the INSERT could run.
     inst.full_clean()
+    inst.validate_constraints()
     inst.save()
     assert isinstance(inst.db_uuid, uuid.UUID)
 
