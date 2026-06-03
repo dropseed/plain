@@ -110,7 +110,7 @@ class PasswordSetForm(forms.Form):
     def save(self, commit: bool = True) -> User:
         self.user.password = self.cleaned_data["new_password1"]
         if commit:
-            self.user.save()
+            self.user.update()
         return self.user
 
 

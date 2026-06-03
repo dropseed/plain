@@ -197,7 +197,12 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
             with transaction.atomic(savepoint=False):
                 for obj in objs:
                     check_and_update_obj(obj)
-                    obj.save()
+                    # bulk=False is the documented way to add unsaved objects,
+                    # so an obj here may be new or already persisted.
+                    if obj._state.adding:
+                        obj.create()
+                    else:
+                        obj.update()
 
     def create(self, **kwargs: Any) -> T:
         self._check_fk_val()
@@ -259,7 +264,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
             with transaction.atomic(savepoint=False):
                 for obj in queryset:
                     setattr(obj, self.field.name, None)
-                    obj.save(update_fields=[self.field.name])
+                    obj.update(fields=[self.field.name])
 
     def set(self, objs: Any, *, bulk: bool = True, clear: bool = False) -> None:
         self._check_fk_val()

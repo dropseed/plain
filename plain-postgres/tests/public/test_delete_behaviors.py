@@ -196,7 +196,7 @@ def test_diamond_shared_child_deleted_once(db):
 
 def test_self_referential_tree_cascade(db):
     root = TreeNode(name="root", parent=None)
-    root.save(clean_and_validate=False)
+    root.create(clean_and_validate=False)
     mid = TreeNode.query.create(name="mid", parent=root)
     leaf = TreeNode.query.create(name="leaf", parent=mid)
 
@@ -258,7 +258,7 @@ def test_circular_fk_cascade_inside_atomic(db):
         a = CircA.query.create(name="a")
         b = CircB.query.create(name="b", partner=a)
         a.partner = b
-        a.save()
+        a.update()
 
     with transaction.atomic():
         a.delete()
@@ -284,7 +284,7 @@ def test_delete_and_reinsert_replacement_in_one_atomic(db):
     with transaction.atomic():
         replacement = DeleteParent.query.create(name="replacement")
         child.parent = replacement
-        child.save()
+        child.update()
         parent.delete()
 
     child.refresh_from_db()
@@ -310,15 +310,15 @@ def test_child_insert_before_parent_in_one_atomic(db):
             (new_id,) = row
 
         child = ChildCascade(parent=new_id)
-        child.save(clean_and_validate=False)
+        child.create(clean_and_validate=False)
 
         # Insert the parent with the reserved id. The constructor rejects a
-        # manual `id`, so set it via attribute and pass force_insert=True --
-        # the deliberate opt-in for the rare case (here, a sequence-reserved id
-        # for a deferred FK) where you genuinely own the value.
+        # manual `id`, so set it via attribute, then create() -- the deliberate
+        # path for the rare case (here, a sequence-reserved id for a deferred
+        # FK) where you genuinely own the value.
         parent = DeleteParent(name="late")
         parent.id = new_id
-        parent.save(clean_and_validate=False, force_insert=True)
+        parent.create(clean_and_validate=False)
 
     assert DeleteParent.query.filter(id=new_id).exists()
     assert ChildCascade.query.filter(parent=new_id).exists()
@@ -481,57 +481,6 @@ def test_delete_already_deleted_instance_raises(db):
         parent.delete()
 
 
-def test_save_with_force_update_after_delete_raises(db):
-    """`.delete()` clears `instance.id`, so there's no row left to UPDATE.
-    save(force_update=...) / save(update_fields=...) must raise rather than
-    fall through to the INSERT and silently re-create the row under a new id.
-
-    The guard raises above save_base's rollback-marking block, so it doesn't
-    poison the surrounding transaction -- no per-save atomic() needed, and the
-    queries between/after the raises keep working in the fixture transaction."""
-    _create_parents()
-
-    parent = DeleteParent.query.get(name="parent")
-    parent.delete()
-    with pytest.raises(ValueError, match="force_update or update_fields"):
-        parent.save(force_update=True)
-
-    other = DeleteParent.query.get(name="default")
-    other.delete()
-    with pytest.raises(ValueError, match="force_update or update_fields"):
-        other.save(update_fields=["name"])
-
-    # The transaction was never marked for rollback -- both deletes are still
-    # visible, proving the ValueErrors didn't poison it.
-    assert not DeleteParent.query.filter(name__in=["parent", "default"]).exists()
-
-
-def test_force_update_on_concurrently_deleted_row_raises(db):
-    """A *persisted* instance whose row was deleted out from under it (e.g. a
-    concurrent delete) raises on save(force_update=True) rather than silently
-    INSERTing a replacement. This is the one path that reaches _save_table's
-    "target row no longer exists" guard -- the new/adding variants (no row to
-    begin with) are rejected earlier in save_base.
-
-    Unlike the save_base pre-checks, this raise runs SQL, so it marks the
-    transaction for rollback; the inner atomic() keeps the outer fixture
-    transaction usable."""
-    _create_parents()
-
-    # Still persisted (adding=False, id set) -- delete the row via a separate
-    # queryset so `parent.id` stays set, unlike parent.delete().
-    parent = DeleteParent.query.get(name="parent")
-    DeleteParent.query.filter(id=parent.id).delete()
-
-    with pytest.raises(psycopg.DatabaseError, match="target row no longer exists"):
-        with transaction.atomic():
-            parent.save(force_update=True)
-
-    # The inner atomic() contained the rollback, so the outer transaction is
-    # still usable and the delete is still visible.
-    assert not DeleteParent.query.filter(name="parent").exists()
-
-
 # ===========================================================================
 # 8. Query-count canary
 # ===========================================================================
@@ -593,9 +542,9 @@ def test_instance_delete_bypasses_custom_query_filters(db):
     uses `_model_meta.base_queryset` to route around custom filtering.
     """
     ghost = HideableItem(name="ghost")
-    ghost.save()
+    ghost.create()
     visible = HideableItem(name="visible")
-    visible.save()
+    visible.create()
 
     # Public queryset filters out ghost rows by default
     assert HideableItem.query.filter(id=ghost.id).count() == 0

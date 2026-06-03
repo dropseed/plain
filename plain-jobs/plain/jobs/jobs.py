@@ -176,7 +176,7 @@ class Job(metaclass=JobType):
                             trace_id=trace_id,
                             span_id=span_id,
                         )
-                        job_request.save()
+                        job_request.create()
 
                         span.set_attribute(
                             MESSAGING_MESSAGE_ID,

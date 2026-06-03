@@ -45,7 +45,7 @@ Redirect.query.create(
 # Disable a redirect without deleting it
 redirect = Redirect.query.get(from_pattern="/old-page/")
 redirect.enabled = False
-redirect.save()
+redirect.update()
 ```
 
 When multiple redirects could match, you can control priority with the `order` field. Lower values are checked first.

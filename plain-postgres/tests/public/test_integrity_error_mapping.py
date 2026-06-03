@@ -14,14 +14,16 @@ from plain.postgres import transaction
 def test_constraint_violation_reaching_db_raises_validation_error(db: None) -> None:
     # clean_and_validate=False bypasses the in-Python check, so the duplicate
     # reaches the database — the deterministic stand-in for a raced insert.
-    ConstraintExample(name="dup", description="same").save(clean_and_validate=False)
+    ConstraintExample(name="dup", description="same").create(clean_and_validate=False)
 
     with pytest.raises(ValidationError):
-        ConstraintExample(name="dup", description="same").save(clean_and_validate=False)
+        ConstraintExample(name="dup", description="same").create(
+            clean_and_validate=False
+        )
 
 
 def test_caught_violation_matches_pre_check_and_recovers_in_atomic(db: None) -> None:
-    ConstraintExample(name="dup", description="same").save(clean_and_validate=False)
+    ConstraintExample(name="dup", description="same").create(clean_and_validate=False)
 
     # The pre-check (validate_constraints) raises this for the duplicate...
     with pytest.raises(ValidationError) as pre_check:
@@ -32,7 +34,7 @@ def test_caught_violation_matches_pre_check_and_recovers_in_atomic(db: None) -> 
     # can keep using the transaction after handling the error.
     with pytest.raises(ValidationError) as caught:
         with transaction.atomic():
-            ConstraintExample(name="dup", description="same").save(
+            ConstraintExample(name="dup", description="same").create(
                 clean_and_validate=False
             )
 
@@ -53,10 +55,10 @@ def test_default_save_maps_duplicate_to_validation_error(db: None) -> None:
     ValidationError. (That the database does the rejecting rather than a
     pre-check is what test_save_skips_constraint_pre_check_select proves; this
     pins the user-facing contract on the common path.)"""
-    ConstraintExample(name="dup", description="same").save()
+    ConstraintExample(name="dup", description="same").create()
 
     with pytest.raises(ValidationError):
         with transaction.atomic():
-            ConstraintExample(name="dup", description="same").save()
+            ConstraintExample(name="dup", description="same").create()
 
     assert ConstraintExample.query.filter(name="dup").count() == 1

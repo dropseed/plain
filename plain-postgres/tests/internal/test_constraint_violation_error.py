@@ -168,7 +168,7 @@ def test_save_runs_full_clean_by_default(
     name_field = ConstraintExample._model_meta.get_field("name")
     monkeypatch.setattr(name_field, "choices", [("ok", "OK")])
     with pytest.raises(ValidationError):
-        ConstraintExample(name="bad", description="d").save()
+        ConstraintExample(name="bad", description="d").create()
     assert ConstraintExample.query.filter(name="bad").count() == 0
 
 
@@ -181,7 +181,7 @@ def test_save_skips_constraint_pre_check_select(db: None) -> None:
     conn.force_debug_cursor = True
     conn.queries_log.clear()
     try:
-        ConstraintExample(name="solo", description="row").save()
+        ConstraintExample(name="solo", description="row").create()
         query_count = len(conn.queries_log)
     finally:
         conn.force_debug_cursor = previous
@@ -192,7 +192,7 @@ def test_save_clean_and_validate_false_skips_validation(
     db: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _add_check_constraint(monkeypatch)
-    ConstraintExample(name="bad", description="d").save(clean_and_validate=False)
+    ConstraintExample(name="bad", description="d").create(clean_and_validate=False)
     assert ConstraintExample.query.filter(name="bad").count() == 1
 
 
@@ -272,7 +272,7 @@ def test_unique_constraint_explicit_validation_error_dict_preserved(
         (*ConstraintExample.model_options.constraints, constraint),
     )
 
-    ConstraintExample(name="dup", description="d1").save(clean_and_validate=False)
+    ConstraintExample(name="dup", description="d1").create(clean_and_validate=False)
     instance = ConstraintExample(name="dup", description="d2")
 
     with pytest.raises(ValidationError) as exc_info:
@@ -301,7 +301,7 @@ def test_unique_constraint_single_field_string_routes_to_field(
         (*ConstraintExample.model_options.constraints, constraint),
     )
 
-    ConstraintExample(name="dup", description="d1").save(clean_and_validate=False)
+    ConstraintExample(name="dup", description="d1").create(clean_and_validate=False)
 
     class Form(ModelForm):
         class Meta:

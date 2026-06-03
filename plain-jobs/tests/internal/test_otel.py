@@ -88,11 +88,11 @@ def test_failed_enqueue_marks_producer_span_as_errored(
     from opentelemetry.trace import StatusCode
 
     def _boom(*args, **kwargs):
-        raise RuntimeError("save failed")
+        raise RuntimeError("create failed")
 
     from plain.jobs.models import JobRequest
 
-    monkeypatch.setattr(JobRequest, "save", _boom)
+    monkeypatch.setattr(JobRequest, "create", _boom)
 
     with pytest.raises(RuntimeError):
         _NoopJob().run_in_worker()
@@ -148,11 +148,11 @@ def test_enqueue_failure_records_error_type_on_metric(
     # which never fires under the test rollback. The failure path records
     # immediately, so it's the one we can assert on here.
     def _boom(*args, **kwargs):
-        raise RuntimeError("save failed")
+        raise RuntimeError("create failed")
 
     from plain.jobs.models import JobRequest
 
-    monkeypatch.setattr(JobRequest, "save", _boom)
+    monkeypatch.setattr(JobRequest, "create", _boom)
 
     with pytest.raises(RuntimeError):
         _NoopJob().run_in_worker()
@@ -630,7 +630,7 @@ def test_running_counts_started_jobprocess_rows_by_queue(metrics) -> None:
 
     # Worker picks it up; `process_job` sets started_at.
     process.started_at = timezone.now()
-    process.save(update_fields=["started_at"])
+    process.update(fields=["started_at"])
 
     assert _by_queue(otel.WorkerMetrics._gauge_running) == {"default": 1}
 

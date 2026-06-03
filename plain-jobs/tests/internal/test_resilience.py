@@ -451,7 +451,7 @@ def test_future_finished_callback_marks_killed_mid_run_as_lost(db) -> None:
     job_process = _make_job_process(_RecordingJob, worker_id=uuid.uuid4())
     # Simulate the child having entered run() before being killed.
     job_process.started_at = timezone.now()
-    job_process.save(update_fields=["started_at"])
+    job_process.update(fields=["started_at"])
 
     fake_future: Future = Future()
     fake_future.set_exception(RuntimeError("BrokenProcessPool"))
@@ -530,7 +530,7 @@ def test_rescue_own_orphans_converts_stranded_row_to_lost(
     job_process = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
     # Backdate so it's past the cutoff.
     job_process.created_at = timezone.now() - datetime.timedelta(seconds=120)
-    job_process.save(update_fields=["created_at"])
+    job_process.update(fields=["created_at"])
 
     worker._rescue_own_orphans()
 
@@ -548,7 +548,7 @@ def test_rescue_own_orphans_leaves_inflight_rows_alone(
 
     job_process = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
     job_process.created_at = timezone.now() - datetime.timedelta(seconds=120)
-    job_process.save(update_fields=["created_at"])
+    job_process.update(fields=["created_at"])
 
     fake_future: Future = Future()
     worker._inflight_futures[fake_future] = str(job_process.uuid)
@@ -587,7 +587,7 @@ def test_rescue_own_orphans_ignores_other_workers_rows(
     other_worker_id = uuid.uuid4()
     other_job = _make_job_process(_RecordingJob, worker_id=other_worker_id)
     other_job.created_at = timezone.now() - datetime.timedelta(seconds=120)
-    other_job.save(update_fields=["created_at"])
+    other_job.update(fields=["created_at"])
 
     worker._rescue_own_orphans()
 

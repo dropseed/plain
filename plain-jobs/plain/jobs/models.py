@@ -287,7 +287,7 @@ class JobProcess(postgres.Model):
                 # is `allow_null=True`), which doesn't subtract cleanly below.
                 started_at = timezone.now()
                 self.started_at = started_at
-                self.save(update_fields=["started_at"])
+                self.update(fields=["started_at"])
 
                 if self.requested_at:
                     queue_wait = (started_at - self.requested_at).total_seconds()
@@ -558,7 +558,7 @@ class JobResultQuerySet(postgres.QuerySet["JobResult"]):
                     extra={"result": str(result)},
                 )
                 result.retry_attempt += 1
-                result.save(update_fields=["retry_attempt"])
+                result.update(fields=["retry_attempt"])
 
 
 class JobResultStatuses(postgres.TextChoices):
@@ -685,7 +685,7 @@ class JobResult(postgres.Model):
             )
             if result:
                 self.retry_job_request_uuid = result.uuid
-                self.save(update_fields=["retry_job_request_uuid"])
+                self.update(fields=["retry_job_request_uuid"])
                 return result
 
         return None

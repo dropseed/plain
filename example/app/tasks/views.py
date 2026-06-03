@@ -57,7 +57,7 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
         form = TaskTitleForm(request=self.request)
         if form.is_valid():
             self.object.title = form.cleaned_data["title"]
-            self.object.save()
+            self.object.update()
 
 
 class TaskCreateView(AuthView, CreateView):

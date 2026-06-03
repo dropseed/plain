@@ -127,7 +127,7 @@ class APIKeyView(View[APIResult]):
         Override this to perform other actions with a valid API key.
         """
         self.api_key.last_used_at = timezone.now()
-        self.api_key.save(update_fields=["last_used_at"])
+        self.api_key.update(fields=["last_used_at"])
 
     def get_api_key(self) -> Any:
         """

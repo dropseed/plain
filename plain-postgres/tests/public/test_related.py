@@ -28,7 +28,7 @@ class TestForwardForeignKeyDescriptor:
 
         # Test setting the forward relationship
         child.parent = parent2
-        child.save()
+        child.update()
         child.refresh_from_db()
         assert child.parent == parent2
 
@@ -41,7 +41,7 @@ class TestForwardForeignKeyDescriptor:
         with pytest.raises(
             Exception, match="constraint|null|NOT NULL"
         ):  # Database constraint error
-            child.save()
+            child.update()
 
     def test_set_to_none_nullable(self, db):
         parent = DeleteParent.query.create(name="Test Parent")
@@ -50,7 +50,7 @@ class TestForwardForeignKeyDescriptor:
         # Test setting nullable FK to None
         child.parent = None
         try:
-            child.save()
+            child.update()
             child.refresh_from_db()
             assert child.parent is None
         except Exception as e:
@@ -575,7 +575,7 @@ class TestForeignKeyPartialInstance:
     def test_assign_by_primary_key(self, db):
         parent = DeleteParent.query.create(name="Parent")
         child = ChildCascade(parent=parent.id)
-        child.save()
+        child.create()
 
         reloaded = ChildCascade.query.get(id=child.id)
         assert reloaded.parent.id == parent.id
@@ -615,9 +615,9 @@ class TestForeignKeyPartialInstance:
         parent = DeleteParent.query.create(name="Parent")
         child = ChildCascade.query.create(parent=parent)
 
-        child.save()
+        child.update()
 
-        # save() must not evict the cached related object.
+        # update() must not evict the cached related object.
         _, queries = self._count_queries(lambda: child.parent.name)
         assert queries == 0
 
@@ -627,7 +627,7 @@ class TestForeignKeyPartialInstance:
 
         # Load with the foreign key column deferred, then save.
         deferred = ChildCascade.query.only("id").get(id=created.id)
-        deferred.save()
+        deferred.update()
 
         reloaded = ChildCascade.query.get(id=created.id)
         assert reloaded.parent.id == parent.id

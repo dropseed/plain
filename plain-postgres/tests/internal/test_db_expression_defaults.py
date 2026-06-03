@@ -4,7 +4,7 @@
 Covers:
 - DDL: column DEFAULT persists after CREATE TABLE
 - Raw SQL: INSERT omitting the column triggers the DB default
-- ORM: Model().save() + bulk_create() populate via RETURNING
+- ORM: Model().create() + bulk_create() populate via RETURNING
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ def test_unsaved_instance_holds_sentinel(db):
 
 def test_save_populates_value_via_returning(db):
     inst = DBDefaultsExample(name="saved")
-    inst.save()
+    inst.create()
 
     assert isinstance(inst.db_uuid, uuid.UUID)
     assert isinstance(inst.created_at, datetime.datetime)
@@ -98,7 +98,7 @@ def test_save_populates_value_via_returning(db):
 
 def test_save_persists_to_database(db):
     inst = DBDefaultsExample(name="saved")
-    inst.save()
+    inst.create()
 
     reloaded = DBDefaultsExample.query.get(id=inst.id)
     assert reloaded.db_uuid == inst.db_uuid
@@ -122,7 +122,7 @@ def test_explicit_value_overrides_db_default(db):
     explicit_dt = datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC)
 
     inst = DBDefaultsExample(name="explicit", db_uuid=explicit, created_at=explicit_dt)
-    inst.save()
+    inst.create()
 
     assert inst.db_uuid == explicit
     assert inst.created_at == explicit_dt
@@ -135,7 +135,7 @@ def test_update_does_not_re_apply_db_default(db):
     """After the row exists, updating an unrelated field must not cause
     Postgres (or the ORM) to re-evaluate the DEFAULT expression."""
     inst = DBDefaultsExample(name="row")
-    inst.save()
+    inst.create()
     original_uuid = inst.db_uuid
 
     DBDefaultsExample.query.filter(id=inst.id).update(name="renamed")
@@ -147,7 +147,7 @@ def test_update_does_not_re_apply_db_default(db):
 
 def test_refresh_from_db_returns_persisted_value(db):
     inst = DBDefaultsExample(name="row")
-    inst.save()
+    inst.create()
     original_uuid = inst.db_uuid
 
     inst.db_uuid = uuid.uuid4()
@@ -166,7 +166,7 @@ def test_validation_skips_sentinel_fields(db):
     # (UUIDField rejects the non-UUID sentinel) before the INSERT could run.
     inst.full_clean()
     inst.validate_constraints()
-    inst.save()
+    inst.create()
     assert isinstance(inst.db_uuid, uuid.UUID)
 
 
@@ -382,7 +382,7 @@ def test_construct_instance_preserves_db_default_on_blank_submission(db):
 
 
 def test_database_default_singleton_survives_pickling(db):
-    """`Model().save()` after `pickle.dumps`/`loads` round-trip must still
+    """`Model().create()` after `pickle.dumps`/`loads` round-trip must still
     work — the sentinel identity check (`is DATABASE_DEFAULT`) drives both
     the descriptor and the INSERT compiler."""
     import pickle
@@ -393,34 +393,17 @@ def test_database_default_singleton_survives_pickling(db):
     restored = pickle.loads(pickle.dumps(inst))
     assert restored.db_uuid is DATABASE_DEFAULT
 
-    restored.save()
+    restored.create()
     assert isinstance(restored.db_uuid, uuid.UUID)
 
 
-def test_explicit_pk_collision_raises_before_write(db):
-    """A new instance with a hand-set id is rejected in save_base before any
-    SQL -- and the guard sits below full_clean, so clean_and_validate=False
-    doesn't slip past it. The existing row a colliding id names is untouched."""
-    original = DBDefaultsExample.query.create(name="original")
-
-    clash = DBDefaultsExample(name="overwrite-attempt")
-    clash.id = original.id
-
-    with pytest.raises(ValueError, match="hand-set primary key"):
-        clash.save(clean_and_validate=False)
-
-    reloaded = DBDefaultsExample.query.get(id=original.id)
-    assert reloaded.name == "original"
-
-
-def test_explicit_pk_with_force_insert_inserts_and_fills_db_defaults(db):
-    """The deliberate opt-in: a new instance with a hand-set id and
-    force_insert=True INSERTs, and the DB-expression defaults (db_uuid,
-    created_at) are filled by the INSERT's RETURNING -- not left as the
-    DATABASE_DEFAULT sentinel."""
+def test_explicit_pk_inserts_and_fills_db_defaults(db):
+    """A new instance with a hand-set id create()s -- INSERTing that id -- and
+    the DB-expression defaults (db_uuid, created_at) are filled by the INSERT's
+    RETURNING, not left as the DATABASE_DEFAULT sentinel."""
     inst = DBDefaultsExample(name="explicit-pk")
     inst.id = 999_999
-    inst.save(force_insert=True)
+    inst.create()
 
     assert inst.id == 999_999
     assert isinstance(inst.db_uuid, uuid.UUID)
@@ -428,16 +411,6 @@ def test_explicit_pk_with_force_insert_inserts_and_fills_db_defaults(db):
 
     reloaded = DBDefaultsExample.query.get(id=999_999)
     assert reloaded.db_uuid == inst.db_uuid
-
-
-def test_force_update_on_adding_instance_raises(db):
-    """force_update on a never-persisted (adding) instance is incoherent --
-    there's no row to update -- so it raises before any SQL rather than
-    silently falling through to an INSERT. (The after-delete case, where id is
-    cleared, is covered in tests/public/test_delete_behaviors.py.)"""
-    inst = DBDefaultsExample(name="x")
-    with pytest.raises(ValueError, match="force_update or update_fields"):
-        inst.save(force_update=True)
 
 
 def test_datetime_update_now_requires_backfill_companion():

@@ -633,7 +633,7 @@ class QuerySet[T: "Model"]:
         """
         obj = self.model(**kwargs)
         self._for_write = True
-        obj.save(force_insert=True)
+        obj.create()
         return obj
 
     def _prepare_for_bulk_create(self, objs: list[T]) -> None:
@@ -790,7 +790,7 @@ class QuerySet[T: "Model"]:
             return 0
         for obj in objs_tuple:
             obj._prepare_related_fields_for_save(
-                operation_name="bulk_update", fields=fields_list
+                operation_name="bulk_update", field_names=fields
             )
         # PK is used twice in the resulting update query, once in the filter
         # and once in the WHEN. Each field will also have one CAST.
@@ -900,9 +900,9 @@ class QuerySet[T: "Model"]:
                         field.primary_key or field.__class__.pre_save is Field.pre_save
                     ):
                         update_fields.add(field.name)
-                obj.save(update_fields=update_fields)
+                obj.update(fields=update_fields)
             else:
-                obj.save()
+                obj.update()
         return obj, False
 
     def _extract_model_params(
@@ -1464,7 +1464,7 @@ class QuerySet[T: "Model"]:
     ) -> list[tuple[Any, ...]] | None:
         """
         Insert a new record for the given model. This provides an interface to
-        the InsertQuery class and is how Model.save() is implemented.
+        the InsertQuery class and is how Model.create() is implemented.
         """
         self._for_write = True
         query = InsertQuery(

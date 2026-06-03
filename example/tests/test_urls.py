@@ -16,7 +16,7 @@ def test_admin_access(db):
     assert client.get("/admin").status_code == 404
 
     user.is_admin = True
-    user.save()
+    user.update()
 
     # Now admin
     assert client.get("/admin").status_code in {200, 302}
