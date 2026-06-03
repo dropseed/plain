@@ -26,11 +26,6 @@ class PlainHelpFormatter(click.HelpFormatter):
     ) -> None:
         """Writes a definition list into the buffer.  This is how options
         and commands are usually formatted.
-
-        :param rows: a list of two item tuples for the terms and values.
-        :param col_max: the maximum width of the first column.
-        :param col_spacing: the number of spaces between the first and
-                            second column.
         """
         rows = list(rows)
         widths = measure_table(rows)

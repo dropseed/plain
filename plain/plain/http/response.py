@@ -699,14 +699,7 @@ class NotAllowedResponse(Response):
 
 
 class JsonResponse(Response):
-    """
-    An HTTP response class that consumes data to be serialized to JSON.
-
-    :param data: Data to be dumped into json.
-    :param encoder: Should be a json encoder class. Defaults to
-      ``plain.json.PlainJSONEncoder``.
-    :param json_dumps_params: A dictionary of kwargs passed to json.dumps().
-    """
+    """An HTTP response class that consumes data to be serialized to JSON."""
 
     def __init__(
         self,
