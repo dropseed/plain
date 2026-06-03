@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.20.1](https://github.com/dropseed/plain/releases/plain-htmx@0.20.1) (2026-06-03)
+
+### What's changed
+
+- Docs: README model-write example updated from `.save()` to `.create()` for plain.postgres 0.106.0. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-htmx@0.20.0) (2026-05-16)
 
 ### What's changed

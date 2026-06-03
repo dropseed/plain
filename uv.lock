@@ -1083,7 +1083,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-htmx"
-version = "0.20.0"
+version = "0.20.1"
 source = { editable = "plain-htmx" }
 dependencies = [
     { name = "plain" },
