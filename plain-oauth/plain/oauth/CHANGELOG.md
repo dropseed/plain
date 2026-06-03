@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.49.8](https://github.com/dropseed/plain/releases/plain-oauth@0.49.8) (2026-06-03)
+
+### What's changed
+
+- Internal: `OAuthConnection` writes (`refresh_access_token`, `get_or_create_user`, `connect`) adopt plain.postgres's new `create()`/`update()` API in place of `save()`. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- No changes required. Requires `plain.postgres>=0.106.0`.
+
 ## [0.49.7](https://github.com/dropseed/plain/releases/plain-oauth@0.49.7) (2026-05-25)
 
 ### What's changed
