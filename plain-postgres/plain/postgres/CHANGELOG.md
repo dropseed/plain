@@ -1,5 +1,23 @@
 # plain-postgres changelog
 
+## [0.106.0](https://github.com/dropseed/plain/releases/plain-postgres@0.106.0) (2026-06-03)
+
+### What's changed
+
+- **`Model.save()` is replaced by explicit `create()` (always INSERT) and `update()` (always UPDATE).** A call site now says which it does. `create()` inserts a new row and returns `self`; `update()` writes an existing row and returns `self`, raising if no row matched (there is no silent INSERT fallback). `update(fields=[...])` limits the columns written (replacing `save(update_fields=[...])`). `save()`, `save_base()`, and the `force_insert`/`force_update` arguments are removed. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+- **Constructing a model with `id=` now raises.** A hand-set `id` at construction almost always means "load the existing row" — use `Model.query.get(id=...)`. A freshly constructed instance is unambiguously new. ([9c0acf7bac](https://github.com/dropseed/plain/commit/9c0acf7bac), [661c7806df](https://github.com/dropseed/plain/commit/661c7806df))
+- **Declared unique/check constraint violations now raise `ValidationError`, not raw `psycopg.IntegrityError`** — mapped at the write boundary, so even a violation that races past validation surfaces as the same field-level error a pre-check would raise. The database is now the authority; the pre-check `SELECT` is no longer required for correctness. Set-based writes (`bulk_create`, `QuerySet.update`) still raise raw `psycopg` errors. ([40c97521c5](https://github.com/dropseed/plain/commit/40c97521c5), [bdbdd524e5](https://github.com/dropseed/plain/commit/bdbdd524e5))
+- **`full_clean()` is now shape-only** (`clean_fields()` + `clean()`); the integrity pre-check moved to `validate_constraints()`, called explicitly. `full_clean()`'s `validate_unique`/`validate_constraints` parameters and the `Model.validate_unique()` / `_get_unique_checks` / `_perform_unique_checks` trio are removed; forms call `full_clean()` then `validate_constraints()`. ([ba4b386fb7](https://github.com/dropseed/plain/commit/ba4b386fb7), [65d56945fb](https://github.com/dropseed/plain/commit/65d56945fb))
+- `delete()` clears the instance's `id` and resets it to "new," so `create()` re-inserts it cleanly; the instance's other field values survive the delete. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- Replace `obj.save()` with `obj.create()` for a new row or `obj.update()` for an existing one; `obj.save(update_fields=[...])` becomes `obj.update(fields=[...])`. The `/plain-upgrade` skill rewrites these for you — the create-vs-update choice is context-dependent, so it reasons per call site.
+- Remove `force_insert=`/`force_update=` — `create()` and `update()` are the explicit forms.
+- Don't pass `id=` to a model constructor; load existing rows with `Model.query.get(id=...)`.
+- Catch `ValidationError` (or `(psycopg.IntegrityError, ValidationError)` when retrying) for unique/check conflicts on instance writes. Inside an open `transaction.atomic()` a violation aborts the transaction — wrap the write in its own `atomic()` to catch and continue.
+- Direct `full_clean()` callers that relied on constraint pre-checking should call `validate_constraints()` explicitly.
+
 ## [0.105.0](https://github.com/dropseed/plain/releases/plain-postgres@0.105.0) (2026-05-25)
 
 ### What's changed
