@@ -1,5 +1,15 @@
 # plain-connect changelog
 
+## [0.7.1](https://github.com/dropseed/plain/releases/plain-connect@0.7.1) (2026-06-03)
+
+### What's changed
+
+- Removed the `plain.observer` coexistence handling now that observer is retired: the "Observer coexistence" docs section and FAQs are gone, and the `TracerProvider`/`LoggerProvider` conflict errors no longer reference observer ordering in `INSTALLED_PACKAGES`. ([1bab9f784a](https://github.com/dropseed/plain/commit/1bab9f784a))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.7.0](https://github.com/dropseed/plain/releases/plain-connect@0.7.0) (2026-05-22)
 
 ### What's changed

@@ -931,7 +931,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-connect"
-version = "0.7.0"
+version = "0.7.1"
 source = { editable = "plain-connect" }
 dependencies = [
     { name = "cryptography" },
