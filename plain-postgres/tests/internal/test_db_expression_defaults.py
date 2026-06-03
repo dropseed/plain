@@ -403,10 +403,13 @@ def test_save_with_explicit_pk_refreshes_db_default_fields_after_update(db):
     original = DBDefaultsExample(name="original")
     original.save()
 
-    # New unsaved instance with the SAME id and no value for db_uuid.
-    # Skip clean_and_validate so the UPDATE-then-INSERT fallback path runs;
-    # validate_unique would otherwise reject the colliding id.
-    same_id = DBDefaultsExample(id=original.id, name="updated")
+    # New unsaved instance with the SAME id and no value for db_uuid. The id
+    # is assigned after construction — the constructor rejects a manual `id`,
+    # and this setattr path is what reaches _save_table's UPDATE-first
+    # fallback. Skip clean_and_validate so validate_unique doesn't reject the
+    # colliding id before the write.
+    same_id = DBDefaultsExample(name="updated")
+    same_id.id = original.id
     assert same_id.db_uuid is DATABASE_DEFAULT
 
     same_id.save(clean_and_validate=False)
@@ -422,7 +425,8 @@ def test_save_with_explicit_pk_falls_back_to_insert(db):
     """When id is set but the row doesn't exist, save() tries UPDATE first
     then INSERT. The DATABASE_DEFAULT sentinel must not leak into the UPDATE
     path — only the INSERT can meaningfully evaluate a DB default."""
-    inst = DBDefaultsExample(id=999_999, name="explicit-pk")
+    inst = DBDefaultsExample(name="explicit-pk")
+    inst.id = 999_999
     inst.save()
 
     assert inst.id == 999_999

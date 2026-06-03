@@ -92,7 +92,7 @@ class Model(metaclass=ModelBase):
     DoesNotExist = DoesNotExistDescriptor()
     MultipleObjectsReturned = MultipleObjectsReturnedDescriptor()
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, *, _from_db: bool = False, **kwargs: Any):
         # Alias some things as locals to avoid repeat global lookups
         cls = self.__class__
         meta = cls._model_meta
@@ -102,6 +102,23 @@ class Model(metaclass=ModelBase):
 
         # Set up the storage for instance state
         self._state = ModelState()
+
+        # Postgres owns the identity primary key — it's generated on INSERT.
+        # Passing `id` to the constructor almost always means "give me the
+        # existing row with this id", which is a query, not a constructor
+        # argument. It's also a silent footgun: a new instance carrying an
+        # already-used id reaches _save_table's UPDATE-first path on save()
+        # and overwrites that row instead of failing. Reject it at the
+        # source. from_db() loads real rows and passes _from_db=True to skip
+        # this.
+        if not _from_db and kwargs.get("id") is not None:
+            if meta.get_forward_field("id").auto_created:
+                raise ValueError(
+                    f"Cannot set the auto-generated primary key 'id' when "
+                    f"constructing a {cls.__name__}. To load an existing row, "
+                    f"use {cls.__name__}.query.get(id=...); to create a new "
+                    f"one, omit 'id' and let the database assign it."
+                )
 
         # Process all fields from kwargs or use defaults
         for field in meta.fields:
@@ -187,7 +204,7 @@ class Model(metaclass=ModelBase):
         field_dict = dict(
             zip((f.name for f in cls._model_meta.concrete_fields), values)
         )
-        new = cls(**field_dict)
+        new = cls(_from_db=True, **field_dict)
         new._state.adding = False
         return new
 

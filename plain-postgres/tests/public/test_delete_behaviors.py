@@ -312,7 +312,12 @@ def test_child_insert_before_parent_in_one_atomic(db):
         child = ChildCascade(parent=new_id)
         child.save(clean_and_validate=False)
 
-        parent = DeleteParent(id=new_id, name="late")
+        # Insert the parent with the reserved id. The constructor rejects a
+        # manual `id`, so set it via attribute — the deliberate path for the
+        # rare case (here, a sequence-reserved id for a deferred FK) where you
+        # genuinely own the value.
+        parent = DeleteParent(name="late")
+        parent.id = new_id
         parent.save(clean_and_validate=False)
 
     assert DeleteParent.query.filter(id=new_id).exists()
