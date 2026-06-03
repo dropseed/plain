@@ -12,6 +12,7 @@ from app.examples.models.constraints import ConstraintExample
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import CheckConstraint, Q, UniqueConstraint
 from plain.postgres.constraints import BaseConstraint
+from plain.postgres.db import get_connection
 from plain.postgres.expressions import F
 from plain.postgres.forms import ModelForm
 from plain.test import RequestFactory
@@ -128,10 +129,31 @@ def test_full_clean_with_choices_and_check_constraint(
 def test_save_runs_full_clean_by_default(
     db: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _add_check_constraint(monkeypatch)
+    # save() still runs full_clean's field validation by default. Constraints
+    # are no longer pre-checked on save (the DB enforces those — see
+    # public/test_integrity_error_mapping); a choices validator is pure-Python,
+    # so it's a clean probe that the field-validation half of full_clean runs.
+    name_field = ConstraintExample._model_meta.get_field("name")
+    monkeypatch.setattr(name_field, "choices", [("ok", "OK")])
     with pytest.raises(ValidationError):
         ConstraintExample(name="bad", description="d").save()
     assert ConstraintExample.query.filter(name="bad").count() == 0
+
+
+def test_save_skips_constraint_pre_check_select(db: None) -> None:
+    """A default save() issues only the INSERT — the per-unique-constraint
+    pre-check SELECT is gone. The database enforces the constraint and
+    save_base maps any violation."""
+    conn = get_connection()
+    previous = conn.force_debug_cursor
+    conn.force_debug_cursor = True
+    conn.queries_log.clear()
+    try:
+        ConstraintExample(name="solo", description="row").save()
+        query_count = len(conn.queries_log)
+    finally:
+        conn.force_debug_cursor = previous
+    assert query_count == 1, [q["sql"] for q in conn.queries_log]
 
 
 def test_save_clean_and_validate_false_skips_validation(
@@ -285,6 +307,23 @@ def test_mapper_builds_validation_error_for_known_constraint(db: None) -> None:
     assert isinstance(error, ValidationError)
     # Composite unique normalizes to dict form under NON_FIELD_ERRORS, matching
     # validate_constraints() rather than returning a flat error.
+    assert NON_FIELD_ERRORS in error.error_dict
+
+
+def test_mapper_builds_validation_error_for_check_constraint(
+    db: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Covers the mapper's CheckConstraint branch (the unique branch is above).
+    # No check constraint exists in the DB here, so drive the mapper directly
+    # with a synthetic diag name pointing at the monkeypatched check constraint.
+    _add_check_constraint(monkeypatch)
+    instance = ConstraintExample(name="bad", description="d")
+    exc = SimpleNamespace(
+        diag=SimpleNamespace(constraint_name="constraint_must_start_ok")
+    )
+    error = instance._integrity_error_to_validation_error(exc)  # ty: ignore[invalid-argument-type]
+    assert isinstance(error, ValidationError)
+    assert error.messages == ['Name must start with "ok-".']
     assert NON_FIELD_ERRORS in error.error_dict
 
 

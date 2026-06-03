@@ -1020,7 +1020,7 @@ author.books.query.published()
 
 ### Validation
 
-`save()` runs `full_clean()` by default — field validators, model `clean()`, and any constraints with a `validate()` method are all checked, raising `ValidationError` on violation. Pass `clean_and_validate=False` to skip it (e.g. for trusted bulk loads).
+`save()` runs `full_clean()` by default — field validators and the model's `clean()` method — raising `ValidationError` on violation. Pass `clean_and_validate=False` to skip it (e.g. for trusted bulk loads). Constraints are _not_ pre-checked here; the database enforces them (see below).
 
 ```python
 @postgres.register_model
@@ -1041,7 +1041,19 @@ class User(postgres.Model):
 
 Field-level validation happens automatically based on field types and constraints.
 
-Validation is a pre-check, not the only guard. If a violation slips past it — a raced unique insert, or a `save(clean_and_validate=False)` — it still reaches the database, and `save()`/`create()` translate that `IntegrityError` into the **same `ValidationError`** the pre-check would have raised (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). So an instance write surfaces a constraint violation the same way whether it's caught before or after the write hits the database.
+**The database is authoritative for constraints.** `save()`/`create()` don't pre-check your declared unique/check constraints — they attempt the write, and if Postgres rejects it, translate the `IntegrityError` into a `ValidationError` (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). You get the same field-level error you'd expect, the write costs no per-constraint `SELECT`, and a raced concurrent insert can't slip through as a 500. (FK violations and `NOT NULL` have no declared constraint to map to and re-raise as the original `IntegrityError`.)
+
+Because the rejected write reaches the database, it aborts the surrounding transaction. If you catch the `ValidationError` and want to keep using the transaction, wrap the write in `transaction.atomic()` so it rolls back to a savepoint:
+
+```python
+try:
+    with transaction.atomic():
+        User.query.create(email=taken_email)
+except ValidationError:
+    ...  # report it — the transaction is still usable
+```
+
+Forms are the exception: a `ModelForm` pre-checks constraints explicitly (its own `full_clean`) so it can surface every violation at once, then saves with validation already done. A direct `save()` reports the first violation Postgres hits.
 
 This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to. If you retry on a unique conflict, catch both:
 
@@ -1054,7 +1066,7 @@ except (psycopg.IntegrityError, ValidationError):
 
 For a plain insert-or-update with no per-row logic, `bulk_create(..., update_conflicts=True, unique_fields=[...])` is an atomic upsert with no race to catch.
 
-Two caveats. The mapping covers **immediate** constraints — the default. An explicitly deferred constraint (`UniqueConstraint(deferrable=Deferrable.DEFERRED)`) is checked at commit, _after_ the write returns, so its violation still surfaces as a raw `psycopg.IntegrityError`. And when a row violates several constraints at once, the pre-check reports them all, while the database stops at the first one it hits — so a post-write `ValidationError` carries a single violation.
+Two caveats. The mapping covers **immediate** constraints — the default. An explicitly deferred constraint (`UniqueConstraint(deferrable=Deferrable.DEFERRED)`) is checked at commit, _after_ the write returns, so its violation still surfaces as a raw `psycopg.IntegrityError`. And when a row violates several constraints at once, a form's pre-check (or an explicit `full_clean()`) reports them all, while a direct `save()` gets only the first one the database hits.
 
 ### Indexes and constraints
 
@@ -1078,7 +1090,7 @@ class User(postgres.Model):
     )
 ```
 
-Constraints are also checked during `full_clean()` (which `save()` runs by default — see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
+Constraints are checked during `full_clean()` — run by a `ModelForm` and any explicit `full_clean()` call, but **not** by a direct `save()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
 
 ```python
 # Simple message — lands on NON_FIELD_ERRORS

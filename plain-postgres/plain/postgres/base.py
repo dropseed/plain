@@ -394,7 +394,22 @@ class Model(metaclass=ModelBase):
                 update_fields = frozenset(loaded_fields)
 
         if clean_and_validate:
-            self.full_clean(exclude=deferred_fields)
+            # Validate the instance's shape (fields + clean()), but not its
+            # constraints. The database is authoritative for unique/check
+            # violations, and save_base maps the resulting IntegrityError back
+            # to the same ValidationError a pre-check would have raised — so
+            # skipping validate_constraints here drops a SELECT-per-constraint
+            # from every write without losing the field-level error. Forms keep
+            # their own pre-check (full_clean in _post_clean) to surface every
+            # violation at once.
+            #
+            # validate_unique stays on (full_clean's default) and is
+            # load-bearing — it's the one pre-check the database can't replace.
+            # A new instance saved with a manually-set, already-existing PK
+            # would otherwise reach _save_table's UPDATE-first path and
+            # silently overwrite that row instead of raising. It's a no-op for
+            # auto PKs; don't drop it while manually-set PKs are still allowed.
+            self.full_clean(exclude=deferred_fields, validate_constraints=False)
 
         self.save_base(
             force_insert=force_insert,

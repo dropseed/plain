@@ -46,3 +46,17 @@ def test_caught_violation_matches_pre_check_and_recovers_in_atomic(db: None) -> 
     # The transaction is usable again after the savepoint rollback, and the
     # duplicate never landed.
     assert ConstraintExample.query.filter(name="dup").count() == 1
+
+
+def test_default_save_maps_duplicate_to_validation_error(db: None) -> None:
+    """A duplicate on the default save() path (validation on) raises
+    ValidationError. (That the database does the rejecting rather than a
+    pre-check is what test_save_skips_constraint_pre_check_select proves; this
+    pins the user-facing contract on the common path.)"""
+    ConstraintExample(name="dup", description="same").save()
+
+    with pytest.raises(ValidationError):
+        with transaction.atomic():
+            ConstraintExample(name="dup", description="same").save()
+
+    assert ConstraintExample.query.filter(name="dup").count() == 1
