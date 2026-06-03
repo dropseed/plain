@@ -195,11 +195,8 @@ class APIView(View[APIResult]):
                 )
             status_code, result = cast(tuple[int, dict[str, Any] | list[Any]], result)
 
-        if isinstance(result, dict):
+        if isinstance(result, dict | list):
             return JsonResponse(result, status_code=status_code)
-
-        if isinstance(result, list):
-            return JsonResponse(result, status_code=status_code, safe=False)
 
         raise TypeError(f"Unexpected APIView return type: {type(result).__name__}")
 

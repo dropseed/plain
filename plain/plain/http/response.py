@@ -702,13 +702,9 @@ class JsonResponse(Response):
     """
     An HTTP response class that consumes data to be serialized to JSON.
 
-    :param data: Data to be dumped into json. By default only ``dict`` objects
-      are allowed to be passed due to a security flaw before ECMAScript 5. See
-      the ``safe`` parameter for more information.
+    :param data: Data to be dumped into json.
     :param encoder: Should be a json encoder class. Defaults to
       ``plain.json.PlainJSONEncoder``.
-    :param safe: Controls if only ``dict`` objects may be serialized. Defaults
-      to ``True``.
     :param json_dumps_params: A dictionary of kwargs passed to json.dumps().
     """
 
@@ -717,7 +713,6 @@ class JsonResponse(Response):
         data: Any,
         *,
         encoder: type[json.JSONEncoder] = PlainJSONEncoder,
-        safe: bool = True,
         json_dumps_params: dict[str, Any] | None = None,
         content_type: str = "application/json",
         status_code: int | None = None,
@@ -725,11 +720,6 @@ class JsonResponse(Response):
         charset: str | None = None,
         headers: dict[str, Any] | None = None,
     ):
-        if safe and not isinstance(data, dict):
-            raise TypeError(
-                "In order to allow non-dict objects to be serialized set the "
-                "safe parameter to False."
-            )
         if json_dumps_params is None:
             json_dumps_params = {}
         data = json.dumps(data, cls=encoder, **json_dumps_params)
