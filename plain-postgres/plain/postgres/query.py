@@ -284,7 +284,6 @@ class QuerySet[T: "Model"]:
     _query: Query
     _result_cache: list[T] | None
     _sticky_filter: bool
-    _for_write: bool
     _prefetch_related_lookups: tuple[Any, ...]
     _prefetch_done: bool
     _known_related_objects: dict[Any, dict[Any, Any]]
@@ -305,7 +304,6 @@ class QuerySet[T: "Model"]:
         instance._query = query or Query(model)
         instance._result_cache = None
         instance._sticky_filter = False
-        instance._for_write = False
         instance._prefetch_related_lookups = ()
         instance._prefetch_done = False
         instance._known_related_objects = {}
@@ -632,7 +630,6 @@ class QuerySet[T: "Model"]:
         and returning the created object.
         """
         obj = self.model(**kwargs)
-        self._for_write = True
         obj.create()
         return obj
 
@@ -722,7 +719,6 @@ class QuerySet[T: "Model"]:
             update_fields_objs,
             unique_fields_objs,
         )
-        self._for_write = True
         fields = meta.concrete_fields
         self._prepare_for_bulk_create(objs)
         with transaction.atomic(savepoint=False):
@@ -794,7 +790,6 @@ class QuerySet[T: "Model"]:
             )
         # PK is used twice in the resulting update query, once in the filter
         # and once in the WHEN. Each field will also have one CAST.
-        self._for_write = True
         max_batch_size = len(objs_tuple)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
         batches = (
@@ -833,7 +828,6 @@ class QuerySet[T: "Model"]:
         """
         # The get() needs to be targeted at the write database in order
         # to avoid potential transaction consistency problems.
-        self._for_write = True
         try:
             return self.get(**kwargs), False
         except self.model.DoesNotExist:
@@ -875,7 +869,6 @@ class QuerySet[T: "Model"]:
             update_defaults = create_defaults = defaults or {}
         else:
             update_defaults = defaults or {}
-        self._for_write = True
         with transaction.atomic():
             # Lock the row so that a concurrent update is blocked until
             # update_or_create() has performed its save.
@@ -961,7 +954,6 @@ class QuerySet[T: "Model"]:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
         del_query = self._chain()
-        del_query._for_write = True
         del_query.sql_query.select_for_update = False
         del_query.sql_query.select_related = False
         del_query.sql_query.clear_ordering(force=True)
@@ -996,7 +988,6 @@ class QuerySet[T: "Model"]:
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
-        self._for_write = True
         query = self.sql_query.chain(UpdateQuery)
         query.add_update_values(kwargs)
 
@@ -1215,7 +1206,6 @@ class QuerySet[T: "Model"]:
         if nowait and skip_locked:
             raise ValueError("The nowait option cannot be used with skip_locked.")
         obj = self._chain()
-        obj._for_write = True
         obj.sql_query.select_for_update = True
         obj.sql_query.select_for_update_nowait = nowait
         obj.sql_query.select_for_update_skip_locked = skip_locked
@@ -1466,7 +1456,6 @@ class QuerySet[T: "Model"]:
         Insert a new record for the given model. This provides an interface to
         the InsertQuery class and is how Model.create() is implemented.
         """
-        self._for_write = True
         query = InsertQuery(
             self.model,
             on_conflict=on_conflict if on_conflict else None,
@@ -1532,7 +1521,6 @@ class QuerySet[T: "Model"]:
             query=self.sql_query.chain(),
         )
         c._sticky_filter = self._sticky_filter
-        c._for_write = self._for_write
         c._prefetch_related_lookups = self._prefetch_related_lookups[:]
         c._known_related_objects = self._known_related_objects
         c._iterable_class = self._iterable_class
