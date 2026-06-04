@@ -10,7 +10,7 @@ Ready for the era of agents.
 Start with an agent (Claude, Codex, Amp, OpenCode, or your agent of choice):
 
 ```
-mkdir my-app && cd my-app && claude "$(curl -sSf https://plainframework.com/start.md)"
+mkdir my-app && cd my-app && claude "$( curl -sSf https://plainframework.com/start.md )"
 ```
 
 Or start with uv directly:
@@ -106,7 +106,7 @@ Models declare fields as annotated attributes, and that typing carries through v
 
 ## Observability at the core
 
-OpenTelemetry traces, a built-in request observer, and slow-query detection ship in the box. The first time an N+1 matters, you already have the tools to see it.
+OpenTelemetry traces and slow-query detection ship in the box. The first time an N+1 matters, you already have the tools to see it.
 
 ## Agents at the forefront
 
@@ -132,7 +132,7 @@ plain docs --search "queryset"         # search across all packages
 
 ## First-party ecosystem
 
-32 packages, one framework. All with built-in docs. Decisions that usually take a sprint are already made.
+31 packages, one framework. All with built-in docs. Decisions that usually take a sprint are already made.
 
 **Foundation:**
 
@@ -172,12 +172,9 @@ plain docs --search "queryset"         # search across all packages
 **Production:**
 
 - [plain.admin](https://plainframework.com/docs/plain-admin/plain/admin/) — database admin
-- [plain.observer](https://plainframework.com/docs/plain-observer/plain/observer/) — request tracing
 - [plain.connect](https://plainframework.com/docs/plain-connect/plain/connect/) — OTLP export to Plain Cloud
 - [plain.flags](https://plainframework.com/docs/plain-flags/plain/flags/) — feature flags
 - [plain.scan](https://plainframework.com/docs/plain-scan/plain/scan/) — security scanning
-- [plain.pageviews](https://plainframework.com/docs/plain-pageviews/plain/pageviews/) — analytics
-- [plain.support](https://plainframework.com/docs/plain-support/plain/support/) — support tickets
 
 **Users:**
 

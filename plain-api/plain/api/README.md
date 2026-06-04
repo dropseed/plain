@@ -256,7 +256,7 @@ Generating API keys is something you will need to do in your own code, wherever 
 ```python
 user = User.query.first()
 user.api_key = APIKey.query.create()
-user.save()
+user.update()
 ```
 
 To use API keys in your views, you can inherit from `APIKeyView` and customize the [`use_api_key`](./views.py#use_api_key) method to associate the request with a user (or any other object) using `set_request_user()`.

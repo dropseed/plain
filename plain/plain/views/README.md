@@ -316,9 +316,9 @@ from plain.postgres import transaction
 
 with transaction.atomic():
     order = Order(user=user)
-    order.save()
+    order.create()
     payment = Payment(order=order, amount=total)
-    payment.save()
+    payment.create()
 ```
 
 ## FAQs

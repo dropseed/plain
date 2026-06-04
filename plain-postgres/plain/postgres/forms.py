@@ -292,7 +292,7 @@ class ModelForm(Form):
     def initial_from(cls, instance: Any) -> dict[str, Any]:
         """Build an initial-values dict from a model instance.
 
-        Translates a ForeignKey to its `<name>_id` value and a ManyToMany
+        Translates a ForeignKey to its related object's id and a ManyToMany
         relation to a list of related-object ids — what `ModelChoiceField`
         and `ModelMultipleChoiceField` take as input. Scalar fields fall
         through to a plain `getattr`. Pass the result as `render_form`'s
@@ -306,17 +306,22 @@ class ModelForm(Form):
                     [] if related is None else [obj.id for obj in related.query]
                 )
             elif isinstance(field, ModelChoiceField):
-                initial[fname] = getattr(instance, f"{fname}_id", None)
+                # A foreign key returns a partial related object whose `.id` is
+                # query-free; there is no `<name>_id` attribute to read.
+                related = getattr(instance, fname, None)
+                initial[fname] = None if related is None else related.id
             else:
                 initial[fname] = getattr(instance, fname, None)
         return initial
 
 
-def update_from[T: Model](instance: T, result: ModelForm) -> T:
-    """Apply a validated `ModelForm` result onto a model instance and save it.
+def _apply_result[T: Model](
+    instance: T, result: ModelForm
+) -> tuple[T, list[tuple[str, Any]]]:
+    """Set a validated `ModelForm` result's column and FK values onto the instance.
 
-    Sets the column and FK values, saves the row, then assigns the M2M
-    relations (which need a primary key first). Returns the instance. Form
+    Returns the instance plus the deferred M2M assignments — those need a
+    primary key, so the caller applies them after the row is written. Form
     fields that aren't columns of the instance's model are ignored — a
     `ModelForm` may carry an extra non-model field (e.g. a confirm-password).
     """
@@ -343,7 +348,18 @@ def update_from[T: Model](instance: T, result: ModelForm) -> T:
             continue
         setattr(instance, fname, value)
 
-    instance.save()
+    return instance, m2m
+
+
+def update_from[T: Model](instance: T, result: ModelForm) -> T:
+    """Apply a validated `ModelForm` result onto a persisted instance and UPDATE it.
+
+    Sets the column and FK values, UPDATEs the existing row, then assigns the
+    M2M relations (which need a primary key first). Returns the instance.
+    """
+    instance, m2m = _apply_result(instance, result)
+
+    instance.update()
 
     for fname, value in m2m:
         getattr(instance, fname).set(list(value))
@@ -352,9 +368,16 @@ def update_from[T: Model](instance: T, result: ModelForm) -> T:
 
 
 def create_from[T: Model](model: type[T], result: ModelForm, /, **extra: Any) -> T:
-    """Create and save a new model instance from a validated `ModelForm` result.
+    """Create a new model instance from a validated `ModelForm` result and INSERT it.
 
     Column values come from `result`; `extra` kwargs (e.g. `author=user`)
-    populate columns the form doesn't carry.
+    populate columns the form doesn't carry. Returns the inserted instance.
     """
-    return update_from(model(**extra), result)
+    instance, m2m = _apply_result(model(**extra), result)
+
+    instance.create()
+
+    for fname, value in m2m:
+        getattr(instance, fname).set(list(value))
+
+    return instance

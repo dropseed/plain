@@ -20,7 +20,7 @@ from plain.postgres.expressions import F
 from plain.runtime import settings
 from plain.utils import timezone
 
-from .exceptions import DeferError, DeferJob
+from .exceptions import DeferJob
 from .otel import (
     operation_duration_histogram,
     process_metric_attributes,
@@ -63,31 +63,25 @@ class JobRequest(postgres.Model):
     Keep all pending job requests in a single table.
     """
 
-    created_at: datetime.datetime = types.DateTimeField(create_now=True)
-    uuid: UUID = types.UUIDField(generate=True)
+    created_at = types.DateTimeField(create_now=True)
+    uuid = types.UUIDField(generate=True)
 
-    job_class: str = types.TextField(max_length=255)
+    job_class = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
-    priority: int = types.SmallIntegerField(default=0)
-    source: str = types.TextField(required=False)
-    queue: str = types.TextField(default="default", max_length=255)
+    priority = types.SmallIntegerField(default=0)
+    source = types.TextField(required=False)
+    queue = types.TextField(default="default", max_length=255)
 
-    retries: int = types.SmallIntegerField(default=0)
-    retry_attempt: int = types.SmallIntegerField(default=0)
+    retries = types.SmallIntegerField(default=0)
+    retry_attempt = types.SmallIntegerField(default=0)
 
-    concurrency_key: str = types.TextField(max_length=255, required=False)
+    concurrency_key = types.TextField(max_length=255, required=False)
 
-    start_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
+    start_at = types.DateTimeField(required=False, allow_null=True)
 
     # OpenTelemetry trace context
-    trace_id: str | None = types.TextField(
-        max_length=34, required=False, allow_null=True
-    )
-    span_id: str | None = types.TextField(
-        max_length=18, required=False, allow_null=True
-    )
+    trace_id = types.TextField(max_length=34, required=False, allow_null=True)
+    span_id = types.TextField(max_length=18, required=False, allow_null=True)
 
     # expires_at = postgres.DateTimeField(required=False, allow_null=True)
 
@@ -109,9 +103,6 @@ class JobRequest(postgres.Model):
             postgres.Index(
                 name="plainjobs_jobrequest_concurrency_key_idx",
                 fields=["concurrency_key"],
-            ),
-            postgres.Index(
-                name="plainjobs_jobrequest_trace_id_idx", fields=["trace_id"]
             ),
             # Used for job grouping queries
             postgres.Index(
@@ -177,35 +168,27 @@ class JobProcess(postgres.Model):
     All active jobs are stored in this table.
     """
 
-    uuid: UUID = types.UUIDField(generate=True)
-    created_at: datetime.datetime = types.DateTimeField(create_now=True)
-    started_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
+    uuid = types.UUIDField(generate=True)
+    created_at = types.DateTimeField(create_now=True)
+    started_at = types.DateTimeField(required=False, allow_null=True)
 
     # From the JobRequest
-    job_request_uuid: UUID = types.UUIDField()
-    requested_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
-    job_class: str = types.TextField(max_length=255)
+    job_request_uuid = types.UUIDField()
+    requested_at = types.DateTimeField(required=False, allow_null=True)
+    job_class = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
-    priority: int = types.SmallIntegerField(default=0)
-    source: str = types.TextField(required=False)
-    queue: str = types.TextField(default="default", max_length=255)
-    retries: int = types.SmallIntegerField(default=0)
-    retry_attempt: int = types.SmallIntegerField(default=0)
-    concurrency_key: str = types.TextField(max_length=255, required=False)
+    priority = types.SmallIntegerField(default=0)
+    source = types.TextField(required=False)
+    queue = types.TextField(default="default", max_length=255)
+    retries = types.SmallIntegerField(default=0)
+    retry_attempt = types.SmallIntegerField(default=0)
+    concurrency_key = types.TextField(max_length=255, required=False)
 
     # OpenTelemetry trace context
-    trace_id: str | None = types.TextField(
-        max_length=34, required=False, allow_null=True
-    )
-    span_id: str | None = types.TextField(
-        max_length=18, required=False, allow_null=True
-    )
+    trace_id = types.TextField(max_length=34, required=False, allow_null=True)
+    span_id = types.TextField(max_length=18, required=False, allow_null=True)
 
-    worker_id: UUID = types.UUIDField()
+    worker_id = types.UUIDField()
 
     query: JobQuerySet = JobQuerySet()
 
@@ -226,9 +209,6 @@ class JobProcess(postgres.Model):
             postgres.Index(
                 name="plainjobs_jobprocess_job_request_uuid_idx",
                 fields=["job_request_uuid"],
-            ),
-            postgres.Index(
-                name="plainjobs_jobprocess_trace_id_idx", fields=["trace_id"]
             ),
             postgres.Index(
                 name="plainjobs_jobprocess_worker_id_idx", fields=["worker_id"]
@@ -301,12 +281,16 @@ class JobProcess(postgres.Model):
                 },
                 links=links,
             ) as span:
-                # This is how we know it has been picked up
-                self.started_at = timezone.now()
-                self.save(update_fields=["started_at"])
+                # This is how we know it has been picked up.
+                # Keep `started_at` as a local: reading `self.started_at` back
+                # through the descriptor types as `datetime | None` (the field
+                # is `allow_null=True`), which doesn't subtract cleanly below.
+                started_at = timezone.now()
+                self.started_at = started_at
+                self.update(fields=["started_at"])
 
                 if self.requested_at:
-                    queue_wait = (self.started_at - self.requested_at).total_seconds()
+                    queue_wait = (started_at - self.requested_at).total_seconds()
                     queue_wait_duration_histogram.record(queue_wait, metric_attributes)
 
                 try:
@@ -326,24 +310,18 @@ class JobProcess(postgres.Model):
                                 "job_process_uuid": self.uuid,
                             },
                         )
-                        return self.defer(job=job, defer_exception=e)
+                        result = self.defer(job=job, defer_exception=e)
+                        if result.retry_job_request_uuid is None:
+                            # Re-enqueue was blocked by should_enqueue() —
+                            # either the default uniqueness rule (a peer
+                            # exists) or a user override (rate limit, custom
+                            # rule). Same treatment as the initial-enqueue
+                            # path's `job.enqueue.skipped`: not an error,
+                            # just visibility on the consumer span.
+                            span.set_attribute("plain.jobs.defer.skipped", True)
+                        return result
 
                     return self.convert_to_result(status=JobResultStatuses.SUCCESSFUL)
-
-                except DeferError as e:
-                    # Defer failed (e.g., concurrency limit reached during re-enqueue)
-                    # The transaction was rolled back, so the JobProcess still exists in DB.
-                    # The pk was restored in defer() before raising, so we can proceed normally.
-                    logger.warning(
-                        "Defer failed",
-                        extra={"job_class": self.job_class, "error": str(e)},
-                    )
-                    error_type = record_span_error(span, e, metric_attributes)
-                    return self.convert_to_result(
-                        status=JobResultStatuses.ERRORED,
-                        error=str(e),
-                        error_type=error_type,
-                    )
 
                 except Exception as e:
                     # Note: if a rescuer already wrote JobResult(LOST) for this
@@ -367,12 +345,17 @@ class JobProcess(postgres.Model):
         """Defer this job by re-enqueueing it for later execution.
 
         Atomically deletes the JobProcess, re-enqueues the job, and creates
-        a JobResult linking to the new request. This ensures the concurrency
-        slot is released before attempting to re-enqueue.
+        a JobResult. The concurrency slot is released before re-enqueue so
+        the new request's own `should_enqueue()` check can pass.
 
-        Raises:
-            DeferError: If the job cannot be re-enqueued (e.g., due to concurrency limits).
-                       The transaction will be rolled back and the JobProcess will remain.
+        If `should_enqueue()` blocks the re-enqueue, the framework honors
+        that signal — same convention as `run_in_worker()` and `retry_job()`,
+        which both return `None` silently in the same situation. The
+        JobResult is still `DEFERRED` but `retry_job_request_uuid` is
+        `None`, the error message records that the re-enqueue was skipped,
+        and the caller stamps `plain.jobs.defer.skipped=True` on the
+        consumer span so this case is queryable in APM without surfacing
+        as an exception.
         """
         # Calculate new retry_attempt based on increment_retries
         retry_attempt = (
@@ -383,7 +366,6 @@ class JobProcess(postgres.Model):
 
         with transaction.atomic():
             # 1. Save JobProcess state and delete (releases concurrency slot)
-            saved_id = self.id
             job_process_uuid = self.uuid
             job_request_uuid = self.job_request_uuid
             requested_at = self.requested_at
@@ -400,21 +382,23 @@ class JobProcess(postgres.Model):
                 concurrency_key=self.concurrency_key,
             )
 
-            # Check if re-enqueue failed
             if new_job_request is None:
-                # Restore id since transaction will roll back and object still exists
-                self.id = saved_id
-                raise DeferError(
-                    f"Failed to re-enqueue deferred job {self.job_class}: "
-                    f"concurrency limit reached for key '{self.concurrency_key}'"
+                error = (
+                    f"Deferred for {defer_exception.delay} seconds "
+                    f"(re-enqueue skipped: should_enqueue() returned False "
+                    f"for concurrency_key '{self.concurrency_key}')"
                 )
+                retry_job_request_uuid = None
+            else:
+                error = f"Deferred for {defer_exception.delay} seconds"
+                retry_job_request_uuid = new_job_request.uuid
 
-            # 3. Create JobResult linking to new request
+            # 3. Create JobResult (linking to new request if one was created)
             result = JobResult.query.create(
                 ended_at=timezone.now(),
-                error=f"Deferred for {defer_exception.delay} seconds",
+                error=error,
                 status=JobResultStatuses.DEFERRED,
-                retry_job_request_uuid=new_job_request.uuid,
+                retry_job_request_uuid=retry_job_request_uuid,
                 # From the JobProcess
                 job_process_uuid=job_process_uuid,
                 started_at=started_at,
@@ -574,7 +558,7 @@ class JobResultQuerySet(postgres.QuerySet["JobResult"]):
                     extra={"result": str(result)},
                 )
                 result.retry_attempt += 1
-                result.save(update_fields=["retry_attempt"])
+                result.update(fields=["retry_attempt"])
 
 
 class JobResultStatuses(postgres.TextChoices):
@@ -594,49 +578,37 @@ class JobResult(postgres.Model):
     All in-process and completed jobs are stored in this table.
     """
 
-    uuid: UUID = types.UUIDField(generate=True)
-    created_at: datetime.datetime = types.DateTimeField(create_now=True)
+    uuid = types.UUIDField(generate=True)
+    created_at = types.DateTimeField(create_now=True)
 
     # From the Job
-    job_process_uuid: UUID = types.UUIDField()
-    started_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
-    ended_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
-    error: str = types.TextField(required=False)
-    status: str = types.TextField(
+    job_process_uuid = types.UUIDField()
+    started_at = types.DateTimeField(required=False, allow_null=True)
+    ended_at = types.DateTimeField(required=False, allow_null=True)
+    error = types.TextField(required=False)
+    status = types.TextField(
         max_length=20,
         choices=JobResultStatuses.choices,
     )
 
     # From the JobRequest
-    job_request_uuid: UUID = types.UUIDField()
-    requested_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
-    job_class: str = types.TextField(max_length=255)
+    job_request_uuid = types.UUIDField()
+    requested_at = types.DateTimeField(required=False, allow_null=True)
+    job_class = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
-    priority: int = types.SmallIntegerField(default=0)
-    source: str = types.TextField(required=False)
-    queue: str = types.TextField(default="default", max_length=255)
-    retries: int = types.SmallIntegerField(default=0)
-    retry_attempt: int = types.SmallIntegerField(default=0)
-    concurrency_key: str = types.TextField(max_length=255, required=False)
+    priority = types.SmallIntegerField(default=0)
+    source = types.TextField(required=False)
+    queue = types.TextField(default="default", max_length=255)
+    retries = types.SmallIntegerField(default=0)
+    retry_attempt = types.SmallIntegerField(default=0)
+    concurrency_key = types.TextField(max_length=255, required=False)
 
     # Retries
-    retry_job_request_uuid: UUID | None = types.UUIDField(
-        required=False, allow_null=True
-    )
+    retry_job_request_uuid = types.UUIDField(required=False, allow_null=True)
 
     # OpenTelemetry trace context
-    trace_id: str | None = types.TextField(
-        max_length=34, required=False, allow_null=True
-    )
-    span_id: str | None = types.TextField(
-        max_length=18, required=False, allow_null=True
-    )
+    trace_id = types.TextField(max_length=34, required=False, allow_null=True)
+    span_id = types.TextField(max_length=18, required=False, allow_null=True)
 
     query: JobResultQuerySet = JobResultQuerySet()
 
@@ -646,24 +618,7 @@ class JobResult(postgres.Model):
             postgres.Index(
                 name="plainjobs_jobresult_created_at_idx", fields=["created_at"]
             ),
-            postgres.Index(
-                name="plainjobs_jobresult_started_at_idx", fields=["started_at"]
-            ),
-            postgres.Index(
-                name="plainjobs_jobresult_ended_at_idx", fields=["ended_at"]
-            ),
             postgres.Index(name="plainjobs_jobresult_status_idx", fields=["status"]),
-            postgres.Index(
-                name="plainjobs_jobresult_job_request_uuid_idx",
-                fields=["job_request_uuid"],
-            ),
-            postgres.Index(
-                name="plainjobs_jobresult_job_class_idx", fields=["job_class"]
-            ),
-            postgres.Index(name="plainjobs_jobresult_queue_idx", fields=["queue"]),
-            postgres.Index(
-                name="plainjobs_jobresult_trace_id_idx", fields=["trace_id"]
-            ),
         ],
         constraints=[
             postgres.UniqueConstraint(
@@ -730,7 +685,7 @@ class JobResult(postgres.Model):
             )
             if result:
                 self.retry_job_request_uuid = result.uuid
-                self.save(update_fields=["retry_job_request_uuid"])
+                self.update(fields=["retry_job_request_uuid"])
                 return result
 
         return None
@@ -747,12 +702,12 @@ class WorkerHeartbeat(postgres.Model):
     in-flight jobs.
     """
 
-    worker_id: UUID = types.UUIDField()
-    hostname: str = types.TextField(max_length=255)
-    pid: int = types.IntegerField()
+    worker_id = types.UUIDField()
+    hostname = types.TextField(max_length=255)
+    pid = types.IntegerField()
     queues: list[str] = types.JSONField()
-    started_at: datetime.datetime = types.DateTimeField(create_now=True)
-    last_heartbeat_at: datetime.datetime = types.DateTimeField()
+    started_at = types.DateTimeField(create_now=True)
+    last_heartbeat_at = types.DateTimeField()
 
     model_options = postgres.Options(
         ordering=["-last_heartbeat_at"],

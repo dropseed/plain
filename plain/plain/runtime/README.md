@@ -98,7 +98,7 @@ PLAIN_ADMIN_FORCE_THEME=       # → None
 
 ### .env files
 
-Plain does not load `.env` files automatically. If you use [`plain.dev`](/plain-dev/README.md), it loads `.env` files for you during development. For production, you need to load them yourself or rely on your deployment platform to inject environment variables.
+Plain does not load `.env` files automatically. If you use [`plain.dev`](/plain-dev/README.md), it loads `.env` files for you during development — see [`.env file precedence`](/plain-dev/plain/dev/README.md#env-files) for the lookup order. For production, you need to load them yourself or rely on your deployment platform to inject environment variables.
 
 ### Custom prefixes
 

@@ -36,7 +36,8 @@ class PasswordField(postgres.TextField):
         if value and not self._is_hashed(value):
             value = hash_password(value)
             # Set the hashed value back on the instance immediately too
-            setattr(model_instance, self.attname, value)
+            assert self.name is not None
+            setattr(model_instance, self.name, value)
 
         return value
 

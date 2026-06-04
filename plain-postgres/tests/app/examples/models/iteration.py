@@ -14,7 +14,7 @@ class IterationExample(postgres.Model):
     class plumbing).
     """
 
-    name: str = types.TextField(max_length=100)
-    tag: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
+    tag = types.TextField(max_length=100)
 
     query: postgres.QuerySet[IterationExample] = postgres.QuerySet()

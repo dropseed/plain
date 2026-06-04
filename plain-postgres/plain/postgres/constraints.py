@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 from types import NoneType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from plain.exceptions import ValidationError
 from plain.postgres.constants import LOOKUP_SEP
@@ -66,6 +66,18 @@ class BaseConstraint:
         if isinstance(self.violation_error, ValidationError):
             return self.violation_error
         return ValidationError(self.violation_error)
+
+    def _db_violation_error(
+        self, instance: Model, model: type[Model]
+    ) -> ValidationError | None:
+        """The ValidationError to raise when the database reports a violation
+        of this constraint (mapped from an IntegrityError at the write
+        boundary), or None if this constraint type can't be mapped — the
+        caller then re-raises the original IntegrityError.
+
+        Subclasses that can describe their own violations override this.
+        """
+        return None
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         path = f"{self.__class__.__module__}.{self.__class__.__name__}"
@@ -145,6 +157,11 @@ class CheckConstraint(BaseConstraint):
                 raise self._build_violation_error()
         except FieldError:
             pass
+
+    def _db_violation_error(
+        self, instance: Model, model: type[Model]
+    ) -> ValidationError | None:
+        return self._build_violation_error()
 
     def __repr__(self) -> str:
         return "<{}: check={} name={}{}>".format(
@@ -363,7 +380,7 @@ class UniqueConstraint(BaseConstraint):
                 if exclude and field_name in exclude:
                     return
                 field = model._model_meta.get_forward_field(field_name)
-                lookup_value = getattr(instance, field.attname)
+                lookup_value = field.value_from_object(instance)
                 if lookup_value is None:
                     # A composite constraint containing NULL value cannot cause
                     # a violation since NULL != NULL in SQL.
@@ -431,8 +448,54 @@ class UniqueConstraint(BaseConstraint):
             return err
 
         if self.fields:
-            err = instance.unique_error_message(model, self.fields)
+            err = self._unique_error_message(instance, model, self.fields)
             if single_field:
                 return ValidationError({single_field: [err]})
             return err
         return ValidationError(f'Constraint "{self.name}" is violated.')
+
+    def _unique_error_message(
+        self,
+        instance: Model,
+        model: type[Model],
+        unique_check: tuple[str, ...],
+    ) -> ValidationError:
+        """Build the ValidationError describing a violation of `unique_check`,
+        using each field's own `unique_error_message` format string."""
+        meta = model._model_meta
+
+        params: dict[str, Any] = {
+            "model": instance,
+            "model_class": model,
+            "model_name": model.model_options.model_name,
+            "unique_check": unique_check,
+        }
+
+        if len(unique_check) == 1:
+            field = meta.get_forward_field(unique_check[0])
+            params["field_label"] = field.name
+            return ValidationError(
+                message=field.unique_error_message,
+                code="unique",
+                params=params,
+            )
+
+        field_names = [meta.get_forward_field(f).name for f in unique_check]
+        # Put an "and" before the last one.
+        field_names[-1] = f"and {field_names[-1]}"
+        # Comma-join when more than two, otherwise just space-join.
+        sep = ", " if len(field_names) > 2 else " "
+        params["field_label"] = sep.join(cast(list[str], field_names))
+
+        # Use the first field's message format.
+        message = meta.get_forward_field(unique_check[0]).unique_error_message
+        return ValidationError(
+            message=message,
+            code="unique",
+            params=params,
+        )
+
+    def _db_violation_error(
+        self, instance: Model, model: type[Model]
+    ) -> ValidationError | None:
+        return self._build_unique_violation(instance, model)

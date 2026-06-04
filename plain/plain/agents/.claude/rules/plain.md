@@ -7,6 +7,7 @@ Plain is a Python web framework.
 - When unsure about an API or something doesn't work, run `uv run plain docs <package>` first. Add `--api` if you need the full API surface.
 - Use the `/plain-install` skill to add new Plain packages.
 - Use the `/plain-upgrade` skill to upgrade Plain packages.
+- Use the `/plain-optimize` skill to investigate slow pages and N+1 queries.
 
 ## Coding style
 
@@ -93,7 +94,7 @@ Trace-context-only (not error attribution): template render (`plain-templates`),
 **Discovery** — find what's available and where things are:
 
 - `uv run plain docs --list` — all packages and core modules with descriptions
-- `uv run plain docs --search <term>` — find which modules/sections mention a term (compact, one line per section)
+- `uv run plain docs --search <term>` — find which modules/sections mention a term (compact, one line per section). Substring by default; add `--regex` for regex patterns (alternation, anchors, etc.)
 
 **Reading** — get full content:
 
@@ -103,7 +104,7 @@ Trace-context-only (not error attribution): template render (`plain-templates`),
 
 **Workflow**: Use `--search <term>` to find which module has what you need, then read the full doc, or run `<name> --search <term>` to print just the matching sections.
 
-Packages: plain, plain-admin, plain-api, plain-assets, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-observer, plain-pages, plain-pageviews, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-support, plain-tailwind, plain-templates, plain-toolbar, plain-tunnel, plain-vendor
+Packages: plain, plain-admin, plain-api, plain-assets, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-pages, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-tailwind, plain-templates, plain-toolbar, plain-tunnel, plain-vendor
 
 Core modules: agents, chores, cli, csrf, forms, http, logs, packages, preflight, runtime, server, test, urls, utils, views
 
@@ -115,7 +116,7 @@ Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/pat
 - `uv run plain pre-commit` — `check` plus commit-specific steps (custom commands, uv lock, build)
 - `uv run plain shell` — interactive Python shell with Plain configured (`-c "..."` for one-off commands)
 - `uv run plain run script.py` — run a script with Plain configured
-- `uv run plain request /path` — test HTTP request against dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`)
+- `uv run plain request /path` — test HTTP request against the dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`). Add `--json` for context-frugal output — response metadata and trace analysis (query counts, N+1s, span tree), no response body.
 
 ## Debugging and verifying changes
 

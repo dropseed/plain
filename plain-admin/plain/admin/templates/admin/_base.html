@@ -77,10 +77,7 @@
     <script src="{{ asset('admin/components.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     {% block header_scripts %}{% endblock %}
 </head>
-<body
-    class="flex flex-col min-h-screen pb-12"
-    {% if is_package_installed('plaintoolbar') %}data-toolbar-installed{% endif %}
-    >
+<body class="flex flex-col min-h-screen pb-12">
 
     {% include "admin/_header.html" %}
 

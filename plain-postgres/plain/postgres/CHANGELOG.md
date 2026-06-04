@@ -1,5 +1,57 @@
 # plain-postgres changelog
 
+## [0.106.0](https://github.com/dropseed/plain/releases/plain-postgres@0.106.0) (2026-06-03)
+
+### What's changed
+
+- **`Model.save()` is replaced by explicit `create()` (always INSERT) and `update()` (always UPDATE).** A call site now says which it does. `create()` inserts a new row and returns `self`; `update()` writes an existing row and returns `self`, raising if no row matched (there is no silent INSERT fallback). `update(fields=[...])` limits the columns written (replacing `save(update_fields=[...])`). `save()`, `save_base()`, and the `force_insert`/`force_update` arguments are removed. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+- **Constructing a model with `id=` now raises.** A hand-set `id` at construction almost always means "load the existing row" — use `Model.query.get(id=...)`. A freshly constructed instance is unambiguously new. ([9c0acf7bac](https://github.com/dropseed/plain/commit/9c0acf7bac), [661c7806df](https://github.com/dropseed/plain/commit/661c7806df))
+- **Declared unique/check constraint violations now raise `ValidationError`, not raw `psycopg.IntegrityError`** — mapped at the write boundary, so even a violation that races past validation surfaces as the same field-level error a pre-check would raise. The database is now the authority; the pre-check `SELECT` is no longer required for correctness. Set-based writes (`bulk_create`, `QuerySet.update`) still raise raw `psycopg` errors. ([40c97521c5](https://github.com/dropseed/plain/commit/40c97521c5), [bdbdd524e5](https://github.com/dropseed/plain/commit/bdbdd524e5))
+- **`full_clean()` is now shape-only** (`clean_fields()` + `clean()`); the integrity pre-check moved to `validate_constraints()`, called explicitly. `full_clean()`'s `validate_unique`/`validate_constraints` parameters and the `Model.validate_unique()` / `_get_unique_checks` / `_perform_unique_checks` trio are removed; forms call `full_clean()` then `validate_constraints()`. ([ba4b386fb7](https://github.com/dropseed/plain/commit/ba4b386fb7), [65d56945fb](https://github.com/dropseed/plain/commit/65d56945fb))
+- `delete()` clears the instance's `id` and resets it to "new," so `create()` re-inserts it cleanly; the instance's other field values survive the delete. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- Replace `obj.save()` with `obj.create()` for a new row or `obj.update()` for an existing one; `obj.save(update_fields=[...])` becomes `obj.update(fields=[...])`. The `/plain-upgrade` skill rewrites these for you — the create-vs-update choice is context-dependent, so it reasons per call site.
+- Remove `force_insert=`/`force_update=` — `create()` and `update()` are the explicit forms.
+- Don't pass `id=` to a model constructor; load existing rows with `Model.query.get(id=...)`.
+- Catch `ValidationError` (or `(psycopg.IntegrityError, ValidationError)` when retrying) for unique/check conflicts on instance writes. Inside an open `transaction.atomic()` a violation aborts the transaction — wrap the write in its own `atomic()` to catch and continue.
+- Direct `full_clean()` callers that relied on constraint pre-checking should call `validate_constraints()` explicitly.
+
+## [0.105.0](https://github.com/dropseed/plain/releases/plain-postgres@0.105.0) (2026-05-25)
+
+### What's changed
+
+- **Field constructors in `plain.postgres.types` are now typed as parameterized descriptors.** Stubs return `XField[T]` (e.g. `TextField[str]`, `IntegerField[int | None]` when `allow_null=True`) instead of the primitive value. Combined with `Field[T]`'s overloaded `__get__`, class-level access (`User.email`) sees the descriptor and instance access (`user.email`) sees the value — no annotation needed on model declarations. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+- **`Field.__set__` is now typed as `value: T`** instead of `Any`, so a type checker flags `row.name = 123` on a `TextField` at the call site. Runtime conversion via `to_python()` is unchanged. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+- **`ForeignKeyField` overloads split by `to=` argument shape.** Passing a model class (`to=Author`) returns `_ForeignKeyDescriptor[T, V]` and accepts bare-PK assignment (`book.author = 5`) via `__set__`. Passing a string forward reference (`to="Author"`) returns the bare value type and requires an LHS annotation so the type can bind. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+- `JSONField` and `EncryptedJSONField` keep explicit annotations on model declarations — their runtime classes aren't generic, so the stubs return `Any`. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- **Drop primitive type annotations on model field declarations.** `name: str = types.TextField()` will now fail type checking because the right-hand side is typed `TextField[str]`, not `str`. Change to `name = types.TextField()` — type checkers still infer `str` at instance access through the descriptor's `__get__`. Runtime is unchanged either way.
+- **Keep explicit annotations for `JSONField` / `EncryptedJSONField`** — these still return `Any` from the stubs, so the declared type is what flows through. Example: `parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)`.
+
+## [0.104.0](https://github.com/dropseed/plain/releases/plain-postgres@0.104.0) (2026-05-22)
+
+### What's changed
+
+- **Foreign keys now return a partial related instance instead of an `_id` attribute.** Reading `book.author` is query-free — it returns an `Author` instance with only its primary key loaded. `book.author.id` gives the foreign key value, and accessing any other field (`book.author.name`) triggers a single deferred-load query for the whole row. The descriptor caches the resolved object so subsequent accesses do not re-query. `select_related()` continues to populate the cache up front for loops. ([b3be028b7b](https://github.com/dropseed/plain/commit/b3be028b7b))
+- **The `<fk>_id` shadow attribute is gone.** There is no `book.author_id` anymore — the raw foreign key column lives in `instance.__dict__` under the field name (`book.__dict__["author"]`) and is reached through the descriptor. `book.author.id` is the replacement read path and is type-checked because `book.author` is an `Author`. Writes that previously assigned `book.author_id = 5` now need to assign the key (or a related instance) through `book.author = 5` — the descriptor accepts a bare primary key value, a model instance, or `None`. ([3baa1c0404](https://github.com/dropseed/plain/commit/3baa1c0404), [b3be028b7b](https://github.com/dropseed/plain/commit/b3be028b7b))
+- **`Field.attname` and `Field.get_attname()` are removed.** Every internal use was the same as `Field.name`; the dual-keying only existed to track the `_id` suffix on foreign keys, which now lives on `Field.column` instead. Use `field.name` for the attribute (and instance-dict key) and `field.column` for the database column. ([6a462a874c](https://github.com/dropseed/plain/commit/6a462a874c), [e556bb7d63](https://github.com/dropseed/plain/commit/e556bb7d63))
+- **Foreign keys with `db_constraint=False` are queried on access** rather than returning a partial instance. Without a database FK constraint a stale key cannot be assumed valid, so the descriptor issues a `SELECT` and raises `RelatedObjectDoesNotExist` immediately if the row is missing — the same exception an empty foreign key raises. Constrained foreign keys (the default) keep the no-query partial-instance shortcut. ([d341d902b4](https://github.com/dropseed/plain/commit/d341d902b4))
+- **Reading a deferred field now hydrates every still-missing concrete column in one query**, not just the field you accessed. This is what makes the partial foreign-key instance cheap to use beyond its primary key — first non-key access loads the whole row. The foreign key column itself is the exception and is loaded on its own when deferred via `.only()` / `.defer()`, so the partial-instance shortcut stays cheap. ([2440e415cb](https://github.com/dropseed/plain/commit/2440e415cb))
+- The descriptor's deferred foreign-key load now goes through `_get_raw_value()`, so a `.only()` queryset that excludes the FK column still resolves the related object on access without mistaking the deferred column for `NULL`. ([d9765979ba](https://github.com/dropseed/plain/commit/d9765979ba))
+- `Field.__delete__` reordered so a missing entry raises `AttributeError` without first wiping the related-object cache — repeated `del`s no longer silently evict cached descriptors. ([b8949f00d0](https://github.com/dropseed/plain/commit/b8949f00d0))
+- Internal cleanup: removed the unused `ForeignKeyField.reverse_related_fields` property, the dead composite-key branches in foreign-key resolution, and the unreachable code left over from the `attname` collapse. ([98b27c5f8a](https://github.com/dropseed/plain/commit/98b27c5f8a), [92e905f25e](https://github.com/dropseed/plain/commit/92e905f25e), [bfcac9a435](https://github.com/dropseed/plain/commit/bfcac9a435))
+
+### Upgrade instructions
+
+- **Audit every `<fk>_id` access** — these attributes no longer exist. Reads (`obj.author_id`) and especially writes (`obj.author_id = 5`) need to move to the field name: `obj.author.id` for reads, `obj.author = 5` for writes. **Pay particular attention to assignments under `# type: ignore` or other suppression** — a stray `obj.author_id = ...` write now creates a plain Python attribute on the instance and silently does nothing on save, because the ORM only persists the descriptor-backed value at `obj.author`. Grep for `_id =`, `_id=` (in `.create()` / `.update()` kwargs), and `_id` template/queryset references on your models. Querysets and lookups (`Author.query.filter(book__author_id=5)`) are unaffected — only attribute access on instances changed.
+- **Stop reading `Field.attname` / calling `Field.get_attname()`.** Any custom field or introspection code that referenced these attributes must switch to `field.name` (the Python attribute) or `field.column` (the database column).
+- **Foreign keys declared with `db_constraint=False` now issue a query on first access** (previously: no query, partial instance). If you relied on accessing a constraint-less FK without a query, the behavior is intentionally stricter — a stale key now fails fast with `RelatedObjectDoesNotExist` instead of yielding a phantom instance that broke only on field access. Use `select_related()` to load these up front in loops.
+- **`.only()` / `.defer()` field lists**: deferred non-FK columns no longer load one-at-a-time. If you `.defer("body")` and later read `instance.body`, the resulting query now refreshes every still-deferred column in the same instance — defer only the columns you do not intend to read.
+
 ## [0.103.5](https://github.com/dropseed/plain/releases/plain-postgres@0.103.5) (2026-05-19)
 
 ### What's changed

@@ -24,9 +24,7 @@ members = [
     "plain-loginlink",
     "plain-mcp",
     "plain-oauth",
-    "plain-observer",
     "plain-pages",
-    "plain-pageviews",
     "plain-passwords",
     "plain-portal",
     "plain-postgres",
@@ -35,7 +33,6 @@ members = [
     "plain-scan",
     "plain-sessions",
     "plain-start",
-    "plain-support",
     "plain-tailwind",
     "plain-templates",
     "plain-toolbar",
@@ -231,9 +228,7 @@ dependencies = [
     { name = "plain-loginlink" },
     { name = "plain-mcp" },
     { name = "plain-oauth" },
-    { name = "plain-observer" },
     { name = "plain-pages" },
-    { name = "plain-pageviews" },
     { name = "plain-passwords" },
     { name = "plain-portal" },
     { name = "plain-postgres" },
@@ -241,7 +236,6 @@ dependencies = [
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
-    { name = "plain-support" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
     { name = "plain-toolbar" },
@@ -269,9 +263,7 @@ requires-dist = [
     { name = "plain-loginlink", editable = "plain-loginlink" },
     { name = "plain-mcp", editable = "plain-mcp" },
     { name = "plain-oauth", editable = "plain-oauth" },
-    { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
-    { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-portal", editable = "plain-portal" },
     { name = "plain-postgres", editable = "plain-postgres" },
@@ -279,7 +271,6 @@ requires-dist = [
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
-    { name = "plain-support", editable = "plain-support" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-templates", editable = "plain-templates" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
@@ -756,7 +747,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.145.1"
+version = "0.148.1"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -789,7 +780,7 @@ dev = [
 
 [[package]]
 name = "plain-admin"
-version = "0.82.1"
+version = "0.82.3"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -820,7 +811,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-api"
-version = "0.33.5"
+version = "0.33.7"
 source = { editable = "plain-api" }
 dependencies = [
     { name = "plain" },
@@ -887,11 +878,16 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-cache"
-version = "0.28.0"
+version = "0.28.2"
 source = { editable = "plain-cache" }
 dependencies = [
     { name = "plain" },
     { name = "plain-postgres" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
 ]
 
 [package.metadata]
@@ -900,9 +896,12 @@ requires-dist = [
     { name = "plain-postgres", editable = "plain-postgres" },
 ]
 
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+
 [[package]]
 name = "plain-cloud"
-version = "0.4.1"
+version = "0.4.2"
 source = { editable = "plain-cloud" }
 dependencies = [
     { name = "click" },
@@ -940,7 +939,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-connect"
-version = "0.4.0"
+version = "0.7.1"
 source = { editable = "plain-connect" }
 dependencies = [
     { name = "cryptography" },
@@ -955,6 +954,7 @@ dev = [
     { name = "plain-auth" },
     { name = "plain-pytest" },
     { name = "plain-templates" },
+    { name = "plain-toolbar" },
 ]
 
 [package.metadata]
@@ -971,11 +971,12 @@ dev = [
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-pytest", editable = "plain-pytest" },
     { name = "plain-templates", editable = "plain-templates" },
+    { name = "plain-toolbar", editable = "plain-toolbar" },
 ]
 
 [[package]]
 name = "plain-dev"
-version = "0.62.0"
+version = "0.63.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
@@ -984,6 +985,11 @@ dependencies = [
     { name = "plain-assets" },
     { name = "requests" },
     { name = "rich" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -995,6 +1001,9 @@ requires-dist = [
     { name = "requests", specifier = ">=2.0.0" },
     { name = "rich" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-elements"
@@ -1021,7 +1030,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-email"
-version = "0.19.3"
+version = "0.20.0"
 source = { editable = "plain-email" }
 dependencies = [
     { name = "plain" },
@@ -1059,7 +1068,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-flags"
-version = "0.36.6"
+version = "0.36.7"
 source = { editable = "plain-flags" }
 dependencies = [
     { name = "plain" },
@@ -1082,7 +1091,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-htmx"
-version = "0.20.0"
+version = "0.20.1"
 source = { editable = "plain-htmx" }
 dependencies = [
     { name = "plain" },
@@ -1105,7 +1114,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-jobs"
-version = "0.53.1"
+version = "0.54.2"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
@@ -1132,7 +1141,7 @@ dev = [
 
 [[package]]
 name = "plain-loginlink"
-version = "0.21.5"
+version = "0.21.6"
 source = { editable = "plain-loginlink" }
 dependencies = [
     { name = "plain" },
@@ -1180,7 +1189,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-oauth"
-version = "0.49.6"
+version = "0.49.8"
 source = { editable = "plain-oauth" }
 dependencies = [
     { name = "plain" },
@@ -1202,37 +1211,6 @@ requires-dist = [
     { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-templates", editable = "plain-templates" },
     { name = "requests", specifier = ">=2.0.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
-
-[[package]]
-name = "plain-observer"
-version = "0.34.12"
-source = { editable = "plain-observer" }
-dependencies = [
-    { name = "opentelemetry-sdk" },
-    { name = "plain" },
-    { name = "plain-admin" },
-    { name = "plain-postgres" },
-    { name = "plain-templates" },
-    { name = "sqlparse" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "plain-pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
-    { name = "plain", editable = "plain" },
-    { name = "plain-admin", editable = "plain-admin" },
-    { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-templates", editable = "plain-templates" },
-    { name = "sqlparse", specifier = ">=0.3.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -1270,23 +1248,8 @@ requires-dist = [
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
-name = "plain-pageviews"
-version = "0.35.8"
-source = { editable = "plain-pageviews" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-postgres" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-postgres", editable = "plain-postgres" },
-]
-
-[[package]]
 name = "plain-passwords"
-version = "0.26.1"
+version = "0.26.3"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },
@@ -1334,7 +1297,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-postgres"
-version = "0.103.5"
+version = "0.106.0"
 source = { editable = "plain-postgres" }
 dependencies = [
     { name = "plain" },
@@ -1365,7 +1328,7 @@ dev = [
 
 [[package]]
 name = "plain-pytest"
-version = "0.18.1"
+version = "0.19.0"
 source = { editable = "plain-pytest" }
 dependencies = [
     { name = "click" },
@@ -1386,7 +1349,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-redirection"
-version = "0.35.5"
+version = "0.35.7"
 source = { editable = "plain-redirection" }
 dependencies = [
     { name = "plain" },
@@ -1424,7 +1387,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-sessions"
-version = "0.45.5"
+version = "0.45.6"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
@@ -1459,39 +1422,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "click", specifier = ">=8.0.0" }]
-
-[[package]]
-name = "plain-support"
-version = "0.34.9"
-source = { editable = "plain-support" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-assets" },
-    { name = "plain-auth" },
-    { name = "plain-postgres" },
-    { name = "plain-templates" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "plain-email" },
-    { name = "plain-pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-assets", editable = "plain-assets" },
-    { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-templates", editable = "plain-templates" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "plain-email", editable = "plain-email" },
-    { name = "plain-pytest", editable = "plain-pytest" },
-]
 
 [[package]]
 name = "plain-tailwind"
@@ -1537,7 +1467,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-toolbar"
-version = "0.12.7"
+version = "0.13.0"
 source = { editable = "plain-toolbar" }
 dependencies = [
     { name = "plain" },
@@ -1614,9 +1544,7 @@ dev = [
     { name = "plain-loginlink" },
     { name = "plain-mcp" },
     { name = "plain-oauth" },
-    { name = "plain-observer" },
     { name = "plain-pages" },
-    { name = "plain-pageviews" },
     { name = "plain-passwords" },
     { name = "plain-portal" },
     { name = "plain-postgres" },
@@ -1624,7 +1552,6 @@ dev = [
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
-    { name = "plain-support" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
     { name = "plain-toolbar" },
@@ -1657,9 +1584,7 @@ dev = [
     { name = "plain-loginlink", editable = "plain-loginlink" },
     { name = "plain-mcp", editable = "plain-mcp" },
     { name = "plain-oauth", editable = "plain-oauth" },
-    { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
-    { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-portal", editable = "plain-portal" },
     { name = "plain-postgres", editable = "plain-postgres" },
@@ -1667,7 +1592,6 @@ dev = [
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
-    { name = "plain-support", editable = "plain-support" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-templates", editable = "plain-templates" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
@@ -2145,15 +2069,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c5/4b/32ad65f8ff5c49254e218ccaae8fc16900cfc289954fb372686159ebe315/spake2-0.9.tar.gz", hash = "sha256:421fc4a8d5ac395af7af0206ffd9e6cdf188c105cb1b883d9d683312bb5a9334", size = 55092, upload-time = "2024-09-25T00:24:07.372Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d2/42/a4e93badf46c20d862ce298d8873451e19f18141c6811ae7fdfaef0ea107/spake2-0.9-py3-none-any.whl", hash = "sha256:2d7cbe936519c4172866649ddceefdec08e3d9b3ce4c8a75bbf84d6bdd07a2fb", size = 31748, upload-time = "2024-09-25T00:24:05.513Z" },
-]
-
-[[package]]
-name = "sqlparse"
-version = "0.5.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e5/40/edede8dd6977b0d3da179a342c198ed100dd2aba4be081861ee5911e4da4/sqlparse-0.5.3.tar.gz", hash = "sha256:09f67787f56a0b16ecdbde1bfc7f5d9c3371ca683cfeaa8e6ff60b4807ec9272", size = 84999, upload-time = "2024-12-10T12:05:30.728Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/5c/bfd6bd0bf979426d405cc6e71eceb8701b148b16c21d2dc3c261efc61c7b/sqlparse-0.5.3-py3-none-any.whl", hash = "sha256:cf2196ed3418f3ba5de6af7e82c694a9fbdbfecccdfc72e281548517081f16ca", size = 44415, upload-time = "2024-12-10T12:05:27.824Z" },
 ]
 
 [[package]]

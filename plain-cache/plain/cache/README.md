@@ -4,6 +4,9 @@
 
 - [Overview](#overview)
 - [Setting expiration](#setting-expiration)
+- [Get-or-set](#get-or-set)
+- [Batch operations](#batch-operations)
+- [Refreshing expiration](#refreshing-expiration)
 - [Checking and deleting](#checking-and-deleting)
 - [Querying cached items](#querying-cached-items)
 - [Automatic cleanup](#automatic-cleanup)
@@ -15,69 +18,105 @@
 
 ## Overview
 
-You can store any JSON-serializable value in the cache using the [`Cached`](./core.py#Cached) class. Each cached item is identified by a unique key and can optionally expire after a set amount of time.
+Import the [`cache`](./core.py#Cache) and store any JSON-serializable value under a key. Each entry can optionally expire after a set amount of time.
 
 ```python
-from plain.cache import Cached
+from plain.cache import cache
 
-# Store a value in the cache
-cached = Cached("my-cache-key")
-cached.set("a JSON-serializable value", expiration=60)  # expires in 60 seconds
+# Store a value (expires in 60 seconds)
+cache.set("my-cache-key", "a JSON-serializable value", expiration=60)
 
-# Later, retrieve the value
-cached = Cached("my-cache-key")
-if cached.exists():
-    print(cached.value)  # "a JSON-serializable value"
-else:
-    print("Cache miss or expired!")
+# Later, read it back (returns None on a miss or if expired)
+value = cache.get("my-cache-key")
 ```
 
-Values are stored in a [`CachedItem`](./models.py#CachedItem) database model, so you don't need to set up Redis or any external caching service.
+`cache` is a stateless module-level store, so there's nothing to instantiate — just import it and call. Values live in a [`CachedItem`](./models.py#CachedItem) database model, so you don't need to set up Redis or any external caching service.
+
+Reads are **expiry-aware**: an entry past its `expires_at` reads as absent (`get()` returns the default, `exists()` returns `False`). Expired rows are deleted out of band — see [Automatic cleanup](#automatic-cleanup).
 
 ## Setting expiration
 
-You can set expiration in several ways when calling `set()`:
+`set()` accepts expiration as seconds, a `timedelta`, or an absolute `datetime`. Omitting it stores the value with no expiration.
 
 ```python
 from datetime import datetime, timedelta
-from plain.cache import Cached
-
-cached = Cached("my-key")
+from plain.cache import cache
 
 # Seconds as int or float
-cached.set("value", expiration=300)  # 5 minutes
+cache.set("k", "value", expiration=300)  # 5 minutes
 
 # Timedelta
-cached.set("value", expiration=timedelta(hours=1))
+cache.set("k", "value", expiration=timedelta(hours=1))
 
 # Specific datetime
-cached.set("value", expiration=datetime(2025, 12, 31, 23, 59, 59))
+cache.set("k", "value", expiration=datetime(2025, 12, 31, 23, 59, 59))
 
 # No expiration (cached forever)
-cached.set("value")
+cache.set("k", "value")
 ```
+
+`set()` always rewrites the whole entry, including its expiry. To change only the expiry without rewriting the value, use [`touch()`](#refreshing-expiration).
+
+## Get-or-set
+
+`get_or_set()` returns the cached value, or computes it, stores it, and returns it on a miss. `default` can be a value or a zero-arg callable (the callable runs only on a miss):
+
+```python
+from datetime import timedelta
+from plain.cache import cache
+
+data = cache.get_or_set(
+    "report:42",
+    lambda: build_expensive_report(42),
+    expiration=timedelta(hours=1),
+)
+```
+
+A stored `None` counts as a hit, so caching a computed `None` won't recompute it every time.
+
+## Batch operations
+
+Read or write many keys at once. `get_many()` is a single query and returns only the live entries:
+
+```python
+from plain.cache import cache
+
+cache.set_many({"a": 1, "b": 2, "c": 3}, expiration=timedelta(minutes=5))
+
+cache.get_many(["a", "b", "missing"])  # {"a": 1, "b": 2}
+
+cache.delete_many(["a", "b"])  # returns the number deleted
+```
+
+## Refreshing expiration
+
+To extend or change a live entry's expiration _without_ rewriting its value, use `touch()`:
+
+```python
+from datetime import timedelta
+from plain.cache import cache
+
+touched = cache.touch("my-key", expiration=timedelta(days=30))  # True if live, else False
+```
+
+`set()` always rewrites `value`, so refreshing a large entry's TTL re-TOASTs the whole blob. `touch()` writes only `expires_at` (and `updated_at`) — a heap-only write that reuses the existing TOAST pointer — so a multi-megabyte value isn't re-written. For refresh-heavy caches of large values (e.g. a conditional-request response cache with a sliding TTL), this avoids the dominant write cost.
+
+`touch()` returns `False` for a missing or already-expired key (it won't resurrect an expired entry). Passing `expiration=None` clears the expiry so the entry never expires.
 
 ## Checking and deleting
 
-You can check if a cached item exists (and is not expired) using `exists()`:
-
 ```python
-cached = Cached("my-key")
+from plain.cache import cache
 
-if cached.exists():
-    # Cache hit - value is available
-    data = cached.value
-else:
-    # Cache miss or expired - compute and store the value
-    data = expensive_computation()
-    cached.set(data, expiration=3600)
-```
+# Check for a live entry without fetching the value
+if cache.exists("my-key"):
+    ...
 
-To delete a cached item:
+# Delete a single key (True if it existed)
+cache.delete("my-key")
 
-```python
-cached = Cached("my-key")
-deleted = cached.delete()  # Returns True if item existed, False otherwise
+# Delete everything
+cache.clear()  # returns the number of rows deleted
 ```
 
 ## Querying cached items
@@ -87,13 +126,16 @@ The [`CachedItem`](./models.py#CachedItem) model includes a custom queryset with
 ```python
 from plain.cache.models import CachedItem
 
-# Get all expired items
+# Live entries (never-expiring or not-yet-expired) -- what reads use
+live_items = CachedItem.query.live()
+
+# Expired items (past their expiration)
 expired_items = CachedItem.query.expired()
 
-# Get all unexpired items (with an expiration date in the future)
-active_items = CachedItem.query.unexpired()
+# Unexpired items with a *future* expiration date (excludes forever items)
+unexpired_items = CachedItem.query.unexpired()
 
-# Get items with no expiration (cached forever)
+# Items with no expiration (cached forever)
 forever_items = CachedItem.query.forever()
 ```
 
@@ -136,15 +178,11 @@ Any JSON-serializable value: strings, numbers, booleans, lists, dicts, and None.
 
 #### What happens when I access an expired item?
 
-The `exists()` method returns `False` for expired items, and `value` returns `None`. The expired item remains in the database until explicitly cleaned up.
-
-#### Is there any observability built in?
-
-Yes. Cache operations (`exists`, `get`, `set`, `delete`) are instrumented with OpenTelemetry spans, so you can see cache hits and misses in your tracing backend.
+`get()` returns the default (`None` unless you pass one) and `exists()` returns `False` — an expired entry reads as absent. The row remains in the database until cleaned up (see [Automatic cleanup](#automatic-cleanup)).
 
 #### How big can cached values be?
 
-There's no hard limit. `plain.cache` works well for the typical mix — config, computed flags, tokens, short-lived results, occasional larger payloads. Once values get large enough to TOAST (Postgres' out-of-line storage, kicking in around a few KB), each rewrite produces orphaned TOAST chunks that autovacuum has to reclaim. The defaults in [Settings](#settings) are tuned for this; very high write rates on very large values may need additional tuning. If you're caching megabyte-sized blobs on every request, consider whether that data wants to live somewhere more permanent (a regular table, object storage) with the cache holding a reference instead.
+There's no hard limit. `plain.cache` works well for the typical mix — config, computed flags, tokens, short-lived results, occasional larger payloads. Once values get large enough to TOAST (Postgres' out-of-line storage, kicking in around a few KB), each rewrite produces orphaned TOAST chunks that autovacuum has to reclaim. The defaults in [Settings](#settings) are tuned for this; very high write rates on very large values may need additional tuning. If you're caching megabyte-sized blobs on every request, consider whether that data wants to live somewhere more permanent (a regular table, object storage) with the cache holding a reference instead — and use [`touch()`](#refreshing-expiration) to slide their TTLs instead of re-`set()`ing them.
 
 ## Installation
 
@@ -173,9 +211,8 @@ plain postgres sync
 Try it out:
 
 ```python
-from plain.cache import Cached
+from plain.cache import cache
 
-cached = Cached("test-key")
-cached.set({"hello": "world"}, expiration=300)
-print(cached.value)  # {'hello': 'world'}
+cache.set("test-key", {"hello": "world"}, expiration=300)
+print(cache.get("test-key"))  # {'hello': 'world'}
 ```

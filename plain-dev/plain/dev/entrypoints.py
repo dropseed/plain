@@ -1,6 +1,4 @@
-import os
-
-from plain.utils.dotenv import load_dotenv
+from .dotenv import load_dotenv_files
 
 
 def setup() -> None:
@@ -11,11 +9,7 @@ def setup() -> None:
     from .contribute import cli  # noqa
     from .services import auto_start_services
 
+    load_dotenv_files()
+
     # Auto-start dev services for commands that need the runtime
     auto_start_services()
-
-    # Load environment variables from .env file
-    if plain_env := os.environ.get("PLAIN_ENV", ""):
-        load_dotenv(f".env.{plain_env}")
-    else:
-        load_dotenv(".env")

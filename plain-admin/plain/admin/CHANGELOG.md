@@ -1,5 +1,25 @@
 # plain-admin changelog
 
+## [0.82.3](https://github.com/dropseed/plain/releases/plain-admin@0.82.3) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.82.2](https://github.com/dropseed/plain/releases/plain-admin@0.82.2) (2026-05-22)
+
+### What's changed
+
+- **List view footer now reserves bottom padding only while the full toolbar is visible.** Switched the body data-attribute selector from `data-toolbar-installed` to `data-toolbar-fullbar` (introduced in `plain.toolbar` 0.13.0) so the sticky pagination footer no longer leaves a 12-unit gap when the toolbar collapses to its new pill mode. ([ab572e0b32](https://github.com/dropseed/plain/commit/ab572e0b32))
+
+### Upgrade instructions
+
+- Upgrade `plain.toolbar` to 0.13.0 in the same step to get the matching pill-mode behavior. With older `plain.toolbar` the new selector is harmless (the bar is always full) — the footer padding will still render correctly.
+
 ## [0.82.1](https://github.com/dropseed/plain/releases/plain-admin@0.82.1) (2026-05-13)
 
 ### What's changed

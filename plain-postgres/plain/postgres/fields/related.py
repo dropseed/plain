@@ -10,7 +10,7 @@ from plain import exceptions
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.deletion import NO_ACTION, SET_NULL, OnDelete
 from plain.postgres.exceptions import FieldDoesNotExist, FieldError
-from plain.postgres.query_utils import PathInfo, Q
+from plain.postgres.query_utils import PathInfo
 from plain.postgres.utils import make_model_tuple
 from plain.preflight import PreflightResult
 
@@ -313,7 +313,7 @@ class RelatedField(FieldCacheMixin, Field):
         limit_choices_to = limit_choices_to or self.get_limit_choices_to()
         get_related_field = getattr(self.remote_field, "get_related_field", None)
         related_field_name = (
-            get_related_field().attname if get_related_field is not None else "id"
+            get_related_field().name if get_related_field is not None else "id"
         )
         choice_func = operator.attrgetter(related_field_name)
         qs = rel_model.query.complex_filter(limit_choices_to)
@@ -424,30 +424,9 @@ class ForeignKeyField(ColumnField, RelatedField):
         obj.__dict__.pop("reverse_path_infos", None)
         return obj
 
-    def __set__(self, instance: Any, value: Any) -> None:
-        """
-        Override Field's __set__ to clear cached related object when FK value changes.
-
-        This ensures that when you change obj.user_id, the cached obj.user is invalidated.
-        """
-        # Check if value is changing and clear cache if needed
-        if (
-            hasattr(self, "attname")
-            and instance.__dict__.get(self.attname) != value
-            and self.is_cached(instance)
-        ):
-            self.delete_cached_value(instance)
-
-        # Call parent's __set__ to do the actual assignment
-        super().__set__(instance, value)
-
     @cached_property
     def related_fields(self) -> list[tuple[ForeignKeyField, Field]]:
         return self.resolve_related_fields()
-
-    @cached_property
-    def reverse_related_fields(self) -> list[tuple[Field, Field]]:
-        return [(rhs_field, lhs_field) for lhs_field, rhs_field in self.related_fields]
 
     @cached_property
     def local_related_fields(self) -> tuple[Field, ...]:
@@ -459,39 +438,12 @@ class ForeignKeyField(ColumnField, RelatedField):
             rhs_field for lhs_field, rhs_field in self.related_fields if rhs_field
         )
 
-    def get_forward_related_filter(self, obj: Model) -> dict[str, Any]:
-        """
-        Return the keyword arguments that when supplied to
-        self.model.object.filter(), would select all instances related through
-        this field to the remote obj. This is used to build the querysets
-        returned by related descriptors. obj is an instance of
-        self.related_field.model.
-        """
-        return {
-            f"{self.name}__{rh_field.name}": getattr(obj, rh_field.attname)
-            for _, rh_field in self.related_fields
-        }
-
-    def get_reverse_related_filter(self, obj: Model) -> Q:
-        """
-        Complement to get_forward_related_filter(). Return the keyword
-        arguments that when passed to self.related_field.model.object.filter()
-        select all instances of self.related_field.model related through
-        this field to obj. obj is an instance of self.model.
-        """
-        return Q.create(
-            [
-                (rh_field.attname, getattr(obj, lh_field.attname))
-                for lh_field, rh_field in self.related_fields
-            ]
-        )
-
     def get_local_related_value(self, instance: Model) -> tuple[Any, ...]:
-        # Always returns the value of the single local field
-        field = self.local_related_fields[0]
-        if field.primary_key:
+        # The single local field is the foreign key itself.
+        if self.primary_key:
             return (instance.id,)
-        return (getattr(instance, field.attname),)
+        # Read the raw key value, not the related object the descriptor returns.
+        return (self._get_raw_value(instance),)
 
     def get_foreign_related_value(self, instance: Model) -> tuple[Any, ...]:
         # Always returns the id of the foreign instance
@@ -655,8 +607,34 @@ class ForeignKeyField(ColumnField, RelatedField):
                 )
         return related_fields
 
-    def get_attname(self) -> str:
-        return f"{self.name}_id"
+    def set_attributes_from_name(self, name: str) -> None:
+        super().set_attributes_from_name(name)
+        # The raw key value lives in instance.__dict__ under the field name
+        # ("author"), reached only through the ForwardForeignKeyDescriptor --
+        # there is no separate "author_id" attribute. The database column
+        # keeps the historical _id suffix.
+        self.column = f"{self.name}_id"
+
+    def _get_raw_value(self, instance: Model) -> Any:
+        """Return the raw related key stored on the instance.
+
+        Reads instance.__dict__ directly -- never through the descriptor, which
+        would yield the related object. If the foreign key column was deferred
+        (.only()/.defer()) it is loaded first, so save/serialize/validate paths
+        never mistake a deferred column for a NULL value.
+        """
+        assert self.name is not None
+        if self.name not in instance.__dict__:
+            instance.refresh_from_db(fields=[self.name])
+        return instance.__dict__.get(self.name)
+
+    def pre_save(self, model_instance: Model, add: bool) -> Any:
+        # Return the raw related key for INSERT/UPDATE, not the related object
+        # that attribute access yields.
+        return self._get_raw_value(model_instance)
+
+    def value_from_object(self, obj: Model) -> Any:
+        return self._get_raw_value(obj)
 
     def get_db_prep_save(self, value: Any, connection: DatabaseConnection) -> Any:
         if value is None or (
@@ -1174,10 +1152,12 @@ class ManyToManyField(RelatedField):
         pass
 
     def value_from_object(self, obj: Model) -> list[Any]:
-        return [] if obj.id is None else list(getattr(obj, self.attname).query)
+        assert self.name is not None
+        return [] if obj.id is None else list(getattr(obj, self.name).query)
 
     def save_form_data(self, instance: Model, data: Any) -> None:
-        getattr(instance, self.attname).set(data)
+        assert self.name is not None
+        getattr(instance, self.name).set(data)
 
     def db_type(self) -> None:
         # A ManyToManyField is not represented by a single column,

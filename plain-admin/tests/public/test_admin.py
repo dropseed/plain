@@ -18,7 +18,7 @@ def test_admin_login_required(db):
     assert client.get("/admin").status_code == 404
 
     user.is_admin = True
-    user.save()
+    user.update()
 
     # Now admin — redirected into the admin (to the first registered list view)
     resp = client.get("/admin")

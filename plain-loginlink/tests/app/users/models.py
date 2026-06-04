@@ -6,7 +6,7 @@ from plain.postgres import types
 
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
+    email = types.EmailField()
 
     query: postgres.QuerySet[User] = postgres.QuerySet()
 

@@ -19,12 +19,12 @@ def test_base_type_change_raises() -> None:
     from_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("created_at", types.DateTimeField())],  # ty: ignore[invalid-argument-type]
+        fields=[("created_at", types.DateTimeField())],
     )
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("created_at", types.UUIDField())],  # ty: ignore[invalid-argument-type]
+        fields=[("created_at", types.UUIDField())],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
     with pytest.raises(MigrationSchemaError) as exc:
@@ -40,12 +40,12 @@ def test_parameter_only_change_succeeds() -> None:
     from_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("name", types.TextField(max_length=50))],  # ty: ignore[invalid-argument-type]
+        fields=[("name", types.TextField(max_length=50))],
     )
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("name", types.TextField(max_length=100))],  # ty: ignore[invalid-argument-type]
+        fields=[("name", types.TextField(max_length=100))],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
     changes = autodetector._detect_changes()
@@ -89,12 +89,12 @@ def test_bigint_to_integer_rejected() -> None:
     from_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("count", types.BigIntegerField())],  # ty: ignore[invalid-argument-type]
+        fields=[("count", types.BigIntegerField())],
     )
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("count", types.IntegerField())],  # ty: ignore[invalid-argument-type]
+        fields=[("count", types.IntegerField())],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
     with pytest.raises(MigrationSchemaError) as exc:

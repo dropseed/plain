@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 from typing import TYPE_CHECKING, Any
 
 import psycopg
@@ -21,10 +20,8 @@ __all__ = ["OAuthConnection"]
 
 @postgres.register_model
 class OAuthConnection(postgres.Model):
-    created_at: datetime.datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime.datetime = types.DateTimeField(
-        create_now=True, update_now=True
-    )
+    created_at = types.DateTimeField(create_now=True)
+    updated_at = types.DateTimeField(create_now=True, update_now=True)
 
     user = types.ForeignKeyField(
         "users.User",
@@ -32,20 +29,16 @@ class OAuthConnection(postgres.Model):
     )
 
     # The key used to refer to this provider type (in settings)
-    provider_key: str = types.TextField(max_length=100)
+    provider_key = types.TextField(max_length=100)
 
     # The unique ID of the user on the provider's system
-    provider_user_id: str = types.TextField(max_length=100)
+    provider_user_id = types.TextField(max_length=100)
 
     # Token data
-    access_token: str = types.EncryptedTextField(max_length=2000)
-    refresh_token: str = types.EncryptedTextField(max_length=2000, required=False)
-    access_token_expires_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
-    refresh_token_expires_at: datetime.datetime | None = types.DateTimeField(
-        required=False, allow_null=True
-    )
+    access_token = types.EncryptedTextField(max_length=2000)
+    refresh_token = types.EncryptedTextField(max_length=2000, required=False)
+    access_token_expires_at = types.DateTimeField(required=False, allow_null=True)
+    refresh_token_expires_at = types.DateTimeField(required=False, allow_null=True)
 
     query: postgres.QuerySet[OAuthConnection] = postgres.QuerySet()
 
@@ -81,7 +74,7 @@ class OAuthConnection(postgres.Model):
             oauth_token=oauth_token
         )
         self.set_token_fields(refreshed_oauth_token)
-        self.save()
+        self.update()
 
     def set_token_fields(self, oauth_token: OAuthToken) -> None:
         self.access_token = oauth_token.access_token
@@ -114,7 +107,7 @@ class OAuthConnection(postgres.Model):
                 provider_user_id=oauth_user.provider_id,
             )
             connection.set_token_fields(oauth_token)
-            connection.save()
+            connection.update()
             return connection
         except cls.DoesNotExist:
             # If email needs to be unique, then we expect
@@ -125,7 +118,7 @@ class OAuthConnection(postgres.Model):
                         user = User(
                             **oauth_user.user_model_fields,
                         )
-                        user.save()
+                        user.create()
                 except (psycopg.IntegrityError, ValidationError):
                     raise OAuthUserAlreadyExistsError(
                         provider_key=provider_key,
@@ -168,6 +161,9 @@ class OAuthConnection(postgres.Model):
 
         connection.set_user_fields(oauth_user)
         connection.set_token_fields(oauth_token)
-        connection.save()
+        if connection._state.adding:
+            connection.create()
+        else:
+            connection.update()
 
         return connection

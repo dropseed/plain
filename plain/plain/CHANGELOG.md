@@ -1,5 +1,76 @@
 # plain changelog
 
+## [0.148.1](https://github.com/dropseed/plain/releases/plain@0.148.1) (2026-06-03)
+
+### What's changed
+
+- **`plain.observer` has been retired.** Its references are removed from core: the package listing, the `plain docs` known-packages list, and the internal request-span plumbing that passed cookies/headers to the observer sampler. ([1bab9f784a](https://github.com/dropseed/plain/commit/1bab9f784a))
+- The `plain-upgrade` skill now summarizes what changed in each release, not just the upgrade steps. ([bfdfb9a45a](https://github.com/dropseed/plain/commit/bfdfb9a45a))
+- Docs: model write examples updated to `create()`/`update()`. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- No changes required. If you used `plain.observer`, switch to `plain.connect` for production telemetry export and `plain.pytest`/`plain.connect` for the OpenTelemetry SDK — observer is no longer published.
+
+## [0.148.0](https://github.com/dropseed/plain/releases/plain@0.148.0) (2026-05-22)
+
+### What's changed
+
+- **`plain request` now captures the OpenTelemetry spans emitted during the request and prints a trace analysis** — query counts, duplicate-query (N+1) detection grouped by SQL with source locations, recorded exceptions, and a span tree. The text output gains a Trace section; `--json` returns structured response metadata plus the same analysis under a top-level `trace` key (with both derived `analysis` and raw `spans`). Use `--json` for context-frugal agent output — no response body, just metadata and trace data. The `/plain-optimize` skill moves from `plain.observer` to core now that trace analysis lives there. ([afba897157](https://github.com/dropseed/plain/commit/afba897157))
+- **`plain request` now surfaces followed redirects and auth state.** A request to an auth-gated view used to silently follow the 302 to the login page and leave the trace looking empty for no obvious reason. The output now prints a `Redirected:` line listing the hop chain (status → path) when redirects were followed, and always reports the resolved user (or `anonymous`) — in both text and `--json` output. ([c4283e48a6](https://github.com/dropseed/plain/commit/c4283e48a6))
+- **Preflight queries are no longer counted in `plain request` traces.** The admin toolbar's preflight badge lazy-runs the full preflight suite on first render (`pg_class` introspection, migration-state queries), and those were landing in captured traces — inflating query counts and duration in ways that looked like real request work. The check counts are now pre-seeded before dispatch so the badge skips the run. ([6e18fc4361](https://github.com/dropseed/plain/commit/6e18fc4361))
+
+### Upgrade instructions
+
+- If you were running `plain observer request /path` for trace analysis, switch to `plain request /path --json` — same JSON shape philosophy, no observer install required.
+- No code changes required. The `/plain-optimize` skill now ships with `plain` itself — `plain.observer` no longer needs to be installed for the workflow.
+
+## [0.147.0](https://github.com/dropseed/plain/releases/plain@0.147.0) (2026-05-21)
+
+### What's changed
+
+- The `plain.utils.dotenv` module has moved to `plain.dev.dotenv`. Production deployments (which don't install `plain.dev`) no longer ship dotenv parsing code at all — load environment variables via your deployment platform instead. ([9932738450](https://github.com/dropseed/plain/commit/9932738450))
+- The CLI dispatcher now sets `PLAIN_ENV` automatically based on the active command: `plain dev` → `dev`, `plain test` → `test`. Export `PLAIN_ENV` yourself to override. This lets `plain.dev`'s new `.env` precedence loader pick up the right env-specific files without users having to set `PLAIN_ENV` manually. ([9932738450](https://github.com/dropseed/plain/commit/9932738450))
+- `SuspiciousOperationError400` exceptions are now logged at `WARNING` without an attached `exc_info`. The rejection is working-as-designed (same noise category as 404s once a scanner is probing), so the full traceback was just adding noise to error trackers. ([7727f0545c](https://github.com/dropseed/plain/commit/7727f0545c))
+
+### Upgrade instructions
+
+- If you imported `load_dotenv` or `parse_dotenv` from `plain.utils.dotenv`, install `plain.dev` and import from `plain.dev.dotenv` instead.
+- If you were filtering `SuspiciousOperationError400` events out of your error tracker by exception type, switch to filtering by log level (warnings vs. errors) or by the `plain.security.*` logger namespace.
+
+## [0.146.0](https://github.com/dropseed/plain/releases/plain@0.146.0) (2026-05-20)
+
+### What's changed
+
+- `plain docs --search` now substring-matches by default; pass `--regex` to opt into regex patterns (with alternation, anchors, etc.). The previous default treated the search term as a regex, which silently broke any search containing regex metacharacters (`.`, `?`, `[`, `(`, etc.). ([c8c1a2bd7b](https://github.com/dropseed/plain/commit/c8c1a2bd7b))
+- The `request` object is no longer attached as a log extra on the 400 host-validation warning, the 405 method-not-allowed warning, or `log_exception()`'s base context. Downstream log processors that called methods on the live request were a footgun — the request lifecycle had often already ended by the time the log was processed. ([6324e21a67](https://github.com/dropseed/plain/commit/6324e21a67))
+
+### Upgrade instructions
+
+- If a saved `plain docs --search` invocation relied on regex behavior, add `--regex` to it.
+- If your logging configuration consumed `record.request` from these entries, switch to another extra field — `request.path` is still attached where it was before.
+
+## [0.145.3](https://github.com/dropseed/plain/releases/plain@0.145.3) (2026-05-20)
+
+### What's changed
+
+- The `plain-support` package has been removed and no longer appears in the package docs list or the `plain docs` CLI. Customer support forms now live in `plain.connect` via the `{% connect_support_fields %}` template tag. ([a1a1da39c5](https://github.com/dropseed/plain/commit/a1a1da39c5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.145.2](https://github.com/dropseed/plain/releases/plain@0.145.2) (2026-05-19)
+
+### What's changed
+
+- The `plain-pageviews` package has been removed and no longer appears in the package docs list or the `plain docs` CLI. First-party pageview tracking now lives in `plain.connect` via the `{% connect_pageviews %}` template tag. ([8fa042fc19](https://github.com/dropseed/plain/commit/8fa042fc19))
+- `plain docs --api` now reads `__all__` whether it is declared as a list or a tuple, so a module using a tuple no longer silently drops its API surface from the output. ([64ee8a4de0](https://github.com/dropseed/plain/commit/64ee8a4de0))
+
+### Upgrade instructions
+
+- No changes required. If you depended on `plain.pageviews`, migrate to `plain.connect`'s pageview tracking.
+
 ## [0.145.1](https://github.com/dropseed/plain/releases/plain@0.145.1) (2026-05-16)
 
 ### What's changed

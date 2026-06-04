@@ -13,8 +13,11 @@
 
   const identity = script.dataset.identity || "";
   const initialTraceId = script.dataset.traceId || "";
+  const initialRoute = script.dataset.route || "";
 
-  const ANONYMOUS_ID_KEY = "plain_pageviews_anonymous_id";
+  // Shared across plain.connect features so submissions from different
+  // widgets on the same browser stitch together.
+  const ANONYMOUS_ID_KEY = "plain_anonymous_id";
 
   function anonymousId() {
     try {
@@ -44,8 +47,10 @@
       referrer: isInitialView ? document.referrer : lastUrl,
       anonymous_id: anonId,
       identity,
-      // Only the server-rendered initial load has a backend trace to link to.
+      // Only the server-rendered initial load has a backend trace and a
+      // resolved route pattern; SPA navigations land with both blank.
       trace_id: isInitialView ? initialTraceId : "",
+      route: isInitialView ? initialRoute : "",
     };
 
     lastUrl = location.href;

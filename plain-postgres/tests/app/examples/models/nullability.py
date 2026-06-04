@@ -12,6 +12,6 @@ class NullabilityExample(postgres.Model):
     to simulate drift, then verify the SetNotNullFix restores it.
     """
 
-    required_text: str = types.TextField(max_length=100)
+    required_text = types.TextField(max_length=100)
 
     query: postgres.QuerySet[NullabilityExample] = postgres.QuerySet()

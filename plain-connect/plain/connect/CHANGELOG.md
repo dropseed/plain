@@ -1,5 +1,62 @@
 # plain-connect changelog
 
+## [0.7.1](https://github.com/dropseed/plain/releases/plain-connect@0.7.1) (2026-06-03)
+
+### What's changed
+
+- Removed the `plain.observer` coexistence handling now that observer is retired: the "Observer coexistence" docs section and FAQs are gone, and the `TracerProvider`/`LoggerProvider` conflict errors no longer reference observer ordering in `INSTALLED_PACKAGES`. ([1bab9f784a](https://github.com/dropseed/plain/commit/1bab9f784a))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.7.0](https://github.com/dropseed/plain/releases/plain-connect@0.7.0) (2026-05-22)
+
+### What's changed
+
+- **New toolbar item links the current request to its exported trace in Plain Cloud.** When `plain.toolbar` is installed and `CONNECT_EXPORT_TOKEN` is set, a "Trace" button appears in the dev toolbar pointing at a short `/t/<trace_id>` URL that resolves the trace back to its app and redirects to the full waterfall view. Requests dropped by `CONNECT_TRACE_SAMPLE_RATE` show a muted "Not sampled" badge instead, so it's clear why no link is available. ([1fe612bf96](https://github.com/dropseed/plain/commit/1fe612bf96), [66d2cdc20e](https://github.com/dropseed/plain/commit/66d2cdc20e))
+- **`CONNECT_FORMS_URL` is replaced by `CONNECT_CLOUD_URL`** (default `https://plainframework.com`). The new setting is the single Plain Cloud base URL — used to build both the toolbar's `/t/<trace_id>` link and the support submission `/forms/<endpoint_id>` URL. Two settings collapsed into one. ([cbd6d7195a](https://github.com/dropseed/plain/commit/cbd6d7195a))
+
+### Upgrade instructions
+
+- **Rename `CONNECT_FORMS_URL` to `CONNECT_CLOUD_URL`** in `app/settings.py` (and `PLAIN_CONNECT_FORMS_URL` → `PLAIN_CONNECT_CLOUD_URL` if set via env var). The default value changes from `https://plainframework.com/forms` to `https://plainframework.com` — the `/forms` suffix is now appended internally by `connect_support_url()`. If you were pointing `CONNECT_FORMS_URL` at a custom endpoint, set `CONNECT_CLOUD_URL` to the same base (without the `/forms` suffix).
+
+## [0.6.1](https://github.com/dropseed/plain/releases/plain-connect@0.6.1) (2026-05-20)
+
+### What's changed
+
+- Support-form README fix: replaced the non-functional `referrerpolicy="strict-origin-when-cross-origin"` attribute on the `<form>` example with `<meta name="referrer" content="strict-origin-when-cross-origin">`. `referrerpolicy` is not a valid attribute on `<form>` — browsers silently ignored it and Plain Cloud kept rejecting submissions with `Origin: null`. The meta-tag override actually works. ([dcd05214ff](https://github.com/dropseed/plain/commit/dcd05214ff))
+
+### Upgrade instructions
+
+- If you copied the previous example and your support form was failing with `Origin: null`, update the page to use the meta-tag pattern from the README.
+
+## [0.6.0](https://github.com/dropseed/plain/releases/plain-connect@0.6.0) (2026-05-20)
+
+### What's changed
+
+- New `{% connect_support_fields %}` template tag and `connect_support_url(endpoint_id)` global for posting contact forms to a Plain Cloud support endpoint. The tag injects three hidden inputs into your own `<form>`: an HMAC-signed render token, an encrypted identity token (when `plain.auth` is installed and the visitor is signed in), and a honeypot field. Any non-reserved field name is captured into the conversation's `extras` automatically — no extra configuration needed. ([f1a692e985](https://github.com/dropseed/plain/commit/f1a692e985))
+- New `CONNECT_SECRET_KEY` setting consolidates the per-feature identity key into a single shared secret used by both pageviews and the support widget. Get the value from the App settings page on Plain Cloud. ([f1a692e985](https://github.com/dropseed/plain/commit/f1a692e985))
+- New `CONNECT_FORMS_URL` setting (default `https://plainframework.com/forms`) for the support submission base URL. ([f1a692e985](https://github.com/dropseed/plain/commit/f1a692e985))
+- New preflight check `connect.secret_key` warns when `CONNECT_PAGEVIEWS_TOKEN` is set without `CONNECT_SECRET_KEY` — pageviews still work, but signed-in user attribution silently won't. ([f1a692e985](https://github.com/dropseed/plain/commit/f1a692e985))
+- The anonymous-visitor id is now stored under `plain_anonymous_id` in `localStorage` so future plain.connect widgets can stitch submissions from the same browser together. ([f1a692e985](https://github.com/dropseed/plain/commit/f1a692e985))
+
+### Upgrade instructions
+
+- **Rename `CONNECT_PAGEVIEWS_IDENTITY_KEY` to `CONNECT_SECRET_KEY`** (env var: `PLAIN_CONNECT_PAGEVIEWS_IDENTITY_KEY` → `PLAIN_CONNECT_SECRET_KEY`). Same value, single setting now shared across connect features.
+- Returning anonymous visitors will get a fresh id on their next page load — the localStorage key changed from `plain_pageviews_anonymous_id` to `plain_anonymous_id`, and the migration was removed before release. Expect a one-time discontinuity in returning-visitor counts.
+
+## [0.5.0](https://github.com/dropseed/plain/releases/plain-connect@0.5.0) (2026-05-19)
+
+### What's changed
+
+- Pageview beacons now carry the matched URL route pattern (e.g. `/blog/<slug>/`) on the server-rendered initial load, mirroring the `http.route` span attribute. This lets pageviews aggregate by view instead of by raw URL. SPA navigations send a blank route. ([93f12bc8c6](https://github.com/dropseed/plain/commit/93f12bc8c6))
+- Docs now note that a strict `Content-Security-Policy` must allow the pageview ingest host in `connect-src` — beacons are sent with `navigator.sendBeacon`, and the browser blocks them otherwise. ([2cab277d3e](https://github.com/dropseed/plain/commit/2cab277d3e))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.4.0](https://github.com/dropseed/plain/releases/plain-connect@0.4.0) (2026-05-18)
 
 ### What's changed

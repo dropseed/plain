@@ -9,7 +9,7 @@ import operator
 import warnings
 from collections.abc import Callable, Iterator, Sequence
 from functools import cached_property
-from itertools import chain, islice
+from itertools import islice
 from typing import TYPE_CHECKING, Any, Never, Self, overload
 
 import psycopg
@@ -97,14 +97,16 @@ class ModelIterable(BaseIterable):
         select_fields = klass_info["select_fields"]
         model_fields_start, model_fields_end = select_fields[0], select_fields[-1] + 1
         init_list = [
-            f[0].target.attname for f in select[model_fields_start:model_fields_end]
+            f[0].target.name for f in select[model_fields_start:model_fields_end]
         ]
         related_populators = get_related_populators(klass_info, select)
         known_related_objects = [
             (
                 field,
                 related_objs,
-                operator.attrgetter(field.attname),
+                # The raw key value, not the related object the descriptor
+                # would return -- the dict below is keyed by raw key.
+                field.value_from_object,
             )
             for field, related_objs in queryset._known_related_objects.items()
         ]
@@ -282,7 +284,6 @@ class QuerySet[T: "Model"]:
     _query: Query
     _result_cache: list[T] | None
     _sticky_filter: bool
-    _for_write: bool
     _prefetch_related_lookups: tuple[Any, ...]
     _prefetch_done: bool
     _known_related_objects: dict[Any, dict[Any, Any]]
@@ -303,7 +304,6 @@ class QuerySet[T: "Model"]:
         instance._query = query or Query(model)
         instance._result_cache = None
         instance._sticky_filter = False
-        instance._for_write = False
         instance._prefetch_related_lookups = ()
         instance._prefetch_done = False
         instance._known_related_objects = {}
@@ -630,23 +630,14 @@ class QuerySet[T: "Model"]:
         and returning the created object.
         """
         obj = self.model(**kwargs)
-        self._for_write = True
-        obj.save(force_insert=True)
+        obj.create()
         return obj
 
     def _prepare_for_bulk_create(self, objs: list[T]) -> None:
-        from plain.postgres.fields.base import DefaultableField
-
-        id_field = self.model._model_meta.get_forward_field("id")
-        has_id_default = (
-            isinstance(id_field, DefaultableField) and id_field.has_default()
-        )
+        # The identity PK is the only PK type, so there's no literal Python
+        # default to materialize -- obj.id stays None and the INSERT takes the
+        # DB's DEFAULT path.
         for obj in objs:
-            if obj.id is None and has_id_default:
-                # User-declared literal default on the PK — materialize it
-                # so the INSERT carries a Python value. Identity PKs take the
-                # DB's DEFAULT path and leave obj.id as None.
-                obj.id = id_field.get_default()
             obj._prepare_related_fields_for_save(operation_name="bulk_create")
 
     def _check_bulk_create_options(
@@ -728,7 +719,6 @@ class QuerySet[T: "Model"]:
             update_fields_objs,
             unique_fields_objs,
         )
-        self._for_write = True
         fields = meta.concrete_fields
         self._prepare_for_bulk_create(objs)
         with transaction.atomic(savepoint=False):
@@ -746,7 +736,8 @@ class QuerySet[T: "Model"]:
                 for obj_with_id, results in zip(objs_with_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
                         if field != id_field:
-                            setattr(obj_with_id, field.attname, result)
+                            assert field.name is not None
+                            setattr(obj_with_id, field.name, result)
                 for obj_with_id in objs_with_id:
                     obj_with_id._state.adding = False
             if objs_without_id:
@@ -763,7 +754,8 @@ class QuerySet[T: "Model"]:
                     assert len(returned_columns) == len(objs_without_id)
                 for obj_without_id, results in zip(objs_without_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
-                        setattr(obj_without_id, field.attname, result)
+                        assert field.name is not None
+                        setattr(obj_without_id, field.name, result)
                     obj_without_id._state.adding = False
 
         return objs
@@ -794,11 +786,10 @@ class QuerySet[T: "Model"]:
             return 0
         for obj in objs_tuple:
             obj._prepare_related_fields_for_save(
-                operation_name="bulk_update", fields=fields_list
+                operation_name="bulk_update", field_names=fields
             )
         # PK is used twice in the resulting update query, once in the filter
         # and once in the WHEN. Each field will also have one CAST.
-        self._for_write = True
         max_batch_size = len(objs_tuple)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
         batches = (
@@ -811,14 +802,14 @@ class QuerySet[T: "Model"]:
             for field in fields_list:
                 when_statements = []
                 for obj in batch_objs:
-                    attr = getattr(obj, field.attname)
+                    attr = field.value_from_object(obj)
                     if not isinstance(attr, ResolvableExpression):
                         attr = Value(attr, output_field=field)
                     when_statements.append(When(id=obj.id, then=attr))
                 case_statement = Case(*when_statements, output_field=field)
                 # PostgreSQL requires casted CASE in updates
                 case_statement = Cast(case_statement, output_field=field)
-                update_kwargs[field.attname] = case_statement
+                update_kwargs[field.name] = case_statement
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
         queryset = self._chain()
@@ -837,7 +828,6 @@ class QuerySet[T: "Model"]:
         """
         # The get() needs to be targeted at the write database in order
         # to avoid potential transaction consistency problems.
-        self._for_write = True
         try:
             return self.get(**kwargs), False
         except self.model.DoesNotExist:
@@ -879,7 +869,6 @@ class QuerySet[T: "Model"]:
             update_defaults = create_defaults = defaults or {}
         else:
             update_defaults = defaults or {}
-        self._for_write = True
         with transaction.atomic():
             # Lock the row so that a concurrent update is blocked until
             # update_or_create() has performed its save.
@@ -904,11 +893,9 @@ class QuerySet[T: "Model"]:
                         field.primary_key or field.__class__.pre_save is Field.pre_save
                     ):
                         update_fields.add(field.name)
-                        if field.name != field.attname:
-                            update_fields.add(field.attname)
-                obj.save(update_fields=update_fields)
+                obj.update(fields=update_fields)
             else:
-                obj.save()
+                obj.update()
         return obj, False
 
     def _extract_model_params(
@@ -967,7 +954,6 @@ class QuerySet[T: "Model"]:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
         del_query = self._chain()
-        del_query._for_write = True
         del_query.sql_query.select_for_update = False
         del_query.sql_query.select_related = False
         del_query.sql_query.clear_ordering(force=True)
@@ -1002,7 +988,6 @@ class QuerySet[T: "Model"]:
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
-        self._for_write = True
         query = self.sql_query.chain(UpdateQuery)
         query.add_update_values(kwargs)
 
@@ -1221,7 +1206,6 @@ class QuerySet[T: "Model"]:
         if nowait and skip_locked:
             raise ValueError("The nowait option cannot be used with skip_locked.")
         obj = self._chain()
-        obj._for_write = True
         obj.sql_query.select_for_update = True
         obj.sql_query.select_for_update_nowait = nowait
         obj.sql_query.select_for_update_skip_locked = skip_locked
@@ -1316,14 +1300,7 @@ class QuerySet[T: "Model"]:
         clone = self._chain()
         names = self._fields
         if names is None:
-            names = set(
-                chain.from_iterable(
-                    (field.name, field.attname)
-                    if hasattr(field, "attname")
-                    else (field.name,)
-                    for field in self.model._model_meta.get_fields()
-                )
-            )
+            names = {field.name for field in self.model._model_meta.get_fields()}
 
         for alias, annotation in annotations.items():
             if alias in names:
@@ -1471,23 +1448,21 @@ class QuerySet[T: "Model"]:
         objs: list[T],
         fields: list[Field],
         returning_fields: list[Field] | None = None,
-        raw: bool = False,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
     ) -> list[tuple[Any, ...]] | None:
         """
         Insert a new record for the given model. This provides an interface to
-        the InsertQuery class and is how Model.save() is implemented.
+        the InsertQuery class and is how Model.create() is implemented.
         """
-        self._for_write = True
         query = InsertQuery(
             self.model,
             on_conflict=on_conflict if on_conflict else None,
             update_fields=update_fields,
             unique_fields=unique_fields,
         )
-        query.insert_values(fields, objs, raw=raw)
+        query.insert_values(fields, objs)
         # InsertQuery returns SQLInsertCompiler which has different execute_sql signature
         return query.get_compiler().execute_sql(returning_fields)
 
@@ -1546,7 +1521,6 @@ class QuerySet[T: "Model"]:
             query=self.sql_query.chain(),
         )
         c._sticky_filter = self._sticky_filter
-        c._for_write = self._for_write
         c._prefetch_related_lookups = self._prefetch_related_lookups[:]
         c._known_related_objects = self._known_related_objects
         c._iterable_class = self._iterable_class
@@ -1677,7 +1651,7 @@ class RawQuerySet:
             if column not in self.model_fields
         ]
         model_init_order = [self.columns.index(f.column) for f in model_init_fields]
-        model_init_names = [f.attname for f in model_init_fields]
+        model_init_names = [f.name for f in model_init_fields]
         return model_init_names, model_init_order, annotation_fields
 
     def prefetch_related(self, *lookups: str | Prefetch | None) -> RawQuerySet:
@@ -2205,8 +2179,8 @@ class RelatedPopulator:
         #      in the order __init__ expects it.
         #  - id_idx: the index of the primary key field in the reordered
         #    model data. Used to check if a related object exists at all.
-        #  - init_list: the field attnames fetched from the database. For
-        #    deferred models this isn't the same as all attnames of the
+        #  - init_list: the field names fetched from the database. For
+        #    deferred models this isn't the same as all names of the
         #    model's fields.
         #  - related_populators: a list of RelatedPopulator instances if
         #    select_related() descends to related models from this model.
@@ -2218,7 +2192,7 @@ class RelatedPopulator:
         self.cols_start = select_fields[0]
         self.cols_end = select_fields[-1] + 1
         self.init_list = [
-            f[0].target.attname for f in select[self.cols_start : self.cols_end]
+            f[0].target.name for f in select[self.cols_start : self.cols_end]
         ]
         self.reorder_for_init = None
 

@@ -44,7 +44,7 @@ class ContactView(TemplateView):
         )
         if isinstance(result, ContactFormWithCompany):
             submission.company = result.company or ""
-        submission.save()
+        submission.create()
         return RedirectResponse(reverse("contacts:success"))
 
 

@@ -3,6 +3,7 @@ URLS_ROUTER = "app.urls.AppRouter"
 INSTALLED_PACKAGES = [
     "plain.assets",
     "plain.templates",
+    "plain.toolbar",
     "plain.sessions",
     "plain.auth",
     "plain.postgres",

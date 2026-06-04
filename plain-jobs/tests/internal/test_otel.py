@@ -88,11 +88,11 @@ def test_failed_enqueue_marks_producer_span_as_errored(
     from opentelemetry.trace import StatusCode
 
     def _boom(*args, **kwargs):
-        raise RuntimeError("save failed")
+        raise RuntimeError("create failed")
 
     from plain.jobs.models import JobRequest
 
-    monkeypatch.setattr(JobRequest, "save", _boom)
+    monkeypatch.setattr(JobRequest, "create", _boom)
 
     with pytest.raises(RuntimeError):
         _NoopJob().run_in_worker()
@@ -148,11 +148,11 @@ def test_enqueue_failure_records_error_type_on_metric(
     # which never fires under the test rollback. The failure path records
     # immediately, so it's the one we can assert on here.
     def _boom(*args, **kwargs):
-        raise RuntimeError("save failed")
+        raise RuntimeError("create failed")
 
     from plain.jobs.models import JobRequest
 
-    monkeypatch.setattr(JobRequest, "save", _boom)
+    monkeypatch.setattr(JobRequest, "create", _boom)
 
     with pytest.raises(RuntimeError):
         _NoopJob().run_in_worker()
@@ -545,6 +545,34 @@ def test_consumed_counter_records_outcome_for_deferred(
 
 
 @pytest.mark.usefixtures("db")
+def test_defer_skipped_when_reenqueue_blocked() -> None:
+    """When defer()'s re-enqueue is blocked by should_enqueue() returning
+    False, the framework honors the signal silently — same convention as
+    run_in_worker() and retry_job(), which both return None in the same
+    situation. The result is recorded as DEFERRED with no retry uuid so
+    the case is visible in admin without surfacing as an exception."""
+    from plain.jobs.exceptions import DeferJob
+    from plain.jobs.models import JobResultStatuses
+
+    # Seed a JobProcess via a job whose should_enqueue allows it through.
+    request = _NoopJob().run_in_worker(concurrency_key="busy")
+    assert request is not None
+    process = request.convert_to_job_process(worker_id=uuid.uuid4())
+
+    # Defer using a job that always says should_enqueue=False. In
+    # production these would be the same class; using two here lets the
+    # initial enqueue succeed and only the re-enqueue get blocked.
+    result = process.defer(
+        job=_ExclusiveJob(),
+        defer_exception=DeferJob(delay=60),
+    )
+
+    assert result.status == JobResultStatuses.DEFERRED
+    assert result.retry_job_request_uuid is None
+    assert "re-enqueue skipped" in result.error
+
+
+@pytest.mark.usefixtures("db")
 def test_workers_gauge_splits_by_state_attribute(metrics, settings) -> None:
     """One `plain.jobs.workers` gauge with `plain.jobs.worker.state` attribute
     distinguishing active vs. stale rows. One snapshot of the cutoff means a
@@ -602,7 +630,7 @@ def test_running_counts_started_jobprocess_rows_by_queue(metrics) -> None:
 
     # Worker picks it up; `process_job` sets started_at.
     process.started_at = timezone.now()
-    process.save(update_fields=["started_at"])
+    process.update(fields=["started_at"])
 
     assert _by_queue(otel.WorkerMetrics._gauge_running) == {"default": 1}
 

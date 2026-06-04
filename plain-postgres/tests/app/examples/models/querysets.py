@@ -8,7 +8,7 @@ from plain.postgres import types
 class DefaultQuerySetModel(postgres.Model):
     """Model that uses the default objects QuerySet."""
 
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query: postgres.QuerySet[DefaultQuerySetModel] = postgres.QuerySet()
 
@@ -27,7 +27,7 @@ class CustomSpecialQuerySet(postgres.QuerySet):
 class CustomQuerySetModel(postgres.Model):
     """Model with a custom QuerySet."""
 
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query = CustomQuerySet()
 
@@ -36,6 +36,6 @@ class CustomQuerySetModel(postgres.Model):
 class CustomSpecialQuerySetModel(postgres.Model):
     """Model with a custom special QuerySet."""
 
-    name: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
 
     query = CustomSpecialQuerySet()

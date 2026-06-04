@@ -46,11 +46,15 @@ def log_exception(request: Request, exc: Exception) -> None:
     if isinstance(exc, NotFoundError404):
         return
 
-    base = {"path": request.path, "request": request}
+    base = {"path": request.path}
 
     if isinstance(exc, SuspiciousOperationError400):
+        # Logged on plain.security.* so operators can target an alert at
+        # security events specifically. Warning (no exc_info) because the
+        # rejection is the working-as-designed response — same noise
+        # category as 404s once a scanner is probing nonexistent paths.
         security_logger = logging.getLogger(f"plain.security.{type(exc).__name__}")
-        security_logger.error(str(exc), extra=base, exc_info=exc)
+        security_logger.warning(str(exc), extra=base)
         return
 
     if isinstance(exc, HTTPException):

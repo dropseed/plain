@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 from plain import postgres
 from plain.postgres import types
 
@@ -14,9 +12,9 @@ class PinnedNavItem(postgres.Model):
         "users.User",
         on_delete=postgres.CASCADE,
     )
-    view_slug: str = types.TextField(max_length=255)
-    order: int = types.SmallIntegerField(default=0)
-    created_at: datetime = types.DateTimeField(create_now=True)
+    view_slug = types.TextField(max_length=255)
+    order = types.SmallIntegerField(default=0)
+    created_at = types.DateTimeField(create_now=True)
 
     query: postgres.QuerySet[PinnedNavItem] = postgres.QuerySet()
 

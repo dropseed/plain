@@ -69,7 +69,9 @@ def _check_if_value_fixed(
     return []
 
 
-class DateField(DefaultableField[datetime.date]):
+class DateField[T: (datetime.date, datetime.date | None) = datetime.date](
+    DefaultableField[T]
+):
     db_type_sql = "date"
     empty_strings_allowed = False
 
@@ -149,7 +151,9 @@ class DateField(DefaultableField[datetime.date]):
         return value
 
 
-class DateTimeField(ColumnField[datetime.datetime]):
+class DateTimeField[
+    T: (datetime.datetime, datetime.datetime | None) = datetime.datetime
+](ColumnField[T]):
     db_type_sql = "timestamp with time zone"
     empty_strings_allowed = False
 
@@ -267,11 +271,12 @@ class DateTimeField(ColumnField[datetime.datetime]):
         )
 
     def pre_save(self, model_instance: Model, add: bool) -> datetime.datetime | None:
+        assert self.name is not None
         if self.update_now:
             value = timezone.now()
-            setattr(model_instance, self.attname, value)
+            setattr(model_instance, self.name, value)
             return value
-        return getattr(model_instance, self.attname)
+        return getattr(model_instance, self.name)
 
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
@@ -301,7 +306,9 @@ class DateTimeField(ColumnField[datetime.datetime]):
         return value
 
 
-class TimeField(DefaultableField[datetime.time]):
+class TimeField[T: (datetime.time, datetime.time | None) = datetime.time](
+    DefaultableField[T]
+):
     db_type_sql = "time without time zone"
     empty_strings_allowed = False
 

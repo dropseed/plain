@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.36.7](https://github.com/dropseed/plain/releases/plain-flags@0.36.7) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.36.6](https://github.com/dropseed/plain/releases/plain-flags@0.36.6) (2026-05-05)
 
 ### What's changed

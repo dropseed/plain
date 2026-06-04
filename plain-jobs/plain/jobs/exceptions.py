@@ -21,14 +21,3 @@ class DeferJob(Exception):
         self.delay = delay
         self.increment_retries = increment_retries
         super().__init__(f"Job deferred for {delay} seconds")
-
-
-class DeferError(Exception):
-    """Raised when a deferred job cannot be re-enqueued.
-
-    This typically happens when concurrency limits prevent the job from being
-    re-queued. The transaction will be rolled back and the job will remain
-    in its current state, then be converted to ERRORED status for retry.
-    """
-
-    pass

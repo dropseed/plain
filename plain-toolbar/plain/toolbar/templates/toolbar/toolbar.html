@@ -1,16 +1,26 @@
 {% if toolbar.should_render() %}
 {% set items=toolbar.get_items() %}
 <script defer src="{{ asset('toolbar/toolbar.js') }}" nonce="{{ request.csp_nonce }}"></script>
-<div id="plaintoolbar" class="print:hidden text-stone-300 fixed bottom-0 w-full z-50 flex flex-col">
+<div id="plaintoolbar"
+     data-collapsed="true"
+     data-expanded="false"
+     data-items-open="false"
+     data-position="left"
+     class="group data-[hidden]:hidden! print:hidden text-stone-300 fixed bottom-0 w-full z-50 flex flex-col">
 
-    <div id="plaintoolbar-details" class="hidden relative text-sm border-white/5 shadow-xl border-t inset-shadow-xs inset-shadow-stone-800 rounded-t-xl bg-stone-950/95 backdrop-blur-sm">
+    {#
+        Details panel. Visibility is driven entirely by data attributes on the
+        wrapper (no JS class toggling): shown when data-expanded=true, but
+        force-hidden on desktop while the bar is a collapsed pill.
+    #}
+    <div id="plaintoolbar-details" class="hidden group-data-[expanded=true]:block sm:group-data-[collapsed=true]:hidden! relative text-sm border-white/5 shadow-xl border-t inset-shadow-xs inset-shadow-stone-800 rounded-t-xl bg-stone-950/95 backdrop-blur-sm">
 
         <div class="flex border-b border-white/5 px-2">
             {# Mobile: scrollable tabs #}
             <div id="plaintoolbar-tabs" class="flex flex-grow overflow-x-auto scrollbar-none">
                 {% for item in items %}
                 {% if item.name and item.panel_template_name %}
-                <button {% if loop.first %}data-active{% endif %} data-toolbar-tab="{{ item.name }}" class="data-active:border-yellow-500 px-3 sm:px-4 py-3 sm:py-2.5 -mb-px cursor-pointer border-b-2 border-transparent hover:border-yellow-600 whitespace-nowrap text-sm" type="button">{{ item.name }}</button>
+                <button {% if loop.first %}data-active="true"{% endif %} data-toolbar-tab="{{ item.name }}" class="data-active:border-yellow-500 px-3 sm:px-4 py-3 sm:py-2.5 -mb-px cursor-pointer border-b-2 border-transparent hover:border-yellow-600 whitespace-nowrap text-sm" type="button">{{ item.name }}</button>
                 {% endif %}
                 {% endfor %}
                 <button data-plaintoolbar-expand class="flex-grow cursor-pointer inline-flex h-full min-w-[2rem]" type="button"></button>
@@ -21,11 +31,6 @@
                         <path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z"/>
                         <path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/>
                         <path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/>
-                    </svg>
-                </button>
-                <button class="cursor-pointer hover:text-white text-white/50" type="button" data-plaintoolbar-expand>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4" viewBox="0 0 16 16">
-                        <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/>
                     </svg>
                 </button>
             </div>
@@ -47,22 +52,50 @@
 
     </div>
 
-    {# Bottom bar: floating pill on mobile, full-width on desktop #}
+    {#
+        Bar layout:
+        - Mobile (always): floating pill at the chosen position
+        - Desktop collapsed pill: floating pill at the chosen position
+        - Desktop uncollapsed (group-data-[collapsed=false]): full-width bottom bar
+    #}
+    {#
+        The pill's three positions are pure CSS translateX off a fixed left-0
+        anchor, so resize needs no JS. data-animate (set by toolbar.js only for
+        a snap or cycle) gates the slide transition; drag/dock stay instant.
+    #}
     <div
         id="plaintoolbar-bar"
-        class="fixed bottom-3 left-3 z-50 sm:relative sm:inset-auto sm:z-auto
-               w-fit sm:w-auto rounded-full sm:rounded-none
-               flex px-3 text-xs gap-3 py-2.5 sm:py-2
-               border border-white/10 sm:border-0 sm:border-t sm:border-white/5
+        class="fixed bottom-3 left-0 z-50 w-fit rounded-full py-2.5 cursor-grab
+               group-data-[position=left]:[transform:translateX(0.75rem)]
+               group-data-[position=center]:[transform:translateX(calc(50vw_-_50%))]
+               group-data-[position=right]:[transform:translateX(calc(100vw_-_100%_-_0.75rem))]
+               data-[animate]:transition-transform data-[animate]:duration-200 data-[animate]:ease-out
+               border border-white/10
+               sm:group-data-[collapsed=false]:relative sm:group-data-[collapsed=false]:inset-auto sm:group-data-[collapsed=false]:z-auto
+               sm:group-data-[collapsed=false]:[transform:none]
+               sm:group-data-[collapsed=false]:w-auto sm:group-data-[collapsed=false]:rounded-none sm:group-data-[collapsed=false]:py-2
+               sm:group-data-[collapsed=false]:border-0 sm:group-data-[collapsed=false]:border-t sm:group-data-[collapsed=false]:border-white/5
+               sm:group-data-[collapsed=false]:cursor-default
+               flex px-3 text-xs gap-3
                bg-stone-950 shadow-xl"
     >
-        {# Version: selectable text on desktop, tappable toggle on mobile #}
-        <span class="hidden sm:flex items-center flex-shrink-0 whitespace-nowrap select-all">{{ toolbar.version }}</span>
-        <button id="plaintoolbar-mobile-toggle" class="flex sm:hidden items-center flex-shrink-0 cursor-pointer whitespace-nowrap" type="button">
+        {# Version: tappable toggle on mobile / desktop pill #}
+        <button id="plaintoolbar-version" class="flex sm:group-data-[collapsed=false]:hidden items-center flex-shrink-0 cursor-pointer whitespace-nowrap" type="button">
             {{ toolbar.version }}
         </button>
-        <button type="button" data-plaintoolbar-expand class="hidden sm:block flex-grow cursor-pointer min-w-0"></button>
-        <div id="plaintoolbar-items" class="hidden sm:flex items-center min-w-0">
+        {# Version: selectable, non-interactive text on the desktop full bar #}
+        <span class="hidden sm:group-data-[collapsed=false]:flex items-center flex-shrink-0 whitespace-nowrap select-all">{{ toolbar.version }}</span>
+
+        {# Filler that expands the panel - desktop full bar only #}
+        <button type="button" data-plaintoolbar-expand class="hidden sm:group-data-[collapsed=false]:block flex-grow cursor-pointer min-w-0" title="Toggle panel"></button>
+
+        {#
+            Items list:
+            - desktop full bar: always shown
+            - mobile: shown when data-items-open=true (toggled by the version button)
+            - desktop pill: hidden
+        #}
+        <div id="plaintoolbar-items" class="hidden max-sm:group-data-[items-open=true]:flex sm:group-data-[collapsed=false]:flex items-center min-w-0">
             <div class="flex items-center gap-3 transition-all min-w-0 [&>button]:max-w-[200px] sm:[&>button]:max-w-none">
 
                 {% for item in items %}
@@ -73,9 +106,15 @@
 
                 {% include "toolbar/links.html" ignore missing %}
 
-                <button data-plaintoolbar-expand class="hidden sm:inline-flex hover:text-white text-white/50 cursor-pointer" type="button" title="Expand toolbar">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 sm:w-3.5 sm:h-3.5" viewBox="0 0 16 16">
+                <button data-plaintoolbar-expand class="hidden sm:group-data-[collapsed=false]:inline-flex hover:text-white text-white/50 cursor-pointer" type="button" title="Toggle panel">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3.5 h-3.5 transition-transform group-data-[expanded=true]:rotate-180" viewBox="0 0 16 16">
                         <path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708z"/>
+                    </svg>
+                </button>
+
+                <button data-plaintoolbar-collapse class="hidden sm:group-data-[collapsed=false]:inline-flex hover:text-white text-white/50 cursor-pointer" type="button" title="Collapse to pill">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3.5 h-3.5" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M4 8a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 4 8"/>
                     </svg>
                 </button>
 

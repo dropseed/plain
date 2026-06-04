@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Self
 
 from plain import postgres
@@ -12,6 +11,18 @@ __all__ = ["CachedItem", "CachedItemQuerySet"]
 
 
 class CachedItemQuerySet(postgres.QuerySet["CachedItem"]):
+    def live(self) -> Self:
+        """Rows readable right now: never-expiring *or* not-yet-expired.
+
+        This is the filter cache reads use -- an entry past its `expires_at`
+        reads as absent. (Contrast `unexpired()`, which matches only rows with a
+        *future* expiry.)
+        """
+        return self.filter(
+            postgres.Q(expires_at__isnull=True)
+            | postgres.Q(expires_at__gte=timezone.now())
+        )
+
     def expired(self) -> Self:
         return self.filter(expires_at__lt=timezone.now())
 
@@ -24,11 +35,11 @@ class CachedItemQuerySet(postgres.QuerySet["CachedItem"]):
 
 @postgres.register_model
 class CachedItem(postgres.Model):
-    key: str = types.TextField(max_length=255)
+    key = types.TextField(max_length=255)
     value: Any = types.JSONField(required=False, allow_null=True)
-    expires_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
-    created_at: datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime = types.DateTimeField(create_now=True, update_now=True)
+    expires_at = types.DateTimeField(required=False, allow_null=True)
+    created_at = types.DateTimeField(create_now=True)
+    updated_at = types.DateTimeField(create_now=True, update_now=True)
 
     query: CachedItemQuerySet = CachedItemQuerySet()
 

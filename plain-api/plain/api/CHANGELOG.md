@@ -1,5 +1,25 @@
 # plain-api changelog
 
+## [0.33.7](https://github.com/dropseed/plain/releases/plain-api@0.33.7) (2026-06-03)
+
+### What's changed
+
+- Internal: `APIKeyView.use_api_key` records `last_used_at` via the new `update(fields=[...])` API instead of `save(update_fields=[...])`. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- No changes required. If you override `use_api_key` or use a `plain.postgres`-backed API key model, it needs `plain.postgres>=0.106.0` (which provides `update()`).
+
+## [0.33.6](https://github.com/dropseed/plain/releases/plain-api@0.33.6) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.33.5](https://github.com/dropseed/plain/releases/plain-api@0.33.5) (2026-05-13)
 
 ### What's changed

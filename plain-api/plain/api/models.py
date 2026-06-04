@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-from uuid import UUID
-
 from plain import postgres
 from plain.postgres import types
 from plain.utils import timezone
@@ -12,17 +9,17 @@ __all__ = ["APIKey"]
 
 @postgres.register_model
 class APIKey(postgres.Model):
-    uuid: UUID = types.UUIDField(generate=True)
-    created_at: datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime = types.DateTimeField(create_now=True, update_now=True)
-    expires_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
-    last_used_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
+    uuid = types.UUIDField(generate=True)
+    created_at = types.DateTimeField(create_now=True)
+    updated_at = types.DateTimeField(create_now=True, update_now=True)
+    expires_at = types.DateTimeField(required=False, allow_null=True)
+    last_used_at = types.DateTimeField(required=False, allow_null=True)
 
-    name: str = types.TextField(max_length=255, required=False)
+    name = types.TextField(max_length=255, required=False)
 
-    token: str = types.RandomStringField(length=40)
+    token = types.RandomStringField(length=40)
 
-    api_version: str = types.TextField(max_length=255, required=False)
+    api_version = types.TextField(max_length=255, required=False)
 
     query: postgres.QuerySet[APIKey] = postgres.QuerySet()
 
