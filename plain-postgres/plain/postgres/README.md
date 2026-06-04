@@ -1053,7 +1053,7 @@ except ValidationError:
     ...  # report it — the transaction is still usable
 ```
 
-Forms are the exception: a `ModelForm` pre-checks constraints explicitly (a `validate_constraints()` call in its `_post_clean`) so it can surface every violation at once, then saves with validation already done. A direct `create()`/`update()` reports the first violation Postgres hits.
+Forms are the exception: a `ModelForm` pre-checks constraints explicitly (a `validate_constraints()` call in its `_post_clean`) so it can surface every violation at once, then writes via `form.create()`/`form.update()` with validation already done. A direct `create()`/`update()` reports the first violation Postgres hits.
 
 This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to. If you retry on a unique conflict, catch both:
 
@@ -1221,7 +1221,7 @@ class UserForm(forms.ModelForm):
 # Usage
 form = UserForm(request=request)
 if form.is_valid():
-    user = form.save()
+    user = form.create()
 ```
 
 ## Architecture

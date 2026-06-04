@@ -193,8 +193,8 @@ class CreateView(FormView):
         return url
 
     def form_valid(self, form: BaseForm) -> Response:
-        """If the form is valid, save the associated model."""
-        self.object = form.save()  # ty: ignore[unresolved-attribute]
+        """If the form is valid, create the associated model."""
+        self.object = form.create()  # ty: ignore[unresolved-attribute]
         return super().form_valid(form)
 
 
@@ -257,8 +257,8 @@ class UpdateView(DetailView, FormView):
         return url
 
     def form_valid(self, form: BaseForm) -> Response:
-        """If the form is valid, save the associated model."""
-        form.save()  # ty: ignore[unresolved-attribute]
+        """If the form is valid, update the associated model."""
+        self.object = form.update()  # ty: ignore[unresolved-attribute]
         return super().form_valid(form)
 
     def get_form_kwargs(self) -> dict[str, Any]:
@@ -274,25 +274,16 @@ class DeleteView(DetailView, FormView):
     response rendered by a template.
     """
 
+    # An empty confirmation form -- deletion is the view's job, not the
+    # form's, so it carries no fields and no model write.
     class EmptyDeleteForm(Form):
-        def __init__(self, instance: Any, **kwargs: Any) -> None:
-            self.instance = instance
-            super().__init__(**kwargs)
-
-        def save(self) -> None:
-            self.instance.delete()
+        pass
 
     form_class = EmptyDeleteForm
 
-    def get_form_kwargs(self) -> dict[str, Any]:
-        """Return the keyword arguments for instantiating the form."""
-        kwargs = super().get_form_kwargs()
-        kwargs.update({"instance": self.object})
-        return kwargs
-
     def form_valid(self, form: BaseForm) -> Response:
-        """If the form is valid, save the associated model."""
-        form.save()  # ty: ignore[unresolved-attribute]
+        """If the confirmation form is valid, delete the object."""
+        self.object.delete()
         return super().form_valid(form)
 
 

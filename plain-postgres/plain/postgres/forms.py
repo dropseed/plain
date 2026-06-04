@@ -5,6 +5,7 @@ and database field objects.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from itertools import chain
 from typing import TYPE_CHECKING, Any, cast
 
@@ -380,30 +381,36 @@ class BaseModelForm(BaseForm):
             if f.name in cleaned_data:
                 f.save_form_data(self.instance, cleaned_data[f.name])
 
-    def save(self, commit: bool = True) -> Any:
-        """
-        Save this form's self.instance object if commit=True. Otherwise, add
-        a save_m2m() method to the form which can be called after the instance
-        is saved manually at a later time. Return the model instance.
-        """
+    def _raise_if_invalid(self, action: str) -> None:
+        """Guard the write methods -- a form with errors can't be persisted."""
         if self.errors:
             raise ValueError(
-                "The {} could not be {} because the data didn't validate.".format(
-                    self.instance.model_options.object_name,
-                    "created" if self.instance._state.adding else "changed",
-                )
+                f"The {self.instance.model_options.object_name} could not be "
+                f"{action} because the data didn't validate."
             )
-        if commit:
-            # If committing, persist the instance and the m2m data immediately.
-            if self.instance._state.adding:
-                self.instance.create(clean_and_validate=False)
-            else:
-                self.instance.update(clean_and_validate=False)
-            self._save_m2m()
-        else:
-            # If not committing, add a method to the form to allow deferred
-            # saving of m2m data.
-            self.save_m2m = self._save_m2m
+
+    def create(self) -> Any:
+        """INSERT this form's instance (and its m2m data) and return it.
+
+        Shape and constraints were already validated in _post_clean, so the
+        write trusts them (clean_and_validate=False). This mirrors
+        Model.create(); use it from a create flow and update() to UPDATE.
+        """
+        self._raise_if_invalid("created")
+        self.instance.create(clean_and_validate=False)
+        self._save_m2m()
+        return self.instance
+
+    def update(self, *, fields: Iterable[str] | None = None) -> Any:
+        """UPDATE this form's instance (and its m2m data) and return it.
+
+        `fields` is passed straight through to Model.update() to limit the
+        columns written; the default writes every loaded field. Validation
+        already ran in _post_clean, so the write trusts it.
+        """
+        self._raise_if_invalid("changed")
+        self.instance.update(clean_and_validate=False, fields=fields)
+        self._save_m2m()
         return self.instance
 
 

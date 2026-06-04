@@ -91,7 +91,7 @@ class TaskListAPIView(APIView):
         if not form.is_valid():
             return 400, {"errors": form.errors}
         form.instance.owner = user
-        task = form.save()
+        task = form.create()
         return 201, _serialize(task)
 
 

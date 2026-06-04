@@ -184,6 +184,6 @@ class PasswordSignupView(CreateView):
 
     def form_valid(self, form: BaseForm) -> Response:
         # # Log the user in and redirect
-        # auth_login(self.request, form.save())
+        # auth_login(self.request, form.create())
 
         return super().form_valid(form)

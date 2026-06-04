@@ -19,6 +19,11 @@ class ExamplesRouter(Router):
             name="forms_update",
         ),
         path(
+            "forms/<int:pk>/delete",
+            views.FormsExampleDeleteView,
+            name="forms_delete",
+        ),
+        path(
             "child-cascade/create",
             views.ChildCascadeCreateView,
             name="child_cascade_create",

@@ -180,7 +180,7 @@ class UserView(BaseAPIView):
         )
 
         if form.is_valid():
-            user = form.save()
+            user = form.update()
             return {
                 "uuid": user.uuid,
                 "username": user.username,
@@ -384,7 +384,7 @@ class TeamAccountAPIView(BaseAPIView):
         form = TeamAccountForm(request=self.request, instance=self.team_account)
 
         if form.is_valid():
-            team_account = form.save()
+            team_account = form.update()
             return TeamAccountSchema.from_team_account(
                 team_account, self.request
             )

@@ -181,6 +181,34 @@ class TestFormsExampleUpdate:
         assert existing.count == 1
 
 
+class TestFormsExampleDelete:
+    """DeleteView posts an empty confirmation form; the view deletes the row."""
+
+    def _create_existing(self) -> FormsExample:
+        return FormsExample.query.create(
+            name="Doomed",
+            status="draft",
+            count=1,
+            ratio=0.5,
+            amount=Decimal("1.00"),
+            event_date=datetime.date(2020, 1, 1),
+            event_time=datetime.time(0, 0, 0),
+            event_datetime=datetime.datetime(2020, 1, 1, 0, 0, 0, tzinfo=datetime.UTC),
+            duration=datetime.timedelta(minutes=1),
+            external_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+        )
+
+    def test_delete_removes_the_row(self, db):
+        existing = self._create_existing()
+        client = Client()
+
+        response = client.post(f"/examples/forms/{existing.id}/delete")
+
+        assert response.status_code == 302, response.content
+        assert response.headers["Location"] == "/ok/"
+        assert not FormsExample.query.filter(id=existing.id).exists()
+
+
 class TestForeignKeyRoundTrip:
     """Exercises the explicit ForeignKeyField → ModelChoiceField handler."""
 
