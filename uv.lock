@@ -885,11 +885,19 @@ dependencies = [
     { name = "plain-postgres" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-postgres", editable = "plain-postgres" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-cloud"

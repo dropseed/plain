@@ -25,6 +25,7 @@ plain-postgres
 plain-assets
 plain-templates
 plain-sessions
+plain-cache
 plain-jobs
 plain-flags
 plain-connect
