@@ -21,9 +21,11 @@ export PLAIN_CONNECT_EXPORT_ENABLED=false
 ALL_PACKAGES="$(cat <<EOF
 plain
 plain-html
+plain-dev
 plain-postgres
 plain-assets
 plain-sessions
+plain-cache
 plain-jobs
 plain-flags
 plain-connect
@@ -32,7 +34,6 @@ plain-oauth
 plain-auth
 plain-passwords
 plain-loginlink
-plain-support
 plain-api
 plain-htmx
 plain-email

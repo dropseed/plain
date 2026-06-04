@@ -1,0 +1,30 @@
+{% if trace_url %}
+{# Trace exported — link to the span waterfall in Plain Cloud #}
+<a
+    href="{{ trace_url }}"
+    target="_blank"
+    rel="noopener"
+    class="inline-flex items-center gap-1.5 cursor-pointer text-xs rounded-full px-2 py-px bg-white/8 text-white/80 hover:bg-white/12 transition-colors"
+    title="View this request's trace in Plain Cloud"
+>
+    <svg class="size-3 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <rect x="2" y="2.5" width="12" height="3" rx="1.5"/>
+        <rect x="5" y="6.5" width="8" height="3" rx="1.5"/>
+        <rect x="3.5" y="10.5" width="6" height="3" rx="1.5"/>
+    </svg>
+    <span class="text-[11px]">Trace</span>
+</a>
+{% elif sampled is false %}
+{# Connect is exporting, but this request was dropped by sampling #}
+<span
+    class="inline-flex items-center gap-1.5 text-xs rounded-full px-2 py-px bg-white/8 text-white/40"
+    title="This request was not sampled for export to Plain Cloud"
+>
+    <svg class="size-3 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <rect x="2" y="2.5" width="12" height="3" rx="1.5"/>
+        <rect x="5" y="6.5" width="8" height="3" rx="1.5"/>
+        <rect x="3.5" y="10.5" width="6" height="3" rx="1.5"/>
+    </svg>
+    <span class="text-[11px]">Not sampled</span>
+</span>
+{% endif %}

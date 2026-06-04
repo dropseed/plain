@@ -14,6 +14,7 @@ from plain.utils.datastructures import ImmutableList
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
+    from plain.postgres.constraints import BaseConstraint
     from plain.postgres.fields import Field
     from plain.postgres.fields.related import ManyToManyField, RelatedField
     from plain.postgres.fields.reverse_related import ForeignObjectRel
@@ -282,33 +283,13 @@ class Meta:
 
     @cached_property
     def _forward_fields_map(self) -> dict[str, Field]:
-        res = {}
-        fields = self._get_fields(reverse=False)
-        for field in fields:
-            res[field.name] = field
-            # Due to the way Plain's internals work, get_field() should also
-            # be able to fetch a field by attname. In the case of a concrete
-            # field with relation, includes the *_id name too
-            try:
-                res[field.attname] = field
-            except AttributeError:
-                pass
-        return res
+        return {field.name: field for field in self._get_fields(reverse=False)}
 
     @cached_property
     def fields_map(self) -> dict[str, Field | ForeignObjectRel]:
-        res = {}
-        fields = self._get_fields(forward=False, reverse=True)
-        for field in fields:
-            res[field.name] = field
-            # Due to the way Plain's internals work, get_field() should also
-            # be able to fetch a field by attname. In the case of a concrete
-            # field with relation, includes the *_id name too
-            try:
-                res[field.attname] = field
-            except AttributeError:
-                pass
-        return res
+        return {
+            field.name: field for field in self._get_fields(forward=False, reverse=True)
+        }
 
     def get_field(self, field_name: str) -> Field | ForeignObjectRel:
         """
@@ -560,8 +541,6 @@ class Meta:
         for field in self.concrete_fields:
             if not field.primary_key:
                 names.append(field.name)
-                if field.name != field.attname:
-                    names.append(field.attname)
         return frozenset(names)
 
     @cached_property
@@ -575,3 +554,20 @@ class Meta:
             for field in self._get_fields(forward=True, reverse=False)
             if field.db_returning
         ]
+
+    @property
+    def constraints_by_name(self) -> dict[str, BaseConstraint]:
+        """
+        Map each named constraint to its definition, keyed by the name
+        Postgres reports in ``err.diag.constraint_name`` — used on the write
+        path to translate an IntegrityError back to the constraint that raised
+        it.
+
+        A plain ``property``, not ``cached_property``: only read on the error
+        path, so recomputing is free, and it can never serve a stale map if
+        ``model_options.constraints`` is mutated.
+        """
+        return {
+            constraint.name: constraint
+            for constraint in self.model.model_options.constraints
+        }

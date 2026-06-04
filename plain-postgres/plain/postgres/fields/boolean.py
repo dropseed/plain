@@ -7,7 +7,7 @@ from plain import exceptions
 from .base import DefaultableField
 
 
-class BooleanField(DefaultableField[bool]):
+class BooleanField[T: (bool, bool | None) = bool](DefaultableField[T]):
     db_type_sql = "boolean"
     empty_strings_allowed = False
 

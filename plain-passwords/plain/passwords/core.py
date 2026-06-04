@@ -21,7 +21,7 @@ def check_user_password(user: Any, password: str) -> bool:
     # Update the stored hashed password if the hashing algorithm changed
     def setter(raw_password: str) -> None:
         user.password = raw_password
-        user.save(update_fields=["password"])
+        user.update(fields=["password"])
 
     password_is_correct = check_password(password, user.password, setter)
 
@@ -77,7 +77,7 @@ def authenticate(*, email: str, password: str) -> User | None:
 def set_user_password(user: User, password: str) -> User:
     """Set the user's password and save."""
     user.password = password
-    user.save()
+    user.update()
     return user
 
 

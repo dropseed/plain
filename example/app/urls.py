@@ -14,7 +14,6 @@ from plain.admin.urls import AdminRouter
 from plain.assets.urls import AssetsRouter
 from plain.auth.views import LogoutView
 from plain.html.views import NotFoundView, TemplateView
-from plain.observer.urls import ObserverRouter
 from plain.passwords.views import PasswordLoginView
 from plain.urls import Router, include, path
 
@@ -44,7 +43,6 @@ class AppRouter(Router):
     urls = [
         include("admin", AdminRouter),
         include("assets", AssetsRouter),
-        include("observer", ObserverRouter),
         include("notes", NotesRouter),
         include("contacts", ContactsRouter),
         include("tasks", TasksRouter),

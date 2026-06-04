@@ -26,14 +26,12 @@ dev = [
   "plain-portal",
   "plain-postgres",
   "plain-oauth",
-  "plain-observer",
   "plain-pages",
   "plain-passwords",
   "plain-pytest",
   "plain-redirection",
   "plain-scan",
   "plain-sessions",
-  "plain-support",
   "plain-tailwind",
   "plain-toolbar",
   "plain-tunnel",
@@ -65,14 +63,12 @@ dev = [
 "plain-portal" = { workspace = true }
 "plain-postgres" = { workspace = true }
 "plain-oauth" = { workspace = true }
-"plain-observer" = { workspace = true }
 "plain-pages" = { workspace = true }
 "plain-passwords" = { workspace = true }
 "plain-pytest" = { workspace = true }
 "plain-redirection" = { workspace = true }
 "plain-scan" = { workspace = true }
 "plain-sessions" = { workspace = true }
-"plain-support" = { workspace = true }
 "plain-tailwind" = { workspace = true }
 "plain-toolbar" = { workspace = true }
 "plain-tunnel" = { workspace = true }

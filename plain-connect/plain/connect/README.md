@@ -7,7 +7,8 @@
 - [Sampling](#sampling)
 - [What gets exported](#what-gets-exported)
 - [Pageview tracking](#pageview-tracking)
-- [Observer coexistence](#observer-coexistence)
+- [Support forms](#support-forms)
+- [Toolbar](#toolbar)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -25,16 +26,17 @@ If `CONNECT_EXPORT_TOKEN` is not set, the package is a no-op — safe to install
 
 ## Settings
 
-| Setting                          | Default                               | Description                                                               |
-| -------------------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
-| `CONNECT_EXPORT_URL`             | `"https://ingest.plainframework.com"` | OTLP ingest endpoint (override to use a custom endpoint)                  |
-| `CONNECT_EXPORT_TOKEN`           | `""`                                  | Auth token for the export endpoint                                        |
-| `CONNECT_TRACE_SAMPLE_RATE`      | `1.0`                                 | Probability of exporting a trace (0.0–1.0)                                |
-| `CONNECT_EXPORT_LOGS`            | `True`                                | Set to `False` to disable OTLP log export                                 |
-| `CONNECT_LOG_LEVEL`              | `"INFO"`                              | Minimum severity exported via OTLP logs (level name or int)               |
-| `CONNECT_PAGEVIEWS_TOKEN`        | `""`                                  | Public pageview-endpoint token; enables the `{% connect_pageviews %}` tag |
-| `CONNECT_PAGEVIEWS_IDENTITY_KEY` | `""`                                  | Secret key for encrypting the logged-in user id into the identity token   |
-| `CONNECT_PAGEVIEWS_URL`          | `"https://beacon.plainframework.com"` | Pageview ingest endpoint                                                  |
+| Setting                     | Default                               | Description                                                                                                |
+| --------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `CONNECT_EXPORT_URL`        | `"https://ingest.plainframework.com"` | OTLP ingest endpoint (override to use a custom endpoint)                                                   |
+| `CONNECT_CLOUD_URL`         | `"https://plainframework.com"`        | Plain Cloud web app base URL — builds toolbar trace links and support form URLs                            |
+| `CONNECT_EXPORT_TOKEN`      | `""`                                  | Auth token for the export endpoint                                                                         |
+| `CONNECT_TRACE_SAMPLE_RATE` | `1.0`                                 | Probability of exporting a trace (0.0–1.0)                                                                 |
+| `CONNECT_EXPORT_LOGS`       | `True`                                | Set to `False` to disable OTLP log export                                                                  |
+| `CONNECT_LOG_LEVEL`         | `"INFO"`                              | Minimum severity exported via OTLP logs (level name or int)                                                |
+| `CONNECT_SECRET_KEY`        | `""`                                  | Shared secret with Plain Cloud (from the App settings page). Encrypts identity tokens, signs render tokens |
+| `CONNECT_PAGEVIEWS_TOKEN`   | `""`                                  | Public pageview-endpoint token; enables the `{% connect_pageviews %}` tag                                  |
+| `CONNECT_PAGEVIEWS_URL`     | `"https://beacon.plainframework.com"` | Pageview ingest endpoint                                                                                   |
 
 All settings can be set via `PLAIN_`-prefixed environment variables or in `app/settings.py`.
 
@@ -74,25 +76,76 @@ PLAIN_CONNECT_PAGEVIEWS_TOKEN=plain_pv_...
 
 The tag renders nothing until the token is set. Once enabled, it reports the URL, title, referrer, and a first-party anonymous id on each page load and SPA navigation (History `pushState` / back-forward).
 
+If your app sends a `Content-Security-Policy`, add the pageview ingest host to `connect-src` — the script beacons to `CONNECT_PAGEVIEWS_URL` (`https://beacon.plainframework.com` by default). Without it, the browser blocks every pageview beacon.
+
 ### User attribution
 
-To attribute pageviews to your signed-in users, also set the secret identity key:
+To attribute pageviews to your signed-in users, also set the shared secret:
 
 ```
-PLAIN_CONNECT_PAGEVIEWS_IDENTITY_KEY=...
+PLAIN_CONNECT_SECRET_KEY=...
 ```
 
-When set, the tag encrypts the signed-in user's id (AES-256-GCM) into an opaque token that only the pageview endpoint can decrypt — the raw id never appears in your HTML. The user is read from [plain.auth](../../plain-auth/plain/auth/README.md); apps without it (or anonymous visitors) are still counted, their pageviews simply carry no user id.
+When set, the tag encrypts the signed-in user's id (AES-256-GCM) into an opaque token that only Plain Cloud can decrypt — the raw id never appears in your HTML. The user is read from [plain.auth](../../plain-auth/plain/auth/README.md); apps without it (or anonymous visitors) are still counted, their pageviews simply carry no user id.
 
-## Observer coexistence
+The same `CONNECT_SECRET_KEY` is used by the `{% connect_support_fields %}` widget below — one secret per app.
 
-If [plain.observer](../../plain-observer/plain/observer/README.md) is also installed, both work simultaneously. plain.connect handles production export while observer provides the local dev toolbar and admin trace viewer. Observer detects the existing TracerProvider and layers its sampler and span processor on top.
+## Support forms
+
+plain.connect ships a tag for sending contact-form submissions to a support endpoint on Plain Cloud. You create the endpoint in the App's Support settings (it gives you an id like `plain_sf_abc123`), then drop a normal HTML form into your template:
+
+```html
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<form action="{{ connect_support_url('plain_sf_abc123') }}" method="POST">
+  {% connect_support_fields %}
+  <input name="name" placeholder="Your name">
+  <input name="email" type="email" placeholder="Email">
+  <textarea name="message" required></textarea>
+  <button type="submit">Send</button>
+</form>
+```
+
+The `{% connect_support_fields %}` tag injects three hidden inputs:
+
+- `plain_connect_render_token` — HMAC-signed timestamp; rejected if it's too fresh (bots that submit instantly) or too stale (rendered hours ago)
+- `plain_connect_identity` — encrypted user id when `plain.auth` is installed and the visitor is signed in
+- `plain_connect_check` — honeypot field; submissions that fill it are silently discarded
+
+Both anti-spam signals require `CONNECT_SECRET_KEY`. Without it the inputs still render (as empty values), so the form remains submittable — you just lose render-token verification and identity attribution.
+
+### Cross-origin Origin header
+
+The form posts cross-origin to Plain Cloud, so the browser's `Origin` header serialization is governed by the page's `Referrer-Policy`. Plain ships `Referrer-Policy: same-origin` by default, which causes Chrome and Firefox to send `Origin: null` on no-cors cross-origin POSTs — and Plain Cloud rejects submissions with a null origin.
+
+The `<meta name="referrer">` tag in the example above overrides the document's policy to `strict-origin-when-cross-origin`, so the browser sends `Origin: https://yourapp.com` and the submission goes through. Putting it in `<head>` is preferable when you can — it applies before any subresources load — but inline next to the form still works for the form submission. Your app's global `Referrer-Policy` header is unaffected.
+
+### Field names
+
+A few field names are reserved — the platform reads them directly:
+
+| Name        | Purpose                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------ |
+| `name`      | Submitter name                                                                                   |
+| `email`     | Submitter email                                                                                  |
+| `message`   | Body of the submission (required)                                                                |
+| `form_slug` | Identifier surfaced in notifications and the inbox (lets one endpoint serve multiple form types) |
+| `_next`     | Redirect target after a form-action POST; ignored unless it matches the endpoint's allow-list    |
+
+Any other field name is captured into the conversation's `extras` JSON dict automatically — no extra configuration needed.
+
+### JSON vs form-action
+
+The endpoint accepts either `application/x-www-form-urlencoded` (the standard `<form action="...">` path) or `application/json` (for fetch-driven submissions). The field names are the same in both shapes. On the form-action path `_next` redirects the browser on success; on the JSON path the response is `{"ok": true, "conversation": "<uuid>"}`.
+
+## Toolbar
+
+If you have [plain.toolbar](../../plain-toolbar/plain/toolbar/README.md) installed, plain.connect adds a **Trace** button that links the current request straight to its trace in Plain Cloud.
+
+The button only appears when export is active (`CONNECT_EXPORT_TOKEN` is set), so it stays out of the way in local dev. It links to a short `/t/<trace_id>` URL on `CONNECT_CLOUD_URL`, which resolves the trace to its app and redirects you to the full trace view — no app slug needed in the link.
+
+If a request wasn't sampled for export (see [Sampling](#sampling)), the button shows "Not sampled" instead. Because traces export in a background batch, a freshly-clicked link may briefly land on a "locating trace" page that retries until the trace arrives.
 
 ## FAQs
-
-#### Do I need plain.observer to use plain.connect?
-
-No. plain.connect works independently. Observer is for local dev tooling; plain.connect is for production export.
 
 #### What happens if the export endpoint is unreachable?
 
@@ -111,5 +164,3 @@ INSTALLED_PACKAGES = [
     # ...
 ]
 ```
-
-Place `plain.connect` **before** `plain.observer` in `INSTALLED_PACKAGES` so it sets up the TracerProvider first.

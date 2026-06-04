@@ -102,7 +102,7 @@ class Config(PackageConfig):
         ):
             raise RuntimeError(
                 "A tracer provider already exists."
-                " plain.connect must be listed before plain.observer in INSTALLED_PACKAGES."
+                " plain.connect must install its own TracerProvider before any other package does."
             )
 
         span_exporter = OTLPSpanExporter(
@@ -142,7 +142,7 @@ class Config(PackageConfig):
             ):
                 raise RuntimeError(
                     "A logger provider already exists."
-                    " plain.connect must be listed before plain.observer in INSTALLED_PACKAGES."
+                    " plain.connect must install its own LoggerProvider before any other package does."
                 )
 
             # Accept either a level name ("INFO") or an int (20).

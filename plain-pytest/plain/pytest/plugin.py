@@ -13,17 +13,28 @@ import pytest
 from plain.runtime import settings as plain_settings
 from plain.runtime import setup
 from plain.test.otel import install_test_meter, install_test_tracer
-from plain.utils.dotenv import load_dotenv
 
 from .browser import TestBrowser
 
 
 def pytest_configure(config: Any) -> None:
-    # Load .env.test if it exists
-    if os.path.exists(".env.test"):
-        # ANSI codes: \033[2;3m = dim + italic, \033[0m = reset
-        print("\033[2;3mLoading environment variables from .env.test...\033[0m")
-        load_dotenv(".env.test", override=True)
+    # Ensure tests run with PLAIN_ENV=test so plain.dev's dotenv loader picks
+    # up `.env.test*` and skips `.env.local` for determinism. `plain test`
+    # already sets this via the CLI dispatcher; this covers direct `pytest`.
+    os.environ.setdefault("PLAIN_ENV", "test")
+
+    # Opportunistically load `.env.test*` via plain.dev's loader if it's
+    # installed. plain.pytest doesn't require plain.dev, so we skip silently
+    # when it's absent — install plain.dev if you want `.env` loading under
+    # direct `pytest` invocations. Narrow to ModuleNotFoundError so a broken
+    # plain.dev install (or a renamed symbol) surfaces instead of being
+    # swallowed.
+    try:
+        from plain.dev.dotenv import load_dotenv_files
+    except ModuleNotFoundError:
+        pass
+    else:
+        load_dotenv_files()
 
     # Run Plain setup before anything else
     setup()

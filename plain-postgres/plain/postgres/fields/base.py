@@ -82,15 +82,12 @@ def _load_field(
 
 # A guide to Field parameters:
 #
-#   * name:      The name of the field specified in the model.
-#   * attname:   The attribute to use on the model object. This is the same as
-#                "name", except in the case of ForeignKeys, where "_id" is
-#                appended.
-#   * column:    The database column for this field. This is the same as
-#                "attname".
-#
-# Code that introspects values, or does other dynamic things, should use
-# attname.
+#   * name:      The name of the field specified in the model. This is also the
+#                attribute and instance __dict__ key for the field's value -- a
+#                foreign key stores its raw key under the field name and is
+#                reached through its descriptor.
+#   * column:    The database column for this field. The same as "name",
+#                except for ForeignKeys, where the "_id" suffix is appended.
 
 
 def _empty(of_cls: type) -> Empty:
@@ -115,7 +112,6 @@ class Field[T](RegisterLookupMixin):
     # Set by __init__
     name: str | None
     # Set by set_attributes_from_name (called by contribute_to_class)
-    attname: str
     column: str
     concrete: bool
     # Set by contribute_to_class
@@ -376,8 +372,9 @@ class Field[T](RegisterLookupMixin):
 
     def set_attributes_from_name(self, name: str) -> None:
         self.name = self.name or name
-        self.attname = self.get_attname()
-        self.column = self.attname
+        # The database column is the field name. A foreign key overrides this
+        # method only to append the "_id" suffix to `column`.
+        self.column = self.name
         self.concrete = self.column is not None
 
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
@@ -394,7 +391,8 @@ class Field[T](RegisterLookupMixin):
         # Field is its own descriptor; make sure it is set on the class so
         # attribute access hits __get__/__set__.
         if self.column:
-            setattr(cls, self.attname, self)
+            assert self.name is not None
+            setattr(cls, self.name, self)
 
     # Descriptor protocol implementation
     @overload
@@ -417,29 +415,43 @@ class Field[T](RegisterLookupMixin):
 
         # If field hasn't been contributed to a class yet (e.g., used standalone
         # as an output_field in aggregates), just return self
-        if not hasattr(self, "attname"):
+        if not hasattr(self, "column"):
             return self
 
         # Instance access - get value from instance dict
+        assert self.name is not None
         data = instance.__dict__
-        field_name = self.attname
+        field_name = self.name
 
-        # If value not in dict, lazy load from database
+        # If value not in dict, lazy load from database. Hydrate every
+        # currently-missing concrete field in one query rather than one query
+        # per field accessed -- this is what makes a foreign key partial
+        # instance cheap to use beyond its primary key.
         if field_name not in data:
-            # Deferred field - load it from the database
-            instance.refresh_from_db(fields=[field_name])
+            missing = [
+                f.name
+                for f in instance._model_meta.concrete_fields
+                if f.name not in data
+            ]
+            instance.refresh_from_db(fields=missing)
 
         return cast(T, data.get(field_name))
 
-    def __set__(self, instance: Model, value: Any) -> None:
+    def __set__(self, instance: Model, value: T) -> None:
         """
         Descriptor __set__ for attribute assignment.
 
         Validates and converts the value using to_python(), then stores it
-        in instance.__dict__[attname].
+        in instance.__dict__[name].
+
+        The parameter is typed `T` (the field's value type) so a type checker
+        rejects assigning incompatible types — `row.name = 123` on a
+        TextField is caught at the call site. The runtime is more permissive
+        (to_python converts strings → ints etc.), but encouraging explicit
+        conversion at the boundary is the better default.
         """
         # Safety check: ensure field has been properly initialized
-        if not hasattr(self, "attname"):
+        if not hasattr(self, "column"):
             raise AttributeError(
                 f"Field {self.__class__.__name__} has not been initialized properly. "
                 f"The field's contribute_to_class() has not been called yet. "
@@ -448,11 +460,17 @@ class Field[T](RegisterLookupMixin):
 
         # Convert/validate the value. The DATABASE_DEFAULT sentinel is stored
         # as-is so the INSERT compiler can emit `DEFAULT` in the VALUES clause.
-        if value is not None and value is not DATABASE_DEFAULT:
-            value = self.to_python(value)
+        # Use a separate local so the parameter's narrow `T` type isn't
+        # widened by to_python's `T | None` return.
+        stored: Any
+        if value is None or value is DATABASE_DEFAULT:
+            stored = value
+        else:
+            stored = self.to_python(value)
 
         # Store in instance dict
-        instance.__dict__[self.attname] = value
+        assert self.name is not None
+        instance.__dict__[self.name] = stored
 
     def __delete__(self, instance: Model) -> None:
         """
@@ -460,20 +478,18 @@ class Field[T](RegisterLookupMixin):
 
         Removes the value from instance.__dict__.
         """
+        assert self.name is not None
         try:
-            del instance.__dict__[self.attname]
+            del instance.__dict__[self.name]
         except KeyError:
             raise AttributeError(
-                f"{instance.__class__.__name__!r} object has no attribute {self.attname!r}"
+                f"{instance.__class__.__name__!r} object has no attribute {self.name!r}"
             )
-
-    def get_attname(self) -> str:
-        assert self.name is not None  # Field name must be set
-        return self.name
 
     def pre_save(self, model_instance: Model, add: bool) -> T | None:
         """Return field's value just before saving."""
-        return getattr(model_instance, self.attname)
+        assert self.name is not None
+        return getattr(model_instance, self.name)
 
     def get_prep_value(self, value: Any) -> Any:
         """Perform preliminary non-db specific value checks and conversions."""
@@ -530,7 +546,8 @@ class Field[T](RegisterLookupMixin):
 
     def value_from_object(self, obj: Model) -> T | None:
         """Return the value of this field in the given model instance."""
-        return getattr(obj, self.attname)
+        assert self.name is not None
+        return getattr(obj, self.name)
 
 
 class ColumnField[T](Field[T]):

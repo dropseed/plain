@@ -60,7 +60,7 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
             self._title_form = result
             return
         self.object.title = result.title
-        self.object.save()
+        self.object.update()
 
 
 class TaskCreateView(AuthView, TemplateView):

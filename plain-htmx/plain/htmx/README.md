@@ -158,21 +158,21 @@ class PullRequestDetailView(HTMXView, DetailView):
             raise ValueError("Only a closed pull request can be opened")
 
         self.object.state = "closed"
-        self.object.save()
+        self.object.update()
 
     def htmx_post_close(self):
         if self.object.state != "open":
             raise ValueError("Only an open pull request can be closed")
 
         self.object.state = "open"
-        self.object.save()
+        self.object.update()
 
     def htmx_post_merge(self):
         if self.object.state != "open":
             raise ValueError("Only an open pull request can be merged")
 
         self.object.state = "merged"
-        self.object.save()
+        self.object.update()
 ```
 
 This can be a matter of preference, but typically you may end up building out an entire form, API, or set of URLs to handle these behaviors. If your application is only going to handle these actions via HTMX, then a single View may be a simpler way to do it.

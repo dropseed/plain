@@ -1,5 +1,16 @@
 # plain-toolbar changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.13.0) (2026-05-22)
+
+### What's changed
+
+- **New draggable pill mode for the dev toolbar.** On desktop the toolbar now defaults to a floating pill that docks to the full-width bar on click; the items panel is a separate toggle. The pill drags horizontally and snaps to left/center/right positions, so it stays out of the way of whatever you're looking at. Position and snap are pure CSS (`translateX` + a `data-animate` transition); UI state lives in `data-*` attributes (`data-expanded`, `data-collapsed`, `data-position`, `data-items-open`) for declarative styling and easy diffing. ([ab572e0b32](https://github.com/dropseed/plain/commit/ab572e0b32))
+- The body element now carries `data-toolbar-fullbar` (rather than the old `data-toolbar-installed`) only while the full bar is visible, so layouts can reserve bottom padding precisely when the bar needs it (pill mode does not).
+
+### Upgrade instructions
+
+- If your application templates checked `body[data-toolbar-installed]` to add padding around the toolbar, switch to `body[data-toolbar-fullbar]`. The new attribute reflects "the full bar is currently visible" rather than "the toolbar package is installed," which is the more useful signal now that the toolbar collapses to a pill by default.
+
 ## [0.12.7](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.7) (2026-05-12)
 
 ### What's changed

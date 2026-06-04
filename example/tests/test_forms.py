@@ -141,7 +141,7 @@ class TestTasks:
         assert response.status_code == 302
         task = Task.query.get(id=task.id)
         assert task.title == "New"
-        assert task.project_id == project.id  # ty: ignore[unresolved-attribute]
+        assert task.project.id == project.id
         assert list(task.tags.query) == [tag]
 
     def test_htmx_inline_rename(self, client, user):

@@ -1,5 +1,16 @@
 # plain-email changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-email@0.20.0) (2026-05-19)
+
+### What's changed
+
+- New in-memory email backend (`plain.email.backends.locmem.EmailBackend`) that captures sent messages in a list instead of delivering them — intended for tests. ([7900426ef0](https://github.com/dropseed/plain/commit/7900426ef0))
+- New `mailoutbox` pytest fixture. It routes `EMAIL_BACKEND` to the in-memory backend for the duration of a test and yields the captured messages, clearing the outbox around each test and restoring the original backend afterward. It auto-registers via a `pytest11` entry point — no plugin configuration needed. ([7900426ef0](https://github.com/dropseed/plain/commit/7900426ef0))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.19.3](https://github.com/dropseed/plain/releases/plain-email@0.19.3) (2026-05-12)
 
 ### What's changed

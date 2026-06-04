@@ -13,6 +13,7 @@
     - [`plain dev logs`](#plain-dev-logs)
     - [`plain dev backups`](#plain-dev-backups)
     - [`plain pre-commit`](#plain-pre-commit)
+- [`.env` files](#env-files)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -124,6 +125,25 @@ Custom commands can be defined in `pyproject.toml` at `tool.plain.check.run` and
 [tool.plain.check.run]
 my-check = {cmd = "echo 'running my check'"}
 ```
+
+## `.env` files
+
+`plain.dev` loads `.env` files for any `plain` command run on the dev machine. Production deployments should set environment variables through your platform — Plain does not load `.env` files when `plain.dev` isn't installed.
+
+Files are read in this order (highest precedence first — the first file to define a key wins):
+
+| File                     | Committed? | When loaded                          |
+| ------------------------ | ---------- | ------------------------------------ |
+| `.env.{PLAIN_ENV}.local` | No         | If `PLAIN_ENV` is set                |
+| `.env.local`             | No         | Always, except when `PLAIN_ENV=test` |
+| `.env.{PLAIN_ENV}`       | Yes        | If `PLAIN_ENV` is set                |
+| `.env`                   | Yes        | Always                               |
+
+Add `.env.local` and `.env.*.local` to your `.gitignore`.
+
+`PLAIN_ENV` is set automatically by the CLI: `plain dev` → `dev`, `plain test` → `test`. Other commands leave `PLAIN_ENV` unset (only `.env.local` and `.env` load). Export `PLAIN_ENV` yourself to override.
+
+Under `PLAIN_ENV=test`, `.env.local` is skipped (matches Next.js and Rails dotenv) so test runs stay deterministic and personal credentials don't leak into the suite. `plain test` sets `PLAIN_ENV=test` for you; the pytest plugin also sets it when `pytest` is invoked directly — and opportunistically loads `.env.test*` if `plain.dev` is installed.
 
 ## Settings
 

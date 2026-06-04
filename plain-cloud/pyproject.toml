@@ -1,6 +1,6 @@
 [project]
 name = "plain.cloud"
-version = "0.4.1"
+version = "0.4.2"
 description = "Command-line tool for managing Plain Cloud."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"

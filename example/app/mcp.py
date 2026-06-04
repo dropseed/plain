@@ -119,7 +119,7 @@ class CreateNote(NotesTool):
 
     def run(self) -> str:
         note = Note(author=self.user, title=self.title, body=self.body)
-        note.save()
+        note.create()
         return f"Created note {note.id}: {note.title}"
 
 
@@ -145,7 +145,7 @@ class UpdateNote(NotesTool):
             note.title = self.title
         if self.body is not None:
             note.body = self.body
-        note.save()
+        note.update()
         return f"Updated note {note.id}"
 
 

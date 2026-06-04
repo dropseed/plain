@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import datetime
-
 from app.users.models import User
 from plain import postgres
 from plain.postgres import types
@@ -17,13 +15,13 @@ PRIORITY_CHOICES = [
 
 @postgres.register_model
 class Project(postgres.Model):
-    owner: User = types.ForeignKeyField(
+    owner = types.ForeignKeyField(
         User,
         on_delete=postgres.CASCADE,
         related_query_name="projects",
     )
-    name: str = types.TextField(max_length=100)
-    created_at: datetime.datetime = types.DateTimeField(create_now=True)
+    name = types.TextField(max_length=100)
+    created_at = types.DateTimeField(create_now=True)
 
     query: postgres.QuerySet[Project] = postgres.QuerySet()
 
@@ -42,12 +40,12 @@ class Project(postgres.Model):
 
 @postgres.register_model
 class Tag(postgres.Model):
-    owner: User = types.ForeignKeyField(
+    owner = types.ForeignKeyField(
         User,
         on_delete=postgres.CASCADE,
         related_query_name="tags",
     )
-    name: str = types.TextField(max_length=40)
+    name = types.TextField(max_length=40)
 
     query: postgres.QuerySet[Tag] = postgres.QuerySet()
 
@@ -70,7 +68,7 @@ class TaskTag(postgres.Model):
 
     task: Task = types.ForeignKeyField("Task", on_delete=postgres.CASCADE)
     task_id: int
-    tag: Tag = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
+    tag = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
     tag_id: int
 
     query: postgres.QuerySet[TaskTag] = postgres.QuerySet()
@@ -86,30 +84,26 @@ class TaskTag(postgres.Model):
 
 @postgres.register_model
 class Task(postgres.Model):
-    owner: User = types.ForeignKeyField(
+    owner = types.ForeignKeyField(
         User,
         on_delete=postgres.CASCADE,
         related_query_name="tasks",
     )
-    project: Project | None = types.ForeignKeyField(
+    project = types.ForeignKeyField(
         Project,
         on_delete=postgres.SET_NULL,
         related_query_name="tasks",
         allow_null=True,
         required=False,
     )
-    title: str = types.TextField(max_length=200)
-    notes: str = types.TextField(default="", required=False)
-    due_date: datetime.date | None = types.DateField(allow_null=True, required=False)
-    priority: str = types.TextField(
-        max_length=4, choices=PRIORITY_CHOICES, default="med"
-    )
-    is_complete: bool = types.BooleanField(default=False)
+    title = types.TextField(max_length=200)
+    notes = types.TextField(default="", required=False)
+    due_date = types.DateField(allow_null=True, required=False)
+    priority = types.TextField(max_length=4, choices=PRIORITY_CHOICES, default="med")
+    is_complete = types.BooleanField(default=False)
     tags: types.ManyToManyManager[Tag] = types.ManyToManyField(Tag, through=TaskTag)
-    created_at: datetime.datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime.datetime = types.DateTimeField(
-        create_now=True, update_now=True
-    )
+    created_at = types.DateTimeField(create_now=True)
+    updated_at = types.DateTimeField(create_now=True, update_now=True)
 
     query: postgres.QuerySet[Task] = postgres.QuerySet()
 

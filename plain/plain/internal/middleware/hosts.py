@@ -38,7 +38,7 @@ class HostValidationMiddleware(HttpMiddleware):
 
             logger.warning(
                 msg,
-                extra={"status_code": 400, "request": request},
+                extra={"status_code": 400},
             )
 
             return Response(status_code=400)

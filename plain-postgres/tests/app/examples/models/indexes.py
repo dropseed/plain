@@ -13,7 +13,7 @@ class IndexExample(postgres.Model):
     never leak into other test files' schemas.
     """
 
-    name: str = types.TextField(max_length=100)
-    description: str = types.TextField(max_length=100)
+    name = types.TextField(max_length=100)
+    description = types.TextField(max_length=100)
 
     query: postgres.QuerySet[IndexExample] = postgres.QuerySet()

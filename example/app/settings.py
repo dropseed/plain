@@ -22,11 +22,9 @@ INSTALLED_PACKAGES = [
     "plain.pages",
     "plain.passwords",
     "plain.sessions",
-    "plain.support",
     "plain.tailwind",
     "plain.toolbar",
     "plain.redirection",
-    "plain.observer",
     "app.users",
     "app.notes",
     "app.contacts",
@@ -52,7 +50,6 @@ DEFAULT_RESPONSE_HEADERS = {
 
 EMAIL_BACKEND = "plain.email.backends.preview.EmailBackend"
 EMAIL_DEFAULT_FROM = "from@example.com"
-SUPPORT_EMAIL = "support@example.com"
 OAUTH_LOGIN_PROVIDERS = {}
 
 MIDDLEWARE = [

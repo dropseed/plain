@@ -1,5 +1,25 @@
 # plain-cache changelog
 
+## [0.28.2](https://github.com/dropseed/plain/releases/plain-cache@0.28.2) (2026-06-03)
+
+### What's changed
+
+- A raced unique-key conflict during `set()` now surfaces as a `ValidationError` (mapped at the save boundary in `plain.postgres`), so the retry path catches `(psycopg.IntegrityError, ValidationError)` rather than `IntegrityError` alone. ([40c97521c5](https://github.com/dropseed/plain/commit/40c97521c5))
+
+### Upgrade instructions
+
+- No changes required. Requires `plain.postgres>=0.106.0`.
+
+## [0.28.1](https://github.com/dropseed/plain/releases/plain-cache@0.28.1) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-cache@0.28.0) (2026-05-06)
 
 ### What's changed

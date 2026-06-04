@@ -32,7 +32,7 @@ def get_normalized_value(value: Any, lhs: Any) -> tuple[Any, ...]:
             source = source.remote_field.model._model_meta.get_field(
                 source.remote_field.field_name
             )
-        return (getattr(value, source.attname),)
+        return (getattr(value, source.name),)
     if not isinstance(value, tuple):
         return (value,)
     return value

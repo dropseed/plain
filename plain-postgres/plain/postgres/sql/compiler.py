@@ -307,7 +307,7 @@ class SQLCompiler:
           position of the select clause).
         - related_klass_infos: [f, klass_info] to descent into
 
-        The annotations is a dictionary of {'attname': column position} values.
+        The annotations is a dictionary of {'name': column position} values.
         """
         select = []
         klass_info = None
@@ -900,7 +900,7 @@ class SQLCompiler:
         if (
             isinstance(field, RelatedField)
             and meta.model.model_options.ordering
-            and getattr(field, "attname", None) != pieces[-1]
+            and field.name != pieces[-1]
             and not getattr(transform_function, "has_transforms", False)
         ):
             # Firstly, avoid infinite loops.
@@ -1495,10 +1495,8 @@ class SQLInsertCompiler(SQLCompiler):
     def pre_save_val(self, field: Any, obj: Any) -> Any:
         """
         Get the given field's value off the given obj. pre_save() is used for
-        things like update_now on DateTimeField. Skip it if this is a raw query.
+        things like update_now on DateTimeField.
         """
-        if self.query.raw:
-            return getattr(obj, field.attname)
         return field.pre_save(obj, add=True)
 
     def assemble_as_sql(

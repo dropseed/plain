@@ -251,6 +251,34 @@ class TestHandleExceptionLogging:
         ]
         assert len(server_errors) == 1
 
+    def test_suspicious_operation_logs_at_warning_without_exc_info(self):
+        """CSRF rejections and other SuspiciousOperationError400s are working-as-designed
+        responses to scanner/probe traffic. They log on `plain.security.*` at WARNING
+        without exc_info so Sentry's logging integration doesn't treat them as ERRORs."""
+
+        from plain.http import SuspiciousOperationError400
+        from plain.logs import log_exception
+
+        security_logger = logging.getLogger("plain.security")
+        handler = _ListHandler()
+        previous_level = security_logger.level
+        security_logger.addHandler(handler)
+        security_logger.setLevel(logging.DEBUG)
+        try:
+            log_exception(
+                RequestFactory().get("/api/app/config"),
+                SuspiciousOperationError400("CSRF rejected"),
+            )
+        finally:
+            security_logger.removeHandler(handler)
+            security_logger.setLevel(previous_level)
+
+        assert len(handler.records) == 1
+        record = handler.records[0]
+        assert record.levelno == logging.WARNING
+        assert record.exc_info is None
+        assert record.name == "plain.security.SuspiciousOperationError400"
+
     def test_response_exception_short_circuits_without_logging(self, request_log):
         """ResponseException is the sanctioned 'I already have a response' path."""
 

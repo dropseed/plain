@@ -192,10 +192,10 @@ class GenerateReportJob(Job):
     def run(self):
         report = Report.query.get(id=self.report_id)
         report.status = "running"
-        report.save()
+        report.update()
         # ...do the work...
         report.status = "done"
-        report.save()
+        report.update()
 
     def on_aborted(self, result):
         # The worker was killed mid-run; run()'s cleanup never executed.
@@ -377,7 +377,7 @@ class WelcomeUserJob(Job):
         if not self.user.welcome_email_sent:
             send_welcome_email(self.user)
             self.user.welcome_email_sent = True
-            self.user.save()
+            self.user.update()
 ```
 
 ## Installation

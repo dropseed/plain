@@ -1,6 +1,7 @@
 ---
 imports:
-  - from plain.connect.templates import connect_pageviews
+  - from plain.connect.templates import connect_pageviews, connect_support_fields, connect_support_url
+  - from plain.toolbar.html import toolbar
 attrs:
   request: Any
 ---
@@ -8,5 +9,13 @@ attrs:
 <html>
   <body>
     {{ connect_pageviews(request) }}
+    <form action="{{ connect_support_url('plain_sf_testid') }}" method="POST">
+      {{ connect_support_fields(request) }}
+      <input name="name">
+      <input name="email">
+      <textarea name="message"></textarea>
+      <button type="submit">Send</button>
+    </form>
+    {{ toolbar(request) }}
   </body>
 </html>

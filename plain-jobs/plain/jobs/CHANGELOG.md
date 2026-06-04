@@ -1,5 +1,38 @@
 # plain-jobs changelog
 
+## [0.54.2](https://github.com/dropseed/plain/releases/plain-jobs@0.54.2) (2026-06-03)
+
+### What's changed
+
+- **Dropped several unused single-column indexes** from the job models: `trace_id` on `JobRequest`, `JobProcess`, and `JobResult`, plus `started_at`, `ended_at`, `job_request_uuid`, `job_class`, and `queue` on `JobResult`. They weren't serving query paths and cost write overhead and storage on every job. ([c7882f0a08](https://github.com/dropseed/plain/commit/c7882f0a08))
+- Internal: model writes adopt plain.postgres's new `create()`/`update()` API. As a side effect the per-write uniqueness pre-check `SELECT` that dominated the jobs write path is gone — the database enforces the constraint. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- Requires `plain.postgres>=0.106.0`.
+- The dropped indexes are removed automatically by schema convergence on your next `plain postgres sync` / deploy — no manual migration. If you query `JobResult` by any of those columns in your own dashboards, add an index on your side.
+
+## [0.54.1](https://github.com/dropseed/plain/releases/plain-jobs@0.54.1) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. The queue-wait calculation in `JobProcess.run_job` now keeps `started_at` as a local since the descriptor reads back as `datetime | None`. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.54.0](https://github.com/dropseed/plain/releases/plain-jobs@0.54.0) (2026-05-20)
+
+### What's changed
+
+- **Deferred jobs whose re-enqueue is blocked by `should_enqueue()` now skip silently instead of erroring.** Previously, raising `DeferJob` inside `run()` would attempt to re-enqueue, and if a peer existed or a custom rule rejected the new request, the framework raised `DeferError` and recorded the result as `ERRORED`. That treated normal concurrency / rate-limit outcomes as failures and surfaced them to exception tooling. The framework now honors the `should_enqueue()` signal the same way `run_in_worker()` and `retry_job()` already do: the `JobResult` is recorded as `DEFERRED` with `retry_job_request_uuid=None`, the error message documents that the re-enqueue was skipped, and the consumer span gets `plain.jobs.defer.skipped=True` so the case is queryable in APM without surfacing as an exception. ([3171bb4238](https://github.com/dropseed/plain/commit/3171bb4238))
+- **`DeferError` removed from the public API.** Nothing raises it anymore.
+
+### Upgrade instructions
+
+- Remove any `except DeferError:` blocks. To detect deferred re-enqueues that were skipped, query for `JobResult` rows with `status=DEFERRED` and `retry_job_request_uuid IS NULL`, or alert on the `plain.jobs.defer.skipped=True` span attribute.
+
 ## [0.53.1](https://github.com/dropseed/plain/releases/plain-jobs@0.53.1) (2026-05-19)
 
 ### What's changed

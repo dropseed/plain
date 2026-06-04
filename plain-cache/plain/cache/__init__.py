@@ -2,8 +2,9 @@ from importlib.metadata import version
 
 __version__ = version("plain.cache")
 
-from .core import Cached
+from .core import Cache, cache
 
 __all__ = [
-    "Cached",
+    "Cache",
+    "cache",
 ]

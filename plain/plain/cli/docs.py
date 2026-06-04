@@ -30,16 +30,13 @@ KNOWN_PACKAGES = {
     "plain-portal": "Remote Python shell and file transfer via encrypted tunnel",
     "plain-postgres": "Model data and store it in a database",
     "plain-oauth": "OAuth provider login",
-    "plain-observer": "On-page telemetry and observability",
     "plain-pages": "Serve static pages, markdown, and assets",
-    "plain-pageviews": "Client-side pageview tracking",
     "plain-passwords": "Password authentication",
     "plain-pytest": "Test with pytest",
     "plain-redirection": "URL redirection with admin and logging",
     "plain-scan": "Test for production best practices",
     "plain-sessions": "Database-backed sessions",
     "plain-start": "Bootstrap a new project from templates",
-    "plain-support": "Support forms for your application",
     "plain-tailwind": "Tailwind CSS without JavaScript or npm",
     "plain-toolbar": "Debug toolbar",
     "plain-tunnel": "Remote access to local dev server",
@@ -311,9 +308,10 @@ def _find_section_content(doc_paths: list[Path], section_heading: str) -> str | 
 @click.command()
 @click.option("--api", is_flag=True, help="Show public API surface only")
 @click.option("--list", "show_list", is_flag=True, help="List available packages")
-@click.option("--search", default="", help="Search docs for a term")
+@click.option("--search", default="", help="Search docs for a term (substring match)")
+@click.option("--regex", is_flag=True, help="Treat --search as a regex pattern")
 @click.argument("module", default="")
-def docs(module: str, api: bool, show_list: bool, search: str) -> None:
+def docs(module: str, api: bool, show_list: bool, search: str, regex: bool) -> None:
     """Show documentation for a package"""
     if show_list:
         click.secho("Packages:", bold=True)
@@ -330,9 +328,15 @@ def docs(module: str, api: bool, show_list: bool, search: str) -> None:
             click.echo(f"  {click.style(module_name, fg='cyan')} — {description}")
         return
 
+    pattern: re.Pattern[str] | None = None
+    if search:
+        try:
+            pattern = re.compile(search if regex else re.escape(search), re.IGNORECASE)
+        except re.error as exc:
+            raise click.UsageError(f"Invalid regex pattern: {exc}") from exc
+
     # --search without module: search all installed docs
-    if search and not module:
-        pattern = re.compile(search, re.IGNORECASE)
+    if pattern and not module:
         all_docs = _collect_all_doc_paths()
         found = False
         for name, doc_paths in sorted(all_docs.items()):
@@ -377,8 +381,7 @@ def docs(module: str, api: bool, show_list: bool, search: str) -> None:
     llm_docs = LLMDocs(module_paths)
     llm_docs.load()
 
-    if search:
-        pattern = re.compile(search, re.IGNORECASE)
+    if pattern:
         doc_matches = _search_docs(llm_docs.docs, pattern)
         api_matches = _search_api(llm_docs, pattern) if api else {}
         if not doc_matches and not api_matches:
