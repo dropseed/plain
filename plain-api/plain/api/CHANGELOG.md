@@ -1,5 +1,16 @@
 # plain-api changelog
 
+## [0.33.8](https://github.com/dropseed/plain/releases/plain-api@0.33.8) (2026-06-07)
+
+### What's changed
+
+- Internal: `APIView` now returns `JsonResponse(result, ...)` for both `dict` and `list` results, following the removal of `JsonResponse`'s `safe` parameter in `plain` 0.149.0 (lists previously went through `safe=False`). ([52338f58da](https://github.com/dropseed/plain/commit/52338f58da))
+- Docs: README examples updated from `form.save()` to `form.update()` for the `plain-postgres` `ModelForm` API change. ([66634f5af9](https://github.com/dropseed/plain/commit/66634f5af9))
+
+### Upgrade instructions
+
+- No changes required. Now requires `plain>=0.149.0` (which removed `JsonResponse(safe=...)`).
+
 ## [0.33.7](https://github.com/dropseed/plain/releases/plain-api@0.33.7) (2026-06-03)
 
 ### What's changed
