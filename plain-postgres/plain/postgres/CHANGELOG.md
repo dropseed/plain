@@ -1,5 +1,23 @@
 # plain-postgres changelog
 
+## [0.107.0](https://github.com/dropseed/plain/releases/plain-postgres@0.107.0) (2026-06-07)
+
+### What's changed
+
+- **`ModelForm.save()` is replaced by explicit `create()` and `update()`**, mirroring the `Model.create()`/`update()` split from 0.106.0. The view already knows whether it's inserting or updating (`CreateView` vs `UpdateView`), so the form no longer branches on `instance._state.adding` to guess. `form.create()` INSERTs the instance (and its m2m data) and returns it; `form.update(fields=None)` UPDATEs it (and its m2m data) and returns it, with `fields=[...]` passed straight through to `Model.update()` to limit the columns written. `save(commit=...)` — including the `commit=False` deferred path — is removed. ([66634f5af9](https://github.com/dropseed/plain/commit/66634f5af9))
+
+### Upgrade instructions
+
+- Replace `form.save()` with `form.create()` in create flows and `form.update()` in update flows. The `/plain-upgrade` skill rewrites these for you — the create-vs-update choice is context-dependent, so it reasons per call site.
+- `form.update(fields=[...])` is available to limit the columns written (a pass-through to `Model.update(fields=...)`).
+- For the old `form.save(commit=False)` pattern (set extra non-form attributes, then save), assign those attributes on `form.instance` after `is_valid()`, then call `form.create()` / `form.update()` — m2m data is still saved for you, so the separate `save_m2m()` step is no longer needed:
+
+    ```python
+    if form.is_valid():
+        form.instance.user = request.user
+        obj = form.create()
+    ```
+
 ## [0.106.0](https://github.com/dropseed/plain/releases/plain-postgres@0.106.0) (2026-06-03)
 
 ### What's changed
