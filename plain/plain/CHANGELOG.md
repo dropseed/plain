@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.149.0](https://github.com/dropseed/plain/releases/plain@0.149.0) (2026-06-07)
+
+### What's changed
+
+- **`JsonResponse` no longer accepts a `safe` argument.** Previously it defaulted to `safe=True` and raised `TypeError` unless `data` was a `dict`; you passed `safe=False` to serialize a list or any other non-dict value. The dict-only guard and the parameter are both gone — `JsonResponse` now serializes any JSON-serializable value directly. ([52338f58da](https://github.com/dropseed/plain/commit/52338f58da))
+
+### Upgrade instructions
+
+- Drop `safe=` from `JsonResponse(...)` calls. If you passed `safe=False` to serialize a list (or any non-dict), just remove the argument — the value now serializes as-is. `safe=True` was the default and is likewise gone.
+
 ## [0.148.1](https://github.com/dropseed/plain/releases/plain@0.148.1) (2026-06-03)
 
 ### What's changed
