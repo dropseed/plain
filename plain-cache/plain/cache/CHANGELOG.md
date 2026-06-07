@@ -1,5 +1,35 @@
 # plain-cache changelog
 
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-cache@0.29.0) (2026-06-07)
+
+### What's changed
+
+- **`plain.cache` is redesigned around a stateless, module-level `cache` singleton.** The `Cached(key)` class is gone; import `cache` and pass the key per call. ([ab0f4b876f](https://github.com/dropseed/plain/commit/ab0f4b876f))
+
+    | Before                              | After                              |
+    | ----------------------------------- | ---------------------------------- |
+    | `Cached("k").set(v, expiration=60)` | `cache.set("k", v, expiration=60)` |
+    | `Cached("k").value`                 | `cache.get("k")`                   |
+    | `Cached("k").exists()`              | `cache.exists("k")`                |
+    | `Cached("k").delete()`              | `cache.delete("k")`                |
+
+- **`get()` replaces the `.value` property** and takes an optional default — `cache.get("k", default)` returns the default on a miss or expiry (instead of always `None`).
+- **`set()` is now `cache.set(key, value, *, expiration=...)`** — `expiration` is keyword-only, and `set()` returns `None` (it previously returned the stored value). It still rewrites the whole entry, including its expiry.
+- **New `get_or_set(key, default, *, expiration=None)`** — returns the cached value, or computes/stores/returns it on a miss. `default` may be a value or a zero-arg callable (invoked only on a miss). A stored `None` counts as a hit.
+- **New batch methods** — `get_many(keys)` (a single query, returns only live entries), `set_many(mapping, *, expiration=None)`, and `delete_many(keys)`.
+- **New `touch(key, *, expiration=None)`** — change a live entry's expiration _without_ rewriting its value. It writes only `expires_at`/`updated_at`, reusing the existing TOAST pointer, so refreshing the TTL of a multi-megabyte value doesn't re-TOAST the blob. Returns `True` if a live entry was updated, `False` for a missing/expired key. Ideal for sliding-TTL caches of large values.
+- **New `clear()`** — delete every entry; returns the number of rows deleted. (`delete()` returns a bool; `delete_many()` and `clear()` return counts.)
+- **New `CachedItem.query.live()` queryset method** — the never-expiring-or-not-yet-expired filter that reads now use, so an entry past its `expires_at` reads as absent. `expired()`/`unexpired()`/`forever()` are unchanged; note `unexpired()` still matches only rows with a _future_ expiry (excluding forever rows), whereas `live()` includes them.
+- **Stricter `expiration` validation** — a `bool` or a bare `date` passed as `expiration` now raises `TypeError` instead of being silently treated as "never expires."
+
+### Upgrade instructions
+
+- Replace `Cached("key")` with the `cache` singleton (see the table above): `from plain.cache import cache`, then `cache.get("key")` / `cache.set("key", value, expiration=...)` / `cache.exists("key")` / `cache.delete("key")`.
+- `expiration` is now keyword-only on `set()` — use `cache.set("k", v, expiration=60)`, not a positional third argument.
+- If you read `Cached(...).value`, switch to `cache.get(key)` (pass a default if you don't want `None`).
+- If you relied on `set()` returning the stored value, note it now returns `None`.
+- No migration required — the `CachedItem` model is unchanged.
+
 ## [0.28.2](https://github.com/dropseed/plain/releases/plain-cache@0.28.2) (2026-06-03)
 
 ### What's changed
