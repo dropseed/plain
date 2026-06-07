@@ -1,5 +1,17 @@
 # plain-templates changelog
 
+## [0.4.0](https://github.com/dropseed/plain/releases/plain-templates@0.4.0) (2026-06-07)
+
+### What's changed
+
+- **`CreateView`, `UpdateView`, and `DeleteView` adapt to the new `ModelForm.create()`/`update()` split** (`plain-postgres` 0.107.0). `CreateView.form_valid` now calls `form.create()`; `UpdateView.form_valid` now calls `form.update()` and assigns the result to `self.object` (it previously left `self.object` unset). ([66634f5af9](https://github.com/dropseed/plain/commit/66634f5af9))
+- **`DeleteView` no longer routes deletion through the form.** Its `EmptyDeleteForm` used to take the instance and define a `save()` that deleted it; it is now a plain fieldless confirmation `Form`, and `DeleteView.form_valid` calls `self.object.delete()` directly. The `get_form_kwargs` override that injected `instance` is removed. ([66634f5af9](https://github.com/dropseed/plain/commit/66634f5af9))
+
+### Upgrade instructions
+
+- If you subclass `CreateView` or `UpdateView` and override `form_valid` to call `form.save()`, switch to `form.create()` / `form.update()`. Using these views with a `ModelForm` requires `plain-postgres>=0.107.0` (which provides `create()`/`update()`).
+- If you subclass `DeleteView` and relied on `EmptyDeleteForm` accepting an `instance` kwarg or its `save()` method, note the form is now fieldless and deletion happens in `form_valid` via `self.object.delete()` — override `form_valid` for custom delete behavior.
+
 ## [0.3.0](https://github.com/dropseed/plain/releases/plain-templates@0.3.0) (2026-05-16)
 
 ### What's changed
