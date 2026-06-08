@@ -1,5 +1,19 @@
 # plain-cache changelog
 
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-cache@0.30.0) (2026-06-07)
+
+### What's changed
+
+- **New `increment(key, delta=1, *, expiration=None)` and `decrement(key, delta=1, *, expiration=None)`** — atomically adjust a stored number in a single `INSERT ... ON CONFLICT` statement and return the new total. Because it's one statement, concurrent callers can't lose updates the way a read-then-`set()` would, making it the right primitive for counters and fixed-window rate limiters. A missing key (or one storing `None`) counts as `0`, so the first increment starts from `delta`; a non-numeric stored value raises. ([99a5d1f6a1](https://github.com/dropseed/plain/commit/99a5d1f6a1))
+
+    Expiry follows a **fixed-window** rule: a missing or expired key starts fresh at `delta` and takes the `expiration` you pass, while a live key adds to the existing total and keeps its current `expires_at` (regardless of the `expiration` argument). To slide the TTL on each call instead, follow up with `touch()`.
+
+- **Removed `cache.exists()`.** A single `get()` answers presence _and_ returns the value in one query, so check it directly: `if cache.get("k") is not None:`. If `None` is a value you legitimately store, pass a sentinel default to tell "absent" from a stored `None`. ([6ff26a98c8](https://github.com/dropseed/plain/commit/6ff26a98c8))
+
+### Upgrade instructions
+
+- Replace `cache.exists("key")` with `cache.get("key") is not None`. If you store `None` as a real value, use a sentinel: `missing = object(); cache.get("key", missing) is not missing`. To compute-and-store on a miss, prefer `get_or_set()` over a check-then-set.
+
 ## [0.29.0](https://github.com/dropseed/plain/releases/plain-cache@0.29.0) (2026-06-07)
 
 ### What's changed
