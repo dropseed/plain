@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
@@ -12,6 +12,4 @@ class NullabilityExample(postgres.Model):
     to simulate drift, then verify the SetNotNullFix restores it.
     """
 
-    required_text = types.TextField(max_length=100)
-
-    query: postgres.QuerySet[NullabilityExample] = postgres.QuerySet()
+    required_text: Field[str] = types.TextField(max_length=100)

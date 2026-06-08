@@ -110,7 +110,7 @@ def test_omitted_required_field_uses_python_empty_at_construction(db):
     surfaces required-but-empty separately; this contract keeps non-validated
     save paths from sending NULL to a NOT NULL column for empty-string types.
     """
-    row = DefaultsExample()
+    row = DefaultsExample()  # ty: ignore[missing-argument]
     # name is TextField(required=True) with no `default=` — empty string
     # fallback at construction.
     assert row.name == ""
