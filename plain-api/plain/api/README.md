@@ -227,18 +227,19 @@ Associating an `APIKey` with a user (or team, for example) is up to you. Most li
 ```python
 # app/users/models.py
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 from plain.api.models import APIKey
 
 
 @postgres.register_model
 class User(postgres.Model):
     # other fields...
-    api_key: APIKey = types.ForeignKeyField(
+    api_key: Field[APIKey | None] = types.ForeignKeyField(
         APIKey,
         on_delete=postgres.CASCADE,
         allow_null=True,
         required=False,
+        default=None,
     )
 
     model_options = postgres.Options(
