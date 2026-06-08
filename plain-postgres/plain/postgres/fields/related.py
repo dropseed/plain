@@ -16,7 +16,7 @@ from plain.preflight import PreflightResult
 
 from ..registry import models_registry
 from . import BLANK_CHOICE_DASH, Field
-from .base import ColumnField
+from .base import NOT_PROVIDED, ColumnField
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
     ForwardForeignKeyDescriptor,
@@ -379,14 +379,27 @@ class ForeignKeyField(ColumnField, RelatedField):
         limit_choices_to: Any = None,
         db_constraint: bool = True,
         *,
+        default: Any = NOT_PROVIDED,
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # `default` and `choices` are intentionally not accepted: a hardcoded
-        # FK id default is a portability/existence footgun, and the related
-        # model itself already defines the valid set. Use `limit_choices_to`
-        # to constrain the target rows.
+        # `default` accepts ONLY `None` -- the "no relation" marker for a
+        # nullable FK, which lets typed construction treat the field as optional.
+        # A hardcoded FK id default stays rejected (portability/existence
+        # footgun; the related model defines the valid set -- use
+        # `limit_choices_to`). `choices` is likewise not accepted.
+        if default is not NOT_PROVIDED:
+            if default is not None:
+                raise TypeError(
+                    f"{self.__class__.__name__} only accepts default=None (the "
+                    "nullable 'no relation' marker); a hardcoded FK id default "
+                    "is not allowed."
+                )
+            if not allow_null:
+                raise TypeError(
+                    f"{self.__class__.__name__}(default=None) requires allow_null=True."
+                )
         if not isinstance(to, str):
             try:
                 to.model_options.model_name

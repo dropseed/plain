@@ -11,7 +11,7 @@ Usage:
     @postgres.register_model
     class User(postgres.Model):
         email: str = types.EmailField()
-        password: str = PasswordField()
+        password: Field[str] = PasswordField()
 
 This is optional - you can continue using untyped field definitions.
 """
