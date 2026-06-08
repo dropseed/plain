@@ -43,6 +43,11 @@ class Article(postgres.Model):
 - **Custom querysets**: declare `query: ClassVar[MyQuerySet] = MyQuerySet()`
   (`ClassVar` so it isn't treated as a field). Default-queryset models declare
   nothing — `Model.query` is typed automatically.
+- **Reverse relations** are `ClassVar` too — they're class-level accessors, not
+  constructor fields:
+  `children: ClassVar[types.ReverseForeignKey[Child]] = types.ReverseForeignKey(...)`.
+  (Annotated non-`ClassVar` attributes that aren't real fields leak into the
+  constructor — preflight `postgres.field_leaks_into_constructor` catches this.)
 
 Do NOT import field classes directly from `plain.postgres` or `plain.postgres.fields`.
 

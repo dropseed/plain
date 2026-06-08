@@ -570,6 +570,7 @@ def ManyToManyField[T: Model](
     related_query_name: str | None = None,
     limit_choices_to: Any = None,
     symmetrical: bool | None = None,
+    init: bool = False,
 ) -> ManyToManyManager[T]: ...
 
 # Reverse relation descriptors

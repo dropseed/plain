@@ -17,8 +17,8 @@ from plain.postgres.query_utils import Q
 class DeleteParent(postgres.Model):
     name: Field[str] = types.TextField(max_length=100)
 
-    childcascade_set: types.ReverseForeignKey[ChildCascade] = types.ReverseForeignKey(
-        to="ChildCascade", field="parent"
+    childcascade_set: ClassVar[types.ReverseForeignKey[ChildCascade]] = (
+        types.ReverseForeignKey(to="ChildCascade", field="parent")
     )
 
 

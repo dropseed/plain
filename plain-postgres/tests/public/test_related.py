@@ -284,7 +284,7 @@ class TestEdgeCases:
 
         # Test that direct assignment to reverse relation raises error
         with pytest.raises(TypeError, match="Direct assignment.*prohibited"):
-            parent.childcascade_set = []  # ty: ignore[invalid-assignment]
+            parent.childcascade_set = []  # ty: ignore[invalid-attribute-access]
 
     def test_instance_none_handling(self, db):
         # Test accessing descriptor on class (not instance)

@@ -68,6 +68,7 @@ DEFERRED = Deferred()
         types.GenericIPAddressField,
         types.IntegerField,
         types.JSONField,
+        types.ManyToManyField,
         types.PrimaryKeyField,
         types.RandomStringField,
         types.SmallIntegerField,
@@ -124,12 +125,14 @@ class Model(metaclass=ModelBase):
     # Every model gets an automatic id field
     id = types.PrimaryKeyField()
 
-    # Descriptors for other model behavior. query is a ClassVar so a model with
-    # a custom QuerySet can override it (`query: ClassVar[MyQuerySet]`) without
-    # the override leaking into @typed's synthesized __init__ as a field.
+    # Descriptors and framework metadata. These are ClassVars so the metaclass's
+    # @dataclass_transform doesn't treat them as constructor fields -- otherwise
+    # `Model(query=...)` / `Model(model_options=...)` would type-check and then
+    # raise an unexpected-keyword TypeError at runtime. A model with a custom
+    # QuerySet overrides query via `query: ClassVar[MyQuerySet]`.
     query: ClassVar[QuerySet[Self]] = QuerySet()
-    model_options: Options = Options()
-    _model_meta: Meta = Meta()
+    model_options: ClassVar[Options] = Options()
+    _model_meta: ClassVar[Meta] = Meta()
     DoesNotExist = DoesNotExistDescriptor()
     MultipleObjectsReturned = MultipleObjectsReturnedDescriptor()
 

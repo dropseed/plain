@@ -162,6 +162,65 @@ class CheckAllModels(PreflightCheck):
         return errors
 
 
+@register_check("postgres.typed_construction")
+class CheckTypedConstruction(PreflightCheck):
+    """Every annotated, non-``ClassVar`` attribute on a model becomes a parameter
+    of the type checker's synthesized ``__init__`` (via ``@dataclass_transform``
+    on ``ModelBase``). If such an attribute isn't a real constructor field, the
+    type checker accepts ``Model(that=...)`` while the runtime ``__init__``
+    rejects it with an unexpected-keyword ``TypeError`` -- a silent, unsound
+    divergence that no normal test exercises.
+
+    Catch it at startup: framework metadata, custom querysets, and
+    reverse-relation accessors must be annotated ``ClassVar[...]`` so they stay
+    out of the synthesized constructor. Real column fields and M2M fields (the
+    checker excludes M2M via a signature-level ``init=False``) are exempt.
+    """
+
+    def run(self) -> list[PreflightResult]:
+        import typing
+
+        from plain.postgres.base import ModelBase
+
+        def is_classvar(ann: object) -> bool:
+            # Annotations are strings under `from __future__ import annotations`,
+            # objects otherwise -- handle both without resolving forward refs.
+            if isinstance(ann, str):
+                return ann.lstrip().startswith(("ClassVar", "typing.ClassVar"))
+            return typing.get_origin(ann) is typing.ClassVar
+
+        errors: list[PreflightResult] = []
+        for model in models_registry.get_models():
+            meta = model._model_meta
+            # Attributes that may be annotated without ClassVar: real column
+            # fields (including DB-owned init=False ones) and M2M fields.
+            real = {f.name for f in meta.fields}
+            real |= {f.name for f in meta.many_to_many}
+            for klass in model.__mro__:
+                # Only classes carrying the transform contribute synthesized
+                # params; ordinary (non-model) mixins don't.
+                if not isinstance(klass, ModelBase):
+                    continue
+                for attr, ann in klass.__dict__.get("__annotations__", {}).items():
+                    if attr.startswith("__") or is_classvar(ann) or attr in real:
+                        continue
+                    errors.append(
+                        PreflightResult(
+                            fix=(
+                                f"'{model.__name__}.{attr}' is annotated but is not a "
+                                "model field, so the type checker treats it as a "
+                                f"constructor argument while the runtime rejects "
+                                f"{model.__name__}({attr}=...). Annotate it "
+                                "ClassVar[...] (it's a class-level accessor or "
+                                "metadata, not a field) or remove the annotation."
+                            ),
+                            obj=model,
+                            id="postgres.field_leaks_into_constructor",
+                        )
+                    )
+        return errors
+
+
 def _check_lazy_references(
     models_registry: ModelsRegistry, packages_registry: Any
 ) -> list[PreflightResult]:

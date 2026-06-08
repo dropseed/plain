@@ -948,14 +948,19 @@ The partial-instance shortcut relies on the database guaranteeing the row exists
 When you define a `ForeignKey` or `ManyToManyField`, Plain automatically creates a reverse accessor on the related model (like `author.book_set`). You can explicitly declare these reverse relationships using [`ReverseForeignKey`](./fields/reverse_descriptors.py#ReverseForeignKey) and [`ReverseManyToMany`](./fields/reverse_descriptors.py#ReverseManyToMany):
 
 ```python
+from typing import ClassVar
+
 from plain import postgres
 from plain.postgres import Field, types
 
 @postgres.register_model
 class Author(postgres.Model):
     name: Field[str] = types.TextField(max_length=200)
-    # Explicit reverse accessor for all books by this author
-    books = types.ReverseForeignKey(to="Book", field="author")
+    # Explicit reverse accessor for all books by this author.
+    # ClassVar keeps it out of the typed constructor (it's an accessor, not a field).
+    books: ClassVar[types.ReverseForeignKey[Book]] = types.ReverseForeignKey(
+        to="Book", field="author"
+    )
 
 @postgres.register_model
 class Book(postgres.Model):
@@ -978,7 +983,9 @@ For many-to-many relationships:
 class Feature(postgres.Model):
     name: Field[str] = types.TextField(max_length=100)
     # Explicit reverse accessor for all cars with this feature
-    cars = types.ReverseManyToMany(to="Car", field="features")
+    cars: ClassVar[types.ReverseManyToMany[Car]] = types.ReverseManyToMany(
+        to="Car", field="features"
+    )
 
 @postgres.register_model
 class Car(postgres.Model):
@@ -1000,14 +1007,14 @@ for car in feature.cars.all():
 
 Reverse relations are optional — if you don't declare them, the automatic `{model}_set` accessor still works.
 
-To get type checking for custom QuerySet methods on reverse relations, specify the QuerySet type as a second parameter:
+Annotate reverse relations with `ClassVar` — they're class-level accessors, not constructor fields, so `ClassVar` keeps them out of the typed `Model(...)` constructor (same as `query`). To get type checking for custom QuerySet methods, specify the QuerySet type as a second parameter:
 
 ```python
 # Basic usage
-books: types.ReverseForeignKey[Book] = types.ReverseForeignKey(to="Book", field="author")
+books: ClassVar[types.ReverseForeignKey[Book]] = types.ReverseForeignKey(to="Book", field="author")
 
 # With custom QuerySet for proper method recognition
-books: types.ReverseForeignKey[Book, BookQuerySet] = types.ReverseForeignKey(to="Book", field="author")
+books: ClassVar[types.ReverseForeignKey[Book, BookQuerySet]] = types.ReverseForeignKey(to="Book", field="author")
 
 # Now type checkers recognize custom methods like .published()
 author.books.query.published()

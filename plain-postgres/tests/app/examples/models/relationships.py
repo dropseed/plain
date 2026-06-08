@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 from plain import postgres
 from plain.postgres import Field, types
 
@@ -8,7 +10,7 @@ from plain.postgres import Field, types
 class Tag(postgres.Model):
     name: Field[str] = types.TextField(max_length=100)
 
-    widgets: types.ReverseManyToMany[Widget] = types.ReverseManyToMany(
+    widgets: ClassVar[types.ReverseManyToMany[Widget]] = types.ReverseManyToMany(
         to="Widget", field="tags"
     )
 

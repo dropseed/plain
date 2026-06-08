@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from plain import postgres
 from plain.postgres import Field, types
@@ -15,7 +15,7 @@ class User(postgres.Model):
     username: Field[str] = types.TextField(max_length=100)
 
     # Explicit reverse relation for OAuth connections
-    oauth_connections: types.ReverseForeignKey[OAuthConnection] = (
+    oauth_connections: ClassVar[types.ReverseForeignKey[OAuthConnection]] = (
         types.ReverseForeignKey(to="plainoauth.OAuthConnection", field="user")
     )
 
