@@ -30,15 +30,20 @@ class Article(postgres.Model):
 
 - **Value type**: `Field[str]`, `Field[int]`, `Field[datetime]`; for an FK to a
   model class, `Field[RelatedModel]`.
-- **Nullable** (`allow_null=True`) → `Field[T | None]` **and** add `default=None`
-  so the field is optional in the constructor (a stock type checker only reads
-  optionality from a call-site `default=`).
+- **Optional in the constructor = a call-site `default=`.** A stock type checker
+  treats a field as omittable only when its definition passes `default=` — this
+  is general, not nullable-specific: `IntegerField(default=0)` is optional, but a
+  `required=False` field with no `default=` is still a _required_ constructor arg.
+  Add `default=` to any field you intend to omit when constructing.
+- **Nullable** (`allow_null=True`) → `Field[T | None]`, and add `default=None` so
+  it's optional in the constructor (per the rule above). Applies to class-ref and
+  string forward-ref FKs alike.
 - **DB-owned** fields are still annotated but auto-excluded from the
   constructor: the `id`, `create_now`/`update_now` datetimes, `generate=True`,
   and `RandomStringField`.
 - **String forward-ref FKs** (`"self"`, `"OtherModel"`) keep a _value-type_
   annotation — the checker can't resolve the string to a model:
-  `parent: Foo | None = types.ForeignKeyField("self", on_delete=postgres.CASCADE, allow_null=True)`.
+  `parent: Foo | None = types.ForeignKeyField("self", on_delete=postgres.CASCADE, allow_null=True, default=None)`.
 - **JSON**: `Field[dict]` / `Field[dict[str, Any]]`.
 - **Custom querysets**: declare `query: ClassVar[MyQuerySet] = MyQuerySet()`
   (`ClassVar` so it isn't treated as a field). Default-queryset models declare
@@ -46,8 +51,8 @@ class Article(postgres.Model):
 - **Reverse relations** are `ClassVar` too — they're class-level accessors, not
   constructor fields:
   `children: ClassVar[types.ReverseForeignKey[Child]] = types.ReverseForeignKey(...)`.
-  (Annotated non-`ClassVar` attributes that aren't real fields leak into the
-  constructor — preflight `postgres.field_leaks_into_constructor` catches this.)
+  (A non-`ClassVar` accessor leaks into the synthesized constructor — the checker
+  would accept `Model(children=...)` even though the runtime rejects it.)
 
 Do NOT import field classes directly from `plain.postgres` or `plain.postgres.fields`.
 

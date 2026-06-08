@@ -148,6 +148,7 @@ class CircA(postgres.Model):
         on_delete=postgres.CASCADE,
         allow_null=True,
         required=False,
+        default=None,
     )
 
 

@@ -12,5 +12,5 @@ class SecretStore(postgres.Model):
     api_key: Field[str] = types.EncryptedTextField(max_length=200)
     notes: Field[str] = types.EncryptedTextField(required=False)
     config: Field[dict | None] = types.EncryptedJSONField(
-        required=False, allow_null=True
+        required=False, allow_null=True, default=None
     )

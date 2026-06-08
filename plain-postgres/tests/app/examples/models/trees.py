@@ -10,5 +10,5 @@ class TreeNode(postgres.Model):
 
     name: Field[str] = types.TextField(max_length=100)
     parent: TreeNode | None = types.ForeignKeyField(
-        "self", on_delete=postgres.CASCADE, allow_null=True
+        "self", on_delete=postgres.CASCADE, allow_null=True, default=None
     )

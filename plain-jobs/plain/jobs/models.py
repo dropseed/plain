@@ -631,7 +631,7 @@ class JobResult(postgres.Model):
 
     # Retries
     retry_job_request_uuid: Field[UUID | None] = types.UUIDField(
-        required=False, allow_null=True
+        required=False, allow_null=True, default=None
     )
 
     # OpenTelemetry trace context

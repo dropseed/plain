@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import ClassVar
 
 from app.users.models import User
 from plain import postgres
@@ -66,9 +65,7 @@ class TaskTag(postgres.Model):
     """Through model for Task ↔ Tag M2M."""
 
     task: Task = types.ForeignKeyField("Task", on_delete=postgres.CASCADE)
-    task_id: ClassVar[int]
     tag: Field[Tag] = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
-    tag_id: ClassVar[int]
 
     model_options = postgres.Options(
         constraints=[

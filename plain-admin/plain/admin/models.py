@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-
-from app.users.models import User
+from typing import TYPE_CHECKING
 
 from plain import postgres
 from plain.postgres import Field, types
+
+if TYPE_CHECKING:
+    from app.users.models import User
 
 
 @postgres.register_model

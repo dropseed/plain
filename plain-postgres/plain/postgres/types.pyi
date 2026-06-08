@@ -548,6 +548,7 @@ def ForeignKeyField[T: Model](
     db_constraint: bool = True,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> T | None: ...
 @overload

@@ -196,7 +196,20 @@ class DateTimeField[
             *super().preflight(**kwargs),
             *self._check_update_now_backfill(),
             *self._check_create_now_default_conflict(),
+            *self._check_fix_default_value(),
         ]
+
+    def _check_fix_default_value(self) -> list[PreflightResult]:
+        # A literal default within ~10s of "now" is almost always a botched
+        # "current time" default -- the user wants create_now=True, not a frozen
+        # timestamp (DateField/TimeField run the same check). None and the
+        # create_now/update_now DB default aren't persistent literals, so exempt.
+        if not self.has_persistent_literal_default():
+            return []
+        value = self.default
+        if not isinstance(value, datetime.datetime):
+            return []
+        return _check_if_value_fixed(self, value)
 
     def _check_create_now_default_conflict(self) -> list[PreflightResult]:
         # create_now/update_now install a DB-side default (Now()); a literal

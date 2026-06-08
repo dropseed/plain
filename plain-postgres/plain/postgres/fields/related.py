@@ -388,18 +388,8 @@ class ForeignKeyField(ColumnField, RelatedField):
         # nullable FK, which lets typed construction treat the field as optional.
         # A hardcoded FK id default stays rejected (portability/existence
         # footgun; the related model defines the valid set -- use
-        # `limit_choices_to`). `choices` is likewise not accepted.
-        if default is not NOT_PROVIDED:
-            if default is not None:
-                raise TypeError(
-                    f"{self.__class__.__name__} only accepts default=None (the "
-                    "nullable 'no relation' marker); a hardcoded FK id default "
-                    "is not allowed."
-                )
-            if not allow_null:
-                raise TypeError(
-                    f"{self.__class__.__name__}(default=None) requires allow_null=True."
-                )
+        # `limit_choices_to`). `choices` is likewise not accepted. The
+        # default=None / allow_null validation is enforced by ColumnField.
         if not isinstance(to, str):
             try:
                 to.model_options.model_name
@@ -415,6 +405,7 @@ class ForeignKeyField(ColumnField, RelatedField):
             )
 
         super().__init__(
+            default=default,
             required=required,
             allow_null=allow_null,
             validators=validators,

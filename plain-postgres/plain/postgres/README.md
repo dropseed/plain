@@ -46,12 +46,14 @@ class User(postgres.Model):
 
 Annotate each field with `Field[T]` (the value type) — that's what gives the
 model a type-checked constructor: `User(email="a@b.com")` flags wrong value
-types, unknown field names, and missing required fields. Nullable fields use
-`Field[T | None]` with `default=None`; DB-owned fields (`id`, `create_now`,
-generated values) are auto-excluded from the constructor. A custom field type
-works the same as long as it ships a `Field`-returning stub (like
-`PasswordField`); one without a typed stub falls back to a value-type
-annotation (`name: str = MyField()`).
+types, unknown field names, and missing required fields. A field is optional in
+that constructor only when its definition passes `default=` (this is general,
+not nullable-specific — a `required=False` field with no `default=` is still a
+required constructor arg), so nullable fields use `Field[T | None]` with
+`default=None`. DB-owned fields (`id`, `create_now`, generated values) are
+auto-excluded from the constructor. A custom field type works the same as long
+as it ships a `Field`-returning stub (like `PasswordField`); one without a typed
+stub falls back to a value-type annotation (`name: str = MyField()`).
 
 Every model automatically includes an `id` field which serves as the primary
 key. The name `id` is reserved and can't be used for other fields.

@@ -162,19 +162,22 @@ class CheckAllModels(PreflightCheck):
         return errors
 
 
-@register_check("postgres.typed_construction")
+# Deliberately NOT a registered preflight check. Every annotated, non-``ClassVar``
+# attribute on a model becomes a parameter of the type checker's synthesized
+# ``__init__`` (via ``@dataclass_transform`` on ``ModelBase``); if such an attribute
+# isn't a real field, the checker accepts ``Model(that=...)`` while the runtime
+# rejects it. Detecting that leak from raw annotations is inherently fragile
+# (aliased ``ClassVar`` imports, annotated properties, string forward refs), and
+# the divergence is low-harm in practice -- you have to actively construct with a
+# non-field kwarg to get bitten. So rather than ship a fragile check into every
+# user app's startup, we guard Plain's *own* models by running this directly from
+# an internal test (tests/internal/test_typed_construction_preflight.py).
 class CheckTypedConstruction(PreflightCheck):
-    """Every annotated, non-``ClassVar`` attribute on a model becomes a parameter
-    of the type checker's synthesized ``__init__`` (via ``@dataclass_transform``
-    on ``ModelBase``). If such an attribute isn't a real constructor field, the
-    type checker accepts ``Model(that=...)`` while the runtime ``__init__``
-    rejects it with an unexpected-keyword ``TypeError`` -- a silent, unsound
-    divergence that no normal test exercises.
-
-    Catch it at startup: framework metadata, custom querysets, and
-    reverse-relation accessors must be annotated ``ClassVar[...]`` so they stay
-    out of the synthesized constructor. Real column fields and M2M fields (the
-    checker excludes M2M via a signature-level ``init=False``) are exempt.
+    """Re-derives the type checker's synthesized constructor field set and flags
+    any annotated, non-``ClassVar`` attribute that isn't a real field. Framework
+    metadata, custom querysets, and reverse-relation accessors must be annotated
+    ``ClassVar[...]`` so they stay out of the synthesized constructor; real column
+    fields and M2M fields (excluded via a signature-level ``init=False``) are exempt.
     """
 
     def run(self) -> list[PreflightResult]:
