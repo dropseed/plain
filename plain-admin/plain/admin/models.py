@@ -1,22 +1,24 @@
 from __future__ import annotations
 
+from datetime import datetime
+
+from app.users.models import User
+
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
 class PinnedNavItem(postgres.Model):
     """A user's pinned navigation item in the admin."""
 
-    user = types.ForeignKeyField(
+    user: User = types.ForeignKeyField(
         "users.User",
         on_delete=postgres.CASCADE,
     )
-    view_slug = types.TextField(max_length=255)
-    order = types.SmallIntegerField(default=0)
-    created_at = types.DateTimeField(create_now=True)
-
-    query: postgres.QuerySet[PinnedNavItem] = postgres.QuerySet()
+    view_slug: Field[str] = types.TextField(max_length=255)
+    order: Field[int] = types.SmallIntegerField(default=0)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
 
     model_options = postgres.Options(
         constraints=[

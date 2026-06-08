@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from datetime import date, datetime
+from typing import ClassVar
+
 from app.users.models import User
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 from plain.urls import reverse
 
 PRIORITY_CHOICES = [
@@ -15,15 +18,13 @@ PRIORITY_CHOICES = [
 
 @postgres.register_model
 class Project(postgres.Model):
-    owner = types.ForeignKeyField(
+    owner: Field[User] = types.ForeignKeyField(
         User,
         on_delete=postgres.CASCADE,
         related_query_name="projects",
     )
-    name = types.TextField(max_length=100)
-    created_at = types.DateTimeField(create_now=True)
-
-    query: postgres.QuerySet[Project] = postgres.QuerySet()
+    name: Field[str] = types.TextField(max_length=100)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
 
     model_options = postgres.Options(
         ordering=["name"],
@@ -40,14 +41,12 @@ class Project(postgres.Model):
 
 @postgres.register_model
 class Tag(postgres.Model):
-    owner = types.ForeignKeyField(
+    owner: Field[User] = types.ForeignKeyField(
         User,
         on_delete=postgres.CASCADE,
         related_query_name="tags",
     )
-    name = types.TextField(max_length=40)
-
-    query: postgres.QuerySet[Tag] = postgres.QuerySet()
+    name: Field[str] = types.TextField(max_length=40)
 
     model_options = postgres.Options(
         ordering=["name"],
@@ -67,11 +66,9 @@ class TaskTag(postgres.Model):
     """Through model for Task ↔ Tag M2M."""
 
     task: Task = types.ForeignKeyField("Task", on_delete=postgres.CASCADE)
-    task_id: int
-    tag = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
-    tag_id: int
-
-    query: postgres.QuerySet[TaskTag] = postgres.QuerySet()
+    task_id: ClassVar[int]
+    tag: Field[Tag] = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
+    tag_id: ClassVar[int]
 
     model_options = postgres.Options(
         constraints=[
@@ -84,28 +81,31 @@ class TaskTag(postgres.Model):
 
 @postgres.register_model
 class Task(postgres.Model):
-    owner = types.ForeignKeyField(
+    owner: Field[User] = types.ForeignKeyField(
         User,
         on_delete=postgres.CASCADE,
         related_query_name="tasks",
     )
-    project = types.ForeignKeyField(
+    project: Field[Project | None] = types.ForeignKeyField(
         Project,
         on_delete=postgres.SET_NULL,
         related_query_name="tasks",
         allow_null=True,
         required=False,
+        default=None,
     )
-    title = types.TextField(max_length=200)
-    notes = types.TextField(default="", required=False)
-    due_date = types.DateField(allow_null=True, required=False)
-    priority = types.TextField(max_length=4, choices=PRIORITY_CHOICES, default="med")
-    is_complete = types.BooleanField(default=False)
+    title: Field[str] = types.TextField(max_length=200)
+    notes: Field[str] = types.TextField(default="", required=False)
+    due_date: Field[date | None] = types.DateField(
+        allow_null=True, required=False, default=None
+    )
+    priority: Field[str] = types.TextField(
+        max_length=4, choices=PRIORITY_CHOICES, default="med"
+    )
+    is_complete: Field[bool] = types.BooleanField(default=False)
     tags: types.ManyToManyManager[Tag] = types.ManyToManyField(Tag, through=TaskTag)
-    created_at = types.DateTimeField(create_now=True)
-    updated_at = types.DateTimeField(create_now=True, update_now=True)
-
-    query: postgres.QuerySet[Task] = postgres.QuerySet()
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
 
     model_options = postgres.Options(
         ordering=["is_complete", "-created_at"],
