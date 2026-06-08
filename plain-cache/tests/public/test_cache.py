@@ -17,7 +17,6 @@ def test_get_set_delete(db):
 
     cache.set("k1", "hello")
     assert cache.get("k1") == "hello"
-    assert cache.exists("k1") is True
 
     assert cache.delete("k1") is True
     assert cache.get("k1") is None
@@ -36,22 +35,26 @@ def test_set_overwrites_existing_key(db):
 
 
 def test_stored_none_is_a_hit(db):
+    missing = object()
     cache.set("k-none", None)
-    assert cache.exists("k-none") is True
-    assert cache.get("k-none", "fallback") is None  # default not used
+    assert cache.get("k-none", "fallback") is None  # default not used -> it's a hit
+    assert (
+        cache.get("k-none", missing) is None
+    )  # sentinel distinguishes hit from absent
 
 
 def test_expired_entry_reads_as_absent(db):
+    missing = object()
     cache.set("k-exp", "v", expiration=timedelta(seconds=-1))
     assert cache.get("k-exp") is None
-    assert cache.exists("k-exp") is False
+    assert cache.get("k-exp", missing) is missing  # default returned -> truly absent
 
 
 def test_set_defaults_to_never_expiring(db):
     cache.set("k-forever", "v")
     assert cache.get("k-forever") == "v"
-    # No expiry set -> still live far in the future.
-    assert cache.exists("k-forever") is True
+    # No expiry set -> the row stores no expiration.
+    assert CachedItem.query.get(key="k-forever").expires_at is None
 
 
 def test_get_or_set_computes_only_on_miss(db):
@@ -99,7 +102,6 @@ def test_touch_extends_expiry_without_changing_value(db):
 
     assert cache.touch("t1", expiration=timedelta(days=1)) is True
     assert cache.get("t1") == {"big": "x" * 200}  # value untouched
-    assert cache.exists("t1") is True
 
 
 def test_touch_can_clear_expiry(db):
@@ -134,4 +136,4 @@ def test_expiration_rejects_bool_and_date(db):
 def test_expiration_accepts_aware_datetime(db):
     expires = timezone.now() + timedelta(hours=1)
     cache.set("dt", "v", expiration=expires)
-    assert cache.exists("dt") is True
+    assert cache.get("dt") == "v"

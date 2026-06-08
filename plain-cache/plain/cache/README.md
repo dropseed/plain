@@ -32,7 +32,7 @@ value = cache.get("my-cache-key")
 
 `cache` is a stateless module-level store, so there's nothing to instantiate — just import it and call. Values live in a [`CachedItem`](./models.py#CachedItem) database model, so you don't need to set up Redis or any external caching service.
 
-Reads are **expiry-aware**: an entry past its `expires_at` reads as absent (`get()` returns the default, `exists()` returns `False`). Expired rows are deleted out of band — see [Automatic cleanup](#automatic-cleanup).
+Reads are **expiry-aware**: an entry past its `expires_at` reads as absent (`get()` returns the default). Expired rows are deleted out of band — see [Automatic cleanup](#automatic-cleanup).
 
 ## Setting expiration
 
@@ -105,11 +105,13 @@ touched = cache.touch("my-key", expiration=timedelta(days=30))  # True if live, 
 
 ## Checking and deleting
 
+There's no `exists()` — a single `get()` answers presence _and_ returns the value in one query, so check it directly:
+
 ```python
 from plain.cache import cache
 
-# Check for a live entry without fetching the value
-if cache.exists("my-key"):
+# Presence check (when None isn't a value you store)
+if cache.get("my-key") is not None:
     ...
 
 # Delete a single key (True if it existed)
@@ -118,6 +120,16 @@ cache.delete("my-key")
 # Delete everything
 cache.clear()  # returns the number of rows deleted
 ```
+
+If `None` is a value you legitimately store, pass a sentinel default to tell "absent" from a stored `None`:
+
+```python
+missing = object()
+if cache.get("my-key", missing) is not missing:
+    ...  # a live entry exists (its value may be None)
+```
+
+To compute-and-store on a miss, reach for [`get_or_set()`](#get-or-set) rather than checking first — it's one query and avoids a check-then-set race.
 
 ## Querying cached items
 
@@ -178,7 +190,7 @@ Any JSON-serializable value: strings, numbers, booleans, lists, dicts, and None.
 
 #### What happens when I access an expired item?
 
-`get()` returns the default (`None` unless you pass one) and `exists()` returns `False` — an expired entry reads as absent. The row remains in the database until cleaned up (see [Automatic cleanup](#automatic-cleanup)).
+`get()` returns the default (`None` unless you pass one) — an expired entry reads as absent. The row remains in the database until cleaned up (see [Automatic cleanup](#automatic-cleanup)).
 
 #### How big can cached values be?
 

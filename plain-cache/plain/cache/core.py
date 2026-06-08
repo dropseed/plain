@@ -76,10 +76,6 @@ class Cache:
         item = self._model.query.live().filter(key=key).first()
         return item.value if item is not None else default
 
-    def exists(self, key: str) -> bool:
-        """Return whether `key` has a live (non-expired) entry."""
-        return self._model.query.live().filter(key=key).exists()
-
     def get_many(self, keys: Iterable[str]) -> dict[str, Any]:
         """Return a `{key: value}` dict of the live entries among `keys`.
 
