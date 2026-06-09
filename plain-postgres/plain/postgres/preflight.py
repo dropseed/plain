@@ -441,6 +441,18 @@ class CheckPrunableMigrations(PreflightCheck):
         return errors
 
 
+def _composite_containing(model: Any, field_name: str) -> tuple[str, list[str]] | None:
+    """First non-partial index/constraint with `field_name` at a non-leading position.
+
+    A non-leading column doesn't cover the FK, but reordering the composite to
+    lead with it often can — worth suggesting in the fix message.
+    """
+    for name, fields, _is_unique in _collect_model_indexes(model):
+        if field_name in fields[1:]:
+            return name, fields
+    return None
+
+
 @register_check("postgres.missing_fk_indexes")
 class CheckMissingFKIndexes(PreflightCheck):
     """Warns about foreign key fields without index coverage."""
@@ -457,10 +469,23 @@ class CheckMissingFKIndexes(PreflightCheck):
                     and not field.primary_key
                     and field.name not in covered_fields
                 ):
+                    fix = (
+                        f"Foreign key '{field.name}' has no index coverage. "
+                        f"Add an Index on [\"{field.name}\"] or a constraint with '{field.name}' as the first field."
+                    )
+
+                    if composite := _composite_containing(model, field.name):
+                        composite_name, composite_fields = composite
+                        fix += (
+                            f" Alternatively, '{composite_name}' on [{', '.join(composite_fields)}] "
+                            f"already includes '{field.name}' — reordering it to put '{field.name}' first "
+                            f"covers this FK without a new index (safe when every query using it "
+                            f"filters all of its columns with equality)."
+                        )
+
                     results.append(
                         PreflightResult(
-                            fix=f"Foreign key '{field.name}' has no index coverage. "
-                            f"Add an Index on [\"{field.name}\"] or a constraint with '{field.name}' as the first field.",
+                            fix=fix,
                             obj=f"{model.model_options.label}.{field.name}",
                             id="postgres.missing_fk_index",
                             warning=True,
