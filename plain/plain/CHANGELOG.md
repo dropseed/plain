@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.150.0](https://github.com/dropseed/plain/releases/plain@0.150.0) (2026-06-09)
+
+### What's changed
+
+- `PREFLIGHT_SILENCED_RESULTS` now accepts obj-qualified entries in the form `"<id>:<obj>"`, silencing a result for one specific object while the same result ID keeps warning everywhere else. For example, `"postgres.missing_fk_index:app.InsightEvent.sender_account"` silences the missing-FK-index warning for that one field only. The object label is whatever appears before the result ID in the preflight output. ([efd02c5ee2](https://github.com/dropseed/plain/commit/efd02c5ee2))
+- A new `preflight.unused_silences` check runs last on full preflight runs (`plain preflight --deploy`) and warns about `PREFLIGHT_SILENCED_RESULTS` entries that matched nothing — an unused entry is either a typo or stale (the issue it silenced has been fixed). It can be silenced via `PREFLIGHT_SILENCED_CHECKS` like any other check, and the matching logic is available as `plain.preflight.unused_silenced_results()`. ([f5863c70be](https://github.com/dropseed/plain/commit/f5863c70be))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.149.1](https://github.com/dropseed/plain/releases/plain@0.149.1) (2026-06-08)
 
 ### What's changed
