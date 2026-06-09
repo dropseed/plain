@@ -550,7 +550,7 @@ class StateModelsRegistry(ModelsRegistry):
         self.ready = True
 
         # There shouldn't be any operations pending at this point.
-        from plain.postgres.preflight import _check_lazy_references
+        from plain.postgres.preflight.models import _check_lazy_references
 
         if errors := _check_lazy_references(self, packages_registry):
             raise ValueError("\n".join(error.fix for error in errors))

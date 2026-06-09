@@ -17,7 +17,7 @@ from plain.postgres.constraints import UniqueConstraint
 from plain.postgres.expressions import F
 from plain.postgres.functions import Lower
 from plain.postgres.indexes import Index
-from plain.postgres.preflight import _fk_covered_field_names
+from plain.postgres.preflight.indexes import _fk_covered_field_names
 
 
 def _model(*, indexes=(), constraints=()) -> SimpleNamespace:

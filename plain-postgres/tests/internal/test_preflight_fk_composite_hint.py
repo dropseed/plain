@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from plain.postgres import Q
 from plain.postgres.constraints import UniqueConstraint
 from plain.postgres.indexes import Index
-from plain.postgres.preflight import _composite_containing
+from plain.postgres.preflight.indexes import _composite_containing
 
 
 def _model(*, indexes=(), constraints=()) -> SimpleNamespace:
