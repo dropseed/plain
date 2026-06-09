@@ -21,17 +21,25 @@ class PreflightResult:
         )
 
     def __str__(self) -> str:
-        if self.obj is None:
-            obj = ""
-        elif hasattr(self.obj, "model_options") and hasattr(
-            self.obj.model_options, "label"
-        ):
-            # Duck type for model objects - use their meta label
-            obj = self.obj.model_options.label
-        else:
-            obj = str(self.obj)
+        obj = "" if self.obj is None else self._obj_label()
         id_part = f"({self.id}) " if self.id else ""
         return f"{obj}: {id_part}{self.fix}"
 
+    def _obj_label(self) -> str:
+        if hasattr(self.obj, "model_options") and hasattr(
+            self.obj.model_options, "label"
+        ):
+            # Duck type for model objects - use their meta label
+            return self.obj.model_options.label
+        return str(self.obj)
+
     def is_silenced(self) -> bool:
-        return bool(self.id and self.id in settings.PREFLIGHT_SILENCED_RESULTS)
+        if not self.id:
+            return False
+        silenced = settings.PREFLIGHT_SILENCED_RESULTS
+        if self.id in silenced:
+            return True
+        # An "id:obj" entry silences the result for one specific object
+        # (e.g. "postgres.missing_fk_index:insights.InsightEvent.sender_account")
+        # while the same result id keeps warning everywhere else.
+        return self.obj is not None and f"{self.id}:{self._obj_label()}" in silenced
