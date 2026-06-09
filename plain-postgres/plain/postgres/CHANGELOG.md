@@ -1,5 +1,17 @@
 # plain-postgres changelog
 
+## [0.108.0](https://github.com/dropseed/plain/releases/plain-postgres@0.108.0) (2026-06-09)
+
+### What's changed
+
+- A partial index of exactly `WHERE <fk> IS NOT NULL` on the FK column now counts as FK index coverage — every FK lookup and referencing-side sweep is a `WHERE fk = ?`, which implies the predicate, so Postgres can always use it. Both the `postgres.missing_fk_indexes` preflight check (an `Index`/`UniqueConstraint` with `condition=Q(fk__isnull=False)`) and the doctor's missing-FK check (matching the live index predicate) accept it; any other partial predicate still doesn't count. ([4836069767](https://github.com/dropseed/plain/commit/4836069767))
+- The missing-FK-index warning now points out when an existing composite index or constraint already contains the FK at a non-leading position, suggesting a reorder to lead with the FK instead of adding a new index (safe when every query using the composite filters all of its columns with equality). ([084b6abba5](https://github.com/dropseed/plain/commit/084b6abba5))
+- Internal: the preflight checks moved from a single `preflight.py` into a `preflight/` package (`models.py`, `database.py`, `indexes.py`). Check names and behavior are unchanged. ([edc792d358](https://github.com/dropseed/plain/commit/edc792d358))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.107.1](https://github.com/dropseed/plain/releases/plain-postgres@0.107.1) (2026-06-08)
 
 ### What's changed
