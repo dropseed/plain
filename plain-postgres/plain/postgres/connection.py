@@ -170,7 +170,19 @@ class DatabaseConnection:
         self.set_autocommit(True)
 
     def ensure_connection(self) -> None:
-        """Guarantee that a connection to the database is established."""
+        """Guarantee that a live connection to the database is established."""
+        if (
+            self.connection is not None
+            and self.connection.closed
+            and not self.in_atomic_block
+        ):
+            # The server closed this connection while we held it (restart,
+            # failover, idle timeout) — psycopg marks it closed once an
+            # operation fails on it. Mid-atomic, swapping it would silently
+            # run the rest of the block outside its transaction — leave the
+            # dead connection for Atomic.__exit__'s error recovery instead.
+            logger.warning("Discarding dead database connection")
+            self.close()
         if self.connection is None:
             self.connect()
 
