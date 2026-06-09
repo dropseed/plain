@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.149.1](https://github.com/dropseed/plain/releases/plain@0.149.1) (2026-06-08)
+
+### What's changed
+
+- Internal: typing-only changes for the `ty` 0.0.45 upgrade. `@deconstructible` gains explicit `@overload` signatures so it type-checks correctly whether applied bare (`@deconstructible`) or with arguments (`@deconstructible(path=...)`), `Worker`'s `sockets` parameter widens from `list` to `Sequence`, and a few `ty: ignore` comments were added or removed to match. No runtime behavior changes. ([95f54e880d](https://github.com/dropseed/plain/commit/95f54e880d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.149.0](https://github.com/dropseed/plain/releases/plain@0.149.0) (2026-06-07)
 
 ### What's changed
