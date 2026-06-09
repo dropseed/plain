@@ -1,5 +1,16 @@
 # plain-postgres changelog
 
+## [0.108.1](https://github.com/dropseed/plain/releases/plain-postgres@0.108.1) (2026-06-09)
+
+### What's changed
+
+- `ensure_connection()` now detects a pooled connection the server has closed while it was held (Postgres restart, failover, idle timeout) and discards it before establishing a fresh one — logging a "Discarding dead database connection" warning — instead of repeatedly failing on the dead connection. Inside an atomic block the dead connection is intentionally left in place so the transaction's normal error handling runs, rather than silently continuing the rest of the block outside its transaction. ([9e82cb4454](https://github.com/dropseed/plain/commit/9e82cb4454))
+- Query span instrumentation no longer pays for expensive attributes when the span is sampled out: the per-query Python stack walk (for `code.*` attributes) and the `DEBUG`-mode stringification of query parameters now only happen when the span is actually recording. The cheap connection attributes are still passed at span creation so attribute-aware samplers can see them in `should_sample()`. ([af736043b0](https://github.com/dropseed/plain/commit/af736043b0))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.108.0](https://github.com/dropseed/plain/releases/plain-postgres@0.108.0) (2026-06-09)
 
 ### What's changed
