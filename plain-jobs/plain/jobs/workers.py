@@ -189,9 +189,9 @@ class Worker:
 
         while not self._is_shutting_down:
             # Return last tick's pooled connection so the next checkout
-            # re-validates it. Holding one connection for the worker's whole
-            # life means a server-side close (PG restart, failover) wedges
-            # the loop reusing a dead connection on every tick.
+            # re-validates it — a server-side close (PG restart, failover)
+            # is then caught at checkout instead of erroring a tick — and so
+            # the loop doesn't hold a pool slot while idle between ticks.
             return_database_connection()
 
             with tracer.start_as_current_span(
@@ -270,6 +270,10 @@ class Worker:
                 future = self.executor.submit(process_job, job_process_uuid)
                 with self._inflight_lock:
                     self._inflight_futures[future] = job_process_uuid
+                # If the future is already done, add_done_callback runs the
+                # callback inline on THIS thread — and its finally returns
+                # this thread's connection. Safe here because no atomic block
+                # or cursor is open at this point; keep it that way.
                 future.add_done_callback(
                     partial(future_finished_callback, job_process_uuid)
                 )
@@ -550,69 +554,79 @@ def future_finished_callback(job_process_uuid: str, future: Future) -> None:
     # Lazy import - see _worker_process_initializer() comment for why
     from .models import JobProcess, JobResultStatuses
 
-    if future.cancelled():
-        logger.warning("Job cancelled", extra={"job_process_uuid": job_process_uuid})
-        try:
-            job = JobProcess.query.get(uuid=job_process_uuid)
-            job.convert_to_result(status=JobResultStatuses.CANCELLED)
-        except JobProcess.DoesNotExist:
-            # Job may have already been cleaned up
-            pass
-    elif exception := future.exception():
-        # Process pool may have been killed (OOM/segfault), or process_job
-        # itself raised past its outer except (e.g. import failure).
-        logger.warning(
-            "Job failed",
-            extra={"job_process_uuid": job_process_uuid},
-            exc_info=exception,
-        )
-        try:
-            job = JobProcess.query.get(uuid=job_process_uuid)
-            # If started_at is set, run() was actively executing when the
-            # process died — user code may have set up state it expected to
-            # tear down. Use LOST so on_aborted fires. If started_at is
-            # unset, run() never got to execute (import failure, etc.), so
-            # ERRORED with no hook is correct.
-            if job.started_at is not None:
-                status = JobResultStatuses.LOST
-            else:
-                status = JobResultStatuses.ERRORED
-            job.convert_to_result(
-                status=status,
-                error="".join(traceback.format_exception(exception)),
+    try:
+        if future.cancelled():
+            logger.warning(
+                "Job cancelled", extra={"job_process_uuid": job_process_uuid}
             )
-        except JobProcess.DoesNotExist:
-            # Job may have already been cleaned up
-            pass
-    else:
-        logger.debug("Job finished", extra={"job_process_uuid": job_process_uuid})
-        # Orphan check: process_job's outer except-Exception swallows any
-        # failure that escapes job.run() (middleware crash, OTel error, DB
-        # blip during convert_to_result, etc.). The future completes cleanly
-        # but the JobProcess row was never converted, and since our parent
-        # is still heartbeating, rescue_stale_workers won't see it as orphaned.
-        job = JobProcess.query.filter(uuid=job_process_uuid).first()
-        if job is None:
-            return
-        logger.warning(
-            "Job future completed but JobProcess survived; converting to ERRORED",
-            extra={"job_process_uuid": job_process_uuid},
-        )
-        try:
-            job.convert_to_result(
-                status=JobResultStatuses.ERRORED,
-                error="Job future completed without recording a result",
+            try:
+                job = JobProcess.query.get(uuid=job_process_uuid)
+                job.convert_to_result(status=JobResultStatuses.CANCELLED)
+            except JobProcess.DoesNotExist:
+                # Job may have already been cleaned up
+                pass
+        elif exception := future.exception():
+            # Process pool may have been killed (OOM/segfault), or process_job
+            # itself raised past its outer except (e.g. import failure).
+            logger.warning(
+                "Job failed",
+                extra={"job_process_uuid": job_process_uuid},
+                exc_info=exception,
             )
-        except Exception:
-            # A peer rescuer may have already created a JobResult(LOST) for
-            # this row, in which case the unique constraint on
-            # JobResult.job_process_uuid trips. Either way, the row is now
-            # accounted for — log and move on rather than letting the
-            # exception escape into the executor's done-callback machinery.
-            logger.exception(
-                "Failed to convert orphan JobProcess to ERRORED",
+            try:
+                job = JobProcess.query.get(uuid=job_process_uuid)
+                # If started_at is set, run() was actively executing when the
+                # process died — user code may have set up state it expected to
+                # tear down. Use LOST so on_aborted fires. If started_at is
+                # unset, run() never got to execute (import failure, etc.), so
+                # ERRORED with no hook is correct.
+                if job.started_at is not None:
+                    status = JobResultStatuses.LOST
+                else:
+                    status = JobResultStatuses.ERRORED
+                job.convert_to_result(
+                    status=status,
+                    error="".join(traceback.format_exception(exception)),
+                )
+            except JobProcess.DoesNotExist:
+                # Job may have already been cleaned up
+                pass
+        else:
+            logger.debug("Job finished", extra={"job_process_uuid": job_process_uuid})
+            # Orphan check: process_job's outer except-Exception swallows any
+            # failure that escapes job.run() (middleware crash, OTel error, DB
+            # blip during convert_to_result, etc.). The future completes cleanly
+            # but the JobProcess row was never converted, and since our parent
+            # is still heartbeating, rescue_stale_workers won't see it as orphaned.
+            job = JobProcess.query.filter(uuid=job_process_uuid).first()
+            if job is None:
+                return
+            logger.warning(
+                "Job future completed but JobProcess survived; converting to ERRORED",
                 extra={"job_process_uuid": job_process_uuid},
             )
+            try:
+                job.convert_to_result(
+                    status=JobResultStatuses.ERRORED,
+                    error="Job future completed without recording a result",
+                )
+            except Exception:
+                # A peer rescuer may have already created a JobResult(LOST) for
+                # this row, in which case the unique constraint on
+                # JobResult.job_process_uuid trips. Either way, the row is now
+                # accounted for — log and move on rather than letting the
+                # exception escape into the executor's done-callback machinery.
+                logger.exception(
+                    "Failed to convert orphan JobProcess to ERRORED",
+                    extra={"job_process_uuid": job_process_uuid},
+                )
+    finally:
+        # This callback runs on the executor's done-callback thread, which
+        # gets its own thread-local pooled connection. Return it after each
+        # callback for the same reasons the run loop returns its connection
+        # every tick: checkout re-validation, and not holding a pool slot
+        # while idle.
+        return_database_connection()
 
 
 def process_job(job_process_uuid: str) -> None:
