@@ -1,5 +1,15 @@
 # plain-postgres changelog
 
+## [0.107.1](https://github.com/dropseed/plain/releases/plain-postgres@0.107.1) (2026-06-08)
+
+### What's changed
+
+- Internal: typing-only cleanup for the `ty` 0.0.45 upgrade. `Query.order_by` is now annotated `tuple[Any, ...]` instead of relying on empty-tuple inference, a few field-name dict keys are narrowed via `assert` or the known-`str` loop variable, and `ty: ignore` comments on the intentionally heterogeneous `get_fields()` / `klass_info` structures were adjusted (net removal of several ignores). No runtime behavior changes. ([5c8015795d](https://github.com/dropseed/plain/commit/5c8015795d), [95f54e880d](https://github.com/dropseed/plain/commit/95f54e880d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.107.0](https://github.com/dropseed/plain/releases/plain-postgres@0.107.0) (2026-06-07)
 
 ### What's changed
