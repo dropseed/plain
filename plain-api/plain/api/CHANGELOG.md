@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.33.9](https://github.com/dropseed/plain/releases/plain-api@0.33.9) (2026-06-08)
+
+### What's changed
+
+- Internal: `ty: ignore` comments added to the OpenAPI decorators where they stamp dynamic `openapi_schema` / `openapi_components` attributes onto the wrapped function, for the `ty` 0.0.45 upgrade. No runtime behavior changes. ([95f54e880d](https://github.com/dropseed/plain/commit/95f54e880d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.33.8](https://github.com/dropseed/plain/releases/plain-api@0.33.8) (2026-06-07)
 
 ### What's changed
