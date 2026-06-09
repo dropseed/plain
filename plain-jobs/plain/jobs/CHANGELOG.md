@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.55.1](https://github.com/dropseed/plain/releases/plain-jobs@0.55.1) (2026-06-09)
+
+### What's changed
+
+- The worker's done-callback thread (which records each job's result after its future completes) now returns its pooled database connection after every callback instead of holding one for the worker's lifetime. This stops the callback thread from occupying a pool slot while idle between job completions, and means the pool re-validates the connection on the next checkout — so a server-side close (Postgres restart, failover) no longer wedges result recording on a dead connection. ([c43ee70517](https://github.com/dropseed/plain/commit/c43ee70517))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.55.0](https://github.com/dropseed/plain/releases/plain-jobs@0.55.0) (2026-06-08)
 
 ### What's changed
