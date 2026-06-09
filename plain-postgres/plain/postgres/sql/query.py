@@ -229,7 +229,9 @@ class Query(BaseExpression):
     #  - True: group by all select fields of the model
     # See compiler.get_group_by() for details.
     group_by = None
-    order_by = ()
+    # Holds field-name strings and order expressions; the compiler duck-types
+    # each entry, so the element type is intentionally loose.
+    order_by: tuple[Any, ...] = ()
     low_mark = 0  # Used for offset/limit.
     high_mark = None  # Used for offset/limit.
     distinct = False

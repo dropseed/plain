@@ -809,13 +809,14 @@ class QuerySet[T: "Model"]:
                 case_statement = Case(*when_statements, output_field=field)
                 # PostgreSQL requires casted CASE in updates
                 case_statement = Cast(case_statement, output_field=field)
+                assert field.name is not None
                 update_kwargs[field.name] = case_statement
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
         queryset = self._chain()
         with transaction.atomic(savepoint=False):
             for ids, update_kwargs in updates:
-                rows_updated += queryset.filter(id__in=ids).update(**update_kwargs)  # ty: ignore[invalid-argument-type] (keys are field.name, always str at runtime)
+                rows_updated += queryset.filter(id__in=ids).update(**update_kwargs)
         return rows_updated
 
     def get_or_create(
@@ -1009,7 +1010,7 @@ class QuerySet[T: "Model"]:
                 new_order_by.append(annotation)
             else:
                 new_order_by.append(col)
-        query.order_by = tuple(new_order_by)  # ty: ignore[invalid-assignment] (order_by default narrows to empty tuple)
+        query.order_by = tuple(new_order_by)
 
         # Clear any annotations so that they won't be present in subqueries.
         query.annotations = {}

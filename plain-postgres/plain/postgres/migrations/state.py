@@ -679,6 +679,7 @@ class ModelState:
             if getattr(field, "remote_field", None) and exclude_rels:
                 continue
             name = field.name
+            assert name is not None
             try:
                 fields.append((name, field.clone()))
             except TypeError as e:
@@ -688,6 +689,7 @@ class ModelState:
         if not exclude_rels:
             for field in model._model_meta.local_many_to_many:
                 name = field.name
+                assert name is not None
                 try:
                     fields.append((name, field.clone()))
                 except TypeError as e:
@@ -732,7 +734,7 @@ class ModelState:
         return cls(
             model.model_options.package_label,
             model.model_options.object_name,
-            fields,  # ty: ignore[invalid-argument-type] (field names are always str at runtime)
+            fields,
             model.model_options.export_for_migrations(),
             bases,
         )

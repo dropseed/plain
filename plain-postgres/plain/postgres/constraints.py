@@ -385,8 +385,8 @@ class UniqueConstraint(BaseConstraint):
                     # A composite constraint containing NULL value cannot cause
                     # a violation since NULL != NULL in SQL.
                     return
-                lookup_kwargs[field.name] = lookup_value
-            queryset = queryset.filter(**lookup_kwargs)  # ty: ignore[invalid-argument-type] (keys are field.name, always str at runtime)
+                lookup_kwargs[field_name] = lookup_value
+            queryset = queryset.filter(**lookup_kwargs)
         else:
             # Ignore constraints with excluded fields.
             if exclude:
