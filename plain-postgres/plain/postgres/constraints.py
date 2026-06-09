@@ -386,7 +386,7 @@ class UniqueConstraint(BaseConstraint):
                     # a violation since NULL != NULL in SQL.
                     return
                 lookup_kwargs[field.name] = lookup_value
-            queryset = queryset.filter(**lookup_kwargs)
+            queryset = queryset.filter(**lookup_kwargs)  # ty: ignore[invalid-argument-type] (keys are field.name, always str at runtime)
         else:
             # Ignore constraints with excluded fields.
             if exclude:

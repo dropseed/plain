@@ -511,8 +511,9 @@ class Meta:
                 fields.append(field.remote_field)
 
         if forward:
-            fields += self.local_fields
-            fields += self.local_many_to_many
+            # get_fields() intentionally returns a heterogeneous list of field types.
+            fields += self.local_fields  # ty: ignore[unsupported-operator]
+            fields += self.local_many_to_many  # ty: ignore[unsupported-operator]
 
         # In order to avoid list manipulation. Always
         # return a shallow copy of the results

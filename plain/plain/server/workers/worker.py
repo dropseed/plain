@@ -24,6 +24,7 @@ import random
 import signal
 import sys
 import time
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from types import FrameType
 from typing import TYPE_CHECKING, Any
@@ -65,7 +66,7 @@ class Worker:
         self,
         age: int,
         ppid: int,
-        sockets: list[sock.BaseSocket],
+        sockets: Sequence[sock.BaseSocket],
         app: ServerApplication,
         timeout: int | float,
         heartbeat: WorkerHeartbeat,

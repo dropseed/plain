@@ -7,7 +7,7 @@ from plain.htmx.templates import HTMXFragmentExtension, render_template_fragment
 
 
 def make_env():
-    return jinja2.Environment(extensions=[HTMXFragmentExtension])
+    return jinja2.Environment(extensions=[HTMXFragmentExtension])  # ty: ignore[invalid-argument-type] (jinja2 Extension metaclass widens to list[type])
 
 
 def test_fragment_full_page_render():

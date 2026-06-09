@@ -699,7 +699,7 @@ class ModelState:
             bases = []
             for base in model.__bases__:
                 bases.append(base)
-            return bases
+            return bases  # ty: ignore[invalid-return-type] (__bases__ widens to list[type])
 
         # We can't rely on __mro__ directly because we only want to flatten
         # abstract models and not the whole tree. However by recursing on
@@ -732,7 +732,7 @@ class ModelState:
         return cls(
             model.model_options.package_label,
             model.model_options.object_name,
-            fields,
+            fields,  # ty: ignore[invalid-argument-type] (field names are always str at runtime)
             model.model_options.export_for_migrations(),
             bases,
         )

@@ -815,7 +815,7 @@ class QuerySet[T: "Model"]:
         queryset = self._chain()
         with transaction.atomic(savepoint=False):
             for ids, update_kwargs in updates:
-                rows_updated += queryset.filter(id__in=ids).update(**update_kwargs)
+                rows_updated += queryset.filter(id__in=ids).update(**update_kwargs)  # ty: ignore[invalid-argument-type] (keys are field.name, always str at runtime)
         return rows_updated
 
     def get_or_create(
@@ -1009,7 +1009,7 @@ class QuerySet[T: "Model"]:
                 new_order_by.append(annotation)
             else:
                 new_order_by.append(col)
-        query.order_by = tuple(new_order_by)
+        query.order_by = tuple(new_order_by)  # ty: ignore[invalid-assignment] (order_by default narrows to empty tuple)
 
         # Clear any annotations so that they won't be present in subqueries.
         query.annotations = {}

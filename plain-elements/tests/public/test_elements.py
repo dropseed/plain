@@ -7,7 +7,7 @@ def _make_env(templates: dict[str, str]):
     """Spin up a Jinja env with our extension and in‑memory templates."""
     return Environment(
         loader=DictLoader(templates),
-        extensions=[ElementsExtension],
+        extensions=[ElementsExtension],  # ty: ignore[invalid-argument-type] (jinja2 Extension metaclass widens to list[type])
         autoescape=False,  # keep it simple for the test
     )
 
