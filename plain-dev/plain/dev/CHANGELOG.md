@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.63.1](https://github.com/dropseed/plain/releases/plain-dev@0.63.1) (2026-06-08)
+
+### What's changed
+
+- **`plain dev` single-instance locking reworked to be crash-safe.** Instead of writing a pidfile and trusting whatever it says, the supervisor now holds an exclusive advisory `flock` on the pidfile for its entire lifetime. A second `plain dev` (or `plain dev services`) fails to take the lock and exits with the "already running" notice, and the kernel drops the lock automatically when the holder exits — so a killed or crashed supervisor no longer leaves a stale pidfile that wrongly blocks the next start. The pid is still recorded so `--stop` can find and signal the running process, but the lock (not the pid) is what prevents duplicates; `--stop` now only signals when a live owner actually holds the lock, so it can't kill an unrelated process that happened to reuse the pid. ([0d5e8ed95f](https://github.com/dropseed/plain/commit/0d5e8ed95f))
+- Internal: renamed `ProcessManager` → `Supervisor`, `DevProcess` → `DevSupervisor`, and `ServicesProcess` → `ServicesSupervisor`.
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.63.0](https://github.com/dropseed/plain/releases/plain-dev@0.63.0) (2026-05-21)
 
 ### What's changed
