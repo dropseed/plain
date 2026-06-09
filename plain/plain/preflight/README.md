@@ -220,6 +220,8 @@ PREFLIGHT_SILENCED_RESULTS = [
 
 The object label is whatever appears before the result ID in the preflight output (for model-level results, the model's label).
 
+Entries that match nothing are reported as warnings by the `preflight.unused_silences` check, which runs last on `plain preflight --deploy` — an unused entry is either a typo or stale (the issue it silenced has been fixed), so remove it.
+
 ## FAQs
 
 #### What's the difference between a check name and a result ID?

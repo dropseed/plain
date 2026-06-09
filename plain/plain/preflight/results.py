@@ -33,13 +33,41 @@ class PreflightResult:
             return self.obj.model_options.label
         return str(self.obj)
 
-    def is_silenced(self) -> bool:
+    def silenced_by(self) -> list[str]:
+        """The `PREFLIGHT_SILENCED_RESULTS` entries that match this result.
+
+        A bare entry matches the result id; an "id:obj" entry matches the
+        result for one specific object (e.g.
+        "postgres.missing_fk_index:insights.InsightEvent.sender_account")
+        while the same result id keeps warning everywhere else.
+        """
         if not self.id:
-            return False
+            return []
         silenced = settings.PREFLIGHT_SILENCED_RESULTS
+        matched = []
         if self.id in silenced:
-            return True
-        # An "id:obj" entry silences the result for one specific object
-        # (e.g. "postgres.missing_fk_index:insights.InsightEvent.sender_account")
-        # while the same result id keeps warning everywhere else.
-        return self.obj is not None and f"{self.id}:{self._obj_label()}" in silenced
+            matched.append(self.id)
+        if self.obj is not None:
+            qualified = f"{self.id}:{self._obj_label()}"
+            if qualified in silenced:
+                matched.append(qualified)
+        return matched
+
+    def is_silenced(self) -> bool:
+        return bool(self.silenced_by())
+
+
+def unused_silenced_results(results: list[PreflightResult]) -> list[str]:
+    """`PREFLIGHT_SILENCED_RESULTS` entries that matched none of `results`.
+
+    An unused entry is either a typo or stale — the issue it silenced has
+    been fixed. Only meaningful when `results` came from a full run
+    (deploy checks included); a partial run skips checks whose entries
+    would then look unused.
+    """
+    if not settings.PREFLIGHT_SILENCED_RESULTS:
+        return []
+    used: set[str] = set()
+    for result in results:
+        used.update(result.silenced_by())
+    return [entry for entry in settings.PREFLIGHT_SILENCED_RESULTS if entry not in used]
