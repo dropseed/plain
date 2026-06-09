@@ -141,6 +141,78 @@ def test_partial_unique_constraint_does_not_cover():
     assert "team" not in _fk_covered_field_names(model)
 
 
+def test_not_null_partial_index_on_fk_covers():
+    """`Index(fields=["team"], condition=Q(team__isnull=False))` covers the
+    FK — every FK lookup and referencing-side sweep is `WHERE team = ?`,
+    which implies `team IS NOT NULL`, so Postgres can always use it."""
+    model = _model(
+        indexes=[
+            Index(
+                name="t_team_not_null_idx",
+                fields=["team"],
+                condition=Q(team__isnull=False),
+            )
+        ]
+    )
+    assert "team" in _fk_covered_field_names(model)
+
+
+def test_not_null_partial_unique_constraint_on_fk_covers():
+    model = _model(
+        constraints=[
+            UniqueConstraint(
+                fields=["team", "email"],
+                name="t_team_email_uniq",
+                condition=Q(team__isnull=False),
+            )
+        ]
+    )
+    assert "team" in _fk_covered_field_names(model)
+
+
+def test_not_null_partial_on_other_field_does_not_cover():
+    """The IS NOT NULL exception only applies when the predicate is on the
+    FK itself — `WHERE other IS NOT NULL` doesn't follow from a team lookup."""
+    model = _model(
+        indexes=[
+            Index(
+                name="t_team_other_idx",
+                fields=["team"],
+                condition=Q(other__isnull=False),
+            )
+        ]
+    )
+    assert "team" not in _fk_covered_field_names(model)
+
+
+def test_is_null_partial_on_fk_does_not_cover():
+    model = _model(
+        indexes=[
+            Index(
+                name="t_team_null_idx",
+                fields=["team"],
+                condition=Q(team__isnull=True),
+            )
+        ]
+    )
+    assert "team" not in _fk_covered_field_names(model)
+
+
+def test_compound_partial_condition_does_not_cover():
+    """`team IS NOT NULL AND deleted_at IS NULL` is narrower than what an
+    arbitrary FK lookup implies, so the partial can't cover it."""
+    model = _model(
+        indexes=[
+            Index(
+                name="t_team_active_not_null_idx",
+                fields=["team"],
+                condition=Q(team__isnull=False, deleted_at__isnull=True),
+            )
+        ]
+    )
+    assert "team" not in _fk_covered_field_names(model)
+
+
 def test_full_index_still_covers_when_partial_sibling_exists():
     """A non-partial index on the same column wins — partial-ness is per
     declaration, not per column."""

@@ -405,10 +405,10 @@ class TestStructuralScenarios:
         assert flagged == [], f"indexed FK should not be flagged; got {flagged}"
 
     def test_missing_fk_index_detected_when_only_partial_index_covers(self) -> None:
-        """A partial index on the FK column doesn't cover arbitrary FK
-        lookups — Postgres can only use it for queries whose predicate
-        implies the partial-index `WHERE`. The check must still flag the
-        FK as missing index coverage."""
+        """A partial index with an unrelated predicate doesn't cover
+        arbitrary FK lookups — Postgres can only use it for queries whose
+        predicate implies the partial-index `WHERE`. The check must still
+        flag the FK as missing index coverage."""
         _execute('CREATE TABLE "_diag_fk_parent3" ("id" serial PRIMARY KEY)')
         _execute(
             'CREATE TABLE "_diag_fk_child3" ('
@@ -431,6 +431,31 @@ class TestStructuralScenarios:
             f"partial index must not satisfy FK coverage; got {flagged}"
         )
         assert flagged[0]["name"] == "_diag_fk_child3.parent_id"
+
+    def test_missing_fk_index_not_detected_with_not_null_partial(self) -> None:
+        """A partial index of exactly `WHERE fk IS NOT NULL` covers the FK —
+        every FK lookup is `WHERE fk = ?`, which implies the predicate, so
+        Postgres can always use it."""
+        _execute('CREATE TABLE "_diag_fk_parent4" ("id" serial PRIMARY KEY)')
+        _execute(
+            'CREATE TABLE "_diag_fk_child4" ('
+            '"id" serial PRIMARY KEY, '
+            '"parent_id" int REFERENCES "_diag_fk_parent4"("id"))'
+        )
+        _execute(
+            'CREATE INDEX "_diag_fk_child4_not_null_parent_idx" '
+            'ON "_diag_fk_child4" ("parent_id") '
+            "WHERE parent_id IS NOT NULL"
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            result = check_missing_fk_indexes(cursor, {})
+
+        flagged = [i for i in result["items"] if i["table"] == "_diag_fk_child4"]
+        assert flagged == [], (
+            f"IS NOT NULL partial on the FK should satisfy coverage; got {flagged}"
+        )
 
     def test_sequence_exhaustion_critical_above_90pct(self) -> None:
         _execute('CREATE TABLE "_diag_seq" ("id" serial PRIMARY KEY, "n" int)')

@@ -10,6 +10,7 @@ from plain.postgres.constraints import UniqueConstraint
 from plain.postgres.db import get_connection
 from plain.postgres.expressions import F, OrderBy
 from plain.postgres.fields.related import ForeignKeyField
+from plain.postgres.query_utils import Q
 from plain.postgres.registry import ModelsRegistry, models_registry
 from plain.preflight import PreflightCheck, PreflightResult, register_check
 from plain.runtime import settings
@@ -29,7 +30,9 @@ def _get_app_models() -> list[Any]:
 def _collect_model_indexes(model: Any) -> list[tuple[str, list[str], bool]]:
     """Collect (name, fields, is_unique) for non-partial indexes/constraints.
 
-    Partials are skipped for the same reason as in ``_fk_covered_field_names``.
+    Partials are skipped: they only apply to rows matching their predicate,
+    so they're never interchangeable with a full index for duplicate
+    detection or reorder suggestions.
     """
     all_indexes: list[tuple[str, list[str], bool]] = []
 
@@ -65,41 +68,62 @@ def _bare_column_name(expr: Any) -> str | None:
     return None
 
 
+def _leading_field_name(
+    fields: tuple[str, ...] | list[str], expressions: tuple
+) -> str | None:
+    """The leading column's field name, or `None` if it's an expression."""
+    if fields:
+        return fields[0].lstrip("-")
+    if expressions:
+        return _bare_column_name(expressions[0])
+    return None
+
+
+def _condition_is_not_null_on(condition: Q, field_name: str) -> bool:
+    """True if `condition` is exactly ``Q(<field_name>__isnull=False)``."""
+    return (
+        not condition.negated
+        and len(condition.children) == 1
+        and condition.children[0] == (f"{field_name}__isnull", False)
+    )
+
+
 def _fk_covered_field_names(model: Any) -> set[str]:
-    """Field names that appear as the leading column of a non-partial index
-    or unique constraint — covering arbitrary FK lookups via the index's
-    leading column.
+    """Field names that appear as the leading column of an index or unique
+    constraint — covering arbitrary FK lookups via the index's leading
+    column. Includes expression-based indexes/constraints whose leading
+    expression is a bare ``F(field_name)``.
 
     Partial indexes/constraints (declared with ``condition=Q(...)``) are
     excluded: Postgres can only use them for queries whose predicate
     implies the partial-index predicate, so an FK lookup or cascade
     delete that doesn't filter by that condition still does a sequential
-    scan. (The narrow ``WHERE fk IS NOT NULL`` case — which Postgres can
-    match to ``WHERE fk = ?`` — is conservatively treated as not
-    covering; users wanting guaranteed FK coverage should add a regular
-    non-partial ``Index(fields=[...])``.) Includes expression-based
-    indexes/constraints whose leading expression is a bare
-    ``F(field_name)``.
+    scan. The one exception is a predicate of exactly
+    ``Q(<fk>__isnull=False)`` on the leading FK itself — every FK lookup
+    and referencing-side sweep is a ``WHERE fk = ?``, which implies
+    ``fk IS NOT NULL``, so Postgres can always use that partial. Match
+    the doctor's coverage rule in
+    ``introspection/health/checks_structural.py``.
     """
     covered: set[str] = set()
 
-    def _record_leading(
-        fields: tuple[str, ...] | list[str], expressions: tuple
-    ) -> None:
-        if fields:
-            covered.add(fields[0].lstrip("-"))
-        elif expressions:
-            name = _bare_column_name(expressions[0])
-            if name is not None:
-                covered.add(name)
+    def _record(index_or_constraint: Any) -> None:
+        leading = _leading_field_name(
+            index_or_constraint.fields, index_or_constraint.expressions
+        )
+        if leading is None:
+            return
+        if not index_or_constraint.is_partial or _condition_is_not_null_on(
+            index_or_constraint.condition, leading
+        ):
+            covered.add(leading)
 
     for index in model.model_options.indexes:
-        if not index.is_partial:
-            _record_leading(index.fields, index.expressions)
+        _record(index)
 
     for constraint in model.model_options.constraints:
-        if isinstance(constraint, UniqueConstraint) and not constraint.is_partial:
-            _record_leading(constraint.fields, constraint.expressions)
+        if isinstance(constraint, UniqueConstraint):
+            _record(constraint)
 
     return covered
 
