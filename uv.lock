@@ -1053,7 +1053,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-esbuild"
-version = "0.10.0"
+version = "0.11.0"
 source = { editable = "plain-esbuild" }
 dependencies = [
     { name = "plain" },
