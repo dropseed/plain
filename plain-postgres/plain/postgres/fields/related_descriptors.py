@@ -23,11 +23,6 @@ reverse foreign key relation.
 1. Related instance on the forward side of a foreign key relation:
    ``ForwardForeignKeyDescriptor``.
 
-   Uniqueness of foreign key values is irrelevant to accessing the related
-   instance, making the many-to-one and one-to-one cases identical as far as
-   the descriptor is concerned. The constraint is checked upstream (unicity
-   validation in forms) or downstream (unique indexes in the database).
-
 2. Related objects manager for related instances on the forward or reverse
    sides of a many-to-many relation: ``ForwardManyToManyDescriptor``.
 
@@ -94,22 +89,14 @@ class ForwardForeignKeyDescriptor:
 
         rel_obj_attr = self.field.get_foreign_related_value
         instance_attr = self.field.get_local_related_value
-        instances_dict = {instance_attr(inst): inst for inst in instances}
-        related_field = self.field.foreign_related_fields[0]
-        remote_field = self.field.remote_field
+        related_field = self.field.target_field
 
         # A foreign key is single-column, so prefetch with a join-less IN query.
         query = {
-            f"{related_field.name}__in": {instance_attr(inst)[0] for inst in instances}
+            f"{related_field.name}__in": {instance_attr(inst) for inst in instances}
         }
         queryset = queryset.filter(**query)
 
-        # Since we're going to assign directly in the cache,
-        # we must manage the reverse relation cache manually.
-        if not remote_field.multiple:
-            for rel_obj in queryset:
-                instance = instances_dict[rel_obj_attr(rel_obj)]
-                remote_field.set_cached_value(rel_obj, instance)
         return (
             queryset,
             rel_obj_attr,
@@ -152,9 +139,6 @@ class ForwardForeignKeyDescriptor:
                 # no query. Accessing any other field triggers the full-row
                 # deferred load.
                 rel_obj = remote_model.from_db([target_name], [pk_value])
-                # For a one-to-one relation, prime the reverse cache too.
-                if not self.field.remote_field.multiple:
-                    self.field.remote_field.set_cached_value(rel_obj, instance)
             self.field.set_cached_value(instance, rel_obj)
 
         # Checked on every access, including a cached None: a non-nullable
@@ -186,11 +170,6 @@ class ForwardForeignKeyDescriptor:
         remote_field = self.field.remote_field
 
         if value is None:
-            # Clear the reverse cache on any previously-related object so a
-            # later delete of it does not cascade into this instance.
-            related = self.field.get_cached_value(instance, default=None)
-            if related is not None and not remote_field.multiple:
-                remote_field.set_cached_value(related, None)
             instance.__dict__[name] = None
             self.field.set_cached_value(instance, None)
             return
@@ -199,9 +178,6 @@ class ForwardForeignKeyDescriptor:
             # A related model instance: store its key, cache the object.
             instance.__dict__[name] = getattr(value, self.field.target_field.name)
             self.field.set_cached_value(instance, value)
-            # For a one-to-one relation, prime the reverse cache.
-            if not remote_field.multiple:
-                remote_field.set_cached_value(value, instance)
             return
 
         if isinstance(value, Model | bool):
@@ -217,12 +193,8 @@ class ForwardForeignKeyDescriptor:
         # A bare related key value (e.g. child.parent = 5).
         new_value = self.field.to_python(value)
         if instance.__dict__.get(name) != new_value:
-            # The key actually changed -- clear the reverse cache on any
-            # previously-related object and drop the now-stale forward cache.
+            # The key actually changed -- drop the now-stale forward cache.
             # Re-storing the same key (e.g. by clean_fields) keeps the cache.
-            related = self.field.get_cached_value(instance, default=None)
-            if related is not None and not remote_field.multiple:
-                remote_field.set_cached_value(related, None)
             if self.field.is_cached(instance):
                 self.field.delete_cached_value(instance)
         instance.__dict__[name] = new_value

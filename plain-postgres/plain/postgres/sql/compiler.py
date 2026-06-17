@@ -906,7 +906,7 @@ class SQLCompiler:
             # Firstly, avoid infinite loops.
             already_seen = already_seen or set()
             join_tuple = tuple(
-                getattr(self.query.alias_map[j], "join_cols", None) for j in joins
+                getattr(self.query.alias_map[j], "join_col", None) for j in joins
             )
             if join_tuple in already_seen:
                 raise FieldError("Infinite loop caused by ordering.")

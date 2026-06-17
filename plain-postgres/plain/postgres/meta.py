@@ -262,8 +262,7 @@ class Meta:
     def related_objects(self) -> ImmutableList[ForeignObjectRel]:
         """
         Return all related objects pointing to the current model. The related
-        objects can come from a one-to-one, one-to-many, or many-to-many field
-        relation type.
+        objects can come from a one-to-many or many-to-many field relation type.
 
         Private API intended only to be used by Plain itself; get_fields()
         combined with filtering of field properties is the public API for

@@ -73,9 +73,9 @@ class Join:
         self.table_alias = table_alias
         # LOUTER or INNER
         self.join_type = join_type
-        # A list of 2-tuples to use in the ON clause of the JOIN.
-        # Each 2-tuple will create one join condition in the ON clause.
-        self.join_cols = join_field.get_joining_columns()
+        # The (lhs_col, rhs_col) pair for the JOIN's ON clause. A relation joins
+        # on a single column pair.
+        self.join_col = join_field.get_joining_columns()
         # Along which field (or ForeignObjectRel in the reverse join case)
         self.join_field = join_field
         # Is this join nullabled?
@@ -95,11 +95,11 @@ class Join:
         qn = compiler.quote_name_unless_alias
         qn2 = quote_name
 
-        # Add a join condition for each pair of joining columns.
-        for lhs_col, rhs_col in self.join_cols:
-            join_conditions.append(
-                f"{qn(self.parent_alias)}.{qn2(lhs_col)} = {qn(self.table_alias)}.{qn2(rhs_col)}"
-            )
+        # Add the single join condition for this relation's column pair.
+        lhs_col, rhs_col = self.join_col
+        join_conditions.append(
+            f"{qn(self.parent_alias)}.{qn2(lhs_col)} = {qn(self.table_alias)}.{qn2(rhs_col)}"
+        )
 
         if self.filtered_relation:
             try:

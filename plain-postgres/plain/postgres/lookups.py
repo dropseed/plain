@@ -270,18 +270,23 @@ class FieldGetDbPrepValueMixin(Lookup):
     def get_db_prep_lookup(
         self, value: Any, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
-        # For relational fields, use the 'target_field' attribute of the
-        # output_field.
-        field = getattr(self.lhs.output_field, "target_field", None)
-        get_db_prep_value = (
-            getattr(field, "get_db_prep_value", None)
-            or self.lhs.output_field.get_db_prep_value
-        )
+        from plain.postgres.fields.related import RelatedField
+        from plain.postgres.fields.reverse_related import ForeignObjectRel
+
+        # A relation prepares lookup values against its target column's field
+        # (e.g. the remote `id`); every other field prepares its own values.
+        # Narrowing instead of getattr() keeps `.target_field` greppable and
+        # type-checked, so removing it fails loudly rather than silently here.
+        output_field = self.lhs.output_field
+        if isinstance(output_field, RelatedField | ForeignObjectRel):
+            prep_field = output_field.target_field
+        else:
+            prep_field = output_field
         return (
             "%s",
-            [get_db_prep_value(v, connection, prepared=True) for v in value]
+            [prep_field.get_db_prep_value(v, connection, prepared=True) for v in value]
             if self.get_db_prep_lookup_value_is_iterable
-            else [get_db_prep_value(value, connection, prepared=True)],
+            else [prep_field.get_db_prep_value(value, connection, prepared=True)],
         )
 
 

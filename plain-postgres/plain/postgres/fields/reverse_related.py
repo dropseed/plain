@@ -69,7 +69,6 @@ class ForeignObjectRel(FieldCacheMixin):
         self.on_delete = on_delete
 
         self.symmetrical = False
-        self.multiple = True
 
     # Some of the following cached_properties can't be initialized in
     # __init__ as the field doesn't have its model yet. Calling these methods
@@ -86,10 +85,11 @@ class ForeignObjectRel(FieldCacheMixin):
     @property
     def target_field(self) -> Field:
         """
-        When filtering against this relation, return the field on the remote
-        model against which the filtering should happen.
+        The remote field this relation filters against. Read dynamically by the
+        related-lookup prep path (`output_field.target_field`) when the relation
+        itself is the lookup target, e.g. ``Parent.query.filter(child=obj)``.
         """
-        return self.path_infos[-1].target_fields[0]
+        return self.path_infos[-1].target_field
 
     @cached_property
     def related_model(self) -> type[Model]:
@@ -103,10 +103,6 @@ class ForeignObjectRel(FieldCacheMixin):
     def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
         return self.field.get_lookup(lookup_name)
 
-    @property
-    def db_type(self) -> str | None:
-        return self.field.db_type
-
     def __repr__(self) -> str:
         return f"<{type(self).__name__}: {self.related_model.model_options.package_label}.{self.related_model.model_options.model_name}>"
 
@@ -118,7 +114,6 @@ class ForeignObjectRel(FieldCacheMixin):
             self.related_query_name,
             self.on_delete,
             self.symmetrical,
-            self.multiple,
         )
 
     def __eq__(self, other: object) -> bool:
@@ -141,18 +136,8 @@ class ForeignObjectRel(FieldCacheMixin):
         state.pop("path_infos", None)
         return state
 
-    def get_joining_columns(self) -> tuple[tuple[str, str], ...]:
-        return self.field.get_reverse_joining_columns()
-
-    def set_field_name(self) -> None:
-        """
-        Set the related field's name, this is not available until later stages
-        of app loading, so set_field_name is called from
-        set_attributes_from_rel()
-        """
-        # By default foreign object doesn't relate to any remote field (for
-        # example custom multicolumn joins currently have no remote field).
-        self.field_name = None
+    def get_joining_columns(self) -> tuple[str, str]:
+        return self.field.get_joining_columns(reverse_join=True)
 
     def get_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
         if filtered_relation:
@@ -203,25 +188,10 @@ class ForeignKeyRel(ForeignObjectRel):
             on_delete=on_delete,
         )
 
-        self.field_name = "id"
-
     def __getstate__(self) -> dict[str, Any]:
         state = super().__getstate__()
         state.pop("related_model", None)
         return state
-
-    @property
-    def identity(self) -> tuple[Any, ...]:
-        return super().identity + (self.field_name,)
-
-    def get_related_field(self) -> Field:
-        """
-        Return the Field in the 'to' object to which this relationship is tied.
-        """
-        return self.model._model_meta.get_forward_field("id")
-
-    def set_field_name(self) -> None:
-        pass
 
 
 class ManyToManyRel(ForeignObjectRel):
@@ -266,23 +236,3 @@ class ManyToManyRel(ForeignObjectRel):
             self.through,
             make_hashable(self.through_fields),
         )
-
-    def get_related_field(self) -> Field:
-        """
-        Return the field in the 'to' object to which this relationship is tied.
-        Provided for symmetry with ForeignKeyRel.
-        """
-        from plain.postgres.fields.related import ForeignKeyField
-
-        meta = self.through._model_meta
-        if self.through_fields:
-            field = meta.get_forward_field(self.through_fields[0])
-        else:
-            for field in meta.fields:
-                rel = getattr(field, "remote_field", None)
-                if rel and rel.model == self.model:
-                    break
-
-        if not isinstance(field, ForeignKeyField):
-            raise ValueError(f"Expected ForeignKeyField, got {type(field)}")
-        return field.foreign_related_fields[0]

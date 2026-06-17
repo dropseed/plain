@@ -538,9 +538,6 @@ class Model(metaclass=ModelBase):
                 # constraints aren't supported by the database, there's the
                 # unavoidable risk of data corruption.
                 if obj.id is None:
-                    # Remove the object from a related instance cache.
-                    if not field.remote_field.multiple:
-                        field.remote_field.delete_cached_value(obj)
                     raise ValueError(
                         f"{operation_name}() prohibited to prevent data loss due to unsaved "
                         f"related object '{field.name}'."
@@ -549,10 +546,10 @@ class Model(metaclass=ModelBase):
                     # Set related object if it has been saved after an
                     # assignment.
                     setattr(self, field.name, obj)
-                # If the relationship's pk/to_field was changed, clear the
-                # cached relationship. Compare the cached object's key against
-                # the raw key value -- not getattr(self, field.name), which
-                # for a foreign key returns the related object, not the key.
+                # If the relationship's key was changed, clear the cached
+                # relationship. Compare the cached object's key against the raw
+                # key value -- not getattr(self, field.name), which for a
+                # foreign key returns the related object, not the key.
                 if getattr(obj, field.target_field.name) != field.value_from_object(
                     self
                 ):
@@ -622,7 +619,7 @@ class Model(metaclass=ModelBase):
             raise ValueError(
                 f"Unsaved model instance {self!r} cannot be used in an ORM query."
             )
-        return getattr(self, field.remote_field.get_related_field().name)
+        return getattr(self, field.target_field.name)
 
     def clean(self) -> None:
         """

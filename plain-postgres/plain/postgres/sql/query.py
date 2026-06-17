@@ -1735,7 +1735,7 @@ class Query(BaseExpression):
                 path.extend(pathinfos)
                 final_field = last.join_field
                 meta = last.to_meta
-                targets = last.target_fields
+                targets = (last.target_field,)
                 cur_names_with_path[1].extend(pathinfos)
                 names_with_path.append(cur_names_with_path)
             else:
@@ -1902,16 +1902,13 @@ class Query(BaseExpression):
                 break
             if info.filtered_relation:
                 break
-            join_targets = {t.column for t in info.join_field.foreign_related_fields}
-            cur_targets = {t.column for t in targets}
-            if not cur_targets.issubset(join_targets):
+            # A direct join is a single-column foreign key; if its target is
+            # this join's foreign column, drop the join and continue from the
+            # local foreign key column instead.
+            join_field = info.join_field
+            if targets[0].column != join_field.target_field.column:
                 break
-            targets_dict = {
-                r[1].column: r[0]
-                for r in info.join_field.related_fields
-                if r[1].column in cur_targets
-            }
-            targets = tuple(targets_dict[t.column] for t in targets)
+            targets = (join_field,)
             self.unref_alias(joins.pop())
         return targets, joins[-1], joins
 
@@ -2579,7 +2576,7 @@ class Query(BaseExpression):
                 break
             trimmed_prefix.append(name)
             paths_in_prefix -= len(path)
-        trimmed_prefix.append(join_field.foreign_related_fields[0].name)
+        trimmed_prefix.append(join_field.target_field.name)
         trimmed_prefix = LOOKUP_SEP.join(trimmed_prefix)
         # Lets still see if we can trim the first join from the inner query
         # (that is, self). We can't do this for:
@@ -2589,14 +2586,14 @@ class Query(BaseExpression):
         #   filters.
         first_join = self.alias_map[lookup_tables[trimmed_paths + 1]]
         if first_join.join_type != LOUTER and not first_join.filtered_relation:
-            select_fields = [r[0] for r in join_field.related_fields]
+            select_fields = [join_field]
             select_alias = lookup_tables[trimmed_paths + 1]
             self.unref_alias(lookup_tables[trimmed_paths])
         else:
             # TODO: It might be possible to trim more joins from the start of the
             # inner query if it happens to have a longer join chain containing the
             # values in select_fields. Lets punt this one for now.
-            select_fields = [r[1] for r in join_field.related_fields]
+            select_fields = [join_field.target_field]
             select_alias = lookup_tables[trimmed_paths]
         # The found starting point is likely a join_class instead of a
         # base_table_class reference. But the first entry in the query's FROM

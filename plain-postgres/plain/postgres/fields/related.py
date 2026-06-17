@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Self, cast
 
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.deletion import SET_NULL, OnDelete
-from plain.postgres.exceptions import FieldDoesNotExist, FieldError
+from plain.postgres.exceptions import FieldDoesNotExist
 from plain.postgres.query_utils import PathInfo
 from plain.postgres.utils import make_model_tuple
 from plain.preflight import PreflightResult
@@ -277,7 +277,6 @@ class RelatedField(FieldCacheMixin, Field):
         self.name = self.name or (
             self.remote_field.model.model_options.model_name + "_" + "id"
         )
-        self.remote_field.set_field_name()
 
     def do_related_class(self, other: type[Model], cls: type[Model]) -> None:
         self.set_attributes_from_rel()
@@ -294,16 +293,12 @@ class RelatedField(FieldCacheMixin, Field):
     @property
     def target_field(self) -> Field:
         """
-        When filtering against this relation, return the field on the remote
-        model against which the filtering should happen.
+        The remote field this relation filters against. Read dynamically by the
+        related-lookup prep path (`output_field.target_field`). ForeignKeyField
+        overrides this with a direct, cached lookup; ManyToManyField uses this
+        path-based form.
         """
-        target_fields = self.path_infos[-1].target_fields
-        if len(target_fields) > 1:
-            raise FieldError(
-                "The relation has multiple target fields, but only single target field "
-                "was asked for"
-            )
-        return target_fields[0]
+        return self.path_infos[-1].target_field
 
     def get_cache_name(self) -> str:
         assert self.name is not None, "Field name must be set"
@@ -372,49 +367,28 @@ class ForeignKeyField(ColumnField, RelatedField):
 
     def __copy__(self) -> ForeignKeyField:
         obj = super().__copy__()
-        # Remove any cached PathInfo values.
+        # Remove cached values that depend on the (possibly not-yet-resolved)
+        # remote model.
+        obj.__dict__.pop("target_field", None)
         obj.__dict__.pop("path_infos", None)
         obj.__dict__.pop("reverse_path_infos", None)
         return obj
 
-    @cached_property
-    def related_fields(self) -> list[tuple[ForeignKeyField, Field]]:
-        return self.resolve_related_fields()
+    def get_local_related_value(self, instance: Model) -> Any:
+        # The local field is the foreign key itself; read its raw key value, not
+        # the related object the descriptor returns.
+        return self._get_raw_value(instance)
 
-    @cached_property
-    def local_related_fields(self) -> tuple[Field, ...]:
-        return tuple(lhs_field for lhs_field, rhs_field in self.related_fields)
+    def get_foreign_related_value(self, instance: Model) -> Any:
+        # A foreign key always points at the remote instance's id.
+        return instance.id
 
-    @cached_property
-    def foreign_related_fields(self) -> tuple[Field, ...]:
-        return tuple(
-            rhs_field for lhs_field, rhs_field in self.related_fields if rhs_field
-        )
-
-    def get_local_related_value(self, instance: Model) -> tuple[Any, ...]:
-        # The single local field is the foreign key itself.
-        if self.primary_key:
-            return (instance.id,)
-        # Read the raw key value, not the related object the descriptor returns.
-        return (self._get_raw_value(instance),)
-
-    def get_foreign_related_value(self, instance: Model) -> tuple[Any, ...]:
-        # Always returns the id of the foreign instance
-        return (instance.id,)
-
-    def get_joining_columns(
-        self, reverse_join: bool = False
-    ) -> tuple[tuple[str, str], ...]:
-        # Always returns a single column pair
+    def get_joining_columns(self, reverse_join: bool = False) -> tuple[str, str]:
+        # A foreign key joins one column pair: this field's column and the
+        # target's id column.
         if reverse_join:
-            from_field, to_field = self.related_fields[0]
-            return ((to_field.column, from_field.column),)
-        else:
-            from_field, to_field = self.related_fields[0]
-            return ((from_field.column, to_field.column),)
-
-    def get_reverse_joining_columns(self) -> tuple[tuple[str, str], ...]:
-        return self.get_joining_columns(reverse_join=True)
+            return (self.target_field.column, self.column)
+        return (self.column, self.target_field.column)
 
     def get_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
         """Get path from this field to the related model."""
@@ -424,7 +398,7 @@ class ForeignKeyField(ColumnField, RelatedField):
             PathInfo(
                 from_meta=from_meta,
                 to_meta=meta,
-                target_fields=self.foreign_related_fields,
+                target_field=self.target_field,
                 join_field=self,
                 m2m=False,
                 direct=True,
@@ -444,9 +418,10 @@ class ForeignKeyField(ColumnField, RelatedField):
             PathInfo(
                 from_meta=from_meta,
                 to_meta=meta,
-                target_fields=(meta.get_forward_field("id"),),
+                target_field=meta.get_forward_field("id"),
                 join_field=self.remote_field,
-                m2m=not self.primary_key,
+                # The reverse of a foreign key always fans out to many rows.
+                m2m=True,
                 direct=False,
                 filtered_relation=filtered_relation,
             )
@@ -500,26 +475,14 @@ class ForeignKeyField(ColumnField, RelatedField):
     def to_python(self, value: Any) -> Any:
         return self.target_field.to_python(value)
 
-    @property
+    @cached_property
     def target_field(self) -> Field:
-        return self.foreign_related_fields[0]
-
-    def resolve_related_fields(self) -> list[tuple[ForeignKeyField, Field]]:
+        """A foreign key points at exactly one column: the remote model's id."""
         if isinstance(self.remote_field.model, str):
             raise ValueError(
                 f"Related model {self.remote_field.model!r} cannot be resolved"
             )
-        from_field = self
-        to_field = self.remote_field.model._model_meta.get_forward_field("id")
-        related_fields: list[tuple[ForeignKeyField, Field]] = [(from_field, to_field)]
-
-        for from_field, to_field in related_fields:
-            if to_field and to_field.model != self.remote_field.model:
-                raise FieldError(
-                    f"'{self.model.model_options.label}.{self.name}' refers to field '{to_field.name}' which is not local to model "
-                    f"'{self.remote_field.model.model_options.label}'."
-                )
-        return related_fields
+        return self.remote_field.model._model_meta.get_forward_field("id")
 
     def set_attributes_from_name(self, name: str) -> None:
         super().set_attributes_from_name(name)
@@ -574,11 +537,8 @@ class ForeignKeyField(ColumnField, RelatedField):
 
     def get_col(self, alias: str | None, output_field: Field | None = None) -> Any:
         if output_field is None:
+            # A foreign key resolves to its target's id column.
             output_field = self.target_field
-            while isinstance(output_field, ForeignKeyField):
-                output_field = output_field.target_field
-                if output_field is self:
-                    raise ValueError("Cannot resolve output_field.")
         return super().get_col(alias, output_field)
 
 
@@ -1047,13 +1007,6 @@ class ManyToManyField(RelatedField):
         self.m2m_reverse_field_name = partial(
             self._get_m2m_reverse_attr, related, "name"
         )
-
-        get_m2m_rel = partial(self._get_m2m_attr, related, "remote_field")
-        self.m2m_target_field_name = lambda: get_m2m_rel().field_name
-        get_m2m_reverse_rel = partial(
-            self._get_m2m_reverse_attr, related, "remote_field"
-        )
-        self.m2m_reverse_target_field_name = lambda: get_m2m_reverse_rel().field_name
 
     def set_attributes_from_rel(self) -> None:
         pass
