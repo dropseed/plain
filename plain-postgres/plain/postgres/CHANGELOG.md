@@ -1,5 +1,16 @@
 # plain-postgres changelog
 
+## [0.110.0](https://github.com/dropseed/plain/releases/plain-postgres@0.110.0) (2026-06-17)
+
+### What's changed
+
+- Internal: the foreign-key/related-field internals are collapsed to the single-column-to-`id` model Plain actually uses, removing the inherited Django composite-key and `to_field` scaffolding. `PathInfo.target_fields` (a tuple) becomes a scalar `target_field`, and a `Join` now holds one `join_col` pair instead of a `join_cols` list. The unused multi-column helpers go with it: `RelatedField.resolve_related_fields()`, the `related_fields`/`local_related_fields`/`foreign_related_fields` properties, `ForeignKeyField.get_reverse_joining_columns()`, and `ForeignObjectRel.get_related_field()` / `field_name` / `set_field_name()` / `db_type` / the `multiple` flag (along with its now-dead reverse-cache priming, left over from the long-removed one-to-one relation). `get_local_related_value()`, `get_foreign_related_value()`, and the join-column accessors now return scalars instead of 1-tuples. ([cbd15fb707](https://github.com/dropseed/plain/commit/cbd15fb707))
+- Internal: the related-lookup prep path (`related_lookups.py`, `lookups.py`) now narrows on `RelatedField | ForeignObjectRel` to find a relation's target field instead of duck-typing with `getattr(output_field, "target_field")` / `hasattr(..., "path_infos")`, so the dependency is greppable, type-checked, and fails loudly if it's ever removed rather than silently falling back. ([cbd15fb707](https://github.com/dropseed/plain/commit/cbd15fb707))
+
+### Upgrade instructions
+
+- No changes required. These are internal ORM query-construction details — how foreign keys, reverse relations, and many-to-many relations behave (filtering, prefetching, related-manager access) is unchanged.
+
 ## [0.109.0](https://github.com/dropseed/plain/releases/plain-postgres@0.109.0) (2026-06-17)
 
 ### What's changed
