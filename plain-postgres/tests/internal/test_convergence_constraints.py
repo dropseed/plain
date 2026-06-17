@@ -1373,3 +1373,69 @@ class TestIndexBackedUniqueConstraints:
             )
         finally:
             ConstraintExample.model_options.constraints = original_constraints
+
+
+class TestProbeTableReuse:
+    """analyze_model creates the probe temp table once per model and reuses it
+    for every round-trip, instead of churning one CREATE/DROP per comparison."""
+
+    def test_analyze_model_shares_one_temp_table_across_round_trips(self, db):
+        from plain.postgres.convergence.analysis import _PROBE_TABLE
+
+        # ConstraintExample already has a converged UNIQUE constraint (one
+        # round-trip); add a converged CHECK so analysis runs a second one.
+        original = list(ConstraintExample.model_options.constraints)
+        ConstraintExample.model_options.constraints = [
+            *original,
+            CheckConstraint(
+                check=Q(name__gt=""),
+                name="examples_constraintexample_name_nonempty",
+            ),
+        ]
+        execute(
+            'ALTER TABLE "examples_constraintexample" ADD CONSTRAINT '
+            '"examples_constraintexample_name_nonempty" CHECK ("name" > \'\')'
+        )
+
+        conn = get_connection()
+        previous = conn.force_debug_cursor
+        conn.force_debug_cursor = True
+        conn.queries_log.clear()
+        try:
+            with conn.cursor() as cursor:
+                analyze_model(conn, cursor, ConstraintExample)
+            sqls = [q["sql"] for q in conn.queries_log]
+        finally:
+            conn.force_debug_cursor = previous
+            ConstraintExample.model_options.constraints = original
+            execute(
+                'ALTER TABLE "examples_constraintexample" DROP CONSTRAINT '
+                '"examples_constraintexample_name_nonempty"'
+            )
+
+        probe_adds = [s for s in sqls if _PROBE_TABLE in s and "ADD CONSTRAINT" in s]
+        creates = [s for s in sqls if "CREATE TEMP TABLE" in s]
+        # Both constraints round-trip through the probe table (proving >1)...
+        assert len(probe_adds) >= 2, sqls
+        # ...sharing a single CREATE TEMP TABLE instead of one per round-trip.
+        assert len(creates) == 1, creates
+
+    def test_analyze_model_recovers_from_leaked_probe_table(self, db):
+        """A probe table stranded by a prior aborted analysis (autocommit commits
+        the CREATE, so a non-fallback error can leave it on a pooled connection)
+        must not wedge the next analysis with DuplicateTable — the create drops
+        any stale table of the same name first."""
+        from plain.postgres.convergence.analysis import _PROBE_TABLE
+
+        conn = get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(f'CREATE TEMP TABLE "{_PROBE_TABLE}" (id integer)')
+            # Without the leading DROP IF EXISTS, the first probe's CREATE would
+            # raise DuplicateTable here.
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, ConstraintExample)
+            assert analysis.table == "examples_constraintexample"
+        finally:
+            with conn.cursor() as cursor:
+                cursor.execute(f'DROP TABLE IF EXISTS pg_temp."{_PROBE_TABLE}"')

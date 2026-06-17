@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextvars
 import json
 import re
 from collections.abc import Iterator
@@ -370,14 +371,15 @@ def analyze_model(
             table_issues=["table missing from database"],
         )
 
-    return ModelAnalysis(
-        label=model.model_options.label,
-        table=table_name,
-        columns=_compare_columns(model, db, table_name, cursor),
-        indexes=_compare_indexes(cursor, model, db, table_name),
-        constraints=_compare_constraints(cursor, model, db, table_name),
-        storage_parameter_drifts=_compare_storage_parameters(model, db, table_name),
-    )
+    with _probe_session(cursor, model):
+        return ModelAnalysis(
+            label=model.model_options.label,
+            table=table_name,
+            columns=_compare_columns(model, db, table_name, cursor),
+            indexes=_compare_indexes(cursor, model, db, table_name),
+            constraints=_compare_constraints(cursor, model, db, table_name),
+            storage_parameter_drifts=_compare_storage_parameters(model, db, table_name),
+        )
 
 
 def _compare_storage_parameters(
@@ -1559,36 +1561,111 @@ class ReadOnlyConnectionError(RuntimeError):
     """
 
 
+_READ_ONLY_MESSAGE = (
+    "Convergence analysis requires write access — it normalizes model SQL by "
+    "creating a session-private temp table. The current connection rejected "
+    "DDL (read-only transaction or standby). Run analysis against a "
+    "primary/writable connection."
+)
+
+
+@dataclass
+class _ProbeSession:
+    """Reuse scope for one model's probe table (see `_probe_session`)."""
+
+    model: type[Model]
+    created: bool = False
+
+
+# Set while `analyze_model` runs so the per-comparison probes share one temp
+# table instead of creating and dropping one each. A single connection is
+# single-threaded, but a ContextVar keeps the scope clean and never leaks the
+# session if analysis raises.
+_active_probe_session: contextvars.ContextVar[_ProbeSession | None] = (
+    contextvars.ContextVar("active_probe_session", default=None)
+)
+
+
 @contextmanager
-def _probe_table(cursor: CursorWrapper, model: type[Model]) -> Iterator[None]:
-    """Set up a session-private temp table mirroring the model's real table.
+def _probe_session(cursor: CursorWrapper, model: type[Model]) -> Iterator[None]:
+    """Reuse one probe table across every round-trip in a model's analysis.
 
-    `cursor.connection.transaction()` issues a SAVEPOINT when nested (or BEGIN
-    when run in autocommit). Either way, a model SQL statement incompatible
-    with the live column shape (e.g. a CHECK referencing a column whose live
-    type differs from what the model now declares) rolls back to this scope
-    rather than poisoning the surrounding analyze transaction. Helpers catch
-    psycopg errors and fall back to a sentinel — drift still gets reported,
-    just without the normalized model text.
+    The temp table is created lazily by the first probe inside this scope and
+    dropped once on exit, so a model with no expression/constraint round-trips
+    creates nothing while a model with many shares a single table instead of
+    churning one per comparison. The exit DROP runs only on the success path —
+    on an error it's skipped to avoid dropping against an aborted connection, so
+    the table can briefly outlive the analysis (autocommit commits the CREATE);
+    the next analysis recreates it cleanly (see `_create_probe_table`).
+    """
+    session = _ProbeSession(model=model)
+    token = _active_probe_session.set(session)
+    try:
+        yield
+    finally:
+        _active_probe_session.reset(token)
+    if session.created:
+        cursor.execute(f"DROP TABLE pg_temp.{_PROBE_TABLE}")
 
-    The trailing DROP is schema-qualified to `pg_temp` so a stray real table
-    sharing the name (in the user's own schema) can't be hit by mistake. A
-    single connection is always single-threaded, so reusing the name across
-    helpers is safe.
+
+def _create_probe_table(cursor: CursorWrapper, model: type[Model]) -> None:
+    """(Re)create the session-private probe table mirroring the model's real table.
+
+    Drops any stale table of the same name first so a leak can't wedge analysis:
+    the shipped CLI runs convergence in autocommit, so the CREATE commits before
+    later probes run, and a non-fallback error escaping `analyze_model` would
+    otherwise leave the table on a pooled connection to collide with the next
+    run's CREATE. The
+    DROP is schema-qualified to `pg_temp` so a real table sharing the name (in
+    the user's own schema) can't be hit by mistake. Raises ReadOnlyConnectionError
+    when the connection rejects the DDL.
     """
     table = quote_name(model.model_options.db_table)
     try:
         with cursor.connection.transaction():
+            cursor.execute(f"DROP TABLE IF EXISTS pg_temp.{_PROBE_TABLE}")
             cursor.execute(f"CREATE TEMP TABLE {_PROBE_TABLE} (LIKE {table})")
-            yield
-            cursor.execute(f"DROP TABLE pg_temp.{_PROBE_TABLE}")
     except psycopg.errors.ReadOnlySqlTransaction as exc:
-        raise ReadOnlyConnectionError(
-            "Convergence analysis requires write access — it normalizes "
-            "model SQL by creating a session-private temp table. The current "
-            "connection rejected DDL (read-only transaction or standby). Run "
-            "analysis against a primary/writable connection."
-        ) from exc
+        raise ReadOnlyConnectionError(_READ_ONLY_MESSAGE) from exc
+
+
+@contextmanager
+def _probe_table(cursor: CursorWrapper, model: type[Model]) -> Iterator[None]:
+    """Provide an empty temp table mirroring the model's real table for one
+    round-trip, isolating the probe's DDL so it can't leak into the analyze
+    transaction.
+
+    Inside an active `_probe_session` for the same model, the table is created
+    once and reused: each probe runs in a SAVEPOINT that is always rolled back,
+    undoing the probe's ADD/ALTER while leaving the shared table in place.
+    Outside a session, the table is created and dropped for this one probe.
+
+    `cursor.connection.transaction()` issues a SAVEPOINT when nested (or BEGIN in
+    autocommit), so model SQL incompatible with the live column shape rolls back
+    to this scope instead of poisoning the surrounding transaction; helpers catch
+    the psycopg error and fall back to a sentinel.
+    """
+    session = _active_probe_session.get()
+    if session is not None and session.model is model:
+        # Reuse the session's shared table; `_probe_session` owns its lifetime.
+        if not session.created:
+            _create_probe_table(cursor, model)
+            session.created = True
+        drop_on_exit = False
+    else:
+        # No session: this probe owns the table for its lifetime.
+        _create_probe_table(cursor, model)
+        drop_on_exit = True
+
+    try:
+        with cursor.connection.transaction() as savepoint:
+            yield
+            # Probe read its definition; undo the ADD/ALTER but keep the table.
+            # psycopg rolls the SAVEPOINT back without surfacing an error.
+            raise psycopg.Rollback(savepoint)
+    finally:
+        if drop_on_exit:
+            cursor.execute(f"DROP TABLE pg_temp.{_PROBE_TABLE}")
 
 
 def _normalize_constraint_def(
