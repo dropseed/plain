@@ -1,5 +1,21 @@
 # plain-postgres changelog
 
+## [0.109.0](https://github.com/dropseed/plain/releases/plain-postgres@0.109.0) (2026-06-17)
+
+### What's changed
+
+- **The `db_constraint` argument is removed from `ForeignKeyField` — every foreign key is now backed by a database `FOREIGN KEY` constraint, always.** Because the database guarantees the referenced row exists, accessing a foreign key always builds a partial related instance from just the stored id (no query); the old "query on access when unconstrained" path is gone. The `fields.foreign_key_unconstrained_requires_no_action` preflight check is also removed. ([9ec559db38](https://github.com/dropseed/plain/commit/9ec559db38))
+- **`limit_choices_to` is removed from `ForeignKeyField` and `ManyToManyField`.** The supporting machinery goes with it: `RelatedField.get_choices()` / `get_limit_choices_to()`, `ForeignObjectRel.get_choices()`, and `QuerySet.complex_filter()` are removed, and `BLANK_CHOICE_DASH` is no longer exported from `plain.postgres.fields`. To restrict the rows offered for a relation, filter the queryset explicitly in your form or view. ([68b6ced4f0](https://github.com/dropseed/plain/commit/68b6ced4f0))
+- **The redundant foreign-key existence pre-check is removed.** `ForeignKeyField.validate()` no longer runs a `SELECT ... EXISTS` query to confirm the target row exists — one fewer query per FK validation. The database `FOREIGN KEY` constraint already enforces this, rejecting an invalid reference at write time (as a `psycopg.IntegrityError`). ([68b6ced4f0](https://github.com/dropseed/plain/commit/68b6ced4f0))
+- Internal: convergence (schema-drift) analysis now reuses a single session-private temp "probe" table per model across all of that model's round-trip comparisons, instead of creating and dropping one per index/constraint/default comparison — fewer DDL statements during schema checks. The internal `canon*` helpers were renamed to `probe`/`normalize`. ([67167a11ee](https://github.com/dropseed/plain/commit/67167a11ee), [06650bea63](https://github.com/dropseed/plain/commit/06650bea63))
+
+### Upgrade instructions
+
+- Remove any `db_constraint=False` arguments from `ForeignKeyField`. Foreign keys are always DB-constrained now; an unconstrained FK (e.g. for soft/cross-system references) is no longer supported.
+- Remove `limit_choices_to=` from `ForeignKeyField` / `ManyToManyField` definitions. To constrain the rows offered for a relation, filter the related queryset explicitly in your form or view.
+- Replace any `QuerySet.complex_filter(...)` calls with `.filter(...)` — pass a dict of lookups or a `Q` object directly.
+- Most projects use none of these and need no changes. The `/plain-upgrade` skill handles the rewrites.
+
 ## [0.108.1](https://github.com/dropseed/plain/releases/plain-postgres@0.108.1) (2026-06-09)
 
 ### What's changed
