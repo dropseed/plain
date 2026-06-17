@@ -42,6 +42,7 @@ from plain.postgres.sql.constants import (
     ORDER_DIR,
     SINGLE,
 )
+from plain.postgres.sql.datastructures import Join
 from plain.postgres.sql.query import Query, get_order_dir
 from plain.postgres.transaction import TransactionManagementError
 from plain.utils.hashable import make_hashable
@@ -903,10 +904,14 @@ class SQLCompiler:
             and field.name != pieces[-1]
             and not getattr(transform_function, "has_transforms", False)
         ):
-            # Firstly, avoid infinite loops.
+            # Firstly, avoid infinite loops. Each join contributes its column
+            # pair to the signature; the base table (no join_col) contributes
+            # None. isinstance keeps `.join_col` greppable and type-checked.
             already_seen = already_seen or set()
+            alias_map = self.query.alias_map
             join_tuple = tuple(
-                getattr(self.query.alias_map[j], "join_col", None) for j in joins
+                alias_map[j].join_col if isinstance(alias_map[j], Join) else None
+                for j in joins
             )
             if join_tuple in already_seen:
                 raise FieldError("Infinite loop caused by ordering.")
