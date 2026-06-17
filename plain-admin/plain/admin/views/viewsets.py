@@ -34,21 +34,22 @@ class AdminViewset:
                 views.append(attr)
 
         for view in views:
-            view.viewset = cls
+            # Dynamic attributes stamped onto the view class by the viewset.
+            view.viewset = cls  # ty: ignore[unresolved-attribute]
 
             if ListView:
-                view.get_list_url = ListView.get_view_url
+                view.get_list_url = ListView.get_view_url  # ty: ignore[unresolved-attribute]
 
             if CreateView:
-                view.get_create_url = CreateView.get_view_url
+                view.get_create_url = CreateView.get_view_url  # ty: ignore[unresolved-attribute]
 
             if DetailView:
-                view.get_detail_url = DetailView.get_view_url
+                view.get_detail_url = DetailView.get_view_url  # ty: ignore[unresolved-attribute]
 
             if UpdateView:
-                view.get_update_url = UpdateView.get_view_url
+                view.get_update_url = UpdateView.get_view_url  # ty: ignore[unresolved-attribute]
 
             if DeleteView:
-                view.get_delete_url = DeleteView.get_view_url
+                view.get_delete_url = DeleteView.get_view_url  # ty: ignore[unresolved-attribute]
 
         return views

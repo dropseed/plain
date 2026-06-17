@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 from .parameters import JobParameters
 
@@ -41,6 +41,10 @@ class JobsRegistry:
 jobs_registry = JobsRegistry()
 
 
+@overload
+def register_job[T: type["Job"]](job_class: T, /, *, alias: str = ...) -> T: ...
+@overload
+def register_job[T: type["Job"]](*, alias: str = ...) -> Callable[[T], T]: ...
 def register_job[T: type["Job"]](
     job_class: T | None = None, *, alias: str = ""
 ) -> T | Callable[[T], T]:

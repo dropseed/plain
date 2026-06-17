@@ -550,7 +550,7 @@ class StateModelsRegistry(ModelsRegistry):
         self.ready = True
 
         # There shouldn't be any operations pending at this point.
-        from plain.postgres.preflight import _check_lazy_references
+        from plain.postgres.preflight.models import _check_lazy_references
 
         if errors := _check_lazy_references(self, packages_registry):
             raise ValueError("\n".join(error.fix for error in errors))
@@ -679,6 +679,7 @@ class ModelState:
             if getattr(field, "remote_field", None) and exclude_rels:
                 continue
             name = field.name
+            assert name is not None
             try:
                 fields.append((name, field.clone()))
             except TypeError as e:
@@ -688,6 +689,7 @@ class ModelState:
         if not exclude_rels:
             for field in model._model_meta.local_many_to_many:
                 name = field.name
+                assert name is not None
                 try:
                     fields.append((name, field.clone()))
                 except TypeError as e:
@@ -699,7 +701,7 @@ class ModelState:
             bases = []
             for base in model.__bases__:
                 bases.append(base)
-            return bases
+            return bases  # ty: ignore[invalid-return-type] (__bases__ widens to list[type])
 
         # We can't rely on __mro__ directly because we only want to flatten
         # abstract models and not the whole tree. However by recursing on

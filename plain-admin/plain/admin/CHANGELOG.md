@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.82.4](https://github.com/dropseed/plain/releases/plain-admin@0.82.4) (2026-06-08)
+
+### What's changed
+
+- Internal: typing-only changes for the `ty` 0.0.45 upgrade. `register_view` and `register_viewset` gain explicit `@overload` signatures so they type-check whether used bare (`@register_view`) or called (`@register_view()`), and `ty: ignore` comments were added where `AdminViewset` stamps dynamic URL helpers (`get_list_url`, etc.) onto its views. No runtime behavior changes. ([95f54e880d](https://github.com/dropseed/plain/commit/95f54e880d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.82.3](https://github.com/dropseed/plain/releases/plain-admin@0.82.3) (2026-05-25)
 
 ### What's changed

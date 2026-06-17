@@ -15,6 +15,8 @@ Plain esbuild provides a simple way to bundle JavaScript files using [esbuild](h
 
 For example, if you have `app/assets/js/app.esbuild.js`, running the build command will create `app/assets/js/app.esbuilt.js` alongside it.
 
+TypeScript and JSX entries work too — `app.esbuild.ts`, `app.esbuild.tsx`, and `app.esbuild.jsx` all compile to a `.esbuilt.js` output. JSX uses the automatic runtime, so you don't need to import React in every file.
+
 ```javascript
 // app/assets/js/app.esbuild.js
 import { someFunction } from "./utils.js";
@@ -55,7 +57,7 @@ Watch for changes and rebuild automatically:
 plain esbuild dev
 ```
 
-The dev command performs an initial build (without minification) and then watches for file changes. When you modify a `.esbuild.` file, it will automatically rebuild. If you delete a source file, the corresponding `.esbuilt.` output file is also removed.
+The dev command performs an initial build (without minification) and then watches for file changes. Each build records which files were bundled into each entry, so when a JS/TS source file changes, only the entries that actually import it are rebuilt — you can split your code into modules and they'll be picked up. If you delete an entry file, the corresponding `.esbuilt.` output file is also removed.
 
 ## FAQs
 

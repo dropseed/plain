@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+from .base import DATABASE_DEFAULT as DATABASE_DEFAULT
 from .base import (
-    BLANK_CHOICE_DASH,
     NOT_PROVIDED,
     Empty,
     Field,
 )
-from .base import DATABASE_DEFAULT as DATABASE_DEFAULT
 from .base import ChoicesField as ChoicesField
 from .base import DatabaseDefault as DatabaseDefault
 from .binary import BinaryField
@@ -26,7 +25,6 @@ from .text import EmailField, RandomStringField, TextField, URLField
 from .uuid import UUIDField
 
 __all__ = [
-    "BLANK_CHOICE_DASH",
     "PrimaryKeyField",
     "BigIntegerField",
     "BinaryField",

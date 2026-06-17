@@ -5,6 +5,7 @@
 - [Overview](#overview)
 - [Setting expiration](#setting-expiration)
 - [Get-or-set](#get-or-set)
+- [Counters](#counters)
 - [Batch operations](#batch-operations)
 - [Refreshing expiration](#refreshing-expiration)
 - [Checking and deleting](#checking-and-deleting)
@@ -32,7 +33,7 @@ value = cache.get("my-cache-key")
 
 `cache` is a stateless module-level store, so there's nothing to instantiate — just import it and call. Values live in a [`CachedItem`](./models.py#CachedItem) database model, so you don't need to set up Redis or any external caching service.
 
-Reads are **expiry-aware**: an entry past its `expires_at` reads as absent (`get()` returns the default, `exists()` returns `False`). Expired rows are deleted out of band — see [Automatic cleanup](#automatic-cleanup).
+Reads are **expiry-aware**: an entry past its `expires_at` reads as absent (`get()` returns the default). Expired rows are deleted out of band — see [Automatic cleanup](#automatic-cleanup).
 
 ## Setting expiration
 
@@ -74,6 +75,47 @@ data = cache.get_or_set(
 
 A stored `None` counts as a hit, so caching a computed `None` won't recompute it every time.
 
+## Counters
+
+`increment()` (and `decrement()`) atomically adjust a stored number in a single `INSERT ... ON CONFLICT` statement and return the new total. Because it's one statement, concurrent callers can't lose updates the way a read-then-`set()` would.
+
+```python
+from plain.cache import cache
+
+cache.increment("page-views")          # 1 (starts at the delta on a miss)
+cache.increment("page-views")          # 2
+cache.increment("page-views", 10)      # 12
+cache.decrement("page-views", 2)       # 10
+```
+
+A key with no numeric value yet — missing, or storing `None` — counts as `0`, so the first increment starts from the delta. Incrementing a key that holds a non-numeric value (a string, list, etc.) raises.
+
+### Expiration
+
+When you pass `expiration`, the counter behaves as a **fixed window**:
+
+- A **missing or expired** key starts fresh at the delta and takes the `expiration` you pass — a lapsed window resets cleanly to a new deadline.
+- A **live** key adds to the existing total and keeps its current `expires_at` — the window holds its original deadline, regardless of the `expiration` argument.
+
+This makes a "count per period" limiter straightforward — e.g. capping requests per IP:
+
+```python
+from plain.cache import cache
+
+def check_rate_limit(key: str, *, limit: int, period: int) -> bool:
+    """Allow up to `limit` calls per `period` seconds. Returns True if allowed."""
+    return cache.increment(key, expiration=period) <= limit
+```
+
+Note this is a _fixed_ window, so it permits a boundary burst (up to `limit` just before the window resets and `limit` just after). For smooth sliding-window or token-bucket limiting you need extra state this primitive doesn't carry.
+
+For a **sliding TTL** — reset only after a stretch of inactivity, rather than on a fixed schedule — refresh the expiry on each increment with [`touch()`](#refreshing-expiration). The count stays atomic; the TTL refresh is a cheap second statement:
+
+```python
+cache.increment("failed-logins:42", expiration=900)
+cache.touch("failed-logins:42", expiration=900)  # push the deadline out on every attempt
+```
+
 ## Batch operations
 
 Read or write many keys at once. `get_many()` is a single query and returns only the live entries:
@@ -105,11 +147,13 @@ touched = cache.touch("my-key", expiration=timedelta(days=30))  # True if live, 
 
 ## Checking and deleting
 
+There's no `exists()` — a single `get()` answers presence _and_ returns the value in one query, so check it directly:
+
 ```python
 from plain.cache import cache
 
-# Check for a live entry without fetching the value
-if cache.exists("my-key"):
+# Presence check (when None isn't a value you store)
+if cache.get("my-key") is not None:
     ...
 
 # Delete a single key (True if it existed)
@@ -118,6 +162,16 @@ cache.delete("my-key")
 # Delete everything
 cache.clear()  # returns the number of rows deleted
 ```
+
+If `None` is a value you legitimately store, pass a sentinel default to tell "absent" from a stored `None`:
+
+```python
+missing = object()
+if cache.get("my-key", missing) is not missing:
+    ...  # a live entry exists (its value may be None)
+```
+
+To compute-and-store on a miss, reach for [`get_or_set()`](#get-or-set) rather than checking first — it's one query and avoids a check-then-set race.
 
 ## Querying cached items
 
@@ -178,7 +232,7 @@ Any JSON-serializable value: strings, numbers, booleans, lists, dicts, and None.
 
 #### What happens when I access an expired item?
 
-`get()` returns the default (`None` unless you pass one) and `exists()` returns `False` — an expired entry reads as absent. The row remains in the database until cleaned up (see [Automatic cleanup](#automatic-cleanup)).
+`get()` returns the default (`None` unless you pass one) — an expired entry reads as absent. The row remains in the database until cleaned up (see [Automatic cleanup](#automatic-cleanup)).
 
 #### How big can cached values be?
 

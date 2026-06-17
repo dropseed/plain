@@ -1,5 +1,17 @@
 # plain-esbuild changelog
 
+## [0.11.0](https://github.com/dropseed/plain/releases/plain-esbuild@0.11.0) (2026-06-09)
+
+### What's changed
+
+- TypeScript and JSX entry points are now supported — `app.esbuild.ts`, `app.esbuild.tsx`, and `app.esbuild.jsx` all compile to a `.esbuilt.js` output. JSX is compiled with the automatic runtime (`--jsx=automatic`), so no `import React` is needed in every file. ([d3861340fc](https://github.com/dropseed/plain/commit/d3861340fc))
+- `plain esbuild dev` now does dependency-aware rebuilds. Each build records which files were bundled into each entry (via esbuild's metafile), and the watcher monitors all JS/TS source files in your asset dirs — not just `.esbuild.` entries. When a module changes, only the entries that actually import it are rebuilt, so you can split code across files and edits to any imported module trigger a rebuild. Entries whose last build failed are retried on any change. ([d3861340fc](https://github.com/dropseed/plain/commit/d3861340fc))
+- Builds invoke the local `node_modules/.bin/esbuild` binary directly when it exists, skipping `npx` resolution overhead on every build. ([d3861340fc](https://github.com/dropseed/plain/commit/d3861340fc))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.10.0](https://github.com/dropseed/plain/releases/plain-esbuild@0.10.0) (2026-05-12)
 
 ### What's changed

@@ -343,7 +343,7 @@ class SQLCompiler:
         if self.query.select_related:
             related_klass_infos = self.get_related_selections(select, select_mask)
             if klass_info is not None:
-                klass_info["related_klass_infos"] = related_klass_infos
+                klass_info["related_klass_infos"] = related_klass_infos  # ty: ignore[invalid-assignment] (heterogeneous klass_info dict)
 
         ret = []
         col_idx = 1
@@ -367,7 +367,7 @@ class SQLCompiler:
                 alias = f"col{col_idx}"
                 col_idx += 1
             ret.append((col, (sql, params), alias))
-        return ret, klass_info, annotations
+        return ret, klass_info, annotations  # ty: ignore[invalid-return-type] (heterogeneous klass_info dict)
 
     def _order_by_pairs(self) -> Generator[tuple[OrderBy, bool]]:
         if self.query.extra_order_by:
@@ -906,7 +906,7 @@ class SQLCompiler:
             # Firstly, avoid infinite loops.
             already_seen = already_seen or set()
             join_tuple = tuple(
-                getattr(self.query.alias_map[j], "join_cols", None) for j in joins
+                getattr(self.query.alias_map[j], "join_col", None) for j in joins
             )
             if join_tuple in already_seen:
                 raise FieldError("Infinite loop caused by ordering.")

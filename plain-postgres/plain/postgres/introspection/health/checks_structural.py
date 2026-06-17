@@ -192,10 +192,11 @@ def check_missing_fk_indexes(
     Partial indexes (``WHERE`` clause set on ``pg_index.indpred``) don't
     count: Postgres only uses them for queries that imply the partial
     predicate, so FK lookups and cascade deletes outside that predicate
-    still sequential-scan. The narrow ``WHERE fk IS NOT NULL`` case —
-    which Postgres can match to ``WHERE fk = ?`` — is conservatively
-    treated as not covering; users wanting guaranteed FK coverage should
-    add a regular non-partial index. Match the preflight's coverage rule.
+    still sequential-scan. The one exception is a predicate of exactly
+    ``<fk> IS NOT NULL`` on the FK column itself — every FK lookup and
+    referencing-side sweep is a ``WHERE fk = ?``, which implies
+    ``fk IS NOT NULL``, so Postgres can always use that partial. Match
+    the preflight's coverage rule.
     """
     cursor.execute("""
         SELECT
@@ -216,7 +217,11 @@ def check_missing_fk_indexes(
               FROM pg_catalog.pg_index i
               WHERE i.indrelid = c.conrelid
                 AND i.indkey[0] = c.conkey[1]
-                AND i.indpred IS NULL
+                AND (
+                    i.indpred IS NULL
+                    OR pg_get_expr(i.indpred, i.indrelid) =
+                        format('(%s IS NOT NULL)', quote_ident(a.attname))
+                )
           )
         ORDER BY ct.relname, a.attname
     """)

@@ -809,6 +809,7 @@ class QuerySet[T: "Model"]:
                 case_statement = Case(*when_statements, output_field=field)
                 # PostgreSQL requires casted CASE in updates
                 case_statement = Cast(case_statement, output_field=field)
+                assert field.name is not None
                 update_kwargs[field.name] = case_statement
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
@@ -1174,23 +1175,6 @@ class QuerySet[T: "Model"]:
             self._query.add_q(~Q(*args, **kwargs))
         else:
             self._query.add_q(Q(*args, **kwargs))
-
-    def complex_filter(self, filter_obj: Q | dict[str, Any]) -> QuerySet[T]:
-        """
-        Return a new QuerySet instance with filter_obj added to the filters.
-
-        filter_obj can be a Q object or a dictionary of keyword lookup
-        arguments.
-
-        This exists to support framework features such as 'limit_choices_to',
-        and usually it will be more natural to use other methods.
-        """
-        if isinstance(filter_obj, Q):
-            clone = self._chain()
-            clone.sql_query.add_q(filter_obj)
-            return clone
-        else:
-            return self._filter_or_exclude(False, args=(), kwargs=filter_obj)
 
     def select_for_update(
         self,

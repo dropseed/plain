@@ -1,5 +1,83 @@
 # plain-postgres changelog
 
+## [0.110.0](https://github.com/dropseed/plain/releases/plain-postgres@0.110.0) (2026-06-17)
+
+### What's changed
+
+- Internal: the foreign-key/related-field internals are collapsed to the single-column-to-`id` model Plain actually uses, removing the inherited Django composite-key and `to_field` scaffolding. `PathInfo.target_fields` (a tuple) becomes a scalar `target_field`, and a `Join` now holds one `join_col` pair instead of a `join_cols` list. The unused multi-column helpers go with it: `RelatedField.resolve_related_fields()`, the `related_fields`/`local_related_fields`/`foreign_related_fields` properties, `ForeignKeyField.get_reverse_joining_columns()`, and `ForeignObjectRel.get_related_field()` / `field_name` / `set_field_name()` / `db_type` / the `multiple` flag (along with its now-dead reverse-cache priming, left over from the long-removed one-to-one relation). `get_local_related_value()`, `get_foreign_related_value()`, and the join-column accessors now return scalars instead of 1-tuples. ([cbd15fb707](https://github.com/dropseed/plain/commit/cbd15fb707))
+- Internal: the related-lookup prep path (`related_lookups.py`, `lookups.py`) now narrows on `RelatedField | ForeignObjectRel` to find a relation's target field instead of duck-typing with `getattr(output_field, "target_field")` / `hasattr(..., "path_infos")`, so the dependency is greppable, type-checked, and fails loudly if it's ever removed rather than silently falling back. ([cbd15fb707](https://github.com/dropseed/plain/commit/cbd15fb707))
+
+### Upgrade instructions
+
+- No changes required. These are internal ORM query-construction details — how foreign keys, reverse relations, and many-to-many relations behave (filtering, prefetching, related-manager access) is unchanged.
+
+## [0.109.0](https://github.com/dropseed/plain/releases/plain-postgres@0.109.0) (2026-06-17)
+
+### What's changed
+
+- **The `db_constraint` argument is removed from `ForeignKeyField` — every foreign key is now backed by a database `FOREIGN KEY` constraint, always.** Because the database guarantees the referenced row exists, accessing a foreign key always builds a partial related instance from just the stored id (no query); the old "query on access when unconstrained" path is gone. The `fields.foreign_key_unconstrained_requires_no_action` preflight check is also removed. ([9ec559db38](https://github.com/dropseed/plain/commit/9ec559db38))
+- **`limit_choices_to` is removed from `ForeignKeyField` and `ManyToManyField`.** The supporting machinery goes with it: `RelatedField.get_choices()` / `get_limit_choices_to()`, `ForeignObjectRel.get_choices()`, and `QuerySet.complex_filter()` are removed, and `BLANK_CHOICE_DASH` is no longer exported from `plain.postgres.fields`. To restrict the rows offered for a relation, filter the queryset explicitly in your form or view. ([68b6ced4f0](https://github.com/dropseed/plain/commit/68b6ced4f0))
+- **The redundant foreign-key existence pre-check is removed.** `ForeignKeyField.validate()` no longer runs a `SELECT ... EXISTS` query to confirm the target row exists — one fewer query per FK validation. The database `FOREIGN KEY` constraint already enforces this, rejecting an invalid reference at write time (as a `psycopg.IntegrityError`). ([68b6ced4f0](https://github.com/dropseed/plain/commit/68b6ced4f0))
+- Internal: convergence (schema-drift) analysis now reuses a single session-private temp "probe" table per model across all of that model's round-trip comparisons, instead of creating and dropping one per index/constraint/default comparison — fewer DDL statements during schema checks. The internal `canon*` helpers were renamed to `probe`/`normalize`. ([67167a11ee](https://github.com/dropseed/plain/commit/67167a11ee), [06650bea63](https://github.com/dropseed/plain/commit/06650bea63))
+
+### Upgrade instructions
+
+- Remove any `db_constraint=False` arguments from `ForeignKeyField`. Foreign keys are always DB-constrained now; an unconstrained FK (e.g. for soft/cross-system references) is no longer supported.
+- Remove `limit_choices_to=` from `ForeignKeyField` / `ManyToManyField` definitions. To constrain the rows offered for a relation, filter the related queryset explicitly in your form or view.
+- Replace any `QuerySet.complex_filter(...)` calls with `.filter(...)` — pass a dict of lookups or a `Q` object directly.
+- Most projects use none of these and need no changes.
+
+## [0.108.1](https://github.com/dropseed/plain/releases/plain-postgres@0.108.1) (2026-06-09)
+
+### What's changed
+
+- `ensure_connection()` now detects a pooled connection the server has closed while it was held (Postgres restart, failover, idle timeout) and discards it before establishing a fresh one — logging a "Discarding dead database connection" warning — instead of repeatedly failing on the dead connection. Inside an atomic block the dead connection is intentionally left in place so the transaction's normal error handling runs, rather than silently continuing the rest of the block outside its transaction. ([9e82cb4454](https://github.com/dropseed/plain/commit/9e82cb4454))
+- Query span instrumentation no longer pays for expensive attributes when the span is sampled out: the per-query Python stack walk (for `code.*` attributes) and the `DEBUG`-mode stringification of query parameters now only happen when the span is actually recording. The cheap connection attributes are still passed at span creation so attribute-aware samplers can see them in `should_sample()`. ([af736043b0](https://github.com/dropseed/plain/commit/af736043b0))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.108.0](https://github.com/dropseed/plain/releases/plain-postgres@0.108.0) (2026-06-09)
+
+### What's changed
+
+- A partial index of exactly `WHERE <fk> IS NOT NULL` on the FK column now counts as FK index coverage — every FK lookup and referencing-side sweep is a `WHERE fk = ?`, which implies the predicate, so Postgres can always use it. Both the `postgres.missing_fk_indexes` preflight check (an `Index`/`UniqueConstraint` with `condition=Q(fk__isnull=False)`) and the doctor's missing-FK check (matching the live index predicate) accept it; any other partial predicate still doesn't count. ([4836069767](https://github.com/dropseed/plain/commit/4836069767))
+- The missing-FK-index warning now points out when an existing composite index or constraint already contains the FK at a non-leading position, suggesting a reorder to lead with the FK instead of adding a new index (safe when every query using the composite filters all of its columns with equality). ([084b6abba5](https://github.com/dropseed/plain/commit/084b6abba5))
+- Internal: the preflight checks moved from a single `preflight.py` into a `preflight/` package (`models.py`, `database.py`, `indexes.py`). Check names and behavior are unchanged. ([edc792d358](https://github.com/dropseed/plain/commit/edc792d358))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.107.1](https://github.com/dropseed/plain/releases/plain-postgres@0.107.1) (2026-06-08)
+
+### What's changed
+
+- Internal: typing-only cleanup for the `ty` 0.0.45 upgrade. `Query.order_by` is now annotated `tuple[Any, ...]` instead of relying on empty-tuple inference, a few field-name dict keys are narrowed via `assert` or the known-`str` loop variable, and `ty: ignore` comments on the intentionally heterogeneous `get_fields()` / `klass_info` structures were adjusted (net removal of several ignores). No runtime behavior changes. ([5c8015795d](https://github.com/dropseed/plain/commit/5c8015795d), [95f54e880d](https://github.com/dropseed/plain/commit/95f54e880d))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.107.0](https://github.com/dropseed/plain/releases/plain-postgres@0.107.0) (2026-06-07)
+
+### What's changed
+
+- **`ModelForm.save()` is replaced by explicit `create()` and `update()`**, mirroring the `Model.create()`/`update()` split from 0.106.0. The view already knows whether it's inserting or updating (`CreateView` vs `UpdateView`), so the form no longer branches on `instance._state.adding` to guess. `form.create()` INSERTs the instance (and its m2m data) and returns it; `form.update(fields=None)` UPDATEs it (and its m2m data) and returns it, with `fields=[...]` passed straight through to `Model.update()` to limit the columns written. `save(commit=...)` — including the `commit=False` deferred path — is removed. ([66634f5af9](https://github.com/dropseed/plain/commit/66634f5af9))
+
+### Upgrade instructions
+
+- Replace `form.save()` with `form.create()` in create flows and `form.update()` in update flows.
+- `form.update(fields=[...])` is available to limit the columns written (a pass-through to `Model.update(fields=...)`).
+- For the old `form.save(commit=False)` pattern (set extra non-form attributes, then save), assign those attributes on `form.instance` after `is_valid()`, then call `form.create()` / `form.update()` — m2m data is still saved for you, so the separate `save_m2m()` step is no longer needed:
+
+    ```python
+    if form.is_valid():
+        form.instance.user = request.user
+        obj = form.create()
+    ```
+
 ## [0.106.0](https://github.com/dropseed/plain/releases/plain-postgres@0.106.0) (2026-06-03)
 
 ### What's changed
@@ -12,7 +90,7 @@
 
 ### Upgrade instructions
 
-- Replace `obj.save()` with `obj.create()` for a new row or `obj.update()` for an existing one; `obj.save(update_fields=[...])` becomes `obj.update(fields=[...])`. The `/plain-upgrade` skill rewrites these for you — the create-vs-update choice is context-dependent, so it reasons per call site.
+- Replace `obj.save()` with `obj.create()` for a new row or `obj.update()` for an existing one; `obj.save(update_fields=[...])` becomes `obj.update(fields=[...])`.
 - Remove `force_insert=`/`force_update=` — `create()` and `update()` are the explicit forms.
 - Don't pass `id=` to a model constructor; load existing rows with `Model.query.get(id=...)`.
 - Catch `ValidationError` (or `(psycopg.IntegrityError, ValidationError)` when retrying) for unique/check conflicts on instance writes. Inside an open `transaction.atomic()` a violation aborts the transaction — wrap the write in its own `atomic()` to catch and continue.
