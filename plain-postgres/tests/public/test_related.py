@@ -7,6 +7,7 @@ from app.examples.models.delete import (
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 
+from plain.exceptions import ValidationError
 from plain.postgres import QuerySet
 
 
@@ -701,3 +702,13 @@ class TestForeignKeyPartialInstance:
         # Same exception family as an empty foreign key -- also an
         # AttributeError -- so hasattr() reports False rather than propagating.
         assert not hasattr(child, "parent")
+
+    def test_unconstrained_fk_validates_existence_on_create(self, db):
+        # With db_constraint=False there's no database FK to enforce the
+        # reference, so create() still verifies the target exists in Python and
+        # raises ValidationError on a missing one. (A constrained FK leaves this
+        # to the database and skips the redundant SELECT.)
+        parent = DeleteParent.query.create(name="Parent")
+        DeleteParent.query.filter(id=parent.id).delete()  # row gone; instance keeps id
+        with pytest.raises(ValidationError):
+            UnconstrainedChild(parent=parent).create()

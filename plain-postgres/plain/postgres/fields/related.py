@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import operator
 from collections.abc import Callable, Sequence
 from functools import cached_property, partial
 from typing import TYPE_CHECKING, Any, Self, cast
@@ -15,7 +14,7 @@ from plain.postgres.utils import make_model_tuple
 from plain.preflight import PreflightResult
 
 from ..registry import models_registry
-from . import BLANK_CHOICE_DASH, Field
+from . import Field
 from .base import ColumnField
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
@@ -98,7 +97,6 @@ class RelatedField(FieldCacheMixin, Field):
 
     non_migration_attrs = (
         *Field.non_migration_attrs,
-        "limit_choices_to",
         "related_query_name",
     )
 
@@ -110,10 +108,9 @@ class RelatedField(FieldCacheMixin, Field):
     # here so RelatedField methods (deconstruct, related_query_name) can
     # reference them without isinstance-narrowing.
     _related_query_name: str | None
-    _limit_choices_to: Any
 
     # No __init__: ForeignKeyField and ManyToManyField each set
-    # _related_query_name, _limit_choices_to, and remote_field themselves.
+    # _related_query_name and remote_field themselves.
 
     def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
         # Handle remote_field deepcopy for RelatedFields
@@ -273,8 +270,6 @@ class RelatedField(FieldCacheMixin, Field):
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
-        if self._limit_choices_to:
-            kwargs["limit_choices_to"] = self._limit_choices_to
         if self._related_query_name is not None:
             kwargs["related_query_name"] = self._related_query_name
         return name, path, args, kwargs
@@ -287,41 +282,6 @@ class RelatedField(FieldCacheMixin, Field):
 
     def do_related_class(self, other: type[Model], cls: type[Model]) -> None:
         self.set_attributes_from_rel()
-
-    def get_limit_choices_to(self) -> Any:
-        """
-        Return ``limit_choices_to`` for this model field.
-
-        If it is a callable, it will be invoked and the result will be
-        returned.
-        """
-        if callable(self.remote_field.limit_choices_to):
-            return self.remote_field.limit_choices_to()  # ty: ignore[call-top-callable]
-        return self.remote_field.limit_choices_to
-
-    def get_choices(
-        self,
-        include_blank: bool = True,
-        blank_choice: list[tuple[str, str]] = BLANK_CHOICE_DASH,
-        limit_choices_to: Any = None,
-        ordering: tuple[str, ...] = (),
-    ) -> list[tuple[Any, str]]:
-        """Return choices from the related model, for use as <select> options."""
-        rel_model = self.remote_field.model
-        if rel_model is None:
-            return blank_choice if include_blank else []
-        limit_choices_to = limit_choices_to or self.get_limit_choices_to()
-        get_related_field = getattr(self.remote_field, "get_related_field", None)
-        related_field_name = (
-            get_related_field().name if get_related_field is not None else "id"
-        )
-        choice_func = operator.attrgetter(related_field_name)
-        qs = rel_model.query.complex_filter(limit_choices_to)
-        if ordering:
-            qs = qs.order_by(*ordering)
-        return (blank_choice if include_blank else []) + [
-            (choice_func(x), str(x)) for x in qs
-        ]
 
     def related_query_name(self) -> str:
         """
@@ -376,7 +336,6 @@ class ForeignKeyField(ColumnField, RelatedField):
         to: type[Model] | str,
         on_delete: OnDelete,
         related_query_name: str | None = None,
-        limit_choices_to: Any = None,
         db_constraint: bool = True,
         *,
         required: bool = True,
@@ -385,8 +344,7 @@ class ForeignKeyField(ColumnField, RelatedField):
     ):
         # `default` and `choices` are intentionally not accepted: a hardcoded
         # FK id default is a portability/existence footgun, and the related
-        # model itself already defines the valid set. Use `limit_choices_to`
-        # to constrain the target rows.
+        # model itself already defines the valid set.
         if not isinstance(to, str):
             try:
                 to.model_options.model_name
@@ -407,13 +365,11 @@ class ForeignKeyField(ColumnField, RelatedField):
             validators=validators,
         )
         self._related_query_name = related_query_name
-        self._limit_choices_to = limit_choices_to
         self.remote_field = ForeignKeyRel(
             field=self,
             to=to,
             on_delete=on_delete,
             related_query_name=related_query_name,
-            limit_choices_to=limit_choices_to,
         )
         self.db_constraint = db_constraint
 
@@ -571,13 +527,19 @@ class ForeignKeyField(ColumnField, RelatedField):
         if value is None:
             return None
 
+        # With a database constraint (the default), Postgres enforces that the
+        # target row exists on write -- re-checking here would be a redundant
+        # SELECT on every create()/update(). Only verify existence in Python
+        # when there's no DB constraint to rely on.
+        if self.db_constraint:
+            return None
+
         field_name = self.remote_field.field_name
         if field_name is None:
             raise ValueError("remote_field.field_name cannot be None")
         qs = self.remote_field.model._model_meta.base_queryset.filter(
             **{field_name: value}
         )
-        qs = qs.complex_filter(self.get_limit_choices_to())
         if not qs.exists():
             raise exceptions.ValidationError(
                 "%(model)s instance with %(field)s %(value)r does not exist.",
@@ -698,13 +660,11 @@ class ManyToManyField(RelatedField):
         through: type[Model] | str,
         through_fields: tuple[str, str] | None = None,
         related_query_name: str | None = None,
-        limit_choices_to: Any = None,
         symmetrical: bool | None = None,
     ):
         # M2M has no database column, so `required`, `allow_null`, `default`,
         # `validators`, and `choices` are intentionally not accepted. Membership
-        # is managed through the related manager; filter target rows with
-        # `limit_choices_to`.
+        # is managed through the related manager.
         if not isinstance(to, str):
             try:
                 to._model_meta
@@ -724,7 +684,6 @@ class ManyToManyField(RelatedField):
             field=self,
             to=to,
             related_query_name=related_query_name,
-            limit_choices_to=limit_choices_to,
             symmetrical=symmetrical,
             through=through,
             through_fields=through_fields,
@@ -732,7 +691,6 @@ class ManyToManyField(RelatedField):
 
         super().__init__()
         self._related_query_name = related_query_name
-        self._limit_choices_to = limit_choices_to
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
