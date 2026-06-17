@@ -14,7 +14,7 @@
 - Remove any `db_constraint=False` arguments from `ForeignKeyField`. Foreign keys are always DB-constrained now; an unconstrained FK (e.g. for soft/cross-system references) is no longer supported.
 - Remove `limit_choices_to=` from `ForeignKeyField` / `ManyToManyField` definitions. To constrain the rows offered for a relation, filter the related queryset explicitly in your form or view.
 - Replace any `QuerySet.complex_filter(...)` calls with `.filter(...)` — pass a dict of lookups or a `Q` object directly.
-- Most projects use none of these and need no changes. The `/plain-upgrade` skill handles the rewrites.
+- Most projects use none of these and need no changes.
 
 ## [0.108.1](https://github.com/dropseed/plain/releases/plain-postgres@0.108.1) (2026-06-09)
 
@@ -57,7 +57,7 @@
 
 ### Upgrade instructions
 
-- Replace `form.save()` with `form.create()` in create flows and `form.update()` in update flows. The `/plain-upgrade` skill rewrites these for you — the create-vs-update choice is context-dependent, so it reasons per call site.
+- Replace `form.save()` with `form.create()` in create flows and `form.update()` in update flows.
 - `form.update(fields=[...])` is available to limit the columns written (a pass-through to `Model.update(fields=...)`).
 - For the old `form.save(commit=False)` pattern (set extra non-form attributes, then save), assign those attributes on `form.instance` after `is_valid()`, then call `form.create()` / `form.update()` — m2m data is still saved for you, so the separate `save_m2m()` step is no longer needed:
 
@@ -79,7 +79,7 @@
 
 ### Upgrade instructions
 
-- Replace `obj.save()` with `obj.create()` for a new row or `obj.update()` for an existing one; `obj.save(update_fields=[...])` becomes `obj.update(fields=[...])`. The `/plain-upgrade` skill rewrites these for you — the create-vs-update choice is context-dependent, so it reasons per call site.
+- Replace `obj.save()` with `obj.create()` for a new row or `obj.update()` for an existing one; `obj.save(update_fields=[...])` becomes `obj.update(fields=[...])`.
 - Remove `force_insert=`/`force_update=` — `create()` and `update()` are the explicit forms.
 - Don't pass `id=` to a model constructor; load existing rows with `Model.query.get(id=...)`.
 - Catch `ValidationError` (or `(psycopg.IntegrityError, ValidationError)` when retrying) for unique/check conflicts on instance writes. Inside an open `transaction.atomic()` a violation aborts the transaction — wrap the write in its own `atomic()` to catch and continue.

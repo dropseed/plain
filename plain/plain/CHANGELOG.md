@@ -144,7 +144,7 @@
 
 ### Upgrade instructions
 
-- **Replace `path(re.compile(...), ...)` with converter syntax.** The `<converter:name>` form (`<int:>`, `<str:>`, `<uuid:>`, `<path:>`, `<slug:>`) plus a custom `register_converter()` covers anything raw regex did. The `/plain-upgrade` skill rewrites the common cases.
+- **Replace `path(re.compile(...), ...)` with converter syntax.** The `<converter:name>` form (`<int:>`, `<str:>`, `<uuid:>`, `<path:>`, `<slug:>`) plus a custom `register_converter()` covers anything raw regex did.
 - **Drop `APPEND_SLASH` from `app/settings.py`** — it has no effect. Trailing-slash behavior is now decided per-route by whether `path("…/")` or `path("…")` is registered.
 - **Remove `RedirectSlashMiddleware` from `MIDDLEWARE`** if you had it.
 - **Update `request.get_full_path()` callers** to drop `force_append_slash=`. There was only one such caller in the framework itself (the deleted middleware).
@@ -174,7 +174,7 @@
         "plain.templates",
     ]
     ```
-- **Rewrite view imports**: anything that was `from plain.views import TemplateView` (or `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) is now `from plain.templates.views import ...`. The `/plain-upgrade` skill rewrites these automatically.
+- **Rewrite view imports**: anything that was `from plain.views import TemplateView` (or `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) is now `from plain.templates.views import ...`.
 - **Rewrite `from plain.templates import Template, register_template_*`** — the import path is unchanged, but you now need the `plain.templates` package installed for those imports to resolve at all.
 - **Drop any direct use of `request.path_info`** — replace with `request.path`. They've been equal in practice; there's no behavior change beyond the name.
 - **Custom subclasses of `Request`** that accepted a `path_info=` constructor kwarg must drop it.
