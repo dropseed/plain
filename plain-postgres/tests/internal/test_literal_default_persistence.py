@@ -148,11 +148,11 @@ def test_compile_literal_default_sql_handles_jsonfield():
 def test_special_char_string_default_round_trip(isolated_db):
     """Literal string defaults with quotes, newlines, and other typical
     non-ASCII punctuation must survive the round trip: compile → SET DEFAULT
-    → pg_get_expr → canonicalize the model side → compare. Otherwise every
+    → pg_get_expr → normalize the model side → compare. Otherwise every
     sync would flag CHANGED for safe-but-ugly inputs."""
     from conftest_convergence import column_default_sql, execute
 
-    from plain.postgres.convergence.analysis import _canonicalize_default_expr
+    from plain.postgres.convergence.analysis import _normalize_default_expr
     from plain.postgres.ddl import compile_literal_default_sql
 
     cases = [
@@ -178,12 +178,12 @@ def test_special_char_string_default_round_trip(isolated_db):
         assert actual_sql is not None
         connection = get_connection()
         with connection.cursor() as cursor:
-            canonical_expected = _canonicalize_default_expr(
+            normalized_expected = _normalize_default_expr(
                 cursor, DefaultsExample, "status", expected_sql
             )
-        assert canonical_expected == actual_sql, (
+        assert normalized_expected == actual_sql, (
             f"round-trip drift for default={value!r}: "
-            f"compiled={expected_sql!r} canonical={canonical_expected!r} "
+            f"compiled={expected_sql!r} normalized={normalized_expected!r} "
             f"catalog={actual_sql!r}"
         )
 

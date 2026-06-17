@@ -646,7 +646,7 @@ class DatabaseConnection:
             }
         # Now get indexes. Sort order, opclasses, INCLUDE, and predicates all
         # ride along inside `pg_get_indexdef` and are compared via the
-        # canonical-tail round-trip in convergence — no need to introspect
+        # normalized-tail round-trip in convergence — no need to introspect
         # them here as separate columns.
         cursor.execute(
             """
