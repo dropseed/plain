@@ -30,22 +30,4 @@ class Migration(migrations.Migration):
                 "constraints": [],
             },
         ),
-        migrations.CreateModel(
-            name="UnconstrainedChild",
-            fields=[
-                ("id", postgres.PrimaryKeyField()),
-                (
-                    "parent",
-                    postgres.ForeignKeyField(
-                        db_constraint=False,
-                        on_delete=plain.postgres.deletion.NO_ACTION,
-                        to="examples.deleteparent",
-                    ),
-                ),
-            ],
-            options={
-                "indexes": [],
-                "constraints": [],
-            },
-        ),
     ]

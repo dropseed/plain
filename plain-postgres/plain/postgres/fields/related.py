@@ -5,9 +5,8 @@ from collections.abc import Callable, Sequence
 from functools import cached_property, partial
 from typing import TYPE_CHECKING, Any, Self, cast
 
-from plain import exceptions
 from plain.postgres.constants import LOOKUP_SEP
-from plain.postgres.deletion import NO_ACTION, SET_NULL, OnDelete
+from plain.postgres.deletion import SET_NULL, OnDelete
 from plain.postgres.exceptions import FieldDoesNotExist, FieldError
 from plain.postgres.query_utils import PathInfo
 from plain.postgres.utils import make_model_tuple
@@ -336,7 +335,6 @@ class ForeignKeyField(ColumnField, RelatedField):
         to: type[Model] | str,
         on_delete: OnDelete,
         related_query_name: str | None = None,
-        db_constraint: bool = True,
         *,
         required: bool = True,
         allow_null: bool = False,
@@ -371,7 +369,6 @@ class ForeignKeyField(ColumnField, RelatedField):
             on_delete=on_delete,
             related_query_name=related_query_name,
         )
-        self.db_constraint = db_constraint
 
     def __copy__(self) -> ForeignKeyField:
         obj = super().__copy__()
@@ -483,18 +480,6 @@ class ForeignKeyField(ColumnField, RelatedField):
                     id="fields.foreign_key_null_constraint_violation",
                 )
             )
-        if not self.db_constraint and on_delete is not NO_ACTION:
-            results.append(
-                PreflightResult(
-                    fix=(
-                        "db_constraint=False requires on_delete=NO_ACTION. "
-                        "Without a FOREIGN KEY constraint there is no place for "
-                        "Postgres to apply the delete behavior."
-                    ),
-                    obj=self,
-                    id="fields.foreign_key_unconstrained_requires_no_action",
-                )
-            )
         return results
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
@@ -510,9 +495,6 @@ class ForeignKeyField(ColumnField, RelatedField):
         else:
             kwargs["to"] = self.remote_field.model.model_options.label_lower
 
-        if self.db_constraint is not True:
-            kwargs["db_constraint"] = self.db_constraint
-
         return name, path, args, kwargs
 
     def to_python(self, value: Any) -> Any:
@@ -521,36 +503,6 @@ class ForeignKeyField(ColumnField, RelatedField):
     @property
     def target_field(self) -> Field:
         return self.foreign_related_fields[0]
-
-    def validate(self, value: Any, model_instance: Model) -> None:
-        super().validate(value, model_instance)
-        if value is None:
-            return None
-
-        # With a database constraint (the default), Postgres enforces that the
-        # target row exists on write -- re-checking here would be a redundant
-        # SELECT on every create()/update(). Only verify existence in Python
-        # when there's no DB constraint to rely on.
-        if self.db_constraint:
-            return None
-
-        field_name = self.remote_field.field_name
-        if field_name is None:
-            raise ValueError("remote_field.field_name cannot be None")
-        qs = self.remote_field.model._model_meta.base_queryset.filter(
-            **{field_name: value}
-        )
-        if not qs.exists():
-            raise exceptions.ValidationError(
-                "%(model)s instance with %(field)s %(value)r does not exist.",
-                code="invalid",
-                params={
-                    "model": self.remote_field.model.model_options.model_name,
-                    "id": value,
-                    "field": self.remote_field.field_name,
-                    "value": value,
-                },
-            )
 
     def resolve_related_fields(self) -> list[tuple[ForeignKeyField, Field]]:
         if isinstance(self.remote_field.model, str):
@@ -940,9 +892,6 @@ class ManyToManyField(RelatedField):
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
-
-        if self.remote_field.db_constraint is not True:
-            kwargs["db_constraint"] = self.remote_field.db_constraint
 
         # Lowercase model names as they should be treated as case-insensitive.
         if isinstance(self.remote_field.model, str):

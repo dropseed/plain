@@ -259,14 +259,12 @@ class ManyToManyRel(ForeignObjectRel):
         self.through_fields = through_fields
 
         self.symmetrical = symmetrical
-        self.db_constraint = True
 
     @property
     def identity(self) -> tuple[Any, ...]:
         return super().identity + (
             self.through,
             make_hashable(self.through_fields),
-            self.db_constraint,
         )
 
     def get_related_field(self) -> Field:

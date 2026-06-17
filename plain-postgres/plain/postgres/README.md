@@ -944,7 +944,7 @@ book.author.name   # one query — loads the rest of the row
 
 The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `select_related()` to load related rows up front and avoid a query per row.
 
-The partial-instance shortcut relies on the database guaranteeing the row exists. A foreign key declared with `db_constraint=False` has no such guarantee, so it is queried on access instead — a stale key raises `DoesNotExist` right away rather than yielding a placeholder.
+The partial-instance shortcut is safe because Plain always creates a database foreign-key constraint, so the referenced row is guaranteed to exist.
 
 ### Reverse relationships
 

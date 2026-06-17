@@ -3,11 +3,9 @@ from app.examples.models.delete import (
     ChildCascade,
     ChildSetNull,
     DeleteParent,
-    UnconstrainedChild,
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 
-from plain.exceptions import ValidationError
 from plain.postgres import QuerySet
 
 
@@ -676,39 +674,3 @@ class TestForeignKeyPartialInstance:
         with pytest.raises(AttributeError):
             del child.parent
         assert fk_field.is_cached(child)  # ty: ignore[unresolved-attribute]
-
-    def test_unconstrained_fk_is_queried_on_access(self, db):
-        # A db_constraint=False foreign key has no database guarantee that the
-        # row exists, so it is queried on access rather than synthesized.
-        parent = DeleteParent.query.create(name="Parent")
-        created = UnconstrainedChild.query.create(parent=parent)
-        child = UnconstrainedChild.query.get(id=created.id)
-
-        related, queries = self._count_queries(lambda: child.parent)
-        assert queries == 1
-        assert related == parent
-
-    def test_unconstrained_fk_raises_on_missing_target(self, db):
-        # Without a database FK constraint the target row can disappear. The
-        # stale key must raise on access -- not return a phantom partial
-        # instance that looks valid until a non-key field is read.
-        parent = DeleteParent.query.create(name="Parent")
-        created = UnconstrainedChild.query.create(parent=parent)
-        parent.delete()  # NO_ACTION + no DB constraint: the child now dangles
-
-        child = UnconstrainedChild.query.get(id=created.id)
-        with pytest.raises(DeleteParent.DoesNotExist):
-            _ = child.parent
-        # Same exception family as an empty foreign key -- also an
-        # AttributeError -- so hasattr() reports False rather than propagating.
-        assert not hasattr(child, "parent")
-
-    def test_unconstrained_fk_validates_existence_on_create(self, db):
-        # With db_constraint=False there's no database FK to enforce the
-        # reference, so create() still verifies the target exists in Python and
-        # raises ValidationError on a missing one. (A constrained FK leaves this
-        # to the database and skips the redundant SELECT.)
-        parent = DeleteParent.query.create(name="Parent")
-        DeleteParent.query.filter(id=parent.id).delete()  # row gone; instance keeps id
-        with pytest.raises(ValidationError):
-            UnconstrainedChild(parent=parent).create()

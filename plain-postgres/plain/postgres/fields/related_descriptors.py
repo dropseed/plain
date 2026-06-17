@@ -147,29 +147,11 @@ class ForwardForeignKeyDescriptor:
                 remote_model = self.field.remote_field.model
                 target_name = self.field.target_field.name
                 assert target_name is not None
-                if self.field.db_constraint:
-                    # The database guarantees the row exists, so build a
-                    # partial related instance with only its primary key
-                    # loaded -- no query. Accessing any other field triggers
-                    # the full-row deferred load.
-                    rel_obj = remote_model.from_db([target_name], [pk_value])
-                else:
-                    # Without a database FK constraint the target row may not
-                    # exist. Query for it so a stale key fails on access,
-                    # rather than yielding a phantom partial instance that
-                    # only breaks once a non-key field is read. A missing row
-                    # raises RelatedObjectDoesNotExist -- the same exception
-                    # an empty foreign key raises -- so every unresolved
-                    # foreign key access fails the same way regardless of
-                    # how the row was loaded.
-                    try:
-                        rel_obj = self.get_queryset().get(**{target_name: pk_value})
-                    except remote_model.DoesNotExist:
-                        raise self.RelatedObjectDoesNotExist(
-                            f"{self.field.model.__name__}.{self.field.name} "
-                            f"points to a {remote_model.__name__} that does "
-                            f"not exist."
-                        ) from None
+                # The database FK constraint guarantees the row exists, so build
+                # a partial related instance with only its primary key loaded --
+                # no query. Accessing any other field triggers the full-row
+                # deferred load.
+                rel_obj = remote_model.from_db([target_name], [pk_value])
                 # For a one-to-one relation, prime the reverse cache too.
                 if not self.field.remote_field.multiple:
                     self.field.remote_field.set_cached_value(rel_obj, instance)

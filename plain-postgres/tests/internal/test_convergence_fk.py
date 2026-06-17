@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.examples.models.delete import ChildCascade, ChildSetNull, UnconstrainedChild
+from app.examples.models.delete import ChildCascade, ChildSetNull
 from app.examples.models.relationships import Widget, WidgetTag
 from app.examples.models.trees import TreeNode
 from conftest_convergence import (
@@ -485,17 +485,3 @@ class TestForeignKeyOnDelete:
         assert execute_plan(items).ok
 
         assert fk_on_delete_action("examples_childsetnull", fk_name) == "n"
-
-
-class TestDbConstraintFalse:
-    def test_no_fk_constraint_for_unconstrained(self, db):
-        """db_constraint=False produces no FK constraint and no drift."""
-        fk_names = get_fk_constraint_names("examples_unconstrainedchild")
-        assert fk_names == []
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, UnconstrainedChild)
-
-        fk_drifts = [d for d in analysis.drifts if isinstance(d, ForeignKeyDrift)]
-        assert fk_drifts == []

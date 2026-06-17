@@ -1101,7 +1101,7 @@ def _compare_foreign_keys(
     # Value: (field_name, constraint_name, expected_on_delete_clause, expected_confdeltype)
     expected_fks: dict[tuple[str, str, str], tuple[str, str, str, str]] = {}
     for f in model._model_meta.local_fields:
-        if isinstance(f, ForeignKeyField) and f.db_constraint:
+        if isinstance(f, ForeignKeyField):
             assert f.name is not None
             to_table = f.target_field.model.model_options.db_table
             to_column = f.target_field.column
