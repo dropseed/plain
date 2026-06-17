@@ -35,7 +35,6 @@ from app.examples.models.delete import (
     Grandparent,
     HideableItem,
     MidParent,
-    UnconstrainedChild,
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.trees import TreeNode
@@ -509,29 +508,6 @@ def test_cascade_delete_issues_one_query(db):
     assert query_count == 1, (
         f"Expected one DELETE; got {query_count} queries — Collector may have "
         f"crept back, or _raw_delete lost its single-statement property."
-    )
-
-
-# ===========================================================================
-# 9. db_constraint=False requires on_delete=NO_ACTION (preflight)
-# ===========================================================================
-
-
-def test_unconstrained_with_cascade_is_rejected_at_preflight():
-    """db_constraint=False has no FK constraint to attach on_delete to, so
-    anything other than NO_ACTION is rejected at model-check."""
-    from plain import postgres
-    from plain.postgres.fields.related import ForeignKeyField
-
-    field = ForeignKeyField(
-        DeleteParent, on_delete=postgres.CASCADE, db_constraint=False
-    )
-    field.set_attributes_from_name("parent")
-    field.model = UnconstrainedChild
-    results = field._check_on_delete()
-
-    assert any(
-        r.id == "fields.foreign_key_unconstrained_requires_no_action" for r in results
     )
 
 

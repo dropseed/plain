@@ -5,9 +5,38 @@ from typing import Any, TypeVar
 
 from plain.runtime import settings
 
-from .results import PreflightResult
+from .checks import PreflightCheck
+from .results import PreflightResult, unused_silenced_results
 
 T = TypeVar("T")
+
+UNUSED_SILENCES_CHECK_NAME = "preflight.unused_silences"
+
+
+class CheckUnusedSilences(PreflightCheck):
+    """Reports `PREFLIGHT_SILENCED_RESULTS` entries that matched nothing.
+
+    An unused entry is either a typo or stale — the issue it silenced has
+    been fixed. Not registered like a normal check: it needs every other
+    check's results, so the registry runs it last with the full run's
+    results, and only on a full run (deploy checks included) — a partial
+    run skips checks whose entries would then look unused.
+    """
+
+    def __init__(self, run_results: list[PreflightResult]) -> None:
+        self.run_results = run_results
+
+    def run(self) -> list[PreflightResult]:
+        return [
+            PreflightResult(
+                fix=f"Silenced result {entry!r} matched nothing in this run. "
+                "Remove it from PREFLIGHT_SILENCED_RESULTS or fix the typo.",
+                obj=entry,
+                id="preflight.unused_silence",
+                warning=True,
+            )
+            for entry in unused_silenced_results(self.run_results)
+        ]
 
 
 class CheckRegistry:
@@ -31,15 +60,20 @@ class CheckRegistry:
         """
         Run all registered checks and yield (check_class, name, results) tuples.
         """
-        # Validate silenced check names
+        # Validate silenced check names (the unused-silences check isn't in
+        # self.checks — the registry emits it itself — but it's silenceable
+        # like any other check)
         silenced_checks = settings.PREFLIGHT_SILENCED_CHECKS
-        unknown_silenced = set(silenced_checks) - set(self.checks.keys())
+        known_checks = set(self.checks.keys()) | {UNUSED_SILENCES_CHECK_NAME}
+        unknown_silenced = set(silenced_checks) - known_checks
         if unknown_silenced:
             unknown_names = ", ".join(sorted(unknown_silenced))
             raise ValueError(
                 f"Unknown check names in PREFLIGHT_SILENCED_CHECKS: {unknown_names}. "
                 "Check for typos or remove outdated check names."
             )
+
+        all_results: list[PreflightResult] = []
 
         for name, (check_class, deploy) in sorted(self.checks.items()):
             # Skip silenced checks
@@ -53,7 +87,12 @@ class CheckRegistry:
             # Instantiate and run check
             check = check_class()
             results = check.run()
+            all_results.extend(results)
             yield check_class, name, results
+
+        if include_deploy_checks and UNUSED_SILENCES_CHECK_NAME not in silenced_checks:
+            check = CheckUnusedSilences(all_results)
+            yield CheckUnusedSilences, UNUSED_SILENCES_CHECK_NAME, check.run()
 
 
 checks_registry = CheckRegistry()

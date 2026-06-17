@@ -893,13 +893,6 @@ class MigrationAutodetector:
                 )
                 if rename_key in self.renamed_models:
                     new_field.remote_field.model = old_field.remote_field.model  # ty: ignore[unresolved-attribute]
-                # Handle ForeignKeyField which can only have a single to_field.
-                remote_field_name = getattr(new_field.remote_field, "field_name", None)
-                if remote_field_name:
-                    to_field_rename_key = rename_key + (remote_field_name,)
-                    if to_field_rename_key in self.renamed_fields:
-                        # Repoint model name only
-                        new_field.remote_field.model = old_field.remote_field.model  # ty: ignore[unresolved-attribute]
                 dependencies.extend(
                     self._get_dependencies_for_foreign_key(
                         package_label,
@@ -974,10 +967,10 @@ class MigrationAutodetector:
             old_udt = old_field.unqualified_db_type()
             new_udt = new_field.unqualified_db_type()
         except ValueError:
-            # RelatedField.resolve_related_fields raises ValueError when the
-            # target model is a string ref that hasn't been resolved on the
-            # state instance. Let the AlterField through — the schema editor
-            # will surface any mismatch at apply time.
+            # ForeignKeyField.target_field raises ValueError when the target
+            # model is a string ref that hasn't been resolved on the state
+            # instance. Let the AlterField through — the schema editor will
+            # surface any mismatch at apply time.
             return
         if old_udt is None or new_udt is None or old_udt == new_udt:
             return

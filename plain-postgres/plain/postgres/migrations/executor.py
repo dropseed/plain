@@ -47,7 +47,7 @@ class MigrationExecutor:
                 if migration not in applied:
                     plan.append(self.loader.graph.nodes[migration])
                     applied[migration] = self.loader.graph.nodes[migration]
-        return plan
+        return plan  # ty: ignore[invalid-return-type] (graph.nodes may hold dummy None, never reached here)
 
     def _create_project_state(
         self, with_applied_migrations: bool = False

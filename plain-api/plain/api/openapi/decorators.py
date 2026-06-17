@@ -33,7 +33,7 @@ def response_typed_dict(
             registry: dict[str, Any] = {}
             top_ref = schema_from_type(return_type, components=registry)
             response_schema["content"] = json_content(top_ref)
-            func.openapi_components = merge_data(
+            func.openapi_components = merge_data(  # ty: ignore[unresolved-attribute] (dynamic attribute stamped by decorator)
                 getattr(func, "openapi_components", {}),
                 registry,
             )
@@ -46,7 +46,7 @@ def response_typed_dict(
                     }
                 }
             }
-            func.openapi_components = merge_data(
+            func.openapi_components = merge_data(  # ty: ignore[unresolved-attribute] (dynamic attribute stamped by decorator)
                 getattr(func, "openapi_components", {}),
                 {
                     "responses": {
@@ -58,7 +58,7 @@ def response_typed_dict(
             _schema = {"responses": {str(status_code): response_schema}}
 
         # Add the response schema to the function
-        func.openapi_schema = merge_data(
+        func.openapi_schema = merge_data(  # ty: ignore[unresolved-attribute] (dynamic attribute stamped by decorator)
             getattr(func, "openapi_schema", {}),
             _schema,
         )
@@ -153,7 +153,7 @@ def request_form(form_class: type[Form]) -> Callable[[F], F]:
             # The body is required if any field is
             request_body["required"] = True
 
-        func.openapi_schema = merge_data(
+        func.openapi_schema = merge_data(  # ty: ignore[unresolved-attribute] (dynamic attribute stamped by decorator)
             getattr(func, "openapi_schema", {}),
             _schema,
         )
@@ -169,7 +169,7 @@ def schema(data: dict[str, Any]) -> Callable[[F], F]:
     """
 
     def decorator(func: F) -> F:
-        func.openapi_schema = merge_data(
+        func.openapi_schema = merge_data(  # ty: ignore[unresolved-attribute] (dynamic attribute stamped by decorator)
             getattr(func, "openapi_schema", {}),
             data,
         )

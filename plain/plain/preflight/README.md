@@ -207,6 +207,21 @@ PREFLIGHT_SILENCED_RESULTS = [
 ]
 ```
 
+You can also silence a result for one specific object by qualifying the ID as `"<id>:<obj>"`. Other objects with the same result ID keep warning:
+
+```python
+# app/settings.py
+PREFLIGHT_SILENCED_RESULTS = [
+    # sender_account is never filtered and Accounts are never bulk-deleted,
+    # so the FK index would be pure write overhead.
+    "postgres.missing_fk_index:insights.InsightEvent.sender_account",
+]
+```
+
+The object label is whatever appears before the result ID in the preflight output (for model-level results, the model's label).
+
+Entries that match nothing are reported as warnings by the `preflight.unused_silences` check, which runs last on `plain preflight --deploy` — an unused entry is either a typo or stale (the issue it silenced has been fixed), so remove it.
+
 ## FAQs
 
 #### What's the difference between a check name and a result ID?

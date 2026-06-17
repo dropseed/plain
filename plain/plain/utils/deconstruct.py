@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from importlib import import_module
-from typing import Any
+from typing import Any, overload
 
 
+@overload
+def deconstructible[T](cls: type[T], /) -> type[T]: ...
+@overload
+def deconstructible[T](*, path: str | None = ...) -> Callable[[type[T]], type[T]]: ...
 def deconstructible[T](
     *args: type[T], path: str | None = None
 ) -> Callable[[type[T]], type[T]] | type[T]:

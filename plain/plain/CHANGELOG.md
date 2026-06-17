@@ -1,5 +1,36 @@
 # plain changelog
 
+## [0.150.0](https://github.com/dropseed/plain/releases/plain@0.150.0) (2026-06-09)
+
+### What's changed
+
+- `PREFLIGHT_SILENCED_RESULTS` now accepts obj-qualified entries in the form `"<id>:<obj>"`, silencing a result for one specific object while the same result ID keeps warning everywhere else. For example, `"postgres.missing_fk_index:app.InsightEvent.sender_account"` silences the missing-FK-index warning for that one field only. The object label is whatever appears before the result ID in the preflight output. ([efd02c5ee2](https://github.com/dropseed/plain/commit/efd02c5ee2))
+- A new `preflight.unused_silences` check runs last on full preflight runs (`plain preflight --deploy`) and warns about `PREFLIGHT_SILENCED_RESULTS` entries that matched nothing — an unused entry is either a typo or stale (the issue it silenced has been fixed). It can be silenced via `PREFLIGHT_SILENCED_CHECKS` like any other check, and the matching logic is available as `plain.preflight.unused_silenced_results()`. ([f5863c70be](https://github.com/dropseed/plain/commit/f5863c70be))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.149.1](https://github.com/dropseed/plain/releases/plain@0.149.1) (2026-06-08)
+
+### What's changed
+
+- Internal: typing-only changes for the `ty` 0.0.45 upgrade. `@deconstructible` gains explicit `@overload` signatures so it type-checks correctly whether applied bare (`@deconstructible`) or with arguments (`@deconstructible(path=...)`), `Worker`'s `sockets` parameter widens from `list` to `Sequence`, and a few `ty: ignore` comments were added or removed to match. No runtime behavior changes. ([95f54e880d](https://github.com/dropseed/plain/commit/95f54e880d))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.149.0](https://github.com/dropseed/plain/releases/plain@0.149.0) (2026-06-07)
+
+### What's changed
+
+- **`JsonResponse` no longer accepts a `safe` argument.** Previously it defaulted to `safe=True` and raised `TypeError` unless `data` was a `dict`; you passed `safe=False` to serialize a list or any other non-dict value. The dict-only guard and the parameter are both gone — `JsonResponse` now serializes any JSON-serializable value directly. ([52338f58da](https://github.com/dropseed/plain/commit/52338f58da))
+
+### Upgrade instructions
+
+- Drop `safe=` from `JsonResponse(...)` calls. If you passed `safe=False` to serialize a list (or any non-dict), just remove the argument — the value now serializes as-is. `safe=True` was the default and is likewise gone.
+
 ## [0.148.1](https://github.com/dropseed/plain/releases/plain@0.148.1) (2026-06-03)
 
 ### What's changed
@@ -113,7 +144,7 @@
 
 ### Upgrade instructions
 
-- **Replace `path(re.compile(...), ...)` with converter syntax.** The `<converter:name>` form (`<int:>`, `<str:>`, `<uuid:>`, `<path:>`, `<slug:>`) plus a custom `register_converter()` covers anything raw regex did. The `/plain-upgrade` skill rewrites the common cases.
+- **Replace `path(re.compile(...), ...)` with converter syntax.** The `<converter:name>` form (`<int:>`, `<str:>`, `<uuid:>`, `<path:>`, `<slug:>`) plus a custom `register_converter()` covers anything raw regex did.
 - **Drop `APPEND_SLASH` from `app/settings.py`** — it has no effect. Trailing-slash behavior is now decided per-route by whether `path("…/")` or `path("…")` is registered.
 - **Remove `RedirectSlashMiddleware` from `MIDDLEWARE`** if you had it.
 - **Update `request.get_full_path()` callers** to drop `force_append_slash=`. There was only one such caller in the framework itself (the deleted middleware).
@@ -143,7 +174,7 @@
         "plain.templates",
     ]
     ```
-- **Rewrite view imports**: anything that was `from plain.views import TemplateView` (or `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) is now `from plain.templates.views import ...`. The `/plain-upgrade` skill rewrites these automatically.
+- **Rewrite view imports**: anything that was `from plain.views import TemplateView` (or `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) is now `from plain.templates.views import ...`.
 - **Rewrite `from plain.templates import Template, register_template_*`** — the import path is unchanged, but you now need the `plain.templates` package installed for those imports to resolve at all.
 - **Drop any direct use of `request.path_info`** — replace with `request.path`. They've been equal in practice; there's no behavior change beyond the name.
 - **Custom subclasses of `Request`** that accepted a `path_info=` constructor kwarg must drop it.

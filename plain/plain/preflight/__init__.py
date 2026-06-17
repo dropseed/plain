@@ -5,7 +5,7 @@ from .registry import (
     run_checks,
     set_check_counts,
 )
-from .results import PreflightResult
+from .results import PreflightResult, unused_silenced_results
 
 # Import these to force registration of checks
 import plain.preflight.files  # NOQA isort:skip
@@ -21,4 +21,5 @@ __all__ = [
     "register_check",
     "run_checks",
     "set_check_counts",
+    "unused_silenced_results",
 ]

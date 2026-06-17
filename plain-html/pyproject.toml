@@ -11,7 +11,7 @@ dependencies = ["plain<1.0.0", "python-frontmatter>=1.1.0"]
 [dependency-groups]
 # `ty` is pinned in dev — Phase 9 (`plain html check --typecheck`) shells out
 # to it. Alpha tool: bump deliberately, not by lockfile drift.
-dev = ["plain.pytest<1.0.0", "html5lib>=1.1", "ty==0.0.34", "jinja2>=3.1.2"]
+dev = ["plain.pytest<1.0.0", "html5lib>=1.1", "ty>=0.0.45", "jinja2>=3.1.2"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

@@ -711,12 +711,6 @@ class WorkerHeartbeat(postgres.Model):
 
     model_options = postgres.Options(
         ordering=["-last_heartbeat_at"],
-        indexes=[
-            postgres.Index(
-                name="plainjobs_workerheartbeat_last_heartbeat_at_idx",
-                fields=["last_heartbeat_at"],
-            ),
-        ],
         constraints=[
             # The unique constraint provides the worker_id lookup index.
             postgres.UniqueConstraint(

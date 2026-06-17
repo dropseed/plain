@@ -19,15 +19,17 @@ from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .backups.core import DatabaseBackups
 from .mkcert import MkcertManager
-from .process import ProcessManager
+from .process import Supervisor
 from .utils import has_pyproject_toml
 
 ENTRYPOINT_GROUP = "plain.dev"
 
 
-class DevProcess(ProcessManager):
+class DevSupervisor(Supervisor):
     pidfile = PLAIN_TEMP_PATH / "dev" / "dev.pid"
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "run"
+    background_command = ["dev"]
+    display_name = "`plain dev`"
 
     def setup(
         self, *, port: int | None, hostname: str | None, log_level: str | None
@@ -49,7 +51,6 @@ class DevProcess(ProcessManager):
         self.hostname = hostname
         self.log_level = log_level
 
-        self.pid_value = self.pid
         self.prepare_log()
 
         if port:
@@ -132,7 +133,10 @@ class DevProcess(ProcessManager):
         return result != 0
 
     def run(self, *, reinstall_ssl: bool = False) -> int:
-        self.write_pidfile()
+        if not self.acquire():
+            click.secho(self.already_running_message(self.read_pidfile()), fg="yellow")
+            return 1
+
         mkcert_manager = MkcertManager()
         mkcert_manager.setup_mkcert(
             install_path=Path.home() / ".plain" / "dev",
@@ -150,12 +154,6 @@ class DevProcess(ProcessManager):
 
         print_event("Running preflight checks...", newline=False)
         self.run_preflight()
-
-        # if ServicesProcess.running_pid():
-        #     self.poncho.add_process(
-        #         "services",
-        #         f"{sys.executable} -m plain dev logs --services --follow",
-        #     )
 
         if find_spec("plain.postgres"):
             print_event("Waiting for database...", newline=False)
@@ -211,7 +209,7 @@ class DevProcess(ProcessManager):
             # Remove the status bar
             self.console_status.stop()
         finally:
-            self.rm_pidfile()
+            self.release()
             self.close()
 
         assert self.poncho.returncode is not None, "returncode should be set after loop"

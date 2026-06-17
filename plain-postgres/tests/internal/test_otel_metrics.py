@@ -15,8 +15,10 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
+from opentelemetry.trace import NoOpTracer
 from psycopg_pool import PoolTimeout
 
+from plain.postgres import otel as postgres_otel
 from plain.postgres.db import get_connection
 from plain.postgres.otel import register_pool_observables
 from plain.postgres.sources import runtime_pool_source
@@ -59,6 +61,33 @@ class TestQuerySpanAttributes:
         assert attrs["server.address"] == attrs.get("network.peer.address")
         assert "server.port" in attrs
         assert attrs["server.port"] == attrs.get("network.peer.port")
+
+    def test_not_recording_skips_stack_walk(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Cheap attributes still build unconditionally (attribute-aware
+        # samplers see them at span creation), but the per-query stack walk
+        # must only happen when the span actually records.
+        stack_walks: list[int] = []
+
+        def counting_code_attributes() -> dict[str, Any]:
+            stack_walks.append(1)
+            return {}
+
+        monkeypatch.setattr(
+            postgres_otel, "_get_code_attributes", counting_code_attributes
+        )
+        monkeypatch.setattr(postgres_otel, "tracer", NoOpTracer())
+
+        class StubDb:
+            settings_dict: dict[str, Any] = {}
+
+        with postgres_otel.db_span(StubDb(), "SELECT 1") as span:  # ty: ignore[invalid-argument-type]
+            pass
+
+        assert span is not None
+        assert not span.is_recording()
+        assert not stack_walks
 
 
 class TestReturnedRowsMetric:

@@ -305,7 +305,10 @@ def db_span(
     # Single settings_dict read — the property delegates to source.config.
     cfg = db.settings_dict
 
-    # Build attribute set following semantic conventions
+    # Cheap attributes are passed at span creation so attribute-aware
+    # samplers can see them in should_sample(). Expensive ones (the
+    # per-query stack walk, DEBUG params) are added after, only when the
+    # span actually records.
     attrs: dict[str, Any] = {
         DB_SYSTEM_NAME: DB_SYSTEM,
         DB_NAMESPACE: cfg.get("DATABASE"),
@@ -313,8 +316,6 @@ def db_span(
         DB_QUERY_SUMMARY: summary,
         DB_OPERATION_NAME: operation,
     }
-
-    attrs.update(_get_code_attributes())
 
     # Add collection name if detected
     if collection_name:
@@ -335,31 +336,41 @@ def db_span(
             attrs[SERVER_PORT] = port_int
             attrs[NETWORK_PEER_PORT] = port_int
 
-    # Add query parameters as attributes when DEBUG is True
-    if settings.DEBUG and params is not None:
-        # Convert params to appropriate format based on type
-        if isinstance(params, dict):
-            # Dictionary params (e.g., for named placeholders)
-            for key, value in params.items():
-                attrs[f"{DB_QUERY_PARAMETER_TEMPLATE}.{key}"] = str(value)
-        elif isinstance(params, list | tuple):
-            # Sequential params (e.g., for %s or ? placeholders)
-            for i, value in enumerate(params):
-                attrs[f"{DB_QUERY_PARAMETER_TEMPLATE}.{i + 1}"] = str(value)
-        else:
-            # Single param (rare but possible)
-            attrs[f"{DB_QUERY_PARAMETER_TEMPLATE}.1"] = str(params)
-
     with tracer.start_as_current_span(
         span_name, kind=SpanKind.CLIENT, attributes=attrs
     ) as span:
+        if span.is_recording():
+            expensive_attrs = _get_code_attributes()
+
+            # Add query parameters as attributes when DEBUG is True
+            if settings.DEBUG and params is not None:
+                # Convert params to appropriate format based on type
+                if isinstance(params, dict):
+                    # Dictionary params (e.g., for named placeholders)
+                    for key, value in params.items():
+                        expensive_attrs[f"{DB_QUERY_PARAMETER_TEMPLATE}.{key}"] = str(
+                            value
+                        )
+                elif isinstance(params, list | tuple):
+                    # Sequential params (e.g., for %s or ? placeholders)
+                    for i, value in enumerate(params):
+                        expensive_attrs[f"{DB_QUERY_PARAMETER_TEMPLATE}.{i + 1}"] = str(
+                            value
+                        )
+                else:
+                    # Single param (rare but possible)
+                    expensive_attrs[f"{DB_QUERY_PARAMETER_TEMPLATE}.1"] = str(params)
+
+            span.set_attributes(expensive_attrs)
+
         start = time.perf_counter()
         try:
             yield span
         except Exception as exc:
             # record_exception + set_status(ERROR) handled by
             # start_as_current_span when the exception propagates out.
-            span.set_attribute(ERROR_TYPE, format_exception_type(exc))
+            if span.is_recording():
+                span.set_attribute(ERROR_TYPE, format_exception_type(exc))
             raise
         duration_s = time.perf_counter() - start
 
