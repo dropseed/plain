@@ -156,6 +156,20 @@ class DevSupervisor(Supervisor):
         self.run_preflight()
 
         if find_spec("plain.postgres"):
+            # Shared-DB divergence guard (managed DBs only). If this checkout
+            # borrowed another checkout's database and would apply a divergent
+            # migration, fork to a private copy first so the shared DB is never
+            # silently mutated. No-op for BYO. Never block dev on it.
+            try:
+                from .postgres import guard_dev_database
+
+                guarded_url = guard_dev_database(APP_PATH.parent)
+                if guarded_url:
+                    self.plain_env["PLAIN_POSTGRES_URL"] = guarded_url
+                    os.environ["PLAIN_POSTGRES_URL"] = guarded_url
+            except Exception as e:
+                click.secho(f"Shared-DB guard skipped: {e}", fg="yellow", err=True)
+
             print_event("Waiting for database...", newline=False)
             subprocess.run(
                 [sys.executable, "-m", "plain", "postgres", "wait"],
