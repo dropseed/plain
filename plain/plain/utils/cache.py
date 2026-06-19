@@ -149,10 +149,3 @@ def patch_vary_headers(response: Response, newheaders: list[str]) -> None:
         response.headers["Vary"] = "*"
     else:
         response.headers["Vary"] = ", ".join(vary_headers)
-
-
-def _to_tuple(s: str) -> tuple[str, str | bool]:
-    t = s.split("=", 1)
-    if len(t) == 2:
-        return t[0].lower(), t[1]
-    return t[0].lower(), True
