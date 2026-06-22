@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.151.0](https://github.com/dropseed/plain/releases/plain@0.151.0) (2026-06-22)
+
+### What's changed
+
+- `patch_cache_control()` now takes explicit keyword-only directives instead of `**kwargs`, covering the full standard set (`max_age`, `s_maxage`, `stale_while_revalidate`, `stale_if_error`, `no_cache`, `no_store`, `no_transform`, `must_revalidate`, `proxy_revalidate`, `must_understand`, `public`, `private`, `immutable`). Unknown directive names now raise `TypeError` instead of being silently emitted, and `max_age` is coerced to an `int`. ([b100fa67](https://github.com/dropseed/plain/commit/b100fa67))
+- `plain request` now handles streaming/file responses (such as assets) instead of failing on their unreadable body — it summarizes them from the `Content-Type`/`Content-Length` headers, and a `--contains`/`--not-contains` check against a streaming response is reported as a failure rather than silently passing. ([f1860e1d](https://github.com/dropseed/plain/commit/f1860e1d))
+- Removed the dead `_to_tuple()` cache helper. ([3a54e8aa](https://github.com/dropseed/plain/commit/3a54e8aa))
+
+### Upgrade instructions
+
+- If you call `patch_cache_control()` with non-standard directive names, set those headers another way — the standard directives are unchanged (e.g. `patch_cache_control(response, max_age=60, no_cache=True)`). Otherwise no changes required.
+
 ## [0.150.0](https://github.com/dropseed/plain/releases/plain@0.150.0) (2026-06-09)
 
 ### What's changed
