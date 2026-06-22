@@ -1114,7 +1114,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-jobs"
-version = "0.55.1"
+version = "0.56.0"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
