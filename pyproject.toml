@@ -16,7 +16,6 @@ dev = [
   "plain-code",
   "plain-dev",
   "plain-elements",
-  "plain-esbuild",
   "plain-flags",
   "plain-htmx",
   "plain-jobs",
@@ -54,7 +53,6 @@ dev = [
 "plain-code" = { workspace = true }
 "plain-dev" = { workspace = true }
 "plain-elements" = { workspace = true }
-"plain-esbuild" = { workspace = true }
 "plain-flags" = { workspace = true }
 "plain-htmx" = { workspace = true }
 "plain-jobs" = { workspace = true }

@@ -17,7 +17,6 @@ members = [
     "plain-dev",
     "plain-elements",
     "plain-email",
-    "plain-esbuild",
     "plain-flags",
     "plain-htmx",
     "plain-jobs",
@@ -221,7 +220,6 @@ dependencies = [
     { name = "plain-dev" },
     { name = "plain-elements" },
     { name = "plain-email" },
-    { name = "plain-esbuild" },
     { name = "plain-flags" },
     { name = "plain-htmx" },
     { name = "plain-jobs" },
@@ -256,7 +254,6 @@ requires-dist = [
     { name = "plain-dev", editable = "plain-dev" },
     { name = "plain-elements", editable = "plain-elements" },
     { name = "plain-email", editable = "plain-email" },
-    { name = "plain-esbuild", editable = "plain-esbuild" },
     { name = "plain-flags", editable = "plain-flags" },
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-jobs", editable = "plain-jobs" },
@@ -1052,21 +1049,6 @@ requires-dist = [
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
-name = "plain-esbuild"
-version = "0.11.0"
-source = { editable = "plain-esbuild" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-assets" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-assets", editable = "plain-assets" },
-]
-
-[[package]]
 name = "plain-flags"
 version = "0.37.0"
 source = { editable = "plain-flags" }
@@ -1537,7 +1519,6 @@ dev = [
     { name = "plain-dev" },
     { name = "plain-elements" },
     { name = "plain-email" },
-    { name = "plain-esbuild" },
     { name = "plain-flags" },
     { name = "plain-htmx" },
     { name = "plain-jobs" },
@@ -1577,7 +1558,6 @@ dev = [
     { name = "plain-dev", editable = "plain-dev" },
     { name = "plain-elements", editable = "plain-elements" },
     { name = "plain-email", editable = "plain-email" },
-    { name = "plain-esbuild", editable = "plain-esbuild" },
     { name = "plain-flags", editable = "plain-flags" },
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-jobs", editable = "plain-jobs" },

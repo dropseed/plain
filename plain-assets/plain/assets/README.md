@@ -63,7 +63,7 @@ The purpose of fingerprinting the assets is to allow the browser to cache them i
     openapi = {cmd = "plain api generate-openapi --validate > app/assets/openapi.json"}
     ```
 
-2. Package-registered hooks via the `plain.assets.compile` entry-point group. Packages like `plain.tailwind` and `plain.esbuild` ship one of these to compile CSS / JS before the asset fingerprinter runs.
+2. Package-registered hooks via the `plain.assets.compile` entry-point group. Packages like `plain.tailwind` ship one of these to compile CSS before the asset fingerprinter runs.
 
 3. The asset compile itself (fingerprinting, compression).
 

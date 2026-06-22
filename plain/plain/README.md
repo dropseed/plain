@@ -63,5 +63,4 @@ The `plain` package includes everything you need to start handling web requests 
 - [plain.htmx](/plain-htmx/plain/htmx/README.md) - HTMX integrated into views and templates.
 - [plain.elements](/plain-elements/plain/elements/README.md) - Server-side HTML components.
 - [plain.pages](/plain-pages/plain/pages/README.md) - Static pages with Markdown and Jinja2.
-- [plain.esbuild](/plain-esbuild/plain/esbuild/README.md) - Simple JavaScript bundling and minification.
 - [plain.vendor](/plain-vendor/plain/vendor/README.md) - Vendor JavaScript and CSS libraries.

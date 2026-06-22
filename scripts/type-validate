@@ -36,7 +36,6 @@ FULLY_TYPED_PATHS = [
     "plain-dev",
     "plain-elements",
     "plain-email",
-    "plain-esbuild",
     "plain-flags",
     "plain-htmx",
     "plain-loginlink",
