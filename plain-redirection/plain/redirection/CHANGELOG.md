@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.36.0](https://github.com/dropseed/plain/releases/plain-redirection@0.36.0) (2026-06-22)
+
+### What's changed
+
+- Collapsed the migration history into a single fresh `0001_initial`. The database schema is unchanged — only the migration files were squashed. ([802f2d87](https://github.com/dropseed/plain/commit/802f2d87))
+
+### Upgrade instructions
+
+- Run `plain migrations prune` after upgrading to clear the now-orphaned history records for this package's old migrations. No SQL runs — it only cleans up migration-history records and is safe and idempotent. If `migrations prune` is already part of your deploy steps, no action is needed.
+
 ## [0.35.7](https://github.com/dropseed/plain/releases/plain-redirection@0.35.7) (2026-06-03)
 
 ### What's changed
