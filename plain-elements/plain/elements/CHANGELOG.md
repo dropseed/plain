@@ -1,5 +1,15 @@
 # plain-elements changelog
 
+## [0.11.6](https://github.com/dropseed/plain/releases/plain-elements@0.11.6) (2026-06-22)
+
+### What's changed
+
+- Capitalized tags inside Jinja comments (`{# ... #}`) are no longer treated as elements — comments are masked before the element scan and restored afterward, so a documentation example like `<Foo />` written inside a comment no longer gets converted or raises "unmatched capitalized tag". ([3f9844f2](https://github.com/dropseed/plain/commit/3f9844f2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.11.5](https://github.com/dropseed/plain/releases/plain-elements@0.11.5) (2026-05-12)
 
 ### What's changed
