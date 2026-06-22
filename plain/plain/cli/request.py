@@ -270,19 +270,24 @@ def request(
         elif response.status_code >= 500:
             failed.append(f"Server error: {response.status_code}")
 
-        body_text = (
-            response.content.decode("utf-8", errors="replace")
-            if response.content
-            else ""
-        )
+        # Streaming/file responses (e.g. assets) have no readable `.content` —
+        # the underlying file is already closed by the time we get here, so only
+        # metadata is available. Skip body assertions, but flag them so a
+        # `--contains` isn't silently treated as passing.
+        if response.streaming:
+            body_text = None
+            if assert_contains or assert_not_contains:
+                failed.append("Cannot check body assertions on a streaming response")
+        else:
+            body_text = response.content.decode("utf-8", errors="replace")
 
-        for text in assert_contains:
-            if text not in body_text:
-                failed.append(f"Response body does not contain: {text}")
+            for text in assert_contains:
+                if text not in body_text:
+                    failed.append(f"Response body does not contain: {text}")
 
-        for text in assert_not_contains:
-            if text in body_text:
-                failed.append(f"Response body contains: {text}")
+            for text in assert_not_contains:
+                if text in body_text:
+                    failed.append(f"Response body contains: {text}")
 
         if output_json:
             response_data: dict[str, Any] = {
@@ -369,32 +374,39 @@ def request(
             click.echo()
 
         # Show response content last
-        if response.content and not no_body:
-            response_content_type = response.headers.get("Content-Type", "")
+        if no_body:
+            pass
+        elif response.streaming:
+            # Streaming/file responses (e.g. assets): the body isn't readable
+            # here, so summarize from headers instead of dumping it.
+            click.secho("Response Body:", fg="yellow", bold=True)
+            content_type = response.headers.get("Content-Type", "") or "unknown"
+            length = response.headers.get("Content-Length")
+            size = f"{length} bytes" if length else "unknown size"
+            click.echo(f"  (streaming response: {content_type}, {size})")
+        elif body_text:
+            content_type = response.headers.get("Content-Type", "").lower()
 
-            if "json" in response_content_type.lower():
-                try:
-                    # The test client adds a json() method to the response
-                    json_method = getattr(response, "json", None)
-                    if json_method and callable(json_method):
-                        json_data: Any = json_method()
-                        click.secho("Response Body (JSON):", fg="yellow", bold=True)
-                        click.echo(json.dumps(json_data, indent=2))
-                    else:
-                        click.secho("Response Body:", fg="yellow", bold=True)
-                        click.echo(response.content.decode("utf-8", errors="replace"))
-                except Exception:
-                    click.secho("Response Body:", fg="yellow", bold=True)
-                    click.echo(response.content.decode("utf-8", errors="replace"))
-            elif "html" in response_content_type.lower():
-                click.secho("Response Body (HTML):", fg="yellow", bold=True)
-                content = response.content.decode("utf-8", errors="replace")
-                click.echo(content)
-            else:
-                click.secho("Response Body:", fg="yellow", bold=True)
-                content = response.content.decode("utf-8", errors="replace")
-                click.echo(content)
-        elif not no_body:
+            # Default: print the decoded body under a generic header. JSON is
+            # pretty-printed; HTML and everything else print as-is.
+            header = "Response Body:"
+            output = body_text
+
+            if "json" in content_type:
+                # The test client adds a json() method to the response.
+                json_method = getattr(response, "json", None)
+                if callable(json_method):
+                    try:
+                        output = json.dumps(json_method(), indent=2)
+                        header = "Response Body (JSON):"
+                    except Exception:
+                        pass  # fall back to the raw decoded body
+            elif "html" in content_type:
+                header = "Response Body (HTML):"
+
+            click.secho(header, fg="yellow", bold=True)
+            click.echo(output)
+        else:
             click.secho("(No response body)", fg="yellow", dim=True)
 
         # Report assertion failures
