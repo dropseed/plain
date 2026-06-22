@@ -47,17 +47,17 @@ def cdn_url():
 class TestAssetsManifest:
     """Tests for AssetsManifest class."""
 
-    def test_is_fingerprinted_true_for_fingerprinted_path(self, manifest):
-        assert manifest.is_fingerprinted("css/style.abc1234.css") is True
+    def test_is_immutable_true_for_fingerprinted_path(self, manifest):
+        assert manifest.is_immutable("css/style.abc1234.css") is True
 
-    def test_is_fingerprinted_false_for_original_path(self, manifest):
-        assert manifest.is_fingerprinted("css/style.css") is False
+    def test_is_immutable_false_for_original_path(self, manifest):
+        assert manifest.is_immutable("css/style.css") is False
 
-    def test_is_fingerprinted_false_for_unknown_path(self, manifest):
-        assert manifest.is_fingerprinted("unknown.css") is False
+    def test_is_immutable_false_for_unknown_path(self, manifest):
+        assert manifest.is_immutable("unknown.css") is False
 
-    def test_is_fingerprinted_false_for_non_fingerprinted_terminal(self, manifest):
-        assert manifest.is_fingerprinted("js/app.js") is False
+    def test_is_immutable_false_for_non_fingerprinted_terminal(self, manifest):
+        assert manifest.is_immutable("js/app.js") is False
 
     def test_resolve_returns_fingerprinted_for_original(self, manifest):
         assert manifest.resolve("css/style.css") == "css/style.abc1234.css"
