@@ -1,5 +1,15 @@
 # plain-postgres changelog
 
+## [0.110.1](https://github.com/dropseed/plain/releases/plain-postgres@0.110.1) (2026-06-22)
+
+### What's changed
+
+- Internal: the ordering infinite-loop guard builds its join signature with `isinstance(alias, Join)` instead of `getattr(alias, "join_col", None)`, keeping `.join_col` greppable and type-checked. No behavior change. ([c813405f](https://github.com/dropseed/plain/commit/c813405f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.110.0](https://github.com/dropseed/plain/releases/plain-postgres@0.110.0) (2026-06-17)
 
 ### What's changed
