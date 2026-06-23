@@ -29,20 +29,20 @@ class CookiesAudit(Audit):
         # Try to get cookies from response.cookies (CookieJar)
         if response.cookies:
             for cookie in response.cookies:
-                # SameSite can be in _rest as either "SameSite" or "samesite" (case-insensitive)
+                # Non-standard attributes (SameSite, HttpOnly) live in the private
+                # `_rest` dict; SameSite casing varies by server, so match case-insensitively.
+                rest: dict[str, str | None] = getattr(cookie, "_rest", {})
                 samesite = None
-                if hasattr(cookie, "_rest") and cookie._rest:
-                    for key in cookie._rest:
-                        if key.lower() == "samesite":
-                            samesite = cookie._rest[key]
-                            break
+                for key in rest:
+                    if key.lower() == "samesite":
+                        samesite = rest[key]
+                        break
 
                 cookies.append(
                     {
                         "name": cookie.name,
                         "secure": cookie.secure,
-                        "httponly": hasattr(cookie, "_rest")
-                        and "HttpOnly" in cookie._rest,
+                        "httponly": "HttpOnly" in rest,
                         "samesite": samesite,
                     }
                 )

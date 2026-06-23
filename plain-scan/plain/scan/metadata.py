@@ -13,7 +13,7 @@ class CookieMetadata:
     """Metadata for a single cookie."""
 
     name: str
-    value: str
+    value: str | None
     domain: str | None
     path: str
     secure: bool
@@ -69,13 +69,14 @@ class ResponseMetadata:
         # Build cookie metadata if present
         if response.cookies:
             for cookie in response.cookies:
-                # Extract SameSite attribute (can be in _rest as "SameSite" or "samesite")
+                # Non-standard attributes (SameSite, HttpOnly) live in the private
+                # `_rest` dict; SameSite casing varies by server, so match case-insensitively.
+                rest: dict[str, str | None] = getattr(cookie, "_rest", {})
                 samesite = None
-                if hasattr(cookie, "_rest") and cookie._rest:
-                    for key in cookie._rest:
-                        if key.lower() == "samesite":
-                            samesite = cookie._rest[key]
-                            break
+                for key in rest:
+                    if key.lower() == "samesite":
+                        samesite = rest[key]
+                        break
 
                 cookie_metadata = CookieMetadata(
                     name=cookie.name,
@@ -83,7 +84,7 @@ class ResponseMetadata:
                     domain=cookie.domain,
                     path=cookie.path,
                     secure=cookie.secure,
-                    httponly=hasattr(cookie, "_rest") and "HttpOnly" in cookie._rest,
+                    httponly="HttpOnly" in rest,
                     samesite=samesite,
                     expires=cookie.expires if cookie.expires else None,
                 )
