@@ -34,6 +34,19 @@ def _cookie_key(key: str) -> bytes:
     return b"plain.http.cookies" + force_bytes(key)
 
 
+def _cookie_signer_salt(key: str, salt: str = "") -> str:
+    """
+    Derive a signer salt from the cookie name and salt argument using an
+    injective encoding.
+
+    Concatenating ``key + salt`` is not injective: distinct (key, salt) pairs
+    such as ("ab", "c") and ("a", "bc") collide on the same signer salt, so a
+    value signed in one context unsigns successfully in another. Length-prefixing
+    the salt makes the encoding injective and removes the collision.
+    """
+    return f"plain.http.cookies.v2:{len(salt)}:{salt}{key}"
+
+
 def get_signed_cookie_signer(key: str, salt: str = "") -> TimestampSigner:
     """
     Create a TimestampSigner for signed cookies with the same configuration
@@ -42,7 +55,7 @@ def get_signed_cookie_signer(key: str, salt: str = "") -> TimestampSigner:
     return TimestampSigner(
         key=_cookie_key(settings.SECRET_KEY).decode(),
         fallback_keys=[_cookie_key(k).decode() for k in settings.SECRET_KEY_FALLBACKS],
-        salt=key + salt,
+        salt=_cookie_signer_salt(key, salt),
     )
 
 
