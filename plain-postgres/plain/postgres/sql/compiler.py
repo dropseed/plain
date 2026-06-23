@@ -344,7 +344,7 @@ class SQLCompiler:
         if self.query.select_related:
             related_klass_infos = self.get_related_selections(select, select_mask)
             if klass_info is not None:
-                klass_info["related_klass_infos"] = related_klass_infos  # ty: ignore[invalid-assignment] (heterogeneous klass_info dict)
+                klass_info["related_klass_infos"] = related_klass_infos
 
         ret = []
         col_idx = 1
