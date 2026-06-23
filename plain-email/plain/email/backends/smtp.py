@@ -65,6 +65,7 @@ class EmailBackend(BaseEmailBackend):
                 "one of those settings to True."
             )
         self.connection = None
+        self._partial_connection = None
         self._lock = threading.RLock()
 
     @property
@@ -89,6 +90,14 @@ class EmailBackend(BaseEmailBackend):
             # Nothing to do if the connection is already open.
             return False
 
+        # If a previous open() failed after creating the socket but before
+        # STARTTLS/login finished, an unencrypted partial connection may be
+        # left over. Close it before opening a new one so we never reuse a
+        # connection that hasn't been fully secured.
+        if self._partial_connection is not None:
+            self._close_connection(self._partial_connection)
+            self._partial_connection = None
+
         # If local_hostname is not specified, socket.getfqdn() gets used.
         # For performance, we use the cached FQDN for local_hostname.
         connection_params: dict[str, Any] = {"local_hostname": _DNS_NAME.get_fqdn()}
@@ -96,30 +105,42 @@ class EmailBackend(BaseEmailBackend):
             connection_params["timeout"] = self.timeout
         if self.use_ssl:
             connection_params["context"] = self.ssl_context
-        self.connection = self.connection_class(
-            self.host, self.port, **connection_params
-        )
+        connection = self.connection_class(self.host, self.port, **connection_params)
+
+        # Hold the socket on _partial_connection (not self.connection) until
+        # STARTTLS and login have both succeeded. If either raises, the
+        # connection is never promoted to self.connection, so a subsequent
+        # open() won't reuse an unencrypted socket.
+        self._partial_connection = connection
 
         # TLS/SSL are mutually exclusive, so only attempt TLS over
         # non-secure connections.
         if not self.use_ssl and self.use_tls:
-            self.connection.starttls(context=self.ssl_context)
+            connection.starttls(context=self.ssl_context)
         if self.username and self.password:
-            self.connection.login(self.username, self.password)
+            connection.login(self.username, self.password)
+
+        # The connection is fully configured (and encrypted, if requested) —
+        # promote it now that nothing can leave it half-open.
+        self.connection = connection
+        self._partial_connection = None
         return True
+
+    def _close_connection(self, connection: smtplib.SMTP) -> None:
+        try:
+            connection.quit()
+        except (ssl.SSLError, smtplib.SMTPServerDisconnected):
+            # This happens when calling quit() on a TLS connection
+            # sometimes, or when the connection was already disconnected
+            # by the server.
+            connection.close()
 
     def close(self) -> None:
         """Close the connection to the email server."""
         if self.connection is None:
             return
         try:
-            try:
-                self.connection.quit()
-            except (ssl.SSLError, smtplib.SMTPServerDisconnected):
-                # This happens when calling quit() on a TLS connection
-                # sometimes, or when the connection was already disconnected
-                # by the server.
-                self.connection.close()
+            self._close_connection(self.connection)
         finally:
             self.connection = None
 
