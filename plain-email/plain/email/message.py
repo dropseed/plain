@@ -303,7 +303,16 @@ class EmailMessage:
             # Use cached _DNS_NAME for performance
             msg["Message-ID"] = make_msgid(domain=str(_DNS_NAME))
         for name, value in self.extra_headers.items():
-            if name.lower() != "from":  # From is already handled
+            header = name.lower()
+            if header == "bcc":
+                raise ValueError(
+                    'Bcc is not a valid email header. Use the "bcc" '
+                    "argument to specify blind carbon copy recipients."
+                )
+            # From/To/Cc/Reply-To are already set above from the instance
+            # attributes (and extra_headers), so skip them here to avoid
+            # duplicating or overriding those headers.
+            if header not in {"from", "to", "cc", "reply-to"}:
                 msg[name] = value
         return msg
 
