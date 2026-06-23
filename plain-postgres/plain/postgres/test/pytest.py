@@ -24,7 +24,7 @@ def _db_disabled() -> Generator[None]:
     """
 
     def cursor_disabled(self: Any) -> None:
-        pytest.fail("Database access not allowed without the `db` fixture")  # ty: ignore[invalid-argument-type]
+        pytest.fail("Database access not allowed without the `db` fixture")
 
     # Save original cursor method and replace with disabled version
     setattr(DatabaseConnection, "_enabled_cursor", DatabaseConnection.cursor)
@@ -63,7 +63,7 @@ def setup_db(request: Any) -> Generator[None]:
 @pytest.fixture
 def db(setup_db: Any, request: Any) -> Generator[None]:
     if "isolated_db" in request.fixturenames:
-        pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")  # ty: ignore[invalid-argument-type]
+        pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
 
     # Set .cursor() back to the original implementation to unblock it
     DatabaseConnection.cursor = getattr(DatabaseConnection, "_enabled_cursor")
@@ -101,7 +101,7 @@ def isolated_db(request: Any) -> Generator[None]:
     test database.
     """
     if "db" in request.fixturenames:
-        pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")  # ty: ignore[invalid-argument-type]
+        pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
     # Set .cursor() back to the original implementation to unblock it
     DatabaseConnection.cursor = getattr(DatabaseConnection, "_enabled_cursor")
 
