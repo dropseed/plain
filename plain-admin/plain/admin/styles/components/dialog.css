@@ -64,5 +64,19 @@
         @apply ring-offset-admin-background focus:ring-admin-ring data-[state=open]:bg-admin-accent data-[state=open]:text-admin-muted-foreground  rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4;
       }
     }
+
+    /* Reduced motion: keep the opacity/backdrop fade, drop the scale-in. The
+       centering translate lives in the same transform, so neutralize just the
+       scale (scale-100) rather than zeroing the transform. */
+    @media (prefers-reduced-motion: reduce) {
+      > * {
+        @apply scale-100;
+      }
+      &:is([open], :popover-open) > * {
+        @starting-style {
+          @apply scale-100;
+        }
+      }
+    }
   }
 }

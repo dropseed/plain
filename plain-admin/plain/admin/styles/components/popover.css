@@ -77,4 +77,16 @@
       @apply p-4;
     }
   }
+
+  /* Reduced motion: keep the opacity fade (not motion), drop the scale-in. */
+  @media (prefers-reduced-motion: reduce) {
+    [data-popover] {
+      scale: 1;
+      &:popover-open {
+        @starting-style {
+          scale: 1;
+        }
+      }
+    }
+  }
 }

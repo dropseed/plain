@@ -48,6 +48,12 @@
   // centered top-layer placement.
   let anchorSeq = 0;
   const linkAnchor = (trigger, panel) => {
+    // `popover="manual"` is what lifts the panel into the top layer; without it
+    // the panel never opens and just sits hidden. Catch a forgotten attribute
+    // loudly instead of failing silently.
+    if (!panel.hasAttribute("popover")) {
+      console.error('Overlay panel is missing popover="manual" — it will not open', panel);
+    }
     const name = `--admin-popover-anchor-${anchorSeq++}`;
     trigger.style.anchorName = name;
     panel.style.positionAnchor = name;
@@ -60,6 +66,10 @@
     trigger.setAttribute("aria-expanded", "false");
     trigger.removeAttribute("aria-activedescendant");
     if (content) {
+      // aria-hidden is load-bearing, not redundant: panels carrying a `flex`
+      // (or other `display`) utility override the UA's
+      // `[popover]:not(:popover-open){display:none}`, so they stay in the a11y
+      // tree when closed. aria-hidden removes them.
       content.setAttribute("aria-hidden", "true");
       if (content.popover && content.matches(":popover-open")) content.hidePopover();
     }
