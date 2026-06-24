@@ -58,7 +58,11 @@
 </header>
 
 {% if objects %}
-<div class="w-full overflow-auto mt-2">
+{# The overflow-auto box (needed for horizontal scroll) also clips vertically,
+   cutting off focus rings on the top/bottom rows. `py-1` gives them room; the
+   smaller top margin and negative bottom margin keep the table in the same
+   place (net top = mt-1 + pt-1 = the original mt-2; net bottom unchanged). #}
+<div class="w-full overflow-auto mt-1 -mb-1 py-1">
     <table class="admin-table table-auto">
         <thead>
             <tr class="[&>:first-child]:rounded-l-admin-md [&>:last-child]:rounded-r-admin-md">
