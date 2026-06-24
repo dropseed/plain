@@ -669,19 +669,19 @@ directly for copy-pasteable markup if you can't open the running admin
 lives one file per primitive in
 [`styles/components/`](./styles/components/).
 
-| Pattern           | Class(es)                                                                                                                                                            |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Buttons           | Compose `.admin-btn` with one of `.admin-btn-primary` / `.admin-btn-secondary` / `.admin-btn-outline` / `.admin-btn-ghost` / `.admin-btn-link`                       |
-| Sizes / icon-only | Stack `.admin-btn-sm` or `.admin-btn-lg`; add `.admin-btn-icon` for a square icon-only button (e.g. `class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost"`) |
-| Status buttons    | `.admin-btn-success`, `.admin-btn-warning`, `.admin-btn-danger`, `.admin-btn-info` (solid fill + paired fg)                                                          |
-| Badges            | Compose `.admin-badge` with one of `.admin-badge-primary` / `.admin-badge-secondary` / `.admin-badge-outline`                                                        |
-| Status badges     | Stack `.admin-badge-success`, `.admin-badge-warning`, `.admin-badge-danger`, `.admin-badge-info` (translucent fill + saturated text)                                 |
-| Alerts            | Compose `.admin-alert` (neutral surface) with `.admin-alert-success` / `.admin-alert-warning` / `.admin-alert-danger` / `.admin-alert-info` for tone                 |
-| Cards             | `.admin-card` — visual shell only (bg + border + radius); compose layout/padding inline (e.g. `class="admin-card flex flex-col gap-6 p-6"`)                          |
-| Form inputs       | `.admin-input`, `.admin-textarea`, `.admin-select` — opt in via class; pair with `-sm` for compact rows                                                              |
-| Dialogs           | `<dialog class="admin-dialog">` opened via `<button command="show-modal" commandfor="…">`                                                                            |
-| Tabs              | `.admin-tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                                                                                                     |
-| Dropdowns         | `.admin-dropdown-menu` wrapping a `<button>` + sibling `[data-popover]` with `[role="menu"]`                                                                         |
+| Pattern           | Class(es)                                                                                                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Buttons           | Compose `.admin-btn` with one of `.admin-btn-primary` / `.admin-btn-secondary` / `.admin-btn-outline` / `.admin-btn-ghost` / `.admin-btn-link`                                                  |
+| Sizes / icon-only | Stack `.admin-btn-sm` or `.admin-btn-lg`; add `.admin-btn-icon` for a square icon-only button (e.g. `class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost"`)                            |
+| Status buttons    | `.admin-btn-success`, `.admin-btn-warning`, `.admin-btn-danger`, `.admin-btn-info` (solid fill + paired fg)                                                                                     |
+| Badges            | Compose `.admin-badge` with one of `.admin-badge-primary` / `.admin-badge-secondary` / `.admin-badge-outline`                                                                                   |
+| Status badges     | Stack `.admin-badge-success`, `.admin-badge-warning`, `.admin-badge-danger`, `.admin-badge-info` (translucent fill + saturated text)                                                            |
+| Alerts            | Compose `.admin-alert` (neutral surface) with `.admin-alert-success` / `.admin-alert-warning` / `.admin-alert-danger` / `.admin-alert-info` for tone                                            |
+| Cards             | `.admin-card` — visual shell only (bg + border + radius); compose layout/padding inline (e.g. `class="admin-card flex flex-col gap-6 p-6"`)                                                     |
+| Form inputs       | `.admin-input`, `.admin-textarea`, `.admin-select` — opt in via class; pair with `-sm` for compact rows                                                                                         |
+| Dialogs           | `<dialog class="admin-dialog">` opened via `<button command="show-modal" commandfor="…">`                                                                                                       |
+| Tabs              | `.admin-tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                                                                                                                                |
+| Dropdowns         | `.admin-dropdown-menu` wrapping a `<button>` + sibling `[data-popover]` (carries `popover="manual"`, opens in the top layer so it's never clipped by a table/overflow box) with `[role="menu"]` |
 
 When writing custom admin templates, prefer the design tokens over hardcoded
 colors so dark mode and theme overrides work automatically:

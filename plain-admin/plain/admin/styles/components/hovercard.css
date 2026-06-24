@@ -1,27 +1,40 @@
-/* Hovercard — hover-triggered version of popover. Trigger can be any
-   element (no <button> requirement); panel is positioned `fixed` via
-   JS using `getBoundingClientRect()` so it escapes container clipping.
+/* Hovercard — hover-triggered top-layer panel. Trigger can be any element
+   (no <button> requirement). Self-contained, but built from the same pieces
+   as [data-popover]: top layer + anchor positioning + the shared overlay
+   fade (just snappier and scale-free). components.js sets `popover="manual"`
+   and links the panel to its trigger, so it escapes container clipping and
+   opens below the trigger, left-aligned.
 
    Markup:
-     <span class="hovercard">
+     <span class="admin-hovercard">
        <some-trigger />
        <div data-hovercard aria-hidden="true">…panel content…</div>
-     </span>
-
-   Surface treatment (bg, border, shadow, radius) is shared with
-   [data-popover] in popover.css. */
+     </span> */
 @layer components {
   .admin-hovercard {
     @apply relative inline-flex;
   }
 
   [data-hovercard] {
-    @apply fixed p-1 text-sm whitespace-nowrap z-50 transition-opacity duration-100;
-  }
-  [data-hovercard][aria-hidden='true'] {
-    @apply opacity-0 invisible pointer-events-none;
-  }
-  [data-hovercard][aria-hidden='false'] {
-    @apply opacity-100 visible pointer-events-auto;
+    @apply bg-admin-popover text-admin-popover-foreground border shadow-md fixed inset-auto z-50 p-1 text-sm whitespace-nowrap;
+    border-radius: var(--radius-popover);
+    --admin-overlay-fade: 100ms;
+
+    position-area: bottom span-right;
+    position-try-fallbacks: flip-block, flip-inline;
+    margin: 0.25rem 0;
+
+    /* Closed base state; the Popover API drives `:popover-open`. No `scale`
+       delta — hovercards just fade, for a snappier hover feel. */
+    opacity: 0;
+    pointer-events: none;
+    transition: var(--admin-overlay-transition);
+    &:popover-open {
+      opacity: 1;
+      pointer-events: auto;
+      @starting-style {
+        opacity: 0;
+      }
+    }
   }
 }

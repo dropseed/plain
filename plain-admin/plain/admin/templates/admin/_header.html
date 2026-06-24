@@ -68,7 +68,7 @@
                         </div>
                     {% endif %}
                 </button>
-                <div id="user-menu-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                <div id="user-menu-popover" popover="manual" data-popover data-align="end" aria-hidden="true" class="w-48">
                     {% if not admin_force_theme %}
                     {# Theme switcher. Sits outside [role=menu] so the
                        dropdown-menu's keyboard nav skips it; the segmented
@@ -143,6 +143,7 @@
             </button>
             <div
                 id="admin-menu-popover"
+                popover="manual"
                 data-popover
                 data-align="end"
                 aria-hidden="true"

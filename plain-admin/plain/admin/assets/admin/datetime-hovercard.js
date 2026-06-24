@@ -33,7 +33,7 @@
   function createRow(label, value) {
     const row = document.createElement("div");
     row.className =
-      "flex justify-between items-center gap-4 px-2 py-1 cursor-pointer rounded hover:bg-accent hover:text-accent-foreground";
+      "flex justify-between items-center gap-4 px-2 py-1 cursor-pointer rounded hover:bg-admin-accent hover:text-admin-accent-foreground";
     row.dataset.copyValue = value;
 
     const labelEl = document.createElement("span");

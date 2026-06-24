@@ -47,6 +47,21 @@
   --radius-checkbox: calc(var(--radius) - 4px);
   --radius-tabs-focus: calc(var(--radius) - 4px);
 
+  /* Top-layer overlay enter/exit fade, shared by every overlay that toggles
+     the top layer — dialog, popover, dropdown-menu, hovercard. Animating
+     these requires transitioning `display` + `overlay` with `allow-discrete`
+     (so the panel stays put through its exit) plus `@starting-style` for the
+     enter; this token carries that recipe once so the four components can't
+     drift. Override `--admin-overlay-fade` per component to retune the
+     duration (the hovercard runs snappier). See the modern-web-guidance
+     "animate-to-from-top-layer" guide. */
+  --admin-overlay-fade: 150ms;
+  --admin-overlay-transition:
+    opacity var(--admin-overlay-fade) ease,
+    scale var(--admin-overlay-fade) ease,
+    display var(--admin-overlay-fade) allow-discrete,
+    overlay var(--admin-overlay-fade) allow-discrete;
+
   /* Fonts. Tailwind v4 wires the `font-sans` / `font-mono` utilities to
      these names automatically — overriding either retheme the admin's
      typography without touching templates. Inter and JetBrains Mono are

@@ -130,7 +130,7 @@
                             >
                                 <admin.Icon name="three-dots" />
                             </button>
-                            <div id="header-extra-links-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                            <div id="header-extra-links-popover" popover="manual" data-popover data-align="end" aria-hidden="true" class="w-48">
                                 <div role="menu">
                                     {% for link, url in extra_links.items() %}
                                     <a role="menuitem" href="{{ url }}">{{ link }}</a>
@@ -153,7 +153,7 @@
                             >
                                 <admin.Icon name="three-dots" class="text-admin-muted-foreground" />
                             </button>
-                            <div id="header-mobile-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                            <div id="header-mobile-actions-popover" popover="manual" data-popover data-align="end" aria-hidden="true" class="w-48">
                                 <div role="menu">
                                     {% for link, url in links.items() %}
                                     <a role="menuitem" href="{{ url }}">{{ link }}</a>

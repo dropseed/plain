@@ -45,6 +45,10 @@ document.addEventListener("submit", (e) => {
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-copy-value]");
   if (!el) return;
+  // Copy rows can sit inside an autolinked cell (the whole cell wrapped in an
+  // <a>), e.g. the datetime hovercard. A copy click means "copy", not
+  // "follow the row link" — stop the anchor from navigating.
+  e.preventDefault();
   const value = el.dataset.copyValue;
   const feedback = el.querySelector("[data-copy-feedback]") || el.lastElementChild;
   if (!feedback) return;

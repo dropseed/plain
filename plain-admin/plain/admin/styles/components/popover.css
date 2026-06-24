@@ -1,80 +1,80 @@
-/* Popover */
+/* Popover (and dropdown-menu, which shares this panel) */
 @layer components {
-  /* Shared surface treatment for popover-family panels (popover,
-     dropdown-menu, hovercard) so theming `--popover` / `--border`
-     affects all of them in one place. */
-  [data-popover],
-  [data-hovercard] {
-    @apply bg-admin-popover text-admin-popover-foreground border shadow-md;
-    border-radius: var(--radius-popover);
-  }
-
+  /* Top-layer, anchor-positioned panel. `popover="manual"` (in markup) lifts
+     it into the top layer on open, so no ancestor `overflow` can clip it —
+     the fix for a row-actions menu inside a table's overflow-auto scroll box.
+     components.js links each panel to its trigger (anchor-name /
+     position-anchor); `position-area` tethers it and `position-try-fallbacks`
+     flips it away from viewport edges. Fade is the shared overlay recipe. */
   [data-popover] {
-    @apply absolute overflow-x-hidden overflow-y-auto z-50 visible opacity-100 scale-100 min-w-full w-max transition-all;
+    @apply bg-admin-popover text-admin-popover-foreground border shadow-md fixed inset-auto z-50 w-max overflow-x-hidden overflow-y-auto;
+    border-radius: var(--radius-popover);
+    min-width: anchor-size(width);
 
-    &[aria-hidden='true'] {
-      @apply invisible opacity-0 scale-95;
-      
-      &:not([data-side]),
-      &[data-side='bottom'] {
-        @apply -translate-y-2;
-      }
-      &[data-side='top'] {
-        @apply translate-y-2;
-      }
-      &[data-side='left'] {
-        @apply translate-x-2;
-      }
-      &[data-side='right'] {
-        @apply -translate-x-2;
-      }
+    /* `data-side` / `data-align` → the `position-area` region around the
+       anchor. Default (no attrs) is below the trigger, start (left) aligned. */
+    position-area: bottom span-right;
+    position-try-fallbacks: flip-block, flip-inline;
+    margin: 0.25rem 0;
+    &[data-align='center'] {
+      position-area: bottom;
     }
-    &:not([data-side]),
-    &[data-side='bottom'] {
-      @apply mt-1 top-full;
+    &[data-align='end'] {
+      position-area: bottom span-left;
     }
     &[data-side='top'] {
-      @apply mb-1 bottom-full;
+      position-area: top span-right;
+      &[data-align='center'] {
+        position-area: top;
+      }
+      &[data-align='end'] {
+        position-area: top span-left;
+      }
     }
     &[data-side='left'] {
-      @apply mr-1 right-full;
-    }
-    &[data-side='right'] {
-      @apply ml-1 left-full;
-    }
-    &:not([data-side]),
-    &[data-side='bottom'],
-    &[data-side='top'] {
-      &:not([data-align]),
-      &[data-align='start'] {
-        @apply left-0;
+      position-area: left span-bottom;
+      margin: 0 0.25rem;
+      &[data-align='center'] {
+        position-area: left;
       }
       &[data-align='end'] {
-        @apply right-0;
-      }
-      &[data-align='center'] {
-        @apply left-1/2 -translate-x-1/2;
+        position-area: left span-top;
       }
     }
-    &[data-side='left'],
     &[data-side='right'] {
-      &:not([data-align]),
-      &[data-align='start'] {
-        @apply top-0;
+      position-area: right span-bottom;
+      margin: 0 0.25rem;
+      &[data-align='center'] {
+        position-area: right;
       }
       &[data-align='end'] {
-        @apply bottom-0;
+        position-area: right span-top;
       }
-      &[data-align='center'] {
-        @apply top-1/2 -translate-y-1/2;
+    }
+
+    /* Closed is the base state (fail-safe: a panel that never becomes a
+       popover stays hidden, rather than flashing open). The Popover API
+       drives `:popover-open`; `@starting-style` animates the enter. */
+    opacity: 0;
+    scale: 0.95;
+    pointer-events: none;
+    transition: var(--admin-overlay-transition);
+    &:popover-open {
+      opacity: 1;
+      scale: 1;
+      pointer-events: auto;
+      @starting-style {
+        opacity: 0;
+        scale: 0.95;
       }
     }
   }
+
   .admin-popover {
     @apply relative inline-flex;
 
     [data-popover] {
       @apply p-4;
     }
-  } 
+  }
 }

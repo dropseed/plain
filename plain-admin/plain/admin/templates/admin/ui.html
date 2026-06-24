@@ -923,7 +923,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {% call section("popovers", "Popovers",
-   "Generic click-to-open panel. Wrap a trigger `<button>` and a `[data-popover]` panel in a `.admin-popover` element — the panel can hold anything (form fields, descriptive content, multi-step UI). Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end). JS in `components.js` shares open/close, outside-click, and Esc handling with `.admin-dropdown-menu`.") %}
+   "Generic click-to-open panel. Wrap a trigger `<button>` and a `[data-popover]` panel in a `.admin-popover` element — the panel can hold anything (form fields, descriptive content, multi-step UI). The panel carries `popover=\"manual\"` so it opens in the top layer, escaping any ancestor `overflow` clip (e.g. a table scroll box), and is tethered to the trigger with CSS anchor positioning. Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end) — `position-area` places it and `position-try-fallbacks` flips it away from viewport edges. JS in `components.js` shares open/close, outside-click, and Esc handling with `.admin-dropdown-menu`.") %}
 
 <p class="text-sm text-admin-muted-foreground mb-2">Popover surface tokens (shared with dropdowns and hovercards):</p>
 {{ swatch_grid(_popover_tokens) }}
@@ -941,7 +941,7 @@ document.addEventListener("DOMContentLoaded", () => {
     >
         Filter <admin.Icon name="chevron-down" />
     </button>
-    <div id="example-popover-panel" data-popover data-align="end" aria-hidden="true" class="w-64">
+    <div id="example-popover-panel" popover="manual" data-popover data-align="end" aria-hidden="true" class="w-64">
         <div class="space-y-2">
             <label class="flex items-center gap-2 text-sm">
                 <input class="admin-input" type="checkbox" /> Active
@@ -958,7 +958,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {% call section("dropdowns", "Dropdowns",
-   "Wrap a trigger button + a [data-popover] menu in a .admin-dropdown-menu element. Items use role=\"menuitem\" and pick up styling from the admin-dropdown-menu component. JS in components.js handles open/close, outside-click, and keyboard navigation (arrow keys, Home/End, Enter/Esc).") %}
+   "Wrap a trigger button + a [data-popover] menu in a .admin-dropdown-menu element. The menu carries popover=\"manual\" so it opens in the top layer and is never clipped by a table or other overflow container. Items use role=\"menuitem\" and pick up styling from the admin-dropdown-menu component. JS in components.js handles open/close, outside-click, and keyboard navigation (arrow keys, Home/End, Enter/Esc).") %}
 
 {% call example() %}
 <div class="admin-dropdown-menu">
@@ -971,7 +971,7 @@ document.addEventListener("DOMContentLoaded", () => {
     >
         Actions <admin.Icon name="chevron-down" />
     </button>
-    <div id="example-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-40">
+    <div id="example-actions-popover" popover="manual" data-popover data-align="end" aria-hidden="true" class="w-40">
         <div role="menu">
             <a role="menuitem" href="#">Edit</a>
             <a role="menuitem" href="#">Duplicate</a>
@@ -1005,7 +1005,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {% call section("hovercards", "Hovercards",
-   "Hover-triggered version of popover. Trigger can be any element (no `<button>` requirement); panel positions fixed via JS so it escapes table-cell clipping. Use for preview/info that doesn't want a click commitment — user mention previews, FK row previews, the datetime hover details on every `<time>` in the admin.") %}
+   "Hover-triggered version of popover. Trigger can be any element (no `<button>` requirement); the panel opens in the top layer and is anchor-positioned (same model as the click popover), so it escapes table-cell clipping. Use for preview/info that doesn't want a click commitment — user mention previews, FK row previews, the datetime hover details on every `<time>` in the admin.") %}
 
 {% call example("Inline trigger — user preview") %}
 {# Wrapper is <div> not <p> so the HTML parser doesn't hoist the
