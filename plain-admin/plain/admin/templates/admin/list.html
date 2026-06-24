@@ -142,7 +142,7 @@
                         >
                             <admin.Icon name="three-dots" />
                         </button>
-                        <div id="row-actions-{{ loop.index }}" popover="manual" data-popover data-align="end" aria-hidden="true" class="w-48">
+                        <div id="row-actions-{{ loop.index }}" popover="manual" data-popover data-align="end" class="w-48">
                             <div role="menu">
                                 {% for text, url in object_links.items() %}
                                 <a role="menuitem" href="{{ url }}">{{ text }}</a>

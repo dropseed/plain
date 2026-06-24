@@ -68,7 +68,7 @@
                         </div>
                     {% endif %}
                 </button>
-                <div id="user-menu-popover" popover="manual" data-popover data-align="end" aria-hidden="true" class="w-48">
+                <div id="user-menu-popover" popover="manual" data-popover data-align="end" class="w-48">
                     {% if not admin_force_theme %}
                     {# Theme switcher. Sits outside [role=menu] so the
                        dropdown-menu's keyboard nav skips it; the segmented
@@ -146,7 +146,6 @@
                 popover="manual"
                 data-popover
                 data-align="end"
-                aria-hidden="true"
                 class="w-80 max-h-[75vh] flex flex-col p-0! overflow-hidden!"
             >
                 <div class="p-3 bg-admin-muted/40 border-b border-admin-border">

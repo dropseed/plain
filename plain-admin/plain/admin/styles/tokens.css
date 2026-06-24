@@ -52,13 +52,16 @@
      these requires transitioning `display` + `overlay` with `allow-discrete`
      (so the panel stays put through its exit) plus `@starting-style` for the
      enter; this token carries that recipe once so the four components can't
-     drift. Override `--admin-overlay-fade` per component to retune the
-     duration (the hovercard runs snappier). See the modern-web-guidance
-     "animate-to-from-top-layer" guide. */
+     drift. `visibility` is transitioned too so a panel that hides via
+     `visibility: hidden` (the robust hide, since a `display` utility can
+     override the UA's popover `display: none`) still fades on exit. Override
+     `--admin-overlay-fade` per component to retune the duration (the hovercard
+     runs snappier). See the modern-web-guidance "animate-to-from-top-layer". */
   --admin-overlay-fade: 150ms;
   --admin-overlay-transition:
     opacity var(--admin-overlay-fade) ease,
     scale var(--admin-overlay-fade) ease,
+    visibility var(--admin-overlay-fade),
     display var(--admin-overlay-fade) allow-discrete,
     overlay var(--admin-overlay-fade) allow-discrete;
 

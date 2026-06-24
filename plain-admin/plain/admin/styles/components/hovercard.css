@@ -8,7 +8,7 @@
    Markup:
      <span class="admin-hovercard">
        <some-trigger />
-       <div data-hovercard aria-hidden="true">…panel content…</div>
+       <div data-hovercard>…panel content…</div>
      </span> */
 @layer components {
   .admin-hovercard {
@@ -24,13 +24,17 @@
     position-try-fallbacks: flip-block, flip-inline;
     margin: 0.25rem 0;
 
-    /* Closed base state; the Popover API drives `:popover-open`. No `scale`
-       delta — hovercards just fade, for a snappier hover feel. */
+    /* Closed base state; the Popover API drives `:popover-open`. `visibility:
+       hidden` is the real hide (robust to the `flex` utility above overriding
+       the UA `display: none`); `pointer-events: none` covers the exit fade. No
+       `scale` delta — hovercards just fade, for a snappier hover feel. */
     opacity: 0;
+    visibility: hidden;
     pointer-events: none;
     transition: var(--admin-overlay-transition);
     &:popover-open {
       opacity: 1;
+      visibility: visible;
       pointer-events: auto;
       @starting-style {
         opacity: 0;

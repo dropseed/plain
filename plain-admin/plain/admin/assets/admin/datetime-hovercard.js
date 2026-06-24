@@ -57,7 +57,6 @@
 
       const panel = document.createElement("div");
       panel.dataset.hovercard = "";
-      panel.setAttribute("aria-hidden", "true");
       panel.className = "min-w-56 flex flex-col";
 
       const wrapper = document.createElement("span");

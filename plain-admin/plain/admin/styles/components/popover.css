@@ -53,15 +53,21 @@
     }
 
     /* Closed is the base state (fail-safe: a panel that never becomes a
-       popover stays hidden, rather than flashing open). The Popover API
-       drives `:popover-open`; `@starting-style` animates the enter. */
+       popover stays hidden, rather than flashing open). `visibility: hidden`
+       is the real hide — it drops the panel from the a11y tree and hit-testing
+       even when a `display` utility (e.g. `flex`) overrides the UA's popover
+       `display: none`. The Popover API drives `:popover-open`; `@starting-style`
+       animates the enter. `pointer-events: none` covers the exit window, where
+       `visibility` is still `visible` as the panel fades. */
     opacity: 0;
     scale: 0.95;
+    visibility: hidden;
     pointer-events: none;
     transition: var(--admin-overlay-transition);
     &:popover-open {
       opacity: 1;
       scale: 1;
+      visibility: visible;
       pointer-events: auto;
       @starting-style {
         opacity: 0;

@@ -65,14 +65,9 @@
     const content = component.querySelector(":scope > [data-popover]");
     trigger.setAttribute("aria-expanded", "false");
     trigger.removeAttribute("aria-activedescendant");
-    if (content) {
-      // aria-hidden is load-bearing, not redundant: panels carrying a `flex`
-      // (or other `display`) utility override the UA's
-      // `[popover]:not(:popover-open){display:none}`, so they stay in the a11y
-      // tree when closed. aria-hidden removes them.
-      content.setAttribute("aria-hidden", "true");
-      if (content.popover && content.matches(":popover-open")) content.hidePopover();
-    }
+    // Visibility (and a11y) is owned by the CSS: a closed panel is
+    // `visibility: hidden`, so there's no panel-level aria-hidden to maintain.
+    if (content && content.popover && content.matches(":popover-open")) content.hidePopover();
     openComponents.delete(component);
     if (focusTrigger) trigger.focus();
     return true;
@@ -84,7 +79,6 @@
     if (!trigger || !content) return null;
     document.dispatchEvent(new CustomEvent(POPOVER_OPEN_EVENT, { detail: { source: component } }));
     trigger.setAttribute("aria-expanded", "true");
-    content.setAttribute("aria-hidden", "false");
     if (content.popover && !content.matches(":popover-open")) content.showPopover();
     openComponents.add(component);
     return { trigger, content };
@@ -373,8 +367,9 @@
     }
 
     // Hovercards are often created dynamically (datetime-hovercard.js), so the
-    // `popover` attribute is set here rather than in markup; the CSS hides a
-    // closed `[data-hovercard]` via opacity until then, so there's no flash.
+    // `popover` attribute is set here rather than in markup; a closed
+    // `[data-hovercard]` is `visibility: hidden` in CSS until then, so there's
+    // no flash and nothing in the a11y tree.
     panel.setAttribute("popover", "manual");
     linkAnchor(trigger, panel);
 
@@ -382,12 +377,10 @@
     const show = () => {
       clearTimeout(hideTimeout);
       hovercard.dispatchEvent(new CustomEvent("hovercard:show"));
-      panel.setAttribute("aria-hidden", "false");
       if (panel.popover && !panel.matches(":popover-open")) panel.showPopover();
     };
     const hide = () => {
       hideTimeout = setTimeout(() => {
-        panel.setAttribute("aria-hidden", "true");
         if (panel.popover && panel.matches(":popover-open")) panel.hidePopover();
       }, 100);
     };
