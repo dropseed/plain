@@ -29,7 +29,7 @@ Run `uv run plain docs runtime` for full details on env var syntax, `.env` files
 
 ## Key Differences from Django
 
-Plain is a Django fork but has different APIs. Package-specific differences are in their respective rules (plain-postgres, plain-templates, plain-test). These are the core framework differences:
+Plain is a Django fork but has different APIs. Package-specific differences are in their respective rules (plain-postgres, plain-templates) under a `## Differences from Django` section. These are the core framework differences:
 
 - **URLs**: Use `Router` with `urls` list, not Django's `urlpatterns`
 - **Request data**: Use `request.query_params` not `request.GET`, `request.form_data` not `request.POST`, `request.json_data` not `json.loads(request.body)`, `request.files` not `request.FILES`

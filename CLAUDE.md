@@ -100,7 +100,7 @@ graph TD
 
 Concise guardrails always loaded into context. Keep them short (~50 lines) — bullet-point reminders, not tutorials. Point to docs for details. Use `paths:` frontmatter to scope rules to relevant files.
 
-Django-specific corrections (e.g., "use X not Django's Y") belong only in `plain.md`'s "Key Differences from Django" section. Package rules should describe how Plain works, not what Django does differently. It's fine for those corrections to cross package boundaries — they live in one place.
+Django-specific corrections (e.g., "use X not Django's Y") are split by scope so each loads only where it's relevant: **core** framework diffs (URLs, request data, middleware) live in `plain.md`'s "Key Differences from Django" section; **package-specific** diffs live in that package's rule under its own `## Differences from Django` section (see `plain-postgres`, `plain-templates`). Keep each correction in exactly one place — don't duplicate a package diff into `plain.md`. The rest of a rule should describe how Plain works, not what Django does differently.
 
 Example pattern (from plain-postgres rule → querying section):
 
