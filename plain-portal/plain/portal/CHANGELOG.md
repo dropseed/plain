@@ -1,5 +1,15 @@
 # plain-portal changelog
 
+## [0.2.8](https://github.com/dropseed/plain/releases/plain-portal@0.2.8) (2026-06-26)
+
+### What's changed
+
+- Bumped the portal server's npm dependencies (undici, Cloudflare workerd/wrangler) to resolve security advisories. ([cea9cd30b2](https://github.com/dropseed/plain/commit/cea9cd30b2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.7](https://github.com/dropseed/plain/releases/plain-portal@0.2.7) (2026-05-05)
 
 ### What's changed
