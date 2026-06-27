@@ -1,5 +1,15 @@
 # plain-connect changelog
 
+## [0.7.2](https://github.com/dropseed/plain/releases/plain-connect@0.7.2) (2026-06-26)
+
+### What's changed
+
+- Added a "Reading your data back" docs section pointing at the separate `plain-cloud` CLI for reading exported data back (production exceptions, slow endpoints, slow queries, recent deploys). ([5f3b10eff8](https://github.com/dropseed/plain/commit/5f3b10eff8))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.7.1](https://github.com/dropseed/plain/releases/plain-connect@0.7.1) (2026-06-03)
 
 ### What's changed
