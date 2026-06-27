@@ -1,5 +1,18 @@
 # plain-admin changelog
 
+## [0.83.1](https://github.com/dropseed/plain/releases/plain-admin@0.83.1) (2026-06-26)
+
+### What's changed
+
+- Admin overlays (dropdown menus, hovercards, popovers) now open in the browser's top layer with anchor positioning, so they're no longer clipped by tables or scroll/overflow containers. ([91680dd514](https://github.com/dropseed/plain/commit/91680dd514))
+- Overlay open/close animations honor `prefers-reduced-motion`, and a missing-popover-attribute edge case is guarded. ([f0025f287a](https://github.com/dropseed/plain/commit/f0025f287a))
+- Closed overlays are hidden with `visibility` rather than `aria-hidden`. ([93009be121](https://github.com/dropseed/plain/commit/93009be121))
+- The list table's scroll box no longer clips focus rings, and a copy button inside an autolinked row now copies instead of following the row link. ([f2b2baf426](https://github.com/dropseed/plain/commit/f2b2baf426))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.83.0](https://github.com/dropseed/plain/releases/plain-admin@0.83.0) (2026-06-22)
 
 ### What's changed
