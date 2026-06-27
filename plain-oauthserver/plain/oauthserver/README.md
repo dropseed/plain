@@ -38,15 +38,7 @@ The driving use case is an **end-user-facing MCP server**: a customer adds your 
 
 ## Connecting an MCP client
 
-MCP clients self-configure over OAuth. The full handshake is automatic once both halves are in place:
-
-1. The client hits your protected MCP endpoint with no token and gets a `401` whose `WWW-Authenticate` header points at the resource's metadata (see [Protecting a resource](#protecting-a-resource)).
-2. The client reads that metadata, finds this authorization server, and fetches `/.well-known/oauth-authorization-server`.
-3. It **registers itself** as a public client via [dynamic client registration](#dynamic-client-registration) — no manual setup.
-4. It opens a browser to `/oauth/authorize`; the user logs in and approves.
-5. It exchanges the code (with PKCE) at `/oauth/token` for an access + refresh token, then calls the MCP endpoint with `Authorization: Bearer <token>`.
-
-You don't write any of that — you mount the routers, protect the resource, and the client drives the rest.
+MCP clients self-configure over OAuth: the client hits your protected endpoint with no token, discovers this server, [registers itself](#dynamic-client-registration), and completes a browser login + consent — you mount the routers and the client drives the rest. The endpoint-side wiring (the resource server and the discovery challenge) lives in [`plain.mcp`](../../plain-mcp/plain/mcp/README.md#oauth-for-mcp-clients), which walks the full handshake.
 
 ## Clients are public
 
@@ -85,24 +77,7 @@ if token is not None:
     user = token.user
 ```
 
-For a `plain.mcp` endpoint, compose [`OAuthResourceServer`](../../plain-mcp/plain/mcp/oauth.py#OAuthResourceServer) and wire it to this validator:
-
-```python
-# app/mcp.py
-from plain.mcp import MCPView, OAuthResourceServer, TokenInfo
-from plain.oauthserver import validate_access_token
-
-
-class AppMCP(OAuthResourceServer, MCPView):
-    name = "myapp"
-    tools = [...]
-
-    def authenticate_token(self, token):
-        at = validate_access_token(token, resource=self.oauth_resource)
-        return TokenInfo(at.user, at.scopes) if at else None
-```
-
-`plain.mcp` handles the `401` challenge and the resource-metadata document; see its README for the routing.
+That's the seam for any resource server. Protecting a [`plain.mcp`](../../plain-mcp/plain/mcp/README.md) endpoint? Its `OAuthResourceServer` mixin wraps this validator and handles the `401` challenge and resource-metadata document for you — see [OAuth for MCP clients](../../plain-mcp/plain/mcp/README.md#oauth-for-mcp-clients).
 
 ## Endpoints
 

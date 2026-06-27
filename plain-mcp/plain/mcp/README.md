@@ -384,6 +384,14 @@ The metadata view derives `resource` from the request path, so an app with sever
 
 `plain.mcp` only validates tokens and emits the challenge — it never issues them. The authorization server is yours to run; [`plain.oauthserver`](../../plain-oauthserver/plain/oauthserver/README.md) is a drop-in one. `authenticate_token` is the seam, so any issuer (a third-party IdP, a custom JWT service) works the same way.
 
+Behind the scenes the client drives the whole handshake — you don't write any of it:
+
+1. Calls your MCP endpoint with no token → gets the `401` + `WWW-Authenticate` challenge.
+2. Reads the protected-resource metadata it points to → finds your authorization server.
+3. Fetches the server's metadata (`/.well-known/oauth-authorization-server`) and **registers itself** — no manual setup.
+4. Opens a browser to the authorize endpoint; the user logs in and approves.
+5. Exchanges the code (with PKCE) for an access + refresh token, then re-calls the endpoint with `Authorization: Bearer <token>`.
+
 ### Public endpoints
 
 The base `MCPView` class has no auth by default — subclassing `MCPView` without overriding `before_request` gives you a public endpoint. There's no "allow all" default to silently swap out; the absence of an auth check is visible in the class definition itself.
