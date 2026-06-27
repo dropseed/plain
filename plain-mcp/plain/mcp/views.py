@@ -18,7 +18,7 @@ from plain.runtime import settings
 from plain.utils.otel import format_exception_type
 from plain.views.base import View
 
-from .exceptions import MCPInvalidParams, MCPUnauthorized
+from .exceptions import MCPInvalidParams, MCPToolError, MCPUnauthorized
 from .resources import MCPResource
 from .tools import MCPTool
 
@@ -344,7 +344,15 @@ class MCPView(View):
 
         try:
             result = tool.run()
+        except MCPToolError as e:
+            # Expected, caller-facing failure — surface the message via the
+            # in-result error channel and don't log it as a server exception.
+            return {
+                "content": [{"type": "text", "text": str(e)}],
+                "isError": True,
+            }
         except Exception as e:
+            # Unexpected bug — log for the operator, stay opaque to the caller.
             log_exception(self.request, e)
             return {
                 "content": [{"type": "text", "text": "Tool execution failed"}],

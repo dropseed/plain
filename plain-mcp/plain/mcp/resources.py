@@ -29,7 +29,9 @@ class MCPResource(ABC):
     `read()` may return `str` (emitted as `text`) or `bytes` (emitted as
     base64 `blob`). Resource instances have `self.mcp` set by the
     dispatcher before `read()` is called — use it to read the caller's
-    user, request, etc.
+    request, and (on an authed view) user, etc. `self.mcp` is typed as the
+    base `MCPView`; for typed access to your view's attributes, re-annotate
+    `mcp` on a per-app base resource (`class AppResource(MCPResource): mcp: AppMCP`).
 
     Override `allowed_for(mcp)` (classmethod) to filter when the resource
     is included — same pattern as `MCPTool`.
@@ -65,7 +67,8 @@ class MCPResource(ABC):
     _uri_pattern: re.Pattern[str] | None = None
     _init_hints: dict[str, Any] | None = None
 
-    # Set by the MCPView dispatcher before `read()` is called.
+    # Set by the MCPView dispatcher before `read()` is called. Re-annotate on a
+    # per-app base resource (`mcp: AppMCP`) for typed access to your view's attrs.
     mcp: MCPView
 
     def __init__(self) -> None:

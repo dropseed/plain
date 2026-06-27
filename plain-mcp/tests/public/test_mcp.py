@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Literal
 
-from plain.mcp import MCPResource, MCPTool, MCPView
+from plain.mcp import MCPResource, MCPTool, MCPToolError, MCPView
 from plain.test import RequestFactory
 
 
@@ -238,6 +238,31 @@ class TestToolExecution:
         )
         assert response["result"]["isError"] is True
         assert response["result"]["content"][0]["text"] == "Tool execution failed"
+
+    def test_tool_error_surfaces_message_without_logging(self, monkeypatch) -> None:
+        class PickyTool(MCPTool):
+            def run(self) -> str:
+                raise MCPToolError("No widget named 'foo'")
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [PickyTool]
+
+        logged: list[Any] = []
+        monkeypatch.setattr(
+            "plain.mcp.views.log_exception", lambda *a, **k: logged.append(a)
+        )
+
+        mcp = _instantiate(MyMCP)
+        response = _call(
+            mcp,
+            _make_request("tools/call", {"name": "PickyTool", "arguments": {}}),
+        )
+        # Expected failure: the caller sees the message via isError, and it is
+        # NOT logged as a server exception (unlike an unexpected error).
+        assert response["result"]["isError"] is True
+        assert response["result"]["content"][0]["text"] == "No widget named 'foo'"
+        assert logged == []
 
     def test_tool_receives_mcp_reference(self) -> None:
         class Reflect(MCPTool):

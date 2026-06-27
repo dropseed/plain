@@ -4,7 +4,7 @@ from importlib.metadata import version
 
 __version__ = version("plain.mcp")
 
-from .exceptions import MCPInvalidParams, MCPUnauthorized
+from .exceptions import MCPInvalidParams, MCPToolError, MCPUnauthorized
 from .oauth import MCPProtectedResourceView, OAuthResourceServer, TokenInfo
 from .resources import MCPResource
 from .tools import MCPTool
@@ -15,6 +15,7 @@ __all__ = [
     "MCPProtectedResourceView",
     "MCPResource",
     "MCPTool",
+    "MCPToolError",
     "MCPUnauthorized",
     "MCPView",
     "OAuthResourceServer",

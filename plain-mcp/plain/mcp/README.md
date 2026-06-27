@@ -83,19 +83,52 @@ class SearchOrders(MCPTool):
         return "\n".join(str(o) for o in Order.query.filter(...))
 ```
 
-**Reading the invoking context.** Before `run()` is called, the dispatcher sets `self.mcp` to the `MCPView` instance that invoked the tool. Use it to read the caller's user, the HTTP request, or any subclass-specific state:
+**Reading the invoking context.** Before `run()` is called, the dispatcher sets `self.mcp` to the `MCPView` instance that invoked the tool — read the HTTP request through it, plus the caller's user and any subclass state. `self.mcp` is typed as the base `MCPView`, which has no `user`; for typed access to attributes an auth mixin or your subclass adds, define a per-app base tool that re-annotates `mcp` to your view, then subclass it:
 
 ```python
-from plain.mcp import MCPTool
+from plain.mcp import MCPTool, MCPView, OAuthResourceServer, TokenInfo
 
 
-class ListMyNotes(MCPTool):
+class AppTool(MCPTool):
+    mcp: AppMCP  # forward ref — typed access to AppMCP's user, scopes, etc.
+
+
+class ListMyNotes(AppTool):
     """List notes owned by the caller."""
 
     def run(self) -> list[dict]:
         return list(
             Note.query.filter(author=self.mcp.user).values("id", "title")
         )
+
+
+class AppMCP(OAuthResourceServer, MCPView):
+    name = "myapp"
+    tools = [ListMyNotes]
+
+    def authenticate_token(self, token: str) -> TokenInfo | None:
+        ...
+```
+
+The `mcp: AppMCP` annotation is a forward reference (resolved lazily), so this natural order just works — base tool and tools first, then the view with `tools = [...]`. A tool that needs nothing view-specific stays bare — `class Greet(MCPTool)` — and `self.mcp` is the base `MCPView` (request, no user).
+
+**Signaling errors.** Raise [`MCPToolError`](./exceptions.py#MCPToolError) from `run()` for an expected, caller-facing failure — bad input, not found, forbidden. The message goes back to the client with `isError: true` (MCP's in-result error channel) so the model can self-correct, and it is _not_ logged as a server exception. Any other exception is treated as a bug: logged server-side and returned as an opaque "Tool execution failed".
+
+```python
+from plain.mcp import MCPTool, MCPToolError
+
+
+class GetOrder(MCPTool):
+    """Look up an order by ID."""
+
+    def __init__(self, order_id: int):
+        self.order_id = order_id
+
+    def run(self) -> dict:
+        order = Order.query.filter(id=self.order_id).first()
+        if order is None:
+            raise MCPToolError(f"No order with id {self.order_id}")
+        return {"id": order.id, "status": order.status}
 ```
 
 **Shared state.** Tool instances are short-lived — one per MCP request. Don't use `__init__` for heavy setup; stash lookups in modules or on the MCP class.
@@ -169,7 +202,7 @@ Metadata is derived automatically:
 
 **Text vs binary.** `read()` returns `str` for text (emitted as `text`) or `bytes` for binary (emitted as base64 `blob`).
 
-**Reading the invoking context.** As with tools, `self.mcp` is set before `read()` is called — use `self.mcp.user` or `self.mcp.request` for user-scoped resources.
+**Reading the invoking context.** As with tools, `self.mcp` is set before `read()` is called — use `self.mcp.request`, and (for typed access to your view's `user` and other attributes) re-annotate `mcp` on a per-app base resource: `class AppResource(MCPResource): mcp: AppMCP`.
 
 **Authorization.** Override `allowed_for(mcp)` on the resource (classmethod) to filter who can see it — resources that return `False` are hidden from listings and rejected from reads. Same model and hooks as tools; see [Filtering tools per request](#filtering-tools-per-request).
 
@@ -452,6 +485,8 @@ The pattern:
 1. Write an `rpc_<method>` method that takes a `params` dict and returns the response dict (as defined by the [MCP spec](https://modelcontextprotocol.io/specification/2025-11-25/server) for that method)
 2. Advertise the capability in `get_capabilities()` so clients know to call it
 3. Raise `MCPInvalidParams` for bad caller input; anything else becomes a generic `INTERNAL_ERROR` with the exception logged server-side
+
+`MCPInvalidParams` is the error channel for these custom `rpc_*` handlers (and `resources/read`). Tools are different: a tool's `run()` reports failures in its _result_ via `isError`, so raise [`MCPToolError`](./exceptions.py#MCPToolError) there instead — see [Tools → Signaling errors](#tools).
 
 ### Example: prompts
 
