@@ -1,5 +1,15 @@
 # plain-scan changelog
 
+## [0.6.4](https://github.com/dropseed/plain/releases/plain-scan@0.6.4) (2026-06-26)
+
+### What's changed
+
+- Hardened the cookie and metadata audits' handling of non-standard cookie attributes (reading the private `_rest` dict via a typed local, case-insensitive `SameSite` matching), alongside a server dependency bump for security advisories. ([cea9cd30b2](https://github.com/dropseed/plain/commit/cea9cd30b2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.6.3](https://github.com/dropseed/plain/releases/plain-scan@0.6.3) (2026-03-10)
 
 ### What's changed
