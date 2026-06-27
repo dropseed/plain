@@ -23,6 +23,7 @@ members = [
     "plain-loginlink",
     "plain-mcp",
     "plain-oauth",
+    "plain-oauthserver",
     "plain-pages",
     "plain-passwords",
     "plain-portal",
@@ -1214,6 +1215,33 @@ requires-dist = [
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
+name = "plain-oauthserver"
+version = "0.0.0"
+source = { editable = "plain-oauthserver" }
+dependencies = [
+    { name = "plain" },
+    { name = "plain-auth" },
+    { name = "plain-postgres" },
+    { name = "plain-templates" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-auth", editable = "plain-auth" },
+    { name = "plain-postgres", editable = "plain-postgres" },
+    { name = "plain-templates", editable = "plain-templates" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+
+[[package]]
 name = "plain-pages"
 version = "0.19.6"
 source = { editable = "plain-pages" }
@@ -1540,6 +1568,7 @@ dev = [
     { name = "plain-loginlink" },
     { name = "plain-mcp" },
     { name = "plain-oauth" },
+    { name = "plain-oauthserver" },
     { name = "plain-pages" },
     { name = "plain-passwords" },
     { name = "plain-portal" },
@@ -1579,6 +1608,7 @@ dev = [
     { name = "plain-loginlink", editable = "plain-loginlink" },
     { name = "plain-mcp", editable = "plain-mcp" },
     { name = "plain-oauth", editable = "plain-oauth" },
+    { name = "plain-oauthserver", editable = "plain-oauthserver" },
     { name = "plain-pages", editable = "plain-pages" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-portal", editable = "plain-portal" },

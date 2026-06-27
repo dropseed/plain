@@ -39,6 +39,7 @@ plain-elements
 plain-htmx
 plain-email
 plain-mcp
+plain-oauthserver
 plain-pages
 EOF
 )"

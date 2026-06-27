@@ -7,8 +7,14 @@ class MCPUnauthorized(Exception):
     """Raised from `before_request` to reject an MCP request.
 
     `MCPView.handle_exception` catches this and returns a JSON-RPC 401
-    response with the exception message as the error text.
+    response with the exception message as the error text. Pass
+    `www_authenticate` to attach an RFC 9728 `WWW-Authenticate` challenge so an
+    OAuth client knows where to discover the authorization server.
     """
+
+    def __init__(self, message: str = "", *, www_authenticate: str | None = None):
+        super().__init__(message)
+        self.www_authenticate = www_authenticate
 
 
 class MCPInvalidParams(Exception):

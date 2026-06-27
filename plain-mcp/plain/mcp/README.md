@@ -11,6 +11,7 @@
 - [Authentication](#authentication)
     - [Session auth](#session-auth-compose-with-authview)
     - [Bearer token auth](#bearer-token-auth)
+    - [OAuth for MCP clients](#oauth-for-mcp-clients)
     - [Public endpoints](#public-endpoints)
 - [Filtering tools per request](#filtering-tools-per-request)
 - [Custom JSON-RPC methods](#custom-json-rpc-methods)
@@ -58,7 +59,7 @@ class AppRouter(Router):
     ]
 ```
 
-AI clients connect to `https://yourapp.com/mcp/` using the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http).
+AI clients connect to `https://yourapp.com/mcp/` using the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http).
 
 `name` is required. `version` defaults to `settings.VERSION` (from your `pyproject.toml`). Auth and authorization are covered below.
 
@@ -106,7 +107,7 @@ class ListMyNotes(MCPTool):
 - **a list of such dicts** → those blocks, in order (mixed content)
 - **any other `dict`/`list`** → one text block with the value JSON-serialized
 
-The dict shape matches the MCP spec wire format directly — you can copy from the [MCP docs](https://modelcontextprotocol.io/specification/2025-03-26/server/tools#tool-result) and return it. `bytes` in `data` (image/audio) or `resource.blob` (embedded resource) are base64-encoded automatically, so you don't touch base64 yourself:
+The dict shape matches the MCP spec wire format directly — you can copy from the [MCP docs](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#tool-result) and return it. `bytes` in `data` (image/audio) or `resource.blob` (embedded resource) are base64-encoded automatically, so you don't touch base64 yourself:
 
 ```python
 class Screenshot(MCPTool):
@@ -330,6 +331,59 @@ Clients send the token in their config:
 }
 ```
 
+### OAuth for MCP clients
+
+Hosted MCP clients (Claude's custom connectors, etc.) authenticate over OAuth 2.1 — they discover your authorization server, register, and complete a browser login, with no token to paste. Compose [`OAuthResourceServer`](./oauth.py#OAuthResourceServer) with `MCPView` and implement `authenticate_token` to validate the bearer against whatever issued it:
+
+```python
+# app/mcp.py
+from plain.mcp import MCPView, OAuthResourceServer, TokenInfo
+from plain.oauthserver import validate_access_token
+
+
+class AppMCP(OAuthResourceServer, MCPView):
+    name = "myapp"
+    tools = [...]
+
+    def authenticate_token(self, token: str) -> TokenInfo | None:
+        at = validate_access_token(token, resource=self.oauth_resource)
+        return TokenInfo(at.user, at.scopes) if at else None
+```
+
+On success `self.user` and `self.scopes` are set for tools to read. On failure the request gets a `401` with an RFC 9728 `WWW-Authenticate` challenge that points the client at a **protected-resource metadata** document — that document names the authorization server, which is how the client knows where to authenticate.
+
+Serve the metadata with [`MCPProtectedResourceView`](./oauth.py#MCPProtectedResourceView), mounted at the challenge path (`.well-known/oauth-protected-resource/` + your MCP path):
+
+```python
+# app/urls.py
+from plain.mcp import MCPProtectedResourceView
+from plain.urls import Router, path
+
+from app.mcp import AppMCP
+
+
+class AppMCPMetadata(MCPProtectedResourceView):
+    pass  # authorization_servers defaults to this app's own origin
+
+
+class AppRouter(Router):
+    namespace = ""
+    urls = [
+        path("mcp", AppMCP, name="mcp"),
+        path(
+            ".well-known/oauth-protected-resource/mcp",
+            AppMCPMetadata,
+            name="mcp_prm",
+        ),
+    ]
+```
+
+`authorization_servers` defaults to this app's origin, so the same-app case (above) needs nothing set. Override it only when an external IdP issues the tokens.
+
+The metadata view derives `resource` from the request path, so an app with several MCP endpoints can mount one catch-all instead of a metadata view per endpoint: `path(".well-known/oauth-protected-resource/<path:resource_path>", AppMCPMetadata)`.
+
+`plain.mcp` only validates tokens and emits the challenge — it never issues them. The authorization server is yours to run; [`plain.oauthserver`](../../plain-oauthserver/plain/oauthserver/README.md) is a drop-in one. `authenticate_token` is the seam, so any issuer (a third-party IdP, a custom JWT service) works the same way.
+
 ### Public endpoints
 
 The base `MCPView` class has no auth by default — subclassing `MCPView` without overriding `before_request` gives you a public endpoint. There's no "allow all" default to silently swap out; the absence of an auth check is visible in the class definition itself.
@@ -387,7 +441,7 @@ class AppMCP(MCPView, AuthView):
 
 The pattern:
 
-1. Write an `rpc_<method>` method that takes a `params` dict and returns the response dict (as defined by the [MCP spec](https://modelcontextprotocol.io/specification/2025-03-26/server) for that method)
+1. Write an `rpc_<method>` method that takes a `params` dict and returns the response dict (as defined by the [MCP spec](https://modelcontextprotocol.io/specification/2025-11-25/server) for that method)
 2. Advertise the capability in `get_capabilities()` so clients know to call it
 3. Raise `MCPInvalidParams` for bad caller input; anything else becomes a generic `INTERNAL_ERROR` with the exception logged server-side
 
@@ -475,7 +529,7 @@ The shipped handlers (`rpc_initialize`, `rpc_ping`, `rpc_tools_list`, `rpc_tools
 
 #### What MCP protocol version is supported?
 
-The `2025-03-26` version of the MCP specification, using the Streamable HTTP transport. The older SSE transport is not supported.
+The `2025-11-25` version of the MCP specification, using the Streamable HTTP transport. The older SSE transport is not supported.
 
 #### Are resource subscriptions supported?
 

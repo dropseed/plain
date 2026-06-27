@@ -25,6 +25,7 @@ dev = [
   "plain-portal",
   "plain-postgres",
   "plain-oauth",
+  "plain-oauthserver",
   "plain-pages",
   "plain-passwords",
   "plain-pytest",
@@ -62,6 +63,7 @@ dev = [
 "plain-portal" = { workspace = true }
 "plain-postgres" = { workspace = true }
 "plain-oauth" = { workspace = true }
+"plain-oauthserver" = { workspace = true }
 "plain-pages" = { workspace = true }
 "plain-passwords" = { workspace = true }
 "plain-pytest" = { workspace = true }
@@ -91,4 +93,10 @@ version = "1.50.0"
 exclude = ["example", "scratch", "scripts"]
 
 [tool.ty.environment]
-extra-paths = ["plain-postgres/tests", "plain/tests", "plain-admin/tests", "example"]
+extra-paths = [
+  "plain-postgres/tests",
+  "plain/tests",
+  "plain-admin/tests",
+  "plain-oauthserver/tests",
+  "example",
+]

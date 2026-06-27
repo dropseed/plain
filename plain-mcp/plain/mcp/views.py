@@ -24,7 +24,13 @@ from .tools import MCPTool
 
 tracer = trace.get_tracer("plain.mcp")
 
-PROTOCOL_VERSION = "2025-03-26"
+PROTOCOL_VERSION = "2025-11-25"
+
+# Streamable HTTP transport revisions this server speaks. initialize echoes the
+# client's requested version when it's one of these (MCP version negotiation),
+# the MCP-Protocol-Version header is validated against the same set, and an
+# absent header means the legacy 2025-03-26 default.
+SUPPORTED_PROTOCOL_VERSIONS = frozenset({"2025-03-26", "2025-06-18", PROTOCOL_VERSION})
 
 PARSE_ERROR = -32700
 INVALID_REQUEST = -32600
@@ -148,8 +154,15 @@ class MCPView(View):
         JSON-RPC error objects at appropriate status codes.
         """
         if isinstance(exc, MCPUnauthorized):
+            headers = (
+                {"WWW-Authenticate": exc.www_authenticate}
+                if exc.www_authenticate
+                else None
+            )
             return JsonResponse(
-                _error_response(None, UNAUTHORIZED, str(exc)), status_code=401
+                _error_response(None, UNAUTHORIZED, str(exc)),
+                status_code=401,
+                headers=headers,
             )
 
         status = exc.status_code if isinstance(exc, HTTPException) else 500
@@ -165,9 +178,22 @@ class MCPView(View):
         )
 
     def post(self) -> Response:
+        # Spec MUST: reject a request that declares a protocol version we don't
+        # speak. An absent header is the legacy 2025-03-26 default, so allowed.
+        version = self.request.headers.get("MCP-Protocol-Version")
+        if version is not None and version not in SUPPORTED_PROTOCOL_VERSIONS:
+            return JsonResponse(
+                _error_response(
+                    None,
+                    INVALID_REQUEST,
+                    f"Unsupported MCP-Protocol-Version: {version}",
+                ),
+                status_code=400,
+            )
         response = self.handle_message(self.request.body)
         if response is None:
-            return Response(status_code=204)
+            # Spec MUST: a notification (no `id`) is acknowledged with 202, no body.
+            return Response(status_code=202)
         return JsonResponse(response)
 
     def handle_message(self, raw: bytes | str) -> dict[str, Any] | None:
@@ -261,8 +287,15 @@ class MCPView(View):
         return capabilities
 
     def rpc_initialize(self, params: dict[str, Any]) -> dict[str, Any]:
+        # MCP version negotiation: echo the client's requested version when we
+        # speak it, otherwise offer our preferred one (the client then decides).
+        requested = params.get("protocolVersion")
+        if requested in SUPPORTED_PROTOCOL_VERSIONS:
+            version = requested
+        else:
+            version = PROTOCOL_VERSION
         return {
-            "protocolVersion": PROTOCOL_VERSION,
+            "protocolVersion": version,
             "capabilities": self.get_capabilities(),
             "serverInfo": {
                 "name": self.name,
