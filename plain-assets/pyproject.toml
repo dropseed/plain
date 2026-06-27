@@ -1,6 +1,6 @@
 [project]
 name = "plain.assets"
-version = "0.4.0"
+version = "0.4.1"
 description = "Serve static assets (CSS, JS, images, etc.) directly or from a CDN."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"

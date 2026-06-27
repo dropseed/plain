@@ -1,5 +1,15 @@
 # plain-assets changelog
 
+## [0.4.1](https://github.com/dropseed/plain/releases/plain-assets@0.4.1) (2026-06-26)
+
+### What's changed
+
+- Removed references to the retired `plain.esbuild` package from the docs and the `compile` command's comments; `plain.tailwind` remains an example `plain.assets.compile` hook. ([c6b3c7efc9](https://github.com/dropseed/plain/commit/c6b3c7efc9))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.4.0](https://github.com/dropseed/plain/releases/plain-assets@0.4.0) (2026-06-22)
 
 ### What's changed

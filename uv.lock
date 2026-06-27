@@ -847,7 +847,7 @@ dev = [
 
 [[package]]
 name = "plain-assets"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "plain-assets" }
 dependencies = [
     { name = "plain" },
