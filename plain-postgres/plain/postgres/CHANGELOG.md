@@ -1,5 +1,15 @@
 # plain-postgres changelog
 
+## [0.110.2](https://github.com/dropseed/plain/releases/plain-postgres@0.110.2) (2026-06-26)
+
+### What's changed
+
+- Internal type-annotation cleanups (`Func` expression attributes, enum choices) and a dev-dependency bump (pytest 9.1.1) to clear a security advisory. No public API changes. ([288bbf0bb1](https://github.com/dropseed/plain/commit/288bbf0bb1))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.110.1](https://github.com/dropseed/plain/releases/plain-postgres@0.110.1) (2026-06-22)
 
 ### What's changed
