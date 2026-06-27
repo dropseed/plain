@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.151.1](https://github.com/dropseed/plain/releases/plain@0.151.1) (2026-06-26)
+
+### What's changed
+
+- `plain check` now surfaces preflight warnings instead of hiding them: a passing run shows a warning count (e.g. duplicate indexes) and a failing run prints preflight's full report. ([8f0b014276](https://github.com/dropseed/plain/commit/8f0b014276))
+- Removed the `plain.esbuild` entry from the package list in the docs now that the package is retired. ([c6b3c7efc9](https://github.com/dropseed/plain/commit/c6b3c7efc9))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.151.0](https://github.com/dropseed/plain/releases/plain@0.151.0) (2026-06-22)
 
 ### What's changed
