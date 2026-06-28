@@ -1,5 +1,15 @@
 # plain-oauthserver changelog
 
+## [0.1.1](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.1) (2026-06-28)
+
+### What's changed
+
+- Documentation: the MCP↔OAuth client handshake walkthrough and the `OAuthResourceServer` composition example moved to [`plain.mcp`](../../plain-mcp/plain/mcp/README.md#oauth-for-mcp-clients)'s README so the integration is documented in one place; this README now cross-links there ([3460d76](https://github.com/dropseed/plain/commit/3460d76137)).
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.0](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.0) (2026-06-26)
 
 Initial release of `plain.oauthserver` — a public-client OAuth 2.1 authorization server for Plain apps, enough to let an MCP client like Claude's custom connector connect as one of your users.
