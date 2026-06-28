@@ -159,6 +159,39 @@ class Screenshot(MCPTool):
 
 Returning a non-content dict like `{"id": 1, "name": "Alice"}` JSON-serializes into a text block — the "here's some structured data" case still works without ceremony.
 
+### Tool annotations
+
+Tools can advertise [MCP annotations](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#tool-annotations) — hints the client uses to present and gate them — by setting `annotations` to a dict in MCP wire format:
+
+```python
+class ListOrders(MCPTool):
+    """List orders."""
+
+    annotations = {"readOnlyHint": True}
+```
+
+`readOnlyHint` is the load-bearing one: clients (e.g. Claude's connector settings) **group read-only tools** and let users auto-allow them while requiring approval for the rest. The spec defines these hints:
+
+| Key               | Meaning                                                   | Spec default |
+| ----------------- | --------------------------------------------------------- | ------------ |
+| `readOnlyHint`    | tool does not modify state                                | `false`      |
+| `destructiveHint` | may perform destructive updates (only when not read-only) | `true`       |
+| `idempotentHint`  | repeated calls have no additional effect                  | `false`      |
+| `openWorldHint`   | interacts with an open / external world                   | `true`       |
+
+The dict is emitted verbatim, so any hint the spec adds later (or one this version doesn't list) works without a plain-mcp update — and a tool that sets no `annotations` carries no `annotations` object at all. Annotations are inherited like any class attribute, so a shared base tool can set them once:
+
+```python
+class ReadTool(MCPTool):
+    annotations = {"readOnlyHint": True}
+
+
+class ListOrders(ReadTool):
+    """List orders."""  # inherits readOnlyHint
+```
+
+> Annotations are advisory: per the spec, clients must treat them as untrusted from untrusted servers, so don't rely on them as an access control — gate writes in the tool itself.
+
 ## Resources
 
 Resources are addressable data sources your server exposes for reading. Each resource is an [`MCPResource`](./resources.py#MCPResource) subclass with a URI and a `read()` method. Declare them on the MCP with `resources = [...]` (parallel to `tools`):
@@ -358,7 +391,7 @@ Clients send the token in their config:
   "mcpServers": {
     "my-app": {
       "url": "https://myapp.com/mcp/",
-      "headers": {"Authorization": "Bearer <token>"}
+      "headers": { "Authorization": "Bearer <token>" }
     }
   }
 }

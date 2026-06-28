@@ -125,6 +125,84 @@ class TestToolRegistration:
         assert tools[0]["inputSchema"]["properties"]["name"]["type"] == "string"
         assert "name" in tools[0]["inputSchema"]["required"]
 
+    def test_tool_emits_annotations(self) -> None:
+        class ListThings(MCPTool):
+            """List things."""
+
+            annotations = {"readOnlyHint": True}
+
+            def run(self) -> str:
+                return "ok"
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [ListThings]
+
+        tools = _call(_instantiate(MyMCP), _make_request("tools/list"))["result"][
+            "tools"
+        ]
+        assert tools[0]["annotations"] == {"readOnlyHint": True}
+
+    def test_tool_without_annotations_omits_key(self) -> None:
+        class DoThing(MCPTool):
+            """Do a thing."""
+
+            def run(self) -> str:
+                return "ok"
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [DoThing]
+
+        tools = _call(_instantiate(MyMCP), _make_request("tools/list"))["result"][
+            "tools"
+        ]
+        assert "annotations" not in tools[0]
+
+    def test_tool_annotations_pass_through_unknown_keys(self) -> None:
+        # Annotations are emitted verbatim, so a hint plain-mcp doesn't model
+        # (a newer spec field) works without a framework change.
+        class Future(MCPTool):
+            """A tool using a not-yet-modeled hint."""
+
+            annotations = {"readOnlyHint": True, "sensitiveHint": True}
+
+            def run(self) -> str:
+                return "ok"
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Future]
+
+        tools = _call(_instantiate(MyMCP), _make_request("tools/list"))["result"][
+            "tools"
+        ]
+        assert tools[0]["annotations"] == {
+            "readOnlyHint": True,
+            "sensitiveHint": True,
+        }
+
+    def test_tool_annotations_inherited(self) -> None:
+        # A base tool's annotations are inherited by subclasses via normal
+        # class-attribute inheritance — no special handling.
+        class ReadTool(MCPTool):
+            annotations = {"readOnlyHint": True}
+
+        class ListThings(ReadTool):
+            """List things."""
+
+            def run(self) -> str:
+                return "ok"
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [ListThings]
+
+        tools = _call(_instantiate(MyMCP), _make_request("tools/list"))["result"][
+            "tools"
+        ]
+        assert tools[0]["annotations"] == {"readOnlyHint": True}
+
     def test_register_classmethod(self) -> None:
         class MyMCP(MCPView):
             name = "test"

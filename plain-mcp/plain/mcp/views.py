@@ -307,16 +307,20 @@ class MCPView(View):
         return {}
 
     def rpc_tools_list(self, params: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "tools": [
-                {
-                    "name": tool_cls.name,
-                    "description": tool_cls.description,
-                    "inputSchema": tool_cls.input_schema,
-                }
-                for tool_cls in self.get_tools()
-            ]
-        }
+        tools = []
+        for tool_cls in self.get_tools():
+            tool: dict[str, Any] = {
+                "name": tool_cls.name,
+                "description": tool_cls.description,
+                "inputSchema": tool_cls.input_schema,
+            }
+            # `annotations` is optional in the spec — omit it when unset (None)
+            # so a tool that sets no hints doesn't carry an empty object.
+            annotations = tool_cls.annotations
+            if annotations:
+                tool["annotations"] = annotations
+            tools.append(tool)
+        return {"tools": tools}
 
     def rpc_tools_call(self, params: dict[str, Any]) -> dict[str, Any]:
         tool_name = params.get("name")
