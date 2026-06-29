@@ -1710,6 +1710,9 @@ class RawQuerySet:
         return f"<{self.__class__.__name__}: {self.sql_query}>"
 
     def __getitem__(self, k: int | slice) -> Model | list[Model]:
+        # Unlike QuerySet, a RawQuerySet is always fully materialized — there's
+        # no lazy query to push a slice into — so indexing keeps plain list
+        # semantics: a slice returns a list (and step/negative slicing work).
         return list(self)[k]
 
     @cached_property
