@@ -84,19 +84,29 @@
                             {{ get_field_label(field) }}
                         </div>
                         {% else %}
+                        {# 3-state sort cycle: unsorted -> ascending -> descending -> cleared. #}
+                        {% if field != order_by_field %}
+                            {% set next_order_by = field %}
+                        {% elif order_by_direction != "-" %}
+                            {% set next_order_by = "-" ~ field %}
+                        {% else %}
+                            {% set next_order_by = "" %}
+                        {% endif %}
                         <a
                             data-merge-params
                             class="text-xs font-normal flex items-center gap-1 hover:text-admin-foreground group"
-                            href="?page=1&order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
+                            href="?page=1&order_by={{ next_order_by }}">
                             <span>{{ get_field_label(field) }}</span>
                             {% if field == order_by_field %}
                                 {% if order_by_direction == "-" %}
-                                <span class="text-[10px]">▼</span>
+                                {# Sorted descending; the next click clears, so reveal an x on hover. #}
+                                <admin.Icon name="caret-down-fill" class="text-[10px] group-hover:hidden" />
+                                <admin.Icon name="x-lg" class="text-[10px] hidden group-hover:inline" />
                                 {% else %}
-                                <span class="text-[10px]">▲</span>
+                                <admin.Icon name="caret-up-fill" class="text-[10px]" />
                                 {% endif %}
                             {% else %}
-                            <span class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100">▼</span>
+                            <admin.Icon name="caret-up-fill" class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100" />
                             {% endif %}
                         </a>
                         {% endif %}
@@ -186,6 +196,7 @@
             <form data-autosubmit method="GET">
                 {% if search_fields and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
                 {% if filter_names and current_filter %}<input type="hidden" name="filter" value="{{ current_filter }}" />{% endif %}
+                {% if order_by_field %}<input type="hidden" name="order_by" value="{{ order_by_direction }}{{ order_by_field }}" />{% endif %}
                 <select name="page" class="admin-select admin-select-sm w-auto">
                 {% for page_num in page.paginator.page_range %}
                     <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>

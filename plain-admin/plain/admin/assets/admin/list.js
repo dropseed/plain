@@ -100,7 +100,12 @@ document.querySelectorAll("[data-merge-params]").forEach((link) => {
   const currentUrl = new URL(window.location.href);
   const params = new URL(link.getAttribute("href"), window.location.href).searchParams;
   params.forEach((value, key) => {
-    currentUrl.searchParams.set(key, value);
+    // An empty value means "remove this param" (e.g. clearing the sort).
+    if (value === "") {
+      currentUrl.searchParams.delete(key);
+    } else {
+      currentUrl.searchParams.set(key, value);
+    }
   });
   link.setAttribute("href", currentUrl.toString());
 });
