@@ -42,11 +42,7 @@ server:
   - server-sse-polling
   - server-sse-multiple-streams
 
-  # DNS-rebinding protection — the spec increasingly requires rejecting a
-  # non-localhost Origin with a 4xx for the Streamable HTTP transport. Plain
-  # validates the Host header (ALLOWED_HOSTS via HostValidationMiddleware) but
-  # not the Origin header, and the conformance client can only set Origin (Host
-  # is a forbidden header for its fetch). Deferred: Origin validation is a
-  # deliberate design call that likely belongs in plain's CSRF/host layer, not
-  # bolted onto plain-mcp. Tracked in the AI arc's plain-mcp dogfooding notes.
-  - dns-rebinding-protection
+  # NOTE: dns-rebinding-protection PASSES — Plain's builtin CsrfViewMiddleware
+  # rejects a forged non-localhost Origin with a 400 (the MCP MUST), and valid
+  # localhost requests are accepted now that the runner targets `/mcp` (no
+  # trailing slash — `/mcp/` 308-redirected, which the raw probe didn't follow).
