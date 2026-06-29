@@ -1,0 +1,111 @@
+#!/bin/bash
+#
+# Launch the MCP Inspector against the example app's MCP server (NotesMCP).
+#
+# The Inspector is the reference MCP *client* — a way to drive a server with no
+# Claude/Cursor account: an interactive UI to list/call tools and watch the
+# wire, plus a `--cli` mode for scripted calls. It complements the automated
+# conformance suite (plain-mcp/tests/conformance), which proves protocol
+# compliance; this exercises a server's actual tools.
+#
+# Like the conformance harness, this boots `plain server` on a local HTTP port
+# (no TLS, so Node connects without cert friction) and tears it down on exit —
+# nothing needs to be running first.
+#
+# Usage:
+#   ./scripts/inspect-mcp                                          # UI mode (opens the Inspector web UI)
+#   ./scripts/inspect-mcp --cli --method tools/list               # scripted: print the tool list
+#   ./scripts/inspect-mcp --cli --method tools/call \
+#       --tool-name list_my_notes                                 # scripted: call a tool
+#
+# Requires Node (npx). The example's NotesMCP uses a hardcoded dev bearer (see
+# example/app/mcp.py). `tools/list` works without a database; tool calls that
+# hit the DB need Postgres (./scripts/start-postgres).
+#
+# UI-mode quirk (MCP Inspector v0.22.0): the bearer is prefilled into
+# Authentication > Custom Headers but a *restored* value isn't applied to the
+# connection until edited — re-type the value (`local-dev-only`) before clicking
+# Connect, or the proxy sends no auth and the server returns 401. CLI mode
+# (--cli) sends the header correctly with no extra step.
+
+set -e
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+EXAMPLE_DIR="${REPO_ROOT}/example"
+PORT="${INSPECT_MCP_PORT:-18766}"
+URL="http://127.0.0.1:${PORT}/mcp"   # no trailing slash — path("mcp", NotesMCP)
+TOKEN="local-dev-only"   # matches DEV_TOKEN in example/app/mcp.py
+
+bold() { printf '\033[1m%s\033[0m\n' "$1"; }
+
+if ! command -v npx >/dev/null 2>&1; then
+    bold "Error: npx not available — install Node.js to run the MCP Inspector."
+    exit 1
+fi
+
+bold "Starting example MCP server on ${URL}"
+
+cd "${EXAMPLE_DIR}"
+PLAIN_SETTINGS_MODULE=app.settings \
+PLAIN_HTTPS_REDIRECT_ENABLED=false \
+    uv run plain server \
+        -b "127.0.0.1:${PORT}" \
+        --workers 1 \
+        --no-access-log \
+    >/tmp/inspect-mcp-server.log 2>&1 &
+SERVER_PID=$!
+
+cleanup() {
+    if kill -0 "${SERVER_PID}" 2>/dev/null; then
+        kill "${SERVER_PID}" 2>/dev/null || true
+        wait "${SERVER_PID}" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT INT TERM
+
+# Wait for the MCP endpoint to answer an authenticated ping.
+for i in $(seq 1 40); do
+    if curl -sf -X POST "${URL}" \
+        -H "Authorization: Bearer ${TOKEN}" \
+        -H 'Content-Type: application/json' \
+        -H 'Accept: application/json, text/event-stream' \
+        -d '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}' \
+        >/dev/null 2>&1; then
+        break
+    fi
+    if ! kill -0 "${SERVER_PID}" 2>/dev/null; then
+        bold "Server died before becoming ready. Last 40 log lines:"
+        tail -n 40 /tmp/inspect-mcp-server.log || true
+        exit 1
+    fi
+    sleep 0.25
+done
+
+bold "Launching MCP Inspector against ${URL}"
+
+# CLI mode wants the server URL as a positional target; UI mode takes it via
+# --server-url. Detect which the caller asked for and shape the args to match.
+# Don't `exec` — that would discard the cleanup trap and leak the server.
+mode_cli=false
+for arg in "$@"; do
+    [ "$arg" = "--cli" ] && mode_cli=true
+done
+
+set +e
+if [ "${mode_cli}" = true ]; then
+    npx --yes @modelcontextprotocol/inspector \
+        "${URL}" \
+        --transport http \
+        --header "Authorization: Bearer ${TOKEN}" \
+        "$@"
+else
+    npx --yes @modelcontextprotocol/inspector \
+        --transport http \
+        --server-url "${URL}" \
+        --header "Authorization: Bearer ${TOKEN}" \
+        "$@"
+fi
+STATUS=$?
+set -e
+
+exit "${STATUS}"
