@@ -4,19 +4,6 @@ import pytest
 from app.examples.models.iteration import IterationExample
 
 from plain.postgres import F, QuerySet
-from plain.postgres.db import get_connection
-
-
-def _capture_queries(callable_):
-    conn = get_connection()
-    prev_force = conn.force_debug_cursor
-    conn.force_debug_cursor = True
-    conn.queries_log.clear()
-    try:
-        callable_()
-        return list(conn.queries_log)
-    finally:
-        conn.force_debug_cursor = prev_force
 
 
 @pytest.fixture
@@ -47,12 +34,13 @@ def test_slice_of_evaluated_queryset_returns_queryset(rows):
     assert [r.name for r in sliced] == [f"name{i:02d}" for i in range(5)]
 
 
-def test_slice_of_evaluated_queryset_does_not_requery(rows):
+def test_slice_of_evaluated_queryset_does_not_requery(rows, capture_queries):
     """Iterating a cached slice reuses the cache instead of hitting the DB."""
     qs = IterationExample.query.order_by("name")
     list(qs)  # evaluate
 
-    queries = _capture_queries(lambda: list(qs[:5]))
+    with capture_queries() as queries:
+        list(qs[:5])
 
     assert queries == []
 
@@ -128,7 +116,7 @@ def test_slice_then_annotate_works_regardless_of_evaluation(rows):
     assert from_unevaluated == from_evaluated == [f"name{i:02d}" for i in range(5)]
 
 
-def test_values_list_cached_slice_reuses_cache(rows):
+def test_values_list_cached_slice_reuses_cache(rows, capture_queries):
     """A cached values_list() slice stays a QuerySet and reuses the cache.
 
     values()/values_list() use a different iterable class than the default
@@ -138,7 +126,8 @@ def test_values_list_cached_slice_reuses_cache(rows):
     list(qs)  # evaluate -> cache holds the values
 
     sliced = qs[:3]
-    queries = _capture_queries(lambda: list(sliced))
+    with capture_queries() as queries:
+        list(sliced)
 
     assert isinstance(sliced, QuerySet)
     assert queries == []

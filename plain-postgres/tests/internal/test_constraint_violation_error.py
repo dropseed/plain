@@ -12,7 +12,6 @@ from app.examples.models.constraints import ConstraintExample
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import CheckConstraint, Q, UniqueConstraint
 from plain.postgres.constraints import BaseConstraint
-from plain.postgres.db import get_connection
 from plain.postgres.expressions import F
 from plain.postgres.forms import ModelForm
 from plain.test import RequestFactory
@@ -172,20 +171,13 @@ def test_save_runs_full_clean_by_default(
     assert ConstraintExample.query.filter(name="bad").count() == 0
 
 
-def test_save_skips_constraint_pre_check_select(db: None) -> None:
+def test_save_skips_constraint_pre_check_select(db: None, capture_queries) -> None:
     """A default save() issues only the INSERT — the per-unique-constraint
     pre-check SELECT is gone. The database enforces the constraint and
     save_base maps any violation."""
-    conn = get_connection()
-    previous = conn.force_debug_cursor
-    conn.force_debug_cursor = True
-    conn.queries_log.clear()
-    try:
+    with capture_queries() as queries:
         ConstraintExample(name="solo", description="row").create()
-        query_count = len(conn.queries_log)
-    finally:
-        conn.force_debug_cursor = previous
-    assert query_count == 1, [q["sql"] for q in conn.queries_log]
+    assert len(queries) == 1, [q["sql"] for q in queries]
 
 
 def test_save_clean_and_validate_false_skips_validation(

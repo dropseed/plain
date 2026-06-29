@@ -1379,7 +1379,9 @@ class TestProbeTableReuse:
     """analyze_model creates the probe temp table once per model and reuses it
     for every round-trip, instead of churning one CREATE/DROP per comparison."""
 
-    def test_analyze_model_shares_one_temp_table_across_round_trips(self, db):
+    def test_analyze_model_shares_one_temp_table_across_round_trips(
+        self, db, capture_queries
+    ):
         from plain.postgres.convergence.analysis import _PROBE_TABLE
 
         # ConstraintExample already has a converged UNIQUE constraint (one
@@ -1398,15 +1400,12 @@ class TestProbeTableReuse:
         )
 
         conn = get_connection()
-        previous = conn.force_debug_cursor
-        conn.force_debug_cursor = True
-        conn.queries_log.clear()
         try:
-            with conn.cursor() as cursor:
-                analyze_model(conn, cursor, ConstraintExample)
-            sqls = [q["sql"] for q in conn.queries_log]
+            with capture_queries() as queries:
+                with conn.cursor() as cursor:
+                    analyze_model(conn, cursor, ConstraintExample)
+            sqls = [q["sql"] for q in queries]
         finally:
-            conn.force_debug_cursor = previous
             ConstraintExample.model_options.constraints = original
             execute(
                 'ALTER TABLE "examples_constraintexample" DROP CONSTRAINT '

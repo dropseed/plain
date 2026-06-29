@@ -485,25 +485,17 @@ def test_delete_already_deleted_instance_raises(db):
 # ===========================================================================
 
 
-def test_cascade_delete_issues_one_query(db):
+def test_cascade_delete_issues_one_query(db, capture_queries):
     """Single-level CASCADE fires exactly one DELETE — Postgres handles the
     cascade internally. This is the headline win of the DB-level rewrite."""
-    from plain.postgres.db import get_connection
-
     _create_parents()
     parent = DeleteParent.query.get(name="parent")
     for _ in range(5):
         ChildCascade.query.create(parent=parent)
 
-    conn = get_connection()
-    prev_force = conn.force_debug_cursor
-    conn.force_debug_cursor = True
-    conn.queries_log.clear()
-    try:
+    with capture_queries() as queries:
         parent.delete()
-        query_count = len(conn.queries_log)
-    finally:
-        conn.force_debug_cursor = prev_force
+    query_count = len(queries)
 
     assert query_count == 1, (
         f"Expected one DELETE; got {query_count} queries — Collector may have "
