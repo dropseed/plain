@@ -376,7 +376,7 @@ def test_delete_rejects_sliced_queryset(db):
     _create_parents()
     qs = DeleteParent.query.all()[:1]
     with pytest.raises(TypeError):
-        qs.delete()  # ty: ignore[unresolved-attribute]
+        qs.delete()
 
 
 def test_delete_rejects_distinct_queryset(db):
