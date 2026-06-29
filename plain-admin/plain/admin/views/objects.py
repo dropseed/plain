@@ -1,5 +1,6 @@
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
@@ -11,6 +12,7 @@ from plain.templates.views import (
     DetailView,
     UpdateView,
 )
+from plain.urls import reverse
 
 from .base import AdminView
 
@@ -112,7 +114,10 @@ class AdminListView(HTMXView, AdminView):
 
     def get(self) -> Response:
         if self.is_htmx_request():
-            htmx_search = "/search/" in self.request.headers.get("HX-Current-Url", "")
+            # Detect a list rendered as a preview fragment inside the global
+            # search page (its hx-get sends HX-Current-Url = the search URL).
+            current_path = urlparse(self.request.headers.get("HX-Current-Url", "")).path
+            htmx_search = current_path == reverse("admin:search")
             if htmx_search:
                 self._table_style = "preview"
         else:
