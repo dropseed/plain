@@ -4,7 +4,7 @@ Runs the [MCP Conformance Test Framework](https://github.com/modelcontextprotoco
 
 ## Layout
 
-- `app/settings.py`, `app/urls.py` — a minimal Plain server that mounts an `MCP` view on `/mcp/`
+- `app/settings.py`, `app/urls.py` — a minimal Plain server that mounts an `MCP` view on `/mcp`
 - `app/mcp.py` — the `ConformanceMCP` subclass and the tools the conformance suite expects (`test_simple_text`, `test_error_handling`)
 - `run` — starts the Plain server on `127.0.0.1:18765`, runs the conformance CLI against it, then shuts the server down
 - `expected-failures.yml` — baseline of scenarios that plain-mcp does not yet pass

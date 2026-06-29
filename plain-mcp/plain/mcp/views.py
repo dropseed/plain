@@ -60,7 +60,7 @@ class MCPView(View):
             tools = [Greet]
 
         # app/urls.py
-        path("mcp/", AppMCP, name="mcp")
+        path("mcp", AppMCP, name="mcp")
 
     MCPView itself does no authentication. Compose with `plain.auth.views.AuthView`
     for session auth (put `MCPView` first in the base list), or override

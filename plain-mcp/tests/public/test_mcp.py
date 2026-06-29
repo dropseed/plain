@@ -22,7 +22,7 @@ def _make_request(
 
 def _instantiate(cls: type[MCPView]) -> MCPView:
     """Build an MCPView instance with a stub request for unit tests."""
-    request = RequestFactory().post("/mcp/", content_type="application/json")
+    request = RequestFactory().post("/mcp", content_type="application/json")
     return cls(request=request)
 
 

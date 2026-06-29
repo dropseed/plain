@@ -59,7 +59,7 @@ class AppRouter(Router):
     ]
 ```
 
-AI clients connect to `https://yourapp.com/mcp/` using the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http).
+AI clients connect to `https://yourapp.com/mcp` using the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http).
 
 `name` is required. `version` defaults to `settings.VERSION` (from your `pyproject.toml`). Auth and authorization are covered below.
 
@@ -297,8 +297,8 @@ class StaffMCP(MCPView, AuthView):
 ```python
 # app/urls.py
 urls = [
-    path("api/mcp/", AppMCP, name="app_mcp"),
-    path("staff/mcp/", StaffMCP, name="staff_mcp"),
+    path("api/mcp", AppMCP, name="app_mcp"),
+    path("staff/mcp", StaffMCP, name="staff_mcp"),
 ]
 ```
 
@@ -390,7 +390,7 @@ Clients send the token in their config:
 {
   "mcpServers": {
     "my-app": {
-      "url": "https://myapp.com/mcp/",
+      "url": "https://myapp.com/mcp",
       "headers": { "Authorization": "Bearer <token>" }
     }
   }
