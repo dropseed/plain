@@ -77,42 +77,50 @@
                 {% endif %}
 
                 {% for field in fields %}
+                    {% set label = get_field_label(field) %}
                     {% if order_by_field is defined %}
-                    <th>
-                        {% if table_style == "preview" %}
-                        <div class="text-xs font-normal">
-                            {{ get_field_label(field) }}
-                        </div>
-                        {% else %}
                         {# 3-state sort cycle: unsorted -> ascending -> descending -> cleared. #}
                         {% if field != order_by_field %}
                             {% set next_order_by = field %}
+                            {% set aria_sort = "none" %}
+                            {% set sort_action = "Sort by " ~ label ~ " ascending" %}
                         {% elif order_by_direction != "-" %}
                             {% set next_order_by = "-" ~ field %}
+                            {% set aria_sort = "ascending" %}
+                            {% set sort_action = "Sort by " ~ label ~ " descending" %}
                         {% else %}
                             {% set next_order_by = "" %}
+                            {% set aria_sort = "descending" %}
+                            {% set sort_action = "Stop sorting by " ~ label %}
                         {% endif %}
+                    <th{% if table_style != "preview" %} aria-sort="{{ aria_sort }}"{% endif %}>
+                        {% if table_style == "preview" %}
+                        <div class="text-xs font-normal">
+                            {{ label }}
+                        </div>
+                        {% else %}
                         <a
                             data-merge-params
+                            aria-label="{{ sort_action }}"
                             class="text-xs font-normal flex items-center gap-1 hover:text-admin-foreground group"
                             href="?page=1&order_by={{ next_order_by }}">
-                            <span>{{ get_field_label(field) }}</span>
+                            <span>{{ label }}</span>
                             {% if field == order_by_field %}
                                 {% if order_by_direction == "-" %}
-                                {# Sorted descending; the next click clears, so reveal an x on hover. #}
-                                <admin.Icon name="caret-down-fill" class="text-[10px] group-hover:hidden" />
-                                <admin.Icon name="x-lg" class="text-[10px] hidden group-hover:inline" />
+                                {# Sorted descending; the next click clears, so reveal an x on hover/focus. #}
+                                <admin.Icon name="caret-down-fill" class="text-[10px] group-hover:hidden group-focus:hidden" />
+                                <admin.Icon name="x-lg" class="text-[10px] hidden group-hover:inline group-focus:inline" />
                                 {% else %}
                                 <admin.Icon name="caret-up-fill" class="text-[10px]" />
                                 {% endif %}
                             {% else %}
-                            <admin.Icon name="caret-up-fill" class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100" />
+                            <admin.Icon name="caret-up-fill" class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100 group-focus:opacity-100" />
                             {% endif %}
                         </a>
                         {% endif %}
                     </th>
                     {% else %}
-                    <th class="text-xs font-normal text-admin-muted-foreground">{{ get_field_label(field) }}</th>
+                    <th class="text-xs font-normal text-admin-muted-foreground">{{ label }}</th>
                     {% endif %}
                 {% endfor %}
 
@@ -193,10 +201,8 @@
             {% if page.has_previous() %}
             <a data-merge-params href="?page={{ page.previous_page_number() }}" class="admin-btn admin-btn-sm admin-btn-outline">&lt;</a>
             {% endif %}
+            {# submitFormClean merges this onto the current URL, so search/filter/sort carry over without hidden inputs. #}
             <form data-autosubmit method="GET">
-                {% if search_fields and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
-                {% if filter_names and current_filter %}<input type="hidden" name="filter" value="{{ current_filter }}" />{% endif %}
-                {% if order_by_field %}<input type="hidden" name="order_by" value="{{ order_by_direction }}{{ order_by_field }}" />{% endif %}
                 <select name="page" class="admin-select admin-select-sm w-auto">
                 {% for page_num in page.paginator.page_range %}
                     <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>

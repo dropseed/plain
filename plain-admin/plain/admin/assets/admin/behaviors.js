@@ -16,16 +16,30 @@ autolinkColumns(document);
 document.addEventListener("htmx:afterSwap", (evt) => autolinkColumns(evt.detail.target));
 
 function submitFormClean(form) {
-  const formData = new FormData(form);
-  const params = new URLSearchParams();
-  for (const [key, value] of formData.entries()) {
+  const target = new URL(
+    form.getAttribute("action") || window.location.pathname,
+    window.location.href,
+  );
+  // A form that stays on the current view (filter, search, pagination) merges its
+  // fields onto the current query string so unrelated params like the active sort
+  // survive; a form that navigates elsewhere (e.g. global search) starts clean.
+  const sameView = target.pathname === window.location.pathname;
+  if (sameView) {
+    target.search = window.location.search;
+  }
+  const data = new FormData(form);
+  for (const [key, value] of data.entries()) {
     if (value) {
-      params.append(key, value);
+      target.searchParams.set(key, value);
+    } else {
+      target.searchParams.delete(key);
     }
   }
-  const basePath = form.getAttribute("action") || window.location.pathname;
-  const url = params.toString() ? `${basePath}?${params.toString()}` : basePath;
-  window.location.href = url;
+  // Any same-view control other than pagination returns to the first page.
+  if (sameView && !data.has("page")) {
+    target.searchParams.delete("page");
+  }
+  window.location.href = target.toString();
 }
 
 document.addEventListener("change", (e) => {

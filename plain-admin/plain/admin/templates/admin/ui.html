@@ -1144,7 +1144,7 @@ document.addEventListener("DOMContentLoaded", () => {
 </table>
 
 <p class="text-sm text-admin-muted-foreground mt-3">
-    GET-form submissions are also intercepted globally to drop empty params from the URL — keeps list views from accumulating <code>?q=&amp;filter=</code> cruft when filters are cleared. No attribute needed; applies to every <code>&lt;form method="GET"&gt;</code>.
+    GET-form submissions are also intercepted globally: a form that stays on the current view merges its fields onto the existing query string — so unrelated state like the active sort survives — while dropping any emptied params and resetting <code>page</code> unless the form itself paginates. Forms that navigate elsewhere (e.g. global search) start from a clean query string. No attribute needed; applies to every <code>&lt;form method="GET"&gt;</code>.
 </p>
 {% endcall %}
 
