@@ -23,6 +23,8 @@ from plain.postgres.convergence import (
     plan_model_convergence,
 )
 from plain.postgres.convergence.analysis import (
+    ConstraintModelDrift,
+    ConstraintNameDrift,
     IndexModelDrift,
     IndexRenameDrift,
     IndexUndeclaredDrift,
@@ -528,14 +530,19 @@ class TestDriftPolicy:
             check=Q(id__gte=0), name="examples_widget_id_check"
         )
         assert can_auto_fix(
-            ConstraintDrift(
-                kind=DriftKind.MISSING, table="t", constraint=constraint, model=Widget
+            ConstraintModelDrift(
+                table="t", constraint=constraint, model=Widget, kind=DriftKind.MISSING
             )
         )
 
     def test_can_auto_fix_false_for_changed_constraint(self):
         """can_auto_fix returns False for changed constraint definitions."""
-        drift = ConstraintDrift(kind=DriftKind.CHANGED, table="t")
+        constraint = CheckConstraint(
+            check=Q(id__gte=0), name="examples_widget_id_check"
+        )
+        drift = ConstraintModelDrift(
+            table="t", constraint=constraint, model=Widget, kind=DriftKind.CHANGED
+        )
         assert not can_auto_fix(drift)
 
 
@@ -623,7 +630,7 @@ class TestExecutePlan:
     def test_handles_failure(self, isolated_db):
         """execute_plan() captures errors without raising."""
         fix = DropConstraintFix(table="examples_widget", name="nonexistent")
-        drift = ConstraintDrift(
+        drift = ConstraintNameDrift(
             kind=DriftKind.UNDECLARED, table="examples_widget", name="nonexistent"
         )
         item = PlanItem(drift=drift, fix=fix)
@@ -643,7 +650,7 @@ class TestExecutePlan:
 
         items = [
             PlanItem(
-                drift=ConstraintDrift(
+                drift=ConstraintNameDrift(
                     kind=DriftKind.UNDECLARED,
                     table="examples_widget",
                     name="nonexistent",
@@ -651,7 +658,7 @@ class TestExecutePlan:
                 fix=DropConstraintFix(table="examples_widget", name="nonexistent"),
             ),
             PlanItem(
-                drift=ConstraintDrift(
+                drift=ConstraintNameDrift(
                     kind=DriftKind.UNDECLARED,
                     table="examples_widget",
                     name="examples_widget_real_check",
@@ -676,7 +683,7 @@ class TestExecutePlan:
 
         items = [
             PlanItem(
-                drift=ConstraintDrift(
+                drift=ConstraintNameDrift(
                     kind=DriftKind.UNDECLARED,
                     table="examples_widget",
                     name="nonexistent",
@@ -684,7 +691,7 @@ class TestExecutePlan:
                 fix=DropConstraintFix(table="examples_widget", name="nonexistent"),
             ),
             PlanItem(
-                drift=ConstraintDrift(
+                drift=ConstraintNameDrift(
                     kind=DriftKind.UNDECLARED,
                     table="examples_widget",
                     name="examples_widget_real_check",
@@ -720,7 +727,7 @@ class TestSyncPolicy:
     def test_blocking_failure_fails_sync(self, isolated_db):
         """A failed constraint fix (blocks_sync=True) makes ok_for_sync False."""
         fix = DropConstraintFix(table="examples_widget", name="nonexistent")
-        drift = ConstraintDrift(
+        drift = ConstraintNameDrift(
             kind=DriftKind.UNDECLARED, table="examples_widget", name="nonexistent"
         )
         item = PlanItem(drift=drift, fix=fix, blocks_sync=True)
@@ -780,7 +787,7 @@ class TestSyncPolicy:
             ),
             # Blocking: will fail (nonexistent constraint)
             PlanItem(
-                drift=ConstraintDrift(
+                drift=ConstraintNameDrift(
                     kind=DriftKind.UNDECLARED,
                     table="examples_widget",
                     name="nonexistent",
@@ -803,7 +810,7 @@ class TestSyncPolicy:
             'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_temp" CHECK ("id" >= 0)'
         )
         fix = DropConstraintFix(table="examples_widget", name="examples_widget_temp")
-        drift = ConstraintDrift(
+        drift = ConstraintNameDrift(
             kind=DriftKind.UNDECLARED,
             table="examples_widget",
             name="examples_widget_temp",

@@ -106,33 +106,50 @@ IndexDrift = IndexModelDrift | IndexRenameDrift | IndexUndeclaredDrift
 
 
 @dataclass
-class ConstraintDrift:
-    """A schema difference for a constraint."""
+class ConstraintModelDrift:
+    """Model declares a constraint the DB is missing (MISSING) or has with a
+    different definition (CHANGED)."""
 
-    kind: DriftKind
     table: str
-    constraint: CheckConstraint | UniqueConstraint | None = None
-    model: type[Model] | None = None
-    old_name: str | None = None
-    new_name: str | None = None
-    name: str | None = None
+    constraint: CheckConstraint | UniqueConstraint
+    model: type[Model]
+    kind: DriftKind  # MISSING or CHANGED
 
     def describe(self) -> str:
-        match self.kind:
-            case DriftKind.MISSING if self.constraint is not None:
-                return f"{self.table}: constraint {self.constraint.name} missing"
-            case DriftKind.UNVALIDATED:
-                return f"{self.table}: constraint {self.name} NOT VALID"
-            case DriftKind.CHANGED if self.constraint is not None:
-                return f"{self.table}: constraint {self.constraint.name} definition changed"
-            case DriftKind.RENAMED:
-                return f"{self.table}: constraint {self.old_name} → {self.new_name}"
-            case DriftKind.UNDECLARED:
-                return f"{self.table}: constraint {self.name} not declared"
-            case _:
-                raise ValueError(
-                    f"Cannot describe {self.kind} constraint drift: {self}"
-                )
+        if self.kind is DriftKind.MISSING:
+            return f"{self.table}: constraint {self.constraint.name} missing"
+        return f"{self.table}: constraint {self.constraint.name} definition changed"
+
+
+@dataclass
+class ConstraintNameDrift:
+    """An existing constraint to validate (UNVALIDATED) or drop (UNDECLARED)."""
+
+    table: str
+    name: str
+    kind: DriftKind  # UNVALIDATED or UNDECLARED
+
+    def describe(self) -> str:
+        if self.kind is DriftKind.UNVALIDATED:
+            return f"{self.table}: constraint {self.name} NOT VALID"
+        return f"{self.table}: constraint {self.name} not declared"
+
+
+@dataclass
+class ConstraintRenameDrift:
+    """A constraint whose DB name differs from the model's declared name."""
+
+    table: str
+    old_name: str
+    new_name: str
+
+    kind: ClassVar[DriftKind] = DriftKind.RENAMED
+
+    def describe(self) -> str:
+        return f"{self.table}: constraint {self.old_name} → {self.new_name}"
+
+
+ConstraintDrift = ConstraintModelDrift | ConstraintNameDrift | ConstraintRenameDrift
 
 
 @dataclass
@@ -989,10 +1006,10 @@ def _compare_unique_constraints(
 
         if not actual[constraint.name].validated:
             issue = "NOT VALID — needs validation"
-            drift = ConstraintDrift(
-                kind=DriftKind.UNVALIDATED,
+            drift = ConstraintNameDrift(
                 table=table,
                 name=constraint.name,
+                kind=DriftKind.UNVALIDATED,
             )
         elif constraint.index_only:
             issue, drift = _compare_index_only_unique(
@@ -1008,11 +1025,11 @@ def _compare_unique_constraints(
                     # Round-trip normalization couldn't complete; normalized
                     # model text is unavailable for the diagnostic.
                     issue = f"definition differs: DB has {actual_def!r}"
-                drift = ConstraintDrift(
-                    kind=DriftKind.CHANGED,
+                drift = ConstraintModelDrift(
                     table=table,
                     constraint=constraint,
                     model=model,
+                    kind=DriftKind.CHANGED,
                 )
 
         statuses.append(
@@ -1039,11 +1056,11 @@ def _compare_unique_constraints(
                     constraint_type=ConType.UNIQUE,
                     fields=list(constraint.fields),
                     issue="missing from database",
-                    drift=ConstraintDrift(
-                        kind=DriftKind.MISSING,
+                    drift=ConstraintModelDrift(
                         table=table,
                         constraint=constraint,
                         model=model,
+                        kind=DriftKind.MISSING,
                     ),
                 )
             )
@@ -1056,8 +1073,8 @@ def _compare_unique_constraints(
             if name in actual_indexes:
                 undeclared_drift = IndexUndeclaredDrift(table=table, name=name)
             else:
-                undeclared_drift = ConstraintDrift(
-                    kind=DriftKind.UNDECLARED, table=table, name=name
+                undeclared_drift = ConstraintNameDrift(
+                    table=table, name=name, kind=DriftKind.UNDECLARED
                 )
             statuses.append(
                 ConstraintStatus(
@@ -1096,10 +1113,10 @@ def _compare_check_constraints(
 
         if not actual[constraint.name].validated:
             issue = "NOT VALID — needs validation"
-            drift = ConstraintDrift(
-                kind=DriftKind.UNVALIDATED,
+            drift = ConstraintNameDrift(
                 table=table,
                 name=constraint.name,
+                kind=DriftKind.UNVALIDATED,
             )
         elif actual_def := actual[constraint.name].definition:
             expected_def = _get_expected_check_definition(cursor, model, constraint)
@@ -1111,11 +1128,11 @@ def _compare_check_constraints(
                     # Round-trip normalization couldn't complete; normalized
                     # model text is unavailable for the diagnostic.
                     issue = f"definition differs: DB has {actual_def!r}"
-                drift = ConstraintDrift(
-                    kind=DriftKind.CHANGED,
+                drift = ConstraintModelDrift(
                     table=table,
                     constraint=constraint,
                     model=model,
+                    kind=DriftKind.CHANGED,
                 )
 
         statuses.append(
@@ -1142,11 +1159,11 @@ def _compare_check_constraints(
                     constraint_type=ConType.CHECK,
                     fields=[],
                     issue="missing from database",
-                    drift=ConstraintDrift(
-                        kind=DriftKind.MISSING,
+                    drift=ConstraintModelDrift(
                         table=table,
                         constraint=constraint,
                         model=model,
+                        kind=DriftKind.MISSING,
                     ),
                 )
             )
@@ -1168,10 +1185,10 @@ def _compare_check_constraints(
                     constraint_type=ConType.CHECK,
                     fields=actual[name].columns,
                     issue="not in model",
-                    drift=ConstraintDrift(
-                        kind=DriftKind.UNDECLARED,
+                    drift=ConstraintNameDrift(
                         table=table,
                         name=name,
+                        kind=DriftKind.UNDECLARED,
                     ),
                 )
             )
@@ -1405,8 +1422,7 @@ def _detect_unique_renames(
                     table=table, old_name=old_name, new_name=constraint.name
                 )
             else:
-                rename_drift = ConstraintDrift(
-                    kind=DriftKind.RENAMED,
+                rename_drift = ConstraintRenameDrift(
                     table=table,
                     old_name=old_name,
                     new_name=constraint.name,
@@ -1523,8 +1539,7 @@ def _detect_check_renames(
                     constraint_type=ConType.CHECK,
                     fields=[],
                     issue=f"rename from {old_name}",
-                    drift=ConstraintDrift(
-                        kind=DriftKind.RENAMED,
+                    drift=ConstraintRenameDrift(
                         table=table,
                         old_name=old_name,
                         new_name=constraint.name,
@@ -1566,8 +1581,8 @@ def _compare_index_only_unique(
         unique=True,
     )
     if issue:
-        changed = ConstraintDrift(
-            kind=DriftKind.CHANGED, table=table, constraint=constraint, model=model
+        changed = ConstraintModelDrift(
+            table=table, constraint=constraint, model=model, kind=DriftKind.CHANGED
         )
         return issue, changed
 

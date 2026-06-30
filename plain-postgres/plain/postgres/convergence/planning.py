@@ -11,7 +11,9 @@ from .analysis import (
     ColumnDefaultUndeclaredDrift,
     ColumnShouldAllowNullDrift,
     ColumnShouldBeNotNullDrift,
-    ConstraintDrift,
+    ConstraintModelDrift,
+    ConstraintNameDrift,
+    ConstraintRenameDrift,
     Drift,
     DriftKind,
     ForeignKeyChangedDrift,
@@ -87,15 +89,9 @@ def _plan_drift(drift: Drift) -> PlanItem:
             )
         case IndexUndeclaredDrift(table=t):
             return PlanItem(drift, DropIndexFix(t, drift.name), blocks_sync=False)
-        case ConstraintDrift(
-            kind=DriftKind.MISSING, table=t, constraint=c, model=m
-        ) if c is not None and m is not None:
-            return PlanItem(drift, AddConstraintFix(t, c, m))
-        case ConstraintDrift(kind=DriftKind.UNVALIDATED, table=t, name=n) if (
-            n is not None
-        ):
-            return PlanItem(drift, ValidateConstraintFix(t, n))
-        case ConstraintDrift(kind=DriftKind.CHANGED):
+        case ConstraintModelDrift(kind=DriftKind.MISSING, table=t):
+            return PlanItem(drift, AddConstraintFix(t, drift.constraint, drift.model))
+        case ConstraintModelDrift(kind=DriftKind.CHANGED):
             return PlanItem(
                 drift,
                 fix=None,
@@ -104,14 +100,16 @@ def _plan_drift(drift: Drift) -> PlanItem:
                     " then remove the old one."
                 ),
             )
-        case ConstraintDrift(
-            kind=DriftKind.RENAMED, table=t, old_name=old, new_name=new
-        ) if old is not None and new is not None:
-            return PlanItem(drift, RenameConstraintFix(t, old, new), blocks_sync=False)
-        case ConstraintDrift(kind=DriftKind.UNDECLARED, table=t, name=n) if (
-            n is not None
-        ):
-            return PlanItem(drift, DropConstraintFix(t, n))
+        case ConstraintNameDrift(kind=DriftKind.UNVALIDATED, table=t):
+            return PlanItem(drift, ValidateConstraintFix(t, drift.name))
+        case ConstraintNameDrift(kind=DriftKind.UNDECLARED, table=t):
+            return PlanItem(drift, DropConstraintFix(t, drift.name))
+        case ConstraintRenameDrift(table=t):
+            return PlanItem(
+                drift,
+                RenameConstraintFix(t, drift.old_name, drift.new_name),
+                blocks_sync=False,
+            )
         case ForeignKeyMissingDrift(
             table=t,
             column=col,

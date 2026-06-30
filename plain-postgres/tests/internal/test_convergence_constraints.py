@@ -25,7 +25,11 @@ from plain.postgres.convergence import (
     plan_convergence,
     plan_model_convergence,
 )
-from plain.postgres.convergence.analysis import IndexUndeclaredDrift
+from plain.postgres.convergence.analysis import (
+    ConstraintModelDrift,
+    ConstraintRenameDrift,
+    IndexUndeclaredDrift,
+)
 from plain.postgres.functions.text import Lower, Upper
 from plain.postgres.introspection import ConType
 
@@ -854,9 +858,7 @@ class TestConstraintRename:
                 analysis = analyze_model(conn, cursor, ConstraintExample)
 
             rename_drifts = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, ConstraintDrift) and d.kind == DriftKind.RENAMED
+                d for d in analysis.drifts if isinstance(d, ConstraintRenameDrift)
             ]
             assert len(rename_drifts) == 1
             assert rename_drifts[0].old_name == "examples_constraintexample_id_old"
@@ -888,9 +890,7 @@ class TestConstraintRename:
             analysis = analyze_model(conn, cursor, ConstraintExample)
 
         rename_drifts = [
-            d
-            for d in analysis.drifts
-            if isinstance(d, ConstraintDrift) and d.kind == DriftKind.RENAMED
+            d for d in analysis.drifts if isinstance(d, ConstraintRenameDrift)
         ]
         assert len(rename_drifts) == 1
         assert (
@@ -1105,8 +1105,7 @@ class TestIndexBackedUniqueConstraints:
             constraint_drifts = [
                 d
                 for d in plan.items
-                if isinstance(d.drift, ConstraintDrift)
-                and d.drift.constraint is not None
+                if isinstance(d.drift, ConstraintModelDrift)
                 and d.drift.constraint.name
                 == "examples_constraintexample_name_partial_uq"
             ]
@@ -1142,8 +1141,7 @@ class TestIndexBackedUniqueConstraints:
             constraint_drifts = [
                 d
                 for d in plan.items
-                if isinstance(d.drift, ConstraintDrift)
-                and d.drift.constraint is not None
+                if isinstance(d.drift, ConstraintModelDrift)
                 and d.drift.constraint.name
                 == "examples_constraintexample_name_upper_uq"
             ]
@@ -1181,8 +1179,7 @@ class TestIndexBackedUniqueConstraints:
             constraint_drifts = [
                 d
                 for d in plan.items
-                if isinstance(d.drift, ConstraintDrift)
-                and d.drift.constraint is not None
+                if isinstance(d.drift, ConstraintModelDrift)
                 and d.drift.constraint.name
                 == "examples_constraintexample_name_lower_cond_uq"
             ]
