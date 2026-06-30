@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 import psycopg
 
@@ -65,7 +65,7 @@ class IndexModelDrift:
     table: str
     index: Index
     model: type[Model]
-    kind: DriftKind  # MISSING, INVALID, or CHANGED
+    kind: Literal[DriftKind.MISSING, DriftKind.INVALID, DriftKind.CHANGED]
 
     def describe(self) -> str:
         if self.kind is DriftKind.MISSING:
@@ -102,6 +102,9 @@ class IndexUndeclaredDrift:
         return f"{self.table}: index {self.name} not declared"
 
 
+# Per-category unions of the shape variants above. These (and the `Drift` /
+# `ColumnDrift` unions below) are plain `|` unions, not PEP 695 `type` aliases,
+# so they stay usable in isinstance() checks against the concrete shapes.
 IndexDrift = IndexModelDrift | IndexRenameDrift | IndexUndeclaredDrift
 
 
@@ -113,7 +116,7 @@ class ConstraintModelDrift:
     table: str
     constraint: CheckConstraint | UniqueConstraint
     model: type[Model]
-    kind: DriftKind  # MISSING or CHANGED
+    kind: Literal[DriftKind.MISSING, DriftKind.CHANGED]
 
     def describe(self) -> str:
         if self.kind is DriftKind.MISSING:
@@ -127,7 +130,7 @@ class ConstraintNameDrift:
 
     table: str
     name: str
-    kind: DriftKind  # UNVALIDATED or UNDECLARED
+    kind: Literal[DriftKind.UNVALIDATED, DriftKind.UNDECLARED]
 
     def describe(self) -> str:
         if self.kind is DriftKind.UNVALIDATED:
@@ -200,7 +203,7 @@ class ForeignKeyNameDrift:
 
     table: str
     name: str
-    kind: DriftKind  # UNVALIDATED or UNDECLARED
+    kind: Literal[DriftKind.UNVALIDATED, DriftKind.UNDECLARED]
 
     def describe(self) -> str:
         if self.kind is DriftKind.UNVALIDATED:
@@ -219,8 +222,6 @@ class ColumnShouldBeNotNullDrift:
     column: str
     has_null_rows: bool = False  # existing NULL rows block an auto-fix
 
-    model_allows_null: ClassVar[bool] = False
-
     def describe(self) -> str:
         if self.has_null_rows:
             return f"{self.table}: column {self.column} allows NULL (NULL rows exist)"
@@ -233,8 +234,6 @@ class ColumnShouldAllowNullDrift:
 
     table: str
     column: str
-
-    model_allows_null: ClassVar[bool] = True
 
     def describe(self) -> str:
         return f"{self.table}: column {self.column} is NOT NULL, model allows NULL"
@@ -250,7 +249,7 @@ class ColumnDefaultExpectedDrift:
 
     table: str
     column: str
-    kind: DriftKind  # MISSING or CHANGED
+    kind: Literal[DriftKind.MISSING, DriftKind.CHANGED]
     model_default_sql: str
     db_default_sql: str | None = None  # set only for CHANGED
 
@@ -298,7 +297,7 @@ class StorageParameterDeclaredDrift:
 
     table: str
     key: str
-    kind: DriftKind  # MISSING or CHANGED
+    kind: Literal[DriftKind.MISSING, DriftKind.CHANGED]
     declared_value: str
     actual_value: str | None = None  # set only for CHANGED
 
@@ -336,8 +335,6 @@ class StorageParameterUndeclaredDrift:
         )
 
 
-# Union of the shape variants above; a plain `|` union (not a PEP 695 `type`
-# alias) so it stays usable in isinstance() checks.
 StorageParameterDrift = StorageParameterDeclaredDrift | StorageParameterUndeclaredDrift
 
 

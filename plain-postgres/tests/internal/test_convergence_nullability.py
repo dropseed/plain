@@ -270,9 +270,10 @@ class TestDropNotNull:
         with conn.cursor() as cursor:
             analysis = analyze_model(conn, cursor, ChildSetNull)
 
-        null_drifts = [d for d in analysis.drifts if isinstance(d, NullabilityDrift)]
+        null_drifts = [
+            d for d in analysis.drifts if isinstance(d, ColumnShouldAllowNullDrift)
+        ]
         assert len(null_drifts) == 1
-        assert null_drifts[0].model_allows_null is True
 
     def test_plans_drop_not_null(self, db):
         """Nullable model + NOT NULL DB → executable DropNotNullFix."""

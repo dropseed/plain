@@ -73,24 +73,18 @@ class PlanItem:
 def _plan_drift(drift: Drift) -> PlanItem:
     """Map a semantic drift to a plan item with policy. All policy lives here."""
     match drift:
-        case IndexModelDrift(kind=DriftKind.MISSING, table=t, index=idx):
-            return PlanItem(
-                drift, CreateIndexFix(t, idx, drift.model), blocks_sync=False
-            )
-        case IndexModelDrift(table=t, index=idx):  # INVALID | CHANGED
-            return PlanItem(
-                drift, RebuildIndexFix(t, idx, drift.model), blocks_sync=False
-            )
-        case IndexRenameDrift(table=t):
-            return PlanItem(
-                drift,
-                RenameIndexFix(t, drift.old_name, drift.new_name),
-                blocks_sync=False,
-            )
-        case IndexUndeclaredDrift(table=t):
-            return PlanItem(drift, DropIndexFix(t, drift.name), blocks_sync=False)
-        case ConstraintModelDrift(kind=DriftKind.MISSING, table=t):
-            return PlanItem(drift, AddConstraintFix(t, drift.constraint, drift.model))
+        case IndexModelDrift(kind=DriftKind.MISSING, table=t, index=idx, model=m):
+            return PlanItem(drift, CreateIndexFix(t, idx, m), blocks_sync=False)
+        case IndexModelDrift(table=t, index=idx, model=m):  # INVALID | CHANGED
+            return PlanItem(drift, RebuildIndexFix(t, idx, m), blocks_sync=False)
+        case IndexRenameDrift(table=t, old_name=old, new_name=new):
+            return PlanItem(drift, RenameIndexFix(t, old, new), blocks_sync=False)
+        case IndexUndeclaredDrift(table=t, name=n):
+            return PlanItem(drift, DropIndexFix(t, n), blocks_sync=False)
+        case ConstraintModelDrift(
+            kind=DriftKind.MISSING, table=t, constraint=c, model=m
+        ):
+            return PlanItem(drift, AddConstraintFix(t, c, m))
         case ConstraintModelDrift(kind=DriftKind.CHANGED):
             return PlanItem(
                 drift,
@@ -100,53 +94,48 @@ def _plan_drift(drift: Drift) -> PlanItem:
                     " then remove the old one."
                 ),
             )
-        case ConstraintNameDrift(kind=DriftKind.UNVALIDATED, table=t):
-            return PlanItem(drift, ValidateConstraintFix(t, drift.name))
-        case ConstraintNameDrift(kind=DriftKind.UNDECLARED, table=t):
-            return PlanItem(drift, DropConstraintFix(t, drift.name))
-        case ConstraintRenameDrift(table=t):
-            return PlanItem(
-                drift,
-                RenameConstraintFix(t, drift.old_name, drift.new_name),
-                blocks_sync=False,
-            )
+        case ConstraintNameDrift(kind=DriftKind.UNVALIDATED, table=t, name=n):
+            return PlanItem(drift, ValidateConstraintFix(t, n))
+        case ConstraintNameDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
+            return PlanItem(drift, DropConstraintFix(t, n))
+        case ConstraintRenameDrift(table=t, old_name=old, new_name=new):
+            return PlanItem(drift, RenameConstraintFix(t, old, new), blocks_sync=False)
         case ForeignKeyMissingDrift(
             table=t,
+            name=n,
             column=col,
             target_table=tt,
             target_column=tc,
             on_delete_clause=od,
         ):
-            return PlanItem(drift, AddForeignKeyFix(t, drift.name, col, tt, tc, od))
+            return PlanItem(drift, AddForeignKeyFix(t, n, col, tt, tc, od))
         case ForeignKeyChangedDrift(
             table=t,
+            name=n,
             column=col,
             target_table=tt,
             target_column=tc,
             on_delete_clause=od,
         ):
-            return PlanItem(drift, ReplaceForeignKeyFix(t, drift.name, col, tt, tc, od))
-        case ForeignKeyNameDrift(kind=DriftKind.UNVALIDATED):
-            return PlanItem(drift, ValidateConstraintFix(drift.table, drift.name))
-        case ForeignKeyNameDrift(kind=DriftKind.UNDECLARED):
-            return PlanItem(drift, DropConstraintFix(drift.table, drift.name))
-        case ColumnShouldBeNotNullDrift(has_null_rows=False):
-            return PlanItem(drift, SetNotNullFix(drift.table, drift.column))
+            return PlanItem(drift, ReplaceForeignKeyFix(t, n, col, tt, tc, od))
+        case ForeignKeyNameDrift(kind=DriftKind.UNVALIDATED, table=t, name=n):
+            return PlanItem(drift, ValidateConstraintFix(t, n))
+        case ForeignKeyNameDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
+            return PlanItem(drift, DropConstraintFix(t, n))
+        case ColumnShouldBeNotNullDrift(has_null_rows=False, table=t, column=col):
+            return PlanItem(drift, SetNotNullFix(t, col))
         case ColumnShouldBeNotNullDrift(has_null_rows=True):
             return PlanItem(
                 drift,
                 fix=None,
                 guidance="Backfill existing NULL rows, then rerun sync.",
             )
-        case ColumnShouldAllowNullDrift():
-            return PlanItem(drift, DropNotNullFix(drift.table, drift.column))
-        case ColumnDefaultExpectedDrift():
-            return PlanItem(
-                drift,
-                SetColumnDefaultFix(drift.table, drift.column, drift.model_default_sql),
-            )
-        case ColumnDefaultUndeclaredDrift():
-            return PlanItem(drift, DropColumnDefaultFix(drift.table, drift.column))
+        case ColumnShouldAllowNullDrift(table=t, column=col):
+            return PlanItem(drift, DropNotNullFix(t, col))
+        case ColumnDefaultExpectedDrift(table=t, column=col, model_default_sql=sql):
+            return PlanItem(drift, SetColumnDefaultFix(t, col, sql))
+        case ColumnDefaultUndeclaredDrift(table=t, column=col):
+            return PlanItem(drift, DropColumnDefaultFix(t, col))
         case StorageParameterDeclaredDrift(table=t, key=k, declared_value=v):
             return PlanItem(drift, SetStorageParameterFix(t, k, v))
         case StorageParameterUndeclaredDrift(table=t, key=k):
