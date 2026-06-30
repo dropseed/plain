@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterable
 from typing import Any, TypeVar
 
 from plain.runtime import settings
@@ -126,6 +126,25 @@ run_checks = checks_registry.run_checks
 _check_counts: dict[str, int] | None = None
 
 
+def count_results_by_severity(
+    checks: Iterable[tuple[Any, str, list[PreflightResult]]],
+) -> tuple[int, int]:
+    """Tally ``(errors, warnings)`` across checks by each check's *visible*
+    (non-silenced) issues. A check with no visible issues counts as neither —
+    an error if any visible issue isn't a warning, otherwise a warning."""
+    error_count = 0
+    warning_count = 0
+    for _check_class, _name, results in checks:
+        visible = [r for r in results if not r.is_silenced()]
+        if not visible:
+            continue
+        if any(not r.warning for r in visible):
+            error_count += 1
+        else:
+            warning_count += 1
+    return error_count, warning_count
+
+
 def get_check_counts() -> dict[str, int]:
     """Return ``{"errors": N, "warnings": N}``, caching for the process lifetime."""
     global _check_counts
@@ -137,19 +156,9 @@ def get_check_counts() -> dict[str, int]:
 
     packages_registry.autodiscover_modules("preflight", include_app=True)
 
-    warning_count = 0
-    error_count = 0
-
-    for _check_class, _name, results in run_checks(
-        include_deploy_checks=not settings.DEBUG
-    ):
-        visible = [r for r in results if not r.is_silenced()]
-        if not visible:
-            continue
-        if any(not r.warning for r in visible):
-            error_count += 1
-        else:
-            warning_count += 1
+    error_count, warning_count = count_results_by_severity(
+        run_checks(include_deploy_checks=not settings.DEBUG)
+    )
 
     _check_counts = {"errors": error_count, "warnings": warning_count}
     return _check_counts
