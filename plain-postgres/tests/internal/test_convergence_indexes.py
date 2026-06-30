@@ -11,11 +11,7 @@ from conftest_convergence import (
 
 from plain.postgres import Index, Q, get_connection
 from plain.postgres.convergence import (
-    CreateIndexFix,
-    DropIndexFix,
     ReadOnlyConnectionError,
-    RebuildIndexFix,
-    RenameIndexFix,
     plan_model_convergence,
 )
 from plain.postgres.convergence.analysis import (
@@ -25,6 +21,12 @@ from plain.postgres.convergence.analysis import (
     IndexRenameDrift,
     IndexUndeclaredDrift,
     analyze_model,
+)
+from plain.postgres.convergence.fixes import (
+    CreateIndexFix,
+    DropIndexFix,
+    RebuildIndexFix,
+    RenameIndexFix,
 )
 from plain.postgres.db import read_only
 from plain.postgres.functions.text import Upper

@@ -5,8 +5,6 @@ from conftest_convergence import execute
 
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
-    ResetStorageParameterFix,
-    SetStorageParameterFix,
     plan_model_convergence,
 )
 from plain.postgres.convergence.analysis import (
@@ -14,6 +12,10 @@ from plain.postgres.convergence.analysis import (
     StorageParameterDeclaredDrift,
     StorageParameterDrift,
     analyze_model,
+)
+from plain.postgres.convergence.fixes import (
+    ResetStorageParameterFix,
+    SetStorageParameterFix,
 )
 from plain.postgres.introspection.schema import _fetch_raw_reloptions
 

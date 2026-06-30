@@ -5,17 +5,7 @@ from conftest_convergence import constraint_exists, create_invalid_index, execut
 
 from plain.postgres import CheckConstraint, Index, Q, get_connection
 from plain.postgres.convergence import (
-    AddConstraintFix,
-    ConstraintDrift,
-    CreateIndexFix,
-    DriftKind,
-    DropConstraintFix,
-    DropIndexFix,
-    IndexDrift,
     PlanItem,
-    RebuildIndexFix,
-    RenameIndexFix,
-    ValidateConstraintFix,
     analyze_model,
     can_auto_fix,
     execute_plan,
@@ -23,11 +13,23 @@ from plain.postgres.convergence import (
     plan_model_convergence,
 )
 from plain.postgres.convergence.analysis import (
+    ConstraintDrift,
     ConstraintModelDrift,
     ConstraintNameDrift,
+    DriftKind,
+    IndexDrift,
     IndexModelDrift,
     IndexRenameDrift,
     IndexUndeclaredDrift,
+)
+from plain.postgres.convergence.fixes import (
+    AddConstraintFix,
+    CreateIndexFix,
+    DropConstraintFix,
+    DropIndexFix,
+    RebuildIndexFix,
+    RenameIndexFix,
+    ValidateConstraintFix,
 )
 from plain.postgres.functions.text import Upper
 

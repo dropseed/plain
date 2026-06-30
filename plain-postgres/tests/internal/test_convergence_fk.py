@@ -14,20 +14,22 @@ from conftest_convergence import (
 
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
-    AddForeignKeyFix,
-    DriftKind,
-    DropConstraintFix,
-    ForeignKeyDrift,
-    ValidateConstraintFix,
     analyze_model,
     execute_plan,
     plan_model_convergence,
 )
 from plain.postgres.convergence.analysis import (
+    DriftKind,
     ForeignKeyChangedDrift,
+    ForeignKeyDrift,
     generate_fk_constraint_name,
 )
-from plain.postgres.convergence.fixes import ReplaceForeignKeyFix
+from plain.postgres.convergence.fixes import (
+    AddForeignKeyFix,
+    DropConstraintFix,
+    ReplaceForeignKeyFix,
+    ValidateConstraintFix,
+)
 
 
 class TestForeignKeyDetection:

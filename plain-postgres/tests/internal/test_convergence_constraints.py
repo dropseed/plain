@@ -13,22 +13,24 @@ from conftest_convergence import (
 from plain.postgres import CheckConstraint, Q, UniqueConstraint, get_connection
 from plain.postgres.constraints import Deferrable
 from plain.postgres.convergence import (
-    AddConstraintFix,
-    ConstraintDrift,
-    DriftKind,
-    DropConstraintFix,
-    IndexDrift,
-    RenameConstraintFix,
-    ValidateConstraintFix,
     analyze_model,
     can_auto_fix,
     plan_convergence,
     plan_model_convergence,
 )
 from plain.postgres.convergence.analysis import (
+    ConstraintDrift,
     ConstraintModelDrift,
     ConstraintRenameDrift,
+    DriftKind,
+    IndexDrift,
     IndexUndeclaredDrift,
+)
+from plain.postgres.convergence.fixes import (
+    AddConstraintFix,
+    DropConstraintFix,
+    RenameConstraintFix,
+    ValidateConstraintFix,
 )
 from plain.postgres.functions.text import Lower, Upper
 from plain.postgres.introspection import ConType
@@ -1276,7 +1278,7 @@ class TestIndexBackedUniqueConstraints:
 
     def test_undeclared_index_only_unique_uses_drop_index(self, db):
         """Undeclared index-only unique should use DropIndexFix, not DropConstraintFix."""
-        from plain.postgres.convergence import DropIndexFix
+        from plain.postgres.convergence.fixes import DropIndexFix
 
         execute(
             'CREATE UNIQUE INDEX "examples_constraintexample_old_partial_uq"'
@@ -1296,7 +1298,7 @@ class TestIndexBackedUniqueConstraints:
 
     def test_rename_index_only_unique_uses_rename_index(self, db):
         """Renaming an index-only unique should use RenameIndexFix."""
-        from plain.postgres.convergence import RenameIndexFix
+        from plain.postgres.convergence.fixes import RenameIndexFix
 
         original_constraints = list(ConstraintExample.model_options.constraints)
         constraint = UniqueConstraint(

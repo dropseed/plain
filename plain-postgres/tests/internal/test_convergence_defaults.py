@@ -5,21 +5,23 @@ from conftest_convergence import column_default_sql, execute
 
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
-    ColumnDefaultDrift,
-    DriftKind,
-    SetColumnDefaultFix,
-    SetNotNullFix,
     analyze_model,
     can_auto_fix,
     execute_plan,
     plan_model_convergence,
 )
 from plain.postgres.convergence.analysis import (
+    ColumnDefaultDrift,
     ColumnDefaultExpectedDrift,
     ColumnDefaultUndeclaredDrift,
     ColumnShouldBeNotNullDrift,
+    DriftKind,
 )
-from plain.postgres.convergence.fixes import DropColumnDefaultFix
+from plain.postgres.convergence.fixes import (
+    DropColumnDefaultFix,
+    SetColumnDefaultFix,
+    SetNotNullFix,
+)
 
 
 class TestColumnDefaultDetection:

@@ -1,37 +1,18 @@
+"""Internal subsystem powering the ``plain postgres sync`` / ``converge`` /
+``schema`` commands.
+
+This is not a public import API. End users drive convergence through those CLI
+commands, not by importing from here, and it is intentionally absent from the
+top-level ``plain.postgres`` surface. The names re-exported below exist for the
+rest of ``plain.postgres`` (the CLI) to use; the drift types, ``DriftKind``,
+the ``Fix`` classes, and the ``Status`` records are convergence-internal and
+live in the ``.analysis`` / ``.fixes`` / ``.planning`` submodules.
+"""
+
 from .analysis import (
-    ColumnDefaultDrift,
-    ColumnDrift,
-    ColumnStatus,
-    ConstraintDrift,
-    ConstraintStatus,
-    Drift,
-    DriftKind,
-    ForeignKeyDrift,
-    IndexDrift,
-    IndexStatus,
     ModelAnalysis,
-    NullabilityDrift,
     ReadOnlyConnectionError,
-    StorageParameterDrift,
     analyze_model,
-)
-from .fixes import (
-    AddConstraintFix,
-    AddForeignKeyFix,
-    CreateIndexFix,
-    DropColumnDefaultFix,
-    DropConstraintFix,
-    DropIndexFix,
-    DropNotNullFix,
-    Fix,
-    RebuildIndexFix,
-    RenameConstraintFix,
-    RenameIndexFix,
-    ResetStorageParameterFix,
-    SetColumnDefaultFix,
-    SetNotNullFix,
-    SetStorageParameterFix,
-    ValidateConstraintFix,
 )
 from .planning import (
     ConvergencePlan,
@@ -45,40 +26,12 @@ from .planning import (
 )
 
 __all__ = [
-    "AddConstraintFix",
-    "AddForeignKeyFix",
-    "ColumnDefaultDrift",
-    "ColumnDrift",
-    "ColumnStatus",
-    "ConstraintDrift",
-    "ConstraintStatus",
     "ConvergencePlan",
     "ConvergenceResult",
-    "CreateIndexFix",
-    "Drift",
-    "DriftKind",
-    "DropColumnDefaultFix",
-    "DropConstraintFix",
-    "DropIndexFix",
-    "DropNotNullFix",
-    "Fix",
     "FixResult",
-    "ForeignKeyDrift",
-    "IndexDrift",
-    "IndexStatus",
     "ModelAnalysis",
-    "NullabilityDrift",
     "PlanItem",
     "ReadOnlyConnectionError",
-    "RebuildIndexFix",
-    "RenameConstraintFix",
-    "RenameIndexFix",
-    "ResetStorageParameterFix",
-    "SetColumnDefaultFix",
-    "SetNotNullFix",
-    "SetStorageParameterFix",
-    "StorageParameterDrift",
-    "ValidateConstraintFix",
     "analyze_model",
     "can_auto_fix",
     "execute_plan",

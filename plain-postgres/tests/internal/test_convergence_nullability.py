@@ -7,9 +7,6 @@ from conftest_convergence import column_is_not_null, constraint_exists, execute
 
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
-    DropNotNullFix,
-    NullabilityDrift,
-    SetNotNullFix,
     analyze_model,
     can_auto_fix,
     plan_model_convergence,
@@ -17,6 +14,11 @@ from plain.postgres.convergence import (
 from plain.postgres.convergence.analysis import (
     ColumnShouldAllowNullDrift,
     ColumnShouldBeNotNullDrift,
+    NullabilityDrift,
+)
+from plain.postgres.convergence.fixes import (
+    DropNotNullFix,
+    SetNotNullFix,
 )
 
 
