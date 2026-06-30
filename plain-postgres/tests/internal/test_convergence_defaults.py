@@ -15,6 +15,10 @@ from plain.postgres.convergence import (
     execute_plan,
     plan_model_convergence,
 )
+from plain.postgres.convergence.analysis import (
+    ColumnDefaultExpectedDrift,
+    ColumnDefaultUndeclaredDrift,
+)
 from plain.postgres.convergence.fixes import DropColumnDefaultFix
 
 
@@ -43,7 +47,7 @@ class TestColumnDefaultDetection:
             analysis = analyze_model(conn, cursor, DBDefaultsExample)
 
         default_drifts = [
-            d for d in analysis.drifts if isinstance(d, ColumnDefaultDrift)
+            d for d in analysis.drifts if isinstance(d, ColumnDefaultExpectedDrift)
         ]
         assert len(default_drifts) == 1
         assert default_drifts[0].kind == DriftKind.MISSING
@@ -65,7 +69,7 @@ class TestColumnDefaultDetection:
             analysis = analyze_model(conn, cursor, DBDefaultsExample)
 
         default_drifts = [
-            d for d in analysis.drifts if isinstance(d, ColumnDefaultDrift)
+            d for d in analysis.drifts if isinstance(d, ColumnDefaultExpectedDrift)
         ]
         assert len(default_drifts) == 1
         assert default_drifts[0].kind == DriftKind.CHANGED
@@ -137,7 +141,7 @@ class TestColumnDefaultDetection:
             analysis = analyze_model(conn, cursor, DefaultsExample)
 
         default_drifts = [
-            d for d in analysis.drifts if isinstance(d, ColumnDefaultDrift)
+            d for d in analysis.drifts if isinstance(d, ColumnDefaultExpectedDrift)
         ]
         assert len(default_drifts) == 1
         assert default_drifts[0].kind == DriftKind.CHANGED
@@ -161,14 +165,13 @@ class TestColumnDefaultDetection:
             analysis = analyze_model(conn, cursor, DefaultsExample)
 
         default_drifts = [
-            d for d in analysis.drifts if isinstance(d, ColumnDefaultDrift)
+            d for d in analysis.drifts if isinstance(d, ColumnDefaultUndeclaredDrift)
         ]
         assert len(default_drifts) == 1
         assert default_drifts[0].kind == DriftKind.UNDECLARED
         assert default_drifts[0].column == "name"
         assert default_drifts[0].db_default_sql is not None
         assert "manual-default" in default_drifts[0].db_default_sql
-        assert default_drifts[0].model_default_sql is None
 
 
 class TestColumnDefaultPlanning:
@@ -225,22 +228,21 @@ class TestColumnDefaultPlanning:
         assert fixes[0].blocks_sync is True
 
     def test_can_auto_fix_missing(self):
-        drift = ColumnDefaultDrift(
-            kind=DriftKind.MISSING,
+        drift = ColumnDefaultExpectedDrift(
             table="t",
             column="c",
-            db_default_sql=None,
+            kind=DriftKind.MISSING,
             model_default_sql="gen_random_uuid()",
         )
         assert can_auto_fix(drift)
 
     def test_can_auto_fix_changed(self):
-        drift = ColumnDefaultDrift(
-            kind=DriftKind.CHANGED,
+        drift = ColumnDefaultExpectedDrift(
             table="t",
             column="c",
-            db_default_sql="now()",
+            kind=DriftKind.CHANGED,
             model_default_sql="gen_random_uuid()",
+            db_default_sql="now()",
         )
         assert can_auto_fix(drift)
 
@@ -265,12 +267,10 @@ class TestColumnDefaultPlanning:
         assert fixes[0].blocks_sync is True
 
     def test_can_auto_fix_undeclared(self):
-        drift = ColumnDefaultDrift(
-            kind=DriftKind.UNDECLARED,
+        drift = ColumnDefaultUndeclaredDrift(
             table="t",
             column="c",
             db_default_sql="'x'::text",
-            model_default_sql=None,
         )
         assert can_auto_fix(drift)
 
@@ -423,7 +423,7 @@ class TestColumnDefaultLifecycle:
         assert len(db_uuid_col) == 1
         drift_types = {type(d) for d in db_uuid_col[0].drifts}
         assert NullabilityDrift in drift_types
-        assert ColumnDefaultDrift in drift_types
+        assert ColumnDefaultExpectedDrift in drift_types
 
         # Plan carries both fixes
         with conn.cursor() as cursor:

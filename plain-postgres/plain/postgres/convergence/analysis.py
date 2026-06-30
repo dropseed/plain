@@ -166,37 +166,47 @@ class NullabilityDrift:
 
 
 @dataclass
-class ColumnDefaultDrift:
-    """Mismatch between the model's declared default and the DB column DEFAULT."""
+class ColumnDefaultExpectedDrift:
+    """Model declares a column DEFAULT the DB is missing (MISSING) or has set
+    to a different value (CHANGED)."""
 
-    kind: DriftKind
     table: str
     column: str
-    db_default_sql: str | None
-    model_default_sql: str | None
+    kind: DriftKind  # MISSING or CHANGED
+    model_default_sql: str
+    db_default_sql: str | None = None  # set only for CHANGED
 
     def describe(self) -> str:
-        match self.kind:
-            case DriftKind.MISSING:
-                return (
-                    f"{self.table}: column {self.column} missing DEFAULT "
-                    f"(expected {self.model_default_sql})"
-                )
-            case DriftKind.CHANGED:
-                return (
-                    f"{self.table}: column {self.column} DEFAULT mismatch — "
-                    f"db has {self.db_default_sql}, model declares "
-                    f"{self.model_default_sql}"
-                )
-            case DriftKind.UNDECLARED:
-                return (
-                    f"{self.table}: column {self.column} has undeclared DEFAULT "
-                    f"{self.db_default_sql}"
-                )
-            case _:
-                raise ValueError(
-                    f"Cannot describe {self.kind} column default drift: {self}"
-                )
+        if self.kind is DriftKind.MISSING:
+            return (
+                f"{self.table}: column {self.column} missing DEFAULT "
+                f"(expected {self.model_default_sql})"
+            )
+        return (
+            f"{self.table}: column {self.column} DEFAULT mismatch — "
+            f"db has {self.db_default_sql}, model declares "
+            f"{self.model_default_sql}"
+        )
+
+
+@dataclass
+class ColumnDefaultUndeclaredDrift:
+    """DB column has a DEFAULT the model doesn't declare."""
+
+    table: str
+    column: str
+    db_default_sql: str
+
+    kind: ClassVar[DriftKind] = DriftKind.UNDECLARED
+
+    def describe(self) -> str:
+        return (
+            f"{self.table}: column {self.column} has undeclared DEFAULT "
+            f"{self.db_default_sql}"
+        )
+
+
+ColumnDefaultDrift = ColumnDefaultExpectedDrift | ColumnDefaultUndeclaredDrift
 
 
 @dataclass
@@ -253,8 +263,8 @@ class StorageParameterUndeclaredDrift:
 StorageParameterDrift = StorageParameterDeclaredDrift | StorageParameterUndeclaredDrift
 
 
-type ColumnDrift = NullabilityDrift | ColumnDefaultDrift
-type Drift = (
+ColumnDrift = NullabilityDrift | ColumnDefaultDrift
+Drift = (
     IndexDrift | ConstraintDrift | ForeignKeyDrift | ColumnDrift | StorageParameterDrift
 )
 
@@ -614,11 +624,10 @@ def _compare_column_default(
 
     if expected_sql is not None:
         if actual.default_sql is None:
-            return ColumnDefaultDrift(
-                kind=DriftKind.MISSING,
+            return ColumnDefaultExpectedDrift(
                 table=table,
                 column=field.column,
-                db_default_sql=None,
+                kind=DriftKind.MISSING,
                 model_default_sql=expected_sql,
             )
 
@@ -638,23 +647,21 @@ def _compare_column_default(
             except json.JSONDecodeError:
                 pass
 
-        return ColumnDefaultDrift(
-            kind=DriftKind.CHANGED,
+        return ColumnDefaultExpectedDrift(
             table=table,
             column=field.column,
-            db_default_sql=actual.default_sql,
+            kind=DriftKind.CHANGED,
             model_default_sql=expected_sql,
+            db_default_sql=actual.default_sql,
         )
 
     if actual.default_sql is None:
         return None
 
-    return ColumnDefaultDrift(
-        kind=DriftKind.UNDECLARED,
+    return ColumnDefaultUndeclaredDrift(
         table=table,
         column=field.column,
         db_default_sql=actual.default_sql,
-        model_default_sql=None,
     )
 
 

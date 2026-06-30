@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 from ..db import get_connection
 from ..registry import models_registry
 from .analysis import (
-    ColumnDefaultDrift,
+    ColumnDefaultExpectedDrift,
+    ColumnDefaultUndeclaredDrift,
     ConstraintDrift,
     Drift,
     DriftKind,
@@ -142,14 +143,14 @@ def _plan_drift(drift: Drift) -> PlanItem:
             )
         case NullabilityDrift(model_allows_null=True):
             return PlanItem(drift, DropNotNullFix(drift.table, drift.column))
-        case ColumnDefaultDrift(
-            kind=DriftKind.MISSING | DriftKind.CHANGED,
-            model_default_sql=default_sql,
-        ) if default_sql is not None:
+        case ColumnDefaultExpectedDrift():
             return PlanItem(
-                drift, SetColumnDefaultFix(drift.table, drift.column, default_sql)
+                drift,
+                SetColumnDefaultFix(
+                    drift.table, drift.column, drift.model_default_sql
+                ),
             )
-        case ColumnDefaultDrift(kind=DriftKind.UNDECLARED):
+        case ColumnDefaultUndeclaredDrift():
             return PlanItem(drift, DropColumnDefaultFix(drift.table, drift.column))
         case StorageParameterDeclaredDrift(table=t, key=k, declared_value=v):
             return PlanItem(drift, SetStorageParameterFix(t, k, v))
