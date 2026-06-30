@@ -1,5 +1,15 @@
 # plain-mcp changelog
 
+## [0.2.1](https://github.com/dropseed/plain/releases/plain-mcp@0.2.1) (2026-06-30)
+
+### What's changed
+
+- Documentation only: the MCP endpoint examples now use a slashless path (`/mcp` rather than `/mcp/`) consistently across the README and the `MCPView` docstring. No code or behavior changes. ([0399d8b](https://github.com/dropseed/plain/commit/0399d8b1ad))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.0](https://github.com/dropseed/plain/releases/plain-mcp@0.2.0) (2026-06-28)
 
 ### What's changed
