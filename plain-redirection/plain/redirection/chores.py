@@ -17,7 +17,9 @@ class DeleteLogs(Chore):
         redirects = RedirectLog.query.filter(created_at__lt=cutoff).delete()
         output = f"{redirects} redirect logs deleted"
 
-        not_founds = NotFoundLog.query.filter(created_at__lt=cutoff).delete()
+        # 404s aggregate by URL, so retention tracks the most recent hit -- a URL
+        # still being crawled keeps a fresh last_seen and survives cleanup.
+        not_founds = NotFoundLog.query.filter(last_seen__lt=cutoff).delete()
         output += f", {not_founds} not found logs deleted"
 
         return output

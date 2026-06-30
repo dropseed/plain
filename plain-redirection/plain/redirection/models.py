@@ -3,10 +3,17 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+import psycopg
+
 from plain import postgres
-from plain.postgres import types
+from plain.exceptions import ValidationError
+from plain.postgres import transaction, types
+from plain.postgres.expressions import F
+from plain.utils import timezone
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from plain.http import Request
 
 __all__ = ["NotFoundLog", "Redirect", "RedirectLog"]
@@ -153,32 +160,101 @@ class RedirectLog(postgres.Model):
 
 @postgres.register_model
 class NotFoundLog(postgres.Model):
-    url = types.URLField(max_length=512)
+    # One row per URL -- repeat 404s for the same URL increment `count` instead
+    # of inserting a new row, so the table tracks distinct broken URLs rather
+    # than every individual crawler hit.
+    #
+    # url is a TextField, not a URLField: it captures whatever URL was requested
+    # (often by crawlers probing odd paths, and on non-dotted hosts like
+    # localhost), so URL-format validation would only get in the way.
+    url = types.TextField(max_length=512)
+    count = types.IntegerField(default=1)
 
-    # Request metadata
+    # Metadata from the most recent hit
     ip_address = types.GenericIPAddressField()
     user_agent = types.TextField(required=False, max_length=512)
     referrer = types.TextField(required=False, max_length=512)
 
-    created_at = types.DateTimeField(create_now=True)
+    # Both set explicitly on insert and refreshed by _increment, so last_seen
+    # is plain create_now (not update_now) -- nothing does an instance .update()
+    # that would need auto-stamping.
+    first_seen = types.DateTimeField(create_now=True)
+    last_seen = types.DateTimeField(create_now=True)
 
     query: postgres.QuerySet[NotFoundLog] = postgres.QuerySet()
 
     model_options = postgres.Options(
-        ordering=["-created_at"],
+        ordering=["-last_seen"],
         indexes=[
             postgres.Index(
-                name="plainredirection_notfoundlog_created_at_idx",
-                fields=["created_at"],
+                name="plainredirection_notfoundlog_last_seen_idx",
+                fields=["last_seen"],
+            ),
+        ],
+        constraints=[
+            postgres.UniqueConstraint(
+                fields=["url"],
+                name="plainredirection_notfoundlog_unique_url",
+            ),
+            postgres.CheckConstraint(
+                check=postgres.Q(count__gte=1),
+                name="plainredirection_notfoundlog_count_check",
             ),
         ],
     )
 
+    def __str__(self) -> str:
+        return f"{self.url} ({self.count})"
+
     @classmethod
-    def from_request(cls, request: Request) -> NotFoundLog:
-        return cls.query.create(
-            url=request.build_absolute_uri(),
-            ip_address=request.client_ip,
-            user_agent=request.headers.get("User-Agent", ""),
-            referrer=request.headers.get("Referer", ""),
+    def from_request(cls, request: Request) -> None:
+        """Record a 404 for this URL, collapsing repeats into a single row.
+
+        Crawlers hammer the same handful of dead URLs, so nearly every 404 is a
+        repeat -- try the increment first, and only insert on the first sighting.
+        """
+        url = request.build_absolute_uri()
+        ip_address = request.client_ip
+        user_agent = request.headers.get("User-Agent", "")
+        referrer = request.headers.get("Referer", "")
+        now = timezone.now()
+
+        if cls._increment(url, ip_address, user_agent, referrer, now):
+            return
+
+        # First time we've seen this URL. A concurrent request for the same new
+        # URL can race us here; the unique constraint turns the loser's insert
+        # into an error, which we resolve by falling back to the increment.
+        try:
+            with transaction.atomic():
+                cls.query.create(
+                    url=url,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    referrer=referrer,
+                    first_seen=now,
+                    last_seen=now,
+                )
+        except (psycopg.IntegrityError, ValidationError):
+            cls._increment(url, ip_address, user_agent, referrer, now)
+
+    @classmethod
+    def _increment(
+        cls,
+        url: str,
+        ip_address: str,
+        user_agent: str,
+        referrer: str,
+        now: datetime,
+    ) -> int:
+        """Bump an existing URL's counter and refresh its latest-hit metadata.
+
+        Returns the number of rows updated (0 if the URL hasn't been seen yet).
+        """
+        return cls.query.filter(url=url).update(
+            count=F("count") + 1,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            referrer=referrer,
+            last_seen=now,
         )

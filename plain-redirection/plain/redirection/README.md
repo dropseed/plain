@@ -107,14 +107,19 @@ for log in recent:
     print(f"{log.from_url} -> {log.to_url} ({log.ip_address})")
 ```
 
-Requests that result in 404s (and don't match any redirect) are logged in [`NotFoundLog`](./models.py#NotFoundLog).
+Requests that result in 404s (and don't match any redirect) are aggregated in [`NotFoundLog`](./models.py#NotFoundLog), with **one row per URL**. Repeat 404s for the same URL bump a `count` and refresh `last_seen` (and the latest hit's metadata) instead of inserting a new row — so a crawler hammering `/wp-admin` shows up as a single counted row, not thousands.
 
 ```python
 from plain.redirection.models import NotFoundLog
 
-# Find 404s from a specific referrer
-broken_links = NotFoundLog.query.filter(referrer__contains="external-site.com")
+# The most-hit broken URLs first
+worst = NotFoundLog.query.all().order_by("-count")[:10]
+
+for log in worst:
+    print(f"{log.url} - {log.count} hits, last seen {log.last_seen}")
 ```
+
+Each row tracks `count`, `first_seen`, and `last_seen` alongside the most recent hit's `ip_address`, `user_agent`, and `referrer`.
 
 ### Automatic cleanup
 

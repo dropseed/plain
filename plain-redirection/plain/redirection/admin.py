@@ -84,7 +84,15 @@ class NotFoundLogAdmin(AdminViewset):
         nav_icon = "exclamation-circle"
         title = "404 logs"
         description = "URLs that returned 404 - useful for finding broken links."
-        fields = ["created_at", "url", "user_agent", "ip_address", "referrer"]
+        fields = [
+            "url",
+            "count",
+            "last_seen",
+            "first_seen",
+            "user_agent",
+            "ip_address",
+            "referrer",
+        ]
         search_fields = ["url", "user_agent", "ip_address", "referrer"]
 
     class DetailView(AdminModelDetailView):

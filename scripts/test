@@ -41,6 +41,7 @@ plain-email
 plain-mcp
 plain-oauthserver
 plain-pages
+plain-redirection
 EOF
 )"
 
