@@ -14,6 +14,10 @@ from plain.postgres.convergence import (
     can_auto_fix,
     plan_model_convergence,
 )
+from plain.postgres.convergence.analysis import (
+    ColumnShouldAllowNullDrift,
+    ColumnShouldBeNotNullDrift,
+)
 
 
 class TestNotNullDetection:
@@ -27,7 +31,9 @@ class TestNotNullDetection:
         with conn.cursor() as cursor:
             analysis = analyze_model(conn, cursor, NullabilityExample)
 
-        null_drifts = [d for d in analysis.drifts if isinstance(d, NullabilityDrift)]
+        null_drifts = [
+            d for d in analysis.drifts if isinstance(d, ColumnShouldBeNotNullDrift)
+        ]
         assert len(null_drifts) == 1
         assert null_drifts[0].table == "examples_nullabilityexample"
         assert null_drifts[0].column == "required_text"
@@ -63,7 +69,9 @@ class TestNotNullDetection:
         with conn.cursor() as cursor:
             analysis = analyze_model(conn, cursor, NullabilityExample)
 
-        null_drifts = [d for d in analysis.drifts if isinstance(d, NullabilityDrift)]
+        null_drifts = [
+            d for d in analysis.drifts if isinstance(d, ColumnShouldBeNotNullDrift)
+        ]
         assert len(null_drifts) == 1
         assert null_drifts[0].has_null_rows is True
 
@@ -172,21 +180,17 @@ class TestNotNullPlanning:
 
     def test_can_auto_fix_no_nulls(self):
         """can_auto_fix returns True for NullabilityDrift with no null rows."""
-        drift = NullabilityDrift(
-            table="t", column="c", model_allows_null=False, has_null_rows=False
-        )
+        drift = ColumnShouldBeNotNullDrift(table="t", column="c", has_null_rows=False)
         assert can_auto_fix(drift)
 
     def test_can_auto_fix_with_nulls(self):
         """can_auto_fix returns False for NullabilityDrift with null rows."""
-        drift = NullabilityDrift(
-            table="t", column="c", model_allows_null=False, has_null_rows=True
-        )
+        drift = ColumnShouldBeNotNullDrift(table="t", column="c", has_null_rows=True)
         assert not can_auto_fix(drift)
 
     def test_can_auto_fix_drop_not_null(self):
         """can_auto_fix returns True for NullabilityDrift (model allows NULL)."""
-        drift = NullabilityDrift(table="t", column="c", model_allows_null=True)
+        drift = ColumnShouldAllowNullDrift(table="t", column="c")
         assert can_auto_fix(drift)
 
 

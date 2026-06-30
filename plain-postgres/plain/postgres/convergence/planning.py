@@ -9,12 +9,13 @@ from ..registry import models_registry
 from .analysis import (
     ColumnDefaultExpectedDrift,
     ColumnDefaultUndeclaredDrift,
+    ColumnShouldAllowNullDrift,
+    ColumnShouldBeNotNullDrift,
     ConstraintDrift,
     Drift,
     DriftKind,
     ForeignKeyDrift,
     IndexDrift,
-    NullabilityDrift,
     StorageParameterDeclaredDrift,
     StorageParameterUndeclaredDrift,
     analyze_model,
@@ -133,15 +134,15 @@ def _plan_drift(drift: Drift) -> PlanItem:
             n is not None
         ):
             return PlanItem(drift, DropConstraintFix(t, n))
-        case NullabilityDrift(model_allows_null=False, has_null_rows=False):
+        case ColumnShouldBeNotNullDrift(has_null_rows=False):
             return PlanItem(drift, SetNotNullFix(drift.table, drift.column))
-        case NullabilityDrift(model_allows_null=False, has_null_rows=True):
+        case ColumnShouldBeNotNullDrift(has_null_rows=True):
             return PlanItem(
                 drift,
                 fix=None,
                 guidance="Backfill existing NULL rows, then rerun sync.",
             )
-        case NullabilityDrift(model_allows_null=True):
+        case ColumnShouldAllowNullDrift():
             return PlanItem(drift, DropNotNullFix(drift.table, drift.column))
         case ColumnDefaultExpectedDrift():
             return PlanItem(

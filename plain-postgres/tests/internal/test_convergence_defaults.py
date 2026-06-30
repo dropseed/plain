@@ -7,7 +7,6 @@ from plain.postgres import get_connection
 from plain.postgres.convergence import (
     ColumnDefaultDrift,
     DriftKind,
-    NullabilityDrift,
     SetColumnDefaultFix,
     SetNotNullFix,
     analyze_model,
@@ -18,6 +17,7 @@ from plain.postgres.convergence import (
 from plain.postgres.convergence.analysis import (
     ColumnDefaultExpectedDrift,
     ColumnDefaultUndeclaredDrift,
+    ColumnShouldBeNotNullDrift,
 )
 from plain.postgres.convergence.fixes import DropColumnDefaultFix
 
@@ -422,7 +422,7 @@ class TestColumnDefaultLifecycle:
         db_uuid_col = [c for c in analysis.columns if c.name == "db_uuid"]
         assert len(db_uuid_col) == 1
         drift_types = {type(d) for d in db_uuid_col[0].drifts}
-        assert NullabilityDrift in drift_types
+        assert ColumnShouldBeNotNullDrift in drift_types
         assert ColumnDefaultExpectedDrift in drift_types
 
         # Plan carries both fixes

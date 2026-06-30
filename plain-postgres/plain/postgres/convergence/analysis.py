@@ -147,22 +147,35 @@ class ForeignKeyDrift:
 
 
 @dataclass
-class NullabilityDrift:
-    """Mismatch between model and DB column nullability."""
+class ColumnShouldBeNotNullDrift:
+    """Model declares the column NOT NULL but the DB column allows NULL."""
 
     table: str
     column: str
-    model_allows_null: bool
-    has_null_rows: bool = False  # Only checked when model_allows_null is False
+    has_null_rows: bool = False  # existing NULL rows block an auto-fix
+
+    model_allows_null: ClassVar[bool] = False
 
     def describe(self) -> str:
-        if not self.model_allows_null:
-            if self.has_null_rows:
-                return (
-                    f"{self.table}: column {self.column} allows NULL (NULL rows exist)"
-                )
-            return f"{self.table}: column {self.column} allows NULL"
+        if self.has_null_rows:
+            return f"{self.table}: column {self.column} allows NULL (NULL rows exist)"
+        return f"{self.table}: column {self.column} allows NULL"
+
+
+@dataclass
+class ColumnShouldAllowNullDrift:
+    """Model allows NULL but the DB column is NOT NULL."""
+
+    table: str
+    column: str
+
+    model_allows_null: ClassVar[bool] = True
+
+    def describe(self) -> str:
         return f"{self.table}: column {self.column} is NOT NULL, model allows NULL"
+
+
+NullabilityDrift = ColumnShouldBeNotNullDrift | ColumnShouldAllowNullDrift
 
 
 @dataclass
@@ -513,20 +526,18 @@ def _compare_columns(
                 else:
                     issue = "expected NOT NULL, actual NULL"
                 drifts.append(
-                    NullabilityDrift(
+                    ColumnShouldBeNotNullDrift(
                         table=table,
                         column=f.column,
-                        model_allows_null=False,
                         has_null_rows=has_nulls,
                     )
                 )
             elif f.allow_null and actual.not_null:
                 issue = "expected NULL, actual NOT NULL"
                 drifts.append(
-                    NullabilityDrift(
+                    ColumnShouldAllowNullDrift(
                         table=table,
                         column=f.column,
-                        model_allows_null=True,
                     )
                 )
 
