@@ -1,5 +1,17 @@
 # plain-postgres changelog
 
+## [0.111.0](https://github.com/dropseed/plain/releases/plain-postgres@0.111.0) (2026-06-30)
+
+### What's changed
+
+- Slicing a `QuerySet` now always returns a `QuerySet`, even when its results are already cached — previously, slicing an already-evaluated queryset returned a plain `list`. The returned queryset carries the sliced cache, so iterating it won't re-query, but re-chaining it (adding a `.filter()`, ordering, etc.) drops the cache and applies the slice as SQL `LIMIT`/`OFFSET` so the rows stay correct. ([d60e07d6ad](https://github.com/dropseed/plain/commit/d60e07d6ad))
+- Step slicing (e.g. `qs[::2]`) now raises `ValueError` instead of silently evaluating the queryset and returning a stepped `list`. Negative indexing and negative slice bounds continue to raise, as before. `RawQuerySet` is unaffected — it is always fully materialized, so its slicing keeps plain `list` semantics, where step and negative slicing still work. ([d60e07d6ad](https://github.com/dropseed/plain/commit/d60e07d6ad), [a873a521d4](https://github.com/dropseed/plain/commit/a873a521d4))
+
+### Upgrade instructions
+
+- If you relied on `queryset[a:b]` returning a `list` — for example checking `isinstance(result, list)`, calling list methods like `.append()` on it, or re-slicing it with a step — wrap it in `list(queryset[a:b])` to materialize it explicitly.
+- Replace any step slicing of a queryset (`queryset[::2]`) with a `list(...)` conversion first, since it now raises `ValueError`.
+
 ## [0.110.2](https://github.com/dropseed/plain/releases/plain-postgres@0.110.2) (2026-06-26)
 
 ### What's changed
