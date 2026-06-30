@@ -17,7 +17,9 @@ from .analysis import (
     ForeignKeyChangedDrift,
     ForeignKeyMissingDrift,
     ForeignKeyNameDrift,
-    IndexDrift,
+    IndexModelDrift,
+    IndexRenameDrift,
+    IndexUndeclaredDrift,
     StorageParameterDeclaredDrift,
     StorageParameterUndeclaredDrift,
     analyze_model,
@@ -69,20 +71,22 @@ class PlanItem:
 def _plan_drift(drift: Drift) -> PlanItem:
     """Map a semantic drift to a plan item with policy. All policy lives here."""
     match drift:
-        case IndexDrift(kind=DriftKind.MISSING, table=t, index=idx, model=m) if (
-            idx is not None and m is not None
-        ):
-            return PlanItem(drift, CreateIndexFix(t, idx, m), blocks_sync=False)
-        case IndexDrift(
-            kind=DriftKind.INVALID | DriftKind.CHANGED, table=t, index=idx, model=m
-        ) if idx is not None and m is not None:
-            return PlanItem(drift, RebuildIndexFix(t, idx, m), blocks_sync=False)
-        case IndexDrift(
-            kind=DriftKind.RENAMED, table=t, old_name=old, new_name=new
-        ) if old is not None and new is not None:
-            return PlanItem(drift, RenameIndexFix(t, old, new), blocks_sync=False)
-        case IndexDrift(kind=DriftKind.UNDECLARED, table=t, name=n) if n is not None:
-            return PlanItem(drift, DropIndexFix(t, n), blocks_sync=False)
+        case IndexModelDrift(kind=DriftKind.MISSING, table=t, index=idx):
+            return PlanItem(
+                drift, CreateIndexFix(t, idx, drift.model), blocks_sync=False
+            )
+        case IndexModelDrift(table=t, index=idx):  # INVALID | CHANGED
+            return PlanItem(
+                drift, RebuildIndexFix(t, idx, drift.model), blocks_sync=False
+            )
+        case IndexRenameDrift(table=t):
+            return PlanItem(
+                drift,
+                RenameIndexFix(t, drift.old_name, drift.new_name),
+                blocks_sync=False,
+            )
+        case IndexUndeclaredDrift(table=t):
+            return PlanItem(drift, DropIndexFix(t, drift.name), blocks_sync=False)
         case ConstraintDrift(
             kind=DriftKind.MISSING, table=t, constraint=c, model=m
         ) if c is not None and m is not None:
@@ -123,9 +127,7 @@ def _plan_drift(drift: Drift) -> PlanItem:
             target_column=tc,
             on_delete_clause=od,
         ):
-            return PlanItem(
-                drift, ReplaceForeignKeyFix(t, drift.name, col, tt, tc, od)
-            )
+            return PlanItem(drift, ReplaceForeignKeyFix(t, drift.name, col, tt, tc, od))
         case ForeignKeyNameDrift(kind=DriftKind.UNVALIDATED):
             return PlanItem(drift, ValidateConstraintFix(drift.table, drift.name))
         case ForeignKeyNameDrift(kind=DriftKind.UNDECLARED):
@@ -143,9 +145,7 @@ def _plan_drift(drift: Drift) -> PlanItem:
         case ColumnDefaultExpectedDrift():
             return PlanItem(
                 drift,
-                SetColumnDefaultFix(
-                    drift.table, drift.column, drift.model_default_sql
-                ),
+                SetColumnDefaultFix(drift.table, drift.column, drift.model_default_sql),
             )
         case ColumnDefaultUndeclaredDrift():
             return PlanItem(drift, DropColumnDefaultFix(drift.table, drift.column))

@@ -25,6 +25,7 @@ from plain.postgres.convergence import (
     plan_convergence,
     plan_model_convergence,
 )
+from plain.postgres.convergence.analysis import IndexUndeclaredDrift
 from plain.postgres.functions.text import Lower, Upper
 from plain.postgres.introspection import ConType
 
@@ -1290,8 +1291,7 @@ class TestIndexBackedUniqueConstraints:
         undeclared = [
             item
             for item in plan.items
-            if isinstance(item.drift, IndexDrift)
-            and item.drift.kind == DriftKind.UNDECLARED
+            if isinstance(item.drift, IndexUndeclaredDrift)
             and item.drift.name == "examples_constraintexample_old_partial_uq"
         ]
         assert len(undeclared) == 1

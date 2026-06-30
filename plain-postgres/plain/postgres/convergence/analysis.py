@@ -58,31 +58,51 @@ class DriftKind(StrEnum):
 
 
 @dataclass
-class IndexDrift:
-    """A schema difference for an index."""
+class IndexModelDrift:
+    """Model declares an index the DB is missing (MISSING), has marked INVALID,
+    or has with a different definition (CHANGED)."""
 
-    kind: DriftKind
     table: str
-    index: Index | None = None
-    model: type[Model] | None = None
-    old_name: str | None = None
-    new_name: str | None = None
-    name: str | None = None
+    index: Index
+    model: type[Model]
+    kind: DriftKind  # MISSING, INVALID, or CHANGED
 
     def describe(self) -> str:
-        match self.kind:
-            case DriftKind.MISSING if self.index is not None:
-                return f"{self.table}: index {self.index.name} missing"
-            case DriftKind.INVALID if self.index is not None:
-                return f"{self.table}: index {self.index.name} INVALID"
-            case DriftKind.CHANGED if self.index is not None:
-                return f"{self.table}: index {self.index.name} definition changed"
-            case DriftKind.RENAMED:
-                return f"{self.table}: index {self.old_name} → {self.new_name}"
-            case DriftKind.UNDECLARED:
-                return f"{self.table}: index {self.name} not declared"
-            case _:
-                raise ValueError(f"Cannot describe {self.kind} index drift: {self}")
+        if self.kind is DriftKind.MISSING:
+            return f"{self.table}: index {self.index.name} missing"
+        if self.kind is DriftKind.INVALID:
+            return f"{self.table}: index {self.index.name} INVALID"
+        return f"{self.table}: index {self.index.name} definition changed"
+
+
+@dataclass
+class IndexRenameDrift:
+    """An index whose DB name differs from the model's declared name."""
+
+    table: str
+    old_name: str
+    new_name: str
+
+    kind: ClassVar[DriftKind] = DriftKind.RENAMED
+
+    def describe(self) -> str:
+        return f"{self.table}: index {self.old_name} → {self.new_name}"
+
+
+@dataclass
+class IndexUndeclaredDrift:
+    """DB has an index the model doesn't declare."""
+
+    table: str
+    name: str
+
+    kind: ClassVar[DriftKind] = DriftKind.UNDECLARED
+
+    def describe(self) -> str:
+        return f"{self.table}: index {self.name} not declared"
+
+
+IndexDrift = IndexModelDrift | IndexRenameDrift | IndexUndeclaredDrift
 
 
 @dataclass
@@ -748,11 +768,11 @@ def _compare_indexes(
                     name=index.name,
                     fields=list(index.fields),
                     issue="INVALID — needs drop and recreate",
-                    drift=IndexDrift(
-                        kind=DriftKind.INVALID,
+                    drift=IndexModelDrift(
                         table=table,
                         index=index,
                         model=model,
+                        kind=DriftKind.INVALID,
                     ),
                 )
             )
@@ -776,11 +796,11 @@ def _compare_indexes(
                         name=index.name,
                         fields=list(index.fields),
                         issue=issue,
-                        drift=IndexDrift(
-                            kind=DriftKind.CHANGED,
+                        drift=IndexModelDrift(
                             table=table,
                             index=index,
                             model=model,
+                            kind=DriftKind.CHANGED,
                         ),
                     )
                 )
@@ -845,8 +865,7 @@ def _compare_indexes(
                     name=index.name,
                     fields=list(index.fields),
                     issue=f"rename from {old_name}",
-                    drift=IndexDrift(
-                        kind=DriftKind.RENAMED,
+                    drift=IndexRenameDrift(
                         table=table,
                         old_name=old_name,
                         new_name=index.name,
@@ -864,11 +883,11 @@ def _compare_indexes(
                     name=index.name,
                     fields=list(index.fields),
                     issue="missing from database",
-                    drift=IndexDrift(
-                        kind=DriftKind.MISSING,
+                    drift=IndexModelDrift(
                         table=table,
                         index=index,
                         model=model,
+                        kind=DriftKind.MISSING,
                     ),
                 )
             )
@@ -881,8 +900,7 @@ def _compare_indexes(
                     name=name,
                     fields=non_unique_indexes[name].columns,
                     issue="not in model",
-                    drift=IndexDrift(
-                        kind=DriftKind.UNDECLARED,
+                    drift=IndexUndeclaredDrift(
                         table=table,
                         name=name,
                     ),
@@ -1036,9 +1054,7 @@ def _compare_unique_constraints(
             # IndexDrift so the planner uses DROP INDEX, not DROP CONSTRAINT.
             undeclared_drift: Drift
             if name in actual_indexes:
-                undeclared_drift = IndexDrift(
-                    kind=DriftKind.UNDECLARED, table=table, name=name
-                )
+                undeclared_drift = IndexUndeclaredDrift(table=table, name=name)
             else:
                 undeclared_drift = ConstraintDrift(
                     kind=DriftKind.UNDECLARED, table=table, name=name
@@ -1383,19 +1399,25 @@ def _detect_unique_renames(
                 )
                 if _index_def_tail(old_def) != expected_tail:
                     continue
-            DriftType = IndexDrift if constraint.index_only else ConstraintDrift
+            rename_drift: IndexRenameDrift | ConstraintDrift
+            if constraint.index_only:
+                rename_drift = IndexRenameDrift(
+                    table=table, old_name=old_name, new_name=constraint.name
+                )
+            else:
+                rename_drift = ConstraintDrift(
+                    kind=DriftKind.RENAMED,
+                    table=table,
+                    old_name=old_name,
+                    new_name=constraint.name,
+                )
             statuses.append(
                 ConstraintStatus(
                     name=constraint.name,
                     constraint_type=ConType.UNIQUE,
                     fields=list(constraint.fields),
                     issue=f"rename from {old_name}",
-                    drift=DriftType(
-                        kind=DriftKind.RENAMED,
-                        table=table,
-                        old_name=old_name,
-                        new_name=constraint.name,
-                    ),
+                    drift=rename_drift,
                 )
             )
             renamed_missing.add(constraint.name)
@@ -1446,8 +1468,7 @@ def _detect_unique_renames(
                     constraint_type=ConType.UNIQUE,
                     fields=list(constraint.fields),
                     issue=f"rename from {old_name}",
-                    drift=IndexDrift(
-                        kind=DriftKind.RENAMED,
+                    drift=IndexRenameDrift(
                         table=table,
                         old_name=old_name,
                         new_name=constraint.name,

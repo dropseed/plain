@@ -21,6 +21,9 @@ from plain.postgres.convergence import (
 from plain.postgres.convergence.analysis import (
     DriftKind,
     IndexDrift,
+    IndexModelDrift,
+    IndexRenameDrift,
+    IndexUndeclaredDrift,
     analyze_model,
 )
 from plain.postgres.db import read_only
@@ -688,11 +691,7 @@ class TestDetectIndexFixes:
             assert len(rename_drifts) == 0
 
             # Should be a missing + undeclared instead
-            missing = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
-            ]
+            missing = [d for d in analysis.drifts if isinstance(d, IndexModelDrift)]
             assert len(missing) == 1
             assert missing[0].index is not None
             assert missing[0].index.name == "examples_indexexample_name_new_idx"
@@ -740,19 +739,13 @@ class TestDetectIndexFixes:
             assert renames == []
 
             # Both sides reported separately instead.
-            missing = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
-            ]
+            missing = [d for d in analysis.drifts if isinstance(d, IndexModelDrift)]
             assert len(missing) == 1
             assert missing[0].index is not None
             assert missing[0].index.name == "examples_indexexample_name_new_idx"
 
             undeclared = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
+                d for d in analysis.drifts if isinstance(d, IndexUndeclaredDrift)
             ]
             assert len(undeclared) == 1
             assert undeclared[0].name == "examples_indexexample_name_old_idx"
@@ -833,9 +826,7 @@ class TestDetectIndexFixes:
                 analysis = analyze_model(conn, cursor, IndexExample)
 
             rename_drifts = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+                d for d in analysis.drifts if isinstance(d, IndexRenameDrift)
             ]
             assert len(rename_drifts) == 2
             assert {d.old_name for d in rename_drifts} == {

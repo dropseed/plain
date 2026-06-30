@@ -22,6 +22,11 @@ from plain.postgres.convergence import (
     plan_convergence,
     plan_model_convergence,
 )
+from plain.postgres.convergence.analysis import (
+    IndexModelDrift,
+    IndexRenameDrift,
+    IndexUndeclaredDrift,
+)
 from plain.postgres.functions.text import Upper
 
 
@@ -149,9 +154,7 @@ class TestAnalyzeModel:
                 analysis = analyze_model(conn, cursor, Widget)
 
             rename_drifts = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+                d for d in analysis.drifts if isinstance(d, IndexRenameDrift)
             ]
             assert len(rename_drifts) == 1
             assert rename_drifts[0].old_name == "examples_widget_name_old_idx"
@@ -199,9 +202,7 @@ class TestAnalyzeModel:
                 analysis = analyze_model(conn, cursor, WidgetTag)
 
             rename_drifts = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+                d for d in analysis.drifts if isinstance(d, IndexRenameDrift)
             ]
             assert len(rename_drifts) == 1
             assert rename_drifts[0].old_name == "examples_widgettag_widget_old_idx"
@@ -227,9 +228,7 @@ class TestAnalyzeModel:
                 analysis = analyze_model(conn, cursor, Widget)
 
             rename_drifts = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+                d for d in analysis.drifts if isinstance(d, IndexRenameDrift)
             ]
             assert len(rename_drifts) == 1
             assert rename_drifts[0].old_name == "examples_widget_name_size_old_idx"
@@ -321,9 +320,7 @@ class TestAnalyzeModel:
                 analysis = analyze_model(conn, cursor, Widget)
 
             rename_drifts = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+                d for d in analysis.drifts if isinstance(d, IndexRenameDrift)
             ]
             assert len(rename_drifts) == 1
             assert rename_drifts[0].old_name == "examples_widget_name_upper_old_idx"
@@ -525,7 +522,7 @@ class TestDriftPolicy:
         """can_auto_fix returns True for missing indexes and constraints."""
         idx = Index(fields=["name"], name="examples_widget_name_idx")
         assert can_auto_fix(
-            IndexDrift(kind=DriftKind.MISSING, table="t", index=idx, model=Widget)
+            IndexModelDrift(table="t", index=idx, model=Widget, kind=DriftKind.MISSING)
         )
         constraint = CheckConstraint(
             check=Q(id__gte=0), name="examples_widget_id_check"
@@ -608,8 +605,7 @@ class TestExecutePlan:
         """execute_plan() collects SQL from successful items."""
         execute('CREATE INDEX "examples_widget_temp_idx" ON "examples_widget" ("name")')
         fix = DropIndexFix(table="examples_widget", name="examples_widget_temp_idx")
-        drift = IndexDrift(
-            kind=DriftKind.UNDECLARED,
+        drift = IndexUndeclaredDrift(
             table="examples_widget",
             name="examples_widget_temp_idx",
         )
@@ -707,8 +703,7 @@ class TestExecutePlan:
         """FixResult.item references the PlanItem."""
         execute('CREATE INDEX "examples_widget_temp_idx" ON "examples_widget" ("name")')
         fix = DropIndexFix(table="examples_widget", name="examples_widget_temp_idx")
-        drift = IndexDrift(
-            kind=DriftKind.UNDECLARED,
+        drift = IndexUndeclaredDrift(
             table="examples_widget",
             name="examples_widget_temp_idx",
         )
@@ -744,11 +739,11 @@ class TestSyncPolicy:
             index=Index(fields=["name"], name="examples_widget_will_fail_idx"),
             model=Widget,
         )
-        drift = IndexDrift(
-            kind=DriftKind.MISSING,
+        drift = IndexModelDrift(
             table="examples_widget",
             index=fix.index,
             model=Widget,
+            kind=DriftKind.MISSING,
         )
         item = PlanItem(drift=drift, fix=fix, blocks_sync=False)
 
@@ -774,11 +769,11 @@ class TestSyncPolicy:
         items = [
             # Non-blocking: will fail (duplicate index)
             PlanItem(
-                drift=IndexDrift(
-                    kind=DriftKind.MISSING,
+                drift=IndexModelDrift(
                     table="examples_widget",
                     index=index,
                     model=Widget,
+                    kind=DriftKind.MISSING,
                 ),
                 fix=CreateIndexFix(table="examples_widget", index=index, model=Widget),
                 blocks_sync=False,
