@@ -64,19 +64,27 @@ class PlanItem:
 def _plan_drift(drift: Drift) -> PlanItem:
     """Map a semantic drift to a plan item with policy. All policy lives here."""
     match drift:
-        case IndexDrift(kind=DriftKind.MISSING, table=t, index=idx, model=m):
+        case IndexDrift(kind=DriftKind.MISSING, table=t, index=idx, model=m) if (
+            idx is not None and m is not None
+        ):
             return PlanItem(drift, CreateIndexFix(t, idx, m), blocks_sync=False)
-        case IndexDrift(kind=DriftKind.INVALID, table=t, index=idx, model=m):
+        case IndexDrift(
+            kind=DriftKind.INVALID | DriftKind.CHANGED, table=t, index=idx, model=m
+        ) if idx is not None and m is not None:
             return PlanItem(drift, RebuildIndexFix(t, idx, m), blocks_sync=False)
-        case IndexDrift(kind=DriftKind.CHANGED, table=t, index=idx, model=m):
-            return PlanItem(drift, RebuildIndexFix(t, idx, m), blocks_sync=False)
-        case IndexDrift(kind=DriftKind.RENAMED, table=t, old_name=old, new_name=new):
+        case IndexDrift(
+            kind=DriftKind.RENAMED, table=t, old_name=old, new_name=new
+        ) if old is not None and new is not None:
             return PlanItem(drift, RenameIndexFix(t, old, new), blocks_sync=False)
-        case IndexDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
+        case IndexDrift(kind=DriftKind.UNDECLARED, table=t, name=n) if n is not None:
             return PlanItem(drift, DropIndexFix(t, n), blocks_sync=False)
-        case ConstraintDrift(kind=DriftKind.MISSING, table=t, constraint=c, model=m):
+        case ConstraintDrift(
+            kind=DriftKind.MISSING, table=t, constraint=c, model=m
+        ) if c is not None and m is not None:
             return PlanItem(drift, AddConstraintFix(t, c, m))
-        case ConstraintDrift(kind=DriftKind.UNVALIDATED, table=t, name=n):
+        case ConstraintDrift(kind=DriftKind.UNVALIDATED, table=t, name=n) if (
+            n is not None
+        ):
             return PlanItem(drift, ValidateConstraintFix(t, n))
         case ConstraintDrift(kind=DriftKind.CHANGED):
             return PlanItem(
@@ -89,9 +97,11 @@ def _plan_drift(drift: Drift) -> PlanItem:
             )
         case ConstraintDrift(
             kind=DriftKind.RENAMED, table=t, old_name=old, new_name=new
-        ):
+        ) if old is not None and new is not None:
             return PlanItem(drift, RenameConstraintFix(t, old, new), blocks_sync=False)
-        case ConstraintDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
+        case ConstraintDrift(kind=DriftKind.UNDECLARED, table=t, name=n) if (
+            n is not None
+        ):
             return PlanItem(drift, DropConstraintFix(t, n))
         case ForeignKeyDrift(
             kind=DriftKind.MISSING,
@@ -101,7 +111,7 @@ def _plan_drift(drift: Drift) -> PlanItem:
             target_table=tt,
             target_column=tc,
             on_delete_clause=od,
-        ):
+        ) if cn is not None and col is not None and tt is not None and tc is not None:
             return PlanItem(drift, AddForeignKeyFix(t, cn, col, tt, tc, od))
         case ForeignKeyDrift(
             kind=DriftKind.CHANGED,
@@ -111,45 +121,41 @@ def _plan_drift(drift: Drift) -> PlanItem:
             target_table=tt,
             target_column=tc,
             on_delete_clause=od,
-        ):
-            assert cn is not None
-            assert col is not None
-            assert tt is not None
-            assert tc is not None
+        ) if cn is not None and col is not None and tt is not None and tc is not None:
             return PlanItem(drift, ReplaceForeignKeyFix(t, cn, col, tt, tc, od))
-        case ForeignKeyDrift(kind=DriftKind.UNVALIDATED, table=t, name=n):
-            return PlanItem(drift, ValidateConstraintFix(t, n))
-        case ForeignKeyDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
-            return PlanItem(drift, DropConstraintFix(t, n))
-        case NullabilityDrift(
-            table=t, column=col, model_allows_null=False, has_null_rows=False
+        case ForeignKeyDrift(kind=DriftKind.UNVALIDATED, table=t, name=n) if (
+            n is not None
         ):
-            return PlanItem(drift, SetNotNullFix(t, col))
+            return PlanItem(drift, ValidateConstraintFix(t, n))
+        case ForeignKeyDrift(kind=DriftKind.UNDECLARED, table=t, name=n) if (
+            n is not None
+        ):
+            return PlanItem(drift, DropConstraintFix(t, n))
+        case NullabilityDrift(model_allows_null=False, has_null_rows=False):
+            return PlanItem(drift, SetNotNullFix(drift.table, drift.column))
         case NullabilityDrift(model_allows_null=False, has_null_rows=True):
             return PlanItem(
                 drift,
                 fix=None,
                 guidance="Backfill existing NULL rows, then rerun sync.",
             )
-        case NullabilityDrift(table=t, column=col, model_allows_null=True):
-            return PlanItem(drift, DropNotNullFix(t, col))
+        case NullabilityDrift(model_allows_null=True):
+            return PlanItem(drift, DropNotNullFix(drift.table, drift.column))
         case ColumnDefaultDrift(
             kind=DriftKind.MISSING | DriftKind.CHANGED,
-            table=t,
-            column=col,
             model_default_sql=default_sql,
-        ):
-            assert default_sql is not None  # MISSING/CHANGED always carry model SQL
-            return PlanItem(drift, SetColumnDefaultFix(t, col, default_sql))
-        case ColumnDefaultDrift(kind=DriftKind.UNDECLARED, table=t, column=col):
-            return PlanItem(drift, DropColumnDefaultFix(t, col))
+        ) if default_sql is not None:
+            return PlanItem(
+                drift, SetColumnDefaultFix(drift.table, drift.column, default_sql)
+            )
+        case ColumnDefaultDrift(kind=DriftKind.UNDECLARED):
+            return PlanItem(drift, DropColumnDefaultFix(drift.table, drift.column))
         case StorageParameterDrift(
             kind=DriftKind.MISSING | DriftKind.CHANGED,
             table=t,
             key=k,
             declared_value=v,
-        ):
-            assert v is not None
+        ) if v is not None:
             return PlanItem(drift, SetStorageParameterFix(t, k, v))
         case StorageParameterDrift(kind=DriftKind.UNDECLARED, table=t, key=k):
             return PlanItem(drift, ResetStorageParameterFix(t, k))
@@ -283,7 +289,8 @@ def execute_plan(items: Sequence[PlanItem]) -> ConvergenceResult:
     """
     result = ConvergenceResult()
     for item in items:
-        assert item.fix is not None
+        # Callers pass plan.executable(), which excludes guidance-only items.
+        assert item.fix is not None, "execute_plan requires items with a fix"
         try:
             sql = item.fix.apply()
             result.results.append(FixResult(item=item, sql=sql))

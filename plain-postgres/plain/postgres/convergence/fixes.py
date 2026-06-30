@@ -218,29 +218,27 @@ class AddConstraintFix(Fix):
 
     def apply(self) -> str:
         if isinstance(self.constraint, UniqueConstraint):
-            return self._apply_unique()
+            return self._apply_unique(self.constraint)
         return self._apply_other()
 
-    def _apply_unique(self) -> str:
-        assert isinstance(self.constraint, UniqueConstraint)
-
+    def _apply_unique(self, constraint: UniqueConstraint) -> str:
         # Step 1: Create unique index concurrently (non-blocking)
-        create_idx = self.constraint.to_sql(self.model, concurrently=True)
+        create_idx = constraint.to_sql(self.model, concurrently=True)
         _execute_autocommit(create_idx)
 
         # Step 2: Attach as constraint — but only for variants PostgreSQL
         # accepts.  Partial indexes, expression indexes, and non-default
         # operator class indexes cannot be attached as constraints; they
         # remain as unique indexes (same enforcement, no pg_constraint row).
-        if self.constraint.index_only:
+        if constraint.index_only:
             return create_idx
 
-        add_constraint = self.constraint.to_attach_sql(self.model)
+        add_constraint = constraint.to_attach_sql(self.model)
         try:
             _execute_and_commit(add_constraint)
         except Exception:
             # Clean up the orphaned index if the constraint attachment fails
-            name = quote_name(self.constraint.name)
+            name = quote_name(constraint.name)
             _execute_autocommit(f"DROP INDEX CONCURRENTLY IF EXISTS {name}")
             raise
 

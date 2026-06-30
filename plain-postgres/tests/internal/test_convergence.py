@@ -523,8 +523,18 @@ class TestDriftPolicy:
 
     def test_can_auto_fix_for_missing(self, db):
         """can_auto_fix returns True for missing indexes and constraints."""
-        assert can_auto_fix(IndexDrift(kind=DriftKind.MISSING, table="t"))
-        assert can_auto_fix(ConstraintDrift(kind=DriftKind.MISSING, table="t"))
+        idx = Index(fields=["name"], name="examples_widget_name_idx")
+        assert can_auto_fix(
+            IndexDrift(kind=DriftKind.MISSING, table="t", index=idx, model=Widget)
+        )
+        constraint = CheckConstraint(
+            check=Q(id__gte=0), name="examples_widget_id_check"
+        )
+        assert can_auto_fix(
+            ConstraintDrift(
+                kind=DriftKind.MISSING, table="t", constraint=constraint, model=Widget
+            )
+        )
 
     def test_can_auto_fix_false_for_changed_constraint(self):
         """can_auto_fix returns False for changed constraint definitions."""

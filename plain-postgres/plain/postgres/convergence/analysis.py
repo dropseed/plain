@@ -71,19 +71,18 @@ class IndexDrift:
 
     def describe(self) -> str:
         match self.kind:
-            case DriftKind.MISSING:
-                assert self.index is not None
+            case DriftKind.MISSING if self.index is not None:
                 return f"{self.table}: index {self.index.name} missing"
-            case DriftKind.INVALID:
-                assert self.index is not None
+            case DriftKind.INVALID if self.index is not None:
                 return f"{self.table}: index {self.index.name} INVALID"
-            case DriftKind.CHANGED:
-                assert self.index is not None
+            case DriftKind.CHANGED if self.index is not None:
                 return f"{self.table}: index {self.index.name} definition changed"
             case DriftKind.RENAMED:
                 return f"{self.table}: index {self.old_name} → {self.new_name}"
-            case _:
+            case DriftKind.UNDECLARED:
                 return f"{self.table}: index {self.name} not declared"
+            case _:
+                raise ValueError(f"Cannot describe {self.kind} index drift: {self}")
 
 
 @dataclass
@@ -100,18 +99,20 @@ class ConstraintDrift:
 
     def describe(self) -> str:
         match self.kind:
-            case DriftKind.MISSING:
-                assert self.constraint is not None
+            case DriftKind.MISSING if self.constraint is not None:
                 return f"{self.table}: constraint {self.constraint.name} missing"
             case DriftKind.UNVALIDATED:
                 return f"{self.table}: constraint {self.name} NOT VALID"
-            case DriftKind.CHANGED:
-                assert self.constraint is not None
+            case DriftKind.CHANGED if self.constraint is not None:
                 return f"{self.table}: constraint {self.constraint.name} definition changed"
             case DriftKind.RENAMED:
                 return f"{self.table}: constraint {self.old_name} → {self.new_name}"
-            case _:
+            case DriftKind.UNDECLARED:
                 return f"{self.table}: constraint {self.name} not declared"
+            case _:
+                raise ValueError(
+                    f"Cannot describe {self.kind} constraint drift: {self}"
+                )
 
 
 @dataclass
@@ -139,8 +140,10 @@ class ForeignKeyDrift:
                     f"{self.table}: FK {self.name} on_delete changed "
                     f"({self.actual_action!r} → {self.expected_action!r})"
                 )
-            case _:
+            case DriftKind.UNDECLARED:
                 return f"{self.table}: FK {self.name} not declared"
+            case _:
+                raise ValueError(f"Cannot describe {self.kind} FK drift: {self}")
 
 
 @dataclass
@@ -185,10 +188,14 @@ class ColumnDefaultDrift:
                     f"db has {self.db_default_sql}, model declares "
                     f"{self.model_default_sql}"
                 )
-            case _:
+            case DriftKind.UNDECLARED:
                 return (
                     f"{self.table}: column {self.column} has undeclared DEFAULT "
                     f"{self.db_default_sql}"
+                )
+            case _:
+                raise ValueError(
+                    f"Cannot describe {self.kind} column default drift: {self}"
                 )
 
 
@@ -219,10 +226,14 @@ class StorageParameterDrift:
                     f"db has {self.actual_value}, model declares "
                     f"{self.declared_value}"
                 )
-            case _:
+            case DriftKind.UNDECLARED:
                 return (
                     f"{self.table}: storage parameter {self.key} not declared "
                     f"(db has {self.actual_value})"
+                )
+            case _:
+                raise ValueError(
+                    f"Cannot describe {self.kind} storage parameter drift: {self}"
                 )
 
 
@@ -499,6 +510,7 @@ def _compare_columns(
         if f.primary_key:
             pk_suffix = f.db_type_suffix() or ""
 
+        # Fields reached via local_fields are always contributed (name set).
         assert f.name is not None
         statuses.append(
             ColumnStatus(
@@ -1102,6 +1114,8 @@ def _compare_foreign_keys(
     expected_fks: dict[tuple[str, str, str], tuple[str, str, str, str]] = {}
     for f in model._model_meta.local_fields:
         if isinstance(f, ForeignKeyField):
+            # Contributed fields always have a name; never silently exclude an
+            # FK from expected_fks (that would flag a live constraint UNDECLARED).
             assert f.name is not None
             to_table = f.target_field.model.model_options.db_table
             to_column = f.target_field.column
