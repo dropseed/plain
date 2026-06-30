@@ -11,6 +11,7 @@ from plain.postgres.convergence import (
 )
 from plain.postgres.convergence.analysis import (
     DriftKind,
+    StorageParameterDeclaredDrift,
     StorageParameterDrift,
     analyze_model,
 )
@@ -37,7 +38,9 @@ class TestStorageParameterDriftDetection:
                 analysis = analyze_model(conn, cursor, StorageParametersExample)
 
             drifts = [
-                d for d in analysis.drifts if isinstance(d, StorageParameterDrift)
+                d
+                for d in analysis.drifts
+                if isinstance(d, StorageParameterDeclaredDrift)
             ]
             assert len(drifts) == 1
             assert drifts[0].kind == DriftKind.MISSING
@@ -61,7 +64,9 @@ class TestStorageParameterDriftDetection:
                 analysis = analyze_model(conn, cursor, StorageParametersExample)
 
             drifts = [
-                d for d in analysis.drifts if isinstance(d, StorageParameterDrift)
+                d
+                for d in analysis.drifts
+                if isinstance(d, StorageParameterDeclaredDrift)
             ]
             assert len(drifts) == 1
             assert drifts[0].kind == DriftKind.CHANGED

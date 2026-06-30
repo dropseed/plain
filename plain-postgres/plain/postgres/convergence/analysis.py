@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import psycopg
 
@@ -200,41 +200,57 @@ class ColumnDefaultDrift:
 
 
 @dataclass
-class StorageParameterDrift:
-    """Mismatch between declared and live `pg_class.reloptions` for a table.
+class StorageParameterDeclaredDrift:
+    """Model declares a storage parameter the DB is missing (MISSING) or has
+    set to a different value (CHANGED).
 
     `key` carries a `toast.` prefix when the parameter belongs to the table's
     TOAST relation; convergence emits and reads it accordingly.
     """
 
-    kind: DriftKind
     table: str
     key: str
-    declared_value: str | None = None
-    actual_value: str | None = None
+    kind: DriftKind  # MISSING or CHANGED
+    declared_value: str
+    actual_value: str | None = None  # set only for CHANGED
 
     def describe(self) -> str:
-        match self.kind:
-            case DriftKind.MISSING:
-                return (
-                    f"{self.table}: storage parameter {self.key} missing "
-                    f"(expected {self.declared_value})"
-                )
-            case DriftKind.CHANGED:
-                return (
-                    f"{self.table}: storage parameter {self.key} mismatch — "
-                    f"db has {self.actual_value}, model declares "
-                    f"{self.declared_value}"
-                )
-            case DriftKind.UNDECLARED:
-                return (
-                    f"{self.table}: storage parameter {self.key} not declared "
-                    f"(db has {self.actual_value})"
-                )
-            case _:
-                raise ValueError(
-                    f"Cannot describe {self.kind} storage parameter drift: {self}"
-                )
+        if self.kind is DriftKind.MISSING:
+            return (
+                f"{self.table}: storage parameter {self.key} missing "
+                f"(expected {self.declared_value})"
+            )
+        return (
+            f"{self.table}: storage parameter {self.key} mismatch — "
+            f"db has {self.actual_value}, model declares "
+            f"{self.declared_value}"
+        )
+
+
+@dataclass
+class StorageParameterUndeclaredDrift:
+    """DB has a storage parameter the model doesn't declare.
+
+    `key` carries a `toast.` prefix when the parameter belongs to the table's
+    TOAST relation; convergence emits and reads it accordingly.
+    """
+
+    table: str
+    key: str
+    actual_value: str
+
+    kind: ClassVar[DriftKind] = DriftKind.UNDECLARED
+
+    def describe(self) -> str:
+        return (
+            f"{self.table}: storage parameter {self.key} not declared "
+            f"(db has {self.actual_value})"
+        )
+
+
+# Union of the shape variants above; a plain `|` union (not a PEP 695 `type`
+# alias) so it stays usable in isinstance() checks.
+StorageParameterDrift = StorageParameterDeclaredDrift | StorageParameterUndeclaredDrift
 
 
 type ColumnDrift = NullabilityDrift | ColumnDefaultDrift
@@ -355,7 +371,11 @@ class ModelAnalysis:
                 {
                     "key": d.key,
                     "kind": d.kind,
-                    "declared_value": d.declared_value,
+                    "declared_value": (
+                        d.declared_value
+                        if isinstance(d, StorageParameterDeclaredDrift)
+                        else None
+                    ),
                     "actual_value": d.actual_value,
                 }
                 for d in self.storage_parameter_drifts
@@ -410,19 +430,19 @@ def _compare_storage_parameters(
         actual_value = actual.get(key)
         if actual_value is None:
             drifts.append(
-                StorageParameterDrift(
-                    kind=DriftKind.MISSING,
+                StorageParameterDeclaredDrift(
                     table=table,
                     key=key,
+                    kind=DriftKind.MISSING,
                     declared_value=declared_value,
                 )
             )
         elif actual_value != declared_value:
             drifts.append(
-                StorageParameterDrift(
-                    kind=DriftKind.CHANGED,
+                StorageParameterDeclaredDrift(
                     table=table,
                     key=key,
+                    kind=DriftKind.CHANGED,
                     declared_value=declared_value,
                     actual_value=actual_value,
                 )
@@ -431,8 +451,7 @@ def _compare_storage_parameters(
     for key, actual_value in actual.items():
         if key not in declared:
             drifts.append(
-                StorageParameterDrift(
-                    kind=DriftKind.UNDECLARED,
+                StorageParameterUndeclaredDrift(
                     table=table,
                     key=key,
                     actual_value=actual_value,

@@ -14,7 +14,8 @@ from .analysis import (
     ForeignKeyDrift,
     IndexDrift,
     NullabilityDrift,
-    StorageParameterDrift,
+    StorageParameterDeclaredDrift,
+    StorageParameterUndeclaredDrift,
     analyze_model,
 )
 from .fixes import (
@@ -150,14 +151,9 @@ def _plan_drift(drift: Drift) -> PlanItem:
             )
         case ColumnDefaultDrift(kind=DriftKind.UNDECLARED):
             return PlanItem(drift, DropColumnDefaultFix(drift.table, drift.column))
-        case StorageParameterDrift(
-            kind=DriftKind.MISSING | DriftKind.CHANGED,
-            table=t,
-            key=k,
-            declared_value=v,
-        ) if v is not None:
+        case StorageParameterDeclaredDrift(table=t, key=k, declared_value=v):
             return PlanItem(drift, SetStorageParameterFix(t, k, v))
-        case StorageParameterDrift(kind=DriftKind.UNDECLARED, table=t, key=k):
+        case StorageParameterUndeclaredDrift(table=t, key=k):
             return PlanItem(drift, ResetStorageParameterFix(t, k))
         case _:
             raise ValueError(f"Unhandled drift: {drift}")
