@@ -116,34 +116,62 @@ class ConstraintDrift:
 
 
 @dataclass
-class ForeignKeyDrift:
-    """A schema difference for a foreign key constraint."""
+class ForeignKeyMissingDrift:
+    """Model declares an FK constraint the DB doesn't have."""
 
-    kind: DriftKind
     table: str
-    name: str | None = None
-    column: str | None = None
-    target_table: str | None = None
-    target_column: str | None = None
+    name: str
+    column: str
+    target_table: str
+    target_column: str
     on_delete_clause: str = ""  # SQL clause to emit, e.g. " ON DELETE CASCADE"
-    actual_action: str | None = None  # CHANGED only: current DB confdeltype
-    expected_action: str | None = None  # CHANGED only: expected confdeltype
+
+    kind: ClassVar[DriftKind] = DriftKind.MISSING
 
     def describe(self) -> str:
-        match self.kind:
-            case DriftKind.MISSING:
-                return f"{self.table}: FK {self.name} missing ({self.column} → {self.target_table}.{self.target_column})"
-            case DriftKind.UNVALIDATED:
-                return f"{self.table}: FK {self.name} NOT VALID"
-            case DriftKind.CHANGED:
-                return (
-                    f"{self.table}: FK {self.name} on_delete changed "
-                    f"({self.actual_action!r} → {self.expected_action!r})"
-                )
-            case DriftKind.UNDECLARED:
-                return f"{self.table}: FK {self.name} not declared"
-            case _:
-                raise ValueError(f"Cannot describe {self.kind} FK drift: {self}")
+        return (
+            f"{self.table}: FK {self.name} missing "
+            f"({self.column} → {self.target_table}.{self.target_column})"
+        )
+
+
+@dataclass
+class ForeignKeyChangedDrift:
+    """An existing FK constraint's ON DELETE action differs from the model."""
+
+    table: str
+    name: str
+    column: str
+    target_table: str
+    target_column: str
+    actual_action: str  # current DB confdeltype
+    expected_action: str  # expected confdeltype
+    on_delete_clause: str = ""
+
+    kind: ClassVar[DriftKind] = DriftKind.CHANGED
+
+    def describe(self) -> str:
+        return (
+            f"{self.table}: FK {self.name} on_delete changed "
+            f"({self.actual_action!r} → {self.expected_action!r})"
+        )
+
+
+@dataclass
+class ForeignKeyNameDrift:
+    """An existing FK constraint to validate (UNVALIDATED) or drop (UNDECLARED)."""
+
+    table: str
+    name: str
+    kind: DriftKind  # UNVALIDATED or UNDECLARED
+
+    def describe(self) -> str:
+        if self.kind is DriftKind.UNVALIDATED:
+            return f"{self.table}: FK {self.name} NOT VALID"
+        return f"{self.table}: FK {self.name} not declared"
+
+
+ForeignKeyDrift = ForeignKeyMissingDrift | ForeignKeyChangedDrift | ForeignKeyNameDrift
 
 
 @dataclass
@@ -1200,8 +1228,7 @@ def _compare_foreign_keys(
                     f"({cs.on_delete_action!r} → {expected_action!r})"
                 )
                 col, to_table, to_column = key
-                drift = ForeignKeyDrift(
-                    kind=DriftKind.CHANGED,
+                drift = ForeignKeyChangedDrift(
                     table=table,
                     name=actual_name,
                     column=col,
@@ -1213,10 +1240,10 @@ def _compare_foreign_keys(
                 )
             elif not cs.validated:
                 issue = "NOT VALID — needs validation"
-                drift = ForeignKeyDrift(
-                    kind=DriftKind.UNVALIDATED,
+                drift = ForeignKeyNameDrift(
                     table=table,
                     name=actual_name,
+                    kind=DriftKind.UNVALIDATED,
                 )
 
             statuses.append(
@@ -1236,8 +1263,7 @@ def _compare_foreign_keys(
                     constraint_type=ConType.FOREIGN_KEY,
                     fields=[col],
                     issue="missing from database",
-                    drift=ForeignKeyDrift(
-                        kind=DriftKind.MISSING,
+                    drift=ForeignKeyMissingDrift(
                         table=table,
                         name=constraint_name,
                         column=col,
@@ -1256,10 +1282,10 @@ def _compare_foreign_keys(
                 constraint_type=ConType.FOREIGN_KEY,
                 fields=cs.columns,
                 issue=f"not in model (→ {cs.target_table}.{cs.target_column})",
-                drift=ForeignKeyDrift(
-                    kind=DriftKind.UNDECLARED,
+                drift=ForeignKeyNameDrift(
                     table=table,
                     name=name,
+                    kind=DriftKind.UNDECLARED,
                 ),
             )
         )

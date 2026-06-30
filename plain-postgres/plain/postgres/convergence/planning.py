@@ -14,7 +14,9 @@ from .analysis import (
     ConstraintDrift,
     Drift,
     DriftKind,
-    ForeignKeyDrift,
+    ForeignKeyChangedDrift,
+    ForeignKeyMissingDrift,
+    ForeignKeyNameDrift,
     IndexDrift,
     StorageParameterDeclaredDrift,
     StorageParameterUndeclaredDrift,
@@ -106,34 +108,28 @@ def _plan_drift(drift: Drift) -> PlanItem:
             n is not None
         ):
             return PlanItem(drift, DropConstraintFix(t, n))
-        case ForeignKeyDrift(
-            kind=DriftKind.MISSING,
+        case ForeignKeyMissingDrift(
             table=t,
-            name=cn,
             column=col,
             target_table=tt,
             target_column=tc,
             on_delete_clause=od,
-        ) if cn is not None and col is not None and tt is not None and tc is not None:
-            return PlanItem(drift, AddForeignKeyFix(t, cn, col, tt, tc, od))
-        case ForeignKeyDrift(
-            kind=DriftKind.CHANGED,
+        ):
+            return PlanItem(drift, AddForeignKeyFix(t, drift.name, col, tt, tc, od))
+        case ForeignKeyChangedDrift(
             table=t,
-            name=cn,
             column=col,
             target_table=tt,
             target_column=tc,
             on_delete_clause=od,
-        ) if cn is not None and col is not None and tt is not None and tc is not None:
-            return PlanItem(drift, ReplaceForeignKeyFix(t, cn, col, tt, tc, od))
-        case ForeignKeyDrift(kind=DriftKind.UNVALIDATED, table=t, name=n) if (
-            n is not None
         ):
-            return PlanItem(drift, ValidateConstraintFix(t, n))
-        case ForeignKeyDrift(kind=DriftKind.UNDECLARED, table=t, name=n) if (
-            n is not None
-        ):
-            return PlanItem(drift, DropConstraintFix(t, n))
+            return PlanItem(
+                drift, ReplaceForeignKeyFix(t, drift.name, col, tt, tc, od)
+            )
+        case ForeignKeyNameDrift(kind=DriftKind.UNVALIDATED):
+            return PlanItem(drift, ValidateConstraintFix(drift.table, drift.name))
+        case ForeignKeyNameDrift(kind=DriftKind.UNDECLARED):
+            return PlanItem(drift, DropConstraintFix(drift.table, drift.name))
         case ColumnShouldBeNotNullDrift(has_null_rows=False):
             return PlanItem(drift, SetNotNullFix(drift.table, drift.column))
         case ColumnShouldBeNotNullDrift(has_null_rows=True):

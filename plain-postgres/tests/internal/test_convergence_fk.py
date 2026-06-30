@@ -23,7 +23,10 @@ from plain.postgres.convergence import (
     execute_plan,
     plan_model_convergence,
 )
-from plain.postgres.convergence.analysis import generate_fk_constraint_name
+from plain.postgres.convergence.analysis import (
+    ForeignKeyChangedDrift,
+    generate_fk_constraint_name,
+)
 from plain.postgres.convergence.fixes import ReplaceForeignKeyFix
 
 
@@ -402,11 +405,7 @@ class TestForeignKeyOnDelete:
         with conn.cursor() as cursor:
             analysis = analyze_model(conn, cursor, ChildCascade)
 
-        changed = [
-            d
-            for d in analysis.drifts
-            if isinstance(d, ForeignKeyDrift) and d.kind == DriftKind.CHANGED
-        ]
+        changed = [d for d in analysis.drifts if isinstance(d, ForeignKeyChangedDrift)]
         assert len(changed) == 1
         assert changed[0].actual_action == "a"
         assert changed[0].expected_action == "c"
