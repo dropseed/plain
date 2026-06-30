@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.83.2](https://github.com/dropseed/plain/releases/plain-admin@0.83.2) (2026-06-30)
+
+### What's changed
+
+- Clicking a sorted column header now cycles through three states — ascending, descending, then cleared (back to the default order) — instead of only toggling between ascending and descending. The sort indicators are now icons rather than unicode arrows, an "x" is revealed on hover/focus when the next click will clear the sort, and column headers expose `aria-sort` and descriptive `aria-label`s for screen readers. ([6c3aa8ce99](https://github.com/dropseed/plain/commit/6c3aa8ce99))
+- The active sort now survives pagination, search, and filtering. GET forms that stay on the current list view merge their fields onto the existing query string rather than rebuilding it from scratch, so unrelated state like `order_by` carries over; changing any non-pagination control still resets back to the first page, and forms that navigate elsewhere (e.g. global search) start from a clean query string. ([d6762c0490](https://github.com/dropseed/plain/commit/d6762c0490))
+- Fixed list previews on the global search page never rendering in the compact "preview" style. Preview detection now compares the request path against the admin search URL instead of substring-matching `/search/`, so it works regardless of where the admin is mounted. ([8dd51b733b](https://github.com/dropseed/plain/commit/8dd51b733b))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.83.1](https://github.com/dropseed/plain/releases/plain-admin@0.83.1) (2026-06-26)
 
 ### What's changed
