@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+import enum
 import json
 from typing import Any, Literal
 
 from plain.mcp import MCPResource, MCPTool, MCPToolError, MCPView
 from plain.test import RequestFactory
+
+
+class _Mode(enum.StrEnum):
+    # Module-level so `get_type_hints` can resolve it under
+    # `from __future__ import annotations` (a local class inside a test would
+    # fail to resolve and silently fall back to a permissive schema).
+    FAST = "fast"
+    SLOW = "slow"
 
 
 def _make_request(
@@ -359,6 +368,537 @@ class TestToolExecution:
         assert response["result"]["content"][0]["text"] == "MyMCP"
 
 
+class TestArgumentValidation:
+    """Arguments are validated against the advertised input schema before the
+    tool runs, so bad input becomes a clear tool error (SEP-1303) rather than
+    an opaque failure inside `run()`."""
+
+    def _add_mcp(self) -> type[MCPView]:
+        class Add(MCPTool):
+            def __init__(self, a: int, b: int):
+                self.a = a
+                self.b = b
+
+            def run(self) -> str:
+                return str(self.a + self.b)
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Add]
+
+        return MyMCP
+
+    def _greet_mcp(self) -> type[MCPView]:
+        # Param is `who`, not `name`, to avoid shadowing MCPTool's own `name`
+        # attribute (which is typed `str`, so an optional `str | None` collides).
+        class Greet(MCPTool):
+            def __init__(self, who: str | None = None):
+                self.who = who
+
+            def run(self) -> str:
+                return f"Hello, {self.who}"
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Greet]
+
+        return MyMCP
+
+    def test_wrong_type_rejected_before_run(self, monkeypatch) -> None:
+        # A string where an integer is declared must be rejected up front —
+        # NOT run through `a + b` and logged as a server exception.
+        logged: list[Any] = []
+        monkeypatch.setattr(
+            "plain.mcp.views.log_exception", lambda *a, **k: logged.append(a)
+        )
+
+        response = _call(
+            _instantiate(self._add_mcp()),
+            _make_request(
+                "tools/call", {"name": "Add", "arguments": {"a": "x", "b": 3}}
+            ),
+        )
+        assert response["result"]["isError"] is True
+        assert "'a' must be an integer" in response["result"]["content"][0]["text"]
+        # The whole point: this input error is not logged as a server exception.
+        assert logged == []
+
+    def test_bool_is_not_an_integer(self) -> None:
+        # JSON `true` is a boolean, not an integer — reject it.
+        response = _call(
+            _instantiate(self._add_mcp()),
+            _make_request(
+                "tools/call", {"name": "Add", "arguments": {"a": True, "b": 3}}
+            ),
+        )
+        assert response["result"]["isError"] is True
+        assert "'a' must be an integer" in response["result"]["content"][0]["text"]
+
+    def test_missing_required_argument(self) -> None:
+        response = _call(
+            _instantiate(self._add_mcp()),
+            _make_request("tools/call", {"name": "Add", "arguments": {"a": 1}}),
+        )
+        assert response["result"]["isError"] is True
+        assert (
+            "missing required argument: b" in response["result"]["content"][0]["text"]
+        )
+
+    def test_enum_violation_lists_allowed_values(self) -> None:
+        class SetStatus(MCPTool):
+            def __init__(self, status: Literal["pending", "done"]):
+                self.status = status
+
+            def run(self) -> str:
+                return self.status
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [SetStatus]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request(
+                "tools/call", {"name": "SetStatus", "arguments": {"status": "bogus"}}
+            ),
+        )
+        assert response["result"]["isError"] is True
+        text = response["result"]["content"][0]["text"]
+        assert "'status' must be one of: pending, done" in text
+
+    def test_optional_accepts_null(self) -> None:
+        response = _call(
+            _instantiate(self._greet_mcp()),
+            _make_request("tools/call", {"name": "Greet", "arguments": {"who": None}}),
+        )
+        assert "isError" not in response["result"]
+        assert response["result"]["content"][0]["text"] == "Hello, None"
+
+    def test_optional_rejects_wrong_type_with_null_branch(self) -> None:
+        response = _call(
+            _instantiate(self._greet_mcp()),
+            _make_request("tools/call", {"name": "Greet", "arguments": {"who": 5}}),
+        )
+        assert response["result"]["isError"] is True
+        assert (
+            "'who' must be a string or null" in response["result"]["content"][0]["text"]
+        )
+
+    def test_list_item_type_validated(self) -> None:
+        class Sum(MCPTool):
+            def __init__(self, ids: list[int]):
+                self.ids = ids
+
+            def run(self) -> str:
+                return str(sum(self.ids))
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Sum]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request(
+                "tools/call", {"name": "Sum", "arguments": {"ids": [1, "two", 3]}}
+            ),
+        )
+        assert response["result"]["isError"] is True
+        assert "'ids[1]' must be an integer" in response["result"]["content"][0]["text"]
+
+    def test_object_type_rejects_non_dict(self) -> None:
+        class Store(MCPTool):
+            def __init__(self, payload: dict):
+                self.payload = payload
+
+            def run(self) -> str:
+                return str(self.payload)
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Store]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request(
+                "tools/call", {"name": "Store", "arguments": {"payload": "nope"}}
+            ),
+        )
+        assert response["result"]["isError"] is True
+        assert "'payload' must be an object" in response["result"]["content"][0]["text"]
+
+    def test_unannotated_param_accepts_any_type(self) -> None:
+        # Unannotated params advertise a permissive schema, so a non-string
+        # argument the tool wants must not be rejected by validation.
+        class Store(MCPTool):
+            def __init__(self, data):  # noqa: ANN001
+                self.data = data
+
+            def run(self) -> dict:
+                return self.data
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Store]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request(
+                "tools/call", {"name": "Store", "arguments": {"data": {"k": "v"}}}
+            ),
+        )
+        assert "isError" not in response["result"]
+
+    def test_int_literal_rejects_bool(self) -> None:
+        # Python `True == 1`, but JSON `true` is not a valid integer Literal.
+        class SetLevel(MCPTool):
+            def __init__(self, level: Literal[1, 2, 3]):
+                self.level = level
+
+            def run(self) -> str:
+                return str(self.level)
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [SetLevel]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request(
+                "tools/call", {"name": "SetLevel", "arguments": {"level": True}}
+            ),
+        )
+        assert response["result"]["isError"] is True
+        assert "'level' must be one of" in response["result"]["content"][0]["text"]
+
+    def test_str_enum_literal_accepts_serialized_value(self) -> None:
+        # A Literal over StrEnum members serializes to plain strings in the
+        # advertised schema; the incoming plain string must still validate
+        # (a strict `type() is type()` check would wrongly reject it).
+        class SetMode(MCPTool):
+            def __init__(self, mode: Literal[_Mode.FAST, _Mode.SLOW]):
+                self.mode = mode
+
+            def run(self) -> str:
+                return str(self.mode)
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [SetMode]
+
+        # Guard against the silent-permissive fallback: the schema must really
+        # carry the enum, otherwise this test proves nothing.
+        assert SetMode.input_schema is not None
+        assert SetMode.input_schema["properties"]["mode"]["enum"] == ["fast", "slow"]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request(
+                "tools/call", {"name": "SetMode", "arguments": {"mode": "fast"}}
+            ),
+        )
+        assert "isError" not in response["result"]
+        assert response["result"]["content"][0]["text"] == "fast"
+
+    def test_int_literal_accepts_integral_float(self) -> None:
+        # `1.0` equals integer `1` numerically (JSON Schema treats them equal),
+        # consistent with a bare `int` param accepting `5.0`.
+        class SetLevel(MCPTool):
+            def __init__(self, level: Literal[1, 2, 3]):
+                self.level = level
+
+            def run(self) -> str:
+                return str(self.level)
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [SetLevel]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request(
+                "tools/call", {"name": "SetLevel", "arguments": {"level": 1.0}}
+            ),
+        )
+        assert "isError" not in response["result"]
+
+    def test_malformed_enum_schema_is_permissive(self) -> None:
+        # A hand-written schema with a non-list `enum` must degrade permissively,
+        # not crash validation into a server error.
+        class Custom(MCPTool):
+            input_schema = {
+                "type": "object",
+                "properties": {"x": {"enum": 5}},  # malformed: enum must be a list
+            }
+
+            def __init__(self, x: int):
+                self.x = x
+
+            def run(self) -> str:
+                return str(self.x)
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Custom]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request("tools/call", {"name": "Custom", "arguments": {"x": 1}}),
+        )
+        assert "isError" not in response["result"]
+        assert response["result"]["content"][0]["text"] == "1"
+
+    def test_malformed_enum_with_type_mismatch_reports_clean_error(self) -> None:
+        # A non-list enum alongside a `type`: a value failing the type must
+        # produce a clean tool error via _describe_type, not crash it into a
+        # logged INTERNAL_ERROR.
+        class Custom(MCPTool):
+            input_schema = {
+                "type": "object",
+                "properties": {"x": {"type": "integer", "enum": 99}},
+            }
+
+            def __init__(self, x: int):
+                self.x = x
+
+            def run(self) -> str:
+                return str(self.x)
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Custom]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request("tools/call", {"name": "Custom", "arguments": {"x": "abc"}}),
+        )
+        assert response["result"]["isError"] is True
+        assert "'x' must be an integer" in response["result"]["content"][0]["text"]
+
+    def test_malformed_anyof_schema_is_permissive(self) -> None:
+        class Custom(MCPTool):
+            input_schema = {
+                "type": "object",
+                "properties": {"x": {"anyOf": 5}},  # malformed: anyOf must be a list
+            }
+
+            def __init__(self, x: int):
+                self.x = x
+
+            def run(self) -> str:
+                return str(self.x)
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Custom]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request("tools/call", {"name": "Custom", "arguments": {"x": 1}}),
+        )
+        assert "isError" not in response["result"]
+
+    def test_non_dict_input_schema_is_permissive(self) -> None:
+        class Weird(MCPTool):
+            input_schema = "totally not a schema"  # misconfigured, non-dict
+
+            def __init__(self, x: int):
+                self.x = x
+
+            def run(self) -> str:
+                return str(self.x)
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Weird]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request("tools/call", {"name": "Weird", "arguments": {"x": 1}}),
+        )
+        assert "isError" not in response["result"]
+        assert response["result"]["content"][0]["text"] == "1"
+
+    def test_integral_float_accepted_for_integer(self) -> None:
+        # `5.0` is a valid integer per JSON Schema 2020-12.
+        response = _call(
+            _instantiate(self._add_mcp()),
+            _make_request(
+                "tools/call", {"name": "Add", "arguments": {"a": 5.0, "b": 3}}
+            ),
+        )
+        assert "isError" not in response["result"]
+        assert response["result"]["content"][0]["text"] == "8.0"
+
+    def test_non_integral_float_rejected_for_integer(self) -> None:
+        response = _call(
+            _instantiate(self._add_mcp()),
+            _make_request(
+                "tools/call", {"name": "Add", "arguments": {"a": 5.5, "b": 3}}
+            ),
+        )
+        assert response["result"]["isError"] is True
+        assert "'a' must be an integer" in response["result"]["content"][0]["text"]
+
+    def test_unexpected_kwarg_rejected_downstream(self) -> None:
+        # All required args present plus an extra kwarg: validation is permissive
+        # on unmodeled props, so the extra is caught by the __init__ TypeError.
+        response = _call(
+            _instantiate(self._add_mcp()),
+            _make_request(
+                "tools/call",
+                {"name": "Add", "arguments": {"a": 1, "b": 2, "extra": 3}},
+            ),
+        )
+        assert response["result"]["isError"] is True
+        text = response["result"]["content"][0]["text"]
+        assert "Invalid arguments" in text
+        assert "extra" in text
+
+    def test_list_reports_all_bad_items(self) -> None:
+        class Sum(MCPTool):
+            def __init__(self, ids: list[int]):
+                self.ids = ids
+
+            def run(self) -> str:
+                return str(sum(self.ids))
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Sum]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request(
+                "tools/call", {"name": "Sum", "arguments": {"ids": ["a", 1, "b"]}}
+            ),
+        )
+        assert response["result"]["isError"] is True
+        text = response["result"]["content"][0]["text"]
+        assert "'ids[0]'" in text
+        assert "'ids[2]'" in text
+
+    def test_malformed_property_schema_is_permissive(self) -> None:
+        # A hand-written input_schema with a shorthand (non-dict) property value
+        # must not crash validation into a server error — stay permissive.
+        class Custom(MCPTool):
+            input_schema = {
+                "type": "object",
+                "properties": {"q": "string"},  # malformed: should be a dict
+            }
+
+            def __init__(self, q: str):
+                self.q = q
+
+            def run(self) -> str:
+                return self.q
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Custom]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request("tools/call", {"name": "Custom", "arguments": {"q": "hi"}}),
+        )
+        assert "isError" not in response["result"]
+        assert response["result"]["content"][0]["text"] == "hi"
+
+    def test_hand_written_schema_keywords_are_permissive(self) -> None:
+        # A tool overriding `input_schema` with keywords we don't model
+        # (`oneOf`) must not be falsely rejected — we validate what we can and
+        # pass the rest through to `run()`.
+        class Custom(MCPTool):
+            input_schema = {
+                "type": "object",
+                "properties": {"value": {"oneOf": [{"type": "string"}]}},
+            }
+
+            def __init__(self, value: Any):
+                self.value = value
+
+            def run(self) -> str:
+                return str(self.value)
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Custom]
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request("tools/call", {"name": "Custom", "arguments": {"value": 42}}),
+        )
+        assert "isError" not in response["result"]
+        assert response["result"]["content"][0]["text"] == "42"
+
+    def test_var_keyword_tool_accepts_arbitrary_args(self) -> None:
+        # A **kwargs tool accepts arbitrary extra arguments — the synthetic
+        # `kwargs` param must not be advertised as a required property, or
+        # validation would reject every real call.
+        class Flexible(MCPTool):
+            def __init__(self, **kwargs):  # noqa: ANN003
+                self.kwargs = kwargs
+
+            def run(self) -> dict:
+                return self.kwargs
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Flexible]
+
+        assert Flexible.input_schema is not None
+        assert Flexible.input_schema["properties"] == {}
+        assert "required" not in Flexible.input_schema
+
+        response = _call(
+            _instantiate(MyMCP),
+            _make_request("tools/call", {"name": "Flexible", "arguments": {"foo": 1}}),
+        )
+        assert "isError" not in response["result"]
+
+    def test_named_plus_var_keyword_validates_named_only(self) -> None:
+        class Flexible(MCPTool):
+            def __init__(self, name: str, **extra):  # noqa: ANN003
+                self.name = name
+                self.extra = extra
+
+            def run(self) -> str:
+                return self.name
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = [Flexible]
+
+        schema = Flexible.input_schema
+        assert schema is not None
+        assert schema["required"] == ["name"]
+        assert "extra" not in schema["properties"]
+
+        # Wrong-typed named arg still rejected...
+        bad = _call(
+            _instantiate(MyMCP),
+            _make_request("tools/call", {"name": "Flexible", "arguments": {"name": 5}}),
+        )
+        assert bad["result"]["isError"] is True
+
+        # ...but a named arg plus arbitrary extras passes.
+        ok = _call(
+            _instantiate(MyMCP),
+            _make_request(
+                "tools/call",
+                {"name": "Flexible", "arguments": {"name": "x", "y": 2}},
+            ),
+        )
+        assert "isError" not in ok["result"]
+
+    def test_non_object_arguments_rejected(self) -> None:
+        response = _call(
+            _instantiate(self._add_mcp()),
+            _make_request("tools/call", {"name": "Add", "arguments": [1, 2]}),
+        )
+        assert response["result"]["isError"] is True
+        assert "must be an object" in response["result"]["content"][0]["text"]
+
+
 class TestToolMetadata:
     def test_tool_subclass_name_defaults_to_classname(self) -> None:
         class Greet(MCPTool):
@@ -550,12 +1090,13 @@ class TestSchemaGeneration:
         }
         assert "name" not in schema.get("required", [])
 
-    def test_unannotated_param_is_required_string(self) -> None:
-        """Unannotated params should fall through to permissive string, not null.
+    def test_unannotated_param_is_required_and_permissive(self) -> None:
+        """Unannotated params fall through to a permissive empty schema.
 
-        A required-looking arg with no annotation must stay required and
-        accept a string — treating it as optional-null would silently let
-        clients skip the field.
+        A required-looking arg with no annotation must stay required, but its
+        schema must not constrain the type — advertising `string` would make
+        validation wrongly reject a dict/int the tool actually wanted (and
+        treating it as optional-null would silently let clients skip it).
         """
 
         class Fn(MCPTool):
@@ -571,7 +1112,7 @@ class TestSchemaGeneration:
 
         schema = _instantiate(MyMCP).tools[0].input_schema
         assert schema is not None
-        assert schema["properties"]["thing"]["type"] == "string"
+        assert schema["properties"]["thing"] == {}
         assert "thing" in schema["required"]
 
 
