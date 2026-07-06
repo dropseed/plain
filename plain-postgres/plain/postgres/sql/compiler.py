@@ -1275,7 +1275,7 @@ class SQLCompiler:
                     yield LOOKUP_SEP.join(path)
                 if klass_info is not None:
                     queue.extend(
-                        (path, related_klass_info)  # type: ignore[invalid-argument-type]
+                        (path, related_klass_info)
                         for related_klass_info in klass_info.get(
                             "related_klass_infos", []
                         )
