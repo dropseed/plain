@@ -20,12 +20,12 @@ from .formatting import PlainContext
 from .install import install
 from .memory import memory
 from .preflight import preflight_cli
+from .python import python, shell
 from .registry import cli_registry
 from .request import request
 from .scaffold import create
 from .server import server
 from .settings import settings
-from .shell import run, shell
 from .upgrade import upgrade
 from .urls import urls
 from .utils import utils
@@ -57,8 +57,8 @@ plain_cli.add_command(utils)
 plain_cli.add_command(urls)
 plain_cli.add_command(changelog)
 plain_cli.add_command(settings)
+plain_cli.add_command(python)
 plain_cli.add_command(shell)
-plain_cli.add_command(run)
 plain_cli.add_command(install)
 plain_cli.add_command(upgrade)
 plain_cli.add_command(server)

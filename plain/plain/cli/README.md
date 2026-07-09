@@ -137,41 +137,48 @@ Pass `cls=SettingOption` and `setting="SETTING_NAME"` to any `@click.option`. Th
 
 `SettingOption` cannot be combined with `envvar=` or `default=` — the setting is the single source of truth for both the default value and environment variable resolution.
 
-## Shell
+## Python
 
-The `plain shell` command starts an interactive Python shell with your Plain app already loaded.
+The `plain python` command behaves like the `python` interpreter, but always runs `plain.runtime.setup()` first so your settings, models, and packages are ready. It covers every mode the interpreter does:
+
+```bash
+$ plain python                  # interactive REPL
+$ plain python -c "..."         # execute a string, then exit
+$ plain python script.py        # run a file as __main__
+$ plain python -                # execute stdin, then exit
+$ echo "..." | plain python     # execute piped input
+```
+
+For one-off commands, use the `-c` flag; for scripts, pass the file:
+
+```bash
+$ plain python -c "from app.users.models import User; print(User.query.count())"
+$ plain python scripts/import_data.py
+```
+
+Arguments after the script are passed through as `sys.argv`, just like `python script.py arg1 arg2`.
+
+If you have IPython installed, the REPL uses it automatically. You can also specify an interface explicitly:
+
+```bash
+$ plain python --interface ipython
+$ plain python --interface bpython
+$ plain python --interface python
+```
+
+### Shell
+
+`plain shell` is a shortcut to the interactive REPL — the same thing as running `plain python` with no arguments. Use it if that name is more familiar:
 
 ```bash
 $ plain shell
 ```
 
-If you have IPython installed, it will be used automatically. You can also specify an interface explicitly:
-
-```bash
-$ plain shell --interface ipython
-$ plain shell --interface bpython
-$ plain shell --interface python
-```
-
-For one-off commands, use the `-c` flag:
-
-```bash
-$ plain shell -c "from app.users.models import User; print(User.query.count())"
-```
-
-### Run a script with app context
-
-The `plain run` command executes a Python script with your app context already set up:
-
-```bash
-$ plain run scripts/import_data.py
-```
-
-This is useful for one-off scripts that need access to your models and settings.
+Only the interactive REPL is enriched (see `SHELL_IMPORT` below). The `-c`, file, and stdin modes run your code as-is with nothing auto-imported, matching how `python` only honors `PYTHONSTARTUP` for interactive sessions.
 
 ### SHELL_IMPORT
 
-Customize what gets imported automatically when the shell starts by setting `SHELL_IMPORT` in your settings:
+Customize what gets imported automatically when the interactive REPL starts by setting `SHELL_IMPORT` in your settings:
 
 ```python
 # app/settings.py
@@ -188,7 +195,7 @@ from app.users.models import User
 __all__ = ["Project", "User"]
 ```
 
-Now when you run `plain shell`, those objects will be automatically imported and available.
+Now when you run `plain python` (or `plain shell`), those objects will be automatically imported and available in the interactive REPL.
 
 ## Built-in commands
 
@@ -197,8 +204,8 @@ Plain includes several built-in commands:
 | Command               | Description                              |
 | --------------------- | ---------------------------------------- |
 | `plain check`         | Run core validation checks               |
-| `plain shell`         | Interactive Python shell                 |
-| `plain run <script>`  | Execute a Python script with app context |
+| `plain python`        | Run Python with the app configured       |
+| `plain shell`         | Interactive Python shell (REPL shortcut) |
 | `plain server`        | Production-ready HTTP server             |
 | `plain preflight`     | Validation checks before deployment      |
 | `plain create <name>` | Create a new local package               |

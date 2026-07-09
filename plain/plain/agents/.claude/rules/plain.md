@@ -114,8 +114,7 @@ Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/pat
 
 - `uv run plain check` — run linting, preflight, migration, and test checks (add `--skip-test` for faster iteration)
 - `uv run plain pre-commit` — `check` plus commit-specific steps (custom commands, uv lock, build)
-- `uv run plain shell` — interactive Python shell with Plain configured (`-c "..."` for one-off commands)
-- `uv run plain run script.py` — run a script with Plain configured
+- `uv run plain python` — Python with Plain configured; like the `python` interpreter (`-c "..."` for one-off commands, `plain python script.py` to run a file, stdin for piped input). `uv run plain shell` is a shortcut to the interactive REPL.
 - `uv run plain request /path` — test HTTP request against the dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`). Add `--json` for context-frugal output — response metadata and trace analysis (query counts, N+1s, span tree), no response body.
 
 ## Debugging and verifying changes
@@ -124,6 +123,6 @@ Don't guess at errors — reproduce them first, read the traceback, then fix wha
 
 - `uv run plain check` — lint, preflight, migration, and test checks in one shot (add `--skip-test` for faster iteration)
 - `uv run plain request /path` — hit a view and see the full error/stacktrace (`--user`, `--status`, `--contains`, `--not-contains`)
-- `uv run plain shell -c "..."` — run a quick snippet to test behavior in isolation
+- `uv run plain python -c "..."` — run a quick snippet to test behavior in isolation
 - `uv run plain test -x -k test_name` — run a specific failing test, stop on first failure
 - `print()` statements — add them, run the code, read the output, then remove before committing
