@@ -448,7 +448,7 @@ class _WorkerStub(Worker):
 
     def __init__(self, queues: list[str], num_processes: int = 0) -> None:
         self.queues = queues
-        self.executor = _StubExecutor(num_processes)  # type: ignore[assignment]
+        self.executor = _StubExecutor(num_processes)
 
 
 @pytest.fixture
