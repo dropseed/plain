@@ -1,5 +1,17 @@
 # plain-postgres changelog
 
+## [0.111.1](https://github.com/dropseed/plain/releases/plain-postgres@0.111.1) (2026-07-10)
+
+### What's changed
+
+- `suppress_db_tracing` is now documented public API (`plain.postgres.otel.suppress_db_tracing`), with a new [Tracing](https://github.com/dropseed/plain/blob/master/plain-postgres/plain/postgres/README.md#tracing) section in the README. Use it around framework-style housekeeping queries (pollers, gauge callbacks) that run outside any entry span, where each query would otherwise export as its own single-span root trace. ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+- Hardened the schema-convergence invariants behind `plain postgres sync` / `converge` / `schema`: a malformed drift now fails loudly at plan time instead of constructing a fix with missing fields, and column/foreign-key comparison asserts it never silently drops a detected drift. ([cb9aa7087c](https://github.com/dropseed/plain/commit/cb9aa7087c))
+- Internal restructuring of the convergence subsystem: the per-kind drift classes were decomposed into shape dataclasses, and `plain.postgres.convergence` no longer re-exports the drift, fix, and status types — it is an internal subsystem driven through the CLI commands, and its `__init__` now only exposes what the CLI uses. No CLI behavior changes. ([75216e16c9](https://github.com/dropseed/plain/commit/75216e16c9), [2b2e57f876](https://github.com/dropseed/plain/commit/2b2e57f876))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.111.0](https://github.com/dropseed/plain/releases/plain-postgres@0.111.0) (2026-06-30)
 
 ### What's changed
