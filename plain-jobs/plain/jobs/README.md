@@ -230,6 +230,8 @@ The worker integrates with OpenTelemetry for distributed tracing. Spans are crea
 
 Jobs are linked to the originating trace context, allowing you to follow jobs initiated from web requests.
 
+Worker housekeeping is deliberately untraced: the idle job poll, the claim transaction, heartbeat writes, and the gauge queries emit no spans, so an idle worker exports no traces at all. Worker-side failures (a failing claim or heartbeat) still surface as one-off `claim job` / `worker heartbeat` error spans.
+
 Messaging metrics:
 
 - `messaging.client.sent.messages` — counter incremented for each enqueue
