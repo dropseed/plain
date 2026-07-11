@@ -1,3 +1,22 @@
+from __future__ import annotations
+
+
+class JobClassNotRegistered(Exception):
+    """A job_class name has no registered Job class.
+
+    Usually means the class was renamed or removed in a deploy while
+    something still references it — pending database rows (requests,
+    retries, results) or a JOBS_SCHEDULE entry.
+    """
+
+    def __init__(self, job_class_name: str):
+        self.job_class_name = job_class_name
+        super().__init__(
+            f"Job class '{job_class_name}' is not registered — it may have "
+            "been renamed or removed in a deploy."
+        )
+
+
 class DeferJob(Exception):
     """Signal that a job should be deferred and re-tried later.
 
