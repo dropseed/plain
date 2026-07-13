@@ -28,6 +28,7 @@ Runs ruff, ty (type checking), oxlint/oxfmt, and annotation coverage checks with
 
 ## Code Style
 
-- Add `from __future__ import annotations` at the top of Python files
+- Functions with more than one parameter should make them keyword-only (`def send(*, to, subject)`) — explicit call sites, safer refactors
+- Don't accept or pass through `**kwargs` blindly — spell out real parameters so type checking works at call sites
 - Keep imports at the top of the file unless avoiding circular imports
 - Don't include args/returns in docstrings if already type annotated
