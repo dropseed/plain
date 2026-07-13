@@ -111,10 +111,10 @@ class Manager:
 
         def _terminate(signum: int, frame: FrameType | None) -> None:
             sig = signal.Signals(signum)
-            self._system_print("{} received\n".format(SIGNALS[sig]["name"]))
+            self.system_print("{} received\n".format(SIGNALS[sig]["name"]))
             self.returncode = SIGNALS[sig]["rc"]
             if self._terminating:
-                self._system_print("forcing immediate shutdown\n")
+                self.system_print("forcing immediate shutdown\n")
                 self.kill()
             else:
                 self.terminate()
@@ -138,12 +138,12 @@ class Manager:
                     self._printer.write(msg)
                 elif msg.type == "start":
                     self._processes[msg.name]["pid"] = msg.data["pid"]
-                    self._system_print(
+                    self.system_print(
                         "{} started (pid={})\n".format(msg.name, msg.data["pid"])
                     )
                 elif msg.type == "stop":
                     self._processes[msg.name]["returncode"] = msg.data["returncode"]
-                    self._system_print(
+                    self.system_print(
                         "{} stopped (rc={})\n".format(msg.name, msg.data["returncode"])
                     )
                     if self.returncode is None:
@@ -190,7 +190,7 @@ class Manager:
         for n in for_termination:
             p = self._processes[n]
             signame = "SIGKILL" if force else "SIGTERM"
-            self._system_print(
+            self.system_print(
                 "sending {} to {} (pid {})\n".format(signame, n, p["pid"])
             )
             if force:
@@ -217,7 +217,7 @@ class Manager:
     def _any_stopped(self) -> bool:
         return any(p.get("returncode") is not None for _, p in self._processes.items())
 
-    def _system_print(self, data: str) -> None:
+    def system_print(self, data: str) -> None:
         self._printer.write(
             Message(
                 type="line",
