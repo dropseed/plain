@@ -24,10 +24,11 @@ class LoginLinkFormView(AuthView, FormView[LoginLinkForm]):
     success_url = reverse_lazy("loginlink:sent")
 
     def get(self) -> Response:
-        # Redirect if the user is already logged in
+        # Redirect if the user is already logged in. The form is never
+        # validated on a GET (no cleaned_data), so "next" comes straight
+        # from the query string, like LoginLinkSentView.
         if self.user:
-            form = self.get_form()
-            return RedirectResponse(self.get_success_url(form))
+            return RedirectResponse(self.request.query_params.get("next", "/"))
 
         return super().get()
 
