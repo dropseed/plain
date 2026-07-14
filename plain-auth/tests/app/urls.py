@@ -42,7 +42,8 @@ class WhoView(AuthView):
     login_required = True
 
     def get(self):
-        return Response(self.user.username)
+        # login_required guarantees an authenticated user here.
+        return Response(self.user.username)  # ty: ignore[unresolved-attribute]
 
 
 class ProtectedView(AuthView):

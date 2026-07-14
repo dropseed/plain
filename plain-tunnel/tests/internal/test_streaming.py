@@ -8,7 +8,17 @@ guard the internal behavior rather than a public contract.
 from __future__ import annotations
 
 import httpx
-from conftest import make_client
+
+from plain.tunnel.client import TunnelClient
+
+
+def make_client(*, subdomain="myapp", tunnel_host="plaintunnel.com"):
+    return TunnelClient(
+        destination_url="http://localhost:8000",
+        subdomain=subdomain,
+        tunnel_host=tunnel_host,
+        log_level="WARNING",
+    )
 
 
 def test_streaming_response_detected_by_content_type():

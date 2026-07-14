@@ -1,13 +1,15 @@
 """Tests for individual security audits.
 
 Each audit reads a ``requests.Response`` off the scanner and returns an
-``AuditResult``. We drive them with synthetic responses (see
-``conftest.make_response``) so no network access is required.
+``AuditResult``. We drive them with synthetic responses so no network access
+is required.
 """
 
 from __future__ import annotations
 
-from conftest import make_response
+import requests
+from requests.cookies import RequestsCookieJar
+from requests.structures import CaseInsensitiveDict
 
 from plain.scan.audits import (
     ContentTypeOptionsAudit,
@@ -17,6 +19,17 @@ from plain.scan.audits import (
     TLSAudit,
 )
 from plain.scan.scanner import Scanner
+
+
+def make_response(*, headers=None, status_code=200, url="https://example.com/"):
+    """Build a synthetic ``requests.Response`` for driving audits offline."""
+    response = requests.Response()
+    response.status_code = status_code
+    response.url = url
+    response.headers = CaseInsensitiveDict(headers or {})
+    response.history = []
+    response.cookies = RequestsCookieJar()
+    return response
 
 
 def run_audit(audit, **response_kwargs):

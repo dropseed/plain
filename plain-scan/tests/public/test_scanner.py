@@ -7,9 +7,23 @@ used so the TLS audit short-circuits instead of opening a socket.
 
 from __future__ import annotations
 
-from conftest import make_response
+import requests
+from requests.cookies import RequestsCookieJar
+from requests.structures import CaseInsensitiveDict
 
 from plain.scan.scanner import Scanner
+
+
+def make_response(*, headers=None, status_code=200, url="https://example.com/"):
+    """Build a synthetic ``requests.Response`` for driving the scanner offline."""
+    response = requests.Response()
+    response.status_code = status_code
+    response.url = url
+    response.headers = CaseInsensitiveDict(headers or {})
+    response.history = []
+    response.cookies = RequestsCookieJar()
+    return response
+
 
 SECURE_HEADERS = {
     "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",

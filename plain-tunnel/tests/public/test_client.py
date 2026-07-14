@@ -5,9 +5,16 @@ passes on the command line.
 
 from __future__ import annotations
 
-from conftest import make_client
+from plain.tunnel.client import PROTOCOL_VERSION, TunnelClient
 
-from plain.tunnel.client import PROTOCOL_VERSION
+
+def make_client(*, subdomain="myapp", tunnel_host="plaintunnel.com"):
+    return TunnelClient(
+        destination_url="http://localhost:8000",
+        subdomain=subdomain,
+        tunnel_host=tunnel_host,
+        log_level="WARNING",
+    )
 
 
 def test_remote_host_uses_secure_urls():

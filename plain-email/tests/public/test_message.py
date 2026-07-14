@@ -87,7 +87,7 @@ def test_string_recipient_is_rejected():
             subject="Hi",
             body="Body",
             from_email="from@example.com",
-            to="not-a-list@example.com",
+            to="not-a-list@example.com",  # ty: ignore[invalid-argument-type]
         )
 
 
@@ -117,7 +117,10 @@ def test_html_alternative_produces_multipart_alternative():
 
     assert msg.is_multipart()
     assert msg.get_content_subtype() == "alternative"
-    payload_types = {part.get_content_type() for part in msg.get_payload()}
+    payload_types = {
+        part.get_content_type()  # ty: ignore[unresolved-attribute]
+        for part in msg.get_payload()
+    }
     assert payload_types == {"text/plain", "text/html"}
 
 
