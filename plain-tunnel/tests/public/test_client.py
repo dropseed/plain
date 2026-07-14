@@ -1,21 +1,13 @@
-"""Tests for TunnelClient's pure setup logic: how it derives the tunnel
-HTTP/WebSocket URLs from its options, and how it classifies responses.
+"""Tests for TunnelClient's public setup: how it derives the tunnel HTTP and
+WebSocket URLs from the destination/subdomain/tunnel-host options a user
+passes on the command line.
 """
 
 from __future__ import annotations
 
-import httpx
+from conftest import make_client
 
-from plain.tunnel.client import PROTOCOL_VERSION, TunnelClient
-
-
-def make_client(*, subdomain="myapp", tunnel_host="plaintunnel.com"):
-    return TunnelClient(
-        destination_url="http://localhost:8000",
-        subdomain=subdomain,
-        tunnel_host=tunnel_host,
-        log_level="WARNING",
-    )
+from plain.tunnel.client import PROTOCOL_VERSION
 
 
 def test_remote_host_uses_secure_urls():
@@ -46,18 +38,3 @@ def test_loopback_ip_uses_insecure_urls():
 def test_websocket_url_carries_protocol_version():
     client = make_client()
     assert client.tunnel_websocket_url.endswith(f"?v={PROTOCOL_VERSION}")
-
-
-def test_streaming_response_detected_by_content_type():
-    client = make_client()
-
-    sse = httpx.Response(200, headers={"content-type": "text/event-stream"})
-    assert client._is_streaming_response(sse) is True
-
-
-def test_non_streaming_response_is_not_flagged():
-    client = make_client()
-
-    for content_type in ("application/json", "text/html; charset=utf-8", ""):
-        response = httpx.Response(200, headers={"content-type": content_type})
-        assert client._is_streaming_response(response) is False
