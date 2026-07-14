@@ -29,6 +29,8 @@ plain-cache
 plain-jobs
 plain-flags
 plain-connect
+plain-cloud
+plain-portal
 plain-admin
 plain-oauth
 plain-auth
