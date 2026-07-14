@@ -32,6 +32,8 @@ plain-connect
 plain-cloud
 plain-portal
 plain-scan
+plain-redirection
+plain-tunnel
 plain-admin
 plain-oauth
 plain-auth
