@@ -1,5 +1,6 @@
 import datetime
 
+import pytest
 from app.users.models import User
 
 from plain.oauth.models import OAuthConnection
@@ -289,164 +290,92 @@ def test_dummy_connect(db, settings):
     assert OAuthConnection.query.count() == 1
 
 
-# def test_dummy_disconnect_to_password(db, client, settings):
-#     settings.OAUTH_LOGIN_PROVIDERS = {
-#         "dummy": {
-#             "class": "test_providers.DummyProvider",
-#             "kwargs": {
-#                 "client_id": "dummy_client_id",
-#                 "client_secret": "dummy_client_secret",
-#                 "scope": "dummy_scope",
-#             },
-#         }
-#     }
-
-#     assert User.query.count() == 0
-#     assert OAuthConnection.query.count() == 0
-
-#     # Create a user
-#     user = User.query.create(
-#         username="dummy_username", email="dummy@example.com", password="dummy_password"
-#     )
-#     OAuthConnection.query.create(
-#         user=user,
-#         provider_key="dummy",
-#         provider_user_id="dummy_id",
-#         access_token="dummy_access_token",
-#         refresh_token="dummy_refresh_token",
-#         access_token_expires_at=datetime.datetime(
-#             2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
-#         ),
-#         refresh_token_expires_at=datetime.datetime(
-#             2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
-#         ),
-#     )
-
-#     assert User.query.count() == 1
-#     assert OAuthConnection.query.count() == 1
-
-#     client.force_login(user)
-
-#     # Raises a BadRequest error - can't disconnect the last connection without a password
-#     response = client.post(
-#         "/oauth/dummy/disconnect/", data={"provider_user_id": "dummy_id"}
-#     )
-#     assert response.status_code == 302
-#     assert response.url == "/"
-
-#     assert User.query.count() == 1
-#     assert OAuthConnection.query.count() == 0
+def _configure_dummy(settings):
+    settings.OAUTH_LOGIN_PROVIDERS = {
+        "dummy": {
+            "class": "test_providers.DummyProvider",
+            "kwargs": {
+                "client_id": "dummy_client_id",
+                "client_secret": "dummy_client_secret",
+                "scope": "dummy_scope",
+            },
+        }
+    }
 
 
-# def test_dummy_disconnect_to_connection(db, client, settings):
-#     settings.OAUTH_LOGIN_PROVIDERS = {
-#         "dummy": {
-#             "class": "test_providers.DummyProvider",
-#             "kwargs": {
-#                 "client_id": "dummy_client_id",
-#                 "client_secret": "dummy_client_secret",
-#                 "scope": "dummy_scope",
-#             },
-#         }
-#     }
-
-#     assert User.query.count() == 0
-#     assert OAuthConnection.query.count() == 0
-
-#     # Create a user
-#     user = User.query.create(
-#         username="dummy_username", email="dummy@example.com"
-#     )
-#     OAuthConnection.query.create(
-#         user=user,
-#         provider_key="dummy",
-#         provider_user_id="dummy_id",
-#         access_token="dummy_access_token",
-#         refresh_token="dummy_refresh_token",
-#         access_token_expires_at=datetime.datetime(
-#             2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
-#         ),
-#         refresh_token_expires_at=datetime.datetime(
-#             2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
-#         ),
-#     )
-#     OAuthConnection.query.create(
-#         user=user,
-#         provider_key="dummy",
-#         provider_user_id="dummy_id2",
-#         access_token="dummy_access_token",
-#         refresh_token="dummy_refresh_token",
-#         access_token_expires_at=datetime.datetime(
-#             2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
-#         ),
-#         refresh_token_expires_at=datetime.datetime(
-#             2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
-#         ),
-#     )
-
-#     assert User.query.count() == 1
-#     assert OAuthConnection.query.count() == 2
-
-#     client.force_login(user)
-
-#     # Raises a BadRequest error - can't disconnect the last connection without a password
-#     response = client.post(
-#         "/oauth/dummy/disconnect/", data={"provider_user_id": "dummy_id"}
-#     )
-#     assert response.status_code == 302
-#     assert response.url == "/"
-
-#     assert User.query.count() == 1
-#     assert OAuthConnection.query.count() == 1
+def _make_connection(user, provider_user_id="dummy_id"):
+    return OAuthConnection.query.create(
+        user=user,
+        provider_key="dummy",
+        provider_user_id=provider_user_id,
+        access_token="dummy_access_token",
+        refresh_token="dummy_refresh_token",
+    )
 
 
-# def test_dummy_disconnect_last(db, client, settings):
-#     settings.OAUTH_LOGIN_PROVIDERS = {
-#         "dummy": {
-#             "class": "test_providers.DummyProvider",
-#             "kwargs": {
-#                 "client_id": "dummy_client_id",
-#                 "client_secret": "dummy_client_secret",
-#                 "scope": "dummy_scope",
-#             },
-#         }
-#     }
+def test_dummy_disconnect_removes_own_connection(db, settings):
+    _configure_dummy(settings)
 
-#     assert User.query.count() == 0
-#     assert OAuthConnection.query.count() == 0
+    user = User.query.create(username="dummy_username", email="dummy@example.com")
+    _make_connection(user)
+    _make_connection(user, provider_user_id="dummy_id2")
 
-#     # Create a user
-#     user = User.query.create(
-#         username="dummy_username", email="dummy@example.com"
-#     )
-#     OAuthConnection.query.create(
-#         user=user,
-#         provider_key="dummy",
-#         provider_user_id="dummy_id",
-#         access_token="dummy_access_token",
-#         refresh_token="dummy_refresh_token",
-#         access_token_expires_at=datetime.datetime(
-#             2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
-#         ),
-#         refresh_token_expires_at=datetime.datetime(
-#             2020, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
-#         ),
-#     )
+    client = Client()
+    client.force_login(user)
 
-#     assert User.query.count() == 1
-#     assert OAuthConnection.query.count() == 1
+    response = client.post(
+        "/oauth/dummy/disconnect", data={"provider_user_id": "dummy_id"}
+    )
 
-#     client.force_login(user)
+    assert response.status_code == 302
+    assert OAuthConnection.query.filter(user=user).count() == 1
+    assert not OAuthConnection.query.filter(
+        user=user, provider_user_id="dummy_id"
+    ).exists()
 
-#     # Raises a BadRequest error - can't disconnect the last connection without a password
-#     response = client.post(
-#         "/oauth/dummy/disconnect/", data={"provider_user_id": "dummy_id"}
-#     )
-#     assert response.status_code == 400
-#     assert response.templates[0].name == "oauth/error.html"
 
-#     assert User.query.count() == 1
-#     assert OAuthConnection.query.count() == 1
+def test_dummy_disconnect_cannot_remove_another_users_connection(db, settings):
+    """A logged-in user must not be able to disconnect a connection that
+    belongs to a different user by supplying its provider_user_id."""
+    _configure_dummy(settings)
+
+    victim = User.query.create(username="victim", email="victim@example.com")
+    _make_connection(victim, provider_user_id="victim_provider_id")
+
+    attacker = User.query.create(username="attacker", email="attacker@example.com")
+    _make_connection(attacker, provider_user_id="attacker_provider_id")
+
+    client = Client()
+    client.force_login(attacker)
+
+    # Attacker targets the victim's connection. The user-scoped lookup finds
+    # nothing for the attacker, so the request errors instead of deleting.
+    with pytest.raises(OAuthConnection.DoesNotExist):
+        client.post(
+            "/oauth/dummy/disconnect",
+            data={"provider_user_id": "victim_provider_id"},
+        )
+
+    # The victim's connection is untouched.
+    assert OAuthConnection.query.filter(
+        user=victim, provider_user_id="victim_provider_id"
+    ).exists()
+
+
+def test_dummy_disconnect_requires_login(db, settings):
+    _configure_dummy(settings)
+
+    user = User.query.create(username="dummy_username", email="dummy@example.com")
+    _make_connection(user)
+
+    # Not logged in -> redirected to login, connection preserved.
+    response = Client().post(
+        "/oauth/dummy/disconnect", data={"provider_user_id": "dummy_id"}
+    )
+
+    assert response.status_code == 302
+    assert "/login" in response.url
+    assert OAuthConnection.query.count() == 1
 
 
 def test_dummy_refresh(db, settings, monkeypatch):

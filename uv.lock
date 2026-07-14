@@ -922,12 +922,20 @@ dependencies = [
     { name = "keyring" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "keyring", specifier = ">=24.0.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest" }]
 
 [[package]]
 name = "plain-code"
@@ -1312,6 +1320,11 @@ dependencies = [
     { name = "websockets" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
@@ -1319,6 +1332,9 @@ requires-dist = [
     { name = "spake2", specifier = ">=0.9" },
     { name = "websockets", specifier = ">=14.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-postgres"
@@ -1381,11 +1397,19 @@ dependencies = [
     { name = "plain-postgres" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-postgres", editable = "plain-postgres" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-scan"
@@ -1517,12 +1541,20 @@ dependencies = [
     { name = "websockets" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "plain", editable = "plain" },
     { name = "websockets", specifier = ">=14.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest" }]
 
 [[package]]
 name = "plain-vendor"

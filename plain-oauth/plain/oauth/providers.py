@@ -160,8 +160,13 @@ class OAuthProvider(ABC):
 
     def handle_disconnect_request(self, *, request: Request) -> Response:
         provider_user_id = request.form_data["provider_user_id"]
+        # Scope to the requesting user so one user can't disconnect another
+        # user's connection by supplying their provider_user_id.
+        user = get_request_user(request)
         connection = OAuthConnection.query.get(
-            provider_key=self.provider_key, provider_user_id=provider_user_id
+            user=user,
+            provider_key=self.provider_key,
+            provider_user_id=provider_user_id,
         )
         connection.delete()
         redirect_url = self.get_disconnect_redirect_url(request=request)

@@ -21,23 +21,11 @@ class StatusCodeAudit(Audit):
         """Check if the final response has a valid status code."""
         response = scanner.fetch()
 
-        # Get status code from response
-        status_code = response.status_code if response else None
-
-        if status_code is None:
-            return AuditResult(
-                name=self.name,
-                detected=True,
-                required=self.required,
-                checks=[
-                    CheckResult(
-                        name="status-code",
-                        passed=False,
-                        message="Unable to determine HTTP status code",
-                    )
-                ],
-                description=self.description,
-            )
+        # fetch() always returns a Response here — it raises on failure, and
+        # scan() skips this audit when the fetch failed. Don't guard with
+        # `if response`: requests.Response.__bool__ is response.ok, which is
+        # False for the 4xx/5xx codes this audit exists to report.
+        status_code = response.status_code
 
         # Check for server errors (5xx)
         if 500 <= status_code < 600:
