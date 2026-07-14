@@ -43,11 +43,10 @@ def test_session_cookie_is_reused(db):
     key_after_set = client.cookies[SESSION_COOKIE].value
 
     client.get("/get")
-    key_after_get = client.cookies.get(SESSION_COOKIE)
 
-    # Reading an existing session shouldn't rotate the key.
-    if key_after_get is not None:
-        assert key_after_get.value == key_after_set
+    # Reading an existing session shouldn't rotate the key; the client keeps
+    # sending the same cookie.
+    assert client.cookies[SESSION_COOKIE].value == key_after_set
     assert Session.query.filter(session_key=key_after_set).exists()
 
 
