@@ -50,7 +50,7 @@ def test_from_value_round_trip():
 
 
 def test_from_value_rejects_unknown():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="not a valid value"):
         DatetimeRangeAliases.from_value("Some Nonsense Range")
 
 
