@@ -31,6 +31,7 @@ plain-flags
 plain-connect
 plain-cloud
 plain-portal
+plain-scan
 plain-admin
 plain-oauth
 plain-auth

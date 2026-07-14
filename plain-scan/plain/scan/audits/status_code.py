@@ -22,7 +22,10 @@ class StatusCodeAudit(Audit):
         response = scanner.fetch()
 
         # Get status code from response
-        status_code = response.status_code if response else None
+        # NB: use an explicit None check — requests.Response.__bool__ returns
+        # response.ok, which is False for 4xx/5xx, so `if response` would
+        # discard the very error codes this audit exists to report.
+        status_code = response.status_code if response is not None else None
 
         if status_code is None:
             return AuditResult(
