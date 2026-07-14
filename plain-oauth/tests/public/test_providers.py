@@ -329,10 +329,9 @@ def test_dummy_disconnect_removes_own_connection(db, settings):
 
     assert response.status_code == 302
     assert OAuthConnection.query.filter(user=user).count() == 1
-    assert (
-        OAuthConnection.query.filter(user=user, provider_user_id="dummy_id").exists()
-        is False
-    )
+    assert not OAuthConnection.query.filter(
+        user=user, provider_user_id="dummy_id"
+    ).exists()
 
 
 def test_dummy_disconnect_cannot_remove_another_users_connection(db, settings):
