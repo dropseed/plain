@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.151.2](https://github.com/dropseed/plain/releases/plain@0.151.2) (2026-07-10)
+
+### What's changed
+
+- Fixed the `plain preflight` summary counting a check as a warning when all of its issues were silenced — a fully-silenced check now counts as neither a warning nor an error. The CLI summary and the cached check counts (used by `plain check`) now share the same tally logic, so the two can no longer disagree. ([abe4ffcae7](https://github.com/dropseed/plain/commit/abe4ffcae7))
+- The shipped agents rule for OTel instrumentation now documents the quieter worker tracing behavior from plain-jobs 0.56.1 (idle ticks emit no spans; claim/heartbeat failures get one-off error spans). ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.151.1](https://github.com/dropseed/plain/releases/plain@0.151.1) (2026-06-26)
 
 ### What's changed

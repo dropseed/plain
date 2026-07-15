@@ -20,6 +20,7 @@ from plain.views.base import View
 
 from .exceptions import MCPInvalidParams, MCPToolError, MCPUnauthorized
 from .resources import MCPResource
+from .schema import validate_arguments
 from .tools import MCPTool
 
 tracer = trace.get_tracer("plain.mcp")
@@ -331,19 +332,21 @@ class MCPView(View):
         # hit this same "unknown" path — existence isn't leaked.
         tool_cls = next((t for t in self.get_tools() if t.name == tool_name), None)
         if tool_cls is None:
-            return {
-                "content": [{"type": "text", "text": f"Unknown tool: {tool_name}"}],
-                "isError": True,
-            }
+            return _tool_error(f"Unknown tool: {tool_name}")
 
+        # Validate against the advertised input schema before instantiating, so a
+        # bad-typed argument returns a clear, model-fixable tool error instead of
+        # failing inside `run()` and being logged as a server exception (SEP-1303).
         arguments = params.get("arguments", {})
+        if validation_errors := validate_arguments(
+            tool_cls.input_schema or {}, arguments
+        ):
+            return _tool_error("Invalid arguments: " + "; ".join(validation_errors))
+
         try:
             tool = tool_cls(**arguments)
         except TypeError as e:
-            return {
-                "content": [{"type": "text", "text": f"Invalid arguments: {e}"}],
-                "isError": True,
-            }
+            return _tool_error(f"Invalid arguments: {e}")
         tool.mcp = self
 
         try:
@@ -351,17 +354,11 @@ class MCPView(View):
         except MCPToolError as e:
             # Expected, caller-facing failure — surface the message via the
             # in-result error channel and don't log it as a server exception.
-            return {
-                "content": [{"type": "text", "text": str(e)}],
-                "isError": True,
-            }
+            return _tool_error(str(e))
         except Exception as e:
             # Unexpected bug — log for the operator, stay opaque to the caller.
             log_exception(self.request, e)
-            return {
-                "content": [{"type": "text", "text": "Tool execution failed"}],
-                "isError": True,
-            }
+            return _tool_error("Tool execution failed")
 
         return {"content": _to_content_blocks(result)}
 
@@ -438,6 +435,11 @@ class MCPView(View):
 
 
 _CONTENT_BLOCK_TYPES = {"text", "image", "audio", "resource", "resource_link"}
+
+
+def _tool_error(text: str) -> dict[str, Any]:
+    """A `tools/call` result carrying a caller-facing failure via `isError`."""
+    return {"content": [{"type": "text", "text": text}], "isError": True}
 
 
 def _b64(data: bytes) -> str:

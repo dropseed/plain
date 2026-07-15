@@ -10,8 +10,28 @@ class IndexView(SessionView):
         return Response("test")
 
 
+class SetView(SessionView):
+    def get(self):
+        self.session["value"] = self.request.query_params.get("value", "bar")
+        return Response("set")
+
+
+class GetView(SessionView):
+    def get(self):
+        return Response(self.session.get("value", "<none>"))
+
+
+class FlushView(SessionView):
+    def post(self):
+        self.session.flush()
+        return Response("flushed")
+
+
 class AppRouter(Router):
     namespace = ""
     urls = [
         path("", IndexView),
+        path("set", SetView),
+        path("get", GetView),
+        path("flush", FlushView),
     ]

@@ -15,22 +15,21 @@ from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
-from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 
 from plain.logs import get_framework_logger
 from plain.postgres import transaction
 from plain.postgres.db import return_database_connection
+from plain.postgres.otel import suppress_db_tracing
 from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.module_loading import import_string
 from plain.utils.os import get_cpu_count
-from plain.utils.otel import format_exception_type
 
-from .otel import WorkerMetrics, tracer
+from .otel import WorkerMetrics, emit_error_consumer_span, record_span_error, tracer
 from .registry import jobs_registry
 
 if TYPE_CHECKING:
-    from .models import JobResult
+    from .models import JobProcess, JobResult
 
 # Models are NOT imported at the top of this file!
 # See comment on _worker_process_initializer() for explanation.
@@ -104,6 +103,13 @@ class Worker:
 
         self._is_shutting_down = False
 
+        # Maintenance baselines — each task runs when its interval has
+        # elapsed since these, so construction counts as the starting point.
+        now = time.time()
+        self._stats_logged_at = now
+        self._job_results_checked_at = now
+        self._jobs_schedule_checked_at = now
+
         self.worker_id = uuid.uuid4()
         self._hostname = socket.gethostname()
         self._pid = os.getpid()
@@ -142,7 +148,10 @@ class Worker:
             },
         )
 
-        self.register_heartbeat()
+        # Heartbeat writes here run outside any entry span — suppress their
+        # DB tracing so they don't export as single-span root traces.
+        with suppress_db_tracing():
+            self.register_heartbeat()
         self._run_loop()
         self._drain_with_heartbeat()
         # Only reached on clean exit. On error/interrupt, control unwinds past
@@ -150,7 +159,8 @@ class Worker:
         # up our in-flight jobs as LOST. Deleting the row here on error would
         # lie about being alive and strand any JobProcess rows still stamped
         # with this worker_id.
-        self.deregister_heartbeat()
+        with suppress_db_tracing():
+            self.deregister_heartbeat()
 
     def _discard_inflight(self, future: Future) -> None:
         with self._inflight_lock:
@@ -178,14 +188,17 @@ class Worker:
             # Sleep up to 1s, waking early if any future completes.
             wait(snapshot, timeout=1)
             try:
-                self.maybe_heartbeat()
+                # No entry span is active during drain — suppress the
+                # heartbeat's DB tracing so each drain tick doesn't export
+                # a single-span root trace.
+                with suppress_db_tracing():
+                    self.maybe_heartbeat()
             except Exception as e:
                 logger.exception(e)
         logger.info("Job worker shutdown complete")
 
     def _run_loop(self) -> None:
-        # Lazy import - see _worker_process_initializer() comment for why
-        from .models import JobRequest
+        consecutive_claim_failures = 0
 
         while not self._is_shutting_down:
             # Return last tick's pooled connection so the next checkout
@@ -194,23 +207,26 @@ class Worker:
             # the loop doesn't hold a pool slot while idle between ticks.
             return_database_connection()
 
-            with tracer.start_as_current_span(
-                "worker loop", kind=trace.SpanKind.CONSUMER
-            ) as span:
-                try:
-                    self.maybe_heartbeat()
-                    self.maybe_log_stats()
-                    self.maybe_check_job_results()
-                    self.maybe_schedule_jobs()
-                except Exception as e:
-                    # The catch is inside the span, so the SDK's auto-record
-                    # on context exit won't fire — stamp the canonical
-                    # failure signal explicitly. Log and continue: these
-                    # tasks are ancillary to the main job processing.
-                    span.record_exception(e)
-                    span.set_status(trace.StatusCode.ERROR)
-                    span.set_attribute(ERROR_TYPE, format_exception_type(e))
-                    logger.exception(e)
+            # Only open the span when maintenance will actually run — a
+            # fully-idle tick exports no telemetry at all, instead of a
+            # single-span root trace per second per worker. A new maybe_*
+            # call here needs its due-predicate added to _maintenance_due().
+            if self._maintenance_due():
+                with tracer.start_as_current_span(
+                    "worker loop", kind=trace.SpanKind.CONSUMER
+                ) as span:
+                    try:
+                        self.maybe_heartbeat()
+                        self.maybe_log_stats()
+                        self.maybe_check_job_results()
+                        self.maybe_schedule_jobs()
+                    except Exception as e:
+                        # The catch is inside the span, so the SDK's auto-record
+                        # on context exit won't fire — stamp the canonical
+                        # failure signal explicitly. Log and continue: these
+                        # tasks are ancillary to the main job processing.
+                        record_span_error(span, e)
+                        logger.exception(e)
 
             # Re-check shutdown after maintenance — a signal may have arrived
             # between the loop condition and now. Don't pick up new work.
@@ -230,38 +246,38 @@ class Worker:
                 time.sleep(0.5)
                 continue
 
-            with transaction.atomic():
-                job_request = (
-                    JobRequest.query.ready_to_run()
-                    .filter(queue__in=self.queues)
-                    .select_for_update(skip_locked=True)
-                    .order_by("-priority", "-start_at", "-created_at")
-                    .first()
-                )
-                if not job_request:
-                    # Potentially no jobs to process (who knows for how long)
-                    # but sleep for a second to give the CPU and DB a break
-                    time.sleep(1)
-                    continue
+            try:
+                job = self._claim_job()
+                consecutive_claim_failures = 0
+            except Exception as e:
+                # A transient DB failure while claiming shouldn't kill the
+                # worker. With the claim's CLIENT spans suppressed there is
+                # no entry span to carry the failure, so emit one.
+                emit_error_consumer_span("claim job", e)
+                logger.exception(e)
+                consecutive_claim_failures += 1
+                if consecutive_claim_failures >= 30:
+                    # This isn't a blip (e.g. schema drift or lost table
+                    # permissions while the heartbeat table stays healthy).
+                    # Crash so the supervisor restarts us visibly instead of
+                    # looping forever while reporting a fresh heartbeat.
+                    raise
+                time.sleep(1)
+                continue
 
-                logger.debug(
-                    "Preparing to execute job",
-                    extra={
-                        "job_class": job_request.job_class,
-                        "job_request_uuid": job_request.uuid,
-                        "job_priority": job_request.priority,
-                        "job_source": job_request.source,
-                        "job_queue": job_request.queue,
-                    },
-                )
-
-                job = job_request.convert_to_job_process(worker_id=self.worker_id)
+            if job is None:
+                # Potentially no jobs to process (who knows for how long)
+                # but sleep for a second to give the CPU and DB a break
+                time.sleep(1)
+                continue
 
             # Signal may have fired during the DB queries above. Don't submit
             # new work past shutdown — revert the JobProcess back to a
             # JobRequest so the next worker generation picks it up.
             if self._is_shutting_down:
-                job.revert_to_job_request()
+                # No entry span here either — same suppression as the claim.
+                with suppress_db_tracing():
+                    job.revert_to_job_request()
                 break
 
             job_process_uuid = str(job.uuid)  # Make a str copy
@@ -287,8 +303,46 @@ class Worker:
                     "Process pool broken, re-enqueuing job",
                     extra={"job_process_uuid": job_process_uuid},
                 )
-                job.revert_to_job_request()
+                # No entry span here either — same suppression as the claim.
+                with suppress_db_tracing():
+                    job.revert_to_job_request()
                 break
+
+    def _claim_job(self) -> JobProcess | None:
+        """Atomically claim the next ready JobRequest as a JobProcess, or
+        return None when the queues are empty.
+
+        The poll is framework housekeeping that fires every ~1s per worker,
+        outside any entry span — untraced, its CLIENT spans would each export
+        as a single-span root trace. Suppress the whole claim transaction;
+        the meaningful telemetry for a claimed job is the `process {queue}`
+        CONSUMER span emitted later by JobProcess.run().
+        """
+        # Lazy import - see _worker_process_initializer() comment for why
+        from .models import JobRequest
+
+        with suppress_db_tracing(), transaction.atomic():
+            job_request = (
+                JobRequest.query.ready_to_run()
+                .filter(queue__in=self.queues)
+                .select_for_update(skip_locked=True)
+                .order_by("-priority", "-start_at", "-created_at")
+                .first()
+            )
+            if not job_request:
+                return None
+
+            logger.debug(
+                "Preparing to execute job",
+                extra={
+                    "job_class": job_request.job_class,
+                    "job_request_uuid": job_request.uuid,
+                    "job_priority": job_request.priority,
+                    "job_source": job_request.source,
+                    "job_queue": job_request.queue,
+                },
+            )
+            return job_request.convert_to_job_process(worker_id=self.worker_id)
 
     def shutdown(self) -> None:
         if self._is_shutting_down:
@@ -301,30 +355,47 @@ class Worker:
         # executor.shutdown(wait=True) here would let our row go stale.
         self._is_shutting_down = True
 
-    def maybe_log_stats(self) -> None:
-        if not self.stats_every:
-            return
+    def _maintenance_due(self) -> bool:
+        """At least one maybe_* task will do real work this tick.
 
+        Checked before opening the `worker loop` span so a fully-idle tick
+        emits no telemetry at all. Any task that is due gets wrapped in the
+        span — it's the OTel error-attribution entry span for maintenance.
+
+        Keep these predicates in lockstep with the maybe_* calls in
+        _run_loop — a task missing here only runs when another task happens
+        to be due.
+        """
         now = time.time()
+        return (
+            self._heartbeat_due(now)
+            or self._stats_due(now)
+            or self._job_results_check_due(now)
+            or self._schedule_due(now)
+        )
 
-        if not hasattr(self, "_stats_logged_at"):
-            self._stats_logged_at = now
+    def _stats_due(self, now: float) -> bool:
+        if not self.stats_every:
+            return False
+        return now - self._stats_logged_at > self.stats_every
 
-        if now - self._stats_logged_at > self.stats_every:
-            self._stats_logged_at = now
-            self.log_stats()
+    def maybe_log_stats(self) -> None:
+        now = time.time()
+        if not self._stats_due(now):
+            return
+        self._stats_logged_at = now
+        self.log_stats()
+
+    def _job_results_check_due(self, now: float) -> bool:
+        # Only need to check once a minute
+        return now - self._job_results_checked_at > 60
 
     def maybe_check_job_results(self) -> None:
         now = time.time()
-
-        if not hasattr(self, "_job_results_checked_at"):
-            self._job_results_checked_at = now
-
-        check_every = 60  # Only need to check once a minute
-
-        if now - self._job_results_checked_at > check_every:
-            self._job_results_checked_at = now
-            self.rescue_job_results()
+        if not self._job_results_check_due(now):
+            return
+        self._job_results_checked_at = now
+        self.rescue_job_results()
 
     def _create_heartbeat_row(self) -> None:
         # Lazy import - see _worker_process_initializer() comment for why
@@ -362,7 +433,9 @@ class Worker:
         except Exception as e:
             # Registration failure is non-fatal — maybe_heartbeat will retry.
             # Until it succeeds, _heartbeat_registered stays False and the run
-            # loop won't claim work.
+            # loop won't claim work. That's serious enough to deserve error
+            # attribution, and there's no entry span here to carry it.
+            emit_error_consumer_span("worker heartbeat", e)
             logger.exception(e)
             logger.warning(
                 "Worker heartbeat registration failed; worker will not claim "
@@ -370,12 +443,15 @@ class Worker:
                 extra={"worker_id": str(self.worker_id)},
             )
 
+    def _heartbeat_due(self, now: float) -> bool:
+        return (
+            not self._heartbeat_registered
+            or now - self._heartbeat_at >= settings.JOBS_HEARTBEAT_INTERVAL
+        )
+
     def maybe_heartbeat(self) -> None:
         now = time.time()
-        if (
-            self._heartbeat_registered
-            and now - self._heartbeat_at < settings.JOBS_HEARTBEAT_INTERVAL
-        ):
+        if not self._heartbeat_due(now):
             return
 
         try:
@@ -388,7 +464,11 @@ class Worker:
             # loop stops claiming work until the next tick succeeds. If the
             # DB is unreachable for long enough, our row goes stale and
             # rescue marks our jobs LOST — that's the intended behavior.
+            # The catch swallows the exception, so stamp the failure on its
+            # own CONSUMER span — otherwise a heartbeat outage exports only
+            # healthy-looking spans (or, during drain, nothing at all).
             self._heartbeat_registered = False
+            emit_error_consumer_span("worker heartbeat", e)
             logger.exception(e)
 
     def deregister_heartbeat(self) -> None:
@@ -414,44 +494,46 @@ class Worker:
             # heartbeat goes stale.
             logger.exception(e)
 
-    def maybe_schedule_jobs(self) -> None:
+    def _schedule_due(self, now: float) -> bool:
         if not self.jobs_schedule:
+            return False
+        # Only need to check once every 60 seconds
+        return now - self._jobs_schedule_checked_at > 60
+
+    def maybe_schedule_jobs(self) -> None:
+        if not self._schedule_due(time.time()):
             return
 
-        now = time.time()
+        for job, schedule in self.jobs_schedule:
+            next_start_at = schedule.next()
 
-        if not hasattr(self, "_jobs_schedule_checked_at"):
-            self._jobs_schedule_checked_at = now
+            # Leverage the concurrency_key to group scheduled jobs
+            # with the same start time
+            schedule_concurrency_key = f"{job.default_concurrency_key()}:scheduled:{int(next_start_at.timestamp())}"
 
-        check_every = 60  # Only need to check once every 60 seconds
-
-        if now - self._jobs_schedule_checked_at > check_every:
-            for job, schedule in self.jobs_schedule:
-                next_start_at = schedule.next()
-
-                # Leverage the concurrency_key to group scheduled jobs
-                # with the same start time
-                schedule_concurrency_key = f"{job.default_concurrency_key()}:scheduled:{int(next_start_at.timestamp())}"
-
-                # Job's should_enqueue hook can control scheduling behavior
-                result = job.run_in_worker(
-                    delay=next_start_at,
-                    concurrency_key=schedule_concurrency_key,
+            # Job's should_enqueue hook can control scheduling behavior
+            result = job.run_in_worker(
+                delay=next_start_at,
+                concurrency_key=schedule_concurrency_key,
+            )
+            # Result is None if should_enqueue returned False
+            if result:
+                logger.info(
+                    "Scheduling job",
+                    extra={
+                        "job_class": result.job_class,
+                        "job_queue": result.queue,
+                        "job_start_at": result.start_at,
+                        "job_schedule": schedule,
+                        "concurrency_key": result.concurrency_key,
+                    },
                 )
-                # Result is None if should_enqueue returned False
-                if result:
-                    logger.info(
-                        "Scheduling job",
-                        extra={
-                            "job_class": result.job_class,
-                            "job_queue": result.queue,
-                            "job_start_at": result.start_at,
-                            "job_schedule": schedule,
-                            "concurrency_key": result.concurrency_key,
-                        },
-                    )
 
-            self._jobs_schedule_checked_at = now
+        # Stamp only after the whole pass succeeds — a mid-pass failure
+        # (caught by the worker-loop catch) then retries next tick instead
+        # of waiting out the window and skipping the missed occurrence.
+        # Re-runs are deduped by the scheduled concurrency_key.
+        self._jobs_schedule_checked_at = time.time()
 
     def log_stats(self) -> None:
         # Lazy import - see _worker_process_initializer() comment for why
@@ -554,78 +636,96 @@ def future_finished_callback(job_process_uuid: str, future: Future) -> None:
     # Lazy import - see _worker_process_initializer() comment for why
     from .models import JobProcess, JobResultStatuses
 
+    # This callback runs on the executor's done-callback thread with no entry
+    # span active, so suppress DB tracing — otherwise the orphan-check query
+    # on every completed job (and the conversions on cancel/failure) each
+    # export as a single-span root trace, scaling with job volume. The
+    # suppression is for framework bookkeeping only: Job.on_aborted is user
+    # code, so its dispatch is deferred to after the suppressed block
+    # (fire_hook=False here, dispatch_aborted_hook below).
+    aborted_result: JobResult | None = None
     try:
-        if future.cancelled():
-            logger.warning(
-                "Job cancelled", extra={"job_process_uuid": job_process_uuid}
-            )
-            try:
-                job = JobProcess.query.get(uuid=job_process_uuid)
-                job.convert_to_result(status=JobResultStatuses.CANCELLED)
-            except JobProcess.DoesNotExist:
-                # Job may have already been cleaned up
-                pass
-        elif exception := future.exception():
-            # Process pool may have been killed (OOM/segfault), or process_job
-            # itself raised past its outer except (e.g. import failure).
-            logger.warning(
-                "Job failed",
-                extra={"job_process_uuid": job_process_uuid},
-                exc_info=exception,
-            )
-            try:
-                job = JobProcess.query.get(uuid=job_process_uuid)
-                # If started_at is set, run() was actively executing when the
-                # process died — user code may have set up state it expected to
-                # tear down. Use LOST so on_aborted fires. If started_at is
-                # unset, run() never got to execute (import failure, etc.), so
-                # ERRORED with no hook is correct.
-                if job.started_at is not None:
-                    status = JobResultStatuses.LOST
-                else:
-                    status = JobResultStatuses.ERRORED
-                job.convert_to_result(
-                    status=status,
-                    error="".join(traceback.format_exception(exception)),
+        with suppress_db_tracing():
+            if future.cancelled():
+                logger.warning(
+                    "Job cancelled", extra={"job_process_uuid": job_process_uuid}
                 )
-            except JobProcess.DoesNotExist:
-                # Job may have already been cleaned up
-                pass
-        else:
-            logger.debug("Job finished", extra={"job_process_uuid": job_process_uuid})
-            # Orphan check: process_job's outer except-Exception swallows any
-            # failure that escapes job.run() (middleware crash, OTel error, DB
-            # blip during convert_to_result, etc.). The future completes cleanly
-            # but the JobProcess row was never converted, and since our parent
-            # is still heartbeating, rescue_stale_workers won't see it as orphaned.
-            job = JobProcess.query.filter(uuid=job_process_uuid).first()
-            if job is None:
-                return
-            logger.warning(
-                "Job future completed but JobProcess survived; converting to ERRORED",
-                extra={"job_process_uuid": job_process_uuid},
-            )
-            try:
-                job.convert_to_result(
-                    status=JobResultStatuses.ERRORED,
-                    error="Job future completed without recording a result",
+                try:
+                    job = JobProcess.query.get(uuid=job_process_uuid)
+                    aborted_result = job.convert_to_result(
+                        status=JobResultStatuses.CANCELLED, fire_hook=False
+                    )
+                except JobProcess.DoesNotExist:
+                    # Job may have already been cleaned up
+                    pass
+            elif exception := future.exception():
+                # Process pool may have been killed (OOM/segfault), or process_job
+                # itself raised past its outer except (e.g. import failure).
+                logger.warning(
+                    "Job failed",
+                    extra={"job_process_uuid": job_process_uuid},
+                    exc_info=exception,
                 )
-            except Exception:
-                # A peer rescuer may have already created a JobResult(LOST) for
-                # this row, in which case the unique constraint on
-                # JobResult.job_process_uuid trips. Either way, the row is now
-                # accounted for — log and move on rather than letting the
-                # exception escape into the executor's done-callback machinery.
-                logger.exception(
-                    "Failed to convert orphan JobProcess to ERRORED",
+                try:
+                    job = JobProcess.query.get(uuid=job_process_uuid)
+                    # If started_at is set, run() was actively executing when the
+                    # process died — user code may have set up state it expected to
+                    # tear down. Use LOST so on_aborted fires. If started_at is
+                    # unset, run() never got to execute (import failure, etc.), so
+                    # ERRORED with no hook is correct.
+                    if job.started_at is not None:
+                        status = JobResultStatuses.LOST
+                    else:
+                        status = JobResultStatuses.ERRORED
+                    result = job.convert_to_result(
+                        status=status,
+                        error="".join(traceback.format_exception(exception)),
+                        fire_hook=False,
+                    )
+                    if status == JobResultStatuses.LOST:
+                        aborted_result = result
+                except JobProcess.DoesNotExist:
+                    # Job may have already been cleaned up
+                    pass
+            else:
+                logger.debug(
+                    "Job finished", extra={"job_process_uuid": job_process_uuid}
+                )
+                # Orphan check: process_job's outer except-Exception swallows any
+                # failure that escapes job.run() (middleware crash, OTel error, DB
+                # blip during convert_to_result, etc.). The future completes cleanly
+                # but the JobProcess row was never converted, and since our parent
+                # is still heartbeating, rescue_stale_workers won't see it as orphaned.
+                job = JobProcess.query.filter(uuid=job_process_uuid).first()
+                if job is None:
+                    return
+                logger.warning(
+                    "Job future completed but JobProcess survived; converting to ERRORED",
                     extra={"job_process_uuid": job_process_uuid},
                 )
+                try:
+                    job.convert_to_result(
+                        status=JobResultStatuses.ERRORED,
+                        error="Job future completed without recording a result",
+                    )
+                except Exception:
+                    # A peer rescuer may have already created a JobResult(LOST) for
+                    # this row, in which case the unique constraint on
+                    # JobResult.job_process_uuid trips. Either way, the row is now
+                    # accounted for — log and move on rather than letting the
+                    # exception escape into the executor's done-callback machinery.
+                    logger.exception(
+                        "Failed to convert orphan JobProcess to ERRORED",
+                        extra={"job_process_uuid": job_process_uuid},
+                    )
+
+        if aborted_result is not None:
+            aborted_result.dispatch_aborted_hook()
     finally:
-        # This callback runs on the executor's done-callback thread, which
-        # gets its own thread-local pooled connection. Return it after each
-        # callback for the same reasons the run loop returns its connection
-        # every tick: checkout re-validation, and not holding a pool slot
-        # while idle.
+        # The done-callback thread gets its own thread-local pooled
+        # connection. Return it after each callback for the same reasons
+        # the run loop returns its connection every tick: checkout
+        # re-validation, and not holding a pool slot while idle.
         return_database_connection()
 
 
@@ -644,13 +744,7 @@ def process_job(job_process_uuid: str) -> None:
             # entry-span home in OTel (e.g. a psycopg transient on this read
             # would otherwise leave only a CLIENT span, which entry-span
             # filtering excludes).
-            with tracer.start_as_current_span(
-                "process job",
-                kind=trace.SpanKind.CONSUMER,
-            ) as span:
-                span.record_exception(e)
-                span.set_status(trace.StatusCode.ERROR)
-                span.set_attribute(ERROR_TYPE, format_exception_type(e))
+            emit_error_consumer_span("process job", e)
             raise
 
         logger.info(

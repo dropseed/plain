@@ -185,10 +185,10 @@ class Job(metaclass=JobType):
 
                         return job_request
             except Exception as e:
-                # Stamps escaped=True on the span event, ERROR_TYPE on both
-                # the span and `metric_attributes` (so the finally below
-                # picks up the failed-send branch).
-                record_span_error(span, e, metric_attributes)
+                # Stamp ERROR_TYPE on the span and copy it into
+                # `metric_attributes` so the finally below picks up the
+                # failed-send branch.
+                metric_attributes[ERROR_TYPE] = record_span_error(span, e)
                 raise
             finally:
                 # Skipped enqueues are visible on the span (`job.enqueue.skipped`)

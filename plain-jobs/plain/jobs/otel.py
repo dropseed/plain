@@ -26,6 +26,7 @@ from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from plain.postgres import Q
 from plain.postgres.aggregates import Count, Min
 from plain.postgres.db import return_database_connection
+from plain.postgres.otel import suppress_db_tracing
 from plain.utils import timezone
 from plain.utils.otel import format_exception_type
 
@@ -58,20 +59,24 @@ queue_wait_duration_histogram = meter.create_histogram(
 )
 
 
-def record_span_error(
-    span: trace.Span,
-    exc: BaseException,
-    metric_attributes: dict[str, Any],
-) -> str:
-    """Mark the span as failed, stamp error.type on it and on the per-call
-    metric attribute dict, and return the error.type string so the caller
-    can forward it to other instruments."""
+def record_span_error(span: trace.Span, exc: BaseException) -> str:
+    """Mark the span as failed, stamp error.type on it, and return the
+    error.type string so the caller can forward it to other instruments
+    (e.g. per-call metric attributes)."""
     error_type = format_exception_type(exc)
     span.record_exception(exc)
     span.set_status(trace.StatusCode.ERROR)
     span.set_attribute(ERROR_TYPE, error_type)
-    metric_attributes[ERROR_TYPE] = error_type
     return error_type
+
+
+def emit_error_consumer_span(name: str, exc: BaseException) -> None:
+    """Open a one-off CONSUMER span solely to carry a failure that has no
+    other entry span — a DB error before the span that would normally own
+    the work is ever reached. Stamps the canonical failure signal so the
+    error lands in entry-span error attribution."""
+    with tracer.start_as_current_span(name, kind=trace.SpanKind.CONSUMER) as span:
+        record_span_error(span, exc)
 
 
 def process_metric_attributes(queue: str, job_class: str) -> dict[str, Any]:
@@ -104,29 +109,39 @@ def record_consumed(result: JobResult, *, error_type: str | None = None) -> None
     consumed_messages_counter.add(1, attrs)
 
 
-def _release_db_connection(
+def _gauge_db_queries(
     callback: Callable[..., Iterable[Observation]],
 ) -> Callable[..., Iterable[Observation]]:
-    """Return a gauge callback's database connection to the pool once its
-    observation has been collected.
+    """Wrap a gauge callback that queries the database.
 
     OTel runs observable-gauge callbacks on the PeriodicExportingMetricReader
-    thread, which has no request or job lifecycle to recycle connections.
-    Left unreturned, that thread's connection wrapper holds a single pooled
-    connection idle between export intervals — long enough for the server (or
-    a pooler) to close it. The next interval then reuses the dead connection
-    and raises `OperationalError: the connection is closed`. Returning it each
-    interval means every callback starts from a freshly checked-out connection.
+    thread, which has no request or job lifecycle — that shapes both concerns
+    handled here:
+
+    - Suppress DB span tracing for the callback's queries. No entry span is
+      active on this thread, so each query would otherwise export as its own
+      single-span root trace — per gauge, per export interval, forever.
+    - Return the connection to the pool once the observation has been
+      collected. Left unreturned, this thread's connection wrapper holds a
+      single pooled connection idle between export intervals — long enough
+      for the server (or a pooler) to close it. The next interval then reuses
+      the dead connection and raises `OperationalError: the connection is
+      closed`. Returning it each interval means every callback starts from a
+      freshly checked-out connection.
     """
 
     @wraps(callback)
     def wrapper(
         cls: type[WorkerMetrics], options: CallbackOptions
     ) -> Iterable[Observation]:
-        try:
-            return callback(cls, options)
-        finally:
-            return_database_connection()
+        with suppress_db_tracing():
+            try:
+                # list() is load-bearing: the SDK iterates the result after
+                # this wrapper exits, so a lazy iterable would run its
+                # queries un-suppressed on an already-returned connection.
+                return list(callback(cls, options))
+            finally:
+                return_database_connection()
 
     return wrapper
 
@@ -223,7 +238,7 @@ class WorkerMetrics:
         return [Observation(n)]
 
     @classmethod
-    @_release_db_connection
+    @_gauge_db_queries
     def _gauge_queue_depth(cls, options: CallbackOptions) -> Iterable[Observation]:
         active = cls._current
         if active is None:
@@ -234,7 +249,7 @@ class WorkerMetrics:
         return _count_per_queue(JobRequest.query.ready_to_run(), active.worker.queues)
 
     @classmethod
-    @_release_db_connection
+    @_gauge_db_queries
     def _gauge_queue_oldest_age(cls, options: CallbackOptions) -> Iterable[Observation]:
         active = cls._current
         if active is None:
@@ -262,7 +277,7 @@ class WorkerMetrics:
         ]
 
     @classmethod
-    @_release_db_connection
+    @_gauge_db_queries
     def _gauge_queue_scheduled(cls, options: CallbackOptions) -> Iterable[Observation]:
         active = cls._current
         if active is None:
@@ -272,7 +287,7 @@ class WorkerMetrics:
         return _count_per_queue(JobRequest.query.scheduled(), active.worker.queues)
 
     @classmethod
-    @_release_db_connection
+    @_gauge_db_queries
     def _gauge_running(cls, options: CallbackOptions) -> Iterable[Observation]:
         active = cls._current
         if active is None:
@@ -287,7 +302,7 @@ class WorkerMetrics:
     # is shared across both observations so a row landing exactly at the
     # boundary can't be counted in both states (or neither).
     @classmethod
-    @_release_db_connection
+    @_gauge_db_queries
     def _gauge_workers(cls, options: CallbackOptions) -> Iterable[Observation]:
         from .models import WorkerHeartbeat, heartbeat_cutoff
 

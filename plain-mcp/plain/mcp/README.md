@@ -71,6 +71,8 @@ Every tool is an [`MCPTool`](./tools.py#MCPTool) subclass. Arguments from the cl
 - **Description** comes from the class docstring (used verbatim — override with `description = "..."`)
 - **Input schema** is derived from `__init__`'s typed signature; override by setting `input_schema = {...}` if you need custom per-parameter descriptions or JSON Schema features
 
+**Argument validation.** Incoming arguments are checked against the derived input schema before your `__init__` runs, so a wrong-typed or missing argument comes back as a clear `isError` message the model can fix (`"'limit' must be an integer"`) instead of blowing up inside `run()` and being logged as a server bug. Validation covers the shapes plain-mcp derives from type hints (primitives, `Literal` enums, `list[T]`, `T | None`); if you hand-write `input_schema` with richer JSON Schema (`oneOf`, `$ref`, numeric bounds), those keywords pass through untouched — validate them in `__init__` or `run()` yourself.
+
 ```python
 class SearchOrders(MCPTool):
     """Search orders by customer name or order ID."""

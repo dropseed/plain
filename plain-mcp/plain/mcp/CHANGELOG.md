@@ -1,5 +1,17 @@
 # plain-mcp changelog
 
+## [0.3.0](https://github.com/dropseed/plain/releases/plain-mcp@0.3.0) (2026-07-10)
+
+### What's changed
+
+- `tools/call` arguments are now validated against the tool's advertised input schema before the tool is instantiated. A missing or wrong-typed argument comes back as a clear, model-fixable `isError` message (e.g. `Invalid arguments: 'limit' must be an integer`) instead of blowing up inside `run()` and being logged as a server exception. Validation covers the schema shapes derived from type hints — primitives, `Literal[...]` enums, `list[T]`, `T | None` — and follows JSON Schema semantics (booleans are not integers; `5.0` is a valid integer). If you hand-write an `input_schema` with richer JSON Schema keywords (`oneOf`, `$ref`, `pattern`, numeric bounds), those pass through unvalidated — check them in `__init__` or `run()` yourself. ([04e6309f7b](https://github.com/dropseed/plain/commit/04e6309f7b))
+- Parameters with no annotation, `Any`, or an unrecognized type now advertise a permissive empty schema (accepts any JSON value) instead of `{"type": "string"}`, so clients are no longer steered into sending strings for values that aren't. ([04e6309f7b](https://github.com/dropseed/plain/commit/04e6309f7b))
+- `*args` / `**kwargs` parameters on a tool's `__init__` are no longer advertised as schema properties — previously a `**kwargs` tool advertised a required `kwargs` property that no client could ever satisfy. ([04e6309f7b](https://github.com/dropseed/plain/commit/04e6309f7b))
+
+### Upgrade instructions
+
+- No changes required for tools whose type hints match what clients actually send. If a tool was knowingly accepting schema-mismatched arguments (e.g. a param annotated `int` that clients send as a string), those calls are now rejected before `__init__` — loosen the annotation (or hand-write `input_schema`) to keep accepting them.
+
 ## [0.2.1](https://github.com/dropseed/plain/releases/plain-mcp@0.2.1) (2026-06-30)
 
 ### What's changed

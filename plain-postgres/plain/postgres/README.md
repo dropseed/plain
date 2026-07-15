@@ -18,6 +18,7 @@
 - [Forms](#forms)
 - [Architecture](#architecture)
 - [Diagnostics](#diagnostics)
+- [Tracing](#tracing)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -1417,6 +1418,21 @@ These are static, code-level checks that catch issues before you deploy. The `di
 - **LLM-powered column recommendations for missing indexes** — `missing_index_candidates` shows the culprit queries and lets you decide. For precise column-level suggestions, use a platform tool (PlanetScale Insights, Dexter, pg_qualstats + hypopg).
 - **Historical trending** — `diagnose` is stateless; it reports on the current state of cumulative stats. Continuous monitoring is out of scope.
 - **Niche server checks** (WAL bloat, replication slot age, etc.) — better covered by your Postgres provider's monitoring or a dedicated tool; users on self-hosted setups that need them typically have their own tooling.
+
+## Tracing
+
+Every query runs inside an OpenTelemetry `CLIENT` span with standard `db.*` attributes, so queries show up as children of whatever request, job, or chore triggered them. You don't configure anything for this — it's on by default and only exports if your app exports traces (e.g. with [plain.connect](../../../plain-connect/plain/connect/README.md)).
+
+If code runs a query with _no_ active span — a background thread, a polling loop — that query's span becomes its own single-span trace. For framework-internal housekeeping queries where that's pure noise, you can suppress query tracing entirely:
+
+```python
+from plain.postgres.otel import suppress_db_tracing
+
+with suppress_db_tracing():
+    MyModel.query.count()  # No span, no query metrics
+```
+
+This is meant for infrastructure code (pollers, metric gauge callbacks, test fixtures) — not for hiding application queries, which you almost always want visible in traces.
 
 ## Settings
 

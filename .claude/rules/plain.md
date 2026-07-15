@@ -83,7 +83,8 @@ If the exception propagates out of the span context, the SDK auto-records and se
 - View 5xx attachment — `plain/views/base.py:_respond_to_exception` (records on the SERVER span via `_finalize_span`)
 - Job enqueue — PRODUCER (`plain-jobs/jobs/jobs.py`)
 - Job execute — CONSUMER (`plain-jobs/jobs/models.py`), plus a fallback CONSUMER span in `plain-jobs/jobs/workers.py:process_job` that catches lookup-time failures before `run()` is reached
-- Worker maintenance loop — CONSUMER (`plain-jobs/jobs/workers.py`)
+- Worker maintenance loop — CONSUMER (`plain-jobs/jobs/workers.py`), opened only on ticks where a maintenance task is due — fully idle ticks emit no spans at all
+- Worker claim/heartbeat failures — one-off `claim job` / `worker heartbeat` CONSUMER error spans via `emit_error_consumer_span` (`plain-jobs/jobs/otel.py`); the claim transaction, heartbeat writes, gauge queries, and done-callback bookkeeping are otherwise untraced (`plain.postgres.otel.suppress_db_tracing`)
 - Chore execution — CONSUMER (`plain/cli/chores.py`)
 - MCP RPC dispatch — SERVER (`plain-mcp/mcp/views.py`)
 
