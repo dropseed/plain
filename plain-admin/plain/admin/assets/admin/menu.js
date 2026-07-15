@@ -1,12 +1,13 @@
 /**
- * Admin menu — filter input inside the menu popover, plus drag-and-drop
- * reordering for pinned tabs in the header strip. The popover's
- * open/close behavior comes from basecoat (assets/admin/components/popover.js)
- * — this file only wires the filter and the tab DnD.
+ * Admin menu — the filter inside the menu popover (filtering + empty state),
+ * plus drag-and-drop reordering for pinned tabs in the header strip. The
+ * popover's open/close behavior comes from basecoat
+ * (assets/admin/components/popover.js).
  */
 document.addEventListener("DOMContentLoaded", () => {
   const filterInput = document.getElementById("menu-filter-input");
   const menuPopover = document.getElementById("admin-menu-popover");
+  const emptyState = document.getElementById("menu-empty-state");
 
   if (filterInput) {
     filterInput.addEventListener("input", (e) => {
@@ -67,7 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // Hide the App / Packages section entirely if nothing under it
+    // Hide a whole section (label, divider, and all) if nothing under it
     // matches.
     sections.forEach((section) => {
       const hasVisibleItems = Array.from(section.querySelectorAll(".menu-item")).some(
@@ -75,6 +76,14 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       section.classList.toggle("hidden", !hasVisibleItems);
     });
+
+    // Show the empty state when the filter matched nothing.
+    if (emptyState) {
+      const anyVisible = Array.from(container.querySelectorAll(".menu-item")).some(
+        (item) => !item.classList.contains("hidden"),
+      );
+      emptyState.classList.toggle("hidden", anyVisible);
+    }
   }
 
   // Drag and drop for nav bar tabs (pinned items only)
