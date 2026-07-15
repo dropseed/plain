@@ -1,5 +1,16 @@
 # plain-postgres changelog
 
+## [0.111.2](https://github.com/dropseed/plain/releases/plain-postgres@0.111.2) (2026-07-15)
+
+### What's changed
+
+- The `setup_db` pytest fixture is now pytest-xdist aware: each worker gets its own test database (`gw0_<db>`, `gw1_<db>`, …), so `plain test -n <N>` runs in parallel without workers colliding while creating, migrating, and dropping the same database. Off-xdist the database name is unchanged (`test_<db>`). ([a8880771d2](https://github.com/dropseed/plain/commit/a8880771d2))
+- Removed an unnecessary `type: ignore` comment in the SQL compiler. ([2a1bf46f13](https://github.com/dropseed/plain/commit/2a1bf46f13))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.111.1](https://github.com/dropseed/plain/releases/plain-postgres@0.111.1) (2026-07-10)
 
 ### What's changed
