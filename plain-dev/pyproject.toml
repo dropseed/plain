@@ -12,7 +12,6 @@ dependencies = [
   "click>=8.0.0",
   "requests>=2.0.0",
   "rich",
-  "inotify",
 ]
 
 [project.entry-points."plain.setup"]
