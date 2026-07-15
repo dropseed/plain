@@ -1,4 +1,4 @@
-import requests
+import httpx
 
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
@@ -9,7 +9,7 @@ class GitLabOAuthProvider(OAuthProvider):
     def _get_token(self, request_data):
         request_data["client_id"] = self.get_client_id()
         request_data["client_secret"] = self.get_client_secret()
-        response = requests.post(
+        response = httpx.post(
             "https://gitlab.com/oauth/token",
             headers={
                 "Accept": "application/json",
@@ -42,7 +42,7 @@ class GitLabOAuthProvider(OAuthProvider):
         )
 
     def get_oauth_user(self, *, oauth_token):
-        response = requests.get(
+        response = httpx.get(
             "https://gitlab.com/api/v4/user",
             headers={
                 "Authorization": f"Bearer {oauth_token.access_token}",

@@ -22,9 +22,8 @@ class StatusCodeAudit(Audit):
         response = scanner.fetch()
 
         # fetch() always returns a Response here — it raises on failure, and
-        # scan() skips this audit when the fetch failed. Don't guard with
-        # `if response`: requests.Response.__bool__ is response.ok, which is
-        # False for the 4xx/5xx codes this audit exists to report.
+        # scan() skips this audit when the fetch failed. Read status_code
+        # directly rather than truth-testing the response.
         status_code = response.status_code
 
         # Check for server errors (5xx)

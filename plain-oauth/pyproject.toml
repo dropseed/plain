@@ -11,12 +11,11 @@ dependencies = [
   "plain.auth>=0.29.0,<1.0.0",
   "plain.postgres>=0.106.0,<1.0.0",
   "plain.templates>=0.1.0,<1.0.0",
-  "requests>=2.0.0",
 ]
 
 
 [dependency-groups]
-dev = ["plain.pytest<1.0.0"]
+dev = ["plain.pytest<1.0.0", "httpx>=0.27"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

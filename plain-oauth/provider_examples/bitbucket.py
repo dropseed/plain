@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Any
 
-import requests
+import httpx
 
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 from plain.utils import timezone
@@ -16,7 +16,7 @@ class BitbucketOAuthProvider(OAuthProvider):
     authorization_url = "https://bitbucket.org/site/oauth2/authorize"
 
     def _get_token(self, request_data: dict[str, Any]) -> OAuthToken:
-        response = requests.post(
+        response = httpx.post(
             "https://bitbucket.org/site/oauth2/access_token",
             auth=(self.get_client_id(), self.get_client_secret()),
             headers={
@@ -51,7 +51,7 @@ class BitbucketOAuthProvider(OAuthProvider):
         )
 
     def get_oauth_user(self, *, oauth_token: OAuthToken) -> OAuthUser:
-        response = requests.get(
+        response = httpx.get(
             "https://api.bitbucket.org/2.0/user",
             headers={
                 "Authorization": f"Bearer {oauth_token.access_token}",
@@ -61,7 +61,7 @@ class BitbucketOAuthProvider(OAuthProvider):
         user_id = response.json()["uuid"]
         username = response.json()["username"]
 
-        response = requests.get(
+        response = httpx.get(
             "https://api.bitbucket.org/2.0/user/emails",
             headers={
                 "Authorization": f"Bearer {oauth_token.access_token}",
