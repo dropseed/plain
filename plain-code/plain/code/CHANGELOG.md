@@ -1,5 +1,16 @@
 # plain-code changelog
 
+## [0.21.8](https://github.com/dropseed/plain/releases/plain-code@0.21.8) (2026-07-15)
+
+### What's changed
+
+- Migrated the oxc downloader from `requests` to `httpx`, keeping behavioral parity (redirects followed, streamed download with progress bar). `requests` is no longer a dependency. ([17570d71cf](https://github.com/dropseed/plain/commit/17570d71cf))
+- Updated the shipped `plain-code` style rules: prefer keyword-only parameters for functions taking more than one argument, and spell out real parameters instead of passing `**kwargs` through blindly (so type checking works at call sites). ([249769ece3](https://github.com/dropseed/plain/commit/249769ece3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.7](https://github.com/dropseed/plain/releases/plain-code@0.21.7) (2026-05-05)
 
 ### What's changed
