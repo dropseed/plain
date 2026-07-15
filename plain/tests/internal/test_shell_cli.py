@@ -9,56 +9,65 @@ from click.testing import CliRunner
 from plain.cli.shell import shell
 
 
-def _invoke(args):
-    """Invoke the shell command with subprocess.run stubbed out.
+def _invoke(args, input=None):
+    """Invoke the shell command, restoring what one-off execution mutates.
 
-    Returns the list of (cmd, kwargs) passed to subprocess.run so tests can
-    assert which execution path was taken without spawning a real interpreter.
+    `-c` and stdin code run in-process as a fresh `__main__` module with
+    sys.argv reset, so put both back afterward for the rest of the suite.
     """
-    calls = []
-
-    def fake_run(cmd, **kwargs):
-        calls.append((cmd, kwargs))
-        return subprocess.CompletedProcess(cmd, 0)
-
-    with mock.patch("plain.cli.shell.subprocess.run", side_effect=fake_run):
-        result = CliRunner().invoke(shell, args, prog_name="plain")
-
-    assert result.exit_code == 0, result.output
-    return calls
-
-
-def _child_body(calls):
-    """The generated `python -c <body>` string for a non-interactive path."""
-    (cmd, _kwargs) = calls[0]
-    assert cmd[:2] == [sys.executable, "-c"]
-    return cmd[2]
+    saved_main = sys.modules["__main__"]
+    saved_argv = sys.argv
+    try:
+        return CliRunner().invoke(shell, args, input=input, prog_name="plain")
+    finally:
+        sys.modules["__main__"] = saved_main
+        sys.argv = saved_argv
 
 
 def test_dash_c_executes_string():
-    body = _child_body(_invoke(["-c", "print(1)"]))
-    assert "plain.runtime.setup()" in body
-    assert "exec(compile('print(1)'" in body
-    assert "sys.argv = ['-c']" in body
-    # User code runs in a fresh namespace, not the wrapper's globals.
-    assert "{'__name__': '__main__'}" in body
+    result = _invoke(["-c", "print(1 + 1)"])
+    assert result.exit_code == 0, result.output
+    assert "2" in result.output
 
 
-def test_piped_stdin_runs_setup():
-    # Regression guard (#66): piped input must run plain.runtime.setup()
-    # explicitly, since PYTHONSTARTUP is skipped for non-interactive stdin.
+def test_dash_c_runs_in_clean_main_namespace():
+    # No wrapper imports leak in, and sys.argv matches `python -c`.
+    result = _invoke(["-c", "import sys; print(sys.argv, 'plain' in dir())"])
+    assert result.exit_code == 0, result.output
+    assert "['-c'] False" in result.output
+
+
+def test_dash_c_defines_picklable_objects():
+    # Classes defined in one-off code must resolve through
+    # sys.modules["__main__"], like `python -c` — pickle enforces this.
+    code = "import pickle\nclass A: pass\nprint(len(pickle.dumps(A())))"
+    result = _invoke(["-c", code])
+    assert result.exit_code == 0, result.output
+    assert int(result.output.strip()) > 0
+
+
+def test_dash_c_error_traceback_starts_at_user_code():
+    result = _invoke(["-c", "1/0"])
+    assert result.exit_code == 1
+    assert 'File "<string>"' in result.output
+    assert "ZeroDivisionError" in result.output
+    assert "shell.py" not in result.output
+
+
+def test_piped_stdin_executes():
+    # Regression guard (#66): piped input must run with the app configured.
+    # It executes in-process, where the CLI has already done setup.
     # CliRunner provides a non-tty stdin.
-    body = _child_body(_invoke([]))
-    assert "plain.runtime.setup()" in body
-    assert "sys.stdin.read()" in body
-    assert "sys.argv = ['-']" in body
+    result = _invoke([], input="import sys; print(sys.argv)")
+    assert result.exit_code == 0, result.output
+    assert "['-']" in result.output
 
 
 def test_tty_launches_enriched_repl():
-    # On a tty, `shell` opens the enriched REPL. Enrichment (banner +
-    # SHELL_IMPORT) is delivered via PYTHONSTARTUP, which only the interactive
-    # interpreter honors — so no `-c` payload, and Plain's startup file must
-    # win over any PYTHONSTARTUP the user has exported.
+    # On a tty, `shell` opens the enriched REPL in a subprocess. Enrichment
+    # (banner + SHELL_IMPORT) is delivered via PYTHONSTARTUP, which only the
+    # interactive interpreter honors — and Plain's startup file must win over
+    # any PYTHONSTARTUP the user has exported.
     calls = []
 
     def fake_run(cmd, **kwargs):
@@ -78,4 +87,3 @@ def test_tty_launches_enriched_repl():
     (cmd, kwargs) = calls[0]
     assert cmd[0] == sys.executable
     assert kwargs["env"]["PYTHONSTARTUP"].endswith("startup.py")
-    assert "-c" not in cmd

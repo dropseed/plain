@@ -3,50 +3,36 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import traceback
+import types
 
 import click
 
 from plain.cli.runtime import common_command
 
-# Runs in the child interpreter before any user code, so the app is fully
-# configured (settings, packages, etc.) for the -c and stdin modes.
-_SETUP = "import plain.runtime; plain.runtime.setup()"
-
 _STARTUP = os.path.join(os.path.dirname(__file__), "startup.py")
 
-# User code executes in a fresh namespace so the wrapper's own imports
-# (plain.runtime, sys) don't leak into it.
-_FRESH_GLOBALS = "{'__name__': '__main__'}"
 
+def _run_source(source: str, filename: str, argv0: str) -> None:
+    """Execute one-off code in this process, as the `__main__` module.
 
-def _exit_with(result: subprocess.CompletedProcess) -> None:
-    if result.returncode:
-        sys.exit(result.returncode)
-
-
-def _run_child(body: str, *, argv: list[str]) -> None:
-    """Run setup + `body` in a child interpreter with sys.argv set to `argv`.
-
-    The child inherits our stdin, so piped input works.
+    The CLI has already run plain.runtime.setup() before any command executes,
+    so the app is configured. Registering a real module as
+    sys.modules["__main__"] keeps `python -c` semantics: user code gets a
+    clean namespace, and objects it defines can be resolved through their
+    module (pickle, multiprocessing).
     """
-    code = f"import sys; sys.argv = {argv!r}; {_SETUP}; {body}"
-    _exit_with(subprocess.run([sys.executable, "-c", code]))
-
-
-def _run_command(command: str) -> None:
-    """`plain shell -c "..."` — execute a string, then exit."""
-    _run_child(
-        f"exec(compile({command!r}, '<string>', 'exec'), {_FRESH_GLOBALS})",
-        argv=["-c"],
-    )
-
-
-def _run_stdin() -> None:
-    """Piped input — execute stdin, then exit."""
-    _run_child(
-        f"exec(compile(sys.stdin.read(), '<stdin>', 'exec'), {_FRESH_GLOBALS})",
-        argv=["-"],
-    )
+    sys.argv = [argv0]
+    module = types.ModuleType("__main__")
+    sys.modules["__main__"] = module
+    try:
+        exec(compile(source, filename, "exec"), module.__dict__)
+    except Exception as e:
+        # Drop this function's frame so the traceback starts at the user's
+        # code, like `python -c`.
+        e.__traceback__ = e.__traceback__.tb_next if e.__traceback__ else None
+        traceback.print_exception(e)
+        sys.exit(1)
 
 
 # Each interface runs under the same interpreter (`sys.executable`) that the
@@ -72,12 +58,12 @@ def _run_repl(interface: str | None) -> None:
     interface_list = _INTERFACES[interface] if interface else _default_interface()
     # Plain's startup file must win over any PYTHONSTARTUP the user has exported,
     # otherwise the banner + SHELL_IMPORT enrichment is silently replaced.
-    _exit_with(
-        subprocess.run(
-            interface_list,
-            env={**os.environ, "PYTHONSTARTUP": _STARTUP},
-        )
+    result = subprocess.run(
+        interface_list,
+        env={**os.environ, "PYTHONSTARTUP": _STARTUP},
     )
+    if result.returncode:
+        sys.exit(result.returncode)
 
 
 @common_command
@@ -99,11 +85,10 @@ def shell(interface: str | None, command: str | None) -> None:
     Also runs one-off code and exits: `-c "..."` or piped stdin.
     """
     if command is not None:
-        _run_command(command)
+        _run_source(command, "<string>", argv0="-c")
     elif not sys.stdin.isatty():
-        # Piped input can't go through the REPL: PYTHONSTARTUP (and thus the
-        # app setup + enrichment) is only honored interactively, so non-tty
-        # stdin runs through a child that sets the app up explicitly.
-        _run_stdin()
+        # Piped input can't go through the REPL — PYTHONSTARTUP (and thus the
+        # enrichment) is only honored for interactive sessions.
+        _run_source(sys.stdin.read(), "<stdin>", argv0="-")
     else:
         _run_repl(interface)
