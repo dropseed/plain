@@ -23,6 +23,7 @@ import os
 import random
 import signal
 import sys
+import time
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from types import FrameType
@@ -48,6 +49,11 @@ SIGNALS = [
     signal.SIGTERM,
     signal.SIGWINCH,
 ]
+
+# Slice of SERVER_GRACEFUL_TIMEOUT reserved for cancelling leftover
+# connection tasks and tearing down after the drain wait, so a
+# SIGTERM-initiated shutdown finishes before the arbiter's SIGKILL lands.
+DRAIN_TEARDOWN_MARGIN = 2.0
 
 
 def check_worker_config(threads: int, connections: int, log: logging.Logger) -> None:
@@ -97,6 +103,8 @@ class Worker:
         self.nr_conns: int = 0
         self._connection_tasks: set[asyncio.Task] = set()
         self._servers: list[asyncio.Server] = []
+        self._sigterm_time: float | None = None
+        self._notify_during_drain = True
         # Worker-level H2 stream budget — limits total in-flight H2 streams
         # across all connections to avoid overwhelming the thread pool.
         self._h2_stream_budget: asyncio.Semaphore = asyncio.Semaphore(
@@ -250,6 +258,7 @@ class Worker:
                     "Thread pool stalled, stopping heartbeat to trigger restart",
                     extra={"timeout": self.timeout},
                 )
+                self._notify_during_drain = False
                 break
 
             await asyncio.sleep(1.0)
@@ -335,7 +344,26 @@ class Worker:
             from plain.runtime import settings
 
             timeout = settings.SERVER_GRACEFUL_TIMEOUT
-            _, pending = await asyncio.wait(self._connection_tasks, timeout=timeout)
+            if self._sigterm_time is not None:
+                # The arbiter SIGKILLs SERVER_GRACEFUL_TIMEOUT after the
+                # SIGTERM it sent us — stop draining early enough that the
+                # cancellation and teardown below still run before it lands.
+                elapsed = time.monotonic() - self._sigterm_time
+                timeout = max(0.0, timeout - elapsed - DRAIN_TEARDOWN_MARGIN)
+
+            deadline = time.monotonic() + timeout
+            pending = set(self._connection_tasks)
+            while pending:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                # Keep the heartbeat fresh while draining so the arbiter
+                # doesn't murder a worker that's shutting down normally.
+                # (The stalled-pool exit skips this — it stopped
+                # heartbeating on purpose to get killed and replaced.)
+                if self._notify_during_drain:
+                    self.notify()
+                _, pending = await asyncio.wait(pending, timeout=min(1.0, remaining))
             for task in pending:
                 task.cancel()
             if pending:
@@ -345,6 +373,7 @@ class Worker:
 
     def _signal_exit(self) -> None:
         self.alive = False
+        self._sigterm_time = time.monotonic()
         # Immediately stop accepting new connections so requests
         # don't land on a worker that's about to exit (H13 prevention).
         # This runs as an event-loop callback, so the heartbeat loop in
