@@ -148,22 +148,27 @@
                 data-align="end"
                 class="w-80 max-h-[75vh] flex flex-col p-0! overflow-hidden!"
             >
-                <div class="p-3 bg-admin-muted/40 border-b border-admin-border">
+                <div class="border-b border-admin-border">
                     <admin.SearchInput
                         id="menu-filter-input"
+                        label="Filter pages"
                         placeholder="Filter pages..."
-                        class="w-full pl-8 pr-3 py-2 text-base sm:text-sm bg-admin-background border border-admin-input rounded-admin-lg focus:outline-none focus:ring-2 focus:ring-admin-ring/30 focus:border-admin-ring placeholder:text-admin-muted-foreground transition-shadow"
+                        class="w-full pl-9 pr-3 py-3 text-base sm:text-sm bg-transparent border-0 focus:outline-none focus:ring-0 placeholder:text-admin-muted-foreground"
                         />
                 </div>
 
                 <div class="overflow-auto flex-1 py-2 px-1.5" id="menu-items-container">
-                    {% with sections=admin_registry.get_nav_sections(plain_packages=False, user=user), header_label="App" %}
+                    {% with sections=admin_registry.get_nav_sections(plain_packages=False, user=user), group_label=None %}
                         {% include "admin/_menu_section.html" %}
                     {% endwith %}
 
-                    {% with sections=admin_registry.get_nav_sections(plain_packages=True, user=user), header_label="Packages" %}
+                    {% with sections=admin_registry.get_nav_sections(plain_packages=True, user=user), group_label="System" %}
                         {% include "admin/_menu_section.html" %}
                     {% endwith %}
+
+                    <div id="menu-empty-state" class="hidden px-3 py-8 text-center text-sm text-admin-muted-foreground">
+                        No pages found
+                    </div>
                 </div>
             </div>
         </div>

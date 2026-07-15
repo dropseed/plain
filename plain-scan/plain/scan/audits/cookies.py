@@ -21,31 +21,28 @@ class CookiesAudit(Audit):
         """Check if cookies are configured securely."""
         response = scanner.fetch()
 
-        # Get all Set-Cookie headers
-        # Note: requests library stores these in response.headers but only returns the last one
-        # We need to use response.raw to get all of them
         cookies = []
 
-        # Try to get cookies from response.cookies (CookieJar)
-        if response.cookies:
-            for cookie in response.cookies:
-                # Non-standard attributes (SameSite, HttpOnly) live in the private
-                # `_rest` dict; SameSite casing varies by server, so match case-insensitively.
-                rest: dict[str, str | None] = getattr(cookie, "_rest", {})
-                samesite = None
-                for key in rest:
-                    if key.lower() == "samesite":
-                        samesite = rest[key]
-                        break
+        # httpx parses Set-Cookie into an httpx.Cookies wrapper; iterate the
+        # underlying jar to get one http.cookiejar.Cookie per cookie.
+        for cookie in response.cookies.jar:
+            # Non-standard attributes (SameSite, HttpOnly) live in the private
+            # `_rest` dict; SameSite casing varies by server, so match case-insensitively.
+            rest: dict[str, str | None] = getattr(cookie, "_rest", {})
+            samesite = None
+            for key in rest:
+                if key.lower() == "samesite":
+                    samesite = rest[key]
+                    break
 
-                cookies.append(
-                    {
-                        "name": cookie.name,
-                        "secure": cookie.secure,
-                        "httponly": "HttpOnly" in rest,
-                        "samesite": samesite,
-                    }
-                )
+            cookies.append(
+                {
+                    "name": cookie.name,
+                    "secure": cookie.secure,
+                    "httponly": "HttpOnly" in rest,
+                    "samesite": samesite,
+                }
+            )
 
         if not cookies:
             # No cookies detected

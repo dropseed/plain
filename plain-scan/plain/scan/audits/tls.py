@@ -52,7 +52,7 @@ class TLSAudit(Audit):
         response = scanner.fetch()
 
         initial_parsed = urlparse(scanner.url)
-        final_parsed = urlparse(response.url)
+        final_parsed = urlparse(str(response.url))
 
         # Prefer the final HTTPS endpoint if we followed redirects
         target_parsed = (

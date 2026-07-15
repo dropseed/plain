@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain import postgres
+from plain.exceptions import ValidationError
 from plain.postgres import Q
 from plain.postgres.exceptions import FieldDoesNotExist
 from plain.postgres.fields.related_managers import BaseRelatedManager
@@ -121,6 +122,24 @@ class AdminModelListView(AdminListView):
                 filters |= Q(**{f"{field}__icontains": search})  # ty: ignore[invalid-argument-type]
             return queryset.filter(filters)
         return queryset
+
+    def select_objects_by_id(
+        self, objects: postgres.QuerySet | list[Any], ids: list[str]
+    ) -> postgres.QuerySet | list[Any]:
+        if isinstance(objects, list):
+            return super().select_objects_by_id(objects, ids)
+        # get_object_id() returns the primary key, so we match on it and keep
+        # the queryset lazy. Coerce each id through the pk field and drop the
+        # ones it rejects, so a stale or malformed id is ignored (per the base
+        # contract) rather than raising.
+        pk_field = self.model._model_meta.get_field("id")
+        valid_ids = []
+        for raw_id in ids:
+            try:
+                valid_ids.append(pk_field.to_python(raw_id))  # ty: ignore[unresolved-attribute]
+            except ValidationError:
+                continue
+        return objects.filter(id__in=valid_ids)
 
     def order_objects(
         self, objects: postgres.QuerySet | list[Any]

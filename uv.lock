@@ -402,15 +402,6 @@ wheels = [
 ]
 
 [[package]]
-name = "inotify"
-version = "0.2.10"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "nose" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/35/cb/6d564f8a3f25d9516298dce151670d01e43a4b3b769c1c15f40453179cd5/inotify-0.2.10.tar.gz", hash = "sha256:974a623a338482b62e16d4eb705fb863ed33ec178680fc3e96ccdf0df6c02a07", size = 9905, upload-time = "2018-07-07T06:46:46.084Z" }
-
-[[package]]
 name = "jaraco-classes"
 version = "3.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -613,15 +604,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a2/f7/139d22fef48ac78127d18e01d80cf1be40236ae489769d17f35c3d425293/more_itertools-11.0.2.tar.gz", hash = "sha256:392a9e1e362cbc106a2457d37cabf9b36e5e12efd4ebff1654630e76597df804", size = 144659, upload-time = "2026-04-09T15:01:33.297Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/98/6af411189d9413534c3eb691182bff1f5c6d44ed2f93f2edfe52a1bbceb8/more_itertools-11.0.2-py3-none-any.whl", hash = "sha256:6e35b35f818b01f691643c6c611bc0902f2e92b46c18fffa77ae1e7c46e912e4", size = 71939, upload-time = "2026-04-09T15:01:32.21Z" },
-]
-
-[[package]]
-name = "nose"
-version = "1.3.7"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/58/a5/0dc93c3ec33f4e281849523a5a913fa1eea9a3068acfa754d44d88107a44/nose-1.3.7.tar.gz", hash = "sha256:f1bffef9cbc82628f6e7d7b40d7e255aefaa1adb6a1b1d26c69a8b79e6208a98", size = 280488, upload-time = "2015-06-02T09:12:32.961Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/d8/dd071918c040f50fa1cf80da16423af51ff8ce4a0f2399b7bf8de45ac3d9/nose-1.3.7-py3-none-any.whl", hash = "sha256:9ff7c6cc443f8c51994b34a667bbcf45afd6d945be7477b52e97516fd17c53ac", size = 154731, upload-time = "2015-06-02T09:12:40.57Z" },
 ]
 
 [[package]]
@@ -942,8 +924,8 @@ name = "plain-code"
 version = "0.21.7"
 source = { editable = "plain-code" }
 dependencies = [
+    { name = "httpx" },
     { name = "plain" },
-    { name = "requests" },
     { name = "ruff" },
     { name = "tomlkit" },
     { name = "ty" },
@@ -951,8 +933,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "plain", editable = "plain" },
-    { name = "requests", specifier = ">=2.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
     { name = "tomlkit", specifier = ">=0.11.0" },
     { name = "ty", specifier = "<1.0.0" },
@@ -1001,10 +983,8 @@ version = "0.63.1"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
-    { name = "inotify" },
     { name = "plain" },
     { name = "plain-assets" },
-    { name = "requests" },
     { name = "rich" },
 ]
 
@@ -1016,10 +996,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
-    { name = "inotify" },
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
-    { name = "requests", specifier = ">=2.0.0" },
     { name = "rich" },
 ]
 
@@ -1202,11 +1180,11 @@ dependencies = [
     { name = "plain-auth" },
     { name = "plain-postgres" },
     { name = "plain-templates" },
-    { name = "requests" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "httpx" },
     { name = "plain-pytest" },
 ]
 
@@ -1216,11 +1194,13 @@ requires-dist = [
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-templates", editable = "plain-templates" },
-    { name = "requests", specifier = ">=2.0.0" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "plain-pytest", editable = "plain-pytest" },
+]
 
 [[package]]
 name = "plain-oauthserver"
@@ -1416,8 +1396,8 @@ name = "plain-scan"
 version = "0.6.4"
 source = { editable = "plain-scan" }
 dependencies = [
+    { name = "httpx" },
     { name = "plain" },
-    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -1427,8 +1407,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "plain", editable = "plain" },
-    { name = "requests" },
 ]
 
 [package.metadata.requires-dev]
@@ -1477,17 +1457,17 @@ name = "plain-tailwind"
 version = "0.23.1"
 source = { editable = "plain-tailwind" }
 dependencies = [
+    { name = "httpx" },
     { name = "plain" },
     { name = "plain-assets" },
-    { name = "requests" },
     { name = "tomlkit" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
-    { name = "requests", specifier = ">=2.0.0" },
     { name = "tomlkit", specifier = ">=0.12.1" },
 ]
 
@@ -1561,17 +1541,17 @@ name = "plain-vendor"
 version = "0.11.6"
 source = { editable = "plain-vendor" }
 dependencies = [
+    { name = "httpx" },
     { name = "plain" },
     { name = "plain-assets" },
-    { name = "requests" },
     { name = "tomlkit" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
-    { name = "requests", specifier = ">=2.0.0" },
     { name = "tomlkit", specifier = ">=0.12.1" },
 ]
 

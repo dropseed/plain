@@ -6,14 +6,7 @@ authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
-  "plain>=0.147.0,<1.0.0",
-  "plain.assets>=0.3.0,<1.0.0",
-  "click>=8.0.0",
-  "requests>=2.0.0",
-  "rich",
-  "inotify",
-]
+dependencies = ["plain>=0.147.0,<1.0.0", "plain.assets>=0.3.0,<1.0.0", "click>=8.0.0", "rich"]
 
 [project.entry-points."plain.setup"]
 "dev-setup" = "plain.dev.entrypoints:setup"

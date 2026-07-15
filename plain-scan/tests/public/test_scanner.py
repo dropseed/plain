@@ -7,22 +7,18 @@ used so the TLS audit short-circuits instead of opening a socket.
 
 from __future__ import annotations
 
-import requests
-from requests.cookies import RequestsCookieJar
-from requests.structures import CaseInsensitiveDict
+import httpx
 
 from plain.scan.scanner import Scanner
 
 
 def make_response(*, headers=None, status_code=200, url="https://example.com/"):
-    """Build a synthetic ``requests.Response`` for driving the scanner offline."""
-    response = requests.Response()
-    response.status_code = status_code
-    response.url = url
-    response.headers = CaseInsensitiveDict(headers or {})
-    response.history = []
-    response.cookies = RequestsCookieJar()
-    return response
+    """Build a synthetic ``httpx.Response`` for driving the scanner offline."""
+    return httpx.Response(
+        status_code=status_code,
+        headers=headers or {},
+        request=httpx.Request("GET", url),
+    )
 
 
 SECURE_HEADERS = {

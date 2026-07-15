@@ -9,7 +9,14 @@
      <span class="admin-hovercard">
        <some-trigger />
        <div data-hovercard>…panel content…</div>
-     </span> */
+     </span>
+
+   Placement: defaults to opening below the trigger. Set
+   `data-hovercard-side="right|left|top|bottom"` on the panel — or on any
+   ancestor, e.g. a table column — to change the side. Setting it on an
+   ancestor lets a whole column of hovercards (including the auto-wrapped
+   <time> ones) open to one side, keeping the trigger column clear so you
+   can scan straight down it without the open panel covering the next row. */
 @layer components {
   .admin-hovercard {
     @apply relative inline-flex;
@@ -20,6 +27,7 @@
     border-radius: var(--radius-popover);
     --admin-overlay-fade: 100ms;
 
+    /* Default placement; overridden per-side below. */
     position-area: bottom span-right;
     position-try-fallbacks: flip-block, flip-inline;
     margin: 0.25rem 0;
@@ -40,5 +48,37 @@
         opacity: 0;
       }
     }
+  }
+
+  /* Placement overrides. Each side sets its own edge-flip order (flip toward
+     the opposite side first) and swaps the gap to the relevant axis. Matched
+     on the panel itself OR any ancestor carrying data-hovercard-side, so a
+     container (a table column, say) can steer every hovercard inside it. */
+  [data-hovercard][data-hovercard-side="right"],
+  [data-hovercard-side="right"] [data-hovercard] {
+    position-area: right span-bottom;
+    position-try-fallbacks: flip-inline, flip-block;
+    margin: 0 0.25rem;
+  }
+
+  [data-hovercard][data-hovercard-side="left"],
+  [data-hovercard-side="left"] [data-hovercard] {
+    position-area: left span-bottom;
+    position-try-fallbacks: flip-inline, flip-block;
+    margin: 0 0.25rem;
+  }
+
+  [data-hovercard][data-hovercard-side="top"],
+  [data-hovercard-side="top"] [data-hovercard] {
+    position-area: top span-right;
+    position-try-fallbacks: flip-block, flip-inline;
+    margin: 0.25rem 0;
+  }
+
+  [data-hovercard][data-hovercard-side="bottom"],
+  [data-hovercard-side="bottom"] [data-hovercard] {
+    position-area: bottom span-right;
+    position-try-fallbacks: flip-block, flip-inline;
+    margin: 0.25rem 0;
   }
 }

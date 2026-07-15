@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Generator
 from typing import Any
@@ -44,12 +45,19 @@ def setup_db(request: Any) -> Generator[None]:
     """
     verbosity = request.config.option.verbose
 
+    # Under pytest-xdist each worker runs its own session and hits this
+    # fixture independently. Give each worker its own database (gw0_<db>,
+    # gw1_<db>, …) so they don't collide creating/migrating/dropping the
+    # same one. PYTEST_XDIST_WORKER is unset off-xdist → empty prefix →
+    # the plain `test_<db>` name.
+    prefix = os.environ.get("PYTEST_XDIST_WORKER", "")
+
     # Test DB points at a different database name, so a pool built
     # against the runtime URL would connect to the wrong place. Close
     # any existing pool so the next checkout rebuilds against the
     # active POSTGRES_URL (which use_test_database swaps).
     runtime_pool_source.close()
-    ctx = use_test_database(verbosity=verbosity)
+    ctx = use_test_database(verbosity=verbosity, prefix=prefix)
     with suppress_db_tracing():
         ctx.__enter__()
     try:

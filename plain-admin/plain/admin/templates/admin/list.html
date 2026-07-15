@@ -10,30 +10,62 @@
 
 {% htmxfragment "list" %}
 
-<header class="flex items-center justify-between">
-    <div>
+<header class="group flex items-center justify-between flex-wrap gap-2">
+    <div class="flex items-center gap-2 flex-wrap">
         {% if table_style == "preview" %}
             <div class="text-sm font-medium text-admin-foreground/80 mb-2">{{ title }}</div>
         {% else %}
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground">{{ page.paginator.count }} result{{ page.paginator.count|pluralize }}</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground group-data-[selecting]:hidden">{{ page.paginator.count }} result{{ page.paginator.count|pluralize }}</h3>
+
+            {% if actions %}
+            <span data-selection-summary class="text-sm text-admin-muted-foreground hidden group-data-[selecting]:inline"></span>
+
+            <form method="POST" data-actions-form data-total-count="{{ page.paginator.count }}">
+                <div class="admin-dropdown-menu">
+                    <button
+                        type="button"
+                        aria-haspopup="menu"
+                        aria-expanded="false"
+                        aria-controls="list-actions-menu"
+                        class="admin-btn admin-btn-sm admin-btn-outline"
+                    >
+                        Actions
+                        <admin.Icon name="caret-down-fill" class="text-[10px]" />
+                    </button>
+                    <div
+                        id="list-actions-menu"
+                        popover="manual"
+                        data-popover
+                        data-align="start"
+                        class="w-48"
+                    >
+                        <div role="menu">
+                            <div role="heading" class="text-xs font-normal text-admin-muted-foreground group-data-[selecting]:hidden">Select rows to run actions</div>
+                            <hr role="separator" class="group-data-[selecting]:hidden" />
+                            {% for action in actions %}
+                            {# Every action opens a confirmation, so every item gets the "…" suffix. #}
+                            <button type="button" role="menuitem" data-action-name="{{ action }}">{{ action }}{% if not action.endswith(("…", "...")) %}…{% endif %}</button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <input type="hidden" name="action_ids" value="" />
+                <input type="hidden" name="action_name" value="" />
+            </form>
+
+            {% if page.has_other_pages() %}
+            <button type="button" data-action-select-all class="hidden admin-btn admin-btn-sm admin-btn-link">Select all {{ page.paginator.count }}</button>
+            {% endif %}
+
+            <button type="button" data-action-clear class="hidden group-data-[selecting]:inline-flex admin-btn admin-btn-sm admin-btn-ghost">Clear</button>
+            {% endif %}
         {% endif %}
     </div>
     <div class="flex space-x-2">
         {% if table_style == "preview" %}
         <a class="text-sm" href="{{ request.path }}{% if search_query %}?search={{ search_query }}{% endif %}">View {{ page.paginator.count }} result{{ "s" if page.paginator.count != 1 else "" }}</a>
         {% else %}
-        {% if actions %}
-        <form method="POST" data-actions-form>
-            <select name="action_name" class="admin-select admin-select-sm w-auto">
-                <option value="">Actions...</option>
-                {% for action in actions %}
-                <option>{{ action }}</option>
-                {% endfor %}
-            </select>
-            <input type="hidden" name="action_ids" value="" />
-        </form>
-        {% endif %}
-
         <form method="GET" class="inline-flex space-x-2">
             {% if filter_names %}
             <select data-autosubmit name="filter" class="admin-select admin-select-sm w-auto">
@@ -70,7 +102,7 @@
                 <th class="p-0 pl-1">
                     <input
                         data-action-checkbox-all
-                        class="admin-input"
+                        class="admin-input block"
                         type="checkbox"
                     />
                 </th>
@@ -136,7 +168,7 @@
 
                 {% if table_style != "preview" and actions %}
                 <td class="p-0 pl-1">
-                    <input data-action-checkbox class="admin-input" type="checkbox" name="{{ get_object_id(object) }}" />
+                    <input data-action-checkbox class="admin-input block" type="checkbox" name="{{ get_object_id(object) }}" />
                 </td>
                 {% endif %}
 
