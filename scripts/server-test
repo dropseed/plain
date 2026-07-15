@@ -52,6 +52,7 @@ run "OpenAPI conformance (schemathesis)" \
 # Worker behavior
 run "H1 worker behavior"            "$REPO_ROOT/tools/server-worker-test"
 run "H2 worker behavior"            "$REPO_ROOT/tools/h2-worker-test"
+run "H1 graceful shutdown (SIGTERM)" "$REPO_ROOT/tools/shutdown-test"
 
 # Load
 if command -v wrk &>/dev/null; then
