@@ -147,6 +147,13 @@ class Arbiter:
         sig = signal.SIGTERM if graceful else signal.SIGQUIT
         limit = time.time() + settings.SERVER_GRACEFUL_TIMEOUT
 
+        # This shutdown ends in SIGKILL at the limit — tell the workers so
+        # they reserve teardown time inside their drain window. (Retirement
+        # SIGTERMs in manage_workers have no SIGKILL follower and don't
+        # set this.)
+        for info in self._workers.values():
+            info.heartbeat.set_kill_clock()
+
         # Instruct the workers to exit
         self._kill_workers(sig)
 

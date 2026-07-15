@@ -47,14 +47,17 @@ class _StubApp:
 class _StubHeartbeat:
     """Minimal stand-in for WorkerHeartbeat."""
 
-    def __init__(self, *, retiring: bool = False) -> None:
-        self.retiring = retiring
+    def __init__(self, *, kill_clock: bool = False) -> None:
+        self.kill_clock = kill_clock
 
     def notify(self) -> None:
         pass
 
     def is_retiring(self) -> bool:
-        return self.retiring
+        return False
+
+    def has_kill_clock(self) -> bool:
+        return self.kill_clock
 
 
 class _CaptureHandler(logging.Handler):
@@ -185,13 +188,17 @@ def test_sigterm_time_latches_on_first_signal() -> None:
     assert worker._sigterm_time == first
 
 
-def test_retiring_worker_keeps_full_graceful_window() -> None:
-    # Retirement SIGTERM comes from our own arbiter with no SIGKILL
-    # follower — the drain deadline must not be anchored (and shortened
-    # by the teardown margin) for it.
-    worker = _make_worker(heartbeat=_StubHeartbeat(retiring=True))
-    worker._signal_exit()
-    assert worker._sigterm_time is None
+def test_no_kill_clock_keeps_full_graceful_window() -> None:
+    # A retirement SIGTERM comes from our own arbiter with no SIGKILL
+    # follower (the arbiter only marks the kill clock in _stop), so the
+    # drain keeps the full graceful window even long after the signal.
+    worker = _make_worker()
+    worker.notify = lambda: None  # ty: ignore[invalid-assignment]
+    worker._sigterm_time = time.monotonic() - 3600
+
+    completed, _ = _drain(worker, task_seconds=0.3)
+
+    assert completed, "no kill clock means the full window applies"
 
 
 def test_short_graceful_timeout_still_drains() -> None:
@@ -199,7 +206,7 @@ def test_short_graceful_timeout_still_drains() -> None:
     # SERVER_GRACEFUL_TIMEOUT keeps a usable drain window on SIGTERM.
     from plain.runtime import settings
 
-    worker = _make_worker()
+    worker = _make_worker(heartbeat=_StubHeartbeat(kill_clock=True))
     worker.notify = lambda: None  # ty: ignore[invalid-assignment]
     worker._sigterm_time = time.monotonic()
 
@@ -214,7 +221,7 @@ def test_short_graceful_timeout_still_drains() -> None:
 
 
 def test_drain_deadline_anchored_at_sigterm_time() -> None:
-    worker = _make_worker()
+    worker = _make_worker(heartbeat=_StubHeartbeat(kill_clock=True))
     worker.notify = lambda: None  # ty: ignore[invalid-assignment]
     # Simulate SIGTERM received long ago: the graceful budget is spent, so
     # the drain must cancel immediately rather than waiting a fresh full

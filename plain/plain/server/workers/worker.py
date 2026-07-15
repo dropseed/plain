@@ -375,12 +375,15 @@ class Worker:
             from plain.runtime import settings
 
             timeout = settings.SERVER_GRACEFUL_TIMEOUT
-            if self._sigterm_time is not None:
-                # The arbiter SIGKILLs SERVER_GRACEFUL_TIMEOUT after the
-                # SIGTERM it sent us — stop draining early enough that the
-                # cancellation and teardown below still run before it lands.
-                # The margin is capped at half the window so deliberately
-                # short graceful timeouts still get a real drain.
+            if self._sigterm_time is not None and self.heartbeat.has_kill_clock():
+                # This shutdown ends in a SIGKILL SERVER_GRACEFUL_TIMEOUT
+                # after the SIGTERM (the arbiter marks that on the
+                # heartbeat) — stop draining early enough that the
+                # cancellation and teardown below still run before it
+                # lands. The margin is capped at half the window so
+                # deliberately short graceful timeouts still get a real
+                # drain. Retirement SIGTERMs have no SIGKILL follower and
+                # keep the full window.
                 elapsed = time.monotonic() - self._sigterm_time
                 margin = min(DRAIN_TEARDOWN_MARGIN, timeout / 2)
                 timeout = max(0.0, timeout - elapsed - margin)
@@ -407,12 +410,10 @@ class Worker:
 
     def _signal_exit(self) -> None:
         self.alive = False
-        # Latch the first SIGTERM — the arbiter's (and any orchestrator's)
-        # SIGKILL clock starts then, so a re-sent SIGTERM must not push
-        # the drain deadline past it. Retirement is the exception: that
-        # SIGTERM comes from our own arbiter with no SIGKILL follower, so
-        # the drain keeps the full graceful window.
-        if self._sigterm_time is None and not self.heartbeat.is_retiring():
+        # Latch the first SIGTERM — the SIGKILL clock (when there is one;
+        # see has_kill_clock) starts then, so a re-sent SIGTERM must not
+        # push the drain deadline past it.
+        if self._sigterm_time is None:
             self._sigterm_time = time.monotonic()
         self._shutdown_event.set()
         # Immediately stop accepting new connections so requests
