@@ -114,7 +114,7 @@ Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/pat
 
 - `uv run plain check` — run linting, preflight, migration, and test checks (add `--skip-test` for faster iteration)
 - `uv run plain pre-commit` — `check` plus commit-specific steps (custom commands, uv lock, build)
-- `uv run plain python` — Python with Plain configured; like the `python` interpreter (`-c "..."` for one-off commands, `plain python script.py` to run a file, stdin for piped input). `uv run plain shell` is a shortcut to the interactive REPL.
+- `uv run plain python` — Python with Plain configured; like the `python` interpreter (`-c "..."` for one-off commands, `-m` for modules, `plain python script.py` to run a file, stdin for piped input). `uv run plain shell` is a shortcut to the interactive REPL.
 - `uv run plain request /path` — test HTTP request against the dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`). Add `--json` for context-frugal output — response metadata and trace analysis (query counts, N+1s, span tree), no response body.
 
 ## Debugging and verifying changes

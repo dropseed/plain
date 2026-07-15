@@ -41,6 +41,8 @@ def test_dash_c_executes_string():
     assert "plain.runtime.setup()" in body
     assert "exec(compile('print(1)'" in body
     assert "sys.argv = ['-c']" in body
+    # User code runs in a fresh namespace, not the wrapper's globals.
+    assert "{'__name__': '__main__'}" in body
 
 
 def test_dash_c_forwards_trailing_args():
@@ -50,18 +52,47 @@ def test_dash_c_forwards_trailing_args():
     assert "sys.argv = ['-c', 'a', 'b']" in body
 
 
-def test_file_runs_as_main_with_args():
-    body = _child_body(_invoke(python, ["script.py", "a", "b"]))
+def test_dash_c_forwards_option_shaped_args():
+    # Everything after the -c payload passes through verbatim, even tokens
+    # that look like plain's own options — matching the interpreter.
+    body = _child_body(
+        _invoke(python, ["-c", "print(1)", "--interface", "python", "-c", "x"])
+    )
+    assert "sys.argv = ['-c', '--interface', 'python', '-c', 'x']" in body
+    assert "exec(compile('print(1)'" in body
+
+
+def test_dash_m_runs_module_as_main():
+    body = _child_body(_invoke(python, ["-m", "app.tasks", "a", "b"]))
     assert "plain.runtime.setup()" in body
-    assert "runpy.run_path('script.py', run_name='__main__')" in body
-    assert "sys.argv = ['script.py', 'a', 'b']" in body
+    assert "runpy.run_module('app.tasks', run_name='__main__', alter_sys=True)" in body
+    assert "sys.argv = ['app.tasks', 'a', 'b']" in body
 
 
-def test_script_args_colliding_with_options_pass_through():
+def test_file_runs_as_main_with_args(tmp_path):
+    script = tmp_path / "script.py"
+    script.write_text("print(1)")
+    body = _child_body(_invoke(python, [str(script), "a", "b"]))
+    assert "plain.runtime.setup()" in body
+    assert f"runpy.run_path({str(script)!r}, run_name='__main__')" in body
+    assert f"sys.argv = [{str(script)!r}, 'a', 'b']" in body
+    # The script's directory goes on sys.path, like `python script.py`.
+    assert f"sys.path.insert(0, {str(tmp_path)!r})" in body
+
+
+def test_file_not_found_is_clean_error():
+    result = CliRunner().invoke(python, ["missing.py"], prog_name="plain")
+    assert result.exit_code == 2
+    assert "can't open file" in result.output
+
+
+def test_script_args_colliding_with_options_pass_through(tmp_path):
     # `plain python script.py -c foo` must forward `-c foo` to the script as
-    # sys.argv, not let click capture `-c` as plain's own --command option.
-    body = _child_body(_invoke(python, ["script.py", "-c", "foo"]))
-    assert "sys.argv = ['script.py', '-c', 'foo']" in body
+    # sys.argv, not treat `-c` as plain's own option.
+    script = tmp_path / "script.py"
+    script.write_text("print(1)")
+    body = _child_body(_invoke(python, [str(script), "-c", "foo"]))
+    assert f"sys.argv = [{str(script)!r}, '-c', 'foo']" in body
 
 
 def test_dash_reads_stdin():
@@ -75,6 +106,18 @@ def test_no_args_non_tty_reads_stdin():
     # rather than opening a REPL.
     body = _child_body(_invoke(python, []))
     assert "sys.stdin.read()" in body
+
+
+def test_unknown_option_is_an_error():
+    result = CliRunner().invoke(python, ["-x"], prog_name="plain")
+    assert result.exit_code != 0
+    assert "Unknown option" in result.output
+
+
+def test_help_option():
+    result = CliRunner().invoke(python, ["--help"], prog_name="plain")
+    assert result.exit_code == 0
+    assert "plain python -m module" in result.output
 
 
 def test_shell_tty_launches_enriched_repl():

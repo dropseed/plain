@@ -139,15 +139,18 @@ Pass `cls=SettingOption` and `setting="SETTING_NAME"` to any `@click.option`. Th
 
 ## Python
 
-The `plain python` command behaves like the `python` interpreter, but always runs `plain.runtime.setup()` first so your settings, models, and packages are ready. It covers every mode the interpreter does:
+The `plain python` command supports the common execution modes of the `python` interpreter, but always runs `plain.runtime.setup()` first so your settings, models, and packages are ready:
 
 ```bash
 $ plain python                  # interactive REPL
 $ plain python -c "..."         # execute a string, then exit
+$ plain python -m module        # run a module as __main__
 $ plain python script.py        # run a file as __main__
 $ plain python -                # execute stdin, then exit
 $ echo "..." | plain python     # execute piped input
 ```
+
+These are the supported modes — other interpreter flags (`-O`, `-W`, etc.) aren't emulated and produce an error.
 
 For one-off commands, use the `-c` flag; for scripts, pass the file:
 
@@ -174,7 +177,7 @@ $ plain python --interface python
 $ plain shell
 ```
 
-Only the interactive REPL is enriched (see `SHELL_IMPORT` below). The `-c`, file, and stdin modes run your code as-is with nothing auto-imported, matching how `python` only honors `PYTHONSTARTUP` for interactive sessions.
+Only the interactive REPL is enriched (see `SHELL_IMPORT` below). The `-c`, `-m`, file, and stdin modes run your code as-is with nothing auto-imported, matching how `python` only honors `PYTHONSTARTUP` for interactive sessions.
 
 ### SHELL_IMPORT
 
