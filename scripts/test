@@ -130,6 +130,10 @@ else
   bold "Running shutdown-test"
   tools/shutdown-test
 
+  echo
+  bold "Running h2-shutdown-test"
+  tools/h2-shutdown-test
+
   # HTTP/1.1 conformance tests (h1spec)
   echo
   bold "Running h1spec"

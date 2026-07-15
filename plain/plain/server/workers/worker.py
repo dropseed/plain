@@ -106,6 +106,9 @@ class Worker:
         self._servers: list[asyncio.Server] = []
         self._sigterm_time: float | None = None
         self._notify_during_drain = True
+        # Set (on the event loop) when shutdown starts — H2 connections
+        # watch this to refuse new streams and drain (h1 gates on alive).
+        self._shutdown_event: asyncio.Event = asyncio.Event()
         # Worker-level H2 stream budget — limits total in-flight H2 streams
         # across all connections to avoid overwhelming the thread pool.
         self._h2_stream_budget: asyncio.Semaphore = asyncio.Semaphore(
@@ -286,13 +289,14 @@ class Worker:
             await asyncio.sleep(1.0)
 
         # Any loop exit means shutdown — the break paths (parent death,
-        # stalled thread pool) leave alive True, but h1 keep-alive
-        # handling gates on it: clear it so h1 connections stop taking
-        # new requests, and requests parsed from here on respond with
-        # Connection: close. (Responses already dispatched still go out
-        # keep-alive, and H2 never checks alive — those connections
-        # drain only by the graceful timeout.)
+        # stalled thread pool) leave alive True, but connection handling
+        # gates on this state: h1 stops taking keep-alive requests once
+        # alive is False (requests parsed from here on respond with
+        # Connection: close; responses already dispatched still go out
+        # keep-alive), and h2 connections watch _shutdown_event to refuse
+        # new streams and drain.
         self.alive = False
+        self._shutdown_event.set()
 
         # Stop accepting new connections (don't await wait_closed() —
         # it blocks until all connection tasks finish, bypassing
@@ -354,6 +358,7 @@ class Worker:
                     self.tpool,
                     stream_budget=self._h2_stream_budget,
                     on_stream_complete=self._count_request,
+                    shutdown_event=self._shutdown_event,
                 )
                 return
 
@@ -396,6 +401,7 @@ class Worker:
     def _signal_exit(self) -> None:
         self.alive = False
         self._sigterm_time = time.monotonic()
+        self._shutdown_event.set()
         # Immediately stop accepting new connections so requests
         # don't land on a worker that's about to exit (H13 prevention).
         # This runs as an event-loop callback, so the heartbeat loop in

@@ -6,7 +6,8 @@ and nothing is logged at ERROR during a normal shutdown (a regression guard —
 a deploy-time SIGTERM once produced a spurious "Server stopped serving
 unexpectedly" error from the worker heartbeat loop; the deterministic pin for
 that race is plain/tests/internal/test_server_worker_shutdown.py, this suite
-covers the user-visible contract). H2 (TLS/ALPN) shutdown is not covered.
+covers the user-visible contract). H2 shutdown is covered by
+tools/h2-shutdown-test and plain/tests/internal/test_server_h2_shutdown.py.
 
 The phases are sequential and share the server process, so this script
 needs to own it. Run via ./tools/shutdown-test:
