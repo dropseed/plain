@@ -1454,7 +1454,7 @@ requires-dist = [{ name = "click", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-tailwind"
-version = "0.23.1"
+version = "0.23.2"
 source = { editable = "plain-tailwind" }
 dependencies = [
     { name = "httpx" },
