@@ -62,6 +62,46 @@ class TestRequestLink:
         assert len(mailoutbox) == 0
 
 
+class TestAlreadyLoggedIn:
+    def test_login_page_redirects_home(self, db):
+        client = Client()
+        client.force_login(User.query.create(email="repeat@example.com"))
+
+        response = client.get("/login")
+
+        assert response.status_code == 302
+        assert response.url == "/"
+
+    def test_login_page_redirects_to_next(self, db):
+        client = Client()
+        client.force_login(User.query.create(email="repeat@example.com"))
+
+        response = client.get("/login?next=/whoami")
+
+        assert response.status_code == 302
+        assert response.url == "/whoami"
+
+    def test_empty_next_redirects_home(self, db):
+        client = Client()
+        client.force_login(User.query.create(email="repeat@example.com"))
+
+        response = client.get("/login?next=")
+
+        # An empty Location header would redirect the browser back to
+        # the login page in a loop.
+        assert response.status_code == 302
+        assert response.url == "/"
+
+    def test_external_next_redirects_home(self, db):
+        client = Client()
+        client.force_login(User.query.create(email="repeat@example.com"))
+
+        response = client.get("/login?next=https://evil.com")
+
+        assert response.status_code == 302
+        assert response.url == "/"
+
+
 class TestFollowLink:
     def test_valid_link_logs_in(self, db, mailoutbox):
         User.query.create(email="follow@example.com")
