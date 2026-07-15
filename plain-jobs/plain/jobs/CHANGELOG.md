@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.57.0](https://github.com/dropseed/plain/releases/plain-jobs@0.57.0) (2026-07-15)
+
+### What's changed
+
+- Updated the built-in job admin (`JobRequest`, `JobProcess`, `JobResult` viewsets) to plain-admin 0.84.0's new `perform_action(self, action, objects)` signature. The bulk Delete and Retry actions now operate on the selected queryset directly. ([d35face4a6](https://github.com/dropseed/plain/commit/d35face4a6), [53c58701fd](https://github.com/dropseed/plain/commit/53c58701fd))
+- The `JobResult` retry detail action now redirects back to the current page (preserving query params) instead of the list root. ([d35face4a6](https://github.com/dropseed/plain/commit/d35face4a6))
+
+### Upgrade instructions
+
+- No changes required. If you subclass the jobs admin viewsets and override `perform_action`, update the override to the new `(action, objects)` signature — see plain-admin 0.84.0. Requires plain-admin 0.84.0.
+
 ## [0.56.1](https://github.com/dropseed/plain/releases/plain-jobs@0.56.1) (2026-07-10)
 
 ### What's changed
