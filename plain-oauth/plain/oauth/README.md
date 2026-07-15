@@ -29,7 +29,7 @@ Here is a complete example showing GitHub OAuth login.
 
 ```python
 # app/oauth.py
-import requests
+import httpx
 
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
@@ -38,7 +38,7 @@ class GitHubOAuthProvider(OAuthProvider):
     authorization_url = "https://github.com/login/oauth/authorize"
 
     def get_oauth_token(self, *, code, request):
-        response = requests.post(
+        response = httpx.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
@@ -52,7 +52,7 @@ class GitHubOAuthProvider(OAuthProvider):
         return OAuthToken(access_token=data["access_token"])
 
     def get_oauth_user(self, *, oauth_token):
-        response = requests.get(
+        response = httpx.get(
             "https://api.github.com/user",
             headers={
                 "Accept": "application/json",
@@ -192,7 +192,7 @@ if connection.access_token_expired():
     connection.refresh_access_token()
 
 # Use the token
-response = requests.get(
+response = httpx.get(
     "https://api.github.com/user/repos",
     headers={"Authorization": f"token {connection.access_token}"},
 )

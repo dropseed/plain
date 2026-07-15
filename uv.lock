@@ -924,8 +924,8 @@ name = "plain-code"
 version = "0.21.7"
 source = { editable = "plain-code" }
 dependencies = [
+    { name = "httpx" },
     { name = "plain" },
-    { name = "requests" },
     { name = "ruff" },
     { name = "tomlkit" },
     { name = "ty" },
@@ -933,8 +933,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "plain", editable = "plain" },
-    { name = "requests", specifier = ">=2.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
     { name = "tomlkit", specifier = ">=0.11.0" },
     { name = "ty", specifier = "<1.0.0" },
@@ -985,7 +985,6 @@ dependencies = [
     { name = "click" },
     { name = "plain" },
     { name = "plain-assets" },
-    { name = "requests" },
     { name = "rich" },
 ]
 
@@ -999,7 +998,6 @@ requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
-    { name = "requests", specifier = ">=2.0.0" },
     { name = "rich" },
 ]
 
@@ -1182,11 +1180,11 @@ dependencies = [
     { name = "plain-auth" },
     { name = "plain-postgres" },
     { name = "plain-templates" },
-    { name = "requests" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "httpx" },
     { name = "plain-pytest" },
 ]
 
@@ -1196,11 +1194,13 @@ requires-dist = [
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-templates", editable = "plain-templates" },
-    { name = "requests", specifier = ">=2.0.0" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "plain-pytest", editable = "plain-pytest" },
+]
 
 [[package]]
 name = "plain-oauthserver"
@@ -1396,8 +1396,8 @@ name = "plain-scan"
 version = "0.6.4"
 source = { editable = "plain-scan" }
 dependencies = [
+    { name = "httpx" },
     { name = "plain" },
-    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -1407,8 +1407,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "plain", editable = "plain" },
-    { name = "requests" },
 ]
 
 [package.metadata.requires-dev]
@@ -1457,17 +1457,17 @@ name = "plain-tailwind"
 version = "0.23.1"
 source = { editable = "plain-tailwind" }
 dependencies = [
+    { name = "httpx" },
     { name = "plain" },
     { name = "plain-assets" },
-    { name = "requests" },
     { name = "tomlkit" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
-    { name = "requests", specifier = ">=2.0.0" },
     { name = "tomlkit", specifier = ">=0.12.1" },
 ]
 
@@ -1541,17 +1541,17 @@ name = "plain-vendor"
 version = "0.11.6"
 source = { editable = "plain-vendor" }
 dependencies = [
+    { name = "httpx" },
     { name = "plain" },
     { name = "plain-assets" },
-    { name = "requests" },
     { name = "tomlkit" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
-    { name = "requests", specifier = ">=2.0.0" },
     { name = "tomlkit", specifier = ">=0.12.1" },
 ]
 

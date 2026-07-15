@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import requests
+    import httpx
 
 
 @dataclass
@@ -61,24 +61,25 @@ class ResponseMetadata:
     cookies: list[CookieMetadata] = field(default_factory=list)
 
     @classmethod
-    def from_response(cls, response: requests.Response) -> ResponseMetadata:
-        """Build ResponseMetadata from a requests.Response object."""
+    def from_response(cls, response: httpx.Response) -> ResponseMetadata:
+        """Build ResponseMetadata from an httpx.Response object."""
 
         cookies = []
 
-        # Build cookie metadata if present
-        if response.cookies:
-            for cookie in response.cookies:
-                # Non-standard attributes (SameSite, HttpOnly) live in the private
-                # `_rest` dict; SameSite casing varies by server, so match case-insensitively.
-                rest: dict[str, str | None] = getattr(cookie, "_rest", {})
-                samesite = None
-                for key in rest:
-                    if key.lower() == "samesite":
-                        samesite = rest[key]
-                        break
+        # httpx exposes parsed cookies as an httpx.Cookies wrapper; the underlying
+        # `.jar` yields http.cookiejar.Cookie objects with the attributes we need.
+        for cookie in response.cookies.jar:
+            # Non-standard attributes (SameSite, HttpOnly) live in the private
+            # `_rest` dict; SameSite casing varies by server, so match case-insensitively.
+            rest: dict[str, str | None] = getattr(cookie, "_rest", {})
+            samesite = None
+            for key in rest:
+                if key.lower() == "samesite":
+                    samesite = rest[key]
+                    break
 
-                cookie_metadata = CookieMetadata(
+            cookies.append(
+                CookieMetadata(
                     name=cookie.name,
                     value=cookie.value,
                     domain=cookie.domain,
@@ -88,18 +89,11 @@ class ResponseMetadata:
                     samesite=samesite,
                     expires=cookie.expires if cookie.expires else None,
                 )
-                cookies.append(cookie_metadata)
-
-        # response.url and status_code are always set after a successful request
-        # but types-requests stubs don't guarantee this
-        url = response.url
-        status_code = response.status_code
-        if url is None or status_code is None:
-            raise ValueError("Response missing url or status_code")
+            )
 
         return cls(
-            url=url,
-            status_code=status_code,
+            url=str(response.url),
+            status_code=response.status_code,
             headers=dict(response.headers),
             cookies=cookies,
         )
@@ -135,8 +129,8 @@ class ScanMetadata:
     responses: list[ResponseMetadata] = field(default_factory=list)
 
     @classmethod
-    def from_response(cls, response: requests.Response | None) -> ScanMetadata:
-        """Build ScanMetadata from a requests.Response object (including redirects)."""
+    def from_response(cls, response: httpx.Response | None) -> ScanMetadata:
+        """Build ScanMetadata from an httpx.Response object (including redirects)."""
 
         timestamp = datetime.now(UTC).isoformat()
 

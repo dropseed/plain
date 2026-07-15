@@ -1,15 +1,13 @@
 """Tests for individual security audits.
 
-Each audit reads a ``requests.Response`` off the scanner and returns an
+Each audit reads an ``httpx.Response`` off the scanner and returns an
 ``AuditResult``. We drive them with synthetic responses so no network access
 is required.
 """
 
 from __future__ import annotations
 
-import requests
-from requests.cookies import RequestsCookieJar
-from requests.structures import CaseInsensitiveDict
+import httpx
 
 from plain.scan.audits import (
     ContentTypeOptionsAudit,
@@ -22,14 +20,12 @@ from plain.scan.scanner import Scanner
 
 
 def make_response(*, headers=None, status_code=200, url="https://example.com/"):
-    """Build a synthetic ``requests.Response`` for driving audits offline."""
-    response = requests.Response()
-    response.status_code = status_code
-    response.url = url
-    response.headers = CaseInsensitiveDict(headers or {})
-    response.history = []
-    response.cookies = RequestsCookieJar()
-    return response
+    """Build a synthetic ``httpx.Response`` for driving audits offline."""
+    return httpx.Response(
+        status_code=status_code,
+        headers=headers or {},
+        request=httpx.Request("GET", url),
+    )
 
 
 def run_audit(audit, **response_kwargs):

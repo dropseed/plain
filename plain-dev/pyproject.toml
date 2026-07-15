@@ -10,7 +10,6 @@ dependencies = [
   "plain>=0.147.0,<1.0.0",
   "plain.assets>=0.3.0,<1.0.0",
   "click>=8.0.0",
-  "requests>=2.0.0",
   "rich",
 ]
 
