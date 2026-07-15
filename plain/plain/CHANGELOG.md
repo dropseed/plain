@@ -1,5 +1,19 @@
 # plain changelog
 
+## [0.152.0](https://github.com/dropseed/plain/releases/plain@0.152.0) (2026-07-15)
+
+### What's changed
+
+- **`plain run` has been removed.** One-off code now runs through `plain shell` — either `plain shell -c "..."` or piped stdin (`cat script.py | plain shell`) — which executes it as the `__main__` module with clean, `python -c`–style tracebacks. For a standalone script file, call `plain.runtime.setup()` yourself at the top of the script and run it with `python`. The interactive REPL enrichment (banner, `SHELL_IMPORT`) continues to apply only to interactive sessions. ([7e55115d82](https://github.com/dropseed/plain/commit/7e55115d82))
+- Worker shutdown now drains in-flight connections gracefully instead of cutting them off. HTTP/1 keep-alive connections stop accepting new keep-alive requests once shutdown begins (responding `Connection: close`) across every shutdown path, and HTTP/2 connections drain by refusing new streams with `REFUSED_STREAM` (safe for clients to retry), letting dispatched streams finish, then closing with `GOAWAY`. ([b7187f56fb](https://github.com/dropseed/plain/commit/b7187f56fb), [5ebd413253](https://github.com/dropseed/plain/commit/5ebd413253))
+- The worker drain now shares one monotonic clock with the arbiter and caps itself against the arbiter's published SIGKILL deadline, so teardown reliably finishes before the process is force-killed. Connection teardown (GOAWAY flush, TLS `close_notify`, transport close) is fully time-bounded, so a slow or unresponsive peer can't stall shutdown. ([0a0ddb0ac6](https://github.com/dropseed/plain/commit/0a0ddb0ac6), [c0b7ce91e3](https://github.com/dropseed/plain/commit/c0b7ce91e3), [67520992e0](https://github.com/dropseed/plain/commit/67520992e0), [8efdc43c3a](https://github.com/dropseed/plain/commit/8efdc43c3a))
+- Connections aborted mid-TLS-handshake (port scans, load-balancer health checks) are now logged at debug instead of surfacing as errors with tracebacks. ([5a14c74223](https://github.com/dropseed/plain/commit/5a14c74223))
+- Removed a false-positive "Server stopped serving unexpectedly" error that the worker heartbeat could log during normal shutdown. ([c90350fdad](https://github.com/dropseed/plain/commit/c90350fdad))
+
+### Upgrade instructions
+
+- Replace any `plain run script.py` usage. For a quick one-off, pipe it into `plain shell` (`plain shell -c "..."` or `cat script.py | plain shell`). For a script file you keep, add `import plain.runtime; plain.runtime.setup()` at the top and run it with `python script.py`, or register it as a CLI command.
+
 ## [0.151.2](https://github.com/dropseed/plain/releases/plain@0.151.2) (2026-07-10)
 
 ### What's changed
