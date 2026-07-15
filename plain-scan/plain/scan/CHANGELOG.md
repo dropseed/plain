@@ -1,5 +1,15 @@
 # plain-scan changelog
 
+## [0.6.5](https://github.com/dropseed/plain/releases/plain-scan@0.6.5) (2026-07-15)
+
+### What's changed
+
+- Migrated the scanner from `requests` to `httpx`. Behavioral parity is preserved, with one improvement: connect and read timeouts are now caught (via `httpx.TransportError`) and recorded for the TLS audit instead of crashing the scan. `requests` is no longer a dependency. ([17570d71cf](https://github.com/dropseed/plain/commit/17570d71cf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.6.4](https://github.com/dropseed/plain/releases/plain-scan@0.6.4) (2026-06-26)
 
 ### What's changed

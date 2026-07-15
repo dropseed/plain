@@ -1393,7 +1393,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-scan"
-version = "0.6.4"
+version = "0.6.5"
 source = { editable = "plain-scan" }
 dependencies = [
     { name = "httpx" },
