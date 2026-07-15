@@ -47,8 +47,8 @@ class _StubApp:
 class _StubHeartbeat:
     """Minimal stand-in for WorkerHeartbeat."""
 
-    def __init__(self, *, kill_clock: bool = False) -> None:
-        self.kill_clock = kill_clock
+    def __init__(self, *, deadline: float = 0.0) -> None:
+        self.deadline = deadline
 
     def notify(self) -> None:
         pass
@@ -56,8 +56,8 @@ class _StubHeartbeat:
     def is_retiring(self) -> bool:
         return False
 
-    def has_kill_clock(self) -> bool:
-        return self.kill_clock
+    def kill_deadline(self) -> float:
+        return self.deadline
 
 
 class _CaptureHandler(logging.Handler):
@@ -177,28 +177,16 @@ def test_stalled_pool_drain_skips_heartbeat() -> None:
     assert notifies == 0
 
 
-def test_sigterm_time_latches_on_first_signal() -> None:
-    # A re-sent SIGTERM must not push the drain deadline forward — the
-    # arbiter's SIGKILL clock starts at the first one.
-    worker = _make_worker()
-    worker._signal_exit()
-    first = worker._sigterm_time
-    time.sleep(0.02)
-    worker._signal_exit()
-    assert worker._sigterm_time == first
-
-
-def test_no_kill_clock_keeps_full_graceful_window() -> None:
+def test_no_kill_deadline_keeps_full_graceful_window() -> None:
     # A retirement SIGTERM comes from our own arbiter with no SIGKILL
-    # follower (the arbiter only marks the kill clock in _stop), so the
-    # drain keeps the full graceful window even long after the signal.
+    # follower (only _stop publishes a kill deadline), so the drain keeps
+    # the full graceful window.
     worker = _make_worker()
     worker.notify = lambda: None  # ty: ignore[invalid-assignment]
-    worker._sigterm_time = time.monotonic() - 3600
 
     completed, _ = _drain(worker, task_seconds=0.3)
 
-    assert completed, "no kill clock means the full window applies"
+    assert completed, "no kill deadline means the full window applies"
 
 
 def test_short_graceful_timeout_still_drains() -> None:
@@ -206,9 +194,8 @@ def test_short_graceful_timeout_still_drains() -> None:
     # SERVER_GRACEFUL_TIMEOUT keeps a usable drain window on SIGTERM.
     from plain.runtime import settings
 
-    worker = _make_worker(heartbeat=_StubHeartbeat(kill_clock=True))
+    worker = _make_worker(heartbeat=_StubHeartbeat(deadline=time.monotonic() + 2))
     worker.notify = lambda: None  # ty: ignore[invalid-assignment]
-    worker._sigterm_time = time.monotonic()
 
     original = settings.SERVER_GRACEFUL_TIMEOUT
     settings.SERVER_GRACEFUL_TIMEOUT = 2
@@ -220,15 +207,38 @@ def test_short_graceful_timeout_still_drains() -> None:
     assert completed, "a 0.3s request should survive a 2s graceful window"
 
 
-def test_drain_deadline_anchored_at_sigterm_time() -> None:
-    worker = _make_worker(heartbeat=_StubHeartbeat(kill_clock=True))
+def test_imminent_kill_deadline_cancels_drain() -> None:
+    # The arbiter's published SIGKILL time is already due: the drain must
+    # cancel immediately rather than waiting a fresh full window.
+    worker = _make_worker(heartbeat=_StubHeartbeat(deadline=time.monotonic()))
     worker.notify = lambda: None  # ty: ignore[invalid-assignment]
-    # Simulate SIGTERM received long ago: the graceful budget is spent, so
-    # the drain must cancel immediately rather than waiting a fresh full
-    # SERVER_GRACEFUL_TIMEOUT (the arbiter's SIGKILL is imminent).
-    worker._sigterm_time = time.monotonic() - 3600
 
     completed, elapsed = _drain(worker, task_seconds=30)
 
     assert not completed, "task should be cancelled, not awaited"
     assert elapsed < 2
+
+
+def test_kill_deadline_published_mid_drain_caps_it() -> None:
+    # A deploy can catch a worker that is already draining (retirement).
+    # The published deadline must take effect mid-drain, not only at
+    # drain start.
+    async def scenario() -> float:
+        heartbeat = _StubHeartbeat()
+        worker = _make_worker(heartbeat=heartbeat)
+        worker.notify = lambda: None  # ty: ignore[invalid-assignment]
+
+        task = asyncio.create_task(asyncio.sleep(30))
+        worker._connection_tasks.add(task)
+        await asyncio.sleep(0)
+
+        start = time.monotonic()
+        drain = asyncio.create_task(worker._graceful_shutdown())
+        await asyncio.sleep(0.3)  # drain is mid-window, no deadline yet
+        heartbeat.deadline = time.monotonic()  # deploy: SIGKILL imminent
+        await asyncio.wait_for(drain, timeout=5)
+        return time.monotonic() - start
+
+    elapsed = asyncio.run(scenario())
+    # The drain noticed the published deadline within about one slice.
+    assert elapsed < 3

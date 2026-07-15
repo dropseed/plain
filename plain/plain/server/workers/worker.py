@@ -104,7 +104,6 @@ class Worker:
         self.nr_conns: int = 0
         self._connection_tasks: set[asyncio.Task] = set()
         self._servers: list[asyncio.Server] = []
-        self._sigterm_time: float | None = None
         self._notify_during_drain = True
         # Set (on the event loop) when shutdown starts — H2 connections
         # watch this to refuse new streams and drain (h1 gates on alive).
@@ -375,22 +374,24 @@ class Worker:
             from plain.runtime import settings
 
             timeout = settings.SERVER_GRACEFUL_TIMEOUT
-            if self._sigterm_time is not None and self.heartbeat.has_kill_clock():
-                # This shutdown ends in a SIGKILL SERVER_GRACEFUL_TIMEOUT
-                # after the SIGTERM (the arbiter marks that on the
-                # heartbeat) — stop draining early enough that the
-                # cancellation and teardown below still run before it
-                # lands. The margin is capped at half the window so
-                # deliberately short graceful timeouts still get a real
-                # drain. Retirement SIGTERMs have no SIGKILL follower and
-                # keep the full window.
-                elapsed = time.monotonic() - self._sigterm_time
-                margin = min(DRAIN_TEARDOWN_MARGIN, timeout / 2)
-                timeout = max(0.0, timeout - elapsed - margin)
+            # The margin is capped at half the window so deliberately
+            # short graceful timeouts still get a real drain.
+            margin = min(DRAIN_TEARDOWN_MARGIN, timeout / 2)
 
             deadline = time.monotonic() + timeout
             pending = set(self._connection_tasks)
             while pending:
+                # When this shutdown ends in SIGKILL, the arbiter
+                # publishes its kill time on the heartbeat — cap the
+                # drain so the cancellation and teardown below still run
+                # before it lands. Re-read every slice: a deploy can
+                # catch a worker that is already draining (e.g.
+                # retiring). Retirement SIGTERMs have no SIGKILL
+                # follower, publish nothing, and keep the full window.
+                kill_deadline = self.heartbeat.kill_deadline()
+                if kill_deadline:
+                    deadline = min(deadline, kill_deadline - margin)
+
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break
@@ -410,11 +411,6 @@ class Worker:
 
     def _signal_exit(self) -> None:
         self.alive = False
-        # Latch the first SIGTERM — the SIGKILL clock (when there is one;
-        # see has_kill_clock) starts then, so a re-sent SIGTERM must not
-        # push the drain deadline past it.
-        if self._sigterm_time is None:
-            self._sigterm_time = time.monotonic()
         self._shutdown_event.set()
         # Immediately stop accepting new connections so requests
         # don't land on a worker that's about to exit (H13 prevention).

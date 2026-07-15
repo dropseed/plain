@@ -24,12 +24,13 @@ class WorkerHeartbeat:
         # The arbiter reads this to pre-spawn a replacement before
         # shutting down the retiring worker.
         self._retiring = mp_context.Value("b", 0, lock=False)
-        # Kill-clock flag — set by the arbiter right before a shutdown
-        # SIGTERM that will be followed by SIGKILL after
-        # SERVER_GRACEFUL_TIMEOUT. The worker reserves teardown time from
-        # its drain window only when this is set; retirement SIGTERMs
-        # (no SIGKILL follower) leave it unset.
-        self._kill_clock = mp_context.Value("b", 0, lock=False)
+        # SIGKILL deadline — the arbiter publishes its monotonic kill
+        # time here right before a shutdown SIGTERM that ends in SIGKILL.
+        # The worker caps its drain against this (re-read every drain
+        # slice, so a deploy that catches an already-draining worker still
+        # applies). 0.0 means no SIGKILL is coming — retirement SIGTERMs
+        # leave it unset and get the full graceful window.
+        self._kill_deadline = mp_context.Value("d", 0.0, lock=False)
 
     def notify(self) -> None:
         self._timestamp.value = time.monotonic()
@@ -43,11 +44,11 @@ class WorkerHeartbeat:
     def is_retiring(self) -> bool:
         return bool(self._retiring.value)
 
-    def set_kill_clock(self) -> None:
-        self._kill_clock.value = 1
+    def set_kill_deadline(self, deadline: float) -> None:
+        self._kill_deadline.value = deadline
 
-    def has_kill_clock(self) -> bool:
-        return bool(self._kill_clock.value)
+    def kill_deadline(self) -> float:
+        return self._kill_deadline.value
 
     def close(self) -> None:
         # No-op: shared memory is cleaned up automatically.
