@@ -9,7 +9,7 @@
     - [Mark commands as common](#mark-commands-as-common)
     - [Bridge CLI options to settings](#bridge-cli-options-to-settings)
 - [Shell](#shell)
-    - [Run a script with app context](#run-a-script-with-app-context)
+    - [Standalone scripts](#standalone-scripts)
     - [SHELL_IMPORT](#shell_import)
 - [Built-in commands](#built-in-commands)
 - [FAQs](#faqs)
@@ -137,47 +137,46 @@ Pass `cls=SettingOption` and `setting="SETTING_NAME"` to any `@click.option`. Th
 
 `SettingOption` cannot be combined with `envvar=` or `default=` — the setting is the single source of truth for both the default value and environment variable resolution.
 
-## Python
+## Shell
 
-The `plain python` command supports the common execution modes of the `python` interpreter, but always runs `plain.runtime.setup()` first so your settings, models, and packages are ready:
-
-```bash
-$ plain python                  # interactive REPL
-$ plain python -c "..."         # execute a string, then exit
-$ plain python -m module        # run a module as __main__
-$ plain python script.py        # run a file as __main__
-$ plain python -                # execute stdin, then exit
-$ echo "..." | plain python     # execute piped input
-```
-
-These are the supported modes — other interpreter flags (`-O`, `-W`, etc.) aren't emulated and produce an error.
-
-For one-off commands, use the `-c` flag; for scripts, pass the file:
-
-```bash
-$ plain python -c "from app.users.models import User; print(User.query.count())"
-$ plain python scripts/import_data.py
-```
-
-Arguments after the script are passed through as `sys.argv`, just like `python script.py arg1 arg2`.
-
-If you have IPython installed, the REPL uses it automatically. You can also specify an interface explicitly:
-
-```bash
-$ plain python --interface ipython
-$ plain python --interface bpython
-$ plain python --interface python
-```
-
-### Shell
-
-`plain shell` is a shortcut to the interactive REPL — the same thing as running `plain python` with no arguments. Use it if that name is more familiar:
+The `plain shell` command starts an interactive Python REPL with your app already configured — settings, models, and packages are ready to use:
 
 ```bash
 $ plain shell
 ```
 
-Only the interactive REPL is enriched (see `SHELL_IMPORT` below). The `-c`, `-m`, file, and stdin modes run your code as-is with nothing auto-imported, matching how `python` only honors `PYTHONSTARTUP` for interactive sessions.
+If you have IPython installed, it will be used automatically. You can also specify an interface explicitly:
+
+```bash
+$ plain shell --interface ipython
+$ plain shell --interface bpython
+$ plain shell --interface python
+```
+
+For one-off code, use the `-c` flag or pipe to stdin:
+
+```bash
+$ plain shell -c "from app.users.models import User; print(User.query.count())"
+$ echo "print(User.query.count())" | plain shell
+```
+
+Only the interactive REPL is enriched (see `SHELL_IMPORT` below). The `-c` and stdin modes run your code as-is with nothing auto-imported, matching how `python` only honors `PYTHONSTARTUP` for interactive sessions.
+
+### Standalone scripts
+
+There's no wrapper command for running script files — configure the app yourself at the top of the script:
+
+```python
+import plain.runtime
+
+plain.runtime.setup()
+
+from app.users.models import User
+
+print(User.query.count())
+```
+
+Then run it like any other Python script (`python scripts/import_data.py`), with normal `sys.argv` behavior for arguments. If a script becomes a keeper, register it as a CLI command instead (see [Adding commands](#adding-commands)).
 
 ### SHELL_IMPORT
 
@@ -198,26 +197,25 @@ from app.users.models import User
 __all__ = ["Project", "User"]
 ```
 
-Now when you run `plain python` (or `plain shell`), those objects will be automatically imported and available in the interactive REPL.
+Now when you run `plain shell`, those objects will be automatically imported and available in the interactive REPL.
 
 ## Built-in commands
 
 Plain includes several built-in commands:
 
-| Command               | Description                              |
-| --------------------- | ---------------------------------------- |
-| `plain check`         | Run core validation checks               |
-| `plain python`        | Run Python with the app configured       |
-| `plain shell`         | Interactive Python shell (REPL shortcut) |
-| `plain server`        | Production-ready HTTP server             |
-| `plain preflight`     | Validation checks before deployment      |
-| `plain create <name>` | Create a new local package               |
-| `plain settings`      | View current settings                    |
-| `plain urls`          | List all URL patterns                    |
-| `plain docs`          | View package documentation               |
-| `plain install`       | Install package dependencies             |
-| `plain upgrade`       | Upgrade Plain packages                   |
-| `plain memory`        | Memory profiling tools                   |
+| Command               | Description                         |
+| --------------------- | ----------------------------------- |
+| `plain check`         | Run core validation checks          |
+| `plain shell`         | Interactive Python shell            |
+| `plain server`        | Production-ready HTTP server        |
+| `plain preflight`     | Validation checks before deployment |
+| `plain create <name>` | Create a new local package          |
+| `plain settings`      | View current settings               |
+| `plain urls`          | List all URL patterns               |
+| `plain docs`          | View package documentation          |
+| `plain install`       | Install package dependencies        |
+| `plain upgrade`       | Upgrade Plain packages              |
+| `plain memory`        | Memory profiling tools              |
 
 Additional commands are added by installed packages (like `plain migrations apply` from plain.postgres).
 

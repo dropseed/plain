@@ -29,7 +29,7 @@ This server only issues **public** clients (PKCE, no secret), so create one
 without a secret:
 
 ```bash
-uv run plain python -c "
+uv run plain shell -c "
 from plain.oauthserver.models import OAuthApplication
 app = OAuthApplication(
     name='Conformance Suite',
