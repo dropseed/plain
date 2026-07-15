@@ -1036,6 +1036,31 @@ document.addEventListener("DOMContentLoaded", () => {
     rows, each clickable to copy via the <code>data-copy-value</code> behavior.
 </p>
 
+<p class="text-sm text-admin-muted-foreground mt-3">
+    Panels open below the trigger by default. Set
+    <code>data-hovercard-side="right|left|top|bottom"</code> on the panel — or on any ancestor,
+    like a table column — to change the side. Steering a whole column to
+    <code>right</code> keeps the trigger column clear so you can scan straight down it without the
+    open panel covering the next row (handy for the auto-wrapped <code>&lt;time&gt;</code> cells,
+    whose panels you don't author directly).
+</p>
+
+{% call example("Right-side placement") %}
+<div class="text-sm">
+    Updated
+    <span class="admin-hovercard">
+        <span class="text-admin-link cursor-help underline decoration-dotted">just now</span>
+        <div data-hovercard data-hovercard-side="right" class="w-64 whitespace-normal flex gap-3 p-3">
+            <div class="flex flex-col gap-0.5 min-w-0">
+                <span class="font-medium">Opens to the right</span>
+                <span class="text-admin-muted-foreground text-xs">Trigger column stays clear for vertical scanning.</span>
+            </div>
+        </div>
+    </span>
+    by the worker.
+</div>
+{% endcall %}
+
 {% call example("Auto-wrapped <time> element") %}
 <div class="text-sm">
     Last seen <time datetime="2026-04-27T14:14:00Z">2 days ago</time> by alice.
