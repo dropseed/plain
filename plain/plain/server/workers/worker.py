@@ -22,6 +22,7 @@ import logging
 import os
 import random
 import signal
+import ssl
 import sys
 import time
 from collections.abc import Sequence
@@ -199,6 +200,27 @@ class Worker:
         if settings.DEBUG:
             loop.set_debug(True)
             loop.slow_callback_duration = 0.1
+
+        # Port scans and TCP health checks (load balancers, `nc -z`) abort
+        # mid-TLS-handshake constantly — asyncio logs each one as an error
+        # with a traceback. Routine connection noise, not application errors.
+        def _accept_error_handler(
+            loop: asyncio.AbstractEventLoop, context: dict[str, Any]
+        ) -> None:
+            if context.get(
+                "message"
+            ) == "Error on transport creation for incoming connection" and isinstance(
+                context.get("exception"),
+                ConnectionResetError | BrokenPipeError | ssl.SSLError | TimeoutError,
+            ):
+                self.log.debug(
+                    "Connection aborted during accept/TLS handshake",
+                    extra={"error": repr(context.get("exception"))},
+                )
+                return
+            loop.default_exception_handler(context)
+
+        loop.set_exception_handler(_accept_error_handler)
 
         # Signal handlers
         loop.add_signal_handler(signal.SIGTERM, self._signal_exit)
