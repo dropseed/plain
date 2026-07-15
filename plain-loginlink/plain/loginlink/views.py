@@ -25,8 +25,7 @@ class LoginLinkFormView(AuthView, FormView[LoginLinkForm]):
 
     def get(self) -> Response:
         # Redirect if the user is already logged in. The form is never
-        # validated on a GET (no cleaned_data), so "next" comes straight
-        # from the query string, like LoginLinkSentView.
+        # validated on a GET, so "next" comes from the query string.
         if self.user:
             return RedirectResponse(self.request.query_params.get("next", "/"))
 
