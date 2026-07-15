@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.auth import login, logout
 from plain.auth.views import AuthView
@@ -18,6 +18,19 @@ from .links import (
     get_link_token_user,
 )
 
+if TYPE_CHECKING:
+    from plain.http import Request
+
+
+def redirect_to_next_url(request: Request, default: str = "/") -> RedirectResponse:
+    """Redirect to the "next" query param, or the default when it's missing,
+    empty, or an external URL (which RedirectResponse refuses)."""
+    next_url = request.query_params.get("next") or default
+    try:
+        return RedirectResponse(next_url)
+    except ValueError:
+        return RedirectResponse(default)
+
 
 class LoginLinkFormView(AuthView, FormView[LoginLinkForm]):
     form_class = LoginLinkForm
@@ -27,7 +40,7 @@ class LoginLinkFormView(AuthView, FormView[LoginLinkForm]):
         # Redirect if the user is already logged in. The form is never
         # validated on a GET, so "next" comes from the query string.
         if self.user:
-            return RedirectResponse(self.request.query_params.get("next", "/"))
+            return redirect_to_next_url(self.request)
 
         return super().get()
 
@@ -50,7 +63,7 @@ class LoginLinkSentView(AuthView, TemplateView):
     def get(self) -> Response:
         # Redirect if the user is already logged in
         if self.user:
-            return RedirectResponse(self.request.query_params.get("next", "/"))
+            return redirect_to_next_url(self.request)
 
         return super().get()
 
@@ -86,7 +99,4 @@ class LoginLinkLoginView(AuthView, View):
 
         login(self.request, user)
 
-        if next_url := self.request.query_params.get("next"):
-            return RedirectResponse(next_url)
-
-        return RedirectResponse(self.success_url)
+        return redirect_to_next_url(self.request, default=self.success_url)
