@@ -1,5 +1,18 @@
 # plain-admin changelog
 
+## [0.84.0](https://github.com/dropseed/plain/releases/plain-admin@0.84.0) (2026-07-15)
+
+### What's changed
+
+- **`perform_action` now receives the selected objects, not their ids.** The signature changed from `perform_action(self, action, target_ids)` to `perform_action(self, action, objects)`. On a model list, `objects` is a lazy queryset already narrowed to the selection, so you can call `.update()` / `.delete()` directly without re-querying — and "Select all N" scales, because the selected ids never have to be materialized. On the generic base list it's a plain list. ([d35face4a6](https://github.com/dropseed/plain/commit/d35face4a6))
+- Reworked the list bulk-action selection UX. Actions now live in an **Actions** dropdown menu (always visible, its items disabled until rows are selected) that confirms before running. The header checkbox toggles the whole current page and shows an indeterminate state for a partial selection, an explicit "Select all N" mode targets every row across all pages, and a live selection summary plus a "Clear" affordance round it out. ([53c58701fd](https://github.com/dropseed/plain/commit/53c58701fd), [2c59420319](https://github.com/dropseed/plain/commit/2c59420319))
+- Admin hovercards accept a `data-hovercard-side="right|left|top|bottom"` placement option. Set it on the panel or on any ancestor (e.g. a table column) so a whole column of hovercards can open to one side, keeping the trigger column clear for vertical scanning. ([d0dd713df8](https://github.com/dropseed/plain/commit/d0dd713df8))
+- The admin menu popover now groups pages by usage rather than code provenance: your app's pages sit unlabeled at the top, framework tooling is separated below a divider under a "System" label, and the filter shows a "No pages found" empty state when nothing matches. The filter input is restyled as a seamless field. ([f2d6d9d69e](https://github.com/dropseed/plain/commit/f2d6d9d69e), [2c59420319](https://github.com/dropseed/plain/commit/2c59420319))
+
+### Upgrade instructions
+
+- Update any `perform_action(self, action, target_ids)` overrides to `perform_action(self, action, objects)`. Instead of re-querying with `Model.query.filter(id__in=target_ids)`, use the `objects` you're handed — on a model list it's already a queryset scoped to the selection, so `objects.update(...)`, `objects.delete()`, or iterating it works directly.
+
 ## [0.83.2](https://github.com/dropseed/plain/releases/plain-admin@0.83.2) (2026-06-30)
 
 ### What's changed
