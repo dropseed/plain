@@ -9,7 +9,7 @@
     - [Mark commands as common](#mark-commands-as-common)
     - [Bridge CLI options to settings](#bridge-cli-options-to-settings)
 - [Shell](#shell)
-    - [Run a script with app context](#run-a-script-with-app-context)
+    - [Standalone scripts](#standalone-scripts)
     - [SHELL_IMPORT](#shell_import)
 - [Built-in commands](#built-in-commands)
 - [FAQs](#faqs)
@@ -139,7 +139,7 @@ Pass `cls=SettingOption` and `setting="SETTING_NAME"` to any `@click.option`. Th
 
 ## Shell
 
-The `plain shell` command starts an interactive Python shell with your Plain app already loaded.
+The `plain shell` command starts an interactive Python REPL with your app already configured — settings, models, and packages are ready to use:
 
 ```bash
 $ plain shell
@@ -153,25 +153,34 @@ $ plain shell --interface bpython
 $ plain shell --interface python
 ```
 
-For one-off commands, use the `-c` flag:
+For one-off code, use the `-c` flag or pipe to stdin:
 
 ```bash
 $ plain shell -c "from app.users.models import User; print(User.query.count())"
+$ echo "print(User.query.count())" | plain shell
 ```
 
-### Run a script with app context
+Only the interactive REPL is enriched (see `SHELL_IMPORT` below). The `-c` and stdin modes run your code as-is with nothing auto-imported, matching how `python` only honors `PYTHONSTARTUP` for interactive sessions.
 
-The `plain run` command executes a Python script with your app context already set up:
+### Standalone scripts
 
-```bash
-$ plain run scripts/import_data.py
+There's no wrapper command for running script files — configure the app yourself at the top of the script:
+
+```python
+import plain.runtime
+
+plain.runtime.setup()
+
+from app.users.models import User
+
+print(User.query.count())
 ```
 
-This is useful for one-off scripts that need access to your models and settings.
+Then run it like any other Python script (`python scripts/import_data.py`), with normal `sys.argv` behavior for arguments. If a script becomes a keeper, register it as a CLI command instead (see [Adding commands](#adding-commands)).
 
 ### SHELL_IMPORT
 
-Customize what gets imported automatically when the shell starts by setting `SHELL_IMPORT` in your settings:
+Customize what gets imported automatically when the interactive REPL starts by setting `SHELL_IMPORT` in your settings:
 
 ```python
 # app/settings.py
@@ -188,26 +197,25 @@ from app.users.models import User
 __all__ = ["Project", "User"]
 ```
 
-Now when you run `plain shell`, those objects will be automatically imported and available.
+Now when you run `plain shell`, those objects will be automatically imported and available in the interactive REPL.
 
 ## Built-in commands
 
 Plain includes several built-in commands:
 
-| Command               | Description                              |
-| --------------------- | ---------------------------------------- |
-| `plain check`         | Run core validation checks               |
-| `plain shell`         | Interactive Python shell                 |
-| `plain run <script>`  | Execute a Python script with app context |
-| `plain server`        | Production-ready HTTP server             |
-| `plain preflight`     | Validation checks before deployment      |
-| `plain create <name>` | Create a new local package               |
-| `plain settings`      | View current settings                    |
-| `plain urls`          | List all URL patterns                    |
-| `plain docs`          | View package documentation               |
-| `plain install`       | Install package dependencies             |
-| `plain upgrade`       | Upgrade Plain packages                   |
-| `plain memory`        | Memory profiling tools                   |
+| Command               | Description                         |
+| --------------------- | ----------------------------------- |
+| `plain check`         | Run core validation checks          |
+| `plain shell`         | Interactive Python shell            |
+| `plain server`        | Production-ready HTTP server        |
+| `plain preflight`     | Validation checks before deployment |
+| `plain create <name>` | Create a new local package          |
+| `plain settings`      | View current settings               |
+| `plain urls`          | List all URL patterns               |
+| `plain docs`          | View package documentation          |
+| `plain install`       | Install package dependencies        |
+| `plain upgrade`       | Upgrade Plain packages              |
+| `plain memory`        | Memory profiling tools              |
 
 Additional commands are added by installed packages (like `plain migrations apply` from plain.postgres).
 
