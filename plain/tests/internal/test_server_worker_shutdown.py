@@ -159,6 +159,36 @@ def test_stalled_pool_drain_skips_heartbeat() -> None:
     assert notifies == 0
 
 
+def test_sigterm_time_latches_on_first_signal() -> None:
+    # A re-sent SIGTERM must not push the drain deadline forward — the
+    # arbiter's SIGKILL clock starts at the first one.
+    worker = _make_worker()
+    worker._signal_exit()
+    first = worker._sigterm_time
+    time.sleep(0.02)
+    worker._signal_exit()
+    assert worker._sigterm_time == first
+
+
+def test_short_graceful_timeout_still_drains() -> None:
+    # The teardown margin is capped so a deliberately short
+    # SERVER_GRACEFUL_TIMEOUT keeps a usable drain window on SIGTERM.
+    from plain.runtime import settings
+
+    worker = _make_worker()
+    worker.notify = lambda: None  # ty: ignore[invalid-assignment]
+    worker._sigterm_time = time.monotonic()
+
+    original = settings.SERVER_GRACEFUL_TIMEOUT
+    settings.SERVER_GRACEFUL_TIMEOUT = 2
+    try:
+        completed, _ = _drain(worker, task_seconds=0.3)
+    finally:
+        settings.SERVER_GRACEFUL_TIMEOUT = original
+
+    assert completed, "a 0.3s request should survive a 2s graceful window"
+
+
 def test_drain_deadline_anchored_at_sigterm_time() -> None:
     worker = _make_worker()
     worker.notify = lambda: None  # ty: ignore[invalid-assignment]

@@ -375,8 +375,11 @@ class Worker:
                 # The arbiter SIGKILLs SERVER_GRACEFUL_TIMEOUT after the
                 # SIGTERM it sent us — stop draining early enough that the
                 # cancellation and teardown below still run before it lands.
+                # The margin is capped at half the window so deliberately
+                # short graceful timeouts still get a real drain.
                 elapsed = time.monotonic() - self._sigterm_time
-                timeout = max(0.0, timeout - elapsed - DRAIN_TEARDOWN_MARGIN)
+                margin = min(DRAIN_TEARDOWN_MARGIN, timeout / 2)
+                timeout = max(0.0, timeout - elapsed - margin)
 
             deadline = time.monotonic() + timeout
             pending = set(self._connection_tasks)
@@ -400,7 +403,11 @@ class Worker:
 
     def _signal_exit(self) -> None:
         self.alive = False
-        self._sigterm_time = time.monotonic()
+        # Latch the first SIGTERM — the arbiter's (and any orchestrator's)
+        # SIGKILL clock starts then, so a re-sent SIGTERM must not push
+        # the drain deadline past it.
+        if self._sigterm_time is None:
+            self._sigterm_time = time.monotonic()
         self._shutdown_event.set()
         # Immediately stop accepting new connections so requests
         # don't land on a worker that's about to exit (H13 prevention).

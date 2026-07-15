@@ -364,9 +364,13 @@ async def async_handle_h2_connection(
             await state.flush()
 
         while True:
-            if draining and not stream_tasks:
-                # All dispatched streams finished — close out (the finally
-                # block sends GOAWAY).
+            if draining and not stream_tasks and not state.streams:
+                # All accepted streams finished — close out (the finally
+                # block sends GOAWAY). state.streams matters too: a stream
+                # whose HEADERS arrived but whose body hasn't finished has
+                # no task yet, and GOAWAY's last_stream_id would tell the
+                # client it was processed — keep reading until it
+                # completes (bounded by the worker's drain deadline).
                 break
 
             if read_task is None:

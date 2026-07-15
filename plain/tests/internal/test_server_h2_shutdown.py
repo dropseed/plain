@@ -165,6 +165,54 @@ def test_idle_h2_connection_closes_promptly_on_shutdown() -> None:
     asyncio.run(scenario())
 
 
+def test_mid_upload_stream_survives_drain() -> None:
+    # A stream whose HEADERS arrived before shutdown but whose body is
+    # still uploading must be drained, not abandoned — GOAWAY's
+    # last_stream_id covers it, so the client would treat an abandoned
+    # stream as possibly-processed and never retry it.
+    async def scenario() -> None:
+        shutdown_event = asyncio.Event()
+        handler = _Handler()
+        client, server_task, executor = await _connect(handler, shutdown_event)
+        try:
+            body = b"x" * 64
+            client.conn.send_headers(
+                1,
+                [
+                    (":method", "POST"),
+                    (":path", "/"),
+                    (":scheme", "http"),
+                    (":authority", "testserver"),
+                    ("content-length", str(len(body))),
+                ],
+            )
+            await client.flush()
+            await asyncio.sleep(0.1)  # server has HEADERS, no body yet
+
+            shutdown_event.set()
+            await asyncio.sleep(0.7)  # past a drain poll — must stay open
+
+            client.conn.send_data(1, body, end_stream=True)
+            await client.flush()
+
+            response = await client.wait_for(
+                lambda e: isinstance(e, h2.events.ResponseReceived) and e.stream_id == 1
+            )
+            assert isinstance(response, h2.events.ResponseReceived)
+            assert dict(response.headers or [])[b":status"] == b"200"
+
+            await client.wait_for(
+                lambda e: isinstance(e, h2.events.ConnectionTerminated),
+                timeout=3.0,
+            )
+            await asyncio.wait_for(server_task, timeout=3.0)
+        finally:
+            server_task.cancel()
+            executor.shutdown(wait=False)
+
+    asyncio.run(scenario())
+
+
 def test_draining_refuses_new_streams_and_completes_inflight() -> None:
     async def scenario() -> None:
         shutdown_event = asyncio.Event()
