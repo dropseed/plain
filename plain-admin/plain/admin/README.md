@@ -436,21 +436,19 @@ class ListView(AdminModelListView):
     fields = ["id", "email", "is_active"]
     actions = ["Activate", "Deactivate", "Delete selected"]
 
-    def perform_action(self, action, target_ids):
-        users = User.query.filter(id__in=target_ids)
-
+    def perform_action(self, action, objects):
         if action == "Activate":
-            users.update(is_active=True)
+            objects.update(is_active=True)
         elif action == "Deactivate":
-            users.update(is_active=False)
+            objects.update(is_active=False)
         elif action == "Delete selected":
-            users.delete()
+            objects.delete()
 
         # Return None to redirect back to the list, or return a Response
         return None
 ```
 
-The `target_ids` parameter contains the IDs of selected items. Users can select individual rows, use the header checkbox to select the whole current page, or click "Select all N" to target the entire filtered queryset across every page. Choosing an action from the **Actions** dropdown confirms before submitting.
+The `objects` parameter is the set of selected items, already narrowed to the current filtered view. On a model list it's a queryset, so you can run set-based `.update()`/`.delete()` directly without re-querying — and "Select all N" scales, because the whole page's worth of ids never has to be materialized. Users can select individual rows, use the header checkbox to select the whole current page, or click "Select all N" to target the entire filtered queryset across every page. Choosing an action from the **Actions** dropdown confirms before submitting.
 
 ## Toolbar
 

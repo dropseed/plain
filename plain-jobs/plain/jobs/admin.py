@@ -188,9 +188,9 @@ class JobRequestViewset(AdminViewset):
         actions = ["Delete"]
         queryset_order = ["-priority", "-start_at", "-created_at"]
 
-        def perform_action(self, action: str, target_ids: list[int]) -> None:
+        def perform_action(self, action: str, objects: postgres.QuerySet) -> None:
             if action == "Delete":
-                JobRequest.query.filter(id__in=target_ids).delete()
+                objects.delete()
 
     class DetailView(AdminModelDetailView):
         model = JobRequest
@@ -221,9 +221,9 @@ class JobProcessViewset(AdminViewset):
             StaleWorkersCard,
         ]
 
-        def perform_action(self, action: str, target_ids: list[int]) -> None:
+        def perform_action(self, action: str, objects: postgres.QuerySet) -> None:
             if action == "Delete":
-                JobProcess.query.filter(id__in=target_ids).delete()
+                objects.delete()
 
     class DetailView(AdminModelDetailView):
         model = JobProcess
@@ -309,9 +309,9 @@ class JobResultViewset(AdminViewset):
                 fields.append("retry_attempt")
             return fields
 
-        def perform_action(self, action: str, target_ids: list[int]) -> None:
+        def perform_action(self, action: str, objects: postgres.QuerySet) -> None:
             if action == "Retry":
-                for result in JobResult.query.filter(id__in=target_ids):
+                for result in objects:
                     result.retry_job(delay=0)
             else:
                 raise ValueError("Invalid action")

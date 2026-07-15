@@ -1,3 +1,4 @@
+from plain import postgres
 from plain.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
@@ -22,14 +23,15 @@ class UserAdmin(AdminViewset):
         allow_global_search = True
         queryset_order = ["-created_at"]
 
-        def perform_action(self, action: str, target_ids: list) -> Response | None:
-            users = User.query.filter(id__in=target_ids)
+        def perform_action(
+            self, action: str, objects: postgres.QuerySet
+        ) -> Response | None:
             if action == "Make admin":
-                users.update(is_admin=True)
+                objects.update(is_admin=True)
             elif action == "Remove admin":
-                users.update(is_admin=False)
+                objects.update(is_admin=False)
             elif action == "Export emails":
-                emails = users.values_list("email", flat=True)
+                emails = objects.values_list("email", flat=True)
                 return Response("\n".join(emails), content_type="text/plain")
             return None
 
