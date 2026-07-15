@@ -44,6 +44,19 @@ class _StubApp:
     reload = False
 
 
+class _StubHeartbeat:
+    """Minimal stand-in for WorkerHeartbeat."""
+
+    def __init__(self, *, retiring: bool = False) -> None:
+        self.retiring = retiring
+
+    def notify(self) -> None:
+        pass
+
+    def is_retiring(self) -> bool:
+        return self.retiring
+
+
 class _CaptureHandler(logging.Handler):
     def __init__(self) -> None:
         super().__init__()
@@ -53,14 +66,16 @@ class _CaptureHandler(logging.Handler):
         self.records.append(record)
 
 
-def _make_worker(listener: _Listener | None = None) -> Worker:
+def _make_worker(
+    listener: _Listener | None = None, *, heartbeat: _StubHeartbeat | None = None
+) -> Worker:
     worker = Worker(
         age=0,
         ppid=os.getppid(),
         sockets=[listener] if listener else [],  # ty: ignore[invalid-argument-type]
         app=_StubApp(),  # ty: ignore[invalid-argument-type]
         timeout=5,
-        heartbeat=None,  # ty: ignore[invalid-argument-type]
+        heartbeat=heartbeat or _StubHeartbeat(),  # ty: ignore[invalid-argument-type]
         handler=None,
     )
     # Normally created in init_process(), which these tests bypass.
@@ -168,6 +183,15 @@ def test_sigterm_time_latches_on_first_signal() -> None:
     time.sleep(0.02)
     worker._signal_exit()
     assert worker._sigterm_time == first
+
+
+def test_retiring_worker_keeps_full_graceful_window() -> None:
+    # Retirement SIGTERM comes from our own arbiter with no SIGKILL
+    # follower — the drain deadline must not be anchored (and shortened
+    # by the teardown margin) for it.
+    worker = _make_worker(heartbeat=_StubHeartbeat(retiring=True))
+    worker._signal_exit()
+    assert worker._sigterm_time is None
 
 
 def test_short_graceful_timeout_still_drains() -> None:

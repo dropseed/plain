@@ -214,7 +214,11 @@ class Worker:
                 "message"
             ) == "Error on transport creation for incoming connection" and isinstance(
                 context.get("exception"),
-                ConnectionResetError | BrokenPipeError | ssl.SSLError | TimeoutError,
+                ConnectionResetError
+                | ConnectionAbortedError  # handshake timeout on 3.13+
+                | BrokenPipeError
+                | ssl.SSLError
+                | TimeoutError,
             ):
                 self.log.debug(
                     "Connection aborted during accept/TLS handshake",
@@ -405,8 +409,10 @@ class Worker:
         self.alive = False
         # Latch the first SIGTERM — the arbiter's (and any orchestrator's)
         # SIGKILL clock starts then, so a re-sent SIGTERM must not push
-        # the drain deadline past it.
-        if self._sigterm_time is None:
+        # the drain deadline past it. Retirement is the exception: that
+        # SIGTERM comes from our own arbiter with no SIGKILL follower, so
+        # the drain keeps the full graceful window.
+        if self._sigterm_time is None and not self.heartbeat.is_retiring():
             self._sigterm_time = time.monotonic()
         self._shutdown_event.set()
         # Immediately stop accepting new connections so requests

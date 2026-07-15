@@ -570,20 +570,27 @@ async def async_handle_h2_connection(
             goaway_data = conn.data_to_send()
             if goaway_data:
                 writer.write(goaway_data)
-                await writer.drain()
+                # Bounded — a backpressured peer must not stall teardown.
+                await asyncio.wait_for(writer.drain(), timeout=0.5)
         except Exception:
             pass
 
         # Close the connection — writer.close() sends TLS close_notify
-        # and closes the underlying transport. The wait is bounded: a peer
-        # that never answers the close_notify would otherwise pin this
-        # task for ssl_shutdown_timeout (30s), holding up worker drain.
+        # and closes the underlying transport. Every wait here is bounded
+        # so the whole teardown fits inside the worker's
+        # DRAIN_TEARDOWN_MARGIN: a peer that never answers the
+        # close_notify would otherwise pin this task for
+        # ssl_shutdown_timeout (30s) and lose the race to the arbiter's
+        # SIGKILL. On timeout, abort the transport outright.
         if not writer.is_closing():
             writer.close()
         try:
-            await asyncio.wait_for(writer.wait_closed(), timeout=2.0)
+            await asyncio.wait_for(writer.wait_closed(), timeout=1.0)
         except (TimeoutError, OSError):
-            pass
+            try:
+                writer.transport.abort()
+            except Exception:
+                pass
 
 
 async def _async_handle_stream(
