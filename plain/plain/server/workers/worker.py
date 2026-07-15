@@ -23,7 +23,6 @@ import os
 import random
 import signal
 import sys
-import time
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from types import FrameType
@@ -166,9 +165,12 @@ class Worker:
 
             def changed(fname: str) -> None:
                 self.log.debug("Server worker reloading", extra={"modified": fname})
+                # Runs on the Reloader thread — flag the heartbeat loop,
+                # which notices within about a second (longer if the
+                # thread pool is backed up) and shuts down gracefully.
+                # (sys.exit() here would only end the watcher thread,
+                # not the process.)
                 self.alive = False
-                time.sleep(0.1)
-                sys.exit(0)
 
             self.reloader = Reloader(callback=changed, watch_html=True)
 
@@ -195,8 +197,9 @@ class Worker:
         loop.add_signal_handler(signal.SIGINT, self._signal_quit)
         loop.add_signal_handler(signal.SIGQUIT, self._signal_quit)
         loop.add_signal_handler(signal.SIGUSR1, self._handle_memory_signal)
-        # SIGABRT/SIGWINCH use signal.signal() because they need the
-        # (sig, frame) signature and call sys.exit() directly
+        # SIGABRT/SIGWINCH use signal.signal() because they take the
+        # (sig, frame) signature; handle_abort also exits the process
+        # directly (handle_winch just ignores the signal)
         signal.signal(signal.SIGABRT, self.handle_abort)
         signal.signal(signal.SIGWINCH, self.handle_winch)
         signal.siginterrupt(signal.SIGTERM, False)
@@ -250,6 +253,15 @@ class Worker:
                 break
 
             await asyncio.sleep(1.0)
+
+        # Any loop exit means shutdown — the break paths (parent death,
+        # stalled thread pool) leave alive True, but h1 keep-alive
+        # handling gates on it: clear it so h1 connections stop taking
+        # new requests, and requests parsed from here on respond with
+        # Connection: close. (Responses already dispatched still go out
+        # keep-alive, and H2 never checks alive — those connections
+        # drain only by the graceful timeout.)
+        self.alive = False
 
         # Stop accepting new connections (don't await wait_closed() —
         # it blocks until all connection tasks finish, bypassing
