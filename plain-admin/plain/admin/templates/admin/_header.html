@@ -157,11 +157,11 @@
                 </div>
 
                 <div class="overflow-auto flex-1 py-2 px-1.5" id="menu-items-container">
-                    {% with sections=admin_registry.get_nav_sections(plain_packages=False, user=user), header_label="App" %}
+                    {% with sections=admin_registry.get_nav_sections(plain_packages=False, user=user), group_label=None %}
                         {% include "admin/_menu_section.html" %}
                     {% endwith %}
 
-                    {% with sections=admin_registry.get_nav_sections(plain_packages=True, user=user), header_label="Packages" %}
+                    {% with sections=admin_registry.get_nav_sections(plain_packages=True, user=user), group_label="System" %}
                         {% include "admin/_menu_section.html" %}
                     {% endwith %}
                 </div>
