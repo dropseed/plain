@@ -97,6 +97,7 @@ class Worker:
         )
         self.nr_conns: int = 0
         self._connection_tasks: set[asyncio.Task] = set()
+        self._servers: list[asyncio.Server] = []
         # Worker-level H2 stream budget — limits total in-flight H2 streams
         # across all connections to avoid overwhelming the thread pool.
         self._h2_stream_budget: asyncio.Semaphore = asyncio.Semaphore(
@@ -212,8 +213,6 @@ class Worker:
         )
 
         # Start servers (one per listener socket)
-        self._servers: list[asyncio.Server] = []
-        servers = self._servers
         for listener in self.sockets:
             assert listener.sock is not None, "Listener socket is closed"
             listener.sock.setblocking(False)
@@ -223,9 +222,11 @@ class Worker:
                 ssl=ssl_ctx,
                 ssl_handshake_timeout=10 if ssl_ctx else None,
             )
-            servers.append(server)
+            self._servers.append(server)
 
-        # Heartbeat loop
+        # Heartbeat loop. _signal_exit can close self._servers between any
+        # two awaits in this body (see its comment) — per-tick checks on
+        # server state would false-positive during shutdown.
         while self.alive:
             self.notify()
             if not self.is_parent_alive():
@@ -248,19 +249,12 @@ class Worker:
                 )
                 break
 
-            # Surface server crashes
-            for server in servers:
-                if not server.is_serving():
-                    self.log.error("Server stopped serving unexpectedly")
-                    self.alive = False
-                    break
-
             await asyncio.sleep(1.0)
 
         # Stop accepting new connections (don't await wait_closed() —
         # it blocks until all connection tasks finish, bypassing
         # _graceful_shutdown's timeout enforcement)
-        for server in servers:
+        for server in self._servers:
             server.close()
 
         await self._graceful_shutdown()
@@ -341,7 +335,10 @@ class Worker:
         self.alive = False
         # Immediately stop accepting new connections so requests
         # don't land on a worker that's about to exit (H13 prevention).
-        for server in getattr(self, "_servers", ()):
+        # This runs as an event-loop callback, so the heartbeat loop in
+        # run() can resume mid-iteration and observe these servers already
+        # closed — per-tick checks on server state would false-positive here.
+        for server in self._servers:
             server.close()
 
     def _signal_quit(self) -> None:
