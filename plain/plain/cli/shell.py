@@ -20,7 +20,7 @@ def _run_source(source: str, filename: str, argv0: str) -> None:
     so the app is configured. Registering a real module as
     sys.modules["__main__"] keeps `python -c` semantics: user code gets a
     clean namespace, and objects it defines can be resolved through their
-    module (pickle, multiprocessing).
+    module (pickle).
     """
     sys.argv = [argv0]
     module = types.ModuleType("__main__")
@@ -44,22 +44,19 @@ _INTERFACES = {
 }
 
 
-def _default_interface() -> list[str]:
-    try:
-        import IPython  # noqa: F401  # ty: ignore[unresolved-import]
-
-        return _INTERFACES["ipython"]
-    except ImportError:
-        return _INTERFACES["python"]
-
-
 def _run_repl(interface: str | None) -> None:
     """Enriched interactive REPL: banner + SHELL_IMPORT via PYTHONSTARTUP."""
-    interface_list = _INTERFACES[interface] if interface else _default_interface()
+    if interface is None:
+        try:
+            import IPython  # noqa: F401  # ty: ignore[unresolved-import]
+
+            interface = "ipython"
+        except ImportError:
+            interface = "python"
     # Plain's startup file must win over any PYTHONSTARTUP the user has exported,
     # otherwise the banner + SHELL_IMPORT enrichment is silently replaced.
     result = subprocess.run(
-        interface_list,
+        _INTERFACES[interface],
         env={**os.environ, "PYTHONSTARTUP": _STARTUP},
     )
     if result.returncode:
@@ -71,7 +68,7 @@ def _run_repl(interface: str | None) -> None:
 @click.option(
     "-i",
     "--interface",
-    type=click.Choice(["ipython", "bpython", "python"]),
+    type=click.Choice(list(_INTERFACES)),
     help="Specify an interactive interpreter interface.",
 )
 @click.option(
