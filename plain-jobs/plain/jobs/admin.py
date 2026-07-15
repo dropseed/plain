@@ -322,7 +322,7 @@ class JobResultViewset(AdminViewset):
 
         def post(self) -> RedirectResponse:
             self.object.retry_job(delay=0)
-            return RedirectResponse(".")
+            return RedirectResponse(self.request.get_full_path())
 
 
 @register_viewset

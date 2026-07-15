@@ -450,7 +450,7 @@ class ListView(AdminModelListView):
         return None
 ```
 
-The `target_ids` parameter contains the IDs of selected items. Users can select individual items or use "Select all" to target the entire filtered queryset.
+The `target_ids` parameter contains the IDs of selected items. Users can select individual rows, use the header checkbox to select the whole current page, or click "Select all N" to target the entire filtered queryset across every page. Choosing an action from the **Actions** dropdown confirms before submitting.
 
 ## Toolbar
 

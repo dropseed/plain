@@ -136,7 +136,7 @@ class AdminListView(HTMXView, AdminView):
         action_name = self.request.form_data.get("action_name")
         actions = self.get_actions()
         if action_name and action_name in actions:
-            action_ids_param = self.request.form_data["action_ids"]
+            action_ids_param = self.request.form_data.get("action_ids", "")
             if action_ids_param == "__all__":
                 target_ids = [self.get_object_id(obj) for obj in self.process_objects()]
             else:
@@ -145,8 +145,9 @@ class AdminListView(HTMXView, AdminView):
             if response:
                 return response
             else:
-                # message in session first
-                return RedirectResponse(".")
+                # Redirect back to the list, keeping the current query params
+                # (page, search, filter).
+                return RedirectResponse(self.request.get_full_path())
 
         raise ValueError("Invalid action")
 
