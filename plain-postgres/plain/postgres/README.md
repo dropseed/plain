@@ -775,6 +775,26 @@ Environment overrides: every setting accepts `PLAIN_POSTGRES_*` env vars, so you
 PLAIN_POSTGRES_MIGRATION_STATEMENT_TIMEOUT=30s plain migrations apply
 ```
 
+### Schema lock
+
+Schema-changing commands — `plain postgres sync`, `plain migrations apply`, `plain postgres converge`, and `plain postgres drop-unknown-tables` — serialize on a single session-level advisory lock, so two deploy processes running at once (a retried migrate job, overlapping release phases) can't interleave schema changes. You don't have to do anything to get this.
+
+A second process warns and waits, retrying until the holder finishes:
+
+```python
+# app/settings.py — defaults shown (waits up to an hour total)
+POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL = 5.0
+POSTGRES_SCHEMA_LOCK_MAX_RETRIES = 720
+```
+
+The wait is generous by default because a legitimate holder can be mid index build. If the budget runs out, the command fails with the holder's `pid` so you can see what's blocking. A crashed holder is not a problem — the lock releases automatically when its database session closes.
+
+The lock is held on its own connection, separate from the one running DDL, so non-transactional operations (`CREATE INDEX CONCURRENTLY`, `VALIDATE CONSTRAINT`) work normally while it's held. Session-level locks don't survive transaction-mode poolers like pgbouncer — if your `POSTGRES_URL` points at one, set [`POSTGRES_MANAGEMENT_URL`](#bypassing-a-connection-pooler-for-management-operations) to a direct connection.
+
+The lock connection sits idle while your DDL runs, so it enables TCP keepalives to survive NAT and load-balancer idle timeouts. A server-side `idle_session_timeout` would still kill it (releasing the lock mid-run) — don't set one for the role that runs migrations. `sync` re-verifies the lock between its migrate and converge phases and stops with a clear error if the session died.
+
+To see the lock live: `SELECT * FROM pg_locks WHERE locktype = 'advisory' AND objid = 1047265496`.
+
 ## Fields
 
 You can use many field types for different data:
