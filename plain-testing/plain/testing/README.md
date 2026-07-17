@@ -300,6 +300,8 @@ def test_homepage_traced():
 
 The cache is isolated per test automatically, like the database — no helper needed.
 
+This is a deliberate boundary: `plain.test` and the runner stay package-agnostic, and each package owns its own testing story. Anything specific to a package's domain ships with that package — HTMX request helpers (the `HX-Request` / `Plain-HX-Action` headers) come from `plain.htmx.test` rather than growing on the client, query budgets come from `plain.postgres.test`, job execution from `plain.jobs.test`. The core surface stays small, and a package's test helpers evolve with the package itself.
+
 ## Running tests
 
 ```bash
@@ -384,7 +386,7 @@ A flake is a bug report about the test, not noise to suppress. Disable re-runnin
 Every test runs inside OpenTelemetry capture, which makes the framework's performance opinions assertable:
 
 ```python
-from plain.test import max_queries
+from plain.postgres.test import max_queries
 
 
 def test_dashboard_query_budget(user):
@@ -394,7 +396,7 @@ def test_dashboard_query_budget(user):
         client.get("/dashboard/")
 ```
 
-- `max_queries(n)` — the block fails if more than `n` database queries execute. A query budget is a contract, checked on every run.
+- `max_queries(n)` — the block fails if more than `n` database queries execute. A query budget is a contract, checked on every run. (It's a database assertion, so it ships with `plain.postgres`.)
 - **N+1 detection** — failure reports flag repeated query shapes automatically, the same analysis as `plain request --json`.
 - **Strict mode** — `plain test --strict` turns framework opinions into failures: any query executed during a template render fails the test ("fetch all data in the view" stops being advice and becomes a check).
 
@@ -489,7 +491,7 @@ A brand-new Plain project has meaningful checks on day one, with zero test files
 
 The system is split across three layers, and the split is what keeps a dev-only package from leaking into production code:
 
-**`plain.test` (core — always installed).** The authoring vocabulary: everything a test file imports. `Client` (redesigned as part of this — see [The test client](#the-test-client)), plus `raises`, the metadata decorators (`cases`, `skip`, `tag`, `timeout`), the context helpers (`override_settings`, `freeze_time`, `patch`, `capture_spans`, `capture_metrics`, `max_queries`), and the `TestLifecycle` protocol. These are small, dependency-light functions and context managers — none of them need the engine to exist. Keeping them in core means app code, package code, and type checkers never depend on a dev package, and `plain.test` remains the single import home you already know. It's also load-bearing outside of tests — `plain request` is built on `Client` — so it couldn't move to a dev-only package even if we wanted it to.
+**`plain.test` (core — always installed).** The authoring vocabulary: everything a test file imports. `Client` (redesigned as part of this — see [The test client](#the-test-client)), plus `raises`, the metadata decorators (`cases`, `skip`, `tag`, `timeout`), the framework-generic context helpers (`override_settings`, `freeze_time`, `patch`, `capture_spans`, `capture_metrics`), and the `TestLifecycle` protocol. Package-specific helpers are deliberately *not* here — they live in each package's own `plain.<package>.test`. These are small, dependency-light functions and context managers — none of them need the engine to exist. Keeping them in core means app code, package code, and type checkers never depend on a dev package, and `plain.test` remains the single import home you already know. It's also load-bearing outside of tests — `plain request` is built on `Client` — so it couldn't move to a dev-only package even if we wanted it to.
 
 **`plain.testing` (this package — a dev dependency).** The engine: the `plain test` CLI, collection, assertion rewriting, execution and parallelism, flake classification, reporting (`--json`, route coverage, `--changed`), the browser wrapper, and the built-in suite. Nothing in your application imports from it; it imports *you*.
 
