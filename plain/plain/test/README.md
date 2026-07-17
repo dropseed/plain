@@ -244,7 +244,7 @@ def test_homepage_span():
     assert server_span.attributes["http.route"] == "/"
 ```
 
-[`capture_spans`](./otel.py#capture_spans) yields the spans emitted during the block (`.get_finished_spans()`, `.find(kind=..., name=...)`). [`capture_metrics`](./otel.py#capture_metrics) yields an `InMemoryMetricReader` for metrics.
+[`capture_spans`](./otel.py#capture_spans) yields the spans emitted during the block (`.get_finished_spans()`, `.find(kind=..., name=...)`). [`capture_metrics`](./otel.py#capture_metrics) yields the metrics — `.points(name)` returns every data point recorded for a metric, `.collect()` forces observable callbacks, `.clear()` forgets what's been captured so far.
 
 ## RequestFactory
 

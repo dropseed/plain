@@ -39,6 +39,17 @@ def install_test_tracer() -> InMemorySpanExporter:
         provider = TracerProvider()
         provider.add_span_processor(SimpleSpanProcessor(_span_exporter))
         trace.set_tracer_provider(provider)
+        if trace.get_tracer_provider() is not provider:
+            # set_tracer_provider is one-shot: if another provider was
+            # installed first (e.g. plain.connect exporting for real), the
+            # call is silently ignored and every capture would come up empty
+            # — while test traffic exports to the real backend. Fail loudly.
+            _span_exporter = None
+            raise RuntimeError(
+                "A global tracer provider is already installed — disable it "
+                "for tests (e.g. PLAIN_CONNECT_EXPORT_ENABLED=false) so spans "
+                "can be captured."
+            )
     return _span_exporter
 
 
@@ -46,12 +57,32 @@ def install_test_meter() -> InMemoryMetricReader:
     global _metric_reader
     if _metric_reader is None:
         from opentelemetry import metrics
+        from opentelemetry.sdk.metrics import Counter, Histogram, UpDownCounter
         from opentelemetry.sdk.metrics import MeterProvider
-        from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+        from opentelemetry.sdk.metrics.export import (
+            AggregationTemporality,
+            InMemoryMetricReader,
+        )
 
-        _metric_reader = InMemoryMetricReader()
+        # Delta temporality so each collection only reports what happened
+        # since the last one — that's what makes the drain-on-entry in
+        # capture_metrics() actually isolate one test's metrics from the
+        # counters accumulated by everything that ran before it.
+        _metric_reader = InMemoryMetricReader(
+            preferred_temporality={
+                Counter: AggregationTemporality.DELTA,
+                UpDownCounter: AggregationTemporality.DELTA,
+                Histogram: AggregationTemporality.DELTA,
+            }
+        )
         provider = MeterProvider(metric_readers=[_metric_reader])
         metrics.set_meter_provider(provider)
+        if metrics.get_meter_provider() is not provider:
+            _metric_reader = None
+            raise RuntimeError(
+                "A global meter provider is already installed — disable it "
+                "for tests so metrics can be captured."
+            )
     return _metric_reader
 
 
@@ -76,24 +107,38 @@ class CapturedSpans:
 
 
 class CapturedMetrics:
-    """Metrics captured by `capture_metrics`, with small lookup conveniences."""
+    """
+    Metrics captured by `capture_metrics`.
+
+    Synchronous instruments report with delta temporality, so each drain of
+    the reader only returns what happened since the last one — drains are
+    accumulated here so `points()` always reflects the whole block.
+    """
 
     def __init__(self, reader: InMemoryMetricReader) -> None:
         self._reader = reader
+        self._collected: list[Any] = []
 
-    def get_metrics_data(self) -> Any:
-        return self._reader.get_metrics_data()
+    def _drain(self) -> None:
+        data = self._reader.get_metrics_data()
+        if data is not None:
+            self._collected.append(data)
 
     def collect(self) -> None:
-        self._reader.collect()
+        """Force a collection — triggers observable instrument callbacks."""
+        self._drain()
+
+    def clear(self) -> None:
+        """Forget the metrics captured so far in this block."""
+        self._drain()
+        self._collected.clear()
 
     def points(self, name: str) -> list[Any]:
-        """Return all data points for the named metric."""
-        data = self.get_metrics_data()
-        if data is None:
-            return []
+        """Return all data points recorded for the named metric."""
+        self._drain()
         return [
             point
+            for data in self._collected
             for resource_metrics in data.resource_metrics
             for scope_metrics in resource_metrics.scope_metrics
             for metric in scope_metrics.metrics
@@ -120,8 +165,8 @@ def capture_spans() -> Generator[CapturedSpans]:
 def capture_metrics() -> Generator[CapturedMetrics]:
     """
     The OpenTelemetry metrics emitted during the block. Drains prior
-    observations on entry. Read with `.points(name)` or `.get_metrics_data()`.
+    observations on entry. Read with `.points(name)`.
     """
     reader = install_test_meter()
-    reader.get_metrics_data()  # drain
+    reader.get_metrics_data()  # drain anything recorded before the block
     yield CapturedMetrics(reader)

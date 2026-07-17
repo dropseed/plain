@@ -57,13 +57,16 @@ def collect_tests(
     *,
     root: Path | None = None,
     exclude_dirs: Iterable[str] = (),
-) -> list[CollectedTest]:
+) -> tuple[list[CollectedTest], list[CollectionError]]:
     """
     Collect tests from the given targets (files, directories, or
     `path::test_name` ids), relative to `root` (default: cwd).
 
     `exclude_dirs` adds directory names to skip during discovery (e.g. the
     runner excludes the Plain `app` directory in app mode).
+
+    Returns the collected tests plus any per-file collection errors — one
+    unimportable file shouldn't stop every other file's tests from running.
     """
     root = (root or Path.cwd()).resolve()
     skip_dir_names = _SKIP_DIR_NAMES | set(exclude_dirs)
@@ -74,6 +77,7 @@ def collect_tests(
         sys.path.insert(0, str(root))
 
     collected: list[CollectedTest] = []
+    errors: list[CollectionError] = []
     for target in targets or ["."]:
         path_part, _, name_part = target.partition("::")
         base = (root / path_part).resolve() if path_part not in ("", ".") else root
@@ -86,13 +90,13 @@ def collect_tests(
             raise FileNotFoundError(f"No such test target: {target}")
 
         for file in files:
-            tests = _collect_file(file, root=root)
+            try:
+                tests = _collect_file(file, root=root)
+            except CollectionError as error:
+                errors.append(error)
+                continue
             if name_part:
-                tests = [
-                    t
-                    for t in tests
-                    if t.name == name_part or t.name.startswith(f"{name_part}[")
-                ]
+                tests = [t for t in tests if _matches_target(t.name, name_part)]
             collected.extend(tests)
 
     # De-duplicate (overlapping targets) while preserving order.
@@ -102,7 +106,17 @@ def collect_tests(
         if test.id not in seen:
             seen.add(test.id)
             unique.append(test)
-    return unique
+    return unique, errors
+
+
+def _matches_target(name: str, target: str) -> bool:
+    """Whether a test name matches a `::`-target: exact, a case of it, or a
+    test within the targeted class."""
+    return (
+        name == target
+        or name.startswith(f"{target}[")
+        or name.startswith(f"{target}::")
+    )
 
 
 def _find_test_files(directory: Path, *, skip_dir_names: set[str]) -> list[Path]:
@@ -140,11 +154,14 @@ def _collect_file(path: Path, *, root: Path) -> list[CollectedTest]:
 
 
 def _collect_class(cls: type, *, relative: str) -> list[CollectedTest]:
-    methods = [
-        (name, obj)
-        for name, obj in vars(cls).items()
-        if inspect.isfunction(obj) and name.startswith("test_")
-    ]
+    # Walk the MRO base-first so inherited test methods are collected too,
+    # with subclass overrides replacing the base definition in place.
+    methods_by_name: dict[str, types.FunctionType] = {}
+    for klass in reversed(cls.__mro__):
+        for name, obj in vars(klass).items():
+            if inspect.isfunction(obj) and name.startswith("test_"):
+                methods_by_name[name] = obj
+    methods = list(methods_by_name.items())
     if not methods:
         return []  # a Test*-named helper (e.g. a view class), not a test class
 

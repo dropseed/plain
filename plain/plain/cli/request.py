@@ -40,6 +40,18 @@ def _dispatch_request(
     return getattr(client, method.lower())(path, **kwargs)
 
 
+def _get_request_user(response: Any) -> Any:
+    """The authenticated user for the request, or None (plain.auth optional)."""
+    try:
+        from plain.auth.requests import get_request_user
+    except ImportError:
+        return None
+    try:
+        return get_request_user(response.request)
+    except Exception:
+        return None
+
+
 def _truncate(value: str, length: int) -> str:
     return value if len(value) <= length else value[: length - 1] + "…"
 
@@ -294,9 +306,8 @@ def request(
                 "status": response.status_code,
                 "request_id": response.request.unique_id,
             }
-            response_data["user"] = (
-                str(response.user) if getattr(response, "user", None) else None
-            )
+            request_user = _get_request_user(response)
+            response_data["user"] = str(request_user) if request_user else None
             redirects = getattr(response, "redirect_chain", None)
             if redirects:
                 response_data["redirects"] = [
@@ -351,8 +362,9 @@ def request(
                 click.echo(f"  URL pattern: {url_name}")
 
         # Always show auth state — authed vs anonymous should never be ambiguous.
-        if getattr(response, "user", None):
-            click.echo(f"  User: {response.user}")
+        request_user = _get_request_user(response)
+        if request_user:
+            click.echo(f"  User: {request_user}")
         else:
             click.echo("  User: anonymous")
 
@@ -393,14 +405,11 @@ def request(
             output = body_text
 
             if "json" in content_type:
-                # The test client adds a json() method to the response.
-                json_method = getattr(response, "json", None)
-                if callable(json_method):
-                    try:
-                        output = json.dumps(json_method(), indent=2)
-                        header = "Response Body (JSON):"
-                    except Exception:
-                        pass  # fall back to the raw decoded body
+                try:
+                    output = json.dumps(response.json_data, indent=2)
+                    header = "Response Body (JSON):"
+                except Exception:
+                    pass  # fall back to the raw decoded body
             elif "html" in content_type:
                 header = "Response Body (HTML):"
 

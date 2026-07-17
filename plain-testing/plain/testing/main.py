@@ -32,7 +32,7 @@ def main(
 
     import plain.runtime
 
-    from .collection import CollectionError, collect_tests
+    from .collection import collect_tests
     from .lifecycles import load_lifecycles
     from .reporting import Reporter
     from .runner import run_tests
@@ -54,11 +54,9 @@ def main(
     reporter = Reporter(verbose=verbose)
 
     try:
-        tests = collect_tests(list(targets), exclude_dirs=exclude_dirs)
-    except CollectionError as e:
-        click.secho(f"Collection error in {e.path}:", fg="red", bold=True, err=True)
-        click.echo(f"  {e.error!r}", err=True)
-        raise SystemExit(2)
+        tests, collection_errors = collect_tests(
+            list(targets), exclude_dirs=exclude_dirs
+        )
     except FileNotFoundError as e:
         click.secho(str(e), fg="red", err=True)
         raise SystemExit(2)
@@ -70,7 +68,7 @@ def main(
     if exclude_tags:
         tests = [t for t in tests if not any(tag in t.tags for tag in exclude_tags)]
 
-    if not tests:
+    if not tests and not collection_errors:
         click.secho("No tests found", fg="yellow")
         raise SystemExit(5)
 
@@ -84,9 +82,10 @@ def main(
     )
 
     reporter.failures(run)
-    reporter.summary(run)
+    reporter.collection_errors(collection_errors)
+    reporter.summary(run, collection_error_count=len(collection_errors))
 
-    sys.exit(0 if run.ok else 1)
+    sys.exit(0 if run.ok and not collection_errors else 1)
 
 
 def _load_dotenv() -> None:

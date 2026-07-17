@@ -42,7 +42,7 @@ FULLY_TYPED_PATHS = [
     "plain-oauth",
     "plain-pages",
     "plain-passwords",
-    "plain-pytest",
+    "plain-testing",
     "plain-redirection",
     "plain-sessions",
     "plain-tailwind",

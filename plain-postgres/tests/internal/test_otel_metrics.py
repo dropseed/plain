@@ -108,7 +108,7 @@ class TestReturnedRowsMetric:
             with conn.cursor() as cursor:
                 # Table doesn't matter — a BEGIN/COMMIT compiles to COMMIT op.
                 cursor.execute("SELECT 1")  # warm
-            otel_metrics.get_metrics_data()  # drain
+            otel_metrics.clear()  # forget the warm-up query's points
 
             with conn.cursor() as cursor:
                 cursor.execute("CREATE TEMP TABLE _otel_tmp (v int)")
@@ -136,15 +136,16 @@ class TestPoolObservables:
                 assert pool.get_stats().get("pool_size", 0) >= 1
 
                 otel_metrics.collect()
-                data = otel_metrics.get_metrics_data()
-                assert data is not None
-                by_name: dict[str, list[dict[str, Any]]] = {}
-                for resource_metric in data.resource_metrics:
-                    for scope_metric in resource_metric.scope_metrics:
-                        for metric in scope_metric.metrics:
-                            by_name.setdefault(metric.name, []).extend(
-                                dict(p.attributes) for p in metric.data.data_points
-                            )
+                by_name: dict[str, list[dict[str, Any]]] = {
+                    name: [dict(p.attributes) for p in otel_metrics.points(name)]
+                    for name in (
+                        "db.client.connection.count",
+                        "db.client.connection.max",
+                        "db.client.connection.idle.min",
+                        "db.client.connection.idle.max",
+                        "db.client.connection.pending_requests",
+                    )
+                }
 
                 count_attrs = by_name.get("db.client.connection.count", [])
                 states = {a.get("db.client.connection.state") for a in count_attrs}

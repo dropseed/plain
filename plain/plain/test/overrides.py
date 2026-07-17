@@ -27,9 +27,10 @@ def override_settings(**overrides: Any) -> Generator[Any]:
     """
     from plain.runtime import settings
 
-    original: dict[str, Any] = {}
+    # Snapshot every original value before applying anything, so an unknown
+    # setting name raises without leaving earlier overrides applied.
+    original = {name: getattr(settings, name) for name in overrides}
     for name, value in overrides.items():
-        original[name] = getattr(settings, name)
         setattr(settings, name, value)
     try:
         yield settings

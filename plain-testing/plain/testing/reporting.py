@@ -61,12 +61,21 @@ class Reporter:
             click.echo()
             click.secho(f"Re-run: plain test {result.test.id}", dim=True)
 
-    def summary(self, run: TestRun) -> None:
+    def collection_errors(self, errors: list) -> None:
+        for error in errors:
+            click.echo()
+            click.secho(f"COLLECTION ERROR {error.path}", fg="red", bold=True)
+            click.echo(f"  {error.error!r}")
+
+    def summary(self, run: TestRun, *, collection_error_count: int = 0) -> None:
         parts = [f"{len(run.passed)} passed"]
         if run.failed:
             parts.append(f"{len(run.failed)} failed")
         if run.skipped:
             parts.append(f"{len(run.skipped)} skipped")
+        if collection_error_count:
+            parts.append(f"{collection_error_count} collection errors")
         line = f"{', '.join(parts)} in {run.duration:.2f}s"
+        failed = run.failed or collection_error_count
         click.echo()
-        click.secho(line, fg="red" if run.failed else "green", bold=True)
+        click.secho(line, fg="red" if failed else "green", bold=True)

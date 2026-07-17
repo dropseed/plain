@@ -36,6 +36,7 @@ _BOUNDARY = "BoUnDaRyStRiNg"
 _MULTIPART_CONTENT = f"multipart/form-data; boundary={_BOUNDARY}"
 # Structured suffix spec: https://tools.ietf.org/html/rfc6838#section-4.2.8
 _JSON_CONTENT_TYPE_RE = _lazy_re_compile(r"^application\/(.+\+)?json")
+_CHARSET_RE = _lazy_re_compile(r".*; charset=([\w-]+);?")
 
 _REDIRECT_STATUS_CODES = (
     HTTPStatus.MOVED_PERMANENTLY,
@@ -56,6 +57,7 @@ class ClientResponse:
 
     def __init__(
         self,
+        *,
         response: Response,
         client: Client,
     ):
@@ -302,9 +304,14 @@ def _encode_request_body(
         )
 
     if body is not None:
+        resolved_content_type = content_type or "application/octet-stream"
+        # Encode a string body with the charset the content type declares,
+        # so the payload bytes match what the request advertises.
+        charset_match = _CHARSET_RE.match(resolved_content_type)
+        charset = charset_match[1] if charset_match else "utf-8"
         return (
-            force_bytes(body),
-            content_type or "application/octet-stream",
+            force_bytes(body, encoding=charset),
+            resolved_content_type,
         )
 
     if form_data is not None or files is not None:

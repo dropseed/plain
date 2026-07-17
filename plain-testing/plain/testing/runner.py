@@ -62,10 +62,15 @@ def run_tests(
     run_start = time.monotonic()
     results: list[TestResult] = []
 
-    for lifecycle in lifecycles:
-        lifecycle.setup_worker()
-
+    # Track which lifecycles actually set up, so a failure partway through
+    # setup still tears down the ones that completed (e.g. drops the test
+    # database instead of leaking it).
+    started: list[TestLifecycle] = []
     try:
+        for lifecycle in lifecycles:
+            lifecycle.setup_worker()
+            started.append(lifecycle)
+
         for test in tests:
             result = _run_one(test, lifecycles=lifecycles)
             results.append(result)
@@ -74,8 +79,12 @@ def run_tests(
             if fail_fast and result.outcome == "failed":
                 break
     finally:
-        for lifecycle in reversed(lifecycles):
-            lifecycle.teardown_worker()
+        for lifecycle in reversed(started):
+            # One lifecycle's teardown failure shouldn't skip the others.
+            try:
+                lifecycle.teardown_worker()
+            except Exception:
+                traceback.print_exc()
 
     return TestRun(results=results, duration=time.monotonic() - run_start)
 
