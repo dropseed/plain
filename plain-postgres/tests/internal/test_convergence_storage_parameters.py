@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.examples.models.storage_parameters import StorageParametersExample
-from conftest_convergence import execute
+from convergence_helpers import execute
 
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
@@ -18,6 +18,7 @@ from plain.postgres.convergence.fixes import (
     SetStorageParameterFix,
 )
 from plain.postgres.introspection.schema import _fetch_raw_reloptions
+from plain.postgres.test import isolated_db
 
 
 def _table_reloptions(table: str) -> tuple[list[str] | None, list[str] | None]:
@@ -30,7 +31,7 @@ def _set_params(model, params: dict[str, str]) -> None:
 
 
 class TestStorageParameterDriftDetection:
-    def test_missing_param_detected(self, db):
+    def test_missing_param_detected(self):
         original = dict(StorageParametersExample.model_options.storage_parameters)
         _set_params(StorageParametersExample, {"autovacuum_vacuum_scale_factor": "0.1"})
 
@@ -51,7 +52,7 @@ class TestStorageParameterDriftDetection:
         finally:
             _set_params(StorageParametersExample, original)
 
-    def test_changed_param_detected(self, db):
+    def test_changed_param_detected(self):
         original = dict(StorageParametersExample.model_options.storage_parameters)
         _set_params(StorageParametersExample, {"autovacuum_vacuum_scale_factor": "0.1"})
 
@@ -81,7 +82,7 @@ class TestStorageParameterDriftDetection:
             )
             _set_params(StorageParametersExample, original)
 
-    def test_undeclared_param_detected(self, db):
+    def test_undeclared_param_detected(self):
         execute('ALTER TABLE "examples_storageparametersexample" SET (fillfactor = 90)')
 
         try:
@@ -100,7 +101,7 @@ class TestStorageParameterDriftDetection:
                 'ALTER TABLE "examples_storageparametersexample" RESET (fillfactor)'
             )
 
-    def test_toast_param_detected(self, db):
+    def test_toast_param_detected(self):
         original = dict(StorageParametersExample.model_options.storage_parameters)
         _set_params(
             StorageParametersExample,
@@ -123,7 +124,7 @@ class TestStorageParameterDriftDetection:
 
 
 class TestStorageParameterPlanning:
-    def test_missing_plans_set_fix(self, db):
+    def test_missing_plans_set_fix(self):
         original = dict(StorageParametersExample.model_options.storage_parameters)
         _set_params(StorageParametersExample, {"autovacuum_vacuum_scale_factor": "0.1"})
 
@@ -145,7 +146,7 @@ class TestStorageParameterPlanning:
         finally:
             _set_params(StorageParametersExample, original)
 
-    def test_undeclared_plans_reset_fix(self, db):
+    def test_undeclared_plans_reset_fix(self):
         execute('ALTER TABLE "examples_storageparametersexample" SET (fillfactor = 90)')
 
         try:
@@ -169,7 +170,8 @@ class TestStorageParameterPlanning:
 
 
 class TestStorageParameterApply:
-    def test_set_fix_applies_heap_param(self, isolated_db):
+    @isolated_db
+    def test_set_fix_applies_heap_param(self):
         fix = SetStorageParameterFix(
             table="examples_storageparametersexample",
             key="autovacuum_vacuum_scale_factor",
@@ -181,7 +183,8 @@ class TestStorageParameterApply:
         assert heap is not None
         assert "autovacuum_vacuum_scale_factor=0.1" in heap
 
-    def test_set_fix_applies_toast_param(self, isolated_db):
+    @isolated_db
+    def test_set_fix_applies_toast_param(self):
         fix = SetStorageParameterFix(
             table="examples_storageparametersexample",
             key="toast.autovacuum_vacuum_scale_factor",
@@ -193,7 +196,8 @@ class TestStorageParameterApply:
         assert toast is not None
         assert "autovacuum_vacuum_scale_factor=0.05" in toast
 
-    def test_reset_fix_clears_param(self, isolated_db):
+    @isolated_db
+    def test_reset_fix_clears_param(self):
         execute('ALTER TABLE "examples_storageparametersexample" SET (fillfactor = 90)')
 
         fix = ResetStorageParameterFix(
@@ -204,7 +208,8 @@ class TestStorageParameterApply:
         heap, _ = _table_reloptions("examples_storageparametersexample")
         assert heap is None or not any("fillfactor" in opt for opt in heap)
 
-    def test_idempotent_after_apply(self, isolated_db):
+    @isolated_db
+    def test_idempotent_after_apply(self):
         original = dict(StorageParametersExample.model_options.storage_parameters)
         _set_params(StorageParametersExample, {"autovacuum_vacuum_scale_factor": "0.1"})
 

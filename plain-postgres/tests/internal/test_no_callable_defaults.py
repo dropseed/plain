@@ -4,42 +4,33 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
-
 from plain.postgres import fields as plain_fields
 from plain.postgres.fields.json import JSONField
+from plain.test import cases, raises
 
 
 def _make_token() -> str:
     return uuid.uuid4().hex
 
 
-@pytest.mark.parametrize(
-    "field_factory",
-    [
-        lambda: plain_fields.TextField(default=lambda: "x"),
-        lambda: plain_fields.TextField(default=_make_token),
-        lambda: plain_fields.TextField(default=uuid.uuid4),
-        lambda: JSONField(default=dict),
-        lambda: JSONField(default=list),
-    ],
-    ids=["lambda", "function", "uuid.uuid4", "dict-class", "list-class"],
+@cases(
+    lambda: plain_fields.TextField(default=lambda: "x"),
+    lambda: plain_fields.TextField(default=_make_token),
+    lambda: plain_fields.TextField(default=uuid.uuid4),
+    lambda: JSONField(default=dict),
+    lambda: JSONField(default=list),
 )
 def test_callable_default_rejected(field_factory):
-    with pytest.raises(TypeError, match="static literal"):
+    with raises(TypeError, match="static literal"):
         field_factory()
 
 
-@pytest.mark.parametrize(
-    "field_factory",
-    [
-        lambda: JSONField(default={}),
-        lambda: JSONField(default=[]),
-        lambda: plain_fields.TextField(default="x"),
-        lambda: plain_fields.IntegerField(default=0),
-        lambda: plain_fields.TextField(),
-    ],
-    ids=["empty-dict", "empty-list", "string", "int", "no-default"],
+@cases(
+    lambda: JSONField(default={}),
+    lambda: JSONField(default=[]),
+    lambda: plain_fields.TextField(default="x"),
+    lambda: plain_fields.IntegerField(default=0),
+    lambda: plain_fields.TextField(),
 )
 def test_literal_default_accepted(field_factory):
     field_factory()

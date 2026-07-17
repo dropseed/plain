@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-import pytest
 from app.examples.models.defaults import DBDefaultsExample
 
 from plain.postgres import RandomStringField, get_connection
 from plain.postgres.functions.random import RandomString
+from plain.test import raises
 
 
 class TestRandomStringInit:
     def test_rejects_zero_length(self):
-        with pytest.raises(ValueError, match=">= 1"):
+        with raises(ValueError, match=">= 1"):
             RandomString(length=0)
 
     def test_rejects_negative_length(self):
-        with pytest.raises(ValueError, match=">= 1"):
+        with raises(ValueError, match=">= 1"):
             RandomString(length=-1)
 
 
@@ -68,23 +68,23 @@ class TestRandomStringRoundTrip:
     """The field's SQL must match what Postgres stores in pg_get_expr so
     convergence sees no drift after sync."""
 
-    def test_value_populated_on_create(self, db):
+    def test_value_populated_on_create(self):
         row = DBDefaultsExample.query.create(name="r")
         assert isinstance(row.token, str)
         assert len(row.token) == 16
 
-    def test_values_are_unique(self, db):
+    def test_values_are_unique(self):
         rows = DBDefaultsExample.query.bulk_create(
             [DBDefaultsExample(name=f"r-{i}") for i in range(5)]
         )
         tokens = {r.token for r in rows}
         assert len(tokens) == 5
 
-    def test_value_drawn_from_hex_alphabet(self, db):
+    def test_value_drawn_from_hex_alphabet(self):
         row = DBDefaultsExample.query.create(name="r")
         assert set(row.token).issubset(set("0123456789abcdef"))
 
-    def test_column_has_persisted_default(self, db):
+    def test_column_has_persisted_default(self):
         with get_connection().cursor() as cursor:
             cursor.execute(
                 """
@@ -101,11 +101,11 @@ class TestRandomStringRoundTrip:
         assert "gen_random_uuid" in default_sql
         assert "substr" in default_sql
 
-    def test_explicit_value_overrides_default(self, db):
+    def test_explicit_value_overrides_default(self):
         row = DBDefaultsExample.query.create(name="r", token="explicit-value")
         assert row.token == "explicit-value"
 
-    def test_raw_insert_uses_persisted_default(self, db):
+    def test_raw_insert_uses_persisted_default(self):
         """A raw INSERT that omits `token` gets a fresh random value from the
         column DEFAULT — the point of declaring the default at the DB level."""
         with get_connection().cursor() as cursor:

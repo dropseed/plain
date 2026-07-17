@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from oauth_helpers import generate_pkce_pair, issue_token_pair
+from oauth_helpers import (
+    generate_pkce_pair,
+    issue_token_pair,
+    login_as,
+    make_public_app,
+    make_user,
+)
 
 from plain.oauthserver.models import (
     AccessToken,
@@ -12,7 +18,7 @@ from plain.oauthserver.models import (
     OAuthApplication,
     RefreshToken,
 )
-from plain.test import Client
+from plain.test import Client, override_settings
 from plain.utils import timezone
 
 REDIRECT_URI = "http://localhost:3000/callback"
@@ -33,8 +39,8 @@ def _make_auth_code(application, user, code_challenge, *, redirect_uri=REDIRECT_
 
 
 class TestMetadata:
-    def test_metadata_document(self, db):
-        data = Client().get("/.well-known/oauth-authorization-server").json()
+    def test_metadata_document(self):
+        data = Client().get("/.well-known/oauth-authorization-server").json_data
         assert data["response_types_supported"] == ["code"]
         assert "authorization_code" in data["grant_types_supported"]
         assert "refresh_token" in data["grant_types_supported"]
@@ -49,104 +55,95 @@ class TestMetadata:
 
 
 class TestRegister:
-    def test_register_public_client(self, db):
+    def test_register_public_client(self):
         response = Client().post(
             "/oauth/register",
-            data={
+            json_data={
                 "redirect_uris": ["https://claude.ai/api/mcp/auth_callback"],
                 "client_name": "Claude",
                 "token_endpoint_auth_method": "none",
             },
-            content_type="application/json",
         )
         assert response.status_code == 201
-        data = response.json()
+        data = response.json_data
         assert data["client_id"]
         assert "client_secret" not in data  # always a public client
         assert data["token_endpoint_auth_method"] == "none"
         assert OAuthApplication.query.filter(client_id=data["client_id"]).exists()
 
-    def test_register_overrides_requested_auth_method_to_public(self, db):
+    def test_register_overrides_requested_auth_method_to_public(self):
         # We only issue public clients, so a request for a secret-based method
         # still yields a public client with no secret.
         response = Client().post(
             "/oauth/register",
-            data={
+            json_data={
                 "redirect_uris": ["https://app.example.com/callback"],
                 "token_endpoint_auth_method": "client_secret_post",
             },
-            content_type="application/json",
         )
         assert response.status_code == 201
-        data = response.json()
+        data = response.json_data
         assert data["token_endpoint_auth_method"] == "none"
         assert "client_secret" not in data
 
-    def test_register_rejects_missing_redirect_uris(self, db):
+    def test_register_rejects_missing_redirect_uris(self):
         response = Client().post(
             "/oauth/register",
-            data={"client_name": "x"},
-            content_type="application/json",
+            json_data={"client_name": "x"},
         )
         assert response.status_code == 400
-        assert response.json()["error"] == "invalid_redirect_uri"
+        assert response.json_data["error"] == "invalid_redirect_uri"
 
-    def test_register_rejects_non_https_redirect(self, db):
+    def test_register_rejects_non_https_redirect(self):
         response = Client().post(
             "/oauth/register",
-            data={"redirect_uris": ["http://evil.example.com/cb"]},
-            content_type="application/json",
+            json_data={"redirect_uris": ["http://evil.example.com/cb"]},
         )
         assert response.status_code == 400
-        assert response.json()["error"] == "invalid_redirect_uri"
+        assert response.json_data["error"] == "invalid_redirect_uri"
 
-    def test_register_rejects_whitespace_smuggled_redirect(self, db):
+    def test_register_rejects_whitespace_smuggled_redirect(self):
         # A value with internal whitespace would split into a second, unvalidated
         # URI once stored space-joined.
         response = Client().post(
             "/oauth/register",
-            data={
+            json_data={
                 "redirect_uris": [
                     "https://ok.example.com/cb http://evil.example.com/cb"
                 ]
             },
-            content_type="application/json",
         )
         assert response.status_code == 400
-        assert response.json()["error"] == "invalid_redirect_uri"
+        assert response.json_data["error"] == "invalid_redirect_uri"
 
 
 class TestRegistrationDisabled:
     """OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION = False locks down DCR."""
 
-    def test_register_returns_403(self, db, monkeypatch):
-        from plain.runtime import settings
+    def test_register_returns_403(self):
+        with override_settings(OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION=False):
+            response = Client().post(
+                "/oauth/register",
+                json_data={"redirect_uris": ["https://app.example.com/cb"]},
+            )
+            assert response.status_code == 403
 
-        monkeypatch.setattr(settings, "OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION", False)
-        response = Client().post(
-            "/oauth/register",
-            data={"redirect_uris": ["https://app.example.com/cb"]},
-            content_type="application/json",
-        )
-        assert response.status_code == 403
-
-    def test_metadata_omits_registration_endpoint(self, db, monkeypatch):
-        from plain.runtime import settings
-
-        monkeypatch.setattr(settings, "OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION", False)
-        data = Client().get("/.well-known/oauth-authorization-server").json()
-        assert "registration_endpoint" not in data
+    def test_metadata_omits_registration_endpoint(self):
+        with override_settings(OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION=False):
+            data = Client().get("/.well-known/oauth-authorization-server").json_data
+            assert "registration_endpoint" not in data
 
 
 # -- Authorization endpoint --
 
 
 class TestAuthorize:
-    def test_requires_login(self, db, public_app):
+    def test_requires_login(self):
+        public_app = make_public_app()
         _, challenge = generate_pkce_pair()
         response = Client().get(
             "/oauth/authorize",
-            data={
+            query_params={
                 "response_type": "code",
                 "client_id": public_app.client_id,
                 "redirect_uri": REDIRECT_URI,
@@ -156,11 +153,13 @@ class TestAuthorize:
         )
         assert response.status_code == 302
 
-    def test_consent_page_renders(self, authenticated_client, public_app):
+    def test_consent_page_renders(self):
+        public_app = make_public_app()
+        client = login_as(make_user())
         _, challenge = generate_pkce_pair()
-        response = authenticated_client.get(
+        response = client.get(
             "/oauth/authorize",
-            data={
+            query_params={
                 "response_type": "code",
                 "client_id": public_app.client_id,
                 "redirect_uri": REDIRECT_URI,
@@ -174,10 +173,12 @@ class TestAuthorize:
         assert "Approve" in body
         assert "Deny" in body
 
-    def test_missing_pkce_shows_error(self, authenticated_client, public_app):
-        response = authenticated_client.get(
+    def test_missing_pkce_shows_error(self):
+        public_app = make_public_app()
+        client = login_as(make_user())
+        response = client.get(
             "/oauth/authorize",
-            data={
+            query_params={
                 "response_type": "code",
                 "client_id": public_app.client_id,
                 "redirect_uri": REDIRECT_URI,
@@ -186,13 +187,13 @@ class TestAuthorize:
         assert response.status_code == 200
         assert "code_challenge" in response.content.decode()
 
-    def test_approve_redirects_with_code_and_iss(
-        self, authenticated_client, public_app
-    ):
+    def test_approve_redirects_with_code_and_iss(self):
+        public_app = make_public_app()
+        client = login_as(make_user())
         _, challenge = generate_pkce_pair()
-        response = authenticated_client.post(
+        response = client.post(
             "/oauth/authorize",
-            data={
+            form_data={
                 "action": "approve",
                 "response_type": "code",
                 "client_id": public_app.client_id,
@@ -211,11 +212,13 @@ class TestAuthorize:
         assert "iss=" in location  # RFC 9207
         assert AuthorizationCode.query.filter(application=public_app).exists()
 
-    def test_deny_redirects_with_error(self, authenticated_client, public_app):
+    def test_deny_redirects_with_error(self):
+        public_app = make_public_app()
+        client = login_as(make_user())
         _, challenge = generate_pkce_pair()
-        response = authenticated_client.post(
+        response = client.post(
             "/oauth/authorize",
-            data={
+            form_data={
                 "action": "deny",
                 "response_type": "code",
                 "client_id": public_app.client_id,
@@ -229,11 +232,13 @@ class TestAuthorize:
         assert "error=access_denied" in response.headers["Location"]
         assert "state=xyz123" in response.headers["Location"]  # state survives deny
 
-    def test_rejects_unsupported_scope(self, authenticated_client, public_app):
+    def test_rejects_unsupported_scope(self):
+        public_app = make_public_app()
+        client = login_as(make_user())
         _, challenge = generate_pkce_pair()
-        response = authenticated_client.post(
+        response = client.post(
             "/oauth/authorize",
-            data={
+            form_data={
                 "action": "approve",
                 "response_type": "code",
                 "client_id": public_app.client_id,
@@ -246,14 +251,16 @@ class TestAuthorize:
         assert response.status_code == 400
         assert not AuthorizationCode.query.filter(application=public_app).exists()
 
-    def test_rejects_unregistered_redirect_uri(self, authenticated_client, public_app):
+    def test_rejects_unregistered_redirect_uri(self):
         # The open-redirect / code-injection guard: an approve POST whose
         # redirect_uri isn't registered to the client must be refused outright,
         # never redirected to and never minting a code.
+        public_app = make_public_app()
+        client = login_as(make_user())
         _, challenge = generate_pkce_pair()
-        response = authenticated_client.post(
+        response = client.post(
             "/oauth/authorize",
-            data={
+            form_data={
                 "action": "approve",
                 "response_type": "code",
                 "client_id": public_app.client_id,
@@ -272,13 +279,15 @@ class TestAuthorize:
 
 
 class TestToken:
-    def test_public_client_exchange_without_secret(self, db, user, public_app):
+    def test_public_client_exchange_without_secret(self):
+        user = make_user()
+        public_app = make_public_app()
         verifier, challenge = generate_pkce_pair()
         auth_code = _make_auth_code(public_app, user, challenge)
 
         response = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "authorization_code",
                 "code": auth_code.code,
                 "redirect_uri": REDIRECT_URI,
@@ -287,7 +296,7 @@ class TestToken:
             },
         )
         assert response.status_code == 200
-        data = response.json()
+        data = response.json_data
         assert data["token_type"] == "Bearer"
         assert data["access_token"]
         assert data["refresh_token"]
@@ -295,12 +304,14 @@ class TestToken:
         # Stored hashed, not as the plaintext we returned.
         assert not AccessToken.query.filter(token_hash=data["access_token"]).exists()
 
-    def test_unknown_client_rejected(self, db, user, public_app):
+    def test_unknown_client_rejected(self):
+        user = make_user()
+        public_app = make_public_app()
         verifier, challenge = generate_pkce_pair()
         auth_code = _make_auth_code(public_app, user, challenge)
         response = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "authorization_code",
                 "code": auth_code.code,
                 "redirect_uri": REDIRECT_URI,
@@ -309,17 +320,19 @@ class TestToken:
             },
         )
         assert response.status_code == 401
-        assert response.json()["error"] == "invalid_client"
+        assert response.json_data["error"] == "invalid_client"
 
-    def test_code_cannot_be_redeemed_by_another_client(self, db, user, public_app):
+    def test_code_cannot_be_redeemed_by_another_client(self):
         # The code lookup is scoped by application, so a code stolen by a
         # different (valid) client is useless — guards against cross-client theft.
+        user = make_user()
+        public_app = make_public_app()
         thief = OAuthApplication.query.create(name="Thief", redirect_uris=REDIRECT_URI)
         verifier, challenge = generate_pkce_pair()
         auth_code = _make_auth_code(public_app, user, challenge)
         response = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "authorization_code",
                 "code": auth_code.code,
                 "redirect_uri": REDIRECT_URI,
@@ -328,14 +341,16 @@ class TestToken:
             },
         )
         assert response.status_code == 400
-        assert response.json()["error"] == "invalid_grant"
+        assert response.json_data["error"] == "invalid_grant"
 
-    def test_pkce_failure(self, db, user, public_app):
+    def test_pkce_failure(self):
+        user = make_user()
+        public_app = make_public_app()
         _, challenge = generate_pkce_pair()
         auth_code = _make_auth_code(public_app, user, challenge)
         response = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "authorization_code",
                 "code": auth_code.code,
                 "redirect_uri": REDIRECT_URI,
@@ -344,9 +359,11 @@ class TestToken:
             },
         )
         assert response.status_code == 400
-        assert response.json()["error"] == "invalid_grant"
+        assert response.json_data["error"] == "invalid_grant"
 
-    def test_code_is_single_use(self, db, user, public_app):
+    def test_code_is_single_use(self):
+        user = make_user()
+        public_app = make_public_app()
         verifier, challenge = generate_pkce_pair()
         auth_code = _make_auth_code(public_app, user, challenge)
         payload = {
@@ -357,10 +374,12 @@ class TestToken:
             "code_verifier": verifier,
         }
         client = Client()
-        assert client.post("/oauth/token", data=payload).status_code == 200
-        assert client.post("/oauth/token", data=payload).status_code == 400
+        assert client.post("/oauth/token", form_data=payload).status_code == 200
+        assert client.post("/oauth/token", form_data=payload).status_code == 400
 
-    def test_expired_code_rejected(self, db, user, public_app):
+    def test_expired_code_rejected(self):
+        user = make_user()
+        public_app = make_public_app()
         verifier, challenge = generate_pkce_pair()
         auth_code = AuthorizationCode.query.create(
             application=public_app,
@@ -372,7 +391,7 @@ class TestToken:
         )
         response = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "authorization_code",
                 "code": auth_code.code,
                 "redirect_uri": REDIRECT_URI,
@@ -381,14 +400,16 @@ class TestToken:
             },
         )
         assert response.status_code == 400
-        assert response.json()["error"] == "invalid_grant"
+        assert response.json_data["error"] == "invalid_grant"
 
-    def test_redirect_uri_must_match(self, db, user, public_app):
+    def test_redirect_uri_must_match(self):
+        user = make_user()
+        public_app = make_public_app()
         verifier, challenge = generate_pkce_pair()
         auth_code = _make_auth_code(public_app, user, challenge)
         response = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "authorization_code",
                 "code": auth_code.code,
                 "redirect_uri": "http://localhost:3000/evil",
@@ -398,12 +419,14 @@ class TestToken:
         )
         assert response.status_code == 400
 
-    def test_missing_verifier_rejected(self, db, user, public_app):
+    def test_missing_verifier_rejected(self):
+        user = make_user()
+        public_app = make_public_app()
         _, challenge = generate_pkce_pair()
         auth_code = _make_auth_code(public_app, user, challenge)
         response = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "authorization_code",
                 "code": auth_code.code,
                 "redirect_uri": REDIRECT_URI,
@@ -411,33 +434,36 @@ class TestToken:
             },
         )
         assert response.status_code == 400
-        assert "code_verifier" in response.json()["error_description"]
+        assert "code_verifier" in response.json_data["error_description"]
 
-    def test_unsupported_grant_type(self, db, public_app):
+    def test_unsupported_grant_type(self):
+        public_app = make_public_app()
         response = Client().post(
             "/oauth/token",
-            data={"grant_type": "implicit", "client_id": public_app.client_id},
+            form_data={"grant_type": "implicit", "client_id": public_app.client_id},
         )
         assert response.status_code == 400
-        assert response.json()["error"] == "unsupported_grant_type"
+        assert response.json_data["error"] == "unsupported_grant_type"
 
 
 # -- Refresh token rotation --
 
 
 class TestRefresh:
-    def test_rotation(self, db, user, public_app):
+    def test_rotation(self):
+        user = make_user()
+        public_app = make_public_app()
         old_access, old_refresh = issue_token_pair(public_app, user)
         response = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "refresh_token",
                 "refresh_token": "refresh-value",
                 "client_id": public_app.client_id,
             },
         )
         assert response.status_code == 200
-        data = response.json()
+        data = response.json_data
         assert data["access_token"] != "access-value"
         assert data["refresh_token"] != "refresh-value"
 
@@ -446,28 +472,32 @@ class TestRefresh:
         assert old_access.revoked is True
         assert old_refresh.revoked is True
 
-    def test_revoked_refresh_rejected(self, db, user, public_app):
+    def test_revoked_refresh_rejected(self):
+        user = make_user()
+        public_app = make_public_app()
         _, old_refresh = issue_token_pair(public_app, user)
         old_refresh.revoked = True
         old_refresh.update(fields=["revoked"])
         response = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "refresh_token",
                 "refresh_token": "refresh-value",
                 "client_id": public_app.client_id,
             },
         )
         assert response.status_code == 400
-        assert response.json()["error"] == "invalid_grant"
+        assert response.json_data["error"] == "invalid_grant"
 
-    def test_expired_refresh_rejected(self, db, user, public_app):
+    def test_expired_refresh_rejected(self):
+        user = make_user()
+        public_app = make_public_app()
         _, old_refresh = issue_token_pair(public_app, user)
         old_refresh.expires_at = timezone.now() - timedelta(minutes=1)
         old_refresh.update(fields=["expires_at"])
         response = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "refresh_token",
                 "refresh_token": "refresh-value",
                 "client_id": public_app.client_id,
@@ -475,9 +505,11 @@ class TestRefresh:
         )
         assert response.status_code == 400
 
-    def test_refresh_token_is_single_use(self, db, user, public_app):
+    def test_refresh_token_is_single_use(self):
         # OAuth 2.1 rotation: re-presenting a refresh token after it rotated
         # away is rejected (the canonical replay property, as one sequence).
+        user = make_user()
+        public_app = make_public_app()
         issue_token_pair(public_app, user)
         payload = {
             "grant_type": "refresh_token",
@@ -485,45 +517,51 @@ class TestRefresh:
             "client_id": public_app.client_id,
         }
         client = Client()
-        assert client.post("/oauth/token", data=payload).status_code == 200
-        replay = client.post("/oauth/token", data=payload)
+        assert client.post("/oauth/token", form_data=payload).status_code == 200
+        replay = client.post("/oauth/token", form_data=payload)
         assert replay.status_code == 400
-        assert replay.json()["error"] == "invalid_grant"
+        assert replay.json_data["error"] == "invalid_grant"
 
-    def test_refresh_cannot_be_used_by_another_client(self, db, user, public_app):
+    def test_refresh_cannot_be_used_by_another_client(self):
+        user = make_user()
+        public_app = make_public_app()
         thief = OAuthApplication.query.create(name="Thief", redirect_uris=REDIRECT_URI)
         issue_token_pair(public_app, user)
         response = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "refresh_token",
                 "refresh_token": "refresh-value",
                 "client_id": thief.client_id,
             },
         )
         assert response.status_code == 400
-        assert response.json()["error"] == "invalid_grant"
+        assert response.json_data["error"] == "invalid_grant"
 
 
 # -- Revocation (RFC 7009) --
 
 
 class TestRevocation:
-    def test_revoke_access_token(self, db, user, public_app):
+    def test_revoke_access_token(self):
+        user = make_user()
+        public_app = make_public_app()
         access, _ = issue_token_pair(public_app, user)
         response = Client().post(
             "/oauth/revoke",
-            data={"token": "access-value", "client_id": public_app.client_id},
+            form_data={"token": "access-value", "client_id": public_app.client_id},
         )
         assert response.status_code == 200
         access.refresh_from_db()
         assert access.revoked is True
 
-    def test_revoke_refresh_cascades_to_access(self, db, user, public_app):
+    def test_revoke_refresh_cascades_to_access(self):
+        user = make_user()
+        public_app = make_public_app()
         access, refresh = issue_token_pair(public_app, user)
         response = Client().post(
             "/oauth/revoke",
-            data={"token": "refresh-value", "client_id": public_app.client_id},
+            form_data={"token": "refresh-value", "client_id": public_app.client_id},
         )
         assert response.status_code == 200
         refresh.refresh_from_db()
@@ -531,10 +569,11 @@ class TestRevocation:
         assert refresh.revoked is True
         assert access.revoked is True
 
-    def test_revoke_unknown_token_is_200(self, db, public_app):
+    def test_revoke_unknown_token_is_200(self):
+        public_app = make_public_app()
         response = Client().post(
             "/oauth/revoke",
-            data={"token": "nope", "client_id": public_app.client_id},
+            form_data={"token": "nope", "client_id": public_app.client_id},
         )
         assert response.status_code == 200
 
@@ -543,22 +582,23 @@ class TestRevocation:
 
 
 class TestEndToEnd:
-    def test_dcr_then_full_public_client_flow(self, authenticated_client, user):
+    def test_dcr_then_full_public_client_flow(self):
+        user = make_user()
+        client = login_as(user)
         register = Client().post(
             "/oauth/register",
-            data={
+            json_data={
                 "redirect_uris": [REDIRECT_URI],
                 "client_name": "Claude",
                 "token_endpoint_auth_method": "none",
             },
-            content_type="application/json",
         )
-        client_id = register.json()["client_id"]
+        client_id = register.json_data["client_id"]
 
         verifier, challenge = generate_pkce_pair()
-        approve = authenticated_client.post(
+        approve = client.post(
             "/oauth/authorize",
-            data={
+            form_data={
                 "action": "approve",
                 "response_type": "code",
                 "client_id": client_id,
@@ -574,7 +614,7 @@ class TestEndToEnd:
 
         tokens = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "authorization_code",
                 "code": code,
                 "redirect_uri": REDIRECT_URI,
@@ -583,8 +623,8 @@ class TestEndToEnd:
             },
         )
         assert tokens.status_code == 200
-        access_token = tokens.json()["access_token"]
-        refresh_token = tokens.json()["refresh_token"]
+        access_token = tokens.json_data["access_token"]
+        refresh_token = tokens.json_data["refresh_token"]
 
         # Token is audience-bound to the resource from the authorize request.
         from plain.oauthserver import validate_access_token
@@ -597,7 +637,7 @@ class TestEndToEnd:
 
         refreshed = Client().post(
             "/oauth/token",
-            data={
+            form_data={
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
                 "client_id": client_id,
@@ -607,7 +647,10 @@ class TestEndToEnd:
 
         revoke = Client().post(
             "/oauth/revoke",
-            data={"token": refreshed.json()["access_token"], "client_id": client_id},
+            form_data={
+                "token": refreshed.json_data["access_token"],
+                "client_id": client_id,
+            },
         )
         assert revoke.status_code == 200
         assert RefreshToken.query.filter(application__client_id=client_id).count() == 2

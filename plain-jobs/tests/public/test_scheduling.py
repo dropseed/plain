@@ -1,8 +1,7 @@
 import datetime
 
-import pytest
-
 from plain.jobs.scheduling import Schedule
+from plain.test import raises
 
 
 def test_schedule():
@@ -91,12 +90,12 @@ def test_complex_combinations():
 
 def test_invalid_date_handling():
     s = Schedule(day_of_month=31, month=2)  # February 31st does not exist
-    with pytest.raises(ValueError, match="No valid schedule match"):
+    with raises(ValueError, match="No valid schedule match"):
         s.next(datetime.datetime(2021, 1, 1))
 
 
 def test_non_matching_schedule():
-    with pytest.raises(ValueError, match="Schedule component should be between"):
+    with raises(ValueError, match="Schedule component should be between"):
         Schedule(hour=25)  # Invalid hour, used as example for handling
 
 

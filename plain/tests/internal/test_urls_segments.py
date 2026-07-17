@@ -8,9 +8,8 @@ only the user-observable resolution behavior is.
 
 from __future__ import annotations
 
-import pytest
-
 from plain.exceptions import ImproperlyConfigured
+from plain.test import raises
 from plain.urls.converters import INT, PATH, STR, UUID
 from plain.urls.segments import (
     Capture,
@@ -67,29 +66,29 @@ def test_path_converter_is_multi_segment():
 
 def test_multi_segment_must_be_terminal():
     """A multi-segment capture that isn't the last segment is rejected."""
-    with pytest.raises(ImproperlyConfigured, match="must be terminal"):
+    with raises(ImproperlyConfigured, match="must be terminal"):
         _route_to_segments("docs/<path:rest>/more")
 
 
 def test_unknown_converter_is_rejected():
-    with pytest.raises(ImproperlyConfigured, match="invalid converter"):
+    with raises(ImproperlyConfigured, match="invalid converter"):
         _route_to_segments("items/<wat:id>/")
 
 
 def test_invalid_parameter_name_is_rejected():
     """Parameter names must be valid Python identifiers."""
-    with pytest.raises(ImproperlyConfigured, match="isn't a valid Python identifier"):
+    with raises(ImproperlyConfigured, match="isn't a valid Python identifier"):
         _route_to_segments("items/<int:1abc>/")
 
 
 def test_empty_parameter_name_is_rejected():
     """`<int:>` (no parameter name) — empty string isn't a valid identifier."""
-    with pytest.raises(ImproperlyConfigured, match="isn't a valid Python identifier"):
+    with raises(ImproperlyConfigured, match="isn't a valid Python identifier"):
         _route_to_segments("items/<int:>/")
 
 
 def test_whitespace_in_brackets_is_rejected():
-    with pytest.raises(ImproperlyConfigured, match="whitespace"):
+    with raises(ImproperlyConfigured, match="whitespace"):
         _route_to_segments("items/<int: id>/")
 
 
@@ -120,7 +119,7 @@ def test_multi_segment_capture_cannot_mix_with_literal():
     Multi-segment captures span segment boundaries, which contradicts the
     within-segment match a Pattern uses.
     """
-    with pytest.raises(ImproperlyConfigured, match="must occupy their own segment"):
+    with raises(ImproperlyConfigured, match="must occupy their own segment"):
         _route_to_segments("docs/<path:rest>.js")
 
 
@@ -133,11 +132,11 @@ def test_include_prefix_parses_same_as_endpoint():
 def test_consecutive_slashes_are_rejected():
     """`foo//bar` produces an empty segment that would never match anything
     at runtime — reject at registration so the dead route is obvious."""
-    with pytest.raises(ImproperlyConfigured, match="empty segment"):
+    with raises(ImproperlyConfigured, match="empty segment"):
         _route_to_segments("foo//bar/")
 
 
 def test_consecutive_slashes_inside_include_prefix_rejected():
     """Same check fires when an `include()` prefix slips a `//` through."""
-    with pytest.raises(ImproperlyConfigured, match="empty segment"):
+    with raises(ImproperlyConfigured, match="empty segment"):
         _route_to_segments("a//b/")

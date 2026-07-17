@@ -7,15 +7,14 @@ flags recompute every time. Disabled flags short-circuit.
 
 from __future__ import annotations
 
-import pytest
-
 from plain.flags import Flag
 from plain.flags.exceptions import FlagDisabled
 from plain.flags.models import Flag as FlagModel
 from plain.flags.models import FlagResult
+from plain.test import override_settings, raises
 
 
-def test_keyed_flag_computes_once_then_caches(db):
+def test_keyed_flag_computes_once_then_caches():
     class CountingFlag(Flag):
         calls = 0
 
@@ -37,7 +36,7 @@ def test_keyed_flag_computes_once_then_caches(db):
     assert FlagResult.query.filter(key="user-1").count() == 1
 
 
-def test_distinct_keys_cache_independently(db):
+def test_distinct_keys_cache_independently():
     class PerKeyFlag(Flag):
         def __init__(self, key, value):
             self._key = key
@@ -57,7 +56,7 @@ def test_distinct_keys_cache_independently(db):
     assert PerKeyFlag("a", "DIFFERENT").value == "AAA"
 
 
-def test_unkeyed_flag_recomputes_every_time(db):
+def test_unkeyed_flag_recomputes_every_time():
     class UnkeyedFlag(Flag):
         calls = 0
 
@@ -76,43 +75,43 @@ def test_unkeyed_flag_recomputes_every_time(db):
     assert FlagResult.query.count() == 0
 
 
-def test_disabled_flag_returns_none_when_not_debug(db, settings):
-    settings.DEBUG = False
+def test_disabled_flag_returns_none_when_not_debug():
+    with override_settings(DEBUG=False):
 
-    class MaybeFlag(Flag):
-        def get_key(self):
-            return "k"
+        class MaybeFlag(Flag):
+            def get_key(self):
+                return "k"
 
-        def get_value(self):
-            return "on"
+            def get_value(self):
+                return "on"
 
-    # First evaluation creates the backing Flag row (enabled by default).
-    assert MaybeFlag().value == "on"
+        # First evaluation creates the backing Flag row (enabled by default).
+        assert MaybeFlag().value == "on"
 
-    FlagModel.query.filter(name="MaybeFlag").update(enabled=False)
+        FlagModel.query.filter(name="MaybeFlag").update(enabled=False)
 
-    # Disabled + not DEBUG: degrade gracefully to None rather than crash.
-    assert MaybeFlag().value is None
-
-
-def test_disabled_flag_raises_when_debug(db, settings):
-    settings.DEBUG = True
-
-    class StrictFlag(Flag):
-        def get_key(self):
-            return "k"
-
-        def get_value(self):
-            return "on"
-
-    assert StrictFlag().value == "on"
-    FlagModel.query.filter(name="StrictFlag").update(enabled=False)
-
-    with pytest.raises(FlagDisabled):
-        StrictFlag().value
+        # Disabled + not DEBUG: degrade gracefully to None rather than crash.
+        assert MaybeFlag().value is None
 
 
-def test_flag_is_truthy_and_supports_membership(db):
+def test_disabled_flag_raises_when_debug():
+    with override_settings(DEBUG=True):
+
+        class StrictFlag(Flag):
+            def get_key(self):
+                return "k"
+
+            def get_value(self):
+                return "on"
+
+        assert StrictFlag().value == "on"
+        FlagModel.query.filter(name="StrictFlag").update(enabled=False)
+
+        with raises(FlagDisabled):
+            StrictFlag().value
+
+
+def test_flag_is_truthy_and_supports_membership():
     class ListFlag(Flag):
         def get_key(self):
             return None

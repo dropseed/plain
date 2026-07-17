@@ -15,7 +15,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "plain.pytest<1.0.0",
+  "plain.testing<1.0.0",
   "plain.auth<1.0.0",
   "plain.assets<1.0.0",
   "plain.templates<1.0.0",

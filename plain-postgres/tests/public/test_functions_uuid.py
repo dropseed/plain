@@ -12,7 +12,7 @@ def test_gen_random_uuid_template():
     assert GenRandomUUID.template == "gen_random_uuid()"
 
 
-def test_gen_random_uuid_produces_valid_uuid_via_raw_sql(db):
+def test_gen_random_uuid_produces_valid_uuid_via_raw_sql():
     """Sanity: Postgres understands gen_random_uuid() and it returns a UUID."""
     with get_connection().cursor() as cursor:
         cursor.execute(f"SELECT {GenRandomUUID.template}")
@@ -22,7 +22,7 @@ def test_gen_random_uuid_produces_valid_uuid_via_raw_sql(db):
     assert isinstance(row[0], uuid.UUID)
 
 
-def test_gen_random_uuid_returns_distinct_values(db):
+def test_gen_random_uuid_returns_distinct_values():
     with get_connection().cursor() as cursor:
         cursor.execute(f"SELECT {GenRandomUUID.template}, {GenRandomUUID.template}")
         row = cursor.fetchone()

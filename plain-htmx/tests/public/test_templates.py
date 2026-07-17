@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import jinja2
-import pytest
 
 from plain.htmx.templates import HTMXFragmentExtension, render_template_fragment
+from plain.test import raises
 
 
 def make_env():
@@ -113,7 +113,7 @@ def test_loop_fragment_full_page_render():
 def test_fragment_not_found():
     env = make_env()
     template = env.from_string('{% htmxfragment "main" %}Hello{% endhtmxfragment %}')
-    with pytest.raises(jinja2.TemplateNotFound, match="nonexistent"):
+    with raises(jinja2.TemplateNotFound, match="nonexistent"):
         render_template_fragment(
             template=template, fragment_name="nonexistent", context={}
         )

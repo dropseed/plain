@@ -1,19 +1,13 @@
 from __future__ import annotations
 
-import pytest
 from click.testing import CliRunner
 from opentelemetry import trace
 
 from plain.chores import Chore, register_chore
-from plain.cli.core import cli
+from plain.cli.chores import chores
 from plain.test.otel import install_test_tracer
 
 _span_exporter = install_test_tracer()
-
-
-@pytest.fixture
-def _otel_clean() -> None:
-    _span_exporter.clear()
 
 
 @register_chore
@@ -42,15 +36,13 @@ def _chore_span(name: str):
     return spans[-1]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_chore_emits_consumer_span_on_success() -> None:
     """Each chore execution gets a `chore {name}` CONSUMER span — the chore
     is the unit of work being consumed. CONSUMER puts it in the canonical
     error-attribution set (SERVER/CONSUMER/PRODUCER) alongside jobs."""
+    _span_exporter.clear()
     name = _qualname(_SuccessChore)
-    result = CliRunner().invoke(
-        cli, ["chores", "run", "--name", name], prog_name="plain"
-    )
+    result = CliRunner().invoke(chores, ["run", "--name", name])
     assert result.exit_code == 0
 
     span = _chore_span(f"chore {name}")
@@ -58,15 +50,13 @@ def test_chore_emits_consumer_span_on_success() -> None:
     assert span.status.status_code == trace.StatusCode.UNSET
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_chore_records_error_on_failure() -> None:
     """A failing chore stamps the canonical failure signal (status=ERROR plus
     error.type) on its span. The chore catch-and-log keeps the runner alive
     so an exception in one chore doesn't skip the rest."""
+    _span_exporter.clear()
     name = _qualname(_BoomChore)
-    result = CliRunner().invoke(
-        cli, ["chores", "run", "--name", name], prog_name="plain"
-    )
+    result = CliRunner().invoke(chores, ["run", "--name", name])
     # `run_chores` calls sys.exit(1) when any chore fails.
     assert result.exit_code == 1
 

@@ -40,9 +40,9 @@ def _valid_post_data() -> dict[str, str]:
 
 
 class TestFormsExampleCreate:
-    def test_create_roundtrip_all_field_types(self, db):
+    def test_create_roundtrip_all_field_types(self):
         client = Client()
-        response = client.post("/examples/forms/create", data=_valid_post_data())
+        response = client.post("/examples/forms/create", form_data=_valid_post_data())
 
         assert response.status_code == 302, response.content
         assert response.headers["Location"] == "/ok/"
@@ -65,72 +65,72 @@ class TestFormsExampleCreate:
         assert obj.duration == datetime.timedelta(hours=1, minutes=30)
         assert obj.external_id == uuid.UUID("123e4567-e89b-12d3-a456-426614174000")
 
-    def test_boolean_false_when_checkbox_unchecked(self, db):
+    def test_boolean_false_when_checkbox_unchecked(self):
         client = Client()
         data = _valid_post_data()
         del data["is_active"]  # unchecked checkboxes aren't posted
-        response = client.post("/examples/forms/create", data=data)
+        response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 302, response.content
         assert FormsExample.query.get().is_active is False
 
-    def test_invalid_integer_returns_400_with_field_error(self, db):
+    def test_invalid_integer_returns_400_with_field_error(self):
         client = Client()
         data = _valid_post_data()
         data["count"] = "not-an-int"
-        response = client.post("/examples/forms/create", data=data)
+        response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 400
         errors = json.loads(response.content)
         assert "count" in errors
 
-    def test_invalid_choice_returns_400(self, db):
+    def test_invalid_choice_returns_400(self):
         client = Client()
         data = _valid_post_data()
         data["status"] = "archived"  # not in the declared choices
-        response = client.post("/examples/forms/create", data=data)
+        response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 400
         errors = json.loads(response.content)
         assert "status" in errors
 
-    def test_invalid_uuid_returns_400(self, db):
+    def test_invalid_uuid_returns_400(self):
         client = Client()
         data = _valid_post_data()
         data["external_id"] = "not-a-uuid"
-        response = client.post("/examples/forms/create", data=data)
+        response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 400
         errors = json.loads(response.content)
         assert "external_id" in errors
 
-    def test_invalid_date_returns_400(self, db):
+    def test_invalid_date_returns_400(self):
         client = Client()
         data = _valid_post_data()
         data["event_date"] = "not-a-date"
-        response = client.post("/examples/forms/create", data=data)
+        response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 400
         errors = json.loads(response.content)
         assert "event_date" in errors
 
-    def test_blank_required_field_returns_400_with_error(self, db):
+    def test_blank_required_field_returns_400_with_error(self):
         """Required field sent as empty string → invalid-form path with errors."""
         client = Client()
         data = _valid_post_data()
         data["name"] = ""
-        response = client.post("/examples/forms/create", data=data)
+        response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 400
         errors = json.loads(response.content)
         assert "name" in errors
 
-    def test_omitted_required_field_returns_400(self, db):
+    def test_omitted_required_field_returns_400(self):
         """Required field entirely absent from POST data → framework-level 400."""
         client = Client()
         data = _valid_post_data()
         del data["name"]
-        response = client.post("/examples/forms/create", data=data)
+        response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 400
 
@@ -150,14 +150,14 @@ class TestFormsExampleUpdate:
             external_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
         )
 
-    def test_update_roundtrip_persists_changed_fields(self, db):
+    def test_update_roundtrip_persists_changed_fields(self):
         existing = self._create_existing()
         client = Client()
         data = _valid_post_data()
         data["name"] = "After"
         data["count"] = "100"
 
-        response = client.post(f"/examples/forms/{existing.id}/update", data=data)
+        response = client.post(f"/examples/forms/{existing.id}/update", form_data=data)
 
         assert response.status_code == 302, response.content
 
@@ -167,13 +167,13 @@ class TestFormsExampleUpdate:
         assert existing.status == "published"
         assert existing.amount == Decimal("99.99")
 
-    def test_update_with_invalid_data_does_not_save(self, db):
+    def test_update_with_invalid_data_does_not_save(self):
         existing = self._create_existing()
         client = Client()
         data = _valid_post_data()
         data["count"] = "not-an-int"
 
-        response = client.post(f"/examples/forms/{existing.id}/update", data=data)
+        response = client.post(f"/examples/forms/{existing.id}/update", form_data=data)
 
         assert response.status_code == 400
         existing.refresh_from_db()
@@ -198,7 +198,7 @@ class TestFormsExampleDelete:
             external_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
         )
 
-    def test_delete_removes_the_row(self, db):
+    def test_delete_removes_the_row(self):
         existing = self._create_existing()
         client = Client()
 
@@ -212,30 +212,32 @@ class TestFormsExampleDelete:
 class TestForeignKeyRoundTrip:
     """Exercises the explicit ForeignKeyField → ModelChoiceField handler."""
 
-    def test_create_with_valid_fk(self, db):
+    def test_create_with_valid_fk(self):
         parent = DeleteParent.query.create(name="parent-1")
         client = Client()
         response = client.post(
-            "/examples/child-cascade/create", data={"parent": str(parent.id)}
+            "/examples/child-cascade/create", form_data={"parent": str(parent.id)}
         )
 
         assert response.status_code == 302, response.content
         child = ChildCascade.query.get()
         assert child.parent.id == parent.id
 
-    def test_create_with_nonexistent_fk_returns_400(self, db):
+    def test_create_with_nonexistent_fk_returns_400(self):
         client = Client()
         response = client.post(
-            "/examples/child-cascade/create", data={"parent": "999999"}
+            "/examples/child-cascade/create", form_data={"parent": "999999"}
         )
 
         assert response.status_code == 400
         errors = json.loads(response.content)
         assert "parent" in errors
 
-    def test_create_with_blank_required_fk_returns_400(self, db):
+    def test_create_with_blank_required_fk_returns_400(self):
         client = Client()
-        response = client.post("/examples/child-cascade/create", data={"parent": ""})
+        response = client.post(
+            "/examples/child-cascade/create", form_data={"parent": ""}
+        )
 
         assert response.status_code == 400
         errors = json.loads(response.content)
@@ -247,11 +249,11 @@ class TestDBExpressionDefaultsRoundTrip:
     user omit the value so Postgres fills it on INSERT. modelfield_to_formfield
     sets required=False for fields where db_returning is True."""
 
-    def test_blank_db_default_fields_are_filled_by_database(self, db):
+    def test_blank_db_default_fields_are_filled_by_database(self):
         client = Client()
         response = client.post(
             "/examples/db-defaults/create",
-            data={"name": "sample", "db_uuid": "", "created_at": ""},
+            form_data={"name": "sample", "db_uuid": "", "created_at": ""},
         )
 
         assert response.status_code == 302, response.content
@@ -260,12 +262,12 @@ class TestDBExpressionDefaultsRoundTrip:
         assert isinstance(obj.db_uuid, uuid.UUID)
         assert isinstance(obj.created_at, datetime.datetime)
 
-    def test_user_supplied_value_overrides_db_default(self, db):
+    def test_user_supplied_value_overrides_db_default(self):
         supplied = "11111111-1111-1111-1111-111111111111"
         client = Client()
         response = client.post(
             "/examples/db-defaults/create",
-            data={
+            form_data={
                 "name": "sample",
                 "db_uuid": supplied,
                 "created_at": "2026-01-02 03:04:05",
@@ -284,11 +286,11 @@ class TestEncryptedFieldsRoundTrip:
     """EncryptedTextField and EncryptedJSONField round-trip through the
     ModelForm → POST → save path with transparent encrypt/decrypt."""
 
-    def test_create_roundtrip_with_encrypted_text(self, db):
+    def test_create_roundtrip_with_encrypted_text(self):
         client = Client()
         response = client.post(
             "/examples/secret-store/create",
-            data={
+            form_data={
                 "name": "prod-key",
                 "api_key": "sk-live-abc123",
                 "notes": "rotate monthly",
@@ -303,11 +305,11 @@ class TestEncryptedFieldsRoundTrip:
         assert obj.notes == "rotate monthly"
         assert obj.config == {"region": "us-east-1"}
 
-    def test_blank_optional_encrypted_text_accepted(self, db):
+    def test_blank_optional_encrypted_text_accepted(self):
         client = Client()
         response = client.post(
             "/examples/secret-store/create",
-            data={
+            form_data={
                 "name": "minimal",
                 "api_key": "sk-test",
                 "notes": "",

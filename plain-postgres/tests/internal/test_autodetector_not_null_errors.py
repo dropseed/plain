@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import pytest
-
 from plain.postgres import types
 from plain.postgres.migrations.autodetector import MigrationAutodetector
 from plain.postgres.migrations.exceptions import MigrationSchemaError
 from plain.postgres.migrations.questioner import MigrationQuestioner
 from plain.postgres.migrations.state import ModelState, ProjectState
+from plain.test import raises
 
 
 def _state_with(model_state: ModelState) -> ProjectState:
@@ -30,9 +29,9 @@ def test_add_not_null_field_without_default_raises() -> None:
         ],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
-    with pytest.raises(MigrationSchemaError) as exc:
+    with raises(MigrationSchemaError) as exc:
         autodetector._detect_changes()
-    msg = str(exc.value)
+    msg = str(exc.exception)
     assert "thing.status" in msg.lower()
     assert "default" in msg.lower()
 
@@ -178,9 +177,9 @@ def test_rename_combined_with_null_change_raises() -> None:
         _state_with(to_model),
         questioner=questioner,
     )
-    with pytest.raises(MigrationSchemaError) as exc:
+    with raises(MigrationSchemaError) as exc:
         autodetector._detect_changes()
-    msg = str(exc.value).lower()
+    msg = str(exc.exception).lower()
     assert "thing.new_name" in msg
     assert "default" in msg
 
@@ -204,8 +203,8 @@ def test_multiple_new_fields_without_default_reports_first() -> None:
         ],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
-    with pytest.raises(MigrationSchemaError) as exc:
+    with raises(MigrationSchemaError) as exc:
         autodetector._detect_changes()
-    msg = str(exc.value).lower()
+    msg = str(exc.exception).lower()
     assert "thing.a_status" in msg
     assert "thing.z_status" not in msg

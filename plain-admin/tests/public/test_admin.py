@@ -5,7 +5,7 @@ from plain.admin.views.registry import registry
 from plain.test import Client
 
 
-def test_admin_login_required(db):
+def test_admin_login_required():
     client = Client()
 
     # Login required
@@ -26,7 +26,7 @@ def test_admin_login_required(db):
     assert resp.url.startswith("/admin/p/")
 
 
-def test_has_permission_on_view(db):
+def test_has_permission_on_view():
     """A view with has_permission returning False denies access via check_auth."""
 
     class RestrictedView(AdminView):
@@ -47,7 +47,7 @@ def test_has_permission_on_view(db):
     assert AdminView.has_permission(user) is True
 
 
-def test_has_permission_setting(db):
+def test_has_permission_setting():
     """ADMIN_HAS_PERMISSION setting controls access to all views."""
     from plain.runtime import settings
 
@@ -74,7 +74,7 @@ def test_has_permission_setting(db):
         settings.ADMIN_HAS_PERMISSION = original
 
 
-def test_ui_view_renders(db):
+def test_ui_view_renders():
     """The UI catalog page renders for an admin user."""
     user = User.query.create(username="admin", is_admin=True)
     client = Client()
@@ -90,7 +90,7 @@ def test_ui_view_renders(db):
     assert "data-theme-set" in body
 
 
-def test_nav_sections_exclude_denied_views(db):
+def test_nav_sections_exclude_denied_views():
     """Nav sections should not include views the user is denied from."""
 
     class AllowedView(AdminView):

@@ -7,38 +7,38 @@ unique constraint that produces a realistic ValidationError on duplicate create.
 
 from typing import cast
 
-import pytest
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import transaction
 from plain.postgres.fields.related import ManyToManyField
+from plain.test import raises
 
 
-def test_create_unique_constraint(db):
+def test_create_unique_constraint():
     Widget.query.create(name="Toyota", size="Tundra")
 
     # No pre-check: the duplicate is rejected by the database and mapped to a
     # ValidationError. Wrap in atomic() so the savepoint rolls back and the
     # transaction stays usable for the count() below.
-    with pytest.raises(ValidationError) as e:
+    with raises(ValidationError) as e:
         with transaction.atomic():
             Widget.query.create(name="Toyota", size="Tundra")
 
-    assert e.value.messages == ["A widget with this name and size already exists."]
-    assert NON_FIELD_ERRORS in e.value.error_dict
+    assert e.exception.messages == ["A widget with this name and size already exists."]
+    assert NON_FIELD_ERRORS in e.exception.error_dict
 
     assert Widget.query.count() == 1
 
 
-def test_update_or_create_unique_constraint(db):
+def test_update_or_create_unique_constraint():
     Widget.query.update_or_create(name="Toyota", size="Tundra")
     Widget.query.update_or_create(name="Toyota", size="Tundra")
 
     assert Widget.query.count() == 1
 
 
-def test_many_to_many_forward_accessor(db):
+def test_many_to_many_forward_accessor():
     """Test that the forward ManyToManyField accessor works."""
     widget = Widget.query.create(name="Tesla", size="Model 3")
     gps = Tag.query.create(name="GPS")
@@ -53,7 +53,7 @@ def test_many_to_many_forward_accessor(db):
     assert tag_names == {"GPS", "Sunroof"}
 
 
-def test_many_to_many_reverse_accessor(db):
+def test_many_to_many_reverse_accessor():
     """Test that the reverse ManyToManyField accessor works."""
     widget1 = Widget.query.create(name="Tesla", size="Model 3")
     widget2 = Widget.query.create(name="Toyota", size="Camry")
@@ -69,7 +69,7 @@ def test_many_to_many_reverse_accessor(db):
     assert widget_sizes == {"Model 3", "Camry"}
 
 
-def test_many_to_many_remove(db):
+def test_many_to_many_remove():
     """Test removing items from a ManyToManyField."""
     widget = Widget.query.create(name="Honda", size="Accord")
     gps = Tag.query.create(name="GPS")
@@ -86,7 +86,7 @@ def test_many_to_many_remove(db):
     assert tag_names == {"GPS", "Leather Seats"}
 
 
-def test_many_to_many_clear(db):
+def test_many_to_many_clear():
     """Test clearing all items from a ManyToManyField."""
     widget = Widget.query.create(name="BMW", size="X5")
     gps = Tag.query.create(name="GPS")
@@ -100,7 +100,7 @@ def test_many_to_many_clear(db):
     assert widget.tags.query.count() == 0
 
 
-def test_value_from_object_returns_related_objects(db):
+def test_value_from_object_returns_related_objects():
     """ManyToManyField.value_from_object must return the currently-related
     objects. ModelForm's `model_to_dict` calls this when given an instance
     so the form can populate `initial` for the M2M field — a regression
@@ -117,7 +117,7 @@ def test_value_from_object_returns_related_objects(db):
     assert {t.name for t in result} == {"GPS", "Sunroof"}
 
 
-def test_value_from_object_unsaved_instance_returns_empty(db):
+def test_value_from_object_unsaved_instance_returns_empty():
     """An unsaved instance has no related rows; value_from_object should
     return an empty list rather than crash.
     """
@@ -126,7 +126,7 @@ def test_value_from_object_unsaved_instance_returns_empty(db):
     assert list(field.value_from_object(widget)) == []
 
 
-def test_many_to_many_through_model(db):
+def test_many_to_many_through_model():
     """Test accessing the through model directly."""
     widget = Widget.query.create(name="Ford", size="Mustang")
     gps = Tag.query.create(name="GPS")

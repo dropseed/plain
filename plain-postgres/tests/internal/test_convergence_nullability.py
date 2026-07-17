@@ -3,7 +3,7 @@ from __future__ import annotations
 from app.examples.models.delete import ChildSetNull
 from app.examples.models.nullability import NullabilityExample
 from app.examples.models.trees import TreeNode
-from conftest_convergence import column_is_not_null, constraint_exists, execute
+from convergence_helpers import column_is_not_null, constraint_exists, execute
 
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
@@ -20,10 +20,11 @@ from plain.postgres.convergence.fixes import (
     DropNotNullFix,
     SetNotNullFix,
 )
+from plain.postgres.test import isolated_db
 
 
 class TestNotNullDetection:
-    def test_detects_nullable_drift(self, db):
+    def test_detects_nullable_drift(self):
         """Non-nullable model field + nullable DB column creates NullabilityDrift."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
@@ -41,7 +42,7 @@ class TestNotNullDetection:
         assert null_drifts[0].column == "required_text"
         assert not null_drifts[0].has_null_rows
 
-    def test_no_drift_when_converged(self, db):
+    def test_no_drift_when_converged(self):
         """Non-nullable model field + NOT NULL DB column creates no drift."""
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -50,7 +51,7 @@ class TestNotNullDetection:
         null_drifts = [d for d in analysis.drifts if isinstance(d, NullabilityDrift)]
         assert null_drifts == []
 
-    def test_no_drift_for_nullable_field(self, db):
+    def test_no_drift_for_nullable_field(self):
         """Nullable model field + nullable DB column creates no drift."""
         # TreeNode.parent is allow_null=True, DB column is nullable
         conn = get_connection()
@@ -60,7 +61,7 @@ class TestNotNullDetection:
         null_drifts = [d for d in analysis.drifts if isinstance(d, NullabilityDrift)]
         assert null_drifts == []
 
-    def test_has_null_rows_flag(self, db):
+    def test_has_null_rows_flag(self):
         """Drift correctly reports whether NULL rows exist."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
@@ -77,7 +78,7 @@ class TestNotNullDetection:
         assert len(null_drifts) == 1
         assert null_drifts[0].has_null_rows is True
 
-    def test_column_status_carries_drift(self, db):
+    def test_column_status_carries_drift(self):
         """ColumnStatus has the drift object for nullable columns."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
@@ -95,7 +96,7 @@ class TestNotNullDetection:
         assert len(null_drifts) == 1
         assert required_col[0].issue == "expected NOT NULL, actual NULL"
 
-    def test_issue_text_with_null_rows(self, db):
+    def test_issue_text_with_null_rows(self):
         """Issue text mentions NULL rows when they exist."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
@@ -112,7 +113,7 @@ class TestNotNullDetection:
             required_col[0].issue == "expected NOT NULL, actual NULL (NULL rows exist)"
         )
 
-    def test_issue_count_includes_nullability(self, db):
+    def test_issue_count_includes_nullability(self):
         """Nullability issues are counted in issue_count."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
@@ -126,7 +127,7 @@ class TestNotNullDetection:
 
 
 class TestNotNullPlanning:
-    def test_executable_when_no_null_rows(self, db):
+    def test_executable_when_no_null_rows(self):
         """No NULL rows → executable SetNotNullFix."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
@@ -144,7 +145,7 @@ class TestNotNullPlanning:
         assert fix.table == "examples_nullabilityexample"
         assert fix.column == "required_text"
 
-    def test_blocked_when_null_rows_exist(self, db):
+    def test_blocked_when_null_rows_exist(self):
         """NULL rows → blocked plan item with guidance."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
@@ -164,7 +165,7 @@ class TestNotNullPlanning:
         assert blocked[0].guidance is not None
         assert "NULL" in blocked[0].guidance
 
-    def test_blocks_sync(self, db):
+    def test_blocks_sync(self):
         """SetNotNullFix blocks sync (correctness convergence)."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
@@ -197,7 +198,8 @@ class TestNotNullPlanning:
 
 
 class TestNotNullFixes:
-    def test_apply_set_not_null(self, isolated_db):
+    @isolated_db
+    def test_apply_set_not_null(self):
         """SetNotNullFix uses safe CHECK NOT VALID → VALIDATE → SET NOT NULL."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
@@ -220,7 +222,8 @@ class TestNotNullFixes:
             generate_notnull_check_name("examples_nullabilityexample", "required_text"),
         )
 
-    def test_set_not_null_lifecycle(self, isolated_db):
+    @isolated_db
+    def test_set_not_null_lifecycle(self):
         """Full cycle: drop NOT NULL → detect → fix → converged."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
@@ -261,7 +264,7 @@ class TestNotNullFixes:
 
 
 class TestDropNotNull:
-    def test_detects_too_strict_column(self, db):
+    def test_detects_too_strict_column(self):
         """Nullable model field + NOT NULL DB column creates NullabilityDrift."""
         # ChildSetNull.parent is allow_null=True; set the column to NOT NULL
         execute(
@@ -277,7 +280,7 @@ class TestDropNotNull:
         ]
         assert len(null_drifts) == 1
 
-    def test_plans_drop_not_null(self, db):
+    def test_plans_drop_not_null(self):
         """Nullable model + NOT NULL DB → executable DropNotNullFix."""
         execute(
             'ALTER TABLE "examples_childsetnull" ALTER COLUMN "parent_id" SET NOT NULL'
@@ -295,7 +298,8 @@ class TestDropNotNull:
         assert fix.column == "parent_id"
         assert drop_fixes[0].blocks_sync is True
 
-    def test_apply_drop_not_null(self, isolated_db):
+    @isolated_db
+    def test_apply_drop_not_null(self):
         """DropNotNullFix applies DROP NOT NULL on the column."""
         # parent_id starts nullable; force it NOT NULL then fix it
         execute(
@@ -309,7 +313,8 @@ class TestDropNotNull:
         assert "DROP NOT NULL" in sql
         assert not column_is_not_null("examples_childsetnull", "parent_id")
 
-    def test_drop_not_null_lifecycle(self, isolated_db):
+    @isolated_db
+    def test_drop_not_null_lifecycle(self):
         """Full cycle: set NOT NULL → detect → fix → converged."""
         execute(
             'ALTER TABLE "examples_childsetnull" ALTER COLUMN "parent_id" SET NOT NULL'

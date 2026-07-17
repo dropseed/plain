@@ -68,9 +68,13 @@ class CLIRegistryGroup(click.Group):
     Click Group that exposes commands from the CLI registry.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any):
+    def __init__(self, *args: Any, import_app_modules: bool = True, **kwargs: Any):
         super().__init__(*args, **kwargs)
-        cli_registry.import_modules()
+        if import_app_modules:
+            # Importing CLI modules from INSTALLED_PACKAGES requires settings,
+            # so this is skipped outside an app — entry-point-registered
+            # commands are already in the registry.
+            cli_registry.import_modules()
 
     def list_commands(self, ctx: Context) -> list[str]:
         return sorted(cli_registry.get_commands().keys())
@@ -100,12 +104,22 @@ class PlainCommandCollection(click.CommandCollection):
         self._setup_attempted = True
 
         try:
-            plain.runtime.setup()
+            try:
+                plain.runtime.setup()
+            except plain.runtime.SetupError:
+                # Already set up (e.g. the CLI is invoked in-process from a
+                # test run that called setup()) — the registry can still load.
+                pass
             self._registry_group = CLIRegistryGroup()
             # Add registry group to sources
             self.sources.insert(0, self._registry_group)
         except plain.runtime.AppPathNotFound:
-            # Allow built-in commands to work regardless of being in a valid app
+            # The `plain.setup` entry points already ran (they load before the
+            # app path check), so registered commands like `plain test` are
+            # still available — expose them alongside the built-ins. Commands
+            # that require the app will error individually when invoked.
+            self._registry_group = CLIRegistryGroup(import_app_modules=False)
+            self.sources.insert(0, self._registry_group)
             click.secho(
                 "Plain `app` directory not found. Some commands may be missing.",
                 fg="yellow",

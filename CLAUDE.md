@@ -55,7 +55,7 @@ Still unsure? **Would a failure surprise a user reading the changelog?** If yes 
 - **Lifecycle**: `internal/` tests are regenerable — delete and rewrite freely when features change. `public/` tests evolve deliberately.
 - **Promotion**: when a test crosses into contract territory, move from `internal/` to `public/`; the reverse isn't a thing.
 
-Both directories run in the normal pytest suite and must pass. Shared fixtures in `tests/conftest.py` are inherited by both.
+Both directories run in the normal `plain test` suite and must pass. Shared helpers live in ordinary modules at the tests root (e.g. `helpers.py`), imported explicitly.
 
 ## Backwards compatibility
 

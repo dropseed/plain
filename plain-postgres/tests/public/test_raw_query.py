@@ -1,7 +1,7 @@
 from app.examples.models.iteration import IterationExample
 
 
-def test_raw_query(db):
+def test_raw_query():
     """Test that raw SQL queries work correctly."""
     IterationExample.query.create(name="Toyota", tag="Camry")
     IterationExample.query.create(name="Honda", tag="Civic")
@@ -19,7 +19,7 @@ def test_raw_query(db):
     assert names == ["Ford", "Honda", "Toyota"]
 
 
-def test_raw_query_with_params(db):
+def test_raw_query_with_params():
     """Test raw queries with parameters."""
     IterationExample.query.create(name="Toyota", tag="Camry")
     IterationExample.query.create(name="Toyota", tag="Corolla")

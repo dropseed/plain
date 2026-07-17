@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import datetime
 import socket
+import time
 import uuid
 from concurrent.futures import Future
-
-import pytest
+from contextlib import contextmanager
 
 from plain.exceptions import ValidationError
 from plain.jobs import Job
+from plain.jobs import workers as jobs_workers
 from plain.jobs.models import (
     JobProcess,
     JobRequest,
@@ -21,6 +22,7 @@ from plain.jobs.models import (
 )
 from plain.jobs.registry import jobs_registry, register_job
 from plain.jobs.workers import Worker, future_finished_callback
+from plain.test import override_settings, patch, raises
 from plain.utils import timezone
 
 _aborted_calls: list[JobResult] = []
@@ -56,11 +58,6 @@ class _PlainJob(Job):
         pass
 
 
-@pytest.fixture(autouse=True)
-def _clear_aborted_calls() -> None:
-    _aborted_calls.clear()
-
-
 def _make_job_process(
     job_class: type[Job],
     *,
@@ -89,153 +86,159 @@ def _make_heartbeat(
     )
 
 
-def test_rescue_stale_workers_rescues_jobs_from_dead_worker(db, settings) -> None:
-    settings.JOBS_HEARTBEAT_TIMEOUT = 60
-
-    dead_worker_id = uuid.uuid4()
-    _make_heartbeat(worker_id=dead_worker_id, age_seconds=120)
-    job_process = _make_job_process(_RecordingJob, worker_id=dead_worker_id)
-
-    rescue_stale_workers()
-
-    # JobProcess deleted, JobResult created with LOST.
-    assert not JobProcess.query.filter(uuid=job_process.uuid).exists()
-    result = JobResult.query.get(job_process_uuid=job_process.uuid)
-    assert result.status == JobResultStatuses.LOST
-
-    # Heartbeat row claimed and deleted.
-    assert not WorkerHeartbeat.query.filter(worker_id=dead_worker_id).exists()
+@contextmanager
+def _worker():
+    """A real Worker. The ProcessPoolExecutor is shut down after the test."""
+    w = Worker(queues=["default"], max_processes=1)
+    try:
+        yield w
+    finally:
+        w.executor.shutdown(wait=False, cancel_futures=True)
 
 
-def test_rescue_stale_workers_leaves_alive_workers_alone(db, settings) -> None:
-    settings.JOBS_HEARTBEAT_TIMEOUT = 60
+def test_rescue_stale_workers_rescues_jobs_from_dead_worker() -> None:
+    with override_settings(JOBS_HEARTBEAT_TIMEOUT=60):
+        dead_worker_id = uuid.uuid4()
+        _make_heartbeat(worker_id=dead_worker_id, age_seconds=120)
+        job_process = _make_job_process(_RecordingJob, worker_id=dead_worker_id)
 
-    alive_worker_id = uuid.uuid4()
-    _make_heartbeat(worker_id=alive_worker_id, age_seconds=10)
-    job_process = _make_job_process(_RecordingJob, worker_id=alive_worker_id)
+        rescue_stale_workers()
 
-    rescue_stale_workers()
+        # JobProcess deleted, JobResult created with LOST.
+        assert not JobProcess.query.filter(uuid=job_process.uuid).exists()
+        result = JobResult.query.get(job_process_uuid=job_process.uuid)
+        assert result.status == JobResultStatuses.LOST
 
-    assert JobProcess.query.filter(uuid=job_process.uuid).exists()
-    assert WorkerHeartbeat.query.filter(worker_id=alive_worker_id).exists()
-    assert not JobResult.query.filter(job_process_uuid=job_process.uuid).exists()
+        # Heartbeat row claimed and deleted.
+        assert not WorkerHeartbeat.query.filter(worker_id=dead_worker_id).exists()
 
 
-def test_rescue_stale_workers_long_running_legitimate_job_is_safe(db, settings) -> None:
+def test_rescue_stale_workers_leaves_alive_workers_alone() -> None:
+    with override_settings(JOBS_HEARTBEAT_TIMEOUT=60):
+        alive_worker_id = uuid.uuid4()
+        _make_heartbeat(worker_id=alive_worker_id, age_seconds=10)
+        job_process = _make_job_process(_RecordingJob, worker_id=alive_worker_id)
+
+        rescue_stale_workers()
+
+        assert JobProcess.query.filter(uuid=job_process.uuid).exists()
+        assert WorkerHeartbeat.query.filter(worker_id=alive_worker_id).exists()
+        assert not JobResult.query.filter(job_process_uuid=job_process.uuid).exists()
+
+
+def test_rescue_stale_workers_long_running_legitimate_job_is_safe() -> None:
     """A long-running JobProcess whose worker is still heartbeating must not be marked LOST.
 
     This is the corruption mode the previous JOBS_TIMEOUT design produced.
     """
-    settings.JOBS_HEARTBEAT_TIMEOUT = 60
+    with override_settings(JOBS_HEARTBEAT_TIMEOUT=60):
+        alive_worker_id = uuid.uuid4()
+        _make_heartbeat(worker_id=alive_worker_id, age_seconds=5)
 
-    alive_worker_id = uuid.uuid4()
-    _make_heartbeat(worker_id=alive_worker_id, age_seconds=5)
+        # Simulate a JobProcess that has existed for a "long" time.
+        job_process = _make_job_process(_RecordingJob, worker_id=alive_worker_id)
+        JobProcess.query.filter(uuid=job_process.uuid).update(
+            created_at=timezone.now() - datetime.timedelta(days=2)
+        )
 
-    # Simulate a JobProcess that has existed for a "long" time.
-    job_process = _make_job_process(_RecordingJob, worker_id=alive_worker_id)
-    JobProcess.query.filter(uuid=job_process.uuid).update(
-        created_at=timezone.now() - datetime.timedelta(days=2)
-    )
+        rescue_stale_workers()
 
-    rescue_stale_workers()
-
-    # JobProcess survives because its worker is alive.
-    assert JobProcess.query.filter(uuid=job_process.uuid).exists()
+        # JobProcess survives because its worker is alive.
+        assert JobProcess.query.filter(uuid=job_process.uuid).exists()
 
 
-def test_rescue_finds_dead_workers_on_other_queues(db, settings) -> None:
+def test_rescue_finds_dead_workers_on_other_queues() -> None:
     """A worker rescuing on its own queue must still claim dead workers on other queues.
 
     Otherwise multi-queue deployments strand jobs: rescuer A on queue 'alpha' would
     delete dead worker B's heartbeat without converting B's queue 'beta' jobs, and
     those JobProcesses would have no heartbeat row to match ever again.
     """
-    settings.JOBS_HEARTBEAT_TIMEOUT = 60
+    with override_settings(JOBS_HEARTBEAT_TIMEOUT=60):
+        dead_worker_id = uuid.uuid4()
+        WorkerHeartbeat.query.create(
+            worker_id=dead_worker_id,
+            hostname=socket.gethostname(),
+            pid=12345,
+            queues=["beta"],
+            last_heartbeat_at=timezone.now() - datetime.timedelta(seconds=120),
+        )
+        name = jobs_registry.get_job_class_name(_RecordingJob)
+        job_process = JobProcess.query.create(
+            job_request_uuid=uuid.uuid4(),
+            job_class=name,
+            parameters={"args": [], "kwargs": {}},
+            queue="beta",
+            worker_id=dead_worker_id,
+        )
 
-    dead_worker_id = uuid.uuid4()
-    WorkerHeartbeat.query.create(
-        worker_id=dead_worker_id,
-        hostname=socket.gethostname(),
-        pid=12345,
-        queues=["beta"],
-        last_heartbeat_at=timezone.now() - datetime.timedelta(seconds=120),
-    )
-    name = jobs_registry.get_job_class_name(_RecordingJob)
-    job_process = JobProcess.query.create(
-        job_request_uuid=uuid.uuid4(),
-        job_class=name,
-        parameters={"args": [], "kwargs": {}},
-        queue="beta",
-        worker_id=dead_worker_id,
-    )
+        # Simulates Worker A (scoped to 'alpha') ticking rescue. The unfiltered
+        # rescue_stale_workers call is what makes this work.
+        rescue_stale_workers()
 
-    # Simulates Worker A (scoped to 'alpha') ticking rescue. The unfiltered
-    # rescue_stale_workers call is what makes this work.
-    rescue_stale_workers()
-
-    assert not JobProcess.query.filter(uuid=job_process.uuid).exists()
-    assert (
-        JobResult.query.get(job_process_uuid=job_process.uuid).status
-        == JobResultStatuses.LOST
-    )
+        assert not JobProcess.query.filter(uuid=job_process.uuid).exists()
+        assert (
+            JobResult.query.get(job_process_uuid=job_process.uuid).status
+            == JobResultStatuses.LOST
+        )
 
 
-def test_rescue_stale_workers_rolls_back_heartbeat_on_conversion_failure(
-    db, settings, monkeypatch
-) -> None:
+def test_rescue_stale_workers_rolls_back_heartbeat_on_conversion_failure() -> None:
     """If conversion fails mid-rescue, the heartbeat must NOT be deleted.
 
     Otherwise the dead worker's remaining JobProcesses would have no heartbeat
     to match on the next rescue tick — stranded forever.
     """
-    settings.JOBS_HEARTBEAT_TIMEOUT = 60
-
-    dead_worker_id = uuid.uuid4()
-    _make_heartbeat(worker_id=dead_worker_id, age_seconds=120)
-    job_process = _make_job_process(_RecordingJob, worker_id=dead_worker_id)
 
     # Force convert_to_result to blow up.
     def _explode(self, **_):
         raise RuntimeError("simulated DB error mid-rescue")
 
-    monkeypatch.setattr(JobProcess, "convert_to_result", _explode)
+    with (
+        override_settings(JOBS_HEARTBEAT_TIMEOUT=60),
+        patch(JobProcess, "convert_to_result", _explode),
+    ):
+        dead_worker_id = uuid.uuid4()
+        _make_heartbeat(worker_id=dead_worker_id, age_seconds=120)
+        job_process = _make_job_process(_RecordingJob, worker_id=dead_worker_id)
 
-    rescue_stale_workers()  # should not raise — exception logged per-worker
+        rescue_stale_workers()  # should not raise — exception logged per-worker
 
-    # Heartbeat survived (claim rolled back), JobProcess survived → next tick can retry.
-    assert WorkerHeartbeat.query.filter(worker_id=dead_worker_id).exists()
-    assert JobProcess.query.filter(uuid=job_process.uuid).exists()
+        # Heartbeat survived (claim rolled back), JobProcess survived → next tick can retry.
+        assert WorkerHeartbeat.query.filter(worker_id=dead_worker_id).exists()
+        assert JobProcess.query.filter(uuid=job_process.uuid).exists()
 
 
-def test_rescue_stale_workers_returns_pending_hooks_after_commit(db, settings) -> None:
+def test_rescue_stale_workers_returns_pending_hooks_after_commit() -> None:
     """rescue_stale_workers commits the rescue and returns JobResults whose
     on_aborted should fire. The caller dispatches them so it can interleave
     heartbeat ticks (a slow hook batch could otherwise starve the heartbeat
     and trigger false-positive LOST from a peer).
     """
-    settings.JOBS_HEARTBEAT_TIMEOUT = 60
+    _aborted_calls.clear()
+    with override_settings(JOBS_HEARTBEAT_TIMEOUT=60):
+        dead_worker_id = uuid.uuid4()
+        _make_heartbeat(worker_id=dead_worker_id, age_seconds=120)
+        _make_job_process(_RecordingJob, worker_id=dead_worker_id)
 
-    dead_worker_id = uuid.uuid4()
-    _make_heartbeat(worker_id=dead_worker_id, age_seconds=120)
-    _make_job_process(_RecordingJob, worker_id=dead_worker_id)
+        pending = rescue_stale_workers()
 
-    pending = rescue_stale_workers()
+        # Rescue committed: heartbeat gone, JobResult exists.
+        assert not WorkerHeartbeat.query.filter(worker_id=dead_worker_id).exists()
+        assert JobResult.query.filter(status=JobResultStatuses.LOST).count() == 1
 
-    # Rescue committed: heartbeat gone, JobResult exists.
-    assert not WorkerHeartbeat.query.filter(worker_id=dead_worker_id).exists()
-    assert JobResult.query.filter(status=JobResultStatuses.LOST).count() == 1
+        # Hook is queued, not dispatched.
+        assert _aborted_calls == []
+        assert len(pending) == 1
+        assert pending[0].status == JobResultStatuses.LOST
 
-    # Hook is queued, not dispatched.
-    assert _aborted_calls == []
-    assert len(pending) == 1
-    assert pending[0].status == JobResultStatuses.LOST
-
-    # Caller fires it.
-    pending[0].dispatch_aborted_hook()
-    assert _aborted_calls == [pending[0]]
+        # Caller fires it.
+        pending[0].dispatch_aborted_hook()
+        assert _aborted_calls == [pending[0]]
 
 
-def test_on_aborted_fires_for_lost(db) -> None:
+def test_on_aborted_fires_for_lost() -> None:
+    _aborted_calls.clear()
     job_process = _make_job_process(_RecordingJob, worker_id=uuid.uuid4())
 
     job_process.convert_to_result(status=JobResultStatuses.LOST)
@@ -244,7 +247,8 @@ def test_on_aborted_fires_for_lost(db) -> None:
     assert _aborted_calls[0].status == JobResultStatuses.LOST
 
 
-def test_on_aborted_fires_for_cancelled(db) -> None:
+def test_on_aborted_fires_for_cancelled() -> None:
+    _aborted_calls.clear()
     job_process = _make_job_process(_RecordingJob, worker_id=uuid.uuid4())
 
     job_process.convert_to_result(status=JobResultStatuses.CANCELLED)
@@ -253,7 +257,8 @@ def test_on_aborted_fires_for_cancelled(db) -> None:
     assert _aborted_calls[0].status == JobResultStatuses.CANCELLED
 
 
-def test_on_aborted_does_not_fire_for_successful(db) -> None:
+def test_on_aborted_does_not_fire_for_successful() -> None:
+    _aborted_calls.clear()
     job_process = _make_job_process(_RecordingJob, worker_id=uuid.uuid4())
 
     job_process.convert_to_result(status=JobResultStatuses.SUCCESSFUL)
@@ -261,7 +266,8 @@ def test_on_aborted_does_not_fire_for_successful(db) -> None:
     assert _aborted_calls == []
 
 
-def test_on_aborted_does_not_fire_for_errored(db) -> None:
+def test_on_aborted_does_not_fire_for_errored() -> None:
+    _aborted_calls.clear()
     job_process = _make_job_process(_RecordingJob, worker_id=uuid.uuid4())
 
     job_process.convert_to_result(status=JobResultStatuses.ERRORED, error="oops")
@@ -269,7 +275,7 @@ def test_on_aborted_does_not_fire_for_errored(db) -> None:
     assert _aborted_calls == []
 
 
-def test_on_aborted_default_no_op_does_not_break_conversion(db) -> None:
+def test_on_aborted_default_no_op_does_not_break_conversion() -> None:
     """Jobs that don't override on_aborted still convert cleanly."""
     job_process = _make_job_process(_PlainJob, worker_id=uuid.uuid4())
 
@@ -278,7 +284,7 @@ def test_on_aborted_default_no_op_does_not_break_conversion(db) -> None:
     assert result.status == JobResultStatuses.LOST
 
 
-def test_on_aborted_exception_does_not_block_result(db) -> None:
+def test_on_aborted_exception_does_not_block_result() -> None:
     """A raise inside on_aborted must not prevent the JobResult from being recorded."""
     job_process = _make_job_process(_RaisingAbortedJob, worker_id=uuid.uuid4())
 
@@ -288,7 +294,7 @@ def test_on_aborted_exception_does_not_block_result(db) -> None:
     assert not JobProcess.query.filter(uuid=job_process.uuid).exists()
 
 
-def test_on_aborted_unregistered_job_class_is_skipped(db) -> None:
+def test_on_aborted_unregistered_job_class_is_skipped() -> None:
     """If the Job class can't be loaded (e.g., deleted from code), result is still recorded."""
     job_process = JobProcess.query.create(
         job_request_uuid=uuid.uuid4(),
@@ -302,7 +308,7 @@ def test_on_aborted_unregistered_job_class_is_skipped(db) -> None:
     assert result.status == JobResultStatuses.LOST
 
 
-def test_jobresult_unique_per_jobprocess(db) -> None:
+def test_jobresult_unique_per_jobprocess() -> None:
     """A second JobResult for the same JobProcess must be rejected.
 
     Guards the rescue-vs-late-finish race: if our heartbeat goes stale during
@@ -318,7 +324,7 @@ def test_jobresult_unique_per_jobprocess(db) -> None:
         job_class="x",
         status=JobResultStatuses.LOST,
     )
-    with pytest.raises(ValidationError):
+    with raises(ValidationError):
         JobResult.query.create(
             job_process_uuid=job_process_uuid,
             job_request_uuid=uuid.uuid4(),
@@ -327,7 +333,7 @@ def test_jobresult_unique_per_jobprocess(db) -> None:
         )
 
 
-def test_convert_to_job_process_stamps_worker_id(db) -> None:
+def test_convert_to_job_process_stamps_worker_id() -> None:
     name = jobs_registry.get_job_class_name(_RecordingJob)
     request = JobRequest.query.create(
         job_class=name,
@@ -340,118 +346,104 @@ def test_convert_to_job_process_stamps_worker_id(db) -> None:
     assert process.worker_id == worker_id
 
 
-@pytest.fixture
-def worker():
-    """A real Worker. The ProcessPoolExecutor is shut down after the test."""
-    w = Worker(queues=["default"], max_processes=1)
-    try:
-        yield w
-    finally:
-        w.executor.shutdown(wait=False, cancel_futures=True)
+def test_register_heartbeat_creates_row() -> None:
+    with _worker() as worker:
+        worker.register_heartbeat()
+
+        row = WorkerHeartbeat.query.get(worker_id=worker.worker_id)
+        assert row.queues == ["default"]
+        assert row.pid > 0
 
 
-def test_register_heartbeat_creates_row(db, worker: Worker) -> None:
-    worker.register_heartbeat()
+def test_maybe_heartbeat_updates_timestamp() -> None:
+    with _worker() as worker, override_settings(JOBS_HEARTBEAT_INTERVAL=0):  # always tick
+        worker.register_heartbeat()
+        initial = WorkerHeartbeat.query.get(worker_id=worker.worker_id).last_heartbeat_at
 
-    row = WorkerHeartbeat.query.get(worker_id=worker.worker_id)
-    assert row.queues == ["default"]
-    assert row.pid > 0
+        worker.maybe_heartbeat()
 
-
-def test_maybe_heartbeat_updates_timestamp(db, worker: Worker, settings) -> None:
-    settings.JOBS_HEARTBEAT_INTERVAL = 0  # always tick
-
-    worker.register_heartbeat()
-    initial = WorkerHeartbeat.query.get(worker_id=worker.worker_id).last_heartbeat_at
-
-    worker.maybe_heartbeat()
-
-    bumped = WorkerHeartbeat.query.get(worker_id=worker.worker_id).last_heartbeat_at
-    assert bumped >= initial
+        bumped = WorkerHeartbeat.query.get(worker_id=worker.worker_id).last_heartbeat_at
+        assert bumped >= initial
 
 
-def test_maybe_heartbeat_recreates_missing_row(db, worker: Worker, settings) -> None:
+def test_maybe_heartbeat_recreates_missing_row() -> None:
     """If the row is missing (e.g., another rescuer claimed us), re-register."""
-    settings.JOBS_HEARTBEAT_INTERVAL = 0
+    with _worker() as worker, override_settings(JOBS_HEARTBEAT_INTERVAL=0):
+        worker.register_heartbeat()
+        WorkerHeartbeat.query.filter(worker_id=worker.worker_id).delete()
 
-    worker.register_heartbeat()
-    WorkerHeartbeat.query.filter(worker_id=worker.worker_id).delete()
+        worker.maybe_heartbeat()
 
-    worker.maybe_heartbeat()
-
-    assert WorkerHeartbeat.query.filter(worker_id=worker.worker_id).exists()
-
-
-def test_deregister_heartbeat_deletes_row(db, worker: Worker) -> None:
-    worker.register_heartbeat()
-    assert WorkerHeartbeat.query.filter(worker_id=worker.worker_id).exists()
-
-    worker.deregister_heartbeat()
-
-    assert not WorkerHeartbeat.query.filter(worker_id=worker.worker_id).exists()
+        assert WorkerHeartbeat.query.filter(worker_id=worker.worker_id).exists()
 
 
-def test_run_loop_returns_connection_each_tick(
-    db, worker: Worker, settings, monkeypatch
-) -> None:
+def test_deregister_heartbeat_deletes_row() -> None:
+    with _worker() as worker:
+        worker.register_heartbeat()
+        assert WorkerHeartbeat.query.filter(worker_id=worker.worker_id).exists()
+
+        worker.deregister_heartbeat()
+
+        assert not WorkerHeartbeat.query.filter(worker_id=worker.worker_id).exists()
+
+
+def test_run_loop_returns_connection_each_tick() -> None:
     """The worker loop returns its pooled connection at the start of every
     tick. Holding one connection for the worker's whole life would let a
     server-side close wedge the loop reusing a dead connection forever."""
-    settings.JOBS_HEARTBEAT_INTERVAL = 0
-    worker.register_heartbeat()
-    worker._heartbeat_registered = True
+    with _worker() as worker, override_settings(JOBS_HEARTBEAT_INTERVAL=0):
+        worker.register_heartbeat()
+        worker._heartbeat_registered = True
 
-    # The no-job branch sleeps a second per tick — skip the real wait.
-    monkeypatch.setattr("plain.jobs.workers.time.sleep", lambda *a, **kw: None)
+        ticks = 0
 
-    ticks = 0
+        def _stop_after_two() -> None:
+            nonlocal ticks
+            ticks += 1
+            if ticks >= 2:
+                worker._is_shutting_down = True
 
-    def _stop_after_two() -> None:
-        nonlocal ticks
-        ticks += 1
-        if ticks >= 2:
-            worker._is_shutting_down = True
+        with (
+            # The no-job branch sleeps a second per tick — skip the real wait.
+            patch(time, "sleep", lambda *a, **kw: None),
+            patch(jobs_workers, "return_database_connection", _stop_after_two),
+        ):
+            worker._run_loop()
 
-    monkeypatch.setattr(
-        "plain.jobs.workers.return_database_connection", _stop_after_two
-    )
-
-    worker._run_loop()
-
-    assert ticks == 2
+        assert ticks == 2
 
 
-def test_run_loop_claims_job_and_submits(db, worker: Worker, monkeypatch) -> None:
+def test_run_loop_claims_job_and_submits() -> None:
     """A full claim through _run_loop: poll finds the JobRequest, converts it
     to a JobProcess, and submits it to the executor. Submission is stubbed —
     spawned worker processes can't see the test transaction's data anyway."""
-    name = jobs_registry.get_job_class_name(_RecordingJob)
-    request = JobRequest.query.create(
-        job_class=name,
-        parameters={"args": [], "kwargs": {}},
-    )
-    worker.register_heartbeat()
+    with _worker() as worker:
+        name = jobs_registry.get_job_class_name(_RecordingJob)
+        request = JobRequest.query.create(
+            job_class=name,
+            parameters={"args": [], "kwargs": {}},
+        )
+        worker.register_heartbeat()
 
-    submitted: list[str] = []
+        submitted: list[str] = []
 
-    def fake_submit(fn, job_process_uuid: str) -> Future:
-        submitted.append(job_process_uuid)
-        return Future()
+        def fake_submit(fn, job_process_uuid: str) -> Future:
+            submitted.append(job_process_uuid)
+            return Future()
 
-    monkeypatch.setattr(worker.executor, "submit", fake_submit)
-    # After the claim, the next tick's empty poll sleeps — use it to exit.
-    monkeypatch.setattr(
-        "plain.jobs.workers.time.sleep", lambda seconds: worker.shutdown()
-    )
+        with (
+            patch(worker.executor, "submit", fake_submit),
+            # After the claim, the next tick's empty poll sleeps — use it to exit.
+            patch(time, "sleep", lambda seconds: worker.shutdown()),
+        ):
+            worker._run_loop()
 
-    worker._run_loop()
-
-    process = JobProcess.query.get(job_request_uuid=request.uuid)
-    assert submitted == [str(process.uuid)]
-    assert not JobRequest.query.filter(uuid=request.uuid).exists()
+        process = JobProcess.query.get(job_request_uuid=request.uuid)
+        assert submitted == [str(process.uuid)]
+        assert not JobRequest.query.filter(uuid=request.uuid).exists()
 
 
-def test_future_finished_callback_rescues_orphan_jobprocess(db) -> None:
+def test_future_finished_callback_rescues_orphan_jobprocess() -> None:
     """If a future completes "successfully" but the JobProcess row survives
     (because process_job's outer except-Exception swallowed a framework error
     before convert_to_result ran), the orphan must be converted to ERRORED.
@@ -472,12 +464,13 @@ def test_future_finished_callback_rescues_orphan_jobprocess(db) -> None:
     assert result.status == JobResultStatuses.ERRORED
 
 
-def test_future_finished_callback_marks_killed_mid_run_as_lost(db) -> None:
+def test_future_finished_callback_marks_killed_mid_run_as_lost() -> None:
     """If the child process dies abruptly (OOM/segfault) while run() is in
     flight, the future raises BrokenProcessPool. started_at was already set,
     so we treat it as LOST and fire on_aborted — user code may have set up
     state it expected to tear down.
     """
+    _aborted_calls.clear()
     job_process = _make_job_process(_RecordingJob, worker_id=uuid.uuid4())
     # Simulate the child having entered run() before being killed.
     job_process.started_at = timezone.now()
@@ -494,59 +487,56 @@ def test_future_finished_callback_marks_killed_mid_run_as_lost(db) -> None:
     assert _aborted_calls == [result]
 
 
-def test_dispatch_aborted_hooks_ticks_heartbeat_between_hooks(
-    db, worker: Worker, settings
-) -> None:
+def test_dispatch_aborted_hooks_ticks_heartbeat_between_hooks() -> None:
     """A slow batch of on_aborted hooks must not starve the worker's
     heartbeat. The dispatcher ticks maybe_heartbeat() between every hook so
     a peer's rescue tick can't false-positive this worker as stale.
     """
-    settings.JOBS_HEARTBEAT_INTERVAL = 0  # tick on every call
-    worker.register_heartbeat()
+    _aborted_calls.clear()
+    with _worker() as worker, override_settings(JOBS_HEARTBEAT_INTERVAL=0):  # tick on every call
+        worker.register_heartbeat()
 
-    # Build three real JobResults to dispatch.
-    results = []
-    for _ in range(3):
-        jp = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
-        results.append(
-            jp.convert_to_result(status=JobResultStatuses.LOST, fire_hook=False)
-        )
+        # Build three real JobResults to dispatch.
+        results = []
+        for _ in range(3):
+            jp = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
+            results.append(
+                jp.convert_to_result(status=JobResultStatuses.LOST, fire_hook=False)
+            )
 
-    initial_at = WorkerHeartbeat.query.get(worker_id=worker.worker_id).last_heartbeat_at
+        initial_at = WorkerHeartbeat.query.get(worker_id=worker.worker_id).last_heartbeat_at
 
-    worker._dispatch_aborted_hooks(results)
+        worker._dispatch_aborted_hooks(results)
 
-    # All hooks fired.
-    assert len(_aborted_calls) == 3
-    # Heartbeat got refreshed during dispatch.
-    bumped_at = WorkerHeartbeat.query.get(worker_id=worker.worker_id).last_heartbeat_at
-    assert bumped_at > initial_at
+        # All hooks fired.
+        assert len(_aborted_calls) == 3
+        # Heartbeat got refreshed during dispatch.
+        bumped_at = WorkerHeartbeat.query.get(worker_id=worker.worker_id).last_heartbeat_at
+        assert bumped_at > initial_at
 
 
-def test_dispatch_aborted_hooks_continues_after_raising_hook(
-    db, worker: Worker
-) -> None:
+def test_dispatch_aborted_hooks_continues_after_raising_hook() -> None:
     """If one hook raises, dispatch_aborted_hook swallows it and the next
     hook still fires. The dispatcher keeps going rather than aborting the
     batch."""
-    raising_jp = _make_job_process(_RaisingAbortedJob, worker_id=worker.worker_id)
-    raising_result = raising_jp.convert_to_result(
-        status=JobResultStatuses.LOST, fire_hook=False
-    )
-    recording_jp = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
-    recording_result = recording_jp.convert_to_result(
-        status=JobResultStatuses.LOST, fire_hook=False
-    )
+    _aborted_calls.clear()
+    with _worker() as worker:
+        raising_jp = _make_job_process(_RaisingAbortedJob, worker_id=worker.worker_id)
+        raising_result = raising_jp.convert_to_result(
+            status=JobResultStatuses.LOST, fire_hook=False
+        )
+        recording_jp = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
+        recording_result = recording_jp.convert_to_result(
+            status=JobResultStatuses.LOST, fire_hook=False
+        )
 
-    worker._dispatch_aborted_hooks([raising_result, recording_result])
+        worker._dispatch_aborted_hooks([raising_result, recording_result])
 
-    # The recording hook ran even though the raising one failed.
-    assert _aborted_calls == [recording_result]
+        # The recording hook ran even though the raising one failed.
+        assert _aborted_calls == [recording_result]
 
 
-def test_rescue_own_orphans_converts_stranded_row_to_lost(
-    db, worker: Worker, settings
-) -> None:
+def test_rescue_own_orphans_converts_stranded_row_to_lost() -> None:
     """Self-rescue: a JobProcess stamped to this worker, older than the
     threshold, and not in our inflight set is stranded — convert to LOST.
 
@@ -555,80 +545,71 @@ def test_rescue_own_orphans_converts_stranded_row_to_lost(
     concurrent.futures, _discard_inflight cleared the future. The row is
     sitting in DB with no path back since our heartbeat is fresh.
     """
-    settings.JOBS_HEARTBEAT_TIMEOUT = 60
+    with _worker() as worker, override_settings(JOBS_HEARTBEAT_TIMEOUT=60):
+        job_process = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
+        # Backdate so it's past the cutoff.
+        job_process.created_at = timezone.now() - datetime.timedelta(seconds=120)
+        job_process.update(fields=["created_at"])
 
-    job_process = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
-    # Backdate so it's past the cutoff.
-    job_process.created_at = timezone.now() - datetime.timedelta(seconds=120)
-    job_process.update(fields=["created_at"])
+        worker._rescue_own_orphans()
 
-    worker._rescue_own_orphans()
-
-    assert not JobProcess.query.filter(uuid=job_process.uuid).exists()
-    result = JobResult.query.get(job_process_uuid=job_process.uuid)
-    assert result.status == JobResultStatuses.LOST
+        assert not JobProcess.query.filter(uuid=job_process.uuid).exists()
+        result = JobResult.query.get(job_process_uuid=job_process.uuid)
+        assert result.status == JobResultStatuses.LOST
 
 
-def test_rescue_own_orphans_leaves_inflight_rows_alone(
-    db, worker: Worker, settings
-) -> None:
+def test_rescue_own_orphans_leaves_inflight_rows_alone() -> None:
     """A row whose future is still in our inflight dict must not be touched,
     even if it's older than the threshold (long-running job)."""
-    settings.JOBS_HEARTBEAT_TIMEOUT = 60
+    with _worker() as worker, override_settings(JOBS_HEARTBEAT_TIMEOUT=60):
+        job_process = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
+        job_process.created_at = timezone.now() - datetime.timedelta(seconds=120)
+        job_process.update(fields=["created_at"])
 
-    job_process = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
-    job_process.created_at = timezone.now() - datetime.timedelta(seconds=120)
-    job_process.update(fields=["created_at"])
+        fake_future: Future = Future()
+        worker._inflight_futures[fake_future] = str(job_process.uuid)
 
-    fake_future: Future = Future()
-    worker._inflight_futures[fake_future] = str(job_process.uuid)
+        worker._rescue_own_orphans()
 
-    worker._rescue_own_orphans()
-
-    assert JobProcess.query.filter(uuid=job_process.uuid).exists()
+        assert JobProcess.query.filter(uuid=job_process.uuid).exists()
 
 
-def test_rescue_own_orphans_respects_age_threshold(
-    db, worker: Worker, settings
-) -> None:
+def test_rescue_own_orphans_respects_age_threshold() -> None:
     """A freshly-claimed row not yet in the inflight dict (microsecond window
     between convert_to_job_process and the dict insert) must NOT be flagged
     as stranded — the threshold is exactly to protect this race."""
-    settings.JOBS_HEARTBEAT_TIMEOUT = 60
+    with _worker() as worker, override_settings(JOBS_HEARTBEAT_TIMEOUT=60):
+        # Fresh row, default created_at = now.
+        job_process = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
+        # Not in inflight set (simulating the moment between create and add).
+        assert worker._inflight_futures == {}
 
-    # Fresh row, default created_at = now.
-    job_process = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
-    # Not in inflight set (simulating the moment between create and add).
-    assert worker._inflight_futures == {}
+        worker._rescue_own_orphans()
 
-    worker._rescue_own_orphans()
-
-    # Still here — too young to be considered stranded.
-    assert JobProcess.query.filter(uuid=job_process.uuid).exists()
+        # Still here — too young to be considered stranded.
+        assert JobProcess.query.filter(uuid=job_process.uuid).exists()
 
 
-def test_rescue_own_orphans_ignores_other_workers_rows(
-    db, worker: Worker, settings
-) -> None:
+def test_rescue_own_orphans_ignores_other_workers_rows() -> None:
     """Self-rescue is per-worker. Rows owned by other workers are off-limits
     here — rescue_stale_workers handles those via heartbeat."""
-    settings.JOBS_HEARTBEAT_TIMEOUT = 60
+    with _worker() as worker, override_settings(JOBS_HEARTBEAT_TIMEOUT=60):
+        other_worker_id = uuid.uuid4()
+        other_job = _make_job_process(_RecordingJob, worker_id=other_worker_id)
+        other_job.created_at = timezone.now() - datetime.timedelta(seconds=120)
+        other_job.update(fields=["created_at"])
 
-    other_worker_id = uuid.uuid4()
-    other_job = _make_job_process(_RecordingJob, worker_id=other_worker_id)
-    other_job.created_at = timezone.now() - datetime.timedelta(seconds=120)
-    other_job.update(fields=["created_at"])
+        worker._rescue_own_orphans()
 
-    worker._rescue_own_orphans()
-
-    assert JobProcess.query.filter(uuid=other_job.uuid).exists()
+        assert JobProcess.query.filter(uuid=other_job.uuid).exists()
 
 
-def test_future_finished_callback_marks_unstarted_failure_as_errored(db) -> None:
+def test_future_finished_callback_marks_unstarted_failure_as_errored() -> None:
     """If the future raises before run() ever started (e.g. process_job
     couldn't import the job class), started_at is unset. There's no in-flight
     user state to clean up, so ERRORED is correct and on_aborted does NOT fire.
     """
+    _aborted_calls.clear()
     job_process = _make_job_process(_RecordingJob, worker_id=uuid.uuid4())
     assert job_process.started_at is None
 
@@ -643,31 +624,28 @@ def test_future_finished_callback_marks_unstarted_failure_as_errored(db) -> None
     assert _aborted_calls == []
 
 
-def test_deregister_keeps_heartbeat_when_jobprocess_still_stamped(
-    db, worker: Worker
-) -> None:
+def test_deregister_keeps_heartbeat_when_jobprocess_still_stamped() -> None:
     """If JobProcess rows still reference us at shutdown, leave the heartbeat
     alone so rescue can pick them up. Deleting it would strand them.
     """
-    worker.register_heartbeat()
-    # Simulate an orphan JobProcess row (e.g., bookkeeping error during drain).
-    name = jobs_registry.get_job_class_name(_RecordingJob)
-    JobProcess.query.create(
-        job_request_uuid=uuid.uuid4(),
-        job_class=name,
-        parameters={"args": [], "kwargs": {}},
-        worker_id=worker.worker_id,
-    )
+    with _worker() as worker:
+        worker.register_heartbeat()
+        # Simulate an orphan JobProcess row (e.g., bookkeeping error during drain).
+        name = jobs_registry.get_job_class_name(_RecordingJob)
+        JobProcess.query.create(
+            job_request_uuid=uuid.uuid4(),
+            job_class=name,
+            parameters={"args": [], "kwargs": {}},
+            worker_id=worker.worker_id,
+        )
 
-    worker.deregister_heartbeat()
+        worker.deregister_heartbeat()
 
-    # Heartbeat survived — rescue will eventually claim it as the worker dies.
-    assert WorkerHeartbeat.query.filter(worker_id=worker.worker_id).exists()
+        # Heartbeat survived — rescue will eventually claim it as the worker dies.
+        assert WorkerHeartbeat.query.filter(worker_id=worker.worker_id).exists()
 
 
-def test_register_heartbeat_failure_leaves_unregistered(
-    db, worker: Worker, monkeypatch
-) -> None:
+def test_register_heartbeat_failure_leaves_unregistered() -> None:
     """If the initial heartbeat insert fails, _heartbeat_registered stays False.
 
     The run loop checks this flag before claiming work — without it, an
@@ -678,46 +656,40 @@ def test_register_heartbeat_failure_leaves_unregistered(
     def _explode(self):
         raise RuntimeError("simulated DB error during heartbeat insert")
 
-    monkeypatch.setattr(Worker, "_create_heartbeat_row", _explode)
+    with _worker() as worker, patch(Worker, "_create_heartbeat_row", _explode):
+        worker.register_heartbeat()
 
-    worker.register_heartbeat()
-
-    assert worker._heartbeat_registered is False
+        assert worker._heartbeat_registered is False
 
 
-def test_maybe_heartbeat_recovers_after_failed_registration(
-    db, worker: Worker, settings
-) -> None:
+def test_maybe_heartbeat_recovers_after_failed_registration() -> None:
     """Once the DB recovers, maybe_heartbeat flips _heartbeat_registered to True."""
-    settings.JOBS_HEARTBEAT_INTERVAL = 0
-    # Simulate the post-failed-registration state.
-    worker._heartbeat_registered = False
+    with _worker() as worker, override_settings(JOBS_HEARTBEAT_INTERVAL=0):
+        # Simulate the post-failed-registration state.
+        worker._heartbeat_registered = False
 
-    worker.maybe_heartbeat()
+        worker.maybe_heartbeat()
 
-    assert worker._heartbeat_registered is True
-    assert WorkerHeartbeat.query.filter(worker_id=worker.worker_id).exists()
+        assert worker._heartbeat_registered is True
+        assert WorkerHeartbeat.query.filter(worker_id=worker.worker_id).exists()
 
 
-def test_maybe_heartbeat_clears_registered_flag_on_refresh_failure(
-    db, worker: Worker, settings, monkeypatch
-) -> None:
+def test_maybe_heartbeat_clears_registered_flag_on_refresh_failure() -> None:
     """If refresh raises (row gone + recreate fails), the run loop must stop
     claiming work. Otherwise we'd keep stamping JobProcesses with a worker_id
     that has no heartbeat — stranding them if we die.
     """
-    settings.JOBS_HEARTBEAT_INTERVAL = 0
-    worker.register_heartbeat()
-    assert worker._heartbeat_registered is True
+    with _worker() as worker, override_settings(JOBS_HEARTBEAT_INTERVAL=0):
+        worker.register_heartbeat()
+        assert worker._heartbeat_registered is True
 
-    # Row gone + create raises = refresh raises.
-    WorkerHeartbeat.query.filter(worker_id=worker.worker_id).delete()
+        # Row gone + create raises = refresh raises.
+        WorkerHeartbeat.query.filter(worker_id=worker.worker_id).delete()
 
-    def _explode(self):
-        raise RuntimeError("simulated DB error during recreate")
+        def _explode(self):
+            raise RuntimeError("simulated DB error during recreate")
 
-    monkeypatch.setattr(Worker, "_create_heartbeat_row", _explode)
+        with patch(Worker, "_create_heartbeat_row", _explode):
+            worker.maybe_heartbeat()
 
-    worker.maybe_heartbeat()
-
-    assert worker._heartbeat_registered is False
+        assert worker._heartbeat_registered is False

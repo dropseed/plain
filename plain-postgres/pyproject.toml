@@ -11,12 +11,12 @@ dependencies = ["plain>=0.134.0,<1.0.0", "psycopg>=3.2", "psycopg-pool>=3.2"]
 [project.entry-points."plain.setup"]
 "postgres-setup" = "plain.postgres.entrypoints:setup"
 
-# Automatically sets this up with pytest
-[project.entry-points."pytest11"]
-"plain.postgres" = "plain.postgres.test.pytest"
+# Test lifecycle discovered by plain.testing
+[project.entry-points."plain.testing"]
+"postgres" = "plain.postgres.test.lifecycle:PostgresTestLifecycle"
 
 [dependency-groups]
-dev = ["plain.pytest<1.0.0", "plain.templates>=0.1.0,<1.0.0", "opentelemetry-sdk>=1.34.1"]
+dev = ["plain.testing<1.0.0", "plain.templates>=0.1.0,<1.0.0", "opentelemetry-sdk>=1.34.1", "cryptography"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

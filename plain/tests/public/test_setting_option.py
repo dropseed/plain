@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import click
-import pytest
 from click.testing import CliRunner
 
 from plain.cli.options import SettingOption
+from plain.test import raises
 
 
 @click.command()
@@ -69,7 +69,7 @@ def test_setting_from_explicit_value():
 
 
 def test_raises_if_both_setting_and_envvar():
-    with pytest.raises(ValueError, match="Cannot use both"):
+    with raises(ValueError, match="Cannot use both"):
 
         @click.command()
         @click.option(
@@ -84,7 +84,7 @@ def test_raises_if_both_setting_and_envvar():
 
 
 def test_raises_if_both_setting_and_default():
-    with pytest.raises(ValueError, match="Cannot use both"):
+    with raises(ValueError, match="Cannot use both"):
 
         @click.command()
         @click.option(

@@ -10,12 +10,13 @@ real rows is exempt -- that path passes `_from_db=True`.
 
 from __future__ import annotations
 
-import pytest
 from app.examples.models.querysets import DefaultQuerySetModel
+
+from plain.test import raises
 
 
 def test_constructing_with_id_raises():
-    with pytest.raises(
+    with raises(
         ValueError,
         match=r"Cannot set the auto-generated primary key 'id'.*query\.get",
     ):
@@ -25,7 +26,7 @@ def test_constructing_with_id_raises():
 def test_query_create_with_id_raises():
     # query.create() constructs the instance first, so it rejects a manual
     # id the same way (before any database work).
-    with pytest.raises(ValueError, match=r"auto-generated primary key 'id'"):
+    with raises(ValueError, match=r"auto-generated primary key 'id'"):
         DefaultQuerySetModel.query.create(id=1, name="x")
 
 
@@ -41,7 +42,7 @@ def test_explicit_id_none_is_allowed():
     assert obj.id is None
 
 
-def test_loaded_rows_keep_their_id(db):
+def test_loaded_rows_keep_their_id():
     # from_db() is exempt: real rows load with their id intact.
     created = DefaultQuerySetModel.query.create(name="loaded")
     fetched = DefaultQuerySetModel.query.get(id=created.id)

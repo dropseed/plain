@@ -19,7 +19,7 @@ def _get(path):
     return Client().get(path, headers=HOST)
 
 
-def test_exact_redirect(db):
+def test_exact_redirect():
     Redirect.query.create(
         from_pattern="/old-page/",
         to_pattern="/new-page/",
@@ -32,7 +32,7 @@ def test_exact_redirect(db):
     assert response.headers["Location"].endswith("/new-page/")
 
 
-def test_redirect_status_code_is_respected(db):
+def test_redirect_status_code_is_respected():
     Redirect.query.create(
         from_pattern="/temp/",
         to_pattern="/somewhere/",
@@ -42,7 +42,7 @@ def test_redirect_status_code_is_respected(db):
     assert _get("/temp/").status_code == 302
 
 
-def test_regex_redirect_substitutes_groups(db):
+def test_regex_redirect_substitutes_groups():
     Redirect.query.create(
         from_pattern=r"^/blog/(\d+)/$",
         to_pattern=r"/posts/\1/",
@@ -56,7 +56,7 @@ def test_regex_redirect_substitutes_groups(db):
     assert response.headers["Location"].endswith("/posts/42/")
 
 
-def test_disabled_redirect_is_ignored(db):
+def test_disabled_redirect_is_ignored():
     Redirect.query.create(
         from_pattern="/disabled/",
         to_pattern="/nope/",
@@ -70,7 +70,7 @@ def test_disabled_redirect_is_ignored(db):
     assert NotFoundLog.query.filter(url__endswith="/disabled/").count() == 1
 
 
-def test_successful_redirect_is_logged(db):
+def test_successful_redirect_is_logged():
     redirect = Redirect.query.create(
         from_pattern="/logged/",
         to_pattern="/destination/",
@@ -84,7 +84,7 @@ def test_successful_redirect_is_logged(db):
     assert log.http_status == 301
 
 
-def test_unmatched_404_is_logged_as_not_found(db):
+def test_unmatched_404_is_logged_as_not_found():
     Redirect.query.create(from_pattern="/something/", to_pattern="/else/")
 
     response = _get("/no-rule-here/")
@@ -94,7 +94,7 @@ def test_unmatched_404_is_logged_as_not_found(db):
     assert RedirectLog.query.count() == 0
 
 
-def test_lower_order_redirect_wins(db):
+def test_lower_order_redirect_wins():
     # Two distinct patterns both match /dup/x/; `order` breaks the tie
     # (lower runs first). from_pattern is unique, so the patterns differ.
     Redirect.query.create(
@@ -109,7 +109,7 @@ def test_lower_order_redirect_wins(db):
     assert response.headers["Location"].endswith("/specific/")
 
 
-def test_existing_page_is_not_redirected(db):
+def test_existing_page_is_not_redirected():
     Redirect.query.create(from_pattern="/", to_pattern="/elsewhere/")
 
     # "/" resolves to a real view, so the 404 path (and redirect) never runs.

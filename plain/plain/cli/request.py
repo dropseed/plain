@@ -22,7 +22,7 @@ _HTTP_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TR
 
 _TRACE_UNAVAILABLE = (
     "Trace capture skipped — opentelemetry-sdk is not installed. "
-    "It ships with plain.connect or plain.pytest."
+    "It ships with plain.connect or plain.testing."
 )
 
 # Cap on per-query lines shown in the text Trace section; the full list is
@@ -232,12 +232,12 @@ def request(
         # Make the request
         method = method.upper()
         kwargs: dict[str, Any] = {
-            "follow": follow,
+            "follow_redirects": follow,
         }
         kwargs["headers"] = header_dict
 
         if method in ("POST", "PUT", "PATCH") and data:
-            kwargs["data"] = data
+            kwargs["body"] = data
             if content_type:
                 kwargs["content_type"] = content_type
 
@@ -246,7 +246,7 @@ def request(
         set_check_counts(errors=0, warnings=0)
 
         # Dispatch the request, capturing a trace when the OpenTelemetry SDK
-        # is available (it ships with plain.connect / plain.pytest, but is
+        # is available (it ships with plain.connect / plain.testing, but is
         # not a Plain core dependency).
         trace_result: TraceResult | None
         if capture_available():

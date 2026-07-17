@@ -5,7 +5,7 @@ import json
 from typing import Any, Literal
 
 from plain.mcp import MCPResource, MCPTool, MCPToolError, MCPView
-from plain.test import RequestFactory
+from plain.test import RequestFactory, patch, raises
 
 
 class _Mode(enum.StrEnum):
@@ -31,7 +31,7 @@ def _make_request(
 
 def _instantiate(cls: type[MCPView]) -> MCPView:
     """Build an MCPView instance with a stub request for unit tests."""
-    request = RequestFactory().post("/mcp", content_type="application/json")
+    request = RequestFactory().post("/mcp", body=b"", content_type="application/json")
     return cls(request=request)
 
 
@@ -42,26 +42,25 @@ def _call(mcp: MCPView, *args: Any, **kwargs: Any) -> dict[str, Any]:
 
 
 class TestMCPProtocol:
-    def setup_method(self) -> None:
+    def _mcp(self) -> MCPView:
         class _TestMCP(MCPView):
             name = "test"
 
-        self.cls = _TestMCP
-        self.mcp = _instantiate(_TestMCP)
+        return _instantiate(_TestMCP)
 
     def test_initialize(self) -> None:
-        response = _call(self.mcp, _make_request("initialize"))
+        response = _call(self._mcp(), _make_request("initialize"))
         assert response["jsonrpc"] == "2.0"
         assert response["id"] == 1
         assert "protocolVersion" in response["result"]
         assert response["result"]["serverInfo"]["name"] == "test"
 
     def test_ping(self) -> None:
-        response = _call(self.mcp, _make_request("ping"))
+        response = _call(self._mcp(), _make_request("ping"))
         assert response["result"] == {}
 
     def test_unknown_method(self) -> None:
-        response = _call(self.mcp, _make_request("bogus/method"))
+        response = _call(self._mcp(), _make_request("bogus/method"))
         assert response["error"]["code"] == -32601
 
     def test_underscore_method_name_rejected(self) -> None:
@@ -71,42 +70,42 @@ class TestMCPProtocol:
         underscore in a raw method name is never valid — rejecting it
         keeps the `/` → `_` rewrite collision-free.
         """
-        response = _call(self.mcp, _make_request("tools_list"))
+        response = _call(self._mcp(), _make_request("tools_list"))
         assert response["error"]["code"] == -32601
 
     def test_parse_error(self) -> None:
-        response = _call(self.mcp, b"not json")
+        response = _call(self._mcp(), b"not json")
         assert response["error"]["code"] == -32700
 
     def test_missing_jsonrpc_version_rejected(self) -> None:
         msg = json.dumps({"id": 1, "method": "ping", "params": {}})
-        response = _call(self.mcp, msg)
+        response = _call(self._mcp(), msg)
         assert response["error"]["code"] == -32600
         assert response["id"] == 1
 
     def test_wrong_jsonrpc_version_rejected(self) -> None:
         msg = json.dumps({"jsonrpc": "1.0", "id": 1, "method": "ping", "params": {}})
-        response = _call(self.mcp, msg)
+        response = _call(self._mcp(), msg)
         assert response["error"]["code"] == -32600
 
     def test_array_params_rejected(self) -> None:
         msg = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping", "params": []})
-        response = _call(self.mcp, msg)
+        response = _call(self._mcp(), msg)
         assert response["error"]["code"] == -32602
 
     def test_null_params_treated_as_empty(self) -> None:
         msg = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping", "params": None})
-        response = _call(self.mcp, msg)
+        response = _call(self._mcp(), msg)
         assert response["result"] == {}
 
     def test_notification_returns_none(self) -> None:
         msg = json.dumps(
             {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}
         )
-        assert self.mcp.handle_message(msg) is None
+        assert self._mcp().handle_message(msg) is None
 
     def test_tools_list_empty(self) -> None:
-        response = _call(self.mcp, _make_request("tools/list"))
+        response = _call(self._mcp(), _make_request("tools/list"))
         assert response["result"]["tools"] == []
 
 
@@ -326,7 +325,7 @@ class TestToolExecution:
         assert response["result"]["isError"] is True
         assert response["result"]["content"][0]["text"] == "Tool execution failed"
 
-    def test_tool_error_surfaces_message_without_logging(self, monkeypatch) -> None:
+    def test_tool_error_surfaces_message_without_logging(self) -> None:
         class PickyTool(MCPTool):
             def run(self) -> str:
                 raise MCPToolError("No widget named 'foo'")
@@ -335,16 +334,15 @@ class TestToolExecution:
             name = "test"
             tools = [PickyTool]
 
-        logged: list[Any] = []
-        monkeypatch.setattr(
-            "plain.mcp.views.log_exception", lambda *a, **k: logged.append(a)
-        )
+        import plain.mcp.views as mcp_views
 
-        mcp = _instantiate(MyMCP)
-        response = _call(
-            mcp,
-            _make_request("tools/call", {"name": "PickyTool", "arguments": {}}),
-        )
+        logged: list[Any] = []
+        with patch(mcp_views, "log_exception", lambda *a, **k: logged.append(a)):
+            mcp = _instantiate(MyMCP)
+            response = _call(
+                mcp,
+                _make_request("tools/call", {"name": "PickyTool", "arguments": {}}),
+            )
         # Expected failure: the caller sees the message via isError, and it is
         # NOT logged as a server exception (unlike an unexpected error).
         assert response["result"]["isError"] is True
@@ -404,20 +402,19 @@ class TestArgumentValidation:
 
         return MyMCP
 
-    def test_wrong_type_rejected_before_run(self, monkeypatch) -> None:
+    def test_wrong_type_rejected_before_run(self) -> None:
         # A string where an integer is declared must be rejected up front —
         # NOT run through `a + b` and logged as a server exception.
-        logged: list[Any] = []
-        monkeypatch.setattr(
-            "plain.mcp.views.log_exception", lambda *a, **k: logged.append(a)
-        )
+        import plain.mcp.views as mcp_views
 
-        response = _call(
-            _instantiate(self._add_mcp()),
-            _make_request(
-                "tools/call", {"name": "Add", "arguments": {"a": "x", "b": 3}}
-            ),
-        )
+        logged: list[Any] = []
+        with patch(mcp_views, "log_exception", lambda *a, **k: logged.append(a)):
+            response = _call(
+                _instantiate(self._add_mcp()),
+                _make_request(
+                    "tools/call", {"name": "Add", "arguments": {"a": "x", "b": 3}}
+                ),
+            )
         assert response["result"]["isError"] is True
         assert "'a' must be an integer" in response["result"]["content"][0]["text"]
         # The whole point: this input error is not logged as a server exception.
@@ -1468,9 +1465,7 @@ class TestResourceTemplates:
         assert response["error"]["code"] == -32602
 
     def test_setting_both_uri_and_template_is_an_error(self) -> None:
-        import pytest
-
-        with pytest.raises(TypeError, match="only one"):
+        with raises(TypeError, match="only one"):
 
             class Bad(MCPResource):
                 uri = "a://b"

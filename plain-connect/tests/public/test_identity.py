@@ -1,11 +1,11 @@
 import base64
 import hashlib
 
-import pytest
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from plain.connect.identity import encrypt_identity
+from plain.test import raises
 
 IDENTITY_KEY = "endpoint-identity-secret"
 
@@ -46,5 +46,5 @@ def test_encrypt_identity_token_is_url_safe():
 
 def test_wrong_key_cannot_decrypt():
     token = encrypt_identity(7, IDENTITY_KEY)
-    with pytest.raises(InvalidTag):
+    with raises(InvalidTag):
         _decrypt(token, "the-wrong-key")

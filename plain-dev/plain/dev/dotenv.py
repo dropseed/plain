@@ -1,9 +1,9 @@
 """Bash-compatible `.env` file parsing and Plain dev/test dotenv loading.
 
 `plain.dev` owns all dotenv code so that production deployments (which don't
-install plain.dev) never load `.env` files. plain.pytest opportunistically
+install plain.dev) never load `.env` files. plain.testing opportunistically
 imports `load_dotenv_files` — if plain.dev is installed, `.env.test*` loads
-under pytest; if not, the plugin skips dotenv loading entirely.
+under the test runner; if not, it falls back to a minimal loader.
 
 Parser supports:
 - KEY=value (basic unquoted)

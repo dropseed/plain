@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import datetime
 
-import pytest
-
 from plain.admin.dates import DatetimeRange, DatetimeRangeAliases
+from plain.test import raises
 
 
 def _dt(y, m, d, **kw):
@@ -50,7 +49,7 @@ def test_from_value_round_trip():
 
 
 def test_from_value_rejects_unknown():
-    with pytest.raises(ValueError, match="not a valid value"):
+    with raises(ValueError, match="not a valid value"):
         DatetimeRangeAliases.from_value("Some Nonsense Range")
 
 

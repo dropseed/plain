@@ -14,9 +14,11 @@ from app.examples.models.defaults import DefaultsExample
 
 from plain.postgres import fields as plain_fields
 from plain.postgres import get_connection
+from plain.postgres.test import isolated_db
+from plain.test import raises
 
 
-def test_create_table_inlines_literal_default(db):
+def test_create_table_inlines_literal_default():
     """CREATE TABLE for a model with `default="pending"` emits `DEFAULT` on
     the column and leaves it there (no trailing DROP DEFAULT)."""
     connection = get_connection()
@@ -31,7 +33,7 @@ def test_create_table_inlines_literal_default(db):
     assert "drop default" not in joined
 
 
-def test_add_field_keeps_literal_default(db):
+def test_add_field_keeps_literal_default():
     """add_field emits a single ADD COLUMN with DEFAULT and does NOT follow up
     with DROP DEFAULT for a literal default."""
     field = plain_fields.TextField(max_length=20, default="active")
@@ -47,7 +49,7 @@ def test_add_field_keeps_literal_default(db):
     assert "drop default" not in joined
 
 
-def test_add_field_without_default_emits_no_default_clause(db):
+def test_add_field_without_default_emits_no_default_clause():
     """`required=False` without an explicit `default=` no longer auto-fills
     existing rows — the ADD COLUMN SQL carries no DEFAULT. The user has to
     declare `default=""` (persists) or `allow_null=True` (nullable column)."""
@@ -63,7 +65,7 @@ def test_add_field_without_default_emits_no_default_clause(db):
     assert "drop default" not in joined
 
 
-def test_alter_field_nullable_to_not_null_is_migration_no_op(db):
+def test_alter_field_nullable_to_not_null_is_migration_no_op():
     """allow_null is in non_migration_attrs — the schema editor emits nothing for a
     nullable→NOT NULL transition. Convergence owns the CHECK NOT VALID +
     VALIDATE + SET NOT NULL dance on the next sync."""
@@ -79,7 +81,7 @@ def test_alter_field_nullable_to_not_null_is_migration_no_op(db):
     assert editor.executed_sql == []
 
 
-def test_alter_field_literal_default_change_with_null_flip_is_migration_no_op(db):
+def test_alter_field_literal_default_change_with_null_flip_is_migration_no_op():
     """Flipping allow_null AND changing default= emits nothing from the schema
     editor. Both attributes are in non_migration_attrs, and convergence handles the
     column DEFAULT drift + NOT NULL transition independently on the next sync."""
@@ -95,7 +97,7 @@ def test_alter_field_literal_default_change_with_null_flip_is_migration_no_op(db
     assert editor.executed_sql == []
 
 
-def test_alter_field_default_only_change_is_migration_no_op(db):
+def test_alter_field_default_only_change_is_migration_no_op():
     """Changing only ``default=`` on an already-NOT-NULL column emits nothing
     from the schema editor — ``default`` is in ``non_migration_attrs``, so the
     migration path short-circuits. Convergence's ``_compare_column_default``
@@ -145,12 +147,13 @@ def test_compile_literal_default_sql_handles_jsonfield():
     assert sql != other_sql
 
 
-def test_special_char_string_default_round_trip(isolated_db):
+@isolated_db
+def test_special_char_string_default_round_trip():
     """Literal string defaults with quotes, newlines, and other typical
     non-ASCII punctuation must survive the round trip: compile → SET DEFAULT
     → pg_get_expr → normalize the model side → compare. Otherwise every
     sync would flag CHANGED for safe-but-ugly inputs."""
-    from conftest_convergence import column_default_sql, execute
+    from convergence_helpers import column_default_sql, execute
 
     from plain.postgres.convergence.analysis import _normalize_default_expr
     from plain.postgres.ddl import compile_literal_default_sql
@@ -188,7 +191,8 @@ def test_special_char_string_default_round_trip(isolated_db):
         )
 
 
-def test_jsonb_default_no_drift_when_keys_reordered(isolated_db):
+@isolated_db
+def test_jsonb_default_no_drift_when_keys_reordered():
     """A JSONField default whose Python source key order differs from the
     DB-stored literal must not flag drift. pg_get_expr deparses literal
     nodes verbatim, so source-order changes in the model leak straight
@@ -196,7 +200,7 @@ def test_jsonb_default_no_drift_when_keys_reordered(isolated_db):
     `_compare_column_default` keeps these in sync. Without that fallback,
     every sync of a JSONField default whose author rearranged keys would
     report spurious CHANGED."""
-    from conftest_convergence import execute
+    from convergence_helpers import execute
 
     from plain.postgres import JSONField
     from plain.postgres.convergence.analysis import _compare_column_default
@@ -242,12 +246,13 @@ def test_jsonb_default_no_drift_when_keys_reordered(isolated_db):
         execute(f'DROP TABLE IF EXISTS "{table}"')
 
 
-def test_jsonb_default_drift_when_values_differ(isolated_db):
+@isolated_db
+def test_jsonb_default_drift_when_values_differ():
     """The JSON-semantic fallback resolves *key order*, not value drift —
     a JSONField whose default value really differs from the DB literal
     must still report CHANGED. Pins the negative case so the fallback
     can't drift into a "never reports JSONField drift" bug."""
-    from conftest_convergence import execute
+    from convergence_helpers import execute
 
     from plain.postgres import JSONField
     from plain.postgres.convergence.analysis import (
@@ -299,7 +304,6 @@ def test_backslash_in_string_default_rejected():
     pg_get_expr returns as a plain ``'...'`` literal — the two forms don't
     round-trip, so convergence would flag spurious drift on every sync.
     DefaultableField rejects them at declaration time."""
-    import pytest
 
-    with pytest.raises(ValueError, match="backslash"):
+    with raises(ValueError, match="backslash"):
         plain_fields.TextField(max_length=100, default=r"C:\Program Files")

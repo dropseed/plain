@@ -10,18 +10,18 @@ earlier writes and run commit hooks. This pins the mechanism -- the connection's
 from __future__ import annotations
 
 import psycopg
-import pytest
 
 from plain.cache import cache
 from plain.postgres import get_connection
+from plain.test import raises
 
 
-def test_failed_increment_marks_transaction_for_rollback(db):
-    # The `db` fixture runs each test inside transaction.atomic(), so the
-    # connection is in an atomic block here -- the production scenario.
+def test_failed_increment_marks_transaction_for_rollback():
+    # Every test runs inside transaction.atomic(), so the connection is in
+    # an atomic block here -- the production scenario.
     cache.set("text", "not a number")
 
-    with pytest.raises(psycopg.DataError):
+    with raises(psycopg.DataError):
         cache.increment("text")
 
     # The error is caught here, but the connection is flagged so the enclosing

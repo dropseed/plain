@@ -327,7 +327,7 @@ def capture_available() -> bool:
     """Whether `capture_spans` can run — the OpenTelemetry SDK must be installed.
 
     The SDK is not a Plain core dependency; it ships with `plain.connect`
-    and `plain.pytest`.
+    and `plain.testing`.
     """
     return find_spec("opentelemetry.sdk") is not None
 

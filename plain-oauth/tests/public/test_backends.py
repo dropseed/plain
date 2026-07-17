@@ -1,5 +1,6 @@
+from plain.auth.requests import get_request_user
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
-from plain.test import Client
+from plain.test import Client, override_settings
 
 
 class DummyProvider(OAuthProvider):
@@ -27,47 +28,49 @@ class DummyProvider(OAuthProvider):
         return
 
 
-def test_single_backend(db, settings):
-    settings.OAUTH_LOGIN_PROVIDERS = {
-        "dummy": {
-            "class": "test_backends.DummyProvider",
-            "kwargs": {
-                "client_id": "dummy_client_id",
-                "client_secret": "dummy_client_secret",
-                "scope": "dummy_scope",
-            },
+def test_single_backend():
+    with override_settings(
+        OAUTH_LOGIN_PROVIDERS={
+            "dummy": {
+                "class": "test_backends.DummyProvider",
+                "kwargs": {
+                    "client_id": "dummy_client_id",
+                    "client_secret": "dummy_client_secret",
+                    "scope": "dummy_scope",
+                },
+            }
         }
-    }
+    ):
+        client = Client()
 
-    client = Client()
+        response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
+        assert response.status_code == 302
+        assert response.url == "/"
 
-    response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
-    assert response.status_code == 302
-    assert response.url == "/"
-
-    # Now logged in
-    response = client.get("/")
-    assert response.user
+        # Now logged in
+        response = client.get("/")
+        assert get_request_user(response.request)
 
 
-def test_multiple_backends(db, settings):
-    settings.OAUTH_LOGIN_PROVIDERS = {
-        "dummy": {
-            "class": "test_backends.DummyProvider",
-            "kwargs": {
-                "client_id": "dummy_client_id",
-                "client_secret": "dummy_client_secret",
-                "scope": "dummy_scope",
-            },
+def test_multiple_backends():
+    with override_settings(
+        OAUTH_LOGIN_PROVIDERS={
+            "dummy": {
+                "class": "test_backends.DummyProvider",
+                "kwargs": {
+                    "client_id": "dummy_client_id",
+                    "client_secret": "dummy_client_secret",
+                    "scope": "dummy_scope",
+                },
+            }
         }
-    }
+    ):
+        client = Client()
 
-    client = Client()
+        response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
+        assert response.status_code == 302
+        assert response.url == "/"
 
-    response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
-    assert response.status_code == 302
-    assert response.url == "/"
-
-    # Now logged in
-    response = client.get("/")
-    assert response.user
+        # Now logged in
+        response = client.get("/")
+        assert get_request_user(response.request)

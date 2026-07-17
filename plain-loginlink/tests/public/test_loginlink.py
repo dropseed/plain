@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 
 from app.users.models import User
 
+from plain.email.test import outbox
 from plain.loginlink.links import generate_link_url
 from plain.test import Client, RequestFactory
 
@@ -30,40 +31,40 @@ def token_path(message) -> str:
 
 
 class TestRequestLink:
-    def test_request_page_renders(self, db):
+    def test_request_page_renders(self):
         response = Client().get("/login")
 
         assert response.status_code == 200
         assert 'name="email"' in response.content.decode()
 
-    def test_known_email_sends_link(self, db, mailoutbox):
+    def test_known_email_sends_link(self):
         User.query.create(email="known@example.com")
         client = Client()
 
         response = client.post(
-            "/login", data={"email": "known@example.com", "next": ""}
+            "/login", form_data={"email": "known@example.com", "next": ""}
         )
 
         assert response.status_code == 302
         assert response.url == "/loginlink/sent"
-        assert len(mailoutbox) == 1
-        assert mailoutbox[0].to == ["known@example.com"]
+        assert len(outbox) == 1
+        assert outbox[0].to == ["known@example.com"]
 
-    def test_unknown_email_sends_nothing_without_leaking(self, db, mailoutbox):
+    def test_unknown_email_sends_nothing_without_leaking(self):
         client = Client()
 
         response = client.post(
-            "/login", data={"email": "ghost@example.com", "next": ""}
+            "/login", form_data={"email": "ghost@example.com", "next": ""}
         )
 
         # Identical 302 -> /loginlink/sent as the known case: no existence leak.
         assert response.status_code == 302
         assert response.url == "/loginlink/sent"
-        assert len(mailoutbox) == 0
+        assert len(outbox) == 0
 
 
 class TestAlreadyLoggedIn:
-    def test_login_page_redirects_home(self, db):
+    def test_login_page_redirects_home(self):
         client = Client()
         client.force_login(User.query.create(email="repeat@example.com"))
 
@@ -72,7 +73,7 @@ class TestAlreadyLoggedIn:
         assert response.status_code == 302
         assert response.url == "/"
 
-    def test_login_page_redirects_to_next(self, db):
+    def test_login_page_redirects_to_next(self):
         client = Client()
         client.force_login(User.query.create(email="repeat@example.com"))
 
@@ -81,7 +82,7 @@ class TestAlreadyLoggedIn:
         assert response.status_code == 302
         assert response.url == "/whoami"
 
-    def test_empty_next_redirects_home(self, db):
+    def test_empty_next_redirects_home(self):
         client = Client()
         client.force_login(User.query.create(email="repeat@example.com"))
 
@@ -92,7 +93,7 @@ class TestAlreadyLoggedIn:
         assert response.status_code == 302
         assert response.url == "/"
 
-    def test_external_next_redirects_home(self, db):
+    def test_external_next_redirects_home(self):
         client = Client()
         client.force_login(User.query.create(email="repeat@example.com"))
 
@@ -103,27 +104,29 @@ class TestAlreadyLoggedIn:
 
 
 class TestFollowLink:
-    def test_valid_link_logs_in(self, db, mailoutbox):
+    def test_valid_link_logs_in(self):
         User.query.create(email="follow@example.com")
         client = Client()
-        client.post("/login", data={"email": "follow@example.com", "next": ""})
-        assert len(mailoutbox) == 1
+        client.post("/login", form_data={"email": "follow@example.com", "next": ""})
+        assert len(outbox) == 1
 
-        response = client.get(token_path(mailoutbox[0]))
+        response = client.get(token_path(outbox[0]))
 
         assert response.status_code == 302
         assert is_logged_in(client)
 
-    def test_invalid_link_shows_failure_page(self, db):
+    def test_invalid_link_shows_failure_page(self):
         client = Client()
 
-        response = client.get("/loginlink/token/not-a-real-token", follow=True)
+        response = client.get(
+            "/loginlink/token/not-a-real-token", follow_redirects=True
+        )
 
         assert response.status_code == 200
         assert "Link Invalid" in response.content.decode()
         assert not is_logged_in(client)
 
-    def test_expired_link_shows_failure_page(self, db):
+    def test_expired_link_shows_failure_page(self):
         user = User.query.create(email="expired@example.com")
         # Mint an already-expired link with the package's public helper.
         url = generate_link_url(
@@ -133,7 +136,7 @@ class TestFollowLink:
             expires_in=-3600,
         )
 
-        response = Client().get(urlsplit(url).path, follow=True)
+        response = Client().get(urlsplit(url).path, follow_redirects=True)
 
         assert response.status_code == 200
         assert "Link Expired" in response.content.decode()

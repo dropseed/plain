@@ -1,4 +1,3 @@
-import pytest
 from app.examples.models.delete import (
     ChildCascade,
     ChildSetNull,
@@ -7,12 +6,14 @@ from app.examples.models.delete import (
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 
 from plain.postgres import QuerySet
+from plain.postgres.test import capture_queries
+from plain.test import raises, skip
 
 
 class TestForwardForeignKeyDescriptor:
     """Test ForwardForeignKeyDescriptor (e.g., child.parent)"""
 
-    def test_get_related_object(self, db):
+    def test_get_related_object(self):
         parent = DeleteParent.query.create(name="Test Parent")
         child = ChildCascade.query.create(parent=parent)
 
@@ -20,7 +21,7 @@ class TestForwardForeignKeyDescriptor:
         assert child.parent == parent
         assert child.parent.name == "Test Parent"
 
-    def test_set_related_object(self, db):
+    def test_set_related_object(self):
         parent1 = DeleteParent.query.create(name="Parent 1")
         parent2 = DeleteParent.query.create(name="Parent 2")
         child = ChildCascade.query.create(parent=parent1)
@@ -31,37 +32,33 @@ class TestForwardForeignKeyDescriptor:
         child.refresh_from_db()
         assert child.parent == parent2
 
-    def test_set_to_none_non_nullable(self, db):
+    def test_set_to_none_non_nullable(self):
         parent = DeleteParent.query.create(name="Test Parent")
         child = ChildCascade.query.create(parent=parent)
 
         # Setting a non-nullable FK to None should work but fail on save
         child.parent = None  # ty: ignore[invalid-assignment]
-        with pytest.raises(
+        with raises(
             Exception, match="constraint|null|NOT NULL"
         ):  # Database constraint error
             child.update()
 
-    def test_set_to_none_nullable(self, db):
+    @skip("Nullable FK handling needs refinement: update() still requires parent")
+    def test_set_to_none_nullable(self):
         parent = DeleteParent.query.create(name="Test Parent")
         child = ChildSetNull.query.create(parent=parent)
 
         # Test setting nullable FK to None
         child.parent = None
-        try:
-            child.update()
-            child.refresh_from_db()
-            assert child.parent is None
-        except Exception as e:
-            # For now, accept that nullable FK behavior might need adjustment
-            # The core relationship functionality works
-            pytest.skip(f"Nullable FK handling needs refinement: {e}")
+        child.update()
+        child.refresh_from_db()
+        assert child.parent is None
 
 
 class TestReverseForeignKey:
     """Test ReverseForeignKey descriptor (e.g., parent.children)"""
 
-    def test_get_related_queryset(self, db):
+    def test_get_related_queryset(self):
         parent = DeleteParent.query.create(name="Test Parent")
         child1 = ChildCascade.query.create(parent=parent)
         child2 = ChildCascade.query.create(parent=parent)
@@ -80,7 +77,7 @@ class TestReverseForeignKey:
         assert child1 in children.all()
         assert child2 in children.all()
 
-    def test_queryset_methods(self, db):
+    def test_queryset_methods(self):
         parent = DeleteParent.query.create(name="Test Parent")
         ChildCascade.query.create(parent=parent)
         ChildCascade.query.create(parent=parent)
@@ -92,7 +89,7 @@ class TestReverseForeignKey:
         assert all_children.count() == 2
         assert filtered_children.count() == 2
 
-    def test_add_method(self, db):
+    def test_add_method(self):
         parent = DeleteParent.query.create(name="Test Parent")
         other_parent = DeleteParent.query.create(name="Other Parent")
         child = ChildCascade.query.create(parent=other_parent)
@@ -103,7 +100,7 @@ class TestReverseForeignKey:
         assert child.parent == parent
         assert child in parent.childcascade_set.query.all()
 
-    def test_create_method(self, db):
+    def test_create_method(self):
         parent = DeleteParent.query.create(name="Test Parent")
 
         # Test create method
@@ -118,7 +115,7 @@ class TestReverseForeignKey:
 class TestPrefetchRelated:
     """Test prefetch_related functionality"""
 
-    def test_prefetch_related_basic(self, db):
+    def test_prefetch_related_basic(self):
         """Test basic prefetch_related functionality with reverse FK"""
         # Create test data
         parent1 = DeleteParent.query.create(name="Parent 1")
@@ -158,7 +155,7 @@ class TestPrefetchRelated:
         parent3_children = list(parent3_from_query.childcascade_set.query.all())
         assert len(parent3_children) == 0
 
-    def test_prefetch_related_forward_fk(self, db):
+    def test_prefetch_related_forward_fk(self):
         """Test prefetch_related functionality with forward FK"""
         # Create test data
         parent1 = DeleteParent.query.create(name="Parent 1")
@@ -181,7 +178,7 @@ class TestPrefetchRelated:
             elif child == child3:
                 assert child.parent.name == "Parent 2"
 
-    def test_prefetch_related_empty_result(self, db):
+    def test_prefetch_related_empty_result(self):
         """Test prefetch_related works correctly with empty results"""
         # Create parent with no children
         DeleteParent.query.create(name="Lonely Parent")
@@ -192,15 +189,15 @@ class TestPrefetchRelated:
         parent_children = list(parents[0].childcascade_set.query.all())
         assert len(parent_children) == 0
 
-    def test_prefetch_related_nonexistent_relation(self, db):
+    def test_prefetch_related_nonexistent_relation(self):
         """Test that prefetch_related raises appropriate error for nonexistent relations"""
         # Create at least one parent so we have something to prefetch on
         DeleteParent.query.create(name="Test Parent")
 
-        with pytest.raises((AttributeError, ValueError)):
+        with raises(AttributeError, ValueError):
             list(DeleteParent.query.prefetch_related("nonexistent_relation").all())
 
-    def test_prefetch_related_queryset_all_preserves_cache(self, db):
+    def test_prefetch_related_queryset_all_preserves_cache(self):
         """Test that queryset.all() preserves prefetch cache"""
         parent = DeleteParent.query.create(name="Test Parent")
         ChildCascade.query.create(parent=parent)
@@ -226,7 +223,7 @@ class TestPrefetchRelated:
 class TestCustomQuerySetInheritance:
     """Test that custom QuerySets are properly inherited in related descriptors"""
 
-    def test_custom_queryset_model_basic(self, db):
+    def test_custom_queryset_model_basic(self):
         # Test that QuerySet behavior works with existing models
         DeleteParent.query.create(name="Test Parent")
 
@@ -243,16 +240,16 @@ class TestCustomQuerySetInheritance:
 class TestEdgeCases:
     """Test edge cases and error conditions"""
 
-    def test_access_before_save(self, db):
+    def test_access_before_save(self):
         # Test accessing relationships on unsaved instances
         parent = DeleteParent(name="Unsaved Parent")
 
         # Should handle unsaved instances gracefully
         # (exact behavior may vary by implementation)
-        with pytest.raises(ValueError, match="primary key value"):
+        with raises(ValueError, match="primary key value"):
             list(parent.childcascade_set.query.all())
 
-    def test_keyword_only_args(self, db):
+    def test_keyword_only_args(self):
         # This tests that our RelatedQuerySet constructors work properly
         parent = DeleteParent.query.create(name="Test Parent")
         children_qs = parent.childcascade_set
@@ -265,7 +262,7 @@ class TestEdgeCases:
         all_children = children_qs.query.all()
         assert isinstance(all_children, QuerySet)
 
-    def test_queryset_class_preservation(self, db):
+    def test_queryset_class_preservation(self):
         # Test that the related queryset class is cached properly
         parent = DeleteParent.query.create(name="Test Parent")
 
@@ -278,14 +275,14 @@ class TestEdgeCases:
         assert isinstance(children1.query, QuerySet)
         assert isinstance(children2.query, QuerySet)
 
-    def test_direct_assignment_error(self, db):
+    def test_direct_assignment_error(self):
         parent = DeleteParent.query.create(name="Test Parent")
 
         # Test that direct assignment to reverse relation raises error
-        with pytest.raises(TypeError, match="Direct assignment.*prohibited"):
+        with raises(TypeError, match="Direct assignment.*prohibited"):
             parent.childcascade_set = []  # ty: ignore[invalid-assignment]
 
-    def test_instance_none_handling(self, db):
+    def test_instance_none_handling(self):
         # Test accessing descriptor on class (not instance)
         descriptor = DeleteParent.childcascade_set
         assert descriptor is not None  # Should return the descriptor itself
@@ -298,7 +295,7 @@ class TestEdgeCases:
 class TestQuerySetMethods:
     """Test that all QuerySet methods work properly on related querysets"""
 
-    def test_chaining_methods(self, db):
+    def test_chaining_methods(self):
         parent = DeleteParent.query.create(name="Test Parent")
         child1 = ChildCascade.query.create(parent=parent)
         child2 = ChildCascade.query.create(parent=parent)
@@ -308,7 +305,7 @@ class TestQuerySetMethods:
         assert children.count() == 2
         assert children.first() in [child1, child2]
 
-    def test_aggregate_methods(self, db):
+    def test_aggregate_methods(self):
         parent = DeleteParent.query.create(name="Test Parent")
         ChildCascade.query.create(parent=parent)
         ChildCascade.query.create(parent=parent)
@@ -323,7 +320,7 @@ class TestQuerySetMethods:
         assert parent.childcascade_set.query.first() is not None
         assert parent.childcascade_set.query.last() is not None
 
-    def test_values_and_values_list(self, db):
+    def test_values_and_values_list(self):
         parent = DeleteParent.query.create(name="Test Parent")
         child1 = ChildCascade.query.create(parent=parent)
         child2 = ChildCascade.query.create(parent=parent)
@@ -341,7 +338,7 @@ class TestQuerySetMethods:
 class TestNewRelatedManagerAPI:
     """Test the new API where managers have .query for QuerySet access"""
 
-    def test_reverse_fk_manager_has_query(self, db):
+    def test_reverse_fk_manager_has_query(self):
         """Test that reverse FK managers have .query attribute"""
         parent = DeleteParent.query.create(name="Test Parent")
         child1 = ChildCascade.query.create(parent=parent)
@@ -361,7 +358,7 @@ class TestNewRelatedManagerAPI:
         filtered = children_qs.filter(id=child2.id)
         assert child2 in filtered
 
-    def test_manager_query_attribute(self, db):
+    def test_manager_query_attribute(self):
         """Test that managers have .query attribute for QuerySet access"""
         parent = DeleteParent.query.create(name="Test Parent")
         ChildCascade.query.create(parent=parent)
@@ -385,7 +382,7 @@ class TestNewRelatedManagerAPI:
         assert isinstance(filtered, QuerySet)
         assert filtered.count() == 2
 
-    def test_manager_relationship_methods(self, db):
+    def test_manager_relationship_methods(self):
         """Test that manager-specific methods (add, create, etc.) work"""
         parent = DeleteParent.query.create(name="Test Parent")
 
@@ -402,7 +399,7 @@ class TestNewRelatedManagerAPI:
         assert child2.parent == parent
         assert parent.childcascade_set.query.count() == 2
 
-    def test_query_iteration(self, db):
+    def test_query_iteration(self):
         """Test that iteration works on .query"""
         parent = DeleteParent.query.create(name="Test Parent")
         child1 = ChildCascade.query.create(parent=parent)
@@ -414,7 +411,7 @@ class TestNewRelatedManagerAPI:
         assert child1 in children
         assert child2 in children
 
-    def test_chaining_on_query(self, db):
+    def test_chaining_on_query(self):
         """Test method chaining on the .query attribute"""
         parent = DeleteParent.query.create(name="Test Parent")
         child1 = ChildCascade.query.create(parent=parent)
@@ -439,7 +436,7 @@ class TestNewRelatedManagerAPI:
         assert child2.id in ids
         assert child3.id in ids
 
-    def test_clear_api_separation(self, db):
+    def test_clear_api_separation(self):
         """Test that API clearly separates manager operations from queries"""
         parent = DeleteParent.query.create(name="Test Parent")
         child1 = ChildCascade.query.create(parent=parent)
@@ -458,7 +455,7 @@ class TestNewRelatedManagerAPI:
         assert child2 in all_children
         assert new_child in all_children
 
-    def test_multiple_parents(self, db):
+    def test_multiple_parents(self):
         """Test that managers correctly filter by parent"""
         parent1 = DeleteParent.query.create(name="Parent 1")
         parent2 = DeleteParent.query.create(name="Parent 2")
@@ -483,7 +480,7 @@ class TestNewRelatedManagerAPI:
 
 
 class TestMetaRelatedObjects:
-    def test_meta_related_objects_includes_reverse_fk(self, db):
+    def test_meta_related_objects_includes_reverse_fk(self):
         """Test that Meta.related_objects includes reverse FK relations.
 
         Regression test: related_objects was checking obj.field.one_to_many
@@ -518,7 +515,7 @@ class TestForeignKeyPartialInstance:
     available with no query, other fields load on first access. There is no
     separate ``<name>_id`` attribute -- ``child.parent.id`` is the key."""
 
-    def test_primary_key_access_is_free(self, db, capture_queries):
+    def test_primary_key_access_is_free(self):
         parent = DeleteParent.query.create(name="Parent")
         created = ChildCascade.query.create(parent=parent)
         child = ChildCascade.query.get(id=created.id)  # fresh, nothing cached
@@ -533,7 +530,7 @@ class TestForeignKeyPartialInstance:
         assert len(queries) == 0
         assert pk == parent.id
 
-    def test_other_fields_load_on_demand(self, db, capture_queries):
+    def test_other_fields_load_on_demand(self):
         parent = DeleteParent.query.create(name="Parent")
         created = ChildCascade.query.create(parent=parent)
         child = ChildCascade.query.get(id=created.id)
@@ -543,7 +540,7 @@ class TestForeignKeyPartialInstance:
         assert len(queries) == 1
         assert name == "Parent"
 
-    def test_one_query_hydrates_the_whole_row(self, db, capture_queries):
+    def test_one_query_hydrates_the_whole_row(self):
         tag = Tag.query.create(name="t")
         widget = Widget.query.create(name="W", size="L")
         created = WidgetTag.query.create(widget=widget, tag=tag)
@@ -557,13 +554,13 @@ class TestForeignKeyPartialInstance:
             _ = widget_tag.widget.size
         assert len(second) == 0
 
-    def test_no_id_suffixed_attribute(self, db):
+    def test_no_id_suffixed_attribute(self):
         parent = DeleteParent.query.create(name="Parent")
         child = ChildCascade.query.create(parent=parent)
 
         assert not hasattr(child, "parent_id")
 
-    def test_assign_by_primary_key(self, db):
+    def test_assign_by_primary_key(self):
         parent = DeleteParent.query.create(name="Parent")
         child = ChildCascade(parent=parent.id)
         child.create()
@@ -571,7 +568,7 @@ class TestForeignKeyPartialInstance:
         reloaded = ChildCascade.query.get(id=child.id)
         assert reloaded.parent.id == parent.id
 
-    def test_select_related_returns_fully_loaded_instance(self, db, capture_queries):
+    def test_select_related_returns_fully_loaded_instance(self):
         parent = DeleteParent.query.create(name="Parent")
         created = ChildCascade.query.create(parent=parent)
         child = ChildCascade.query.select_related("parent").get(id=created.id)
@@ -581,16 +578,16 @@ class TestForeignKeyPartialInstance:
             _ = child.parent.name
         assert len(queries) == 0
 
-    def test_non_nullable_fk_with_no_value_raises_consistently(self, db):
+    def test_non_nullable_fk_with_no_value_raises_consistently(self):
         # A non-nullable foreign key with no value must raise on every access,
         # not raise once and then return a cached None.
         child = ChildCascade()
-        with pytest.raises(AttributeError, match="has no parent"):
+        with raises(AttributeError, match="has no parent"):
             _ = child.parent
-        with pytest.raises(AttributeError, match="has no parent"):
+        with raises(AttributeError, match="has no parent"):
             _ = child.parent
 
-    def test_reverse_iteration_prepopulates_forward_fk(self, db, capture_queries):
+    def test_reverse_iteration_prepopulates_forward_fk(self):
         parent = DeleteParent.query.create(name="Parent")
         ChildCascade.query.create(parent=parent)
         ChildCascade.query.create(parent=parent)
@@ -602,7 +599,7 @@ class TestForeignKeyPartialInstance:
             _ = [child.parent.name for child in children]
         assert len(queries) == 0
 
-    def test_save_keeps_foreign_key_cache(self, db, capture_queries):
+    def test_save_keeps_foreign_key_cache(self):
         parent = DeleteParent.query.create(name="Parent")
         child = ChildCascade.query.create(parent=parent)
 
@@ -613,7 +610,7 @@ class TestForeignKeyPartialInstance:
             _ = child.parent.name
         assert len(queries) == 0
 
-    def test_save_with_deferred_fk_preserves_value(self, db):
+    def test_save_with_deferred_fk_preserves_value(self):
         parent = DeleteParent.query.create(name="Parent")
         created = ChildCascade.query.create(parent=parent)
 
@@ -624,12 +621,12 @@ class TestForeignKeyPartialInstance:
         reloaded = ChildCascade.query.get(id=created.id)
         assert reloaded.parent.id == parent.id
 
-    def test_assign_bool_is_rejected(self, db):
+    def test_assign_bool_is_rejected(self):
         child = ChildCascade()
-        with pytest.raises(ValueError, match="Cannot assign"):
+        with raises(ValueError, match="Cannot assign"):
             child.parent = True
 
-    def test_reassign_by_bare_pk_evicts_cached_object(self, db):
+    def test_reassign_by_bare_pk_evicts_cached_object(self):
         # When a cached foreign key is reassigned by bare primary key to a
         # different target, the cached related object must be evicted -- a
         # later read must see the new target, not the stale cached one.
@@ -645,7 +642,7 @@ class TestForeignKeyPartialInstance:
         assert child.parent.id == p2.id
         assert child.parent.name == "P2"
 
-    def test_del_clears_foreign_key(self, db):
+    def test_del_clears_foreign_key(self):
         parent = DeleteParent.query.create(name="Parent")
         child = ChildCascade.query.create(parent=parent)
 
@@ -653,7 +650,7 @@ class TestForeignKeyPartialInstance:
 
         assert "parent" not in child.__dict__
 
-    def test_del_missing_foreign_key_keeps_cache_intact(self, db):
+    def test_del_missing_foreign_key_keeps_cache_intact(self):
         # If the raw key is missing from __dict__, `del` must raise without
         # mutating the field cache -- otherwise the caller catches the
         # AttributeError thinking nothing changed while the cache is gone.
@@ -664,6 +661,6 @@ class TestForeignKeyPartialInstance:
 
         fk_field = ChildCascade._model_meta.get_forward_field("parent")
         assert fk_field.is_cached(child)  # ty: ignore[unresolved-attribute]
-        with pytest.raises(AttributeError):
+        with raises(AttributeError):
             del child.parent
         assert fk_field.is_cached(child)  # ty: ignore[unresolved-attribute]

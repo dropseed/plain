@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 
-import pytest
+from clients import error_client
 from opentelemetry import trace
 
 from plain.internal.handlers.base import BaseHandler
@@ -13,11 +13,6 @@ from plain.test.otel import install_test_tracer
 from plain.urls.resolvers import _get_cached_resolver
 
 _span_exporter = install_test_tracer()
-
-
-@pytest.fixture
-def _otel_clean() -> None:
-    _span_exporter.clear()
 
 
 def _server_span():
@@ -30,8 +25,8 @@ def _server_span():
     return spans[-1]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_homepage_span_name_and_route_attribute() -> None:
+    _span_exporter.clear()
     Client().get("/")
 
     span = _server_span()
@@ -41,8 +36,8 @@ def test_homepage_span_name_and_route_attribute() -> None:
     assert span.attributes["http.response.status_code"] == 200
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_404_span_name_omits_path() -> None:
+    _span_exporter.clear()
     # Per OTel HTTP semconv, unmatched requests must not include the path
     # in the span name — keeps span-name cardinality bounded under scanner
     # traffic on /xmlrpc.php, /wp-login.php, etc.
@@ -55,9 +50,10 @@ def test_404_span_name_omits_path() -> None:
     assert span.status.status_code == trace.StatusCode.UNSET
 
 
-@pytest.mark.usefixtures("_otel_clean")
-def test_500_records_exception_and_error_status(error_client) -> None:
-    error_client.get("/plain-500/")
+def test_500_records_exception_and_error_status() -> None:
+    _span_exporter.clear()
+    with error_client() as client:
+        client.get("/plain-500/")
 
     span = _server_span()
     assert span.name == "GET /plain-500/"

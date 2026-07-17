@@ -1,8 +1,6 @@
-import pytest
-
 from plain.htmx.views import HTMXView
 from plain.http import Response
-from plain.test import RequestFactory
+from plain.test import RequestFactory, raises
 
 
 class V(HTMXView):
@@ -90,8 +88,8 @@ def test_non_identifier_action_returns_no_handler():
 
 def test_non_standard_method_does_not_dispatch():
     """Non-IANA HTTP methods must not be used to invoke view attributes."""
-    request = RequestFactory().generic(
-        "GET_RESPONSE", "/", headers={"HX-Request": "true"}
+    request = RequestFactory().request(
+        method="GET_RESPONSE", path="/", headers={"HX-Request": "true"}
     )
     view = V(request=request)
     assert view.get_request_handler() is None
@@ -173,5 +171,5 @@ def test_invalid_return_type_raises():
         "/", headers={"HX-Request": "true", "Plain-HX-Action": "bad_return"}
     )
     view = ActionView(request=request)
-    with pytest.raises(TypeError, match="must return a Response or None"):
+    with raises(TypeError, match="must return a Response or None"):
         view.get_response()

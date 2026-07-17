@@ -13,7 +13,7 @@ def test_api_view():
     client = Client()
     response = client.get("/test")
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello, world!"}
+    assert response.json_data == {"message": "Hello, world!"}
 
 
 def test_typed_dict_return_value_serializes_as_json():
@@ -21,7 +21,7 @@ def test_typed_dict_return_value_serializes_as_json():
     client = Client()
     response = client.get("/typed-dict-return")
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello, typed!"}
+    assert response.json_data == {"message": "Hello, typed!"}
 
 
 def test_tuple_status_code_return_overrides_default_200():
@@ -29,7 +29,7 @@ def test_tuple_status_code_return_overrides_default_200():
     client = Client()
     response = client.post("/tuple-status-return")
     assert response.status_code == 201
-    assert response.json() == {"id": 42, "created": True}
+    assert response.json_data == {"id": 42, "created": True}
 
 
 def test_versioned_api_view():
@@ -37,20 +37,18 @@ def test_versioned_api_view():
     response = client.post(
         "/test-versioned",
         headers={"API-Version": "v2"},
-        data={"name": "Dave"},
-        content_type="application/json",
+        json_data={"name": "Dave"},
     )
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello, Dave!"}
+    assert response.json_data == {"message": "Hello, Dave!"}
 
     response = client.post(
         "/test-versioned",
         headers={"API-Version": "v1"},
-        data={"to": "Dave"},
-        content_type="application/json",
+        json_data={"to": "Dave"},
     )
     assert response.status_code == 200
-    assert response.json() == {"msg": "Hello, Dave!"}
+    assert response.json_data == {"msg": "Hello, Dave!"}
 
 
 def test_validation_error_is_returned_as_400_json():
@@ -65,33 +63,30 @@ def test_validation_error_is_returned_as_400_json():
 
     response = client.post(
         "/validation-error",
-        data={"shape": "string"},
-        content_type="application/json",
+        json_data={"shape": "string"},
     )
     assert response.status_code == 400
-    body = response.json()
+    body = response.json_data
     assert body["id"] == "validation_error"
     assert body["message"].startswith("Validation error: ")
     assert "errors" not in body
 
     response = client.post(
         "/validation-error",
-        data={"shape": "list"},
-        content_type="application/json",
+        json_data={"shape": "list"},
     )
     assert response.status_code == 400
-    body = response.json()
+    body = response.json_data
     assert body["id"] == "validation_error"
     assert body["message"].startswith("Validation error: ")
     assert "errors" not in body
 
     response = client.post(
         "/validation-error",
-        data={"shape": "dict"},
-        content_type="application/json",
+        json_data={"shape": "dict"},
     )
     assert response.status_code == 400
-    body = response.json()
+    body = response.json_data
     assert body["id"] == "validation_error"
     assert body["message"] == "Validation error"
     assert body["errors"] == [
@@ -107,7 +102,7 @@ def test_unhandled_exception_attaches_response_exception():
     response = client.get("/unhandled-exception")
     assert response.status_code == 500
     assert isinstance(response.exception, RuntimeError)
-    body = response.json()
+    body = response.json_data
     assert body["id"] == "server_error"
 
 
@@ -122,11 +117,11 @@ def test_unsupported_media_type_is_returned_as_415_json():
 
     response = client.post(
         "/json-echo",
-        data="hello",
+        body="hello",
         content_type="text/plain",
     )
     assert response.status_code == 415
-    body = response.json()
+    body = response.json_data
     assert body["id"] == "unsupported_media_type"
 
 
@@ -302,13 +297,11 @@ def test_json_not_found_view_returns_json_404_for_any_method():
     response = client.get("/missing/anything")
     assert response.status_code == 404
     assert response.headers["Content-Type"].startswith("application/json")
-    assert response.json()["id"] == "not_found"
+    assert response.json_data["id"] == "not_found"
 
-    response = client.post(
-        "/missing/anything", data="{}", content_type="application/json"
-    )
+    response = client.post("/missing/anything", json_data={})
     assert response.status_code == 404
-    assert response.json()["id"] == "not_found"
+    assert response.json_data["id"] == "not_found"
 
 
 def test_api_key_view_auto_emits_security_scheme():

@@ -18,7 +18,7 @@ def _jsonrpc(method: str, params: dict | None = None, msg_id: int = 1) -> str:
 class TestChallenge:
     def test_missing_token_returns_401_with_www_authenticate(self) -> None:
         response = Client().post(
-            "/oauth-mcp", data=_jsonrpc("initialize"), content_type="application/json"
+            "/oauth-mcp", body=_jsonrpc("initialize"), content_type="application/json"
         )
         assert response.status_code == 401
         challenge = response.headers["WWW-Authenticate"]
@@ -32,7 +32,7 @@ class TestChallenge:
     def test_invalid_token_returns_401_with_challenge(self) -> None:
         client = Client(headers={"Authorization": "Bearer nope"})
         response = client.post(
-            "/oauth-mcp", data=_jsonrpc("initialize"), content_type="application/json"
+            "/oauth-mcp", body=_jsonrpc("initialize"), content_type="application/json"
         )
         assert response.status_code == 401
         # RFC 6750: a supplied-but-rejected token is flagged invalid_token.
@@ -41,7 +41,7 @@ class TestChallenge:
     def test_valid_token_authenticates(self) -> None:
         client = Client(headers={"Authorization": "Bearer valid-token"})
         response = client.post(
-            "/oauth-mcp", data=_jsonrpc("initialize"), content_type="application/json"
+            "/oauth-mcp", body=_jsonrpc("initialize"), content_type="application/json"
         )
         assert response.status_code == 200
         body = json.loads(response.content)
@@ -51,7 +51,7 @@ class TestChallenge:
         # RFC 7235: the auth-scheme is matched case-insensitively.
         client = Client(headers={"Authorization": "bearer valid-token"})
         response = client.post(
-            "/oauth-mcp", data=_jsonrpc("initialize"), content_type="application/json"
+            "/oauth-mcp", body=_jsonrpc("initialize"), content_type="application/json"
         )
         assert response.status_code == 200
 
@@ -60,7 +60,7 @@ class TestChallenge:
         client = Client(headers={"Authorization": "Bearer valid-token"})
         response = client.post(
             "/oauth-mcp",
-            data=_jsonrpc("tools/call", {"name": "WhoAmI", "arguments": {}}),
+            body=_jsonrpc("tools/call", {"name": "WhoAmI", "arguments": {}}),
             content_type="application/json",
         )
         assert response.status_code == 200

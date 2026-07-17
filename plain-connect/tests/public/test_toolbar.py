@@ -1,12 +1,9 @@
 import re
 
-import pytest
-
-from plain.test import Client
+from plain.test import Client, override_settings
 
 
-@pytest.fixture
-def real_tracing():
+def install_real_tracing() -> None:
     """Install a real SDK TracerProvider so requests get valid, sampled spans.
 
     Without an SDK provider, OpenTelemetry hands out no-op spans whose context
@@ -23,31 +20,39 @@ def real_tracing():
         trace.set_tracer_provider(TracerProvider(sampler=ALWAYS_ON))
 
 
-def test_no_trace_button_when_export_is_not_configured(db, settings):
+def test_no_trace_button_when_export_is_not_configured():
     # The toolbar renders in DEBUG, but with no CONNECT_EXPORT_TOKEN the
     # connect item disables itself and contributes nothing.
-    settings.DEBUG = True
-    response = Client().get("/")
-    assert response.status_code == 200
-    assert b"plainframework.com/t/" not in response.content
+    with override_settings(DEBUG=True):
+        response = Client().get("/")
+        assert response.status_code == 200
+        assert b"plainframework.com/t/" not in response.content
 
 
-def test_trace_button_links_to_the_dashboard(db, settings, real_tracing):
+def test_trace_button_links_to_the_dashboard():
     # The test suite exports PLAIN_CONNECT_EXPORT_ENABLED=false, so re-enable it.
-    settings.DEBUG = True
-    settings.CONNECT_EXPORT_ENABLED = True
-    settings.CONNECT_EXPORT_TOKEN = "test-token"
-    response = Client().get("/")
-    assert response.status_code == 200
-    match = re.search(rb"https://plainframework\.com/t/[0-9a-f]{32}", response.content)
-    assert match, f"no trace link in toolbar: {response.content!r}"
+    install_real_tracing()
+    with override_settings(
+        DEBUG=True, CONNECT_EXPORT_ENABLED=True, CONNECT_EXPORT_TOKEN="test-token"
+    ):
+        response = Client().get("/")
+        assert response.status_code == 200
+        match = re.search(
+            rb"https://plainframework\.com/t/[0-9a-f]{32}", response.content
+        )
+        assert match, f"no trace link in toolbar: {response.content!r}"
 
 
-def test_trace_link_uses_the_configured_cloud_url(db, settings, real_tracing):
-    settings.DEBUG = True
-    settings.CONNECT_EXPORT_ENABLED = True
-    settings.CONNECT_EXPORT_TOKEN = "test-token"
-    settings.CONNECT_CLOUD_URL = "https://cloud.example.com"
-    response = Client().get("/")
-    assert response.status_code == 200
-    assert re.search(rb"https://cloud\.example\.com/t/[0-9a-f]{32}", response.content)
+def test_trace_link_uses_the_configured_cloud_url():
+    install_real_tracing()
+    with override_settings(
+        DEBUG=True,
+        CONNECT_EXPORT_ENABLED=True,
+        CONNECT_EXPORT_TOKEN="test-token",
+        CONNECT_CLOUD_URL="https://cloud.example.com",
+    ):
+        response = Client().get("/")
+        assert response.status_code == 200
+        assert re.search(
+            rb"https://cloud\.example\.com/t/[0-9a-f]{32}", response.content
+        )

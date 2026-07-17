@@ -8,7 +8,6 @@ import struct
 
 import nacl.exceptions
 import nacl.secret
-import pytest
 import spake2
 
 from plain.portal.codegen import WORDLIST, generate_code, validate_code
@@ -31,6 +30,7 @@ from plain.portal.protocol import (
     make_pong,
     make_relay_url,
 )
+from plain.test import raises
 
 # ---------------------------------------------------------------------------
 # 1. Code generation roundtrip
@@ -178,7 +178,7 @@ class TestCrypto:
         enc_wrong = PortalEncryptor(key_wrong)
 
         ciphertext = enc_right.encrypt(b"secret data")
-        with pytest.raises(nacl.exceptions.CryptoError):
+        with raises(nacl.exceptions.CryptoError):
             enc_wrong.decrypt(ciphertext)
 
     def test_encryptor_large_payload(self):
@@ -430,7 +430,7 @@ class TestFraming:
             bad_header = struct.pack("!I", _MAX_FRAME_SIZE + 1)
             reader, _ = _make_stream_pair()
             reader._set_data(bad_header + b"\x00" * 100)
-            with pytest.raises(ValueError, match="Frame too large"):
+            with raises(ValueError, match="Frame too large"):
                 await _recv_framed(reader)
 
         asyncio.run(_run())
@@ -532,123 +532,141 @@ def _make_execute_code(*, writable: bool = False):
 
 
 class TestExecuteCode:
-    def setup_method(self):
-        self.execute = _make_execute_code()
-
     def test_simple_expression(self):
-        result = self.execute("1 + 2")
+        execute = _make_execute_code()
+        result = execute("1 + 2")
         assert result["return_value"] == "3"
         assert result["stdout"] == ""
         assert result["error"] is None
 
     def test_string_expression(self):
-        result = self.execute("'hello'")
+        execute = _make_execute_code()
+        result = execute("'hello'")
         assert result["return_value"] == "'hello'"
 
     def test_none_expression(self):
         """None result should not set return_value."""
-        result = self.execute("None")
+        execute = _make_execute_code()
+        result = execute("None")
         assert result["return_value"] is None
 
     def test_print_captured(self):
-        result = self.execute("print('hello world')")
+        execute = _make_execute_code()
+        result = execute("print('hello world')")
         assert "hello world" in result["stdout"]
         assert result["return_value"] is None
         assert result["error"] is None
 
     def test_print_and_expression(self):
         """Print output is captured, and the last expression value is returned."""
-        result = self.execute("print('side effect')\n42")
+        execute = _make_execute_code()
+        result = execute("print('side effect')\n42")
         assert "side effect" in result["stdout"]
         assert result["return_value"] == "42"
 
     def test_multiline_statements(self):
+        execute = _make_execute_code()
         code = "x = 10\ny = 20\nx + y"
-        result = self.execute(code)
+        result = execute(code)
         assert result["return_value"] == "30"
         assert result["error"] is None
 
     def test_syntax_error(self):
-        result = self.execute("def")
+        execute = _make_execute_code()
+        result = execute("def")
         assert result["error"] is not None
         assert "SyntaxError" in result["error"]
 
     def test_runtime_error(self):
-        result = self.execute("1 / 0")
+        execute = _make_execute_code()
+        result = execute("1 / 0")
         assert result["error"] is not None
         assert "ZeroDivisionError" in result["error"]
 
     def test_name_error(self):
-        result = self.execute("undefined_variable")
+        execute = _make_execute_code()
+        result = execute("undefined_variable")
         assert result["error"] is not None
         assert "NameError" in result["error"]
 
     def test_stderr_captured(self):
+        execute = _make_execute_code()
         code = "import sys; print('err', file=sys.stderr)"
-        result = self.execute(code)
+        result = execute(code)
         assert "err" in result["stdout"]  # stderr is appended to stdout
 
     def test_json_output_dict(self):
-        result = self.execute('{"key": "value"}', json_output=True)
+        execute = _make_execute_code()
+        result = execute('{"key": "value"}', json_output=True)
         assert result["return_value"] == '{"key": "value"}'
         # Verify it's valid JSON
         parsed = json.loads(result["return_value"])
         assert parsed == {"key": "value"}
 
     def test_json_output_list(self):
-        result = self.execute("[1, 2, 3]", json_output=True)
+        execute = _make_execute_code()
+        result = execute("[1, 2, 3]", json_output=True)
         assert result["return_value"] == "[1, 2, 3]"
 
     def test_json_output_fallback_to_repr(self):
         """Non-JSON-serializable objects fall back to repr."""
-        result = self.execute("object()", json_output=True)
+        execute = _make_execute_code()
+        result = execute("object()", json_output=True)
         assert result["return_value"] is not None
         assert result["return_value"].startswith("<object object at")
 
     def test_json_output_with_set(self):
         """Sets aren't JSON-serializable, should fall back to repr."""
-        result = self.execute("{1, 2, 3}", json_output=True)
+        execute = _make_execute_code()
+        result = execute("{1, 2, 3}", json_output=True)
         assert result["return_value"] is not None
         # repr of a set
         assert result["return_value"].startswith("{")
 
     def test_system_exit_caught(self):
         """SystemExit (a BaseException) should be caught and reported."""
-        result = self.execute("raise SystemExit(1)")
+        execute = _make_execute_code()
+        result = execute("raise SystemExit(1)")
         assert result["error"] is not None
         assert "SystemExit" in result["error"]
 
     def test_keyboard_interrupt_caught(self):
         """KeyboardInterrupt (a BaseException) should be caught."""
-        result = self.execute("raise KeyboardInterrupt()")
+        execute = _make_execute_code()
+        result = execute("raise KeyboardInterrupt()")
         assert result["error"] is not None
         assert "KeyboardInterrupt" in result["error"]
 
     def test_fresh_namespace_per_call(self):
         """Each execution gets a fresh namespace."""
-        self.execute("x = 42")
-        result = self.execute("x")
+        execute = _make_execute_code()
+        execute("x = 42")
+        result = execute("x")
         assert result["error"] is not None
         assert "NameError" in result["error"]
 
     def test_import_in_code(self):
-        result = self.execute("import math\nmath.pi")
+        execute = _make_execute_code()
+        result = execute("import math\nmath.pi")
         assert result["return_value"] is not None
         assert "3.14" in result["return_value"]
 
     def test_only_statements_no_expression(self):
         """Code with only statements (no trailing expression) has no return_value."""
-        result = self.execute("x = 1\ny = 2")
+        execute = _make_execute_code()
+        result = execute("x = 1\ny = 2")
         assert result["return_value"] is None
         assert result["error"] is None
 
     def test_multiline_function_definition_and_call(self):
+        execute = _make_execute_code()
         code = "def add(a, b):\n    return a + b\nadd(3, 4)"
-        result = self.execute(code)
+        result = execute(code)
         assert result["return_value"] == "7"
 
     def test_empty_code(self):
-        result = self.execute("")
+        execute = _make_execute_code()
+        result = execute("")
         assert result["return_value"] is None
         assert result["error"] is None
         assert result["stdout"] == ""

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from opentelemetry import trace
 from opentelemetry.semconv.attributes.code_attributes import (
     CODE_FILE_PATH,
@@ -16,11 +15,6 @@ from plain.test.otel import install_test_tracer
 _span_exporter = install_test_tracer()
 
 
-@pytest.fixture
-def _otel_clean() -> None:
-    _span_exporter.clear()
-
-
 def _query_attributes(sql: str) -> dict[str, str | int]:
     return {
         DB_QUERY_TEXT: sql,
@@ -30,8 +24,8 @@ def _query_attributes(sql: str) -> dict[str, str | int]:
     }
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_groups_queries_and_flags_n_plus_one() -> None:
+    _span_exporter.clear()
     tracer = trace.get_tracer("test")
     with tracer.start_as_current_span("GET /"):
         for _ in range(3):
@@ -55,8 +49,8 @@ def test_groups_queries_and_flags_n_plus_one() -> None:
     assert "/app/views.py:10 in index" in n_plus_one[0]["sources"]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_distinct_queries_are_not_flagged() -> None:
+    _span_exporter.clear()
     tracer = trace.get_tracer("test")
     with tracer.start_as_current_span("GET /"):
         for sql in ("SELECT * FROM users", "SELECT * FROM teams"):
@@ -74,8 +68,8 @@ def test_distinct_queries_are_not_flagged() -> None:
     assert analysis["issues"] == []
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_same_query_across_traces_is_not_n_plus_one() -> None:
+    _span_exporter.clear()
     # --follow redirects produce one trace per hop; a query that runs once
     # per request must not be flagged as a duplicate across traces.
     tracer = trace.get_tracer("test")
@@ -95,8 +89,8 @@ def test_same_query_across_traces_is_not_n_plus_one() -> None:
     assert analysis["issues"] == []
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_n_plus_one_only_flags_app_code() -> None:
+    _span_exporter.clear()
     # With app_root set, a query repeated only in framework code (e.g. a
     # preflight check under site-packages) is not flagged — only repeats in
     # project code are.
@@ -127,8 +121,8 @@ def test_n_plus_one_only_flags_app_code() -> None:
     assert analysis["query_count"] == 6
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_n_plus_one_ignores_framework_repeats_of_an_app_query() -> None:
+    _span_exporter.clear()
     # A query app code runs once but framework code repeats must not be
     # flagged — only the app's own per-trace repeats count toward N+1.
     app_path = "/my/project/app/views.py"
@@ -152,8 +146,8 @@ def test_n_plus_one_ignores_framework_repeats_of_an_app_query() -> None:
     assert analysis["query_count"] == 4
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_emits_flat_raw_spans() -> None:
+    _span_exporter.clear()
     tracer = trace.get_tracer("test")
     with tracer.start_as_current_span("GET /"):
         with tracer.start_as_current_span("render template"):
@@ -170,8 +164,8 @@ def test_emits_flat_raw_spans() -> None:
     assert by_name["render template"]["parent_span_id"] == by_name["GET /"]["span_id"]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_raw_span_passes_attributes_through_and_drops_stacktrace() -> None:
+    _span_exporter.clear()
     tracer = trace.get_tracer("test")
     with tracer.start_as_current_span(
         "query",
@@ -192,8 +186,8 @@ def test_raw_span_passes_attributes_through_and_drops_stacktrace() -> None:
     assert CODE_STACKTRACE not in attributes
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_capture_spans_isolates_other_processors() -> None:
+    _span_exporter.clear()
     # capture_spans() detaches processors an installed package attached —
     # here, the test tracer's own exporter — so a captured span reaches
     # only the capture exporter, not the pre-existing one.
@@ -205,8 +199,8 @@ def test_capture_spans_isolates_other_processors() -> None:
     assert "inside" not in [s.name for s in _span_exporter.get_finished_spans()]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_captures_exception_issue() -> None:
+    _span_exporter.clear()
     tracer = trace.get_tracer("test")
     try:
         with tracer.start_as_current_span("GET /boom"):

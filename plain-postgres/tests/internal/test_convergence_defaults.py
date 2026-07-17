@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
-from conftest_convergence import column_default_sql, execute
+from convergence_helpers import column_default_sql, execute
 
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
@@ -22,10 +22,11 @@ from plain.postgres.convergence.fixes import (
     SetColumnDefaultFix,
     SetNotNullFix,
 )
+from plain.postgres.test import isolated_db
 
 
 class TestColumnDefaultDetection:
-    def test_no_drift_when_converged(self, db):
+    def test_no_drift_when_converged(self):
         """Model declares expression default, DB has matching DEFAULT → no drift."""
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -36,7 +37,7 @@ class TestColumnDefaultDetection:
         ]
         assert default_drifts == []
 
-    def test_detects_missing_default(self, db):
+    def test_detects_missing_default(self):
         """Manual DROP DEFAULT in DB while model declares one → MISSING drift."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
@@ -59,7 +60,7 @@ class TestColumnDefaultDetection:
         assert default_drifts[0].model_default_sql is not None
         assert "gen_random_uuid()" in default_drifts[0].model_default_sql
 
-    def test_detects_changed_default(self, db):
+    def test_detects_changed_default(self):
         """DB has a different DEFAULT than the model declares → CHANGED drift."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
@@ -81,7 +82,7 @@ class TestColumnDefaultDetection:
         assert default_drifts[0].model_default_sql is not None
         assert "statement_timestamp" in default_drifts[0].model_default_sql.lower()
 
-    def test_column_status_carries_default_drift(self, db):
+    def test_column_status_carries_default_drift(self):
         """ColumnStatus.drifts contains a ColumnDefaultDrift for the column."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
@@ -101,7 +102,7 @@ class TestColumnDefaultDetection:
         assert default_drifts[0].kind == DriftKind.MISSING
         assert created_col[0].issue is not None
 
-    def test_no_drift_when_literal_default_matches(self, db):
+    def test_no_drift_when_literal_default_matches(self):
         """Literal defaults persist on the column, and a matching DB DEFAULT
         produces no drift."""
         default = column_default_sql("examples_defaultsexample", "status")
@@ -117,7 +118,7 @@ class TestColumnDefaultDetection:
         ]
         assert default_drifts == []
 
-    def test_no_drift_when_callable_default_stripped(self, db):
+    def test_no_drift_when_callable_default_stripped(self):
         """Callable defaults are evaluated in Python; Plain strips them from
         the column, so DB has no DEFAULT and there's no drift."""
         assert column_default_sql("examples_defaultsexample", "token") is None
@@ -131,7 +132,7 @@ class TestColumnDefaultDetection:
         ]
         assert default_drifts == []
 
-    def test_detects_changed_literal_default(self, db):
+    def test_detects_changed_literal_default(self):
         """DB has a different DEFAULT than the model's literal `default=` → CHANGED."""
         execute(
             'ALTER TABLE "examples_defaultsexample" '
@@ -153,7 +154,7 @@ class TestColumnDefaultDetection:
         assert default_drifts[0].model_default_sql is not None
         assert "pending" in default_drifts[0].model_default_sql
 
-    def test_detects_undeclared_default_on_undeclared_field(self, db):
+    def test_detects_undeclared_default_on_undeclared_field(self):
         """Manual SET DEFAULT on a column whose model declares no default →
         UNDECLARED drift.  Plain owns column DEFAULTs; declare a default on
         the field to make it persistent."""
@@ -177,7 +178,7 @@ class TestColumnDefaultDetection:
 
 
 class TestColumnDefaultPlanning:
-    def test_plans_set_default_for_missing(self, db):
+    def test_plans_set_default_for_missing(self):
         """MISSING drift → executable SetColumnDefaultFix."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
@@ -196,7 +197,7 @@ class TestColumnDefaultPlanning:
         assert fix.column == "db_uuid"
         assert "gen_random_uuid()" in fix.default_sql
 
-    def test_plans_set_default_for_changed(self, db):
+    def test_plans_set_default_for_changed(self):
         """CHANGED drift → executable SetColumnDefaultFix that overwrites."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
@@ -214,7 +215,7 @@ class TestColumnDefaultPlanning:
         assert fix.column == "created_at"
         assert "statement_timestamp" in fix.default_sql.lower()
 
-    def test_blocks_sync(self, db):
+    def test_blocks_sync(self):
         """SetColumnDefaultFix blocks sync (correctness convergence)."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
@@ -248,7 +249,7 @@ class TestColumnDefaultPlanning:
         )
         assert can_auto_fix(drift)
 
-    def test_plans_drop_default_for_undeclared(self, db):
+    def test_plans_drop_default_for_undeclared(self):
         """UNDECLARED drift → executable DropColumnDefaultFix."""
         execute(
             'ALTER TABLE "examples_defaultsexample" '
@@ -278,7 +279,8 @@ class TestColumnDefaultPlanning:
 
 
 class TestColumnDefaultFixes:
-    def test_apply_set_default(self, isolated_db):
+    @isolated_db
+    def test_apply_set_default(self):
         """SetColumnDefaultFix installs the provided SQL as the column DEFAULT."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
@@ -298,7 +300,8 @@ class TestColumnDefaultFixes:
         assert default is not None
         assert "gen_random_uuid()" in default
 
-    def test_apply_set_default_replaces_existing(self, isolated_db):
+    @isolated_db
+    def test_apply_set_default_replaces_existing(self):
         """SetColumnDefaultFix overwrites an existing DEFAULT in one statement."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
@@ -317,7 +320,8 @@ class TestColumnDefaultFixes:
         assert "statement_timestamp" in default.lower()
         assert "clock_timestamp" not in default
 
-    def test_apply_drop_default(self, isolated_db):
+    @isolated_db
+    def test_apply_drop_default(self):
         """DropColumnDefaultFix removes the column DEFAULT."""
         assert column_default_sql("examples_dbdefaultsexample", "db_uuid") is not None
 
@@ -351,7 +355,8 @@ class TestColumnDefaultFixes:
 
 
 class TestColumnDefaultLifecycle:
-    def test_drift_correction_end_to_end(self, isolated_db):
+    @isolated_db
+    def test_drift_correction_end_to_end(self):
         """Manual DROP DEFAULT → detect MISSING → plan → execute → converged."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
@@ -380,7 +385,8 @@ class TestColumnDefaultLifecycle:
         default_fixes = [i for i in items if isinstance(i.fix, SetColumnDefaultFix)]
         assert default_fixes == []
 
-    def test_undeclared_default_end_to_end(self, isolated_db):
+    @isolated_db
+    def test_undeclared_default_end_to_end(self):
         """Manual SET DEFAULT on a column whose model declares no default →
         detect UNDECLARED → DROP → converged."""
         execute(
@@ -405,7 +411,8 @@ class TestColumnDefaultLifecycle:
             items = plan_model_convergence(conn, cursor, DefaultsExample).executable()
         assert not [i for i in items if isinstance(i.fix, DropColumnDefaultFix)]
 
-    def test_column_carries_both_nullability_and_default_drifts(self, isolated_db):
+    @isolated_db
+    def test_column_carries_both_nullability_and_default_drifts(self):
         """A column with both kinds of drift populates `drifts` with both,
         and convergence applies both fixes in one plan."""
         execute(
@@ -442,7 +449,8 @@ class TestColumnDefaultLifecycle:
         assert default is not None
         assert "gen_random_uuid()" in default
 
-    def test_changed_default_end_to_end(self, isolated_db):
+    @isolated_db
+    def test_changed_default_end_to_end(self):
         """Wrong DEFAULT → detect CHANGED → plan → execute → converged."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '

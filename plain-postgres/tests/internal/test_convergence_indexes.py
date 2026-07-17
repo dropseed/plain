@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import pytest
 from app.examples.models.indexes import IndexExample
-from conftest_convergence import (
+from convergence_helpers import (
     create_invalid_index,
     execute,
     index_exists,
@@ -30,6 +29,8 @@ from plain.postgres.convergence.fixes import (
 )
 from plain.postgres.db import read_only
 from plain.postgres.functions.text import Upper
+from plain.postgres.test import isolated_db
+from plain.test import raises
 
 
 def _create_hash_index(name: str = "examples_indexexample_name_hash_idx") -> None:
@@ -37,7 +38,7 @@ def _create_hash_index(name: str = "examples_indexexample_name_hash_idx") -> Non
 
 
 class TestUnmanagedIndexTypes:
-    def test_hash_index_not_flagged_as_undeclared(self, db):
+    def test_hash_index_not_flagged_as_undeclared(self):
         """A hash index is unmanaged — no drift, shown as informational."""
         _create_hash_index()
 
@@ -62,7 +63,7 @@ class TestUnmanagedIndexTypes:
         assert hash_idx.issue is None
         assert hash_idx.drift is None
 
-    def test_unmanaged_index_not_auto_dropped(self, db):
+    def test_unmanaged_index_not_auto_dropped(self):
         """Convergence does not propose dropping unmanaged index types."""
         _create_hash_index()
 
@@ -76,7 +77,7 @@ class TestUnmanagedIndexTypes:
             for item in items
         )
 
-    def test_btree_extra_index_still_undeclared(self, db):
+    def test_btree_extra_index_still_undeclared(self):
         """A btree index not in the model is still flagged as undeclared."""
         execute(
             'CREATE INDEX "examples_indexexample_extra_idx"'
@@ -92,7 +93,7 @@ class TestUnmanagedIndexTypes:
             for d in analysis.drifts
         )
 
-    def test_unmanaged_index_not_counted_as_issue(self, db):
+    def test_unmanaged_index_not_counted_as_issue(self):
         """Unmanaged indexes don't count toward the issue total."""
         _create_hash_index()
 
@@ -102,7 +103,7 @@ class TestUnmanagedIndexTypes:
 
         assert analysis.issue_count == 0
 
-    def test_name_conflict_with_unmanaged_index(self, db):
+    def test_name_conflict_with_unmanaged_index(self):
         """A declared index whose name collides with a hash index is an error."""
         _create_hash_index("examples_indexexample_name_idx")
 
@@ -135,7 +136,7 @@ class TestDescendingIndexNoDrift:
     without drift. Regression: the DB's `col DESC` from pg_get_indexdef was
     being parsed as an opclass of `"desc"`, flagging every sync as changed."""
 
-    def test_descending_index_has_no_drift_on_second_sync(self, db):
+    def test_descending_index_has_no_drift_on_second_sync(self):
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
             *original_indexes,
@@ -165,7 +166,7 @@ class TestDescendingIndexNoDrift:
 
 
 class TestDetectIndexFixes:
-    def test_detects_missing_index(self, db):
+    def test_detects_missing_index(self):
         """Add an index to the model, detect it as missing."""
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
@@ -187,7 +188,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_extra_index(self, db):
+    def test_detects_extra_index(self):
         """An index in the DB not declared on the model is auto-dropped."""
         execute(
             'CREATE INDEX "examples_indexexample_extra_idx"'
@@ -204,7 +205,8 @@ class TestDetectIndexFixes:
         assert isinstance(fix, DropIndexFix)
         assert fix.name == "examples_indexexample_extra_idx"
 
-    def test_detects_invalid_index(self, isolated_db):
+    @isolated_db
+    def test_detects_invalid_index(self):
         """An INVALID index matching a model index produces a RebuildIndexFix."""
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
@@ -236,7 +238,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_index_definition_changed(self, db):
+    def test_detects_index_definition_changed(self):
         """An index with the same name but different columns produces a RebuildIndexFix."""
         original_indexes = list(IndexExample.model_options.indexes)
         # Model declares index on "name" field
@@ -266,7 +268,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_index_sort_order_changed(self, db):
+    def test_detects_index_sort_order_changed(self):
         """An index whose model declaration is DESC but the live index is
         ASC must be detected as drift. Round-tripping the model side through
         pg_get_indexdef preserves the sort modifier in the normalized text."""
@@ -294,7 +296,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_partial_index_predicate_with_paren_in_literal(self, db):
+    def test_detects_partial_index_predicate_with_paren_in_literal(self):
         """Partial-index predicates whose string literal contains parentheses
         must still compare correctly. Round-tripping the model side through
         pg_get_indexdef means both sides come from the same deparser, so
@@ -326,7 +328,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_partial_index_predicate_case_change(self, db):
+    def test_detects_partial_index_predicate_case_change(self):
         """Partial index predicate that differs only in literal case (e.g.
         `status='abc'` vs `status='ABC'`) must be detected as drift —
         pg_get_indexdef preserves literal contents verbatim, so the normalized
@@ -357,7 +359,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_index_include_changed(self, db):
+    def test_detects_index_include_changed(self):
         """An index with the same key columns but a different INCLUDE list
         is real drift — convergence must rebuild it. Earlier the
         normalization stripped INCLUDE entirely, so a missing or extra
@@ -394,7 +396,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_expression_index_definition_changed(self, db):
+    def test_detects_expression_index_definition_changed(self):
         """An expression index with the same name but different expression produces a RebuildIndexFix."""
         original_indexes = list(IndexExample.model_options.indexes)
         # Model declares UPPER(name)
@@ -424,7 +426,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_expression_index_sort_order_change(self, db):
+    def test_detects_expression_index_sort_order_change(self):
         """An expression index with the same expression but different sort
         direction must be detected as drift. Round-tripping the model side
         through pg_get_indexdef makes ASC/DESC visible in the normalized text
@@ -454,7 +456,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_mixed_expression_column_index_column_change(self, db):
+    def test_detects_mixed_expression_column_index_column_change(self):
         """An index combining an expression and a plain column must detect
         drift when only the plain column differs. Regression: an early
         version compared just the expression text from `pg_get_expr(indexprs)`
@@ -487,7 +489,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_no_false_positive_for_matching_expression_index(self, db):
+    def test_no_false_positive_for_matching_expression_index(self):
         """An expression index with matching name and definition produces no issues."""
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
@@ -510,7 +512,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_no_false_positive_for_matching_index(self, db):
+    def test_no_false_positive_for_matching_index(self):
         """An index with matching name and matching columns produces no issues."""
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
@@ -533,7 +535,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_opclass_change(self, db):
+    def test_detects_opclass_change(self):
         """An index whose model declares an opclass (e.g. text_pattern_ops
         for prefix-match support) but whose live index uses the default
         opclass must be detected as drift. The normalized-tail compare puts
@@ -567,7 +569,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_no_false_positive_for_matching_opclass_index(self, db):
+    def test_no_false_positive_for_matching_opclass_index(self):
         """An index whose model and DB both declare the same non-default
         opclass must converge without drift. Symmetric pin to the
         opclass-change detection — pg_get_indexdef renders the opclass
@@ -600,7 +602,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_partial_index_condition_changed(self, db):
+    def test_detects_partial_index_condition_changed(self):
         """A partial index with same name/columns but different WHERE produces a RebuildIndexFix."""
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
@@ -633,7 +635,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_no_false_positive_for_matching_partial_index(self, db):
+    def test_no_false_positive_for_matching_partial_index(self):
         """A partial index with matching name, columns, and condition produces no issues."""
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
@@ -660,7 +662,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_no_false_rename_when_condition_differs(self, db):
+    def test_no_false_rename_when_condition_differs(self):
         """Two indexes on same column but different conditions should not be detected as a rename."""
         original_indexes = list(IndexExample.model_options.indexes)
         # Model has a partial index with a condition
@@ -700,7 +702,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_no_false_index_rename_when_normalization_fails(self, db):
+    def test_no_false_index_rename_when_normalization_fails(self):
         """On a half-migrated DB the round-trip normalization can return
         the empty sentinel for every missing index. The rename detector
         must NOT bucket sentinel-failing indexes under "" — that would let
@@ -754,7 +756,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_index_drift_diagnostic_when_normalization_fails(self, db):
+    def test_index_drift_diagnostic_when_normalization_fails(self):
         """When the model and DB share an index name but
         `_normalize_index_def` returns "" (model SQL incompatible with
         live shape), `_compare_normalized_index` must still emit a CHANGED
@@ -797,7 +799,7 @@ class TestDetectIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_detects_multiple_expression_index_renames_in_one_pass(self, db):
+    def test_detects_multiple_expression_index_renames_in_one_pass(self):
         """Multiple expression-based index renames in a single analyze pass
         each trigger their own `_normalize_index_def` round-trip — every
         call wraps the temp-table create/drop in `cursor.connection.transaction()`,
@@ -856,7 +858,8 @@ class TestDetectIndexFixes:
 
 
 class TestApplyIndexFixes:
-    def test_create_index(self, isolated_db):
+    @isolated_db
+    def test_create_index(self):
         """CreateIndexFix creates an index using CONCURRENTLY."""
         original_indexes = list(IndexExample.model_options.indexes)
         index = Index(fields=["name"], name="examples_indexexample_name_idx")
@@ -875,7 +878,8 @@ class TestApplyIndexFixes:
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_drop_index(self, isolated_db):
+    @isolated_db
+    def test_drop_index(self):
         """DropIndexFix drops an index using CONCURRENTLY."""
         execute(
             'CREATE INDEX "examples_indexexample_temp_idx"'
@@ -891,7 +895,8 @@ class TestApplyIndexFixes:
         assert "CONCURRENTLY" in sql
         assert not index_exists("examples_indexexample_temp_idx")
 
-    def test_rebuild_invalid_index(self, isolated_db):
+    @isolated_db
+    def test_rebuild_invalid_index(self):
         """RebuildIndexFix drops an INVALID index and recreates it."""
         original_indexes = list(IndexExample.model_options.indexes)
         index = Index(fields=["name"], name="examples_indexexample_name_idx")
@@ -923,7 +928,8 @@ class TestApplyIndexFixes:
 
 
 class TestApplyRenameIndex:
-    def test_rename_index(self, isolated_db):
+    @isolated_db
+    def test_rename_index(self):
         """RenameIndexFix renames using ALTER INDEX ... RENAME TO."""
         execute(
             'CREATE INDEX "examples_indexexample_old_idx"'
@@ -942,7 +948,8 @@ class TestApplyRenameIndex:
         assert not index_exists("examples_indexexample_old_idx")
         assert index_exists("examples_indexexample_new_idx")
 
-    def test_rename_lifecycle(self, isolated_db):
+    @isolated_db
+    def test_rename_lifecycle(self):
         """Full cycle: detect rename -> apply -> detect again -> converged."""
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
@@ -980,7 +987,8 @@ class TestReadOnlyConnection:
     so it can't run on a read-only / standby connection. Surface that as a
     clean domain error rather than a raw psycopg ReadOnlySqlTransaction."""
 
-    def test_analyze_inside_read_only_raises_clean_error(self, isolated_db):
+    @isolated_db
+    def test_analyze_inside_read_only_raises_clean_error(self):
         # Same-name match → normalization runs → first DDL attempt under
         # read_only() raises ReadOnlySqlTransaction, which we translate.
         original_indexes = list(IndexExample.model_options.indexes)
@@ -995,7 +1003,7 @@ class TestReadOnlyConnection:
         try:
             conn = get_connection()
             with read_only():
-                with pytest.raises(
+                with raises(
                     ReadOnlyConnectionError,
                     match="requires write access",
                 ):

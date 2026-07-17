@@ -1,7 +1,7 @@
 from app.examples.models.mixins import MixinTestModel
 
 
-def test_mixin_fields_inherited(db):
+def test_mixin_fields_inherited():
     """Test that fields from mixins are properly inherited and processed."""
     # Verify mixin fields are present
     field_names = [f.name for f in MixinTestModel._model_meta.fields]

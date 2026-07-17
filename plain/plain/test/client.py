@@ -8,7 +8,7 @@ from io import BytesIO, IOBase
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse, urlsplit
 
-from plain.http import AsyncStreamingResponse, QueryDict, Request, StreamingResponse
+from plain.http import AsyncStreamingResponse, Request, StreamingResponse
 from plain.http import Response as HttpResponse
 from plain.internal.handlers.base import BaseHandler
 from plain.json import PlainJSONEncoder
@@ -34,16 +34,23 @@ __all__ = [
 
 _BOUNDARY = "BoUnDaRyStRiNg"
 _MULTIPART_CONTENT = f"multipart/form-data; boundary={_BOUNDARY}"
-_CONTENT_TYPE_RE = _lazy_re_compile(r".*; charset=([\w-]+);?")
 # Structured suffix spec: https://tools.ietf.org/html/rfc6838#section-4.2.8
 _JSON_CONTENT_TYPE_RE = _lazy_re_compile(r"^application\/(.+\+)?json")
+
+_REDIRECT_STATUS_CODES = (
+    HTTPStatus.MOVED_PERMANENTLY,
+    HTTPStatus.FOUND,
+    HTTPStatus.SEE_OTHER,
+    HTTPStatus.TEMPORARY_REDIRECT,
+    HTTPStatus.PERMANENT_REDIRECT,
+)
 
 
 class ClientResponse:
     """
-    Response wrapper returned by test Client with test-specific attributes.
+    Response wrapper returned by test Client.
 
-    Wraps any Response subclass and adds attributes useful for testing,
+    Wraps any Response subclass and adds assertable data useful for testing,
     while delegating all other attribute access to the wrapped response.
     """
 
@@ -60,11 +67,22 @@ class ClientResponse:
         self.request: Request
         self.redirect_chain: list[tuple[str, int]]
         self.resolver_match: SimpleLazyObject | ResolverMatch
-        # Optional: set by plain.auth if available
-        # self.user: Model
 
-    def json(self, **extra: Any) -> Any:
-        """Parse response content as JSON."""
+    @property
+    def text(self) -> str:
+        """Response content decoded as a string."""
+        response = object.__getattribute__(self, "_response")
+        return response.content.decode(response.charset)
+
+    @property
+    def body(self) -> bytes:
+        """Raw response content."""
+        response = object.__getattribute__(self, "_response")
+        return response.content
+
+    @property
+    def json_data(self) -> Any:
+        """Response content parsed as JSON (requires a JSON content type)."""
         _json_cache = object.__getattribute__(self, "_json_cache")
         if _json_cache is None:
             response = object.__getattribute__(self, "_response")
@@ -73,12 +91,17 @@ class ClientResponse:
                 raise ValueError(
                     f'Content-Type header is "{content_type}", not "application/json"'
                 )
-            _json_cache = json.loads(
-                response.content.decode(response.charset),
-                **extra,
-            )
+            _json_cache = json.loads(response.content.decode(response.charset))
             object.__setattr__(self, "_json_cache", _json_cache)
         return _json_cache
+
+    @property
+    def redirect_to(self) -> str | None:
+        """The redirect target if this is a 3xx response, otherwise None."""
+        response = object.__getattribute__(self, "_response")
+        if 300 <= response.status_code < 400:
+            return response.headers.get("Location")
+        return None
 
     @property
     def url(self) -> str:
@@ -267,15 +290,67 @@ class ClientHandler(BaseHandler):
         return self._finish_pipeline(request, response, pending.ran_before)
 
 
+def _encode_request_body(
+    *,
+    form_data: dict[str, Any] | None,
+    json_data: Any,
+    body: bytes | str | None,
+    files: dict[str, Any] | None,
+    content_type: str | None,
+    json_encoder: type[json.JSONEncoder],
+) -> tuple[bytes, str]:
+    """
+    Encode the body arguments into (bytes, content_type).
+
+    Exactly one body source may be given: form_data (optionally with files),
+    json_data, or a raw body. `content_type` only applies to a raw body.
+    """
+    sources = [
+        form_data is not None or files is not None,
+        json_data is not None,
+        body is not None,
+    ]
+    if sum(sources) > 1:
+        raise TypeError(
+            "Pass only one of form_data/files, json_data, or body per request"
+        )
+    if content_type is not None and body is None:
+        raise TypeError(
+            "content_type only applies to a raw body — form_data and json_data set their own"
+        )
+
+    if json_data is not None:
+        return (
+            json.dumps(json_data, cls=json_encoder).encode(),
+            "application/json",
+        )
+
+    if body is not None:
+        return (
+            force_bytes(body),
+            content_type or "application/octet-stream",
+        )
+
+    if form_data is not None or files is not None:
+        merged: dict[str, Any] = dict(form_data or {})
+        merged.update(files or {})
+        return (
+            encode_multipart(_BOUNDARY, merged),
+            _MULTIPART_CONTENT,
+        )
+
+    return (b"", "")
+
+
 class RequestFactory:
     """
     Class that lets you create mock Request objects for use in testing.
 
     Usage:
 
-    rf = RequestFactory()
-    get_request = rf.get('/hello/')
-    post_request = rf.post('/submit/', {'foo': 'bar'})
+        rf = RequestFactory()
+        get_request = rf.get("/hello/")
+        post_request = rf.post("/submit/", form_data={"foo": "bar"})
 
     Once you have a request object you can pass it to any view function,
     just as if that view had been hooked up using a urlrouter.
@@ -305,6 +380,17 @@ class RequestFactory:
         headers: dict[str, str] | None = None,
     ) -> Request:
         """Build a Request object directly from the given parameters."""
+        # A URL can carry its own query string; merge it in front of any
+        # explicitly-passed query string.
+        parsed = urlparse(str(path))  # path can be lazy
+        path = parsed.path
+        if parsed.params:
+            path += ";" + parsed.params
+        if parsed.query:
+            query_string = (
+                f"{parsed.query}&{query_string}" if query_string else parsed.query
+            )
+
         # Merge headers: defaults first, then per-request overrides
         all_headers: dict[str, str] = dict(self._default_headers)
         if headers:
@@ -345,97 +431,19 @@ class RequestFactory:
         "Construct a generic request object."
         return self._build_request(**kwargs)
 
-    def _encode_data(self, data: dict[str, Any] | str, content_type: str) -> bytes:
-        if content_type is _MULTIPART_CONTENT:
-            return encode_multipart(_BOUNDARY, data)  # ty: ignore[invalid-argument-type]
-        else:
-            # Encode the content so that the byte representation is correct.
-            match = _CONTENT_TYPE_RE.match(content_type)
-            if match:
-                charset = match[1]
-            else:
-                charset = "utf-8"
-            return force_bytes(data, encoding=charset)
-
-    def _encode_json(self, data: Any, content_type: str) -> Any:
-        """
-        Return encoded JSON if data is a dict, list, or tuple and content_type
-        is application/json.
-        """
-        should_encode = _JSON_CONTENT_TYPE_RE.match(content_type) and isinstance(
-            data, dict | list | tuple
-        )
-        return json.dumps(data, cls=self.json_encoder) if should_encode else data
-
-    def generic(
-        self,
-        method: str,
-        path: str,
-        data: Any = "",
-        content_type: str = "application/octet-stream",
-        secure: bool = True,
-        *,
-        headers: dict[str, str] | None = None,
-        query_string: str = "",
-        server_name: str = "testserver",
-        server_port: str = "",
-    ) -> Request:
-        """Construct an arbitrary HTTP request."""
-        parsed = urlparse(str(path))  # path can be lazy
-        path = parsed.path
-        if parsed.params:
-            path += ";" + parsed.params
-        data = force_bytes(data, "utf-8")
-        if not query_string:
-            query_string = parsed.query
-        return self._build_request(
-            method=method,
-            path=path,
-            data=data,
-            content_type=content_type,
-            query_string=query_string,
-            secure=secure,
-            server_name=server_name,
-            server_port=server_port,
-            headers=headers,
-        )
-
     def get(
         self,
         path: str,
-        data: dict[str, Any] | None = None,
-        secure: bool = True,
         *,
+        query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        secure: bool = True,
     ) -> Request:
         """Construct a GET request."""
-        data = {} if data is None else data
-        return self.generic(
-            "GET",
-            path,
-            secure=secure,
-            headers=headers,
-            query_string=urlencode(data, doseq=True),
-        )
-
-    def post(
-        self,
-        path: str,
-        data: Any = None,
-        content_type: str = _MULTIPART_CONTENT,
-        secure: bool = True,
-        *,
-        headers: dict[str, str] | None = None,
-    ) -> Request:
-        """Construct a POST request."""
-        data = self._encode_json({} if data is None else data, content_type)
-        post_data = self._encode_data(data, content_type)
-
-        return self.generic(
-            "POST",
-            path,
-            post_data,
-            content_type,
+        return self._build_request(
+            method="GET",
+            path=path,
+            query_string=urlencode(query_params or {}, doseq=True),
             secure=secure,
             headers=headers,
         )
@@ -443,114 +451,206 @@ class RequestFactory:
     def head(
         self,
         path: str,
-        data: dict[str, Any] | None = None,
-        secure: bool = True,
         *,
+        query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        secure: bool = True,
     ) -> Request:
         """Construct a HEAD request."""
-        data = {} if data is None else data
-        return self.generic(
-            "HEAD",
-            path,
+        return self._build_request(
+            method="HEAD",
+            path=path,
+            query_string=urlencode(query_params or {}, doseq=True),
             secure=secure,
             headers=headers,
-            query_string=urlencode(data, doseq=True),
         )
 
     def trace(
         self,
         path: str,
-        secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
+        secure: bool = True,
     ) -> Request:
         """Construct a TRACE request."""
-        return self.generic("TRACE", path, secure=secure, headers=headers)
+        return self._build_request(
+            method="TRACE", path=path, secure=secure, headers=headers
+        )
 
     def options(
         self,
         path: str,
-        data: Any = "",
-        content_type: str = "application/octet-stream",
-        secure: bool = True,
         *,
+        query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        secure: bool = True,
     ) -> Request:
         "Construct an OPTIONS request."
-        return self.generic(
-            "OPTIONS", path, data, content_type, secure=secure, headers=headers
+        return self._build_request(
+            method="OPTIONS",
+            path=path,
+            query_string=urlencode(query_params or {}, doseq=True),
+            secure=secure,
+            headers=headers,
+        )
+
+    def post(
+        self,
+        path: str,
+        *,
+        form_data: dict[str, Any] | None = None,
+        json_data: Any = None,
+        body: bytes | str | None = None,
+        files: dict[str, Any] | None = None,
+        content_type: str | None = None,
+        query_params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        secure: bool = True,
+    ) -> Request:
+        """Construct a POST request."""
+        return self._body_request(
+            "POST",
+            path,
+            form_data=form_data,
+            json_data=json_data,
+            body=body,
+            files=files,
+            content_type=content_type,
+            query_params=query_params,
+            headers=headers,
+            secure=secure,
         )
 
     def put(
         self,
         path: str,
-        data: Any = "",
-        content_type: str = "application/octet-stream",
-        secure: bool = True,
         *,
+        form_data: dict[str, Any] | None = None,
+        json_data: Any = None,
+        body: bytes | str | None = None,
+        files: dict[str, Any] | None = None,
+        content_type: str | None = None,
+        query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        secure: bool = True,
     ) -> Request:
         """Construct a PUT request."""
-        data = self._encode_json(data, content_type)
-        return self.generic(
-            "PUT", path, data, content_type, secure=secure, headers=headers
+        return self._body_request(
+            "PUT",
+            path,
+            form_data=form_data,
+            json_data=json_data,
+            body=body,
+            files=files,
+            content_type=content_type,
+            query_params=query_params,
+            headers=headers,
+            secure=secure,
         )
 
     def patch(
         self,
         path: str,
-        data: Any = "",
-        content_type: str = "application/octet-stream",
-        secure: bool = True,
         *,
+        form_data: dict[str, Any] | None = None,
+        json_data: Any = None,
+        body: bytes | str | None = None,
+        files: dict[str, Any] | None = None,
+        content_type: str | None = None,
+        query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        secure: bool = True,
     ) -> Request:
         """Construct a PATCH request."""
-        data = self._encode_json(data, content_type)
-        return self.generic(
-            "PATCH", path, data, content_type, secure=secure, headers=headers
+        return self._body_request(
+            "PATCH",
+            path,
+            form_data=form_data,
+            json_data=json_data,
+            body=body,
+            files=files,
+            content_type=content_type,
+            query_params=query_params,
+            headers=headers,
+            secure=secure,
         )
 
     def delete(
         self,
         path: str,
-        data: Any = "",
-        content_type: str = "application/octet-stream",
-        secure: bool = True,
         *,
+        form_data: dict[str, Any] | None = None,
+        json_data: Any = None,
+        body: bytes | str | None = None,
+        files: dict[str, Any] | None = None,
+        content_type: str | None = None,
+        query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        secure: bool = True,
     ) -> Request:
         """Construct a DELETE request."""
-        data = self._encode_json(data, content_type)
-        return self.generic(
-            "DELETE", path, data, content_type, secure=secure, headers=headers
+        return self._body_request(
+            "DELETE",
+            path,
+            form_data=form_data,
+            json_data=json_data,
+            body=body,
+            files=files,
+            content_type=content_type,
+            query_params=query_params,
+            headers=headers,
+            secure=secure,
+        )
+
+    def _body_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        form_data: dict[str, Any] | None,
+        json_data: Any,
+        body: bytes | str | None,
+        files: dict[str, Any] | None,
+        content_type: str | None,
+        query_params: dict[str, Any] | None,
+        headers: dict[str, str] | None,
+        secure: bool,
+    ) -> Request:
+        encoded, encoded_content_type = _encode_request_body(
+            form_data=form_data,
+            json_data=json_data,
+            body=body,
+            files=files,
+            content_type=content_type,
+            json_encoder=self.json_encoder,
+        )
+        return self._build_request(
+            method=method,
+            path=path,
+            data=encoded,
+            content_type=encoded_content_type,
+            query_string=urlencode(query_params or {}, doseq=True),
+            secure=secure,
+            headers=headers,
         )
 
 
 class Client:
     """
-    A class that can act as a client for testing purposes.
+    A client for making requests against the app without running a server.
 
-    It allows the user to compose GET and POST requests, and
-    obtain the response that the server gave to those requests.
-    The server Response objects are annotated with the details
-    of the contexts and templates that were rendered during the
-    process of serving the request.
+    It speaks the same vocabulary as the rest of Plain: `form_data=` arrives
+    as `request.form_data`, `json_data=` as `request.json_data`, `files=` as
+    `request.files`, and `query_params=` as `request.query_params`.
 
-    Client objects are stateful - they will retain cookie (and
-    thus session) details for the lifetime of the Client instance.
-
-    This is not intended as a replacement for Twill/Selenium or
-    the like - it is here to allow testing against the
-    contexts and templates produced by a view, rather than the
-    HTML rendered to the end-user.
+    Client objects are stateful — they retain cookie (and thus session)
+    details for the lifetime of the Client instance.
     """
 
     def __init__(
         self,
-        raise_request_exception: bool = True,
         *,
+        raise_request_exception: bool = True,
         headers: dict[str, str] | None = None,
     ) -> None:
         self._request_factory = RequestFactory(headers=headers)
@@ -585,16 +685,6 @@ class Client:
         if client_response.exception and self.raise_request_exception:
             raise client_response.exception
 
-        # If the request had a user, make it available on the response.
-        try:
-            from plain.auth.requests import get_request_user
-
-            client_response.user = get_request_user(client_response.request)
-        except Exception:
-            # ImportError if plain.auth not installed, or other exceptions
-            # if session middleware didn't run (e.g. healthcheck)
-            pass
-
         # Attach the ResolverMatch instance to the response.
         # Returns None for paths handled by middleware (e.g. healthcheck)
         # that don't have a corresponding URL route.
@@ -616,199 +706,243 @@ class Client:
     def get(
         self,
         path: str,
-        data: dict[str, Any] | None = None,
-        follow: bool = False,
-        secure: bool = True,
         *,
+        query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        follow_redirects: bool = False,
+        secure: bool = True,
     ) -> ClientResponse:
         """Request a response from the server using GET."""
         request = self._request_factory.get(
-            path, data=data, secure=secure, headers=headers
+            path, query_params=query_params, headers=headers, secure=secure
         )
         response = self.request(request)
-        if follow:
-            response = self._handle_redirects(response, data=data, headers=headers)
-        return response
-
-    def post(
-        self,
-        path: str,
-        data: Any = None,
-        content_type: str = _MULTIPART_CONTENT,
-        follow: bool = False,
-        secure: bool = True,
-        *,
-        headers: dict[str, str] | None = None,
-    ) -> ClientResponse:
-        """Request a response from the server using POST."""
-        request = self._request_factory.post(
-            path,
-            data=data,
-            content_type=content_type,
-            secure=secure,
-            headers=headers,
-        )
-        response = self.request(request)
-        if follow:
-            response = self._handle_redirects(
-                response, data=data, content_type=content_type, headers=headers
-            )
+        if follow_redirects:
+            response = self._handle_redirects(response, headers=headers)
         return response
 
     def head(
         self,
         path: str,
-        data: dict[str, Any] | None = None,
-        follow: bool = False,
-        secure: bool = True,
         *,
+        query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        follow_redirects: bool = False,
+        secure: bool = True,
     ) -> ClientResponse:
         """Request a response from the server using HEAD."""
         request = self._request_factory.head(
-            path, data=data, secure=secure, headers=headers
+            path, query_params=query_params, headers=headers, secure=secure
         )
         response = self.request(request)
-        if follow:
-            response = self._handle_redirects(response, data=data, headers=headers)
+        if follow_redirects:
+            response = self._handle_redirects(response, headers=headers)
         return response
 
     def options(
         self,
         path: str,
-        data: Any = "",
-        content_type: str = "application/octet-stream",
-        follow: bool = False,
-        secure: bool = True,
         *,
+        query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        follow_redirects: bool = False,
+        secure: bool = True,
     ) -> ClientResponse:
         """Request a response from the server using OPTIONS."""
         request = self._request_factory.options(
-            path,
-            data=data,
-            content_type=content_type,
-            secure=secure,
-            headers=headers,
+            path, query_params=query_params, headers=headers, secure=secure
         )
         response = self.request(request)
-        if follow:
-            response = self._handle_redirects(
-                response, data=data, content_type=content_type, headers=headers
-            )
-        return response
-
-    def put(
-        self,
-        path: str,
-        data: Any = "",
-        content_type: str = "application/octet-stream",
-        follow: bool = False,
-        secure: bool = True,
-        *,
-        headers: dict[str, str] | None = None,
-    ) -> ClientResponse:
-        """Send a resource to the server using PUT."""
-        request = self._request_factory.put(
-            path,
-            data=data,
-            content_type=content_type,
-            secure=secure,
-            headers=headers,
-        )
-        response = self.request(request)
-        if follow:
-            response = self._handle_redirects(
-                response, data=data, content_type=content_type, headers=headers
-            )
-        return response
-
-    def patch(
-        self,
-        path: str,
-        data: Any = "",
-        content_type: str = "application/octet-stream",
-        follow: bool = False,
-        secure: bool = True,
-        *,
-        headers: dict[str, str] | None = None,
-    ) -> ClientResponse:
-        """Send a resource to the server using PATCH."""
-        request = self._request_factory.patch(
-            path,
-            data=data,
-            content_type=content_type,
-            secure=secure,
-            headers=headers,
-        )
-        response = self.request(request)
-        if follow:
-            response = self._handle_redirects(
-                response, data=data, content_type=content_type, headers=headers
-            )
-        return response
-
-    def delete(
-        self,
-        path: str,
-        data: Any = "",
-        content_type: str = "application/octet-stream",
-        follow: bool = False,
-        secure: bool = True,
-        *,
-        headers: dict[str, str] | None = None,
-    ) -> ClientResponse:
-        """Send a DELETE request to the server."""
-        request = self._request_factory.delete(
-            path,
-            data=data,
-            content_type=content_type,
-            secure=secure,
-            headers=headers,
-        )
-        response = self.request(request)
-        if follow:
-            response = self._handle_redirects(
-                response, data=data, content_type=content_type, headers=headers
-            )
+        if follow_redirects:
+            response = self._handle_redirects(response, headers=headers)
         return response
 
     def trace(
         self,
         path: str,
-        data: Any = "",
-        follow: bool = False,
-        secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
+        follow_redirects: bool = False,
+        secure: bool = True,
     ) -> ClientResponse:
         """Send a TRACE request to the server."""
-        request = self._request_factory.trace(path, secure=secure, headers=headers)
+        request = self._request_factory.trace(path, headers=headers, secure=secure)
         response = self.request(request)
-        if follow:
-            response = self._handle_redirects(response, data=data, headers=headers)
+        if follow_redirects:
+            response = self._handle_redirects(response, headers=headers)
+        return response
+
+    def post(
+        self,
+        path: str,
+        *,
+        form_data: dict[str, Any] | None = None,
+        json_data: Any = None,
+        body: bytes | str | None = None,
+        files: dict[str, Any] | None = None,
+        content_type: str | None = None,
+        query_params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = False,
+        secure: bool = True,
+    ) -> ClientResponse:
+        """Request a response from the server using POST."""
+        return self._body_method(
+            "POST",
+            path,
+            form_data=form_data,
+            json_data=json_data,
+            body=body,
+            files=files,
+            content_type=content_type,
+            query_params=query_params,
+            headers=headers,
+            follow_redirects=follow_redirects,
+            secure=secure,
+        )
+
+    def put(
+        self,
+        path: str,
+        *,
+        form_data: dict[str, Any] | None = None,
+        json_data: Any = None,
+        body: bytes | str | None = None,
+        files: dict[str, Any] | None = None,
+        content_type: str | None = None,
+        query_params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = False,
+        secure: bool = True,
+    ) -> ClientResponse:
+        """Send a resource to the server using PUT."""
+        return self._body_method(
+            "PUT",
+            path,
+            form_data=form_data,
+            json_data=json_data,
+            body=body,
+            files=files,
+            content_type=content_type,
+            query_params=query_params,
+            headers=headers,
+            follow_redirects=follow_redirects,
+            secure=secure,
+        )
+
+    def patch(
+        self,
+        path: str,
+        *,
+        form_data: dict[str, Any] | None = None,
+        json_data: Any = None,
+        body: bytes | str | None = None,
+        files: dict[str, Any] | None = None,
+        content_type: str | None = None,
+        query_params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = False,
+        secure: bool = True,
+    ) -> ClientResponse:
+        """Send a resource to the server using PATCH."""
+        return self._body_method(
+            "PATCH",
+            path,
+            form_data=form_data,
+            json_data=json_data,
+            body=body,
+            files=files,
+            content_type=content_type,
+            query_params=query_params,
+            headers=headers,
+            follow_redirects=follow_redirects,
+            secure=secure,
+        )
+
+    def delete(
+        self,
+        path: str,
+        *,
+        form_data: dict[str, Any] | None = None,
+        json_data: Any = None,
+        body: bytes | str | None = None,
+        files: dict[str, Any] | None = None,
+        content_type: str | None = None,
+        query_params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = False,
+        secure: bool = True,
+    ) -> ClientResponse:
+        """Send a DELETE request to the server."""
+        return self._body_method(
+            "DELETE",
+            path,
+            form_data=form_data,
+            json_data=json_data,
+            body=body,
+            files=files,
+            content_type=content_type,
+            query_params=query_params,
+            headers=headers,
+            follow_redirects=follow_redirects,
+            secure=secure,
+        )
+
+    def _body_method(
+        self,
+        method: str,
+        path: str,
+        *,
+        form_data: dict[str, Any] | None,
+        json_data: Any,
+        body: bytes | str | None,
+        files: dict[str, Any] | None,
+        content_type: str | None,
+        query_params: dict[str, Any] | None,
+        headers: dict[str, str] | None,
+        follow_redirects: bool,
+        secure: bool,
+    ) -> ClientResponse:
+        encoded, encoded_content_type = _encode_request_body(
+            form_data=form_data,
+            json_data=json_data,
+            body=body,
+            files=files,
+            content_type=content_type,
+            json_encoder=self._request_factory.json_encoder,
+        )
+        request = self._request_factory._build_request(
+            method=method,
+            path=path,
+            data=encoded,
+            content_type=encoded_content_type,
+            query_string=urlencode(query_params or {}, doseq=True),
+            secure=secure,
+            headers=headers,
+        )
+        response = self.request(request)
+        if follow_redirects:
+            response = self._handle_redirects(
+                response,
+                body=encoded,
+                content_type=encoded_content_type,
+                headers=headers,
+            )
         return response
 
     def _handle_redirects(
         self,
         response: ClientResponse,
-        data: Any = "",
+        *,
+        body: bytes = b"",
         content_type: str = "",
         headers: dict[str, str] | None = None,
     ) -> ClientResponse:
         """
-        Follow any redirects by requesting responses from the server using GET.
+        Follow redirect responses until a non-redirect response is reached.
         """
         response.redirect_chain = []
-        redirect_status_codes = (
-            HTTPStatus.MOVED_PERMANENTLY,
-            HTTPStatus.FOUND,
-            HTTPStatus.SEE_OTHER,
-            HTTPStatus.TEMPORARY_REDIRECT,
-            HTTPStatus.PERMANENT_REDIRECT,
-        )
-        while response.status_code in redirect_status_codes:
+        while response.status_code in _REDIRECT_STATUS_CODES:
             response_url = response.url
             redirect_chain = response.redirect_chain
             redirect_chain.append((response_url, response.status_code))
@@ -835,56 +969,27 @@ class Client:
             if not path.startswith("/"):
                 path = urljoin(response.request.path, path)
 
+            method = response.request.method
             if response.status_code in (
                 HTTPStatus.TEMPORARY_REDIRECT,
                 HTTPStatus.PERMANENT_REDIRECT,
-            ):
-                # Preserve request method for 307/308 responses.
-                method = response.request.method
-
-                if method in ("GET", "HEAD"):
-                    # GET/HEAD: the Location URL is the new URL; its query
-                    # string wins. (The original request's `data` was already
-                    # encoded into the first URL; the redirect's Location is
-                    # what the server told us to follow.)
-                    request = self._request_factory._build_request(
-                        method=method,
-                        path=path,
-                        query_string=url.query,
-                        secure=secure,
-                        server_name=server_name,
-                        server_port=server_port,
-                        headers=headers,
-                    )
-                    data = QueryDict(url.query)
-                else:
-                    # POST/PUT/etc: preserve body and add redirect URL's
-                    # query. Mirror `RequestFactory.post()`'s None→{}
-                    # normalization so the followed request is byte-identical
-                    # to the initial one — same body, same content headers.
-                    if data is None:
-                        data = {}
-                    encoded_data = self._request_factory._encode_json(
-                        data, content_type
-                    )
-                    encoded_data = self._request_factory._encode_data(
-                        encoded_data, content_type
-                    )
-                    request = self._request_factory._build_request(
-                        method=method,
-                        path=path,
-                        data=encoded_data,
-                        content_type=content_type,
-                        query_string=url.query,
-                        secure=secure,
-                        server_name=server_name,
-                        server_port=server_port,
-                        headers=headers,
-                    )
-            else:
-                # Non-307/308: redirect as GET with query from redirect URL
+            ) and method not in ("GET", "HEAD"):
+                # 307/308 preserve the request method and body.
                 request = self._request_factory._build_request(
-                    method="GET",
+                    method=method,
+                    path=path,
+                    data=body,
+                    content_type=content_type,
+                    query_string=url.query,
+                    secure=secure,
+                    server_name=server_name,
+                    server_port=server_port,
+                    headers=headers,
+                )
+            else:
+                # Everything else redirects as a GET without a body.
+                request = self._request_factory._build_request(
+                    method="GET" if method not in ("GET", "HEAD") else method,
                     path=path,
                     query_string=url.query,
                     secure=secure,
@@ -892,7 +997,7 @@ class Client:
                     server_port=server_port,
                     headers=headers,
                 )
-                data = QueryDict(url.query)
+                body = b""
                 content_type = ""
 
             response = self.request(request)

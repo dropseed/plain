@@ -18,7 +18,9 @@ value automatically because they already share a source.
 
 from __future__ import annotations
 
-import pytest
+from contextlib import contextmanager
+
+from clients import error_client
 from opentelemetry.semconv.attributes import url_attributes
 
 from plain.runtime import settings
@@ -29,7 +31,7 @@ from plain.urls.resolvers import _get_cached_resolver
 _span_exporter = install_test_tracer()
 
 
-@pytest.fixture
+@contextmanager
 def app_router():
     """Stand up the default app router and drain spans before the test runs."""
     original = settings.URLS_ROUTER
@@ -51,14 +53,15 @@ def _request_span(spans):
     raise AssertionError("No span with url.path attribute found")
 
 
-def test_otel_url_path_records_request_path(app_router):
+def test_otel_url_path_records_request_path():
     """`GET /` → `url.path` span attribute is `/` (request.path)."""
-    Client().get("/")
-    span = _request_span(app_router)
-    assert span.attributes[url_attributes.URL_PATH] == "/"
+    with app_router() as spans:
+        Client().get("/")
+        span = _request_span(spans)
+        assert span.attributes[url_attributes.URL_PATH] == "/"
 
 
-def test_otel_url_path_is_unnormalized(app_router):
+def test_otel_url_path_is_unnormalized():
     """`GET ///` → `url.path` records what arrives at the resolver layer.
 
     Today: the request layer collapses multiple leading slashes to one, so
@@ -66,12 +69,13 @@ def test_otel_url_path_is_unnormalized(app_router):
     and the recorded value reflects that — same final value, different
     provenance.
     """
-    Client().get("///")
-    span = _request_span(app_router)
-    assert span.attributes[url_attributes.URL_PATH] == "/"
+    with app_router() as spans:
+        Client().get("///")
+        span = _request_span(spans)
+        assert span.attributes[url_attributes.URL_PATH] == "/"
 
 
-def test_exception_log_records_request_path(error_client):
+def test_exception_log_records_request_path():
     """Exception log `path` field uses `request.path`, same source as the OTel
     span attribute (per the divergence fix that unified both).
 
@@ -95,7 +99,8 @@ def test_exception_log_records_request_path(error_client):
     request_logger = logging.getLogger("plain.request")
     request_logger.addHandler(handler)
     try:
-        error_client.get("/plain-500/")
+        with error_client() as client:
+            client.get("/plain-500/")
     finally:
         request_logger.removeHandler(handler)
 

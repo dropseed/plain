@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from app.examples.models.iteration import IterationExample
 
+from plain.postgres.test import capture_queries
 
-def test_repr_does_not_execute_sql_when_unevaluated(db, capture_queries):
+
+def test_repr_does_not_execute_sql_when_unevaluated():
     """repr() of an unevaluated queryset must not issue a SQL query.
 
     Error reporters (Sentry, pdb, exception templates) call repr() on
@@ -19,7 +21,7 @@ def test_repr_does_not_execute_sql_when_unevaluated(db, capture_queries):
     assert repr(qs) == "<QuerySet [unevaluated]>"
 
 
-def test_repr_uses_cache_when_evaluated(db, capture_queries):
+def test_repr_uses_cache_when_evaluated():
     """Once a queryset is evaluated, repr() reflects its rows without re-querying."""
     IterationExample.query.create(name="alpha", tag="a")
     IterationExample.query.create(name="beta", tag="b")
@@ -36,7 +38,7 @@ def test_repr_uses_cache_when_evaluated(db, capture_queries):
     assert rendered.count("IterationExample") == 2
 
 
-def test_repr_truncates_large_evaluated_querysets(db):
+def test_repr_truncates_large_evaluated_querysets():
     """The truncation marker still appears past REPR_OUTPUT_SIZE."""
     for i in range(25):
         IterationExample.query.create(name=f"name{i:02d}", tag="t")

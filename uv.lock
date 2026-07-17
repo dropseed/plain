@@ -28,7 +28,6 @@ members = [
     "plain-passwords",
     "plain-portal",
     "plain-postgres",
-    "plain-pytest",
     "plain-redirection",
     "plain-scan",
     "plain-sessions",
@@ -247,12 +246,12 @@ dependencies = [
     { name = "plain-passwords" },
     { name = "plain-portal" },
     { name = "plain-postgres" },
-    { name = "plain-pytest" },
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
+    { name = "plain-testing" },
     { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
@@ -281,12 +280,12 @@ requires-dist = [
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-portal", editable = "plain-portal" },
     { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-pytest", editable = "plain-pytest" },
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-templates", editable = "plain-templates" },
+    { name = "plain-testing", editable = "plain-testing" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },
@@ -391,15 +390,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/20/b0/36bd937216ec521246249be3bf9855081de4c5e06a0c9b4219dbeda50373/importlib_metadata-8.7.0-py3-none-any.whl", hash = "sha256:e5dd1551894c77868a30651cef00984d50e1002d06942a7101d34870c5f02afd", size = 27656, upload-time = "2025-04-27T15:29:00.214Z" },
-]
-
-[[package]]
-name = "iniconfig"
-version = "2.1.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f2/97/ebf4da567aa6827c909642694d71c9fcf53e5b504f2d96afea02718862f3/iniconfig-2.1.0.tar.gz", hash = "sha256:3abbd2e30b36733fee78f9c7f7308f2d0050e88f0087fd25c2645f63c773e1c7", size = 4793, upload-time = "2025-03-19T20:09:59.721Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/e1/e6716421ea10d38022b952c159d5161ca1193197fb744506875fbb87ea7b/iniconfig-2.1.0-py3-none-any.whl", hash = "sha256:9deba5723312380e77435581c6bf4935c94cbfab9b1ed33ef8d238ea168eb760", size = 6050, upload-time = "2025-03-19T20:10:01.071Z" },
 ]
 
 [[package]]
@@ -724,15 +714,6 @@ wheels = [
 ]
 
 [[package]]
-name = "packaging"
-version = "25.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a1/d4/1fc4078c65507b51b96ca8f8c3ba19e6a61c8253c72794544580a7b6c24d/packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f", size = 165727, upload-time = "2025-04-19T11:48:59.673Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484", size = 66469, upload-time = "2025-04-19T11:48:57.875Z" },
-]
-
-[[package]]
 name = "pathable"
 version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -756,7 +737,8 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "opentelemetry-sdk" },
-    { name = "pytest" },
+    { name = "plain-dev" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -771,7 +753,8 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
-    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "plain-dev", editable = "plain-dev" },
+    { name = "plain-testing", editable = "plain-testing" },
 ]
 
 [[package]]
@@ -789,7 +772,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -803,7 +786,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-api"
@@ -816,7 +799,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "openapi-spec-validator" },
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -825,7 +808,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 [package.metadata.requires-dev]
 dev = [
     { name = "openapi-spec-validator", specifier = ">=0.7.1" },
-    { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-testing", editable = "plain-testing" },
 ]
 
 [[package]]
@@ -838,14 +821,14 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
 requires-dist = [{ name = "plain", editable = "plain" }]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-auth"
@@ -859,7 +842,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -870,7 +853,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-cache"
@@ -883,7 +866,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -893,7 +876,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-cloud"
@@ -907,7 +890,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -918,7 +901,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-code"
@@ -956,8 +939,8 @@ dependencies = [
 dev = [
     { name = "plain-assets" },
     { name = "plain-auth" },
-    { name = "plain-pytest" },
     { name = "plain-templates" },
+    { name = "plain-testing" },
     { name = "plain-toolbar" },
 ]
 
@@ -973,8 +956,8 @@ requires-dist = [
 dev = [
     { name = "plain-assets", editable = "plain-assets" },
     { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-pytest", editable = "plain-pytest" },
     { name = "plain-templates", editable = "plain-templates" },
+    { name = "plain-testing", editable = "plain-testing" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
 ]
 
@@ -991,7 +974,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1003,7 +986,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0.0" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-elements"
@@ -1016,7 +999,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1026,7 +1009,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-email"
@@ -1039,7 +1022,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1049,7 +1032,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-flags"
@@ -1062,7 +1045,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1072,7 +1055,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-htmx"
@@ -1085,7 +1068,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1095,7 +1078,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-jobs"
@@ -1109,7 +1092,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "plain-postgres" },
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1121,7 +1104,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-testing", editable = "plain-testing" },
 ]
 
 [[package]]
@@ -1137,7 +1120,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "plain-auth" },
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1150,7 +1133,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-testing", editable = "plain-testing" },
 ]
 
 [[package]]
@@ -1163,20 +1146,21 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
 requires-dist = [{ name = "plain", editable = "plain" }]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-oauth"
 version = "0.50.1"
 source = { editable = "plain-oauth" }
 dependencies = [
+    { name = "cryptography" },
     { name = "plain" },
     { name = "plain-auth" },
     { name = "plain-postgres" },
@@ -1186,11 +1170,12 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "httpx" },
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=41.0" },
     { name = "plain", editable = "plain" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-postgres", editable = "plain-postgres" },
@@ -1200,7 +1185,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx", specifier = ">=0.27" },
-    { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-testing", editable = "plain-testing" },
 ]
 
 [[package]]
@@ -1216,7 +1201,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1228,7 +1213,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-pages"
@@ -1245,7 +1230,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1259,7 +1244,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-passwords"
@@ -1274,7 +1259,7 @@ dependencies = [
 dev = [
     { name = "plain-auth" },
     { name = "plain-email" },
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1287,7 +1272,7 @@ requires-dist = [
 dev = [
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-email", editable = "plain-email" },
-    { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-testing", editable = "plain-testing" },
 ]
 
 [[package]]
@@ -1303,7 +1288,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1315,7 +1300,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-postgres"
@@ -1329,9 +1314,10 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "cryptography" },
     { name = "opentelemetry-sdk" },
-    { name = "plain-pytest" },
     { name = "plain-templates" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1343,30 +1329,10 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "cryptography" },
     { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
-    { name = "plain-pytest", editable = "plain-pytest" },
     { name = "plain-templates", editable = "plain-templates" },
-]
-
-[[package]]
-name = "plain-pytest"
-version = "0.19.0"
-source = { editable = "plain-pytest" }
-dependencies = [
-    { name = "click" },
-    { name = "cryptography" },
-    { name = "opentelemetry-sdk" },
-    { name = "plain" },
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.0.0" },
-    { name = "cryptography" },
-    { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
-    { name = "plain", editable = "plain" },
-    { name = "pytest", specifier = ">=7.0.0" },
+    { name = "plain-testing", editable = "plain-testing" },
 ]
 
 [[package]]
@@ -1380,7 +1346,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1390,7 +1356,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-scan"
@@ -1403,7 +1369,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1413,7 +1379,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-sessions"
@@ -1427,7 +1393,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "plain-postgres" },
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1439,7 +1405,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-testing", editable = "plain-testing" },
 ]
 
 [[package]]
@@ -1483,7 +1449,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1493,7 +1459,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-testing"
@@ -1541,7 +1507,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "pytest" },
+    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -1552,7 +1518,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest" }]
+dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-vendor"
@@ -1603,7 +1569,6 @@ dev = [
     { name = "plain-passwords" },
     { name = "plain-portal" },
     { name = "plain-postgres" },
-    { name = "plain-pytest" },
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
@@ -1644,7 +1609,6 @@ dev = [
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-portal", editable = "plain-portal" },
     { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-pytest", editable = "plain-pytest" },
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
@@ -1662,15 +1626,6 @@ dev = [
 name = "plainx-dev"
 version = "0.1.5"
 source = { editable = "plainx-dev" }
-
-[[package]]
-name = "pluggy"
-version = "1.6.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
-]
 
 [[package]]
 name = "protobuf"
@@ -1876,22 +1831,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/48/47/e761c254f410c023a469284a9bc210933e18588ca87706ae93002c05114c/pynacl-1.6.2-cp38-abi3-win32.whl", hash = "sha256:5811c72b473b2f38f7e2a3dc4f8642e3a3e9b5e7317266e4ced1fba85cae41aa", size = 227421, upload-time = "2026-01-01T17:32:33.076Z" },
     { url = "https://files.pythonhosted.org/packages/41/ad/334600e8cacc7d86587fe5f565480fde569dfb487389c8e1be56ac21d8ac/pynacl-1.6.2-cp38-abi3-win_amd64.whl", hash = "sha256:62985f233210dee6548c223301b6c25440852e13d59a8b81490203c3227c5ba0", size = 239754, upload-time = "2026-01-01T17:32:34.557Z" },
     { url = "https://files.pythonhosted.org/packages/29/7d/5945b5af29534641820d3bd7b00962abbbdfee84ec7e19f0d5b3175f9a31/pynacl-1.6.2-cp38-abi3-win_arm64.whl", hash = "sha256:834a43af110f743a754448463e8fd61259cd4ab5bbedcf70f9dabad1d28a394c", size = 184801, upload-time = "2026-01-01T17:32:36.309Z" },
-]
-
-[[package]]
-name = "pytest"
-version = "9.1.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
-    { name = "iniconfig" },
-    { name = "packaging" },
-    { name = "pluggy" },
-    { name = "pygments" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
 ]
 
 [[package]]

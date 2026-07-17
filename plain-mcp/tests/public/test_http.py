@@ -8,12 +8,9 @@ from __future__ import annotations
 
 import json
 
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
-    InMemorySpanExporter,
-)
 from opentelemetry.trace import SpanKind, StatusCode
 
-from plain.test import Client
+from plain.test import Client, capture_spans
 
 
 def _jsonrpc(method: str, params: dict | None = None, msg_id: int = 1) -> str:
@@ -34,7 +31,7 @@ class TestPublicEndpoint:
         client = Client()
         response = client.post(
             "/mcp",
-            data=_jsonrpc("initialize"),
+            body=_jsonrpc("initialize"),
             content_type="application/json",
         )
         assert response.status_code == 200
@@ -48,7 +45,7 @@ class TestPublicEndpoint:
         client = Client()
         response = client.post(
             "/mcp",
-            data=_jsonrpc("initialize", {"protocolVersion": "2025-06-18"}),
+            body=_jsonrpc("initialize", {"protocolVersion": "2025-06-18"}),
             content_type="application/json",
         )
         assert json.loads(response.content)["result"]["protocolVersion"] == "2025-06-18"
@@ -58,7 +55,7 @@ class TestPublicEndpoint:
         client = Client()
         response = client.post(
             "/mcp",
-            data=_jsonrpc("initialize", {"protocolVersion": "1999-01-01"}),
+            body=_jsonrpc("initialize", {"protocolVersion": "1999-01-01"}),
             content_type="application/json",
         )
         assert json.loads(response.content)["result"]["protocolVersion"] == "2025-11-25"
@@ -67,7 +64,7 @@ class TestPublicEndpoint:
         # Spec MUST: an unsupported MCP-Protocol-Version header is rejected.
         client = Client(headers={"MCP-Protocol-Version": "1999-01-01"})
         response = client.post(
-            "/mcp", data=_jsonrpc("ping"), content_type="application/json"
+            "/mcp", body=_jsonrpc("ping"), content_type="application/json"
         )
         assert response.status_code == 400
         assert (
@@ -77,7 +74,7 @@ class TestPublicEndpoint:
     def test_supported_protocol_version_header_accepted(self) -> None:
         client = Client(headers={"MCP-Protocol-Version": "2025-06-18"})
         response = client.post(
-            "/mcp", data=_jsonrpc("ping"), content_type="application/json"
+            "/mcp", body=_jsonrpc("ping"), content_type="application/json"
         )
         assert response.status_code == 200
 
@@ -85,7 +82,7 @@ class TestPublicEndpoint:
         client = Client()
         response = client.post(
             "/mcp",
-            data=_jsonrpc("tools/call", {"name": "Echo", "arguments": {"text": "hi"}}),
+            body=_jsonrpc("tools/call", {"name": "Echo", "arguments": {"text": "hi"}}),
             content_type="application/json",
         )
         assert response.status_code == 200
@@ -97,7 +94,7 @@ class TestPublicEndpoint:
         client = Client()
         response = client.post(
             "/mcp",
-            data=json.dumps(
+            body=json.dumps(
                 {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}
             ),
             content_type="application/json",
@@ -113,7 +110,7 @@ class TestUnhandledException:
         client = Client(raise_request_exception=False)
         response = client.post(
             "/boom",
-            data=_jsonrpc("ping"),
+            body=_jsonrpc("ping"),
             content_type="application/json",
         )
         assert response.status_code == 500
@@ -129,41 +126,41 @@ class TestRPCMethodSpan:
     HTTP 200 — the outer HTTP SERVER span sees success and the failure is
     invisible to OTel-based exception tooling."""
 
-    def test_rpc_method_emits_server_span(
-        self, otel_spans: InMemorySpanExporter
-    ) -> None:
-        client = Client()
-        response = client.post(
-            "/mcp",
-            data=_jsonrpc("initialize"),
-            content_type="application/json",
-        )
-        assert response.status_code == 200
+    def test_rpc_method_emits_server_span(self) -> None:
+        with capture_spans() as otel_spans:
+            client = Client()
+            response = client.post(
+                "/mcp",
+                body=_jsonrpc("initialize"),
+                content_type="application/json",
+            )
+            assert response.status_code == 200
 
-        rpc_spans = [
-            s for s in otel_spans.get_finished_spans() if s.name == "rpc initialize"
-        ]
+            rpc_spans = [
+                s for s in otel_spans.get_finished_spans() if s.name == "rpc initialize"
+            ]
         assert len(rpc_spans) == 1
         span = rpc_spans[0]
         assert span.kind == SpanKind.SERVER
         assert span.status.status_code == StatusCode.UNSET
 
-    def test_rpc_method_records_error_when_handler_fails(
-        self, otel_spans: InMemorySpanExporter
-    ) -> None:
-        client = Client()
-        response = client.post(
-            "/rpc-boom",
-            data=_jsonrpc("boom"),
-            content_type="application/json",
-        )
-        # handle_message swallows handler exceptions into a JSON-RPC error
-        # response with HTTP 200 — the failure surfaces on the span.
-        assert response.status_code == 200
-        body = json.loads(response.content)
-        assert body["error"]["code"] == -32603
+    def test_rpc_method_records_error_when_handler_fails(self) -> None:
+        with capture_spans() as otel_spans:
+            client = Client()
+            response = client.post(
+                "/rpc-boom",
+                body=_jsonrpc("boom"),
+                content_type="application/json",
+            )
+            # handle_message swallows handler exceptions into a JSON-RPC error
+            # response with HTTP 200 — the failure surfaces on the span.
+            assert response.status_code == 200
+            body = json.loads(response.content)
+            assert body["error"]["code"] == -32603
 
-        rpc_spans = [s for s in otel_spans.get_finished_spans() if s.name == "rpc boom"]
+            rpc_spans = [
+                s for s in otel_spans.get_finished_spans() if s.name == "rpc boom"
+            ]
         assert len(rpc_spans) == 1
         span = rpc_spans[0]
         assert span.status.status_code == StatusCode.ERROR
@@ -180,7 +177,7 @@ class TestAuthedEndpoint:
         client = Client()
         response = client.post(
             "/authed",
-            data=_jsonrpc("ping"),
+            body=_jsonrpc("ping"),
             content_type="application/json",
         )
         assert response.status_code == 401
@@ -191,7 +188,7 @@ class TestAuthedEndpoint:
         client = Client(headers={"Authorization": "Bearer wrong-token"})
         response = client.post(
             "/authed",
-            data=_jsonrpc("ping"),
+            body=_jsonrpc("ping"),
             content_type="application/json",
         )
         assert response.status_code == 401
@@ -200,7 +197,7 @@ class TestAuthedEndpoint:
         client = Client(headers={"Authorization": "Bearer topsecret"})
         response = client.post(
             "/authed",
-            data=_jsonrpc("tools/call", {"name": "Secret", "arguments": {}}),
+            body=_jsonrpc("tools/call", {"name": "Secret", "arguments": {}}),
             content_type="application/json",
         )
         assert response.status_code == 200
@@ -212,7 +209,7 @@ class TestAuthedEndpoint:
         client = Client(headers={"Authorization": "Bearer topsecret"})
         response = client.post(
             "/authed",
-            data=_jsonrpc("tools/call", {"name": "Echo", "arguments": {"text": "hi"}}),
+            body=_jsonrpc("tools/call", {"name": "Echo", "arguments": {"text": "hi"}}),
             content_type="application/json",
         )
         # Echo is on PublicMCP, not AuthedMCP → unknown tool error

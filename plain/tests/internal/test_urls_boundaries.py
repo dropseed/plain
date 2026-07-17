@@ -17,72 +17,82 @@ slashed form.
 
 from __future__ import annotations
 
+from clients import boundary_client
 
-def test_canonical_include_resolves(boundary_client):
+
+def test_canonical_include_resolves():
     """`include("admin-canonical/", ...)` → child route resolves normally."""
-    response = boundary_client.get("/admin-canonical/home/")
-    assert response.status_code == 200
-    assert response.content == b"hello"
+    with boundary_client() as client:
+        response = client.get("/admin-canonical/home/")
+        assert response.status_code == 200
+        assert response.content == b"hello"
 
 
-def test_canonical_include_nested_resolves(boundary_client):
+def test_canonical_include_nested_resolves():
     """Nested `include("nested/", ...)` inside the canonical include resolves."""
-    response = boundary_client.get("/admin-canonical/nested/users/")
-    assert response.status_code == 200
-    assert response.content == b"users-list"
+    with boundary_client() as client:
+        response = client.get("/admin-canonical/nested/users/")
+        assert response.status_code == 200
+        assert response.content == b"users-list"
 
 
-def test_canonical_include_nested_with_param(boundary_client):
+def test_canonical_include_nested_with_param():
     """Nested include with URL parameter."""
-    response = boundary_client.get("/admin-canonical/nested/users/42/")
-    assert response.status_code == 200
-    assert response.content == b"user-42"
+    with boundary_client() as client:
+        response = client.get("/admin-canonical/nested/users/42/")
+        assert response.status_code == 200
+        assert response.content == b"user-42"
 
 
-def test_include_without_trailing_slash_resolves(boundary_client):
+def test_include_without_trailing_slash_resolves():
     """`include("admin-boundary", ...)` — no-slash include still resolves
     its slashed children correctly. Include slash is irrelevant — the
     child route's own slash form (set by `URLS_TRAILING_SLASH=True` in
     this fixture) drives the canonical URL.
     """
-    response = boundary_client.get("/admin-boundary/home/")
-    assert response.status_code == 200
-    assert response.content == b"hello"
+    with boundary_client() as client:
+        response = client.get("/admin-boundary/home/")
+        assert response.status_code == 200
+        assert response.content == b"hello"
 
 
-def test_include_without_slash_no_longer_concatenates(boundary_client):
+def test_include_without_slash_no_longer_concatenates():
     """The `/adminhome/`-style collision is structurally impossible —
     segments are split on `/` before matching, so the include prefix
     and child's first segment can't merge regardless of slash choice.
     """
-    response = boundary_client.get("/admin-boundaryhome/")
-    assert response.status_code == 404
+    with boundary_client() as client:
+        response = client.get("/admin-boundaryhome/")
+        assert response.status_code == 404
 
 
-def test_root_include_resolves(boundary_client):
+def test_root_include_resolves():
     """`include("", ...)` → child route reachable at its bare path."""
-    response = boundary_client.get("/root-hello/")
-    assert response.status_code == 200
-    assert response.content == b"hello"
+    with boundary_client() as client:
+        response = client.get("/root-hello/")
+        assert response.status_code == 200
+        assert response.content == b"hello"
 
 
-def test_include_with_leading_slash_resolves(boundary_client):
+def test_include_with_leading_slash_resolves():
     """`include("/admin-leading/", ...)` — leading slash is stripped.
 
     The constructor normalizes the route to `admin-leading/`, so child
     routes resolve under the expected `/admin-leading/...` prefix.
     """
-    response = boundary_client.get("/admin-leading/home/")
-    assert response.status_code == 200
-    assert response.content == b"hello"
+    with boundary_client() as client:
+        response = client.get("/admin-leading/home/")
+        assert response.status_code == 200
+        assert response.content == b"hello"
 
 
-def test_path_with_leading_slash_resolves(boundary_client):
+def test_path_with_leading_slash_resolves():
     """`path("/leading-slash/", ...)` — leading slash is stripped.
 
     `path()` accepts the leading slash form; it's normalized to
     `leading-slash/` before becoming a regex.
     """
-    response = boundary_client.get("/leading-slash/")
-    assert response.status_code == 200
-    assert response.content == b"hello"
+    with boundary_client() as client:
+        response = client.get("/leading-slash/")
+        assert response.status_code == 200
+        assert response.content == b"hello"

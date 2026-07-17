@@ -12,7 +12,7 @@ dependencies = ["plain>=0.147.0,<1.0.0", "plain.assets>=0.3.0,<1.0.0", "click>=8
 "dev-setup" = "plain.dev.entrypoints:setup"
 
 [dependency-groups]
-dev = ["pytest>=8.0.0"]
+dev = ["plain.testing<1.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

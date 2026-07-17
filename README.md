@@ -100,7 +100,7 @@ Python where you want it, JS where you need it.
 - **Frontend:** htmx, Tailwind CSS
 - **Python tooling:** uv (packages), ruff (lint/format), ty (type checking)
 - **JavaScript tooling:** oxc (lint/format)
-- **Testing:** pytest
+- **Testing:** plain.testing — Plain's own test runner
 
 Models declare fields as annotated attributes, and that typing carries through views, forms, and URLs. `plain check` runs `ty` on every pass — what your IDE shows, CI enforces, and agents read from the same signatures.
 
@@ -161,7 +161,7 @@ plain docs --search "queryset"         # search across all packages
 **Development:**
 
 - [plain.dev](https://plainframework.com/docs/plain-dev/plain/dev/) — local server
-- [plain.pytest](https://plainframework.com/docs/plain-pytest/plain/pytest/) — testing helpers
+- [plain.testing](https://plainframework.com/docs/plain-testing/plain/testing/) — test runner
 - [plain.toolbar](https://plainframework.com/docs/plain-toolbar/plain/toolbar/) — debug toolbar
 - [plain.code](https://plainframework.com/docs/plain-code/plain/code/) — code formatting
 - [plain.portal](https://plainframework.com/docs/plain-portal/plain/portal/) — remote shell and file transfer

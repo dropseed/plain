@@ -3,6 +3,7 @@
 **Plain's own test runner — plain functions, bare asserts, and a runner that knows your whole stack.**
 
 - [Overview](#overview)
+- [Status](#status)
 - [Writing tests](#writing-tests)
 - [The test client](#the-test-client)
 - [Assertions](#assertions)
@@ -48,6 +49,10 @@ Everything a test uses is either an explicit import, an explicit `with` block, o
 And because the runner is part of the framework, it knows your whole stack: every test runs inside OpenTelemetry capture, so failures report the queries and spans behind them; the runner knows your URL routes, so it can tell you which ones are untested; and the database, email outbox, and cache are isolated per test without any setup on your part.
 
 The guiding rule for the API: **decorators declare, bodies acquire.** Decorators attach static facts to a test (its cases, its tags, its timeout). Runtime state — settings overrides, frozen time, captured spans — always enters through a `with` block or a function call in the body, where you can see its scope.
+
+## Status
+
+This README is the spec; the engine is being built against it. **Working today**: collection (functions, `Test*` classes, async), assertion rewriting, `raises`/`@cases`/`@skip`/`@tag`, `override_settings`/`patch`/`capture_spans`/`capture_metrics`, the redesigned `Client`, the lifecycle entry point with automatic database (rolled-back transaction, `@isolated_db`) and email outbox isolation, and the runner flags `-k`/`-x`/`-v`/`--tag`/`--exclude-tag`. **Not built yet**: `freeze_time`, `@timeout`, `--lf`, `--pdb`, parallelism and the template-database clone, `--shuffle`, flake classification, `max_queries`-in-strict-mode/route coverage, `--json`/`--changed`, browser testing, and the built-in suite — those sections below describe where this is going.
 
 ## Writing tests
 
@@ -134,15 +139,18 @@ assert response.json_data["id"]
 - `response.text` (str) and `response.body` (bytes)
 - `response.json_data` — parsed JSON, mirroring the request-side name
 - `response.redirect_to` — the redirect target on a 3xx response, `None` otherwise, so redirect checks are one line
-- `response.request` — the request that produced this response, after middleware ran; `response.request.user` is how you check who was authenticated
+- `response.request` — the request that produced this response, after middleware ran; combine with [plain.auth](../../../plain-auth/plain/auth/README.md)'s `get_request_user(response.request)` to check who was authenticated
 
 ```python
+from plain.auth.requests import get_request_user
+
+
 def test_login():
     client = Client()
     client.force_login(user)
 
     response = client.get("/dashboard/")
-    assert response.request.user == user
+    assert get_request_user(response.request) == user
 
     client.logout()
     assert client.get("/dashboard/").redirect_to == "/login/"
@@ -262,7 +270,7 @@ If `plain.postgres` is installed, every test gets an isolated database automatic
 - Each worker process gets its own fast clone of the template (`CREATE DATABASE ... TEMPLATE ...`).
 - Each test runs inside a transaction that is rolled back afterward.
 
-The transaction is opened lazily, on the first database connection checkout — so tests that never touch the database pay nothing, and tests that do are isolated automatically. The runner owns the connection, so it always knows which kind of test it's running.
+Tests that exercise DDL or transaction behavior itself (migrations, convergence, commit semantics) can't run inside a transaction that never commits — decorate them with `@isolated_db` from `plain.postgres.test` to get a dedicated database for that test instead of the rollback wrapper.
 
 Tests that need a real, separately-connectable database (a live server in a browser test, connection behavior itself) get a dedicated database instead of a rolled-back transaction — see [Browser testing](#browser-testing).
 

@@ -1,6 +1,5 @@
-import pytest
-
 from plain.runtime import settings
+from plain.test import raises
 from plain.urls import absolute_url, reverse_absolute
 
 
@@ -23,5 +22,5 @@ def test_absolute_url():
 
 
 def test_absolute_url_requires_base_url():
-    with pytest.raises(ValueError, match="BASE_URL"):
+    with raises(ValueError, match="BASE_URL"):
         absolute_url("/foo/")

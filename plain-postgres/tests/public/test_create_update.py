@@ -8,7 +8,6 @@ Each refuses the wrong lifecycle state, and delete() resets the instance to
 from __future__ import annotations
 
 import psycopg
-import pytest
 from app.examples.models.constraints import ConstraintExample
 from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.querysets import DefaultQuerySetModel
@@ -17,13 +16,14 @@ from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.exceptions import ValidationError
 from plain.postgres import transaction
 from plain.postgres.exceptions import FieldError
+from plain.test import raises
 
 # ===========================================================================
 # create()
 # ===========================================================================
 
 
-def test_create_inserts_and_returns_self(db):
+def test_create_inserts_and_returns_self():
     obj = DefaultQuerySetModel(name="x")
     result = obj.create()
 
@@ -33,18 +33,18 @@ def test_create_inserts_and_returns_self(db):
     assert DefaultQuerySetModel.query.get(id=obj.id).name == "x"
 
 
-def test_create_one_liner(db):
+def test_create_one_liner():
     obj = DefaultQuerySetModel(name="x").create()
     assert obj.id is not None
 
 
-def test_create_on_persisted_instance_raises(db):
+def test_create_on_persisted_instance_raises():
     obj = DefaultQuerySetModel(name="x").create()
-    with pytest.raises(ValueError, match="already persisted"):
+    with raises(ValueError, match="already persisted"):
         obj.create()
 
 
-def test_create_with_hand_set_id_inserts(db):
+def test_create_with_hand_set_id_inserts():
     # A hand-set id is inserted as given -- create() always INSERTs, so it is
     # itself the explicit "insert this id" action.
     obj = DefaultQuerySetModel(name="x")
@@ -55,31 +55,31 @@ def test_create_with_hand_set_id_inserts(db):
     assert DefaultQuerySetModel.query.get(id=990_001).name == "x"
 
 
-def test_create_with_colliding_hand_set_id_raises(db):
+def test_create_with_colliding_hand_set_id_raises():
     # A colliding id is rejected by the database (duplicate primary key). The
     # implicit PK isn't a declared constraint, so it surfaces raw, not mapped.
     existing = DefaultQuerySetModel(name="existing").create()
     clash = DefaultQuerySetModel(name="clash")
     clash.id = existing.id
 
-    with pytest.raises(psycopg.IntegrityError):
+    with raises(psycopg.IntegrityError):
         with transaction.atomic():
             clash.create()
 
     assert DefaultQuerySetModel.query.get(id=existing.id).name == "existing"
 
 
-def test_create_maps_constraint_violation_to_validation_error(db):
+def test_create_maps_constraint_violation_to_validation_error():
     # A declared UniqueConstraint violation maps to ValidationError, same as a
     # pre-check would raise.
     ConstraintExample(name="dup", description="same").create()
 
-    with pytest.raises(ValidationError):
+    with raises(ValidationError):
         with transaction.atomic():
             ConstraintExample(name="dup", description="same").create()
 
 
-def test_create_skips_validation_when_asked(db):
+def test_create_skips_validation_when_asked():
     # clean_and_validate=False still inserts.
     obj = DefaultQuerySetModel(name="x").create(clean_and_validate=False)
     assert obj.id is not None
@@ -90,7 +90,7 @@ def test_create_skips_validation_when_asked(db):
 # ===========================================================================
 
 
-def test_update_writes_and_returns_self(db):
+def test_update_writes_and_returns_self():
     obj = DefaultQuerySetModel(name="x").create()
     obj.name = "y"
     result = obj.update()
@@ -99,13 +99,13 @@ def test_update_writes_and_returns_self(db):
     assert DefaultQuerySetModel.query.get(id=obj.id).name == "y"
 
 
-def test_update_on_new_instance_raises(db):
+def test_update_on_new_instance_raises():
     obj = DefaultQuerySetModel(name="x")
-    with pytest.raises(ValueError, match="hasn't been created"):
+    with raises(ValueError, match="hasn't been created"):
         obj.update()
 
 
-def test_update_fields_writes_only_named(db):
+def test_update_fields_writes_only_named():
     obj = ConstraintExample(name="n1", description="d1").create()
     obj.name = "n2"
     obj.description = "d2"
@@ -116,13 +116,13 @@ def test_update_fields_writes_only_named(db):
     assert refreshed.description == "d1"  # not in update_fields -- left alone
 
 
-def test_update_fields_unknown_field_raises(db):
+def test_update_fields_unknown_field_raises():
     obj = DefaultQuerySetModel(name="x").create()
-    with pytest.raises(ValueError, match="do not exist"):
+    with raises(ValueError, match="do not exist"):
         obj.update(fields=["nope"])
 
 
-def test_update_empty_update_fields_is_noop(db):
+def test_update_empty_update_fields_is_noop():
     obj = ConstraintExample(name="n1", description="d1").create()
     obj.name = "n2"
     obj.update(fields=[])
@@ -130,7 +130,7 @@ def test_update_empty_update_fields_is_noop(db):
     assert ConstraintExample.query.get(id=obj.id).name == "n1"  # nothing written
 
 
-def test_update_deferred_field_auto_excluded(db):
+def test_update_deferred_field_auto_excluded():
     obj = ConstraintExample(name="n1", description="d1").create()
     loaded = ConstraintExample.query.only("name").get(id=obj.id)
     loaded.name = "n2"
@@ -141,21 +141,21 @@ def test_update_deferred_field_auto_excluded(db):
     assert refreshed.description == "d1"  # deferred -- never written
 
 
-def test_update_explicit_deferred_field_raises(db):
+def test_update_explicit_deferred_field_raises():
     obj = ConstraintExample(name="n1", description="d1").create()
     loaded = ConstraintExample.query.only("name").get(id=obj.id)
-    with pytest.raises(FieldError, match="deferred"):
+    with raises(FieldError, match="deferred"):
         loaded.update(fields=["description"])
 
 
-def test_update_no_matching_row_raises(db):
+def test_update_no_matching_row_raises():
     # The row is deleted out from under a persisted instance -- update() has no
     # INSERT fallback, so it raises rather than silently vanishing.
     obj = ConstraintExample(name="n", description="d").create()
     ConstraintExample.query.filter(id=obj.id).delete()
     obj.name = "changed"
 
-    with pytest.raises(psycopg.DatabaseError, match="affected no rows"):
+    with raises(psycopg.DatabaseError, match="affected no rows"):
         with transaction.atomic():
             obj.update()
 
@@ -165,16 +165,16 @@ def test_update_no_matching_row_raises(db):
 # ===========================================================================
 
 
-def test_create_with_unsaved_foreign_key_raises(db):
+def test_create_with_unsaved_foreign_key_raises():
     # Assigning an unsaved related object and writing it would silently lose the
     # FK -- create() refuses (the guard checks every concrete field).
     tag = Tag(name="t").create()
     wt = WidgetTag(widget=Widget(name="unsaved", size="m"), tag=tag)
-    with pytest.raises(ValueError, match="unsaved related object"):
+    with raises(ValueError, match="unsaved related object"):
         wt.create()
 
 
-def test_update_guards_only_the_fields_being_written(db):
+def test_update_guards_only_the_fields_being_written():
     # The guard runs for the FK update() is about to write and skips the rest --
     # exercising the field-name filtering in _prepare_related_fields_for_save.
     widget = Widget(name="w", size="m").create()
@@ -185,7 +185,7 @@ def test_update_guards_only_the_fields_being_written(db):
     wt.widget = Widget(name="unsaved", size="m")
 
     # Writing the widget column hits the guard (and raises before any SQL).
-    with pytest.raises(ValueError, match="unsaved related object"):
+    with raises(ValueError, match="unsaved related object"):
         wt.update(fields=["widget"])
 
     # Writing only the tag column skips the unsaved widget -- it's not in the
@@ -200,7 +200,7 @@ def test_update_guards_only_the_fields_being_written(db):
 # ===========================================================================
 
 
-def test_delete_resets_adding_so_create_reinserts(db):
+def test_delete_resets_adding_so_create_reinserts():
     obj = DefaultQuerySetModel(name="x").create()
     obj.delete()
 
@@ -212,14 +212,14 @@ def test_delete_resets_adding_so_create_reinserts(db):
     assert DefaultQuerySetModel.query.get(id=obj.id).name == "x"
 
 
-def test_update_after_delete_raises(db):
+def test_update_after_delete_raises():
     obj = DefaultQuerySetModel(name="x").create()
     obj.delete()
-    with pytest.raises(ValueError, match="hasn't been created"):
+    with raises(ValueError, match="hasn't been created"):
         obj.update()
 
 
-def test_delete_preserves_field_values_except_id(db):
+def test_delete_preserves_field_values_except_id():
     # delete() clears only the id -- every other field survives so callers can
     # still reference the deleted row (correlate it, log it, filter to confirm
     # it's gone). Server-default fields keep their populated values too.
@@ -241,13 +241,13 @@ def test_delete_preserves_field_values_except_id(db):
     assert not DBDefaultsExample.query.filter(db_uuid=obj.db_uuid).exists()
 
 
-def test_lifecycle_guard_does_not_poison_transaction(db):
+def test_lifecycle_guard_does_not_poison_transaction():
     """create()/update()'s lifecycle guards raise before any SQL (above the
     rollback-marking write block), so catching one inside an open atomic()
     leaves the transaction usable."""
     with transaction.atomic():
         persisted = DefaultQuerySetModel(name="x").create()
-        with pytest.raises(ValueError, match="already persisted"):
+        with raises(ValueError, match="already persisted"):
             persisted.create()  # guard raises before touching the database
 
         # The transaction wasn't marked for rollback -- this still commits.

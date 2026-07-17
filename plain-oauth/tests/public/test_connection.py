@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-import pytest
 from app.users.models import User
 
 from plain.oauth.exceptions import OAuthUserAlreadyExistsError
 from plain.oauth.models import OAuthConnection
 from plain.oauth.providers import OAuthToken, OAuthUser
+from plain.test import raises
 from plain.utils import timezone
 
 PROVIDER = "dummy"
@@ -27,7 +27,7 @@ def make_oauth_user(provider_id="prov-1", email="new@example.com", username="new
     )
 
 
-def test_first_login_creates_user_and_connection(db):
+def test_first_login_creates_user_and_connection():
     connection = OAuthConnection.get_or_create_user(
         provider_key=PROVIDER,
         oauth_token=OAuthToken(access_token="tok-1"),
@@ -41,7 +41,7 @@ def test_first_login_creates_user_and_connection(db):
     assert connection.user.email == "new@example.com"
 
 
-def test_returning_user_reuses_connection_and_updates_token(db):
+def test_returning_user_reuses_connection_and_updates_token():
     first = OAuthConnection.get_or_create_user(
         provider_key=PROVIDER,
         oauth_token=OAuthToken(access_token="tok-1"),
@@ -62,12 +62,12 @@ def test_returning_user_reuses_connection_and_updates_token(db):
     assert second.access_token == "tok-2"
 
 
-def test_existing_email_without_connection_is_rejected(db):
+def test_existing_email_without_connection_is_rejected():
     # A user already registered this email (e.g. via password signup) but has
     # no OAuth connection. Auto-linking would be an account-takeover vector.
     User.query.create(email="taken@example.com", username="existing")
 
-    with pytest.raises(OAuthUserAlreadyExistsError):
+    with raises(OAuthUserAlreadyExistsError):
         OAuthConnection.get_or_create_user(
             provider_key=PROVIDER,
             oauth_token=OAuthToken(access_token="tok"),
@@ -80,7 +80,7 @@ def test_existing_email_without_connection_is_rejected(db):
     assert OAuthConnection.query.count() == 0
 
 
-def test_connect_is_idempotent_for_same_user_and_provider(db):
+def test_connect_is_idempotent_for_same_user_and_provider():
     user = User.query.create(email="u@example.com", username="u")
 
     first = OAuthConnection.connect(
@@ -101,7 +101,7 @@ def test_connect_is_idempotent_for_same_user_and_provider(db):
     assert second.access_token == "b"
 
 
-def test_access_token_expired(db):
+def test_access_token_expired():
     user = User.query.create(email="e@example.com", username="e")
     conn = OAuthConnection.connect(
         user=user,
@@ -120,7 +120,7 @@ def test_access_token_expired(db):
     assert conn.access_token_expired() is False
 
 
-def test_refresh_token_expired(db):
+def test_refresh_token_expired():
     user = User.query.create(email="r@example.com", username="r")
     conn = OAuthConnection.connect(
         user=user,

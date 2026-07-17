@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import pytest
-
 from plain.postgres import types
 from plain.postgres.migrations.autodetector import MigrationAutodetector
 from plain.postgres.migrations.exceptions import MigrationSchemaError
 from plain.postgres.migrations.state import ModelState, ProjectState
+from plain.test import cases, raises
 
 
 def _state_with(model_state: ModelState) -> ProjectState:
@@ -27,9 +26,9 @@ def test_base_type_change_raises() -> None:
         fields=[("created_at", types.UUIDField())],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
-    with pytest.raises(MigrationSchemaError) as exc:
+    with raises(MigrationSchemaError) as exc:
         autodetector._detect_changes()
-    msg = str(exc.value)
+    msg = str(exc.exception)
     assert "thing.created_at" in msg.lower()
     assert "uuid" in msg.lower()
     assert "alter_thing_created_at_type" in msg
@@ -55,13 +54,10 @@ def test_parameter_only_change_succeeds() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    ("from_field", "to_field"),
-    [
-        (types.IntegerField, types.BigIntegerField),
-        (types.SmallIntegerField, types.IntegerField),
-        (types.SmallIntegerField, types.BigIntegerField),
-    ],
+@cases(
+    (types.IntegerField, types.BigIntegerField),
+    (types.SmallIntegerField, types.IntegerField),
+    (types.SmallIntegerField, types.BigIntegerField),
 )
 def test_safe_widening_allowed(from_field, to_field) -> None:
     from_model = ModelState(
@@ -97,9 +93,9 @@ def test_bigint_to_integer_rejected() -> None:
         fields=[("count", types.IntegerField())],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
-    with pytest.raises(MigrationSchemaError) as exc:
+    with raises(MigrationSchemaError) as exc:
         autodetector._detect_changes()
-    msg = str(exc.value).lower()
+    msg = str(exc.exception).lower()
     assert "thing.count" in msg
     assert "bigint" in msg
     assert "integer" in msg

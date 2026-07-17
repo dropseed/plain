@@ -12,12 +12,12 @@ from __future__ import annotations
 import datetime
 import uuid
 
-import pytest
 from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
 
 from plain.postgres import get_connection
 from plain.postgres.fields import DATABASE_DEFAULT
 from plain.postgres.functions import GenRandomUUID, Now
+from plain.test import raises
 
 
 def _column_default(table_name: str, column_name: str) -> str | None:
@@ -34,19 +34,19 @@ def _column_default(table_name: str, column_name: str) -> str | None:
     return row[0] if row else None
 
 
-def test_gen_random_uuid_default_persists_on_column(db):
+def test_gen_random_uuid_default_persists_on_column():
     default = _column_default("examples_dbdefaultsexample", "db_uuid")
     assert default is not None
     assert "gen_random_uuid()" in default
 
 
-def test_now_default_persists_on_column(db):
+def test_now_default_persists_on_column():
     default = _column_default("examples_dbdefaultsexample", "created_at")
     assert default is not None
     assert "statement_timestamp()" in default.lower()
 
 
-def test_raw_insert_omitting_expression_defaulted_columns_succeeds(db):
+def test_raw_insert_omitting_expression_defaulted_columns_succeeds():
     """The whole point of expression defaults: Postgres fills the value."""
     with get_connection().cursor() as cursor:
         cursor.execute(
@@ -61,7 +61,7 @@ def test_raw_insert_omitting_expression_defaulted_columns_succeeds(db):
     assert row[1] is not None
 
 
-def test_raw_insert_produces_unique_uuids(db):
+def test_raw_insert_produces_unique_uuids():
     """`gen_random_uuid()` runs per row, not once — the `ADD COLUMN default`
     bug this design fixes."""
     uuids = []
@@ -79,7 +79,7 @@ def test_raw_insert_produces_unique_uuids(db):
     assert len(set(uuids)) == 5
 
 
-def test_unsaved_instance_holds_sentinel(db):
+def test_unsaved_instance_holds_sentinel():
     """Before save, attribute access returns the DATABASE_DEFAULT sentinel
     rather than evaluating the expression in Python."""
     inst = DBDefaultsExample(name="x")
@@ -87,7 +87,7 @@ def test_unsaved_instance_holds_sentinel(db):
     assert inst.created_at is DATABASE_DEFAULT
 
 
-def test_save_populates_value_via_returning(db):
+def test_save_populates_value_via_returning():
     inst = DBDefaultsExample(name="saved")
     inst.create()
 
@@ -96,7 +96,7 @@ def test_save_populates_value_via_returning(db):
     assert inst.id is not None
 
 
-def test_save_persists_to_database(db):
+def test_save_persists_to_database():
     inst = DBDefaultsExample(name="saved")
     inst.create()
 
@@ -105,7 +105,7 @@ def test_save_persists_to_database(db):
     assert reloaded.created_at == inst.created_at
 
 
-def test_bulk_create_assigns_unique_values_per_row(db):
+def test_bulk_create_assigns_unique_values_per_row():
     rows = DBDefaultsExample.query.bulk_create(
         [DBDefaultsExample(name=f"b-{i}") for i in range(5)]
     )
@@ -117,7 +117,7 @@ def test_bulk_create_assigns_unique_values_per_row(db):
         assert r.id is not None
 
 
-def test_explicit_value_overrides_db_default(db):
+def test_explicit_value_overrides_db_default():
     explicit = uuid.UUID("11111111-2222-3333-4444-555555555555")
     explicit_dt = datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC)
 
@@ -131,7 +131,7 @@ def test_explicit_value_overrides_db_default(db):
     assert reloaded.db_uuid == explicit
 
 
-def test_update_does_not_re_apply_db_default(db):
+def test_update_does_not_re_apply_db_default():
     """After the row exists, updating an unrelated field must not cause
     Postgres (or the ORM) to re-evaluate the DEFAULT expression."""
     inst = DBDefaultsExample(name="row")
@@ -145,7 +145,7 @@ def test_update_does_not_re_apply_db_default(db):
     assert reloaded.name == "renamed"
 
 
-def test_refresh_from_db_returns_persisted_value(db):
+def test_refresh_from_db_returns_persisted_value():
     inst = DBDefaultsExample(name="row")
     inst.create()
     original_uuid = inst.db_uuid
@@ -156,7 +156,7 @@ def test_refresh_from_db_returns_persisted_value(db):
     assert inst.db_uuid == original_uuid
 
 
-def test_validation_skips_sentinel_fields(db):
+def test_validation_skips_sentinel_fields():
     """A field still holding the DATABASE_DEFAULT sentinel has no Python value
     yet, so neither shape validation (full_clean) nor the constraint pre-check
     (validate_constraints) may touch it — the UniqueConstraint over db_uuid
@@ -170,7 +170,7 @@ def test_validation_skips_sentinel_fields(db):
     assert isinstance(inst.db_uuid, uuid.UUID)
 
 
-def test_alter_field_is_no_op_for_default_only_expression_change(db):
+def test_alter_field_is_no_op_for_default_only_expression_change():
     """AlterField that only changes an expression default must be a no-op in
     the schema editor — convergence reconciles the column DEFAULT afterward.
     This keeps the schema editor focused on table/column structure and lets
@@ -208,9 +208,7 @@ def test_alter_field_is_no_op_for_default_only_expression_change(db):
     assert "drop default" not in joined
 
 
-def test_alter_field_nullable_to_not_null_with_expression_default_is_migration_no_op(
-    db,
-):
+def test_alter_field_nullable_to_not_null_with_expression_default_is_migration_no_op():
     """A nullable→NOT NULL transition on a column that already carries an
     expression DEFAULT is a schema-editor no-op. Convergence owns the
     NullabilityDrift (SetNotNullFix blocks if NULL rows exist)."""
@@ -230,7 +228,7 @@ def test_alter_field_nullable_to_not_null_with_expression_default_is_migration_n
     assert editor.executed_sql == []
 
 
-def test_alter_field_renames_column_before_dropping_old_default(db):
+def test_alter_field_renames_column_before_dropping_old_default():
     """When AlterField both renames the column AND changes its type and the
     old field had an expression default, the DROP DEFAULT must use the new
     column name (run after the rename) — otherwise it targets a column
@@ -260,7 +258,7 @@ def test_alter_field_renames_column_before_dropping_old_default(db):
     assert "old_touched_at" not in statements[drop_idx]
 
 
-def test_alter_field_drops_old_expression_default_before_type_change(db):
+def test_alter_field_drops_old_expression_default_before_type_change():
     """ALTER COLUMN TYPE with an incompatible expression DEFAULT in place
     will fail — Postgres can't cast e.g. STATEMENT_TIMESTAMP() to uuid.
     The schema editor must drop the old DEFAULT before the type alter.
@@ -285,7 +283,7 @@ def test_alter_field_drops_old_expression_default_before_type_change(db):
     assert type_idx > drop_idx, "type change must come after DROP DEFAULT"
 
 
-def test_alter_field_literal_default_skips_drop_before_type_change(db):
+def test_alter_field_literal_default_skips_drop_before_type_change():
     """Literal defaults don't need the pre-type-change DROP — the field's
     `db_returning` is False, so only the ALTER TYPE runs. Postgres only
     re-evaluates the DEFAULT on subsequent INSERTs, and convergence reconciles
@@ -328,7 +326,7 @@ def test_modelfield_to_formfield_excludes_expression_defaults():
     assert form_field.initial == "pending"
 
 
-def test_model_to_dict_omits_database_default_fields(db):
+def test_model_to_dict_omits_database_default_fields():
     """model_to_dict is commonly used to seed a Form's `initial` from an
     instance. If a DATABASE_DEFAULT sentinel leaked into that dict, it
     would override the formfield's own initial=None and render the
@@ -344,7 +342,7 @@ def test_model_to_dict_omits_database_default_fields(db):
     assert "created_at" not in as_dict
 
 
-def test_construct_instance_preserves_db_default_on_blank_submission(db):
+def test_construct_instance_preserves_db_default_on_blank_submission():
     """A blank HTML input for a DDE-defaulted field comes through as an
     entry in form.data with a cleaned value of None/empty. construct_instance
     must not overwrite DATABASE_DEFAULT with None in that case — the whole
@@ -381,7 +379,7 @@ def test_construct_instance_preserves_db_default_on_blank_submission(db):
     assert instance.name == "from-form"
 
 
-def test_database_default_singleton_survives_pickling(db):
+def test_database_default_singleton_survives_pickling():
     """`Model().create()` after `pickle.dumps`/`loads` round-trip must still
     work — the sentinel identity check (`is DATABASE_DEFAULT`) drives both
     the descriptor and the INSERT compiler."""
@@ -397,7 +395,7 @@ def test_database_default_singleton_survives_pickling(db):
     assert isinstance(restored.db_uuid, uuid.UUID)
 
 
-def test_explicit_pk_inserts_and_fills_db_defaults(db):
+def test_explicit_pk_inserts_and_fills_db_defaults():
     """A new instance with a hand-set id create()s -- INSERTing that id -- and
     the DB-expression defaults (db_uuid, created_at) are filled by the INSERT's
     RETURNING, not left as the DATABASE_DEFAULT sentinel."""
@@ -438,7 +436,7 @@ def test_uuid_default_kwarg_rejected_at_signature():
     isn't supported; use `generate=True` or set the value explicitly."""
     from plain.postgres import fields as plain_fields
 
-    with pytest.raises(TypeError, match="unexpected keyword argument 'default'"):
+    with raises(TypeError, match="unexpected keyword argument 'default'"):
         plain_fields.UUIDField(default=uuid.uuid4)  # ty: ignore[unknown-argument]
 
 
@@ -447,7 +445,7 @@ def test_datetime_default_kwarg_rejected_at_signature():
     `update_now=True`, or set the value explicitly."""
     from plain.postgres import fields as plain_fields
 
-    with pytest.raises(TypeError, match="unexpected keyword argument 'default'"):
+    with raises(TypeError, match="unexpected keyword argument 'default'"):
         plain_fields.DateTimeField(default=datetime.datetime(2020, 1, 1))  # ty: ignore[unknown-argument]
 
 

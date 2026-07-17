@@ -1,10 +1,9 @@
 from typing import Union
 
-import pytest
-
 from plain.exceptions import ImproperlyConfigured
 from plain.runtime import Secret
 from plain.runtime.user_settings import _parse_env_value
+from plain.test import raises
 
 
 def test_parse_env_value_str_passthrough():
@@ -30,12 +29,12 @@ def test_parse_env_value_list_and_dict_via_json():
 
 
 def test_parse_env_value_invalid_json_raises():
-    with pytest.raises(ImproperlyConfigured, match="Invalid JSON"):
+    with raises(ImproperlyConfigured, match="Invalid JSON"):
         _parse_env_value("not-json", list[str], "FOO")
 
 
 def test_parse_env_value_missing_annotation_raises():
-    with pytest.raises(ImproperlyConfigured, match="Type hint required"):
+    with raises(ImproperlyConfigured, match="Type hint required"):
         _parse_env_value("anything", None, "FOO")
 
 

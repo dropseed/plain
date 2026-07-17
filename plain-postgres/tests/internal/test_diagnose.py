@@ -4,7 +4,7 @@ Covers the 80/20: every check runs cleanly against a real database, the
 deterministic structural checks detect staged scenarios, and the CLI produces
 valid JSON output that reflects live findings.
 
-Scenario tests stage DDL inside the `db` fixture's transaction, so tables,
+Scenario tests stage DDL inside the per-test transaction, so tables,
 indexes, and catalog tweaks all roll back at teardown. Scratch objects use a
 `_diag_` prefix so findings can be located regardless of any baseline state
 in the shared test database.
@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
 from click.testing import CliRunner
 
 from plain.postgres import get_connection
@@ -46,7 +45,6 @@ def _find_check(results: list[CheckResult], name: str) -> CheckResult:
     )
 
 
-@pytest.mark.usefixtures("_unblock_cursor", "db")
 class TestRunAllChecks:
     """Smoke: every check runs against the real test DB without erroring and
     returns a well-formed CheckResult. This is the cheap regression net —
@@ -101,7 +99,6 @@ class TestRunAllChecks:
         assert isinstance(context, dict)
 
 
-@pytest.mark.usefixtures("_unblock_cursor", "db")
 class TestStructuralScenarios:
     """Stage a known problem, run the specific check, assert it fires with
     the right shape. Only covers the four deterministic structural checks —
@@ -293,9 +290,7 @@ class TestStructuralScenarios:
         assert flagged[0]["name"] == "_diag_dup_exact_uuid_idx"
         assert "_diag_dup_exact_unique_uuid" in flagged[0]["detail"]
 
-    def test_duplicate_indexes_detected_when_two_non_unique_match_exactly(
-        self,
-    ) -> None:
+    def test_duplicate_indexes_detected_when_two_non_unique_match_exactly(self) -> None:
         """Two non-unique indexes on identical columns — flag the alphabetically
         later name (deterministic) so we don't double-report or oscillate."""
         _execute('CREATE TABLE "_diag_dup_pair" ("id" serial PRIMARY KEY, "x" int)')
@@ -502,7 +497,6 @@ class TestStructuralScenarios:
         assert flagged[0]["table"] == "_diag_inv"
 
 
-@pytest.mark.usefixtures("_unblock_cursor", "db")
 class TestDiagnoseCLI:
     """End-to-end: the CLI renders real findings. Only the JSON path is
     asserted — human formatting is exercised by hand and not worth snapshot

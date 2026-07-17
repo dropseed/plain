@@ -24,9 +24,8 @@ Preflight (warning):
 
 from __future__ import annotations
 
-import pytest
-
 from plain.exceptions import ImproperlyConfigured
+from plain.test import raises
 from plain.urls import Router, include, path
 from plain.views import View
 
@@ -58,23 +57,23 @@ def test_pattern_name_without_colon_is_silent():
 
 
 def test_duplicate_parameter_name_raises():
-    with pytest.raises(ImproperlyConfigured, match="more than once"):
+    with raises(ImproperlyConfigured, match="more than once"):
         path("items/<int:id>/<int:id>/", _View)
 
 
 def test_duplicate_parameter_name_across_converter_types_raises():
     """Same name, different converter — still a collision."""
-    with pytest.raises(ImproperlyConfigured, match="more than once"):
+    with raises(ImproperlyConfigured, match="more than once"):
         path("items/<int:id>/<slug:id>/", _View)
 
 
 def test_question_mark_in_route_raises():
-    with pytest.raises(ImproperlyConfigured, match=r"'\?' or '#'"):
+    with raises(ImproperlyConfigured, match=r"'\?' or '#'"):
         path("search?q=foo/", _View)
 
 
 def test_hash_in_route_raises():
-    with pytest.raises(ImproperlyConfigured, match=r"'\?' or '#'"):
+    with raises(ImproperlyConfigured, match=r"'\?' or '#'"):
         path("about#contact/", _View)
 
 
@@ -98,7 +97,7 @@ def test_duplicate_namespace_among_includes_raises():
     from plain.urls.resolvers import URLResolver
     from plain.urls.segments import _route_to_segments
 
-    with pytest.raises(ImproperlyConfigured, match="Namespace 'shared'"):
+    with raises(ImproperlyConfigured, match="Namespace 'shared'"):
         URLResolver(
             segments=_route_to_segments(""), raw_route="", router=_ParentRouter()
         )
@@ -127,7 +126,7 @@ def test_duplicate_namespace_through_unnamespaced_include_raises():
     from plain.urls.resolvers import URLResolver
     from plain.urls.segments import _route_to_segments
 
-    with pytest.raises(ImproperlyConfigured, match="Namespace 'shared'"):
+    with raises(ImproperlyConfigured, match="Namespace 'shared'"):
         URLResolver(
             segments=_route_to_segments(""), raw_route="", router=_ParentRouter()
         )

@@ -12,7 +12,7 @@ from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.relationships import Tag, Widget
 
 
-def test_forward_fk_filter_by_instance(db):
+def test_forward_fk_filter_by_instance():
     parent = DeleteParent(name="p")
     parent.create()
     child = ChildCascade(parent=parent)
@@ -21,7 +21,7 @@ def test_forward_fk_filter_by_instance(db):
     assert list(ChildCascade.query.filter(parent=parent)) == [child]
 
 
-def test_reverse_fk_filter_by_instance(db):
+def test_reverse_fk_filter_by_instance():
     parent = DeleteParent(name="p")
     parent.create()
     child = ChildCascade(parent=parent)
@@ -30,7 +30,7 @@ def test_reverse_fk_filter_by_instance(db):
     assert list(DeleteParent.query.filter(childcascade=child)) == [parent]
 
 
-def test_reverse_fk_filter_in(db):
+def test_reverse_fk_filter_in():
     parent = DeleteParent(name="p")
     parent.create()
     child = ChildCascade(parent=parent)
@@ -39,7 +39,7 @@ def test_reverse_fk_filter_in(db):
     assert list(DeleteParent.query.filter(childcascade__in=[child])) == [parent]
 
 
-def test_forward_m2m_filter_by_instance(db):
+def test_forward_m2m_filter_by_instance():
     widget = Widget(name="w", size="m")
     widget.create()
     tag = Tag(name="t")
@@ -49,7 +49,7 @@ def test_forward_m2m_filter_by_instance(db):
     assert list(Widget.query.filter(tags=tag)) == [widget]
 
 
-def test_reverse_m2m_filter_by_instance(db):
+def test_reverse_m2m_filter_by_instance():
     widget = Widget(name="w", size="m")
     widget.create()
     tag = Tag(name="t")
@@ -64,7 +64,7 @@ def test_reverse_m2m_filter_by_instance(db):
 # trim_start, a distinct subquery-building path from the filter() lookups above.
 
 
-def test_exclude_across_reverse_fk(db):
+def test_exclude_across_reverse_fk():
     p1 = DeleteParent(name="p1")
     p1.create()
     child = ChildCascade(parent=p1)
@@ -76,7 +76,7 @@ def test_exclude_across_reverse_fk(db):
     assert set(DeleteParent.query.exclude(childcascade=child)) == {p2}
 
 
-def test_exclude_across_m2m(db):
+def test_exclude_across_m2m():
     w1 = Widget(name="w1", size="m")
     w1.create()
     tag = Tag(name="t")

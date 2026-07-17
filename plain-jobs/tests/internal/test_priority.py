@@ -6,7 +6,7 @@ from plain.jobs.models import JobRequest
 from plain.utils import timezone
 
 
-def test_higher_priority_jobs_ordered_first(db):
+def test_higher_priority_jobs_ordered_first():
     """Higher priority number = higher priority = should come first in queries."""
     now = timezone.now()
 
@@ -32,7 +32,7 @@ def test_higher_priority_jobs_ordered_first(db):
     assert jobs[2].id == low.id
 
 
-def test_same_priority_ordered_by_created_at_descending(db):
+def test_same_priority_ordered_by_created_at_descending():
     """Jobs with the same priority should be ordered newest first (default ordering)."""
     now = timezone.now()
 
@@ -58,7 +58,7 @@ def test_same_priority_ordered_by_created_at_descending(db):
     assert jobs[2].id == first.id
 
 
-def test_worker_ordering_priority_then_created_at(db):
+def test_worker_ordering_priority_then_created_at():
     """The worker query orders by -priority, -start_at, -created_at."""
     now = timezone.now()
 

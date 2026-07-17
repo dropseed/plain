@@ -1,8 +1,7 @@
+import functools
 import json
 import logging
 from io import StringIO
-
-import pytest
 
 from plain.logs import app_logger, get_framework_logger
 from plain.logs.configure import configure_logging
@@ -10,9 +9,43 @@ from plain.logs.formatters import JSONFormatter, KeyValueFormatter
 from plain.logs.logger import PlainLogger
 
 
+def cleanup_loggers(func):
+    """Clean up loggers after each test to avoid interference.
+
+    Only delete loggers tests in this file created (`test`, `test.*`,
+    `plain.test.*`). Framework-owned names like `plain.request`,
+    `plain.security.*`, and `plain.server.access` stay in the registry
+    so other tests — and framework code holding module-level Logger
+    references — keep agreeing with `logging.getLogger`.
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        finally:
+            for logger_name in list(logging.root.manager.loggerDict.keys()):
+                if (
+                    logger_name == "test"
+                    or logger_name.startswith("test.")
+                    or logger_name.startswith("plain.test")
+                ):
+                    del logging.root.manager.loggerDict[logger_name]
+
+            # Clear handlers from framework loggers that tests in this file
+            # attach to directly.
+            for logger_name in ["plain", "app"]:
+                logger = logging.getLogger(logger_name)
+                for handler in logger.handlers[:]:
+                    logger.removeHandler(handler)
+
+    return wrapper
+
+
 class TestLoggingConfiguration:
     """Test that logging configuration sets up loggers correctly."""
 
+    @cleanup_loggers
     def test_configure_logging_basic(self):
         """Test basic logging configuration."""
         configure_logging(
@@ -32,6 +65,7 @@ class TestLoggingConfiguration:
         # app_logger is a PlainLogger, plain logger is a standard Logger
         assert isinstance(app_logger, PlainLogger)
 
+    @cleanup_loggers
     def test_nested_logger_inheritance(self):
         """Test that nested loggers inherit settings from parent loggers."""
         configure_logging(
@@ -47,6 +81,7 @@ class TestLoggingConfiguration:
         assert plain_nested.getEffectiveLevel() == logging.ERROR
         assert app_nested.getEffectiveLevel() == logging.DEBUG
 
+    @cleanup_loggers
     def test_plain_logger_structured_output(self):
         """Test that the plain logger produces structured output via parent handlers."""
         stream = StringIO()
@@ -79,15 +114,17 @@ class TestLoggingConfiguration:
 class TestLoggerFormats:
     """Test different logging formats work correctly."""
 
-    def setup_method(self):
+    def _reset_handlers(self):
         """Reset logging configuration before each test."""
         for logger_name in ["plain", "app"]:
             logger = logging.getLogger(logger_name)
             for handler in logger.handlers[:]:
                 logger.removeHandler(handler)
 
+    @cleanup_loggers
     def test_json_format_output(self):
         """Test JSON format produces valid JSON."""
+        self._reset_handlers()
         stream = StringIO()
         handler = logging.StreamHandler(stream)
         handler.setFormatter(JSONFormatter("%(json)s"))
@@ -107,8 +144,10 @@ class TestLoggerFormats:
         assert parsed["key"] == "value"
         assert "timestamp" in parsed
 
+    @cleanup_loggers
     def test_keyvalue_format_output(self):
         """Test KV format produces key-value pairs with proper escaping."""
+        self._reset_handlers()
         stream = StringIO()
         handler = logging.StreamHandler(stream)
         handler.setFormatter(
@@ -138,6 +177,7 @@ class TestLoggerFormats:
 class TestPlainLogger:
     """Test PlainLogger specific functionality."""
 
+    @cleanup_loggers
     def test_app_logger_instance_and_kwargs(self):
         """Test PlainLogger instance and kwargs functionality."""
         assert isinstance(app_logger, PlainLogger)
@@ -157,6 +197,7 @@ class TestPlainLogger:
         assert parsed["user_id"] == 123
         assert parsed["action"] == "login"
 
+    @cleanup_loggers
     def test_context_management(self):
         """Test PlainLogger context management and restoration."""
         stream = StringIO()
@@ -197,6 +238,7 @@ class TestPlainLogger:
 
         assert logger.context == original_context
 
+    @cleanup_loggers
     def test_standard_logging_features(self):
         """Test standard logging features like exc_info work correctly."""
         stream = StringIO()
@@ -221,6 +263,7 @@ class TestPlainLogger:
         assert "exception" in parsed
         assert "ValueError: Test exception" in parsed["exception"]
 
+    @cleanup_loggers
     def test_extra_and_context_both_appear(self):
         """Test that both extra and context params merge into output."""
         stream = StringIO()
@@ -241,6 +284,7 @@ class TestPlainLogger:
         assert parsed["from_extra"] == "yes"
         assert parsed["from_context"] == "yes"
 
+    @cleanup_loggers
     def test_force_debug_functionality(self):
         """Test debug mode forcing and reference counting."""
         stream = StringIO()
@@ -280,6 +324,7 @@ class TestPlainLogger:
 class TestGetFrameworkLogger:
     """Test the get_framework_logger factory function."""
 
+    @cleanup_loggers
     def test_auto_name(self):
         """Test that get_framework_logger() derives name from caller's module."""
         log = get_framework_logger()
@@ -288,17 +333,20 @@ class TestGetFrameworkLogger:
         expected = ".".join(parts[:2]) if len(parts) >= 2 else parts[0]
         assert log.name == expected
 
+    @cleanup_loggers
     def test_explicit_name(self):
         """Test that get_framework_logger() with explicit name uses it directly."""
         log = get_framework_logger("plain.server.access")
         assert log.name == "plain.server.access"
 
+    @cleanup_loggers
     def test_returns_same_instance(self):
         """Test that repeated calls return the same logger instance."""
         log1 = get_framework_logger("plain.test.same")
         log2 = get_framework_logger("plain.test.same")
         assert log1 is log2
 
+    @cleanup_loggers
     def test_structured_output_via_extra(self):
         """Test that framework loggers produce structured output via extra=context."""
         stream = StringIO()
@@ -319,6 +367,7 @@ class TestGetFrameworkLogger:
 class TestLogLevels:
     """Test that log levels work correctly."""
 
+    @cleanup_loggers
     def test_log_level_filtering(self):
         """Test that log levels filter messages correctly."""
         stream = StringIO()
@@ -340,31 +389,3 @@ class TestLogLevels:
         assert "ERROR: Error message" in output
         assert "Debug message" not in output
         assert "Info message" not in output
-
-
-@pytest.fixture(autouse=True)
-def cleanup_loggers():
-    """Clean up loggers after each test to avoid interference.
-
-    Only delete loggers tests in this file created (`test`, `test.*`,
-    `plain.test.*`). Framework-owned names like `plain.request`,
-    `plain.security.*`, and `plain.server.access` stay in the registry
-    so other tests — and framework code holding module-level Logger
-    references — keep agreeing with `logging.getLogger`.
-    """
-    yield
-
-    for logger_name in list(logging.root.manager.loggerDict.keys()):
-        if (
-            logger_name == "test"
-            or logger_name.startswith("test.")
-            or logger_name.startswith("plain.test")
-        ):
-            del logging.root.manager.loggerDict[logger_name]
-
-    # Clear handlers from framework loggers that tests in this file
-    # attach to directly.
-    for logger_name in ["plain", "app"]:
-        logger = logging.getLogger(logger_name)
-        for handler in logger.handlers[:]:
-            logger.removeHandler(handler)

@@ -4,14 +4,14 @@ attachments, HTML alternatives, and header-injection protection.
 
 from __future__ import annotations
 
-import pytest
-
 from plain.email import send_mail
 from plain.email.message import (
     BadHeaderError,
     EmailMessage,
     EmailMultiAlternatives,
 )
+from plain.email.test import outbox
+from plain.test import override_settings, raises
 
 
 def test_message_sets_core_headers():
@@ -62,10 +62,10 @@ def test_bcc_is_not_exposed_in_headers():
     assert "secret@example.com" not in msg.as_string()
 
 
-def test_default_from_email_is_used(settings):
-    settings.EMAIL_DEFAULT_FROM = "default@example.com"
-    email = EmailMessage(subject="Hi", body="Body", to=["to@example.com"])
-    assert email.message()["From"] == "default@example.com"
+def test_default_from_email_is_used():
+    with override_settings(EMAIL_DEFAULT_FROM="default@example.com"):
+        email = EmailMessage(subject="Hi", body="Body", to=["to@example.com"])
+        assert email.message()["From"] == "default@example.com"
 
 
 def test_header_injection_is_blocked():
@@ -77,12 +77,12 @@ def test_header_injection_is_blocked():
         from_email="from@example.com",
         to=["to@example.com"],
     )
-    with pytest.raises(BadHeaderError):
+    with raises(BadHeaderError):
         email.message()
 
 
 def test_string_recipient_is_rejected():
-    with pytest.raises(TypeError):
+    with raises(TypeError):
         EmailMessage(
             subject="Hi",
             body="Body",
@@ -124,7 +124,7 @@ def test_html_alternative_produces_multipart_alternative():
     assert payload_types == {"text/plain", "text/html"}
 
 
-def test_send_mail_with_html_message_captured(mailoutbox):
+def test_send_mail_with_html_message_captured():
     send_mail(
         "Subject",
         "Plain body",
@@ -133,7 +133,7 @@ def test_send_mail_with_html_message_captured(mailoutbox):
         html_message="<p>HTML body</p>",
     )
 
-    assert len(mailoutbox) == 1
-    sent = mailoutbox[0]
+    assert len(outbox) == 1
+    sent = outbox[0]
     assert sent.body == "Plain body"
     assert ("<p>HTML body</p>", "text/html") in sent.alternatives

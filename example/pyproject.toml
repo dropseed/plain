@@ -25,7 +25,7 @@ dependencies = [
   "plain-oauth",
   "plain-pages",
   "plain-passwords",
-  "plain-pytest",
+  "plain-testing",
   "plain-redirection",
   "plain-scan",
   "plain-sessions",
