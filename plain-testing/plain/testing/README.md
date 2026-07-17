@@ -42,9 +42,9 @@ Run it with `plain test`:
 plain test
 ```
 
-There are no fixtures, no `conftest.py`, and no plugins. Everything a test uses is either an explicit import, an explicit `with` block, or something the framework does for every test automatically (like wrapping it in a database transaction). If you can read the test file, you know everything that happens.
+Everything a test uses is either an explicit import, an explicit `with` block, or something the framework does for every test automatically (like wrapping it in a database transaction). If you can read the test file, you know everything that happens.
 
-Because Plain owns the runner, your tests get things a general-purpose runner can't do: every test runs inside OpenTelemetry capture, so failures report the queries and spans behind them; the runner knows your URL routes, so it can tell you which ones are untested; and the database, email outbox, and cache are isolated per test without any setup on your part.
+And because the runner is part of the framework, it knows your whole stack: every test runs inside OpenTelemetry capture, so failures report the queries and spans behind them; the runner knows your URL routes, so it can tell you which ones are untested; and the database, email outbox, and cache are isolated per test without any setup on your part.
 
 The guiding rule for the API: **decorators declare, bodies acquire.** Decorators attach static facts to a test (its cases, its tags, its timeout). Runtime state — settings overrides, frozen time, captured spans — always enters through a `with` block or a function call in the body, where you can see its scope.
 
@@ -54,7 +54,7 @@ Tests live in `tests/` and follow the conventions you already know:
 
 - Files named `test_*.py` (searched recursively)
 - Functions named `test_*`
-- `async def test_*` works natively — no plugin, no decorator. Async tests run with the same executor semantics as the production server.
+- `async def test_*` works natively, with the same executor semantics as the production server.
 
 ```python
 # tests/test_signup.py
@@ -94,7 +94,7 @@ def test_dashboard_requires_login():
     assert client.get("/dashboard/").status_code == 200
 ```
 
-There is no `conftest.py` and no fixture injection. If a test needs something, it imports it or builds it — nothing arrives through argument names.
+If a test needs something, it imports it or builds it — everything in a test file traces back to a name you can see.
 
 ## Assertions
 
@@ -161,7 +161,7 @@ def test_big_import(): ...
 - `@tag(name)` — labels for selection: `plain test --tag slow` or `plain test --exclude-tag slow`.
 - `@timeout(seconds)` — per-test override of the runner's default timeout.
 
-That's the whole decorator surface. There is no general "marks" system — tags plus file paths cover selection, and anything dynamic belongs in the test body.
+That's the whole decorator surface — anything dynamic belongs in the test body.
 
 ## Overriding context
 
@@ -208,13 +208,13 @@ If `plain.postgres` is installed, every test gets an isolated database automatic
 - Each worker process gets its own fast clone of the template (`CREATE DATABASE ... TEMPLATE ...`).
 - Each test runs inside a transaction that is rolled back afterward.
 
-The transaction is opened lazily, on the first database connection checkout — so tests that never touch the database pay nothing. There is no `db` fixture to request and no "database access not allowed" guard to trip over; the runner knows whether you used the database because it owns the connection.
+The transaction is opened lazily, on the first database connection checkout — so tests that never touch the database pay nothing, and tests that do are isolated automatically. The runner owns the connection, so it always knows which kind of test it's running.
 
 Tests that need a real, separately-connectable database (a live server in a browser test, connection behavior itself) get a dedicated database instead of a rolled-back transaction — see [Browser testing](#browser-testing).
 
 ## Package test helpers
 
-Installed Plain packages expose their test helpers under `plain.<package>.test` — explicit imports, no global registration:
+Installed Plain packages expose their test helpers under `plain.<package>.test`:
 
 ```python
 from plain.email.test import outbox
@@ -323,7 +323,7 @@ FLAKY tests/test_webhooks.py::test_delivery_retry
     Flaky tests are failures. Re-run: plain test tests/test_webhooks.py::test_delivery_retry --shuffle 8471
 ```
 
-A flake is a bug report about the test, not noise to suppress. There is no "retry until green" mode. Disable re-running entirely with `--no-rerun` (useful when a failure is expected and you want the fastest loop).
+A flake is a bug report about the test, not noise to suppress. Disable re-running entirely with `--no-rerun` (useful when a failure is expected and you want the fastest loop).
 
 ## Performance assertions
 
@@ -454,7 +454,7 @@ class TestLifecycle:  # protocol, defined in plain.test
     def teardown_worker(self): ...
 ```
 
-`plain.postgres` builds the template database and wraps each test in a lazy rolled-back transaction. `plain.email` resets the outbox. `plain.cache` isolates the cache. The engine discovers and drives them; the packages never import the engine. This entry point group is the **entire** extension API — there are no other hooks.
+`plain.postgres` builds the template database and wraps each test in a lazy rolled-back transaction. `plain.email` resets the outbox. `plain.cache` isolates the cache. The engine discovers and drives them; the packages never import the engine. This entry point group is the **entire** extension API.
 
 The dependency arrows only point one way:
 
