@@ -34,6 +34,7 @@ dev = [
   "plain-sessions",
   "plain-tailwind",
   "plain-templates",
+  "plain-testing",
   "plain-toolbar",
   "plain-tunnel",
   "plain-vendor",
@@ -72,6 +73,7 @@ dev = [
 "plain-sessions" = { workspace = true }
 "plain-tailwind" = { workspace = true }
 "plain-templates" = { workspace = true }
+"plain-testing" = { workspace = true }
 "plain-toolbar" = { workspace = true }
 "plain-tunnel" = { workspace = true }
 "plain-vendor" = { workspace = true }

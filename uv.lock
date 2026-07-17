@@ -35,6 +35,7 @@ members = [
     "plain-start",
     "plain-tailwind",
     "plain-templates",
+    "plain-testing",
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
@@ -1495,6 +1496,23 @@ requires-dist = [
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
+name = "plain-testing"
+version = "0.1.0"
+source = { editable = "plain-testing" }
+dependencies = [
+    { name = "click" },
+    { name = "opentelemetry-sdk" },
+    { name = "plain" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "click", specifier = ">=8.0.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
+    { name = "plain", editable = "plain" },
+]
+
+[[package]]
 name = "plain-toolbar"
 version = "0.13.0"
 source = { editable = "plain-toolbar" }
@@ -1591,6 +1609,7 @@ dev = [
     { name = "plain-sessions" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
+    { name = "plain-testing" },
     { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
@@ -1631,6 +1650,7 @@ dev = [
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-templates", editable = "plain-templates" },
+    { name = "plain-testing", editable = "plain-testing" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },
