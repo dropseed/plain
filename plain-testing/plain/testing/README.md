@@ -469,7 +469,7 @@ Since entry points are just strings in `pyproject.toml`, a package like `plain-p
 
 ## Migrating from pytest
 
-Test bodies survive untouched — bare `assert` and `Client` are the same. What changes is the machinery around them:
+This is Plain's test runner — there's exactly one, and upgrading an existing project (which will have used pytest via the retired `plain.pytest` package) is a one-time, automated migration. Test bodies survive untouched — bare `assert` and `Client` are the same. What changes is the machinery around them:
 
 | pytest | plain.testing |
 | --- | --- |
@@ -491,8 +491,6 @@ Test bodies survive untouched — bare `assert` and `Client` are the same. What 
 
 The rewrites are mechanical, and the `/plain-upgrade` agent handles them. Anything it can't map — an un-absorbed pytest plugin, an unusual fixture — it reports instead of silently dropping.
 
-`plain.pytest` remains available during the transition; the two runners can coexist in a project while you migrate.
-
 ## FAQs
 
 #### Why is the package named `plain.testing` when I import from `plain.test`?
@@ -505,7 +503,7 @@ Yes — `coverage run -m plain.testing` works like any other Python entry point,
 
 #### Can I use pytest plugins?
 
-No — this is not pytest, and there is no plugin system to load them into. The most common plugins are features of the runner (see the migration table). If a plugin you rely on has no equivalent, that's useful feedback — and `plain.pytest` still exists.
+No — this is not pytest, and there is no plugin system to load them into. The most common plugins are features of the runner (see the migration table). If a plugin you rely on has no equivalent, that's useful feedback.
 
 #### How do I debug a failing test?
 
