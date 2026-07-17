@@ -23,6 +23,11 @@ __all__ = ["TestLifecycle"]
 
 
 class TestLifecycle:
+    # When set, the lifecycle only loads if this package is in the app's
+    # INSTALLED_PACKAGES — the entry point is importable whenever the package
+    # is in the environment, which is a wider net than "the app uses it".
+    required_package: str | None = None
+
     def setup_worker(self) -> None:
         """Called once per worker process, before any tests run."""
 

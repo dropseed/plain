@@ -10,17 +10,11 @@ redirect back to the list and the resulting database rows.
 from __future__ import annotations
 
 from app.users.models import User
+from helpers import make_admin_client
 
 from plain.test import Client
 
 LIST_URL = "/admin/p/user"
-
-
-def make_admin_client() -> Client:
-    user = User.query.create(username="admin", is_admin=True)
-    client = Client()
-    client.force_login(user)
-    return client
 
 
 def run_action(client: Client, action_ids: str):

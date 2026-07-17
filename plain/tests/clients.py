@@ -1,7 +1,6 @@
 from contextlib import contextmanager
 
-from plain.runtime import settings
-from plain.test import Client
+from plain.test import Client, override_settings
 from plain.urls.resolvers import _get_cached_resolver
 
 
@@ -16,24 +15,22 @@ def _swap_router(
     helpers that exercise the global default explicitly pass
     `urls_trailing_slash=False`.
     """
-    original = settings.URLS_ROUTER
-    original_debug = settings.DEBUG
-    original_ts = settings.URLS_TRAILING_SLASH
-    settings.URLS_ROUTER = router_path
-    settings.DEBUG = debug
-    settings.URLS_TRAILING_SLASH = urls_trailing_slash
-    _get_cached_resolver.cache_clear()
     try:
-        client = Client(raise_request_exception=False)
-        # Middleware chain was built on init with the old router; rebuild it
-        # after the settings swap.
-        client.handler._middleware_chain = None
-        client.handler.load_middleware()
-        yield client
+        with override_settings(
+            URLS_ROUTER=router_path,
+            DEBUG=debug,
+            URLS_TRAILING_SLASH=urls_trailing_slash,
+        ):
+            _get_cached_resolver.cache_clear()
+            client = Client(raise_request_exception=False)
+            # Middleware chain was built on init with the old router; rebuild it
+            # after the settings swap.
+            client.handler._middleware_chain = None
+            client.handler.load_middleware()
+            yield client
     finally:
-        settings.URLS_ROUTER = original
-        settings.DEBUG = original_debug
-        settings.URLS_TRAILING_SLASH = original_ts
+        # Settings are restored by override_settings; clear the resolver
+        # cache again so the original router is re-resolved.
         _get_cached_resolver.cache_clear()
 
 

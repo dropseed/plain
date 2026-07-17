@@ -59,9 +59,8 @@ class ClientResponse:
         response: Response,
         client: Client,
     ):
-        # Store wrapped response in __dict__ directly to avoid __setattr__ recursion
-        object.__setattr__(self, "_response", response)
-        object.__setattr__(self, "_json_cache", None)
+        self._response = response
+        self._json_cache: Any = None
         # Test-specific attributes
         self.client = client
         self.request: Request
@@ -71,64 +70,41 @@ class ClientResponse:
     @property
     def text(self) -> str:
         """Response content decoded as a string."""
-        response = object.__getattribute__(self, "_response")
-        return response.content.decode(response.charset)
+        return self._response.content.decode(self._response.charset)
 
     @property
     def body(self) -> bytes:
         """Raw response content."""
-        response = object.__getattribute__(self, "_response")
-        return response.content
+        return self._response.content
 
     @property
     def json_data(self) -> Any:
         """Response content parsed as JSON (requires a JSON content type)."""
-        _json_cache = object.__getattribute__(self, "_json_cache")
-        if _json_cache is None:
-            response = object.__getattribute__(self, "_response")
-            content_type = response.headers.get("Content-Type", "")
+        if self._json_cache is None:
+            content_type = self._response.headers.get("Content-Type", "")
             if not _JSON_CONTENT_TYPE_RE.match(content_type):
                 raise ValueError(
                     f'Content-Type header is "{content_type}", not "application/json"'
                 )
-            _json_cache = json.loads(response.content.decode(response.charset))
-            object.__setattr__(self, "_json_cache", _json_cache)
-        return _json_cache
+            self._json_cache = json.loads(
+                self._response.content.decode(self._response.charset)
+            )
+        return self._json_cache
 
     @property
     def redirect_to(self) -> str | None:
         """The redirect target if this is a 3xx response, otherwise None."""
-        response = object.__getattribute__(self, "_response")
-        if 300 <= response.status_code < 400:
-            return response.headers.get("Location")
+        if 300 <= self._response.status_code < 400:
+            return self._response.headers.get("Location")
         return None
-
-    @property
-    def url(self) -> str:
-        """
-        Return redirect URL if this is a redirect response.
-
-        This property exists on RedirectResponse and is added for redirects.
-        """
-        response = object.__getattribute__(self, "_response")
-        if hasattr(response, "url"):
-            return response.url
-        # For non-redirect responses, try to get Location header
-        if "Location" in response.headers:
-            return response.headers["Location"]
-        raise AttributeError(f"{response.__class__.__name__} has no attribute 'url'")
 
     def __getattr__(self, name: str) -> Any:
         """Delegate attribute access to the wrapped response."""
-        return getattr(object.__getattribute__(self, "_response"), name)
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        """Set attributes on the wrapper itself."""
-        object.__setattr__(self, name, value)
+        return getattr(self.__dict__["_response"], name)
 
     def __repr__(self) -> str:
         """Return repr of wrapped response."""
-        return repr(object.__getattribute__(self, "_response"))
+        return repr(self._response)
 
 
 class FakePayload(IOBase):
@@ -427,9 +403,31 @@ class RequestFactory:
 
         return request
 
-    def request(self, **kwargs: Any) -> Request:
-        "Construct a generic request object."
-        return self._build_request(**kwargs)
+    def request(
+        self,
+        *,
+        method: str,
+        path: str,
+        data: bytes = b"",
+        content_type: str = "",
+        query_string: str = "",
+        secure: bool = True,
+        server_name: str = "testserver",
+        server_port: str = "",
+        headers: dict[str, str] | None = None,
+    ) -> Request:
+        "Construct a request with an arbitrary method."
+        return self._build_request(
+            method=method,
+            path=path,
+            data=data,
+            content_type=content_type,
+            query_string=query_string,
+            secure=secure,
+            server_name=server_name,
+            server_port=server_port,
+            headers=headers,
+        )
 
     def get(
         self,
@@ -943,7 +941,9 @@ class Client:
         """
         response.redirect_chain = []
         while response.status_code in _REDIRECT_STATUS_CODES:
-            response_url = response.url
+            response_url = response.redirect_to
+            if response_url is None:
+                break  # a 3xx without a Location header — nowhere to go
             redirect_chain = response.redirect_chain
             redirect_chain.append((response_url, response.status_code))
 

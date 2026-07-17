@@ -45,9 +45,8 @@ class raises:
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> bool:
-        expected_names = " or ".join(e.__name__ for e in self.expected)
-
         if exc_type is None:
+            expected_names = " or ".join(e.__name__ for e in self.expected)
             raise AssertionError(f"{expected_names} was not raised")
 
         if not issubclass(exc_type, self.expected):

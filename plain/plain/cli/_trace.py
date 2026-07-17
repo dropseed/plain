@@ -324,7 +324,7 @@ def analyze_trace(
 
 
 def capture_available() -> bool:
-    """Whether `capture_spans` can run — the OpenTelemetry SDK must be installed.
+    """Whether `capture_trace_spans` can run — the OpenTelemetry SDK must be installed.
 
     The SDK is not a Plain core dependency; it ships with `plain.connect`
     and `plain.testing`.
@@ -333,7 +333,7 @@ def capture_available() -> bool:
 
 
 @contextmanager
-def capture_spans() -> Generator[InMemorySpanExporter]:
+def capture_trace_spans() -> Generator[InMemorySpanExporter]:
     """Capture every span emitted within the block, in isolation.
 
     For the duration of the block the active tracer provider records every

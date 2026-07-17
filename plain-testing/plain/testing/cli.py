@@ -17,8 +17,8 @@ from plain.cli.runtime import common_command
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 def cli(args: tuple[str, ...]) -> None:
     """Run tests"""
-    # Re-exec into a fresh process so PLAIN_ENV=test is set before the
-    # runtime loads settings (the `plain` CLI has already run setup() by the
-    # time a subcommand dispatches).
+    # Re-exec into a fresh process so the runner owns the setup decision (app
+    # vs library mode) instead of inheriting this process's already-completed
+    # setup, and so the run starts from clean interpreter state.
     os.environ.setdefault("PLAIN_ENV", "test")
     os.execvp(sys.executable, [sys.executable, "-m", "plain.testing", *args])

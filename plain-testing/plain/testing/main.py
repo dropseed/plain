@@ -30,6 +30,8 @@ def main(
     os.environ.setdefault("PLAIN_ENV", "test")
     _load_dotenv()
 
+    import plain.runtime
+
     from .collection import CollectionError, collect_tests
     from .lifecycles import load_lifecycles
     from .reporting import Reporter
@@ -37,19 +39,22 @@ def main(
 
     # App mode: a resolvable Plain app gets the full lifecycle. Library mode:
     # no app, kernel only — collection, assertions, and runner still work.
-    app_mode = (Path.cwd() / "app").exists() or os.environ.get("PLAIN_SETTINGS_MODULE")
-    if app_mode:
-        import plain.runtime
-
+    # The runtime is the authority on whether there's an app.
+    try:
         plain.runtime.setup()
-        lifecycles = load_lifecycles()
-    else:
+    except plain.runtime.AppPathNotFound:
         lifecycles = []
+        exclude_dirs: tuple[str, ...] = ()
+    else:
+        lifecycles = load_lifecycles()
+        # The Plain `app` directory isn't a place tests live — a convention
+        # the runner knows, not the collection kernel.
+        exclude_dirs = ("app",)
 
     reporter = Reporter(verbose=verbose)
 
     try:
-        tests = collect_tests(list(targets))
+        tests = collect_tests(list(targets), exclude_dirs=exclude_dirs)
     except CollectionError as e:
         click.secho(f"Collection error in {e.path}:", fg="red", bold=True, err=True)
         click.echo(f"  {e.error!r}", err=True)

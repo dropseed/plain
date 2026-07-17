@@ -188,6 +188,10 @@ def rewrite_asserts(tree: ast.Module) -> ast.Module:
         ],
         level=0,
     )
+    # Locate just the injected node — the rewritten asserts already carry
+    # locations, so a whole-tree fix_missing_locations pass isn't needed.
+    if tree.body:
+        ast.copy_location(formatter_import, tree.body[0])
+    ast.fix_missing_locations(formatter_import)
     tree.body.insert(insert_at, formatter_import)
-    ast.fix_missing_locations(tree)
     return tree

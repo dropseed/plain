@@ -15,7 +15,7 @@ from ._trace import (
     TraceResult,
     analyze_trace,
     capture_available,
-    capture_spans,
+    capture_trace_spans,
 )
 
 _HTTP_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE")
@@ -250,7 +250,7 @@ def request(
         # not a Plain core dependency).
         trace_result: TraceResult | None
         if capture_available():
-            with capture_spans() as otel_exporter:
+            with capture_trace_spans() as otel_exporter:
                 response = _dispatch_request(client, method, path, kwargs)
             trace_result = analyze_trace(
                 otel_exporter.get_finished_spans(), app_root=os.getcwd()

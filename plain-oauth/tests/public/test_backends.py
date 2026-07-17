@@ -32,7 +32,7 @@ def test_single_backend():
     with override_settings(
         OAUTH_LOGIN_PROVIDERS={
             "dummy": {
-                "class": "test_backends.DummyProvider",
+                "class": f"{__name__}.DummyProvider",
                 "kwargs": {
                     "client_id": "dummy_client_id",
                     "client_secret": "dummy_client_secret",
@@ -56,7 +56,7 @@ def test_multiple_backends():
     with override_settings(
         OAUTH_LOGIN_PROVIDERS={
             "dummy": {
-                "class": "test_backends.DummyProvider",
+                "class": f"{__name__}.DummyProvider",
                 "kwargs": {
                     "client_id": "dummy_client_id",
                     "client_secret": "dummy_client_secret",

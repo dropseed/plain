@@ -10,7 +10,6 @@ import concurrent.futures
 import threading
 from typing import Any
 
-from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.trace import NoOpTracer
 from psycopg_pool import PoolTimeout
 
@@ -26,19 +25,6 @@ from plain.test.otel import install_test_meter
 # observations land on it.
 install_test_meter()
 register_pool_observables(runtime_pool_source)
-
-
-def _metric_points(reader: InMemoryMetricReader, metric_name: str) -> list[Any]:
-    data = reader.get_metrics_data()
-    points: list[Any] = []
-    if data is None:
-        return points
-    for resource_metric in data.resource_metrics:
-        for scope_metric in resource_metric.scope_metrics:
-            for metric in scope_metric.metrics:
-                if metric.name == metric_name:
-                    points.extend(metric.data.data_points)
-    return points
 
 
 class TestQuerySpanAttributes:
@@ -91,7 +77,7 @@ class TestReturnedRowsMetric:
                 cursor.execute("SELECT generate_series(1, 5)")
                 cursor.fetchall()
 
-            points = _metric_points(otel_metrics, "db.client.response.returned_rows")
+            points = otel_metrics.points("db.client.response.returned_rows")
         # Histogram points aggregate over collection window; at least one
         # data point with our operation tag should be present.
         select_points = [
@@ -109,7 +95,7 @@ class TestReturnedRowsMetric:
             with conn.cursor() as cursor:
                 list(cursor.stream("SELECT generate_series(1, 7)"))
 
-            points = _metric_points(otel_metrics, "db.client.response.returned_rows")
+            points = otel_metrics.points("db.client.response.returned_rows")
         select_points = [
             p for p in points if p.attributes.get("db.operation.name") == "SELECT"
         ]
@@ -130,7 +116,7 @@ class TestReturnedRowsMetric:
                 cursor.execute("UPDATE _otel_tmp SET v = v + 1")
                 cursor.execute("DELETE FROM _otel_tmp")
 
-            points = _metric_points(otel_metrics, "db.client.response.returned_rows")
+            points = otel_metrics.points("db.client.response.returned_rows")
         for p in points:
             assert p.attributes.get("db.operation.name") == "SELECT", (
                 f"non-SELECT recorded returned_rows: {p.attributes}"
@@ -210,7 +196,7 @@ class TestWaitTimeHistogram:
                         fut.result(timeout=3.0)
 
                 otel_metrics.collect()
-                points = _metric_points(otel_metrics, "db.client.connection.wait_time")
+                points = otel_metrics.points("db.client.connection.wait_time")
                 relevant = [
                     p
                     for p in points
@@ -241,7 +227,7 @@ class TestTimeoutCounter:
                         runtime_pool_source.release(held)
 
                 otel_metrics.collect()
-                points = _metric_points(otel_metrics, "db.client.connection.timeouts")
+                points = otel_metrics.points("db.client.connection.timeouts")
                 relevant = [
                     p
                     for p in points

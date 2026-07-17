@@ -6,6 +6,8 @@ Every failure block ends with the exact re-run command for that test.
 
 from __future__ import annotations
 
+import textwrap
+
 import click
 
 from .runner import TestResult, TestRun
@@ -27,7 +29,8 @@ class Reporter:
         self._dots_on_line = 0
 
     def collected(self, count: int) -> None:
-        click.secho(f"Collected {count} tests", dim=True)
+        plural = "" if count == 1 else "s"
+        click.secho(f"Collected {count} test{plural}", dim=True)
 
     def result(self, result: TestResult) -> None:
         color = _STATUS_COLORS[result.outcome]
@@ -35,8 +38,8 @@ class Reporter:
         if self.verbose:
             status = result.outcome.upper()
             line = f"{status:<7} {result.test.id}"
-            if result.outcome == "skipped" and result.skip_reason:
-                line += f" ({result.skip_reason})"
+            if result.outcome == "skipped" and result.test.skip_reason:
+                line += f" ({result.test.skip_reason})"
             if result.outcome != "skipped":
                 line += f" ({result.duration:.3f}s)"
             click.secho(line, fg=color, bold=bold)
@@ -54,7 +57,7 @@ class Reporter:
             click.echo()
             click.secho(f"FAILED {result.test.id}", fg="red", bold=True)
             click.echo()
-            click.echo(_indent(result.traceback_text.rstrip()))
+            click.echo(textwrap.indent(result.traceback_text.rstrip(), "  "))
             click.echo()
             click.secho(f"Re-run: plain test {result.test.id}", dim=True)
 
@@ -67,7 +70,3 @@ class Reporter:
         line = f"{', '.join(parts)} in {run.duration:.2f}s"
         click.echo()
         click.secho(line, fg="red" if run.failed else "green", bold=True)
-
-
-def _indent(text: str, prefix: str = "  ") -> str:
-    return "\n".join(prefix + line for line in text.splitlines())

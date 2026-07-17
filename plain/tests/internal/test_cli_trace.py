@@ -9,7 +9,7 @@ from opentelemetry.semconv.attributes.code_attributes import (
 )
 from opentelemetry.semconv.attributes.db_attributes import DB_QUERY_TEXT
 
-from plain.cli._trace import analyze_trace, capture_spans
+from plain.cli._trace import analyze_trace, capture_trace_spans
 from plain.test.otel import install_test_tracer
 
 _span_exporter = install_test_tracer()
@@ -186,12 +186,12 @@ def test_raw_span_passes_attributes_through_and_drops_stacktrace() -> None:
     assert CODE_STACKTRACE not in attributes
 
 
-def test_capture_spans_isolates_other_processors() -> None:
+def test_capture_trace_spans_isolates_other_processors() -> None:
     _span_exporter.clear()
-    # capture_spans() detaches processors an installed package attached —
+    # capture_trace_spans() detaches processors an installed package attached —
     # here, the test tracer's own exporter — so a captured span reaches
     # only the capture exporter, not the pre-existing one.
-    with capture_spans() as exporter:
+    with capture_trace_spans() as exporter:
         with trace.get_tracer("test").start_as_current_span("inside"):
             pass
 

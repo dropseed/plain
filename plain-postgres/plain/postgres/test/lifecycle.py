@@ -11,6 +11,7 @@ transaction that never commits.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
@@ -31,19 +32,12 @@ if TYPE_CHECKING:
 
 
 class PostgresTestLifecycle(TestLifecycle):
+    required_package = "plain.postgres"
+
     def __init__(self) -> None:
         self._worker_db_ctx: Any = None
-        self._active = False
 
     def setup_worker(self) -> None:
-        from plain.runtime import settings
-
-        # The entry point loads whenever plain.postgres is importable, but
-        # the lifecycle only applies when the app actually installs it.
-        self._active = "plain.postgres" in settings.INSTALLED_PACKAGES
-        if not self._active:
-            return
-
         # use_test_database installs a direct connection to the test database
         # via the connection ContextVar; close any existing pool so nothing
         # keeps handing out connections opened against the runtime URL.
@@ -53,9 +47,6 @@ class PostgresTestLifecycle(TestLifecycle):
             self._worker_db_ctx.__enter__()
 
     def teardown_worker(self) -> None:
-        if not self._active:
-            return
-
         if self._worker_db_ctx is not None:
             with suppress_db_tracing():
                 self._worker_db_ctx.__exit__(None, None, None)
@@ -64,9 +55,7 @@ class PostgresTestLifecycle(TestLifecycle):
 
     @contextmanager
     def around_test(self, test: CollectedTest) -> Generator[None]:
-        if not self._active:
-            yield
-        elif ISOLATED_DB_TAG in test.tags:
+        if ISOLATED_DB_TAG in test.tags:
             yield from self._run_in_isolated_database(test)
         else:
             yield from self._run_in_rolled_back_transaction()
@@ -100,9 +89,8 @@ class PostgresTestLifecycle(TestLifecycle):
                 conn.close()
 
     def _run_in_isolated_database(self, test: CollectedTest) -> Generator[None]:
-        import re
-
-        prefix = re.sub(r"[^0-9A-Za-z_]+", "_", test.name)
+        test_name = test.id.rpartition("::")[2]
+        prefix = re.sub(r"[^0-9A-Za-z_]+", "_", test_name)
 
         # Per-test pool, rebuilt against this test's database.
         runtime_pool_source.close()

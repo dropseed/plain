@@ -50,7 +50,7 @@ class DummyProvider(OAuthProvider):
 
 DUMMY_PROVIDERS = {
     "dummy": {
-        "class": "test_providers.DummyProvider",
+        "class": f"{__name__}.DummyProvider",
         "kwargs": {
             "client_id": "dummy_client_id",
             "client_secret": "dummy_client_secret",

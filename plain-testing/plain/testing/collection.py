@@ -10,10 +10,12 @@ when imported; helper modules do not.
 from __future__ import annotations
 
 import ast
+import functools
 import inspect
+import os
 import sys
 import types
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,7 +29,7 @@ from .assertions import rewrite_asserts
 
 __all__ = ["CollectedTest", "collect_tests", "CollectionError"]
 
-_SKIP_DIR_NAMES = {"__pycache__", "node_modules", "app"}
+_SKIP_DIR_NAMES = {"__pycache__", "node_modules"}
 
 
 class CollectionError(Exception):
@@ -40,25 +42,31 @@ class CollectionError(Exception):
 @dataclass
 class CollectedTest:
     id: str  # e.g. "public/test_client.py::test_get" or "...::TestX::test_y[0]"
-    path: Path
-    name: str  # function name, including class prefix and case suffix
-    func: Callable  # zero-setup callable that runs the test body
+    func: Callable  # zero-argument callable that runs the test body
     tags: tuple[str, ...] = ()
     skip_reason: str | None = None
-    case_args: tuple | None = None
 
-    def __str__(self) -> str:
-        return self.id
+    @property
+    def name(self) -> str:
+        """The test's name within its file (e.g. "TestX::test_y[0]")."""
+        return self.id.partition("::")[2]
 
 
 def collect_tests(
-    targets: list[str], *, root: Path | None = None
+    targets: list[str],
+    *,
+    root: Path | None = None,
+    exclude_dirs: Iterable[str] = (),
 ) -> list[CollectedTest]:
     """
     Collect tests from the given targets (files, directories, or
     `path::test_name` ids), relative to `root` (default: cwd).
+
+    `exclude_dirs` adds directory names to skip during discovery (e.g. the
+    runner excludes the Plain `app` directory in app mode).
     """
     root = (root or Path.cwd()).resolve()
+    skip_dir_names = _SKIP_DIR_NAMES | set(exclude_dirs)
 
     # Test modules import helpers (and each other's routers/models) as
     # top-level modules, so the root goes on sys.path.
@@ -73,7 +81,7 @@ def collect_tests(
         if base.is_file():
             files = [base]
         elif base.is_dir():
-            files = _find_test_files(base)
+            files = _find_test_files(base, skip_dir_names=skip_dir_names)
         else:
             raise FileNotFoundError(f"No such test target: {target}")
 
@@ -97,25 +105,24 @@ def collect_tests(
     return unique
 
 
-def _find_test_files(directory: Path) -> list[Path]:
+def _find_test_files(directory: Path, *, skip_dir_names: set[str]) -> list[Path]:
     files = []
-    for path in sorted(directory.rglob("test_*.py")):
-        relative_parts = path.relative_to(directory).parts[:-1]
-        if any(
-            part in _SKIP_DIR_NAMES or part.startswith(".") for part in relative_parts
-        ):
-            continue
-        files.append(path)
+    for dirpath, dirnames, filenames in os.walk(directory):
+        # Prune skipped directories in place so os.walk never descends into
+        # them (rglob can't prune — a .venv or node_modules would get a full
+        # tree walk).
+        dirnames[:] = sorted(
+            d for d in dirnames if d not in skip_dir_names and not d.startswith(".")
+        )
+        files.extend(
+            Path(dirpath) / f
+            for f in sorted(filenames)
+            if f.startswith("test_") and f.endswith(".py")
+        )
     return files
 
 
 def _collect_file(path: Path, *, root: Path) -> list[CollectedTest]:
-    # Test files import sibling helper modules as top-level names, so the
-    # file's own directory goes on sys.path too (same as the root).
-    parent = str(path.parent)
-    if parent not in sys.path:
-        sys.path.insert(0, parent)
-
     module = _import_test_module(path, root=root)
     relative = path.relative_to(root).as_posix() if path.is_relative_to(root) else path
 
@@ -125,26 +132,14 @@ def _collect_file(path: Path, *, root: Path) -> list[CollectedTest]:
             continue  # imported, not defined here
 
         if inspect.isfunction(obj) and name.startswith("test_"):
-            tests.extend(_expand(obj, path=path, base_id=f"{relative}::{name}"))
+            tests.extend(_expand(obj, base_id=f"{relative}::{name}"))
         elif inspect.isclass(obj) and name.startswith("Test"):
-            tests.extend(_collect_class(obj, path=path, relative=str(relative)))
+            tests.extend(_collect_class(obj, relative=str(relative)))
 
-    tests.sort(key=lambda t: _definition_order(t.func))
     return tests
 
 
-def _definition_order(func: Callable) -> int:
-    inner = inspect.unwrap(func)
-    code = getattr(inner, "__plain_testing_lineno__", None)
-    if code is not None:
-        return code
-    try:
-        return inner.__code__.co_firstlineno
-    except AttributeError:
-        return 0
-
-
-def _collect_class(cls: type, *, path: Path, relative: str) -> list[CollectedTest]:
+def _collect_class(cls: type, *, relative: str) -> list[CollectedTest]:
     methods = [
         (name, obj)
         for name, obj in vars(cls).items()
@@ -164,18 +159,15 @@ def _collect_class(cls: type, *, path: Path, relative: str) -> list[CollectedTes
                 instance = cls()
                 return getattr(instance, method_name)(*args)
 
-            call.__plain_testing_lineno__ = method.__code__.co_firstlineno  # ty: ignore[unresolved-attribute]
             return call
 
         tests.extend(
             _expand(
                 method,
-                path=path,
                 base_id=f"{relative}::{cls.__name__}::{name}",
                 call=make_call(),
                 extra_tags=class_tags,
                 class_skip=class_skip,
-                name_prefix=f"{cls.__name__}::",
             )
         )
     return tests
@@ -184,26 +176,21 @@ def _collect_class(cls: type, *, path: Path, relative: str) -> list[CollectedTes
 def _expand(
     func: types.FunctionType,
     *,
-    path: Path,
     base_id: str,
     call: Callable | None = None,
     extra_tags: tuple[str, ...] = (),
     class_skip: str | None = None,
-    name_prefix: str = "",
 ) -> list[CollectedTest]:
     """Expand @cases into one CollectedTest per case."""
     run = call if call is not None else func
     tags = (*extra_tags, *getattr(func, TEST_TAGS_ATTRIBUTE, ()))
     skip_reason = getattr(func, TEST_SKIP_ATTRIBUTE, None) or class_skip
     case_list = getattr(func, TEST_CASES_ATTRIBUTE, None)
-    base_name = f"{name_prefix}{func.__name__}"
 
     if case_list is None:
         return [
             CollectedTest(
                 id=base_id,
-                path=path,
-                name=base_name,
                 func=run,
                 tags=tags,
                 skip_reason=skip_reason,
@@ -213,12 +200,9 @@ def _expand(
     return [
         CollectedTest(
             id=f"{base_id}[{index}]",
-            path=path,
-            name=f"{base_name}[{index}]",
-            func=run,
+            func=functools.partial(run, *case),
             tags=tags,
             skip_reason=skip_reason,
-            case_args=case,
         )
         for index, case in enumerate(case_list)
     ]

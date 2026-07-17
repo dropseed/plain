@@ -26,7 +26,7 @@ def test_github_provider():
     with override_settings(
         OAUTH_LOGIN_PROVIDERS={
             "github": {
-                "class": "provider_tests.test_github.DummyGitHubOAuthProvider",
+                "class": f"{__name__}.DummyGitHubOAuthProvider",
                 "kwargs": {
                     "client_id": "test_id",
                     "client_secret": "test_secret",

@@ -10,6 +10,7 @@ page content, and database rows.
 from __future__ import annotations
 
 from app.users.models import User
+from helpers import make_admin_client
 
 from plain.test import Client
 
@@ -27,13 +28,6 @@ def edit_url(user: User) -> str:
 
 def delete_url(user: User) -> str:
     return f"/admin/p/user/{user.id}/delete"
-
-
-def make_admin_client() -> Client:
-    user = User.query.create(username="admin", is_admin=True)
-    client = Client()
-    client.force_login(user)
-    return client
 
 
 class TestListAndDetail:

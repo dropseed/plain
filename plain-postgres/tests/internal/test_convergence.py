@@ -33,39 +33,49 @@ from plain.postgres.convergence.fixes import (
 )
 from plain.postgres.functions.text import Upper
 from plain.postgres.test import isolated_db
+from plain.test import patch
 
 
 class TestPassOrdering:
     def test_fixes_sorted_by_pass(self):
         """plan_convergence() returns items in pass order: rebuild, create indexes,
         add constraints, validate, drop constraints, drop indexes."""
-        original_indexes = list(Widget.model_options.indexes)
-        original_constraints = list(Widget.model_options.constraints)
+        with (
+            patch(
+                Widget.model_options,
+                "indexes",
+                [
+                    *Widget.model_options.indexes,
+                    Index(fields=["name"], name="examples_widget_name_idx"),
+                    Index(fields=["size"], name="examples_widget_size_idx"),
+                ],
+            ),
+            patch(
+                Widget.model_options,
+                "constraints",
+                [
+                    *Widget.model_options.constraints,
+                    CheckConstraint(
+                        check=Q(id__gte=0), name="examples_widget_id_nonneg"
+                    ),
+                    CheckConstraint(
+                        check=Q(id__lte=999999), name="examples_widget_id_max"
+                    ),
+                ],
+            ),
+        ):
+            create_invalid_index("examples_widget_size_idx")
+            execute(
+                'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_max"'
+                ' CHECK ("id" <= 999999) NOT VALID'
+            )
+            execute(
+                'CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("size")'
+            )
+            execute(
+                'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_extra_check" CHECK ("id" >= -1)'
+            )
 
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["name"], name="examples_widget_name_idx"),
-            Index(fields=["size"], name="examples_widget_size_idx"),
-        ]
-        Widget.model_options.constraints = [
-            *original_constraints,
-            CheckConstraint(check=Q(id__gte=0), name="examples_widget_id_nonneg"),
-            CheckConstraint(check=Q(id__lte=999999), name="examples_widget_id_max"),
-        ]
-
-        create_invalid_index("examples_widget_size_idx")
-        execute(
-            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_max"'
-            ' CHECK ("id" <= 999999) NOT VALID'
-        )
-        execute(
-            'CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("size")'
-        )
-        execute(
-            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_extra_check" CHECK ("id" >= -1)'
-        )
-
-        try:
             items = plan_convergence().executable()
             fix_types = [type(item.fix) for item in items]
 
@@ -104,9 +114,6 @@ class TestPassOrdering:
             assert add_con_max < validate_min
             assert validate_max < drop_con_min
             assert drop_con_max < drop_idx
-        finally:
-            Widget.model_options.indexes = original_indexes
-            Widget.model_options.constraints = original_constraints
 
 
 class TestFixFailureRecovery:
@@ -145,16 +152,18 @@ class TestAnalyzeModel:
 
     def test_rename_detection(self):
         """A missing index + extra index with same columns is detected as a rename."""
-        original_indexes = list(Widget.model_options.indexes)
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["name"], name="examples_widget_name_new_idx"),
-        ]
-        execute(
-            'CREATE INDEX "examples_widget_name_old_idx" ON "examples_widget" ("name")'
-        )
+        with patch(
+            Widget.model_options,
+            "indexes",
+            [
+                *Widget.model_options.indexes,
+                Index(fields=["name"], name="examples_widget_name_new_idx"),
+            ],
+        ):
+            execute(
+                'CREATE INDEX "examples_widget_name_old_idx" ON "examples_widget" ("name")'
+            )
 
-        try:
             conn = get_connection()
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Widget)
@@ -186,23 +195,23 @@ class TestAnalyzeModel:
             assert renamed[0].issue == "rename from examples_widget_name_old_idx"
             assert renamed[0].drift is not None
             assert renamed[0].drift.kind == DriftKind.RENAMED
-        finally:
-            Widget.model_options.indexes = original_indexes
 
     def test_rename_with_fk_columns(self):
         """Rename detection resolves model field names to DB column names."""
-        original_indexes = list(WidgetTag.model_options.indexes)
         # Model field is "widget", DB column is "widget_id"
-        WidgetTag.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["widget"], name="examples_widgettag_widget_new_idx"),
-        ]
-        execute(
-            'CREATE INDEX "examples_widgettag_widget_old_idx"'
-            ' ON "examples_widgettag" ("widget_id")'
-        )
+        with patch(
+            WidgetTag.model_options,
+            "indexes",
+            [
+                *WidgetTag.model_options.indexes,
+                Index(fields=["widget"], name="examples_widgettag_widget_new_idx"),
+            ],
+        ):
+            execute(
+                'CREATE INDEX "examples_widgettag_widget_old_idx"'
+                ' ON "examples_widgettag" ("widget_id")'
+            )
 
-        try:
             conn = get_connection()
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, WidgetTag)
@@ -213,22 +222,24 @@ class TestAnalyzeModel:
             assert len(rename_drifts) == 1
             assert rename_drifts[0].old_name == "examples_widgettag_widget_old_idx"
             assert rename_drifts[0].new_name == "examples_widgettag_widget_new_idx"
-        finally:
-            WidgetTag.model_options.indexes = original_indexes
 
     def test_rename_multi_column(self):
         """Rename detection works for multi-column indexes."""
-        original_indexes = list(Widget.model_options.indexes)
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["name", "size"], name="examples_widget_name_size_new_idx"),
-        ]
-        execute(
-            'CREATE INDEX "examples_widget_name_size_old_idx"'
-            ' ON "examples_widget" ("name", "size")'
-        )
+        with patch(
+            Widget.model_options,
+            "indexes",
+            [
+                *Widget.model_options.indexes,
+                Index(
+                    fields=["name", "size"], name="examples_widget_name_size_new_idx"
+                ),
+            ],
+        ):
+            execute(
+                'CREATE INDEX "examples_widget_name_size_old_idx"'
+                ' ON "examples_widget" ("name", "size")'
+            )
 
-        try:
             conn = get_connection()
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Widget)
@@ -239,21 +250,21 @@ class TestAnalyzeModel:
             assert len(rename_drifts) == 1
             assert rename_drifts[0].old_name == "examples_widget_name_size_old_idx"
             assert rename_drifts[0].new_name == "examples_widget_name_size_new_idx"
-        finally:
-            Widget.model_options.indexes = original_indexes
 
     def test_no_rename_when_columns_differ(self):
         """Different columns means separate create + drop, not a rename."""
-        original_indexes = list(Widget.model_options.indexes)
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["size"], name="examples_widget_size_idx"),
-        ]
-        execute(
-            'CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("name")'
-        )
+        with patch(
+            Widget.model_options,
+            "indexes",
+            [
+                *Widget.model_options.indexes,
+                Index(fields=["size"], name="examples_widget_size_idx"),
+            ],
+        ):
+            execute(
+                'CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("name")'
+            )
 
-        try:
             conn = get_connection()
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Widget)
@@ -270,21 +281,25 @@ class TestAnalyzeModel:
                 isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
                 for d in analysis.drifts
             )
-        finally:
-            Widget.model_options.indexes = original_indexes
 
     def test_no_rename_when_ambiguous(self):
         """Two missing + two extra with same columns: no rename, all create/drop."""
-        original_indexes = list(Widget.model_options.indexes)
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["name"], name="examples_widget_idx_a"),
-            Index(fields=["name"], name="examples_widget_idx_b"),
-        ]
-        execute('CREATE INDEX "examples_widget_old_a" ON "examples_widget" ("name")')
-        execute('CREATE INDEX "examples_widget_old_b" ON "examples_widget" ("name")')
+        with patch(
+            Widget.model_options,
+            "indexes",
+            [
+                *Widget.model_options.indexes,
+                Index(fields=["name"], name="examples_widget_idx_a"),
+                Index(fields=["name"], name="examples_widget_idx_b"),
+            ],
+        ):
+            execute(
+                'CREATE INDEX "examples_widget_old_a" ON "examples_widget" ("name")'
+            )
+            execute(
+                'CREATE INDEX "examples_widget_old_b" ON "examples_widget" ("name")'
+            )
 
-        try:
             conn = get_connection()
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Widget)
@@ -305,22 +320,22 @@ class TestAnalyzeModel:
             ]
             assert len(missing_drifts) == 2
             assert len(undeclared_drifts) == 2
-        finally:
-            Widget.model_options.indexes = original_indexes
 
     def test_rename_expression_index(self):
         """Expression-based indexes are matched by normalized definition."""
-        original_indexes = list(Widget.model_options.indexes)
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(Upper("name"), name="examples_widget_name_upper_new_idx"),
-        ]
-        execute(
-            'CREATE INDEX "examples_widget_name_upper_old_idx"'
-            ' ON "examples_widget" (UPPER("name"))'
-        )
+        with patch(
+            Widget.model_options,
+            "indexes",
+            [
+                *Widget.model_options.indexes,
+                Index(Upper("name"), name="examples_widget_name_upper_new_idx"),
+            ],
+        ):
+            execute(
+                'CREATE INDEX "examples_widget_name_upper_old_idx"'
+                ' ON "examples_widget" (UPPER("name"))'
+            )
 
-        try:
             conn = get_connection()
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Widget)
@@ -340,18 +355,17 @@ class TestAnalyzeModel:
                 isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
                 for d in analysis.drifts
             )
-        finally:
-            Widget.model_options.indexes = original_indexes
 
     def test_fixable_index_annotated(self):
         """A missing index has a drift on its IndexStatus."""
-        original_indexes = list(Widget.model_options.indexes)
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["name"], name="examples_widget_name_idx"),
-        ]
-
-        try:
+        with patch(
+            Widget.model_options,
+            "indexes",
+            [
+                *Widget.model_options.indexes,
+                Index(fields=["name"], name="examples_widget_name_idx"),
+            ],
+        ):
             conn = get_connection()
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Widget)
@@ -365,18 +379,17 @@ class TestAnalyzeModel:
             assert missing[0].issue is not None
             assert missing[0].drift is not None
             assert missing[0].drift.kind == DriftKind.MISSING
-        finally:
-            Widget.model_options.indexes = original_indexes
 
     def test_plan_model_convergence(self):
         """plan_model_convergence() returns a plan with correct items."""
-        original_indexes = list(Widget.model_options.indexes)
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["name"], name="examples_widget_name_idx"),
-        ]
-
-        try:
+        with patch(
+            Widget.model_options,
+            "indexes",
+            [
+                *Widget.model_options.indexes,
+                Index(fields=["name"], name="examples_widget_name_idx"),
+            ],
+        ):
             conn = get_connection()
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, Widget).executable()
@@ -384,18 +397,17 @@ class TestAnalyzeModel:
             assert isinstance(items, list)
             assert len(items) == 1
             assert isinstance(items[0].fix, CreateIndexFix)
-        finally:
-            Widget.model_options.indexes = original_indexes
 
     def test_issue_count(self):
         """ModelAnalysis.issue_count counts issues correctly."""
-        original_indexes = list(Widget.model_options.indexes)
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["name"], name="examples_widget_name_idx"),
-        ]
-
-        try:
+        with patch(
+            Widget.model_options,
+            "indexes",
+            [
+                *Widget.model_options.indexes,
+                Index(fields=["name"], name="examples_widget_name_idx"),
+            ],
+        ):
             conn = get_connection()
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Widget)
@@ -409,8 +421,6 @@ class TestAnalyzeModel:
             ]
             assert len(missing) == 1
             assert missing[0].issue is not None
-        finally:
-            Widget.model_options.indexes = original_indexes
 
 
 class TestDriftPolicy:
@@ -418,13 +428,14 @@ class TestDriftPolicy:
 
     def test_index_fixes_do_not_block_sync(self):
         """Index operations (create, rebuild, rename) do not block sync."""
-        original_indexes = list(Widget.model_options.indexes)
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["name"], name="examples_widget_name_idx"),
-        ]
-
-        try:
+        with patch(
+            Widget.model_options,
+            "indexes",
+            [
+                *Widget.model_options.indexes,
+                Index(fields=["name"], name="examples_widget_name_idx"),
+            ],
+        ):
             conn = get_connection()
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, Widget).executable()
@@ -432,19 +443,20 @@ class TestDriftPolicy:
             assert len(items) == 1
             assert isinstance(items[0].fix, CreateIndexFix)
             assert items[0].blocks_sync is False
-        finally:
-            Widget.model_options.indexes = original_indexes
 
     def test_constraint_add_blocks_sync(self):
         """Adding a missing constraint blocks sync."""
-        original_constraints = list(Widget.model_options.constraints)
-        check = CheckConstraint(
-            check=Q(id__gte=0),
-            name="examples_widget_id_nonneg",
-        )
-        Widget.model_options.constraints = [*original_constraints, check]
-
-        try:
+        with patch(
+            Widget.model_options,
+            "constraints",
+            [
+                *Widget.model_options.constraints,
+                CheckConstraint(
+                    check=Q(id__gte=0),
+                    name="examples_widget_id_nonneg",
+                ),
+            ],
+        ):
             conn = get_connection()
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, Widget).executable()
@@ -452,22 +464,24 @@ class TestDriftPolicy:
             assert len(items) == 1
             assert isinstance(items[0].fix, AddConstraintFix)
             assert items[0].blocks_sync is True
-        finally:
-            Widget.model_options.constraints = original_constraints
 
     def test_constraint_validate_blocks_sync(self):
         """Validating a NOT VALID constraint blocks sync."""
-        original_constraints = list(Widget.model_options.constraints)
-        check = CheckConstraint(
-            check=Q(id__gte=0),
-            name="examples_widget_id_nonneg",
-        )
-        Widget.model_options.constraints = [*original_constraints, check]
-        execute(
-            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_nonneg" CHECK ("id" >= 0) NOT VALID'
-        )
+        with patch(
+            Widget.model_options,
+            "constraints",
+            [
+                *Widget.model_options.constraints,
+                CheckConstraint(
+                    check=Q(id__gte=0),
+                    name="examples_widget_id_nonneg",
+                ),
+            ],
+        ):
+            execute(
+                'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_nonneg" CHECK ("id" >= 0) NOT VALID'
+            )
 
-        try:
             conn = get_connection()
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, Widget).executable()
@@ -475,21 +489,21 @@ class TestDriftPolicy:
             assert len(items) == 1
             assert isinstance(items[0].fix, ValidateConstraintFix)
             assert items[0].blocks_sync is True
-        finally:
-            Widget.model_options.constraints = original_constraints
 
     def test_rename_does_not_block_sync(self):
         """Renames (index and constraint) do not block sync."""
-        original_indexes = list(Widget.model_options.indexes)
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["name"], name="examples_widget_name_new_idx"),
-        ]
-        execute(
-            'CREATE INDEX "examples_widget_name_old_idx" ON "examples_widget" ("name")'
-        )
+        with patch(
+            Widget.model_options,
+            "indexes",
+            [
+                *Widget.model_options.indexes,
+                Index(fields=["name"], name="examples_widget_name_new_idx"),
+            ],
+        ):
+            execute(
+                'CREATE INDEX "examples_widget_name_old_idx" ON "examples_widget" ("name")'
+            )
 
-        try:
             conn = get_connection()
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, Widget).executable()
@@ -497,8 +511,6 @@ class TestDriftPolicy:
             assert len(items) == 1
             assert isinstance(items[0].fix, RenameIndexFix)
             assert items[0].blocks_sync is False
-        finally:
-            Widget.model_options.indexes = original_indexes
 
     def test_undeclared_constraint_included_in_plan(self):
         """Undeclared constraints are auto-dropped."""
@@ -573,31 +585,34 @@ class TestConvergencePlan:
 
     def test_has_work_counts_forward_fixes(self):
         """has_work() sees forward fixes."""
-        original_indexes = list(Widget.model_options.indexes)
-        Widget.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["name"], name="examples_widget_name_idx"),
-        ]
-
-        try:
+        with patch(
+            Widget.model_options,
+            "indexes",
+            [
+                *Widget.model_options.indexes,
+                Index(fields=["name"], name="examples_widget_name_idx"),
+            ],
+        ):
             plan = plan_convergence()
             assert plan.has_work()
-        finally:
-            Widget.model_options.indexes = original_indexes
 
     def test_blocked_for_changed_constraint(self):
         """Changed constraint definition appears in plan.blocked."""
-        original_constraints = list(Widget.model_options.constraints)
-        check = CheckConstraint(
-            check=Q(id__gte=1),
-            name="examples_widget_id_nonneg",
-        )
-        Widget.model_options.constraints = [*original_constraints, check]
-        execute(
-            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_nonneg" CHECK ("id" >= 0)'
-        )
+        with patch(
+            Widget.model_options,
+            "constraints",
+            [
+                *Widget.model_options.constraints,
+                CheckConstraint(
+                    check=Q(id__gte=1),
+                    name="examples_widget_id_nonneg",
+                ),
+            ],
+        ):
+            execute(
+                'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_nonneg" CHECK ("id" >= 0)'
+            )
 
-        try:
             conn = get_connection()
             with conn.cursor() as cursor:
                 plan = plan_model_convergence(conn, cursor, Widget)
@@ -607,8 +622,6 @@ class TestConvergencePlan:
             assert plan.blocked[0].drift.kind == DriftKind.CHANGED
             assert plan.blocked[0].fix is None
             assert plan.blocked[0].guidance is not None
-        finally:
-            Widget.model_options.constraints = original_constraints
 
 
 class TestExecutePlan:

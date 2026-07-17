@@ -2,7 +2,7 @@ from app.users.models import User
 
 from plain.admin.views.base import AdminView
 from plain.admin.views.registry import registry
-from plain.test import Client
+from plain.test import Client, override_settings
 
 
 def test_admin_login_required():
@@ -49,7 +49,6 @@ def test_has_permission_on_view():
 
 def test_has_permission_setting():
     """ADMIN_HAS_PERMISSION setting controls access to all views."""
-    from plain.runtime import settings
 
     class TargetView(AdminView):
         title = "Target"
@@ -61,17 +60,12 @@ def test_has_permission_setting():
 
     user = User.query.create(username="admin", is_admin=True)
 
-    original = settings.ADMIN_HAS_PERMISSION
-    try:
-        settings.ADMIN_HAS_PERMISSION = allow
-
+    with override_settings(ADMIN_HAS_PERMISSION=allow):
         # Setting denies TargetView
         assert TargetView.has_permission(user) is False
 
         # But allows other views
         assert AdminView.has_permission(user) is True
-    finally:
-        settings.ADMIN_HAS_PERMISSION = original
 
 
 def test_ui_view_renders():

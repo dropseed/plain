@@ -28,7 +28,6 @@ class TestResult:
     duration: float = 0.0
     error: BaseException | None = None
     traceback_text: str = ""
-    skip_reason: str | None = None
 
 
 @dataclass
@@ -83,15 +82,14 @@ def run_tests(
 
 def _run_one(test: CollectedTest, *, lifecycles: list[TestLifecycle]) -> TestResult:
     if test.skip_reason is not None:
-        return TestResult(test=test, outcome="skipped", skip_reason=test.skip_reason)
+        return TestResult(test=test, outcome="skipped")
 
-    args = test.case_args or ()
     start = time.monotonic()
     try:
         with ExitStack() as stack:
             for lifecycle in lifecycles:
                 stack.enter_context(lifecycle.around_test(test))
-            outcome = test.func(*args)
+            outcome = test.func()
             if inspect.iscoroutine(outcome):
                 asyncio.run(outcome)
     except KeyboardInterrupt:

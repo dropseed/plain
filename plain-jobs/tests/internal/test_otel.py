@@ -70,7 +70,9 @@ def test_enqueue_skipped_marks_span() -> None:
         result = _ExclusiveJob().run_in_worker(concurrency_key="busy")
 
         assert result is None
-        span = next(s for s in otel_spans.get_finished_spans() if s.name == "send default")
+        span = next(
+            s for s in otel_spans.get_finished_spans() if s.name == "send default"
+        )
         assert span.attributes is not None
         assert span.attributes["job.enqueue.skipped"] is True
 
@@ -146,7 +148,7 @@ def test_enqueue_failure_records_error_type_on_metric() -> None:
         with raises(RuntimeError):
             _NoopJob().run_in_worker()
 
-        sent_points = _metric_points(otel_metrics, "messaging.client.sent.messages")
+        sent_points = otel_metrics.points("messaging.client.sent.messages")
         assert sent_points, "expected sent_messages counter point on failure"
         assert all(
             p.attributes.get("error.type") == "RuntimeError" for p in sent_points
@@ -258,7 +260,10 @@ def test_worker_loop_idle_tick_emits_no_spans() -> None:
     def shutdown_instead_of_sleeping(seconds: float) -> None:
         worker._is_shutting_down = True
 
-    with capture_spans() as otel_spans, patch(time, "sleep", shutdown_instead_of_sleeping):
+    with (
+        capture_spans() as otel_spans,
+        patch(time, "sleep", shutdown_instead_of_sleeping),
+    ):
         worker._run_loop()
 
         assert otel_spans.get_finished_spans() == ()
@@ -440,15 +445,12 @@ class _WorkerStub(Worker):
 @contextmanager
 def _metrics():
     """Construct a `WorkerMetrics` around a stub Worker; restore prior state."""
-    saved = otel.WorkerMetrics._current
 
     def _make(worker):
         return otel.WorkerMetrics(worker)
 
-    try:
+    with patch(otel.WorkerMetrics, "_current", otel.WorkerMetrics._current):
         yield _make
-    finally:
-        otel.WorkerMetrics._current = saved
 
 
 def _by_queue(callback) -> dict[str, float]:
@@ -469,9 +471,7 @@ def test_worker_processes_gauge_reports_pool_size() -> None:
 def test_gauges_return_empty_when_no_active_metrics() -> None:
     """The active-instance indirection is the whole reason this exists; verify
     each gauge returns no observations when nothing is active."""
-    saved = otel.WorkerMetrics._current
-    otel.WorkerMetrics._current = None
-    try:
+    with patch(otel.WorkerMetrics, "_current", None):
         for callback in (
             otel.WorkerMetrics._gauge_worker_processes,
             otel.WorkerMetrics._gauge_queue_depth,
@@ -480,8 +480,6 @@ def test_gauges_return_empty_when_no_active_metrics() -> None:
             otel.WorkerMetrics._gauge_running,
         ):
             assert list(callback(CallbackOptions())) == []
-    finally:
-        otel.WorkerMetrics._current = saved
 
 
 # Every @_gauge_db_queries-decorated callback. Shared by the tests that pin
@@ -569,21 +567,6 @@ def test_metrics_swap_routes_callbacks_to_current_instance() -> None:
         assert set(_by_queue(otel.WorkerMetrics._gauge_queue_depth)) == {"queue-b"}
 
 
-def _metric_points(otel_metrics, name: str) -> list:
-    """Return all data points for a named metric across the export."""
-    data = otel_metrics.get_metrics_data()
-    if data is None:
-        return []
-    return [
-        p
-        for rm in data.resource_metrics
-        for sm in rm.scope_metrics
-        for m in sm.metrics
-        if m.name == name
-        for p in m.data.data_points
-    ]
-
-
 def _trigger_outcome(status: str) -> None:
     """Take a JobRequest through to a terminal JobResult with the given status."""
     request = _NoopJob().run_in_worker()
@@ -601,7 +584,7 @@ def test_consumed_counter_records_outcome_for_lost() -> None:
     with capture_metrics() as otel_metrics:
         _trigger_outcome(JobResultStatuses.LOST)
 
-        points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+        points = otel_metrics.points("messaging.client.consumed.messages")
         lost_points = [
             p for p in points if p.attributes.get("plain.jobs.outcome") == "lost"
         ]
@@ -621,7 +604,7 @@ def test_consumed_counter_records_outcome_for_cancelled() -> None:
     with capture_metrics() as otel_metrics:
         _trigger_outcome(JobResultStatuses.CANCELLED)
 
-        points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+        points = otel_metrics.points("messaging.client.consumed.messages")
         cancelled = [
             p for p in points if p.attributes.get("plain.jobs.outcome") == "cancelled"
         ]
@@ -636,7 +619,7 @@ def test_consumed_counter_records_outcome_for_successful() -> None:
     with capture_metrics() as otel_metrics:
         _trigger_outcome(JobResultStatuses.SUCCESSFUL)
 
-        points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+        points = otel_metrics.points("messaging.client.consumed.messages")
         successful = [
             p for p in points if p.attributes.get("plain.jobs.outcome") == "successful"
         ]
@@ -649,7 +632,7 @@ def test_consumed_counter_records_outcome_for_errored() -> None:
     with capture_metrics() as otel_metrics:
         _trigger_outcome(JobResultStatuses.ERRORED)
 
-        points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+        points = otel_metrics.points("messaging.client.consumed.messages")
         errored = [
             p for p in points if p.attributes.get("plain.jobs.outcome") == "errored"
         ]
@@ -670,7 +653,7 @@ def test_consumed_counter_includes_error_type_when_job_raises() -> None:
         # splits by attribute set, so other tests may have produced errored
         # points without `error.type`. Look for a point that carries both
         # attributes.
-        points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+        points = otel_metrics.points("messaging.client.consumed.messages")
         matching = [
             p
             for p in points
@@ -693,7 +676,7 @@ def test_consumed_counter_records_outcome_for_deferred() -> None:
         process = request.convert_to_job_process(worker_id=uuid.uuid4())
         process.defer(job=_NoopJob(), defer_exception=DeferJob(delay=60))
 
-        points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+        points = otel_metrics.points("messaging.client.consumed.messages")
         deferred = [
             p for p in points if p.attributes.get("plain.jobs.outcome") == "deferred"
         ]

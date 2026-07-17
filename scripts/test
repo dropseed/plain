@@ -98,7 +98,7 @@ for package in $packages; do
     --isolated \
     --package "$package" \
     $WITH \
-    plain test "$@"
+    python -m plain.testing "$@"
   set +x
 
   cd ../..
@@ -108,7 +108,7 @@ done
 echo
 bold "Testing example"
 cd "example"
-uv run --isolated $WITH plain test "$@"
+uv run --isolated $WITH python -m plain.testing "$@"
 cd ..
 
 if [ "$run_server" = false ]; then
