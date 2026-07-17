@@ -305,14 +305,14 @@ def _encode_request_body(
 
     if body is not None:
         resolved_content_type = content_type or "application/octet-stream"
-        # Encode a string body with the charset the content type declares,
-        # so the payload bytes match what the request advertises.
-        charset_match = _CHARSET_RE.match(resolved_content_type)
-        charset = charset_match[1] if charset_match else "utf-8"
-        return (
-            force_bytes(body, encoding=charset),
-            resolved_content_type,
-        )
+        if isinstance(body, str):
+            # Encode a string body with the charset the content type
+            # declares, so the payload bytes match what the request
+            # advertises. Bytes pass through untouched.
+            charset_match = _CHARSET_RE.match(resolved_content_type)
+            charset = charset_match[1] if charset_match else "utf-8"
+            body = body.encode(charset)
+        return (body, resolved_content_type)
 
     if form_data is not None or files is not None:
         merged: dict[str, Any] = dict(form_data or {})

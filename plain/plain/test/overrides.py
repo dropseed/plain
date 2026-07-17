@@ -28,11 +28,13 @@ def override_settings(**overrides: Any) -> Generator[Any]:
     from plain.runtime import settings
 
     # Snapshot every original value before applying anything, so an unknown
-    # setting name raises without leaving earlier overrides applied.
+    # setting name raises without leaving earlier overrides applied. The
+    # apply loop runs inside the try so a rejected value (settings are
+    # type-checked on assignment) still restores whatever was applied.
     original = {name: getattr(settings, name) for name in overrides}
-    for name, value in overrides.items():
-        setattr(settings, name, value)
     try:
+        for name, value in overrides.items():
+            setattr(settings, name, value)
         yield settings
     finally:
         for name, value in original.items():
