@@ -10,6 +10,7 @@
 - [Database access](#database-access)
 - [Package test helpers](#package-test-helpers)
 - [Running tests](#running-tests)
+- [Testing code outside the app](#testing-code-outside-the-app)
 - [Parallelism](#parallelism)
 - [Flake detection](#flake-detection)
 - [Performance assertions](#performance-assertions)
@@ -264,6 +265,31 @@ plain test -v                           # verbose
 
 Test order is **deterministic by default**: same code, same order, every time. Failure state for `--lf` is stashed in the gitignored `.plain/` directory.
 
+## Testing code outside the app
+
+Not everything in your repo is the app. A common shape is a uv workspace with supporting packages alongside it:
+
+```
+pyproject.toml        # workspace root — the Plain app lives here
+app/
+tests/
+packages/
+  billing/            # a plain Python package, no Plain dependency
+    pyproject.toml
+    src/billing/
+    tests/
+```
+
+There are two situations, and both work:
+
+**Alongside an app.** `plain test packages/billing/tests` runs those tests under the app's runtime like any others. Pure-Python tests don't notice — the database lifecycle is lazy, so tests that never touch Plain pay nothing for it.
+
+**No app at all.** In a project with no Plain app, the runner switches to **library mode** instead of erroring. Collection, assertion rewriting, `raises`, `@cases` and the other decorators, `patch`, `freeze_time`, parallelism, shuffling, and `--json` all work — none of them need a running app. Helpers that do need one (`Client`, `override_settings`, the database lifecycle) raise a clear error saying so. This makes `plain test` a usable test runner for any Python package, not just Plain apps.
+
+The runner resolves the app the same way every `plain` command does; the presence or absence of an app picks the mode — there's nothing to configure.
+
+One invocation is one runtime context. In a monorepo where each package has its own test app (the plain framework repo itself is ~30 packages shaped exactly like this), you run the runner once per package — which is also a natural outer parallelism boundary.
+
 ## Parallelism
 
 Parallel execution is built into the runner:
@@ -409,7 +435,7 @@ A brand-new Plain project has meaningful checks on day one, with zero test files
 
 The system is split across three layers, and the split is what keeps a dev-only package from leaking into production code:
 
-**`plain.test` (core — always installed).** The authoring vocabulary: everything a test file imports. `Client` and `RequestFactory` (already there today), plus `raises`, the metadata decorators (`cases`, `skip`, `tag`, `timeout`), the context helpers (`override_settings`, `freeze_time`, `patch`, `capture_spans`, `capture_metrics`, `max_queries`), and the `TestLifecycle` protocol. These are small, dependency-light functions and context managers — none of them need the engine to exist. Keeping them in core means app code, package code, and type checkers never depend on a dev package, and `plain.test` remains the single import home you already know.
+**`plain.test` (core — always installed).** The authoring vocabulary: everything a test file imports. `Client` and `RequestFactory` (already there today), plus `raises`, the metadata decorators (`cases`, `skip`, `tag`, `timeout`), the context helpers (`override_settings`, `freeze_time`, `patch`, `capture_spans`, `capture_metrics`, `max_queries`), and the `TestLifecycle` protocol. These are small, dependency-light functions and context managers — none of them need the engine to exist. Keeping them in core means app code, package code, and type checkers never depend on a dev package, and `plain.test` remains the single import home you already know. It's also load-bearing outside of tests — `plain request` is built on `Client` — so it couldn't move to a dev-only package even if we wanted it to.
 
 **`plain.testing` (this package — a dev dependency).** The engine: the `plain test` CLI, collection, assertion rewriting, execution and parallelism, flake classification, reporting (`--json`, route coverage, `--changed`), the browser wrapper, and the built-in suite. Nothing in your application imports from it; it imports *you*.
 
@@ -466,6 +492,10 @@ The rewrites are mechanical, and the `/plain-upgrade` agent handles them. Anythi
 `plain.pytest` remains available during the transition; the two runners can coexist in a project while you migrate.
 
 ## FAQs
+
+#### Why is the package named `plain.testing` when I import from `plain.test`?
+
+Because they're different things with different install lives. `plain.test` is a core module and has to stay one — it isn't only test vocabulary, core features depend on it at runtime (`plain request` simulates requests with `Client`). A dev-only package can't own a module that production Plain imports. So the module you import ships with core, and the engine that runs your tests installs separately. In practice: you **install** `plain.testing`, you **import** from `plain.test`, you **run** `plain test`.
 
 #### Does coverage work?
 
