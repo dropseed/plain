@@ -439,6 +439,8 @@ The system is split across three layers, and the split is what keeps a dev-only 
 
 **`plain.testing` (this package — a dev dependency).** The engine: the `plain test` CLI, collection, assertion rewriting, execution and parallelism, flake classification, reporting (`--json`, route coverage, `--changed`), the browser wrapper, and the built-in suite. Nothing in your application imports from it; it imports *you*.
 
+The line between the two is simple: **if a test file imports it, it lives in core; if it runs test files, it lives here.** Growth is one-way — the vocabulary in `plain.test` expands over time, and nothing that's there today (`Client`, `RequestFactory`, the OTel test installers) moves into the engine.
+
 **Other Plain packages (lifecycle + helpers).** Each package that participates in testing implements the `TestLifecycle` protocol and registers it under the `plain.testing` entry point group:
 
 ```toml
