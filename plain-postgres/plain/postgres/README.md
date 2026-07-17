@@ -12,6 +12,7 @@
     - [Structural migrations](#structural-migrations)
     - [Data migrations](#data-migrations)
     - [Convergence](#convergence)
+    - [Readiness](#readiness)
 - [Fields](#fields)
 - [Relationships](#relationships)
 - [Constraints](#constraints)
@@ -556,6 +557,8 @@ plain postgres sync
 
 In development (`DEBUG=True`), sync auto-generates migrations before applying them. In production, it only applies existing migrations and converges.
 
+Sync also waits for the database to accept connections before starting (up to `POSTGRES_WAIT_TIMEOUT` seconds, default 60), so a release phase or dev environment where the database is still coming up doesn't need a separate wait step in front of it. Configuration errors — bad credentials, a broken `POSTGRES_URL` — fail immediately instead of retrying. `migrations apply` and `converge` do the same.
+
 | Command                        | Purpose                                                               |
 | ------------------------------ | --------------------------------------------------------------------- |
 | `plain postgres sync`          | Create + apply migrations + converge (the one command for everything) |
@@ -794,6 +797,37 @@ The lock is held on its own connection, separate from the one running DDL, so no
 The lock connection sits idle while your DDL runs, so it enables TCP keepalives to survive NAT and load-balancer idle timeouts. A server-side `idle_session_timeout` would still kill it (releasing the lock mid-run) — don't set one for the role that runs migrations. `sync` re-verifies the lock between its migrate and converge phases and stops with a clear error if the session died.
 
 To see the lock live: `SELECT * FROM pg_locks WHERE locktype = 'advisory' AND objid = 1047265496`.
+
+### Readiness
+
+`plain postgres ready` checks that the database is ready for this code to serve: the database is reachable, all migrations are applied, and every model's table and columns exist. It's built for serving entrypoints — gate `plain server` or `plain jobs worker` on it so a process whose image got ahead of the database (a skipped migrate job, a restored backup, a rollback) fails with a clear diagnosis instead of serving mystery errors.
+
+```bash
+# In a server entrypoint or Kubernetes initContainer
+plain postgres ready --wait
+plain server
+```
+
+The exit code tells the caller what kind of problem it is:
+
+| Exit | Meaning                                                                                                                                                             |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | Ready to serve.                                                                                                                                                     |
+| `1`  | Not ready, but retryable — migrations pending, schema missing objects, or the database is unreachable. A scheduled migrate (or the server coming back) resolves it. |
+| `2`  | Configuration error a human must fix — bad credentials, database doesn't exist. Retrying will never fix it.                                                         |
+
+`--wait` polls until ready, so it standardizes the entrypoint poll-loop that otherwise gets hand-rolled around `migrate --check`-style commands. Configuration errors still exit `2` immediately, and `--timeout <seconds>` bounds the wait (an in-flight connection attempt finishes first, so the exit can run up to ~10 seconds past the deadline against an unresponsive host). Use `--json` (without `--wait`) for machine-readable output — the payload includes the exit code alongside the classification.
+
+A few behaviors are deliberate:
+
+- **Data migrations don't gate.** A pending migration whose operations are all `RunPython` warns instead of blocking — a long backfill is legitimately pending for hours while new processes serve fine.
+- **`DEBUG` warns instead of gating.** Mid-development you routinely have a new model with no migration yet; the dev server should tell you, not refuse to boot. This is the command's exit-code policy — the JSON `status` and the Python API below always report the true classification.
+- **Existence only.** The schema check verifies tables and columns exist — the things the ORM can't run without. Index, constraint, and type drift is [convergence](#convergence)'s job and never blocks serving.
+- **Unknown connection failures are retryable.** Only clearly-permanent errors (bad password, missing database, a broken `POSTGRES_URL`) exit `2` — a database restarting mid-deploy must never read as a configuration problem.
+
+The check runs against `POSTGRES_URL` — the connection the app serves through. Release phases don't need a readiness gate in front of them: the schema commands (`sync`, `migrations apply`, `converge`) wait for the database themselves, retrying connection failures for up to `POSTGRES_WAIT_TIMEOUT` seconds (default 60) while configuration errors fail immediately with the same classification `ready` uses.
+
+In Python, the same check is [`check_database_ready()`](./readiness.py#check_database_ready), which returns a classified [`ReadinessResult`](./readiness.py#ReadinessResult).
 
 ## Fields
 
@@ -1470,6 +1504,7 @@ The connection is configured with a single URL (`POSTGRES_URL`). `DATABASE_URL` 
 | `POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   | `str`         | `"3s"`                  | `PLAIN_POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   |
 | `POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      | `str`         | `"3s"`                  | `PLAIN_POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      |
 | `POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT` | `str`         | `"3s"`                  | `PLAIN_POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT` |
+| `POSTGRES_WAIT_TIMEOUT`                  | `float`       | `60.0`                  | `PLAIN_POSTGRES_WAIT_TIMEOUT`                  |
 
 See [`default_settings.py`](./default_settings.py) for more details.
 

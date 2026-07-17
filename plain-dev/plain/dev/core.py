@@ -74,6 +74,9 @@ class DevSupervisor(Supervisor):
             "PLAIN_SERVER_ACCESS_LOG_FIELDS": '["method", "url", "status", "duration_ms", "size"]',
             "FORCE_COLOR": "1",
             "PYTHONWARNINGS": "default::DeprecationWarning,default::PendingDeprecationWarning",
+            # Dev databases can take a while on first run (Docker image pull);
+            # give schema commands more patience than the production default.
+            "PLAIN_POSTGRES_WAIT_TIMEOUT": "300",
             **os.environ,
         }
 
@@ -156,18 +159,14 @@ class DevSupervisor(Supervisor):
         self.run_preflight()
 
         if find_spec("plain.postgres"):
-            print_event("Waiting for database...", newline=False)
-            subprocess.run(
-                [sys.executable, "-m", "plain", "postgres", "wait"],
-                env=self.plain_env,
-                check=True,
-            )
-
-            # Backup before syncing if sync would make changes
+            # Backup before syncing if sync would make changes. sync --check
+            # waits for the database itself (POSTGRES_WAIT_TIMEOUT); capture
+            # only stdout so its stderr wait-progress lines stream live.
+            print_event("Waiting for database...")
             check_result = subprocess.run(
                 [sys.executable, "-m", "plain", "postgres", "sync", "--check"],
                 env=self.plain_env,
-                capture_output=True,
+                stdout=subprocess.PIPE,
             )
 
             if check_result.returncode != 0:
@@ -184,11 +183,15 @@ class DevSupervisor(Supervisor):
                     click.secho("skipped", dim=True)
 
             print_event("Syncing database...")
-            subprocess.run(
+            sync_result = subprocess.run(
                 [sys.executable, "-m", "plain", "postgres", "sync"],
-                env=self.plain_env,
-                check=True,
+                # The --check above already waited for the database — fail
+                # fast here instead of waiting a second full window.
+                env={**self.plain_env, "PLAIN_POSTGRES_WAIT_TIMEOUT": "0"},
             )
+            if sync_result.returncode != 0:
+                click.secho("Database sync failed — see the output above.", fg="red")
+                return 1
 
         print_event("Starting app...")
 

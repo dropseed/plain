@@ -374,6 +374,16 @@ class SettingDefinition:
         return repr(self.value)
 
     def set_value(self, value: typing.Any, source: str) -> None:
+        # Accept an int where a float is annotated (PEP 484 numeric tower) —
+        # `PLAIN_X=30` and `X = 30` are natural spellings for a float
+        # setting. Stored as float so the value matches the annotation.
+        # bool is excluded: it's an int subclass but never a number here.
+        if (
+            self.annotation is float
+            and isinstance(value, int)
+            and not isinstance(value, bool)
+        ):
+            value = float(value)
         self.check_type(value)
         self.value = value
         self.source = source

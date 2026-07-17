@@ -27,7 +27,11 @@ from ..migrations.recorder import MigrationRecorder
 from ..migrations.state import ModelState, ProjectState
 from ..migrations.writer import MigrationWriter
 from ..registry import models_registry
-from .decorators import cli_schema_lock, database_management_command
+from .decorators import (
+    cli_schema_lock,
+    cli_wait_for_database,
+    database_management_command,
+)
 
 if TYPE_CHECKING:
     from ..connection import DatabaseConnection
@@ -359,6 +363,7 @@ def apply(
     quiet: bool,
 ) -> None:
     """Apply database migrations"""
+    cli_wait_for_database()
 
     def migration_progress_callback(
         action: str,
