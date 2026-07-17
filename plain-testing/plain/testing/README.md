@@ -4,6 +4,7 @@
 
 - [Overview](#overview)
 - [Writing tests](#writing-tests)
+- [The test client](#the-test-client)
 - [Assertions](#assertions)
 - [Test metadata](#test-metadata)
 - [Overriding context](#overriding-context)
@@ -64,7 +65,7 @@ from app.users.models import User
 
 
 def test_signup_creates_user():
-    response = Client().post("/signup/", data={"email": "a@example.com"})
+    response = Client().post("/signup/", form_data={"email": "a@example.com"})
     assert response.status_code == 302
     assert User.query.count() == 1
 ```
@@ -95,6 +96,59 @@ def test_dashboard_requires_login():
 ```
 
 If a test needs something, it imports it or builds it — everything in a test file traces back to a name you can see.
+
+## The test client
+
+`Client` makes requests against your app without running a server, and it speaks the same vocabulary as the rest of Plain. The names you send with are the names views receive: `form_data=` arrives as `request.form_data`, `json_data=` as `request.json_data`, `files=` as `request.files`, `query_params=` as `request.query_params`.
+
+```python
+from plain.test import Client
+
+
+def test_signup_flow():
+    client = Client()
+
+    response = client.post("/signup/", form_data={"email": "a@example.com"})
+    assert response.redirect_to == "/welcome/"
+
+    response = client.get("/welcome/")
+    assert "Check your email" in response.text
+```
+
+Everything after the path is keyword-only. The content type follows from the argument — `form_data=` sends a form, `json_data=` sends JSON — and `headers={...}` adds anything else:
+
+```python
+response = client.post(
+    "/api/orders/",
+    json_data={"sku": "A-1"},
+    headers={"Authorization": f"Bearer {token}"},
+)
+assert response.status_code == 201
+assert response.json_data["id"]
+```
+
+**Responses are data, not assertion methods.** Bare `assert` is the assertion API, so the response exposes rich, assertable attributes instead of `assert_*` helpers:
+
+- `response.status_code`
+- `response.headers`
+- `response.text` (str) and `response.body` (bytes)
+- `response.json_data` — parsed JSON, mirroring the request-side name
+- `response.redirect_to` — the redirect target on a 3xx response, `None` otherwise, so redirect checks are one line
+- `response.request` — the request that produced this response, after middleware ran; `response.request.user` is how you check who was authenticated
+
+```python
+def test_login():
+    client = Client()
+    client.force_login(user)
+
+    response = client.get("/dashboard/")
+    assert response.request.user == user
+
+    client.logout()
+    assert client.get("/dashboard/").redirect_to == "/login/"
+```
+
+A client holds cookies and session state across requests, so multi-step flows read top to bottom. `force_login(user)` authenticates without going through the login form; `logout()` clears the session. Redirects aren't followed unless you ask (`follow_redirects=True`) — where a request lands is usually the thing worth asserting.
 
 ## Assertions
 
@@ -225,7 +279,7 @@ from plain.test import capture_spans, capture_metrics
 
 def test_signup_sends_welcome_email():
     with capture_jobs() as jobs:
-        Client().post("/signup/", data={"email": "a@example.com"})
+        Client().post("/signup/", form_data={"email": "a@example.com"})
         jobs.run_all()  # process enqueued jobs in-process, same transaction
 
     assert len(outbox) == 1
@@ -435,7 +489,7 @@ A brand-new Plain project has meaningful checks on day one, with zero test files
 
 The system is split across three layers, and the split is what keeps a dev-only package from leaking into production code:
 
-**`plain.test` (core — always installed).** The authoring vocabulary: everything a test file imports. `Client` and `RequestFactory` (already there today), plus `raises`, the metadata decorators (`cases`, `skip`, `tag`, `timeout`), the context helpers (`override_settings`, `freeze_time`, `patch`, `capture_spans`, `capture_metrics`, `max_queries`), and the `TestLifecycle` protocol. These are small, dependency-light functions and context managers — none of them need the engine to exist. Keeping them in core means app code, package code, and type checkers never depend on a dev package, and `plain.test` remains the single import home you already know. It's also load-bearing outside of tests — `plain request` is built on `Client` — so it couldn't move to a dev-only package even if we wanted it to.
+**`plain.test` (core — always installed).** The authoring vocabulary: everything a test file imports. `Client` (redesigned as part of this — see [The test client](#the-test-client)), plus `raises`, the metadata decorators (`cases`, `skip`, `tag`, `timeout`), the context helpers (`override_settings`, `freeze_time`, `patch`, `capture_spans`, `capture_metrics`, `max_queries`), and the `TestLifecycle` protocol. These are small, dependency-light functions and context managers — none of them need the engine to exist. Keeping them in core means app code, package code, and type checkers never depend on a dev package, and `plain.test` remains the single import home you already know. It's also load-bearing outside of tests — `plain request` is built on `Client` — so it couldn't move to a dev-only package even if we wanted it to.
 
 **`plain.testing` (this package — a dev dependency).** The engine: the `plain test` CLI, collection, assertion rewriting, execution and parallelism, flake classification, reporting (`--json`, route coverage, `--changed`), the browser wrapper, and the built-in suite. Nothing in your application imports from it; it imports *you*.
 
