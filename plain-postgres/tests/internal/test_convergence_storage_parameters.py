@@ -13,9 +13,9 @@ from plain.postgres.convergence.analysis import (
     StorageParameterDrift,
     analyze_model,
 )
-from plain.postgres.convergence.fixes import (
-    ResetStorageParameterFix,
-    SetStorageParameterFix,
+from plain.postgres.convergence.corrections import (
+    ResetStorageParameterCorrection,
+    SetStorageParameterCorrection,
 )
 from plain.postgres.introspection.schema import _fetch_raw_reloptions
 
@@ -135,9 +135,9 @@ class TestStorageParameterPlanning:
                 ).executable()
 
             set_fixes = [
-                item.fix
+                item.correction
                 for item in items
-                if isinstance(item.fix, SetStorageParameterFix)
+                if isinstance(item.correction, SetStorageParameterCorrection)
             ]
             assert len(set_fixes) == 1
             assert set_fixes[0].key == "autovacuum_vacuum_scale_factor"
@@ -156,9 +156,9 @@ class TestStorageParameterPlanning:
                 ).executable()
 
             reset_fixes = [
-                item.fix
+                item.correction
                 for item in items
-                if isinstance(item.fix, ResetStorageParameterFix)
+                if isinstance(item.correction, ResetStorageParameterCorrection)
             ]
             assert len(reset_fixes) == 1
             assert reset_fixes[0].key == "fillfactor"
@@ -170,25 +170,25 @@ class TestStorageParameterPlanning:
 
 class TestStorageParameterApply:
     def test_set_fix_applies_heap_param(self, isolated_db):
-        fix = SetStorageParameterFix(
+        correction = SetStorageParameterCorrection(
             table="examples_storageparametersexample",
             key="autovacuum_vacuum_scale_factor",
             value="0.1",
         )
 
-        fix.apply()
+        correction.apply()
         heap, _ = _table_reloptions("examples_storageparametersexample")
         assert heap is not None
         assert "autovacuum_vacuum_scale_factor=0.1" in heap
 
     def test_set_fix_applies_toast_param(self, isolated_db):
-        fix = SetStorageParameterFix(
+        correction = SetStorageParameterCorrection(
             table="examples_storageparametersexample",
             key="toast.autovacuum_vacuum_scale_factor",
             value="0.05",
         )
 
-        fix.apply()
+        correction.apply()
         _, toast = _table_reloptions("examples_storageparametersexample")
         assert toast is not None
         assert "autovacuum_vacuum_scale_factor=0.05" in toast
@@ -196,10 +196,10 @@ class TestStorageParameterApply:
     def test_reset_fix_clears_param(self, isolated_db):
         execute('ALTER TABLE "examples_storageparametersexample" SET (fillfactor = 90)')
 
-        fix = ResetStorageParameterFix(
+        correction = ResetStorageParameterCorrection(
             table="examples_storageparametersexample", key="fillfactor"
         )
-        fix.apply()
+        correction.apply()
 
         heap, _ = _table_reloptions("examples_storageparametersexample")
         assert heap is None or not any("fillfactor" in opt for opt in heap)
@@ -215,8 +215,8 @@ class TestStorageParameterApply:
                     conn, cursor, StorageParametersExample
                 ).executable()
             for item in items:
-                assert item.fix is not None
-                item.fix.apply()
+                assert item.correction is not None
+                item.correction.apply()
 
             with get_connection().cursor() as cursor:
                 analysis = analyze_model(

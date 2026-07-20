@@ -43,7 +43,7 @@ def _execute_and_commit(sql: str | list[str], *, blocking: bool = True) -> None:
     """Execute DDL in a committed transaction with convergence timeouts.
 
     Accepts a single SQL string or a list of statements that must share one
-    transaction (e.g. SetNotNullFix step 3: SET NOT NULL + DROP temp check
+    transaction (e.g. SetNotNullCorrection step 3: SET NOT NULL + DROP temp check
     together so no orphan constraint can remain after a partial failure).
     """
     prelude = _convergence_prelude(blocking=blocking, local=True)
@@ -124,7 +124,7 @@ def _execute_autocommit(sql: str) -> None:
             conn.set_autocommit(False)
 
 
-class Fix(ABC):
+class Correction(ABC):
     """Concrete executable SQL operation for convergence."""
 
     pass_order: ClassVar[int]
@@ -137,7 +137,7 @@ class Fix(ABC):
 
 
 @dataclass
-class RebuildIndexFix(Fix):
+class RebuildIndexCorrection(Correction):
     """Drop an INVALID index and recreate it CONCURRENTLY."""
 
     pass_order = 0
@@ -158,7 +158,7 @@ class RebuildIndexFix(Fix):
 
 
 @dataclass
-class RenameIndexFix(Fix):
+class RenameIndexCorrection(Correction):
     """Rename an index (catalog-only, instant)."""
 
     pass_order = 1
@@ -177,7 +177,7 @@ class RenameIndexFix(Fix):
 
 
 @dataclass
-class CreateIndexFix(Fix):
+class CreateIndexCorrection(Correction):
     """Create a missing index using CONCURRENTLY (doesn't block writes)."""
 
     pass_order = 1
@@ -196,7 +196,7 @@ class CreateIndexFix(Fix):
 
 
 @dataclass
-class AddConstraintFix(Fix):
+class AddConstraintCorrection(Correction):
     """Add a missing constraint.
 
     Check constraints use ADD CONSTRAINT ... NOT VALID + VALIDATE CONSTRAINT
@@ -263,7 +263,7 @@ class AddConstraintFix(Fix):
 
 
 @dataclass
-class AddForeignKeyFix(Fix):
+class AddForeignKeyCorrection(Correction):
     """Add a missing FK constraint using NOT VALID, then validate immediately.
 
     Step 1: ADD CONSTRAINT ... NOT VALID (SHARE ROW EXCLUSIVE, no scan)
@@ -307,7 +307,7 @@ class AddForeignKeyFix(Fix):
 
 
 @dataclass
-class ReplaceForeignKeyFix(Fix):
+class ReplaceForeignKeyCorrection(Correction):
     """Swap a FK's ON DELETE action, then validate.
 
     Step 1: ALTER TABLE DROP CONSTRAINT + ADD CONSTRAINT ... NOT VALID
@@ -362,7 +362,7 @@ class ReplaceForeignKeyFix(Fix):
 
 
 @dataclass
-class SetNotNullFix(Fix):
+class SetNotNullCorrection(Correction):
     """Enforce NOT NULL via CHECK NOT VALID → VALIDATE → SET NOT NULL.
 
     A bare SET NOT NULL acquires ACCESS EXCLUSIVE and scans the whole table
@@ -421,7 +421,7 @@ class SetNotNullFix(Fix):
 
 
 @dataclass
-class DropNotNullFix(Fix):
+class DropNotNullCorrection(Correction):
     """Remove NOT NULL from a column (model now allows NULL).
 
     DROP NOT NULL is a catalog-only change — no data scan, instant.
@@ -442,7 +442,7 @@ class DropNotNullFix(Fix):
 
 
 @dataclass
-class SetColumnDefaultFix(Fix):
+class SetColumnDefaultCorrection(Correction):
     """Set (or replace) a column's DEFAULT (catalog-only, instant)."""
 
     pass_order = 2
@@ -465,7 +465,7 @@ class SetColumnDefaultFix(Fix):
 
 
 @dataclass
-class DropColumnDefaultFix(Fix):
+class DropColumnDefaultCorrection(Correction):
     """Drop a column's DEFAULT (catalog-only, instant)."""
 
     pass_order = 2
@@ -487,7 +487,7 @@ class DropColumnDefaultFix(Fix):
 
 
 @dataclass
-class RenameConstraintFix(Fix):
+class RenameConstraintCorrection(Correction):
     """Rename a constraint (catalog-only, instant).
 
     For unique constraints, Postgres automatically renames the backing index.
@@ -509,7 +509,7 @@ class RenameConstraintFix(Fix):
 
 
 @dataclass
-class ValidateConstraintFix(Fix):
+class ValidateConstraintCorrection(Correction):
     """Validate a NOT VALID constraint (SHARE UPDATE EXCLUSIVE — doesn't block writes)."""
 
     pass_order = 3
@@ -527,7 +527,7 @@ class ValidateConstraintFix(Fix):
 
 
 @dataclass
-class DropConstraintFix(Fix):
+class DropConstraintCorrection(Correction):
     pass_order = 4
 
     table: str
@@ -543,7 +543,7 @@ class DropConstraintFix(Fix):
 
 
 @dataclass
-class DropIndexFix(Fix):
+class DropIndexCorrection(Correction):
     pass_order = 5
 
     table: str
@@ -559,7 +559,7 @@ class DropIndexFix(Fix):
 
 
 @dataclass
-class SetStorageParameterFix(Fix):
+class SetStorageParameterCorrection(Correction):
     """Set a single `pg_class.reloptions` parameter (catalog-only, instant)."""
 
     pass_order = 2
@@ -580,7 +580,7 @@ class SetStorageParameterFix(Fix):
 
 
 @dataclass
-class ResetStorageParameterFix(Fix):
+class ResetStorageParameterCorrection(Correction):
     """Reset a single `pg_class.reloptions` parameter (catalog-only, instant)."""
 
     pass_order = 2

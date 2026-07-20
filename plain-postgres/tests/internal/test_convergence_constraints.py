@@ -14,7 +14,7 @@ from plain.postgres import CheckConstraint, Q, UniqueConstraint, get_connection
 from plain.postgres.constraints import Deferrable
 from plain.postgres.convergence import (
     analyze_model,
-    can_auto_fix,
+    can_auto_correct,
     plan_convergence,
     plan_model_convergence,
 )
@@ -26,11 +26,11 @@ from plain.postgres.convergence.analysis import (
     IndexDrift,
     IndexUndeclaredDrift,
 )
-from plain.postgres.convergence.fixes import (
-    AddConstraintFix,
-    DropConstraintFix,
-    RenameConstraintFix,
-    ValidateConstraintFix,
+from plain.postgres.convergence.corrections import (
+    AddConstraintCorrection,
+    DropConstraintCorrection,
+    RenameConstraintCorrection,
+    ValidateConstraintCorrection,
 )
 from plain.postgres.functions.text import Lower, Upper
 from plain.postgres.introspection import ConType
@@ -80,8 +80,8 @@ class TestUnmanagedConstraintTypes:
             items = plan_model_convergence(conn, cursor, ConstraintExample).executable()
 
         assert not any(
-            isinstance(item.fix, DropConstraintFix)
-            and item.fix.name == "examples_constraintexample_name_excl"
+            isinstance(item.correction, DropConstraintCorrection)
+            and item.correction.name == "examples_constraintexample_name_excl"
             for item in items
         )
 
@@ -113,8 +113,8 @@ class TestDetectConstraintFixes:
             items = plan_model_convergence(conn, cursor, ConstraintExample).executable()
 
         assert len(items) == 1
-        assert isinstance(items[0].fix, DropConstraintFix)
-        assert items[0].fix.name == "examples_constraintexample_test_check"
+        assert isinstance(items[0].correction, DropConstraintCorrection)
+        assert items[0].correction.name == "examples_constraintexample_test_check"
 
     def test_detects_extra_unique_constraint(self, db):
         execute(
@@ -126,8 +126,8 @@ class TestDetectConstraintFixes:
             items = plan_model_convergence(conn, cursor, ConstraintExample).executable()
 
         assert len(items) == 1
-        assert isinstance(items[0].fix, DropConstraintFix)
-        assert items[0].fix.name == "examples_constraintexample_extra_unique"
+        assert isinstance(items[0].correction, DropConstraintCorrection)
+        assert items[0].correction.name == "examples_constraintexample_extra_unique"
 
     def test_detects_missing_check_constraint(self, db):
         original_constraints = list(ConstraintExample.model_options.constraints)
@@ -145,9 +145,10 @@ class TestDetectConstraintFixes:
                 ).executable()
 
             assert len(items) == 1
-            assert isinstance(items[0].fix, AddConstraintFix)
+            assert isinstance(items[0].correction, AddConstraintCorrection)
             assert (
-                items[0].fix.constraint.name == "examples_constraintexample_id_nonneg"
+                items[0].correction.constraint.name
+                == "examples_constraintexample_id_nonneg"
             )
         finally:
             ConstraintExample.model_options.constraints = original_constraints
@@ -162,9 +163,10 @@ class TestDetectConstraintFixes:
             items = plan_model_convergence(conn, cursor, ConstraintExample).executable()
 
         assert len(items) == 1
-        assert isinstance(items[0].fix, AddConstraintFix)
+        assert isinstance(items[0].correction, AddConstraintCorrection)
         assert (
-            items[0].fix.constraint.name == "unique_constraintexample_name_description"
+            items[0].correction.constraint.name
+            == "unique_constraintexample_name_description"
         )
 
     def test_detects_not_valid_check_constraint(self, db):
@@ -188,8 +190,8 @@ class TestDetectConstraintFixes:
                 ).executable()
 
             assert len(items) == 1
-            assert isinstance(items[0].fix, ValidateConstraintFix)
-            assert items[0].fix.name == "examples_constraintexample_id_nonneg"
+            assert isinstance(items[0].correction, ValidateConstraintCorrection)
+            assert items[0].correction.name == "examples_constraintexample_id_nonneg"
         finally:
             ConstraintExample.model_options.constraints = original_constraints
 
@@ -213,12 +215,12 @@ class TestDetectConstraintFixes:
             with conn.cursor() as cursor:
                 plan = plan_model_convergence(conn, cursor, ConstraintExample)
 
-            # Changed constraint definition has no auto-fix
+            # Changed constraint definition has no auto-correction
             assert plan.executable() == []
             assert len(plan.blocked) == 1
             assert isinstance(plan.blocked[0].drift, ConstraintDrift)
             assert plan.blocked[0].drift.kind == DriftKind.CHANGED
-            assert plan.blocked[0].fix is None
+            assert plan.blocked[0].correction is None
             assert plan.blocked[0].guidance is not None
         finally:
             ConstraintExample.model_options.constraints = original_constraints
@@ -268,7 +270,7 @@ class TestDetectConstraintFixes:
             assert len(plan.blocked) == 1
             assert isinstance(plan.blocked[0].drift, ConstraintDrift)
             assert plan.blocked[0].drift.kind == DriftKind.CHANGED
-            assert plan.blocked[0].fix is None
+            assert plan.blocked[0].correction is None
             assert plan.blocked[0].guidance is not None
         finally:
             ConstraintExample.model_options.constraints = original_constraints
@@ -346,7 +348,7 @@ class TestDetectConstraintFixes:
 
 class TestApplyConstraintFixes:
     def test_add_check_constraint_validates_immediately(self, isolated_db):
-        """AddConstraintFix for check constraints adds NOT VALID and validates in one apply."""
+        """AddConstraintCorrection for check constraints adds NOT VALID and validates in one apply."""
         check = CheckConstraint(
             check=Q(id__gte=0),
             name="examples_constraintexample_id_nonneg",
@@ -355,12 +357,12 @@ class TestApplyConstraintFixes:
         ConstraintExample.model_options.constraints = [*original_constraints, check]
 
         try:
-            fix = AddConstraintFix(
+            correction = AddConstraintCorrection(
                 table="examples_constraintexample",
                 constraint=check,
                 model=ConstraintExample,
             )
-            sql = fix.apply()
+            sql = correction.apply()
 
             assert "NOT VALID" in sql
             assert "VALIDATE CONSTRAINT" in sql
@@ -374,7 +376,7 @@ class TestApplyConstraintFixes:
             ConstraintExample.model_options.constraints = original_constraints
 
     def test_validate_constraint(self, isolated_db):
-        """ValidateConstraintFix validates a NOT VALID constraint."""
+        """ValidateConstraintCorrection validates a NOT VALID constraint."""
         execute(
             'ALTER TABLE "examples_constraintexample" ADD CONSTRAINT "examples_constraintexample_id_nonneg" CHECK ("id" >= 0) NOT VALID'
         )
@@ -382,11 +384,11 @@ class TestApplyConstraintFixes:
             "examples_constraintexample", "examples_constraintexample_id_nonneg"
         )
 
-        fix = ValidateConstraintFix(
+        correction = ValidateConstraintCorrection(
             table="examples_constraintexample",
             name="examples_constraintexample_id_nonneg",
         )
-        fix.apply()
+        correction.apply()
 
         assert constraint_is_valid(
             "examples_constraintexample", "examples_constraintexample_id_nonneg"
@@ -408,9 +410,9 @@ class TestApplyConstraintFixes:
                     conn, cursor, ConstraintExample
                 ).executable()
             assert len(items) == 1
-            assert isinstance(items[0].fix, AddConstraintFix)
+            assert isinstance(items[0].correction, AddConstraintCorrection)
 
-            items[0].fix.apply()
+            items[0].correction.apply()
             assert constraint_is_valid(
                 "examples_constraintexample", "examples_constraintexample_id_nonneg"
             )
@@ -454,8 +456,8 @@ class TestApplyConstraintFixes:
                     conn, cursor, ConstraintExample
                 ).executable()
             assert len(items) == 1
-            assert isinstance(items[0].fix, AddConstraintFix)
-            items[0].fix.apply()
+            assert isinstance(items[0].correction, AddConstraintCorrection)
+            items[0].correction.apply()
 
             # Second pass: must report no drift, neither executable nor
             # blocked. PG stores `IN (...)` as `= ANY (ARRAY[...])` and adds
@@ -698,7 +700,7 @@ class TestApplyConstraintFixes:
             ConstraintExample.model_options.constraints = original_constraints
 
     def test_check_definition_change_is_blocked(self, isolated_db):
-        """Changed check definition is blocked — no auto-fix available."""
+        """Changed check definition is blocked — no auto-correction available."""
         original_constraints = list(ConstraintExample.model_options.constraints)
         # Model declares CHECK (id >= 1)
         check = CheckConstraint(
@@ -715,7 +717,7 @@ class TestApplyConstraintFixes:
         try:
             conn = get_connection()
 
-            # Detects definition change as blocked (no executable fix)
+            # Detects definition change as blocked (no executable correction)
             with conn.cursor() as cursor:
                 plan = plan_model_convergence(conn, cursor, ConstraintExample)
 
@@ -723,15 +725,15 @@ class TestApplyConstraintFixes:
             assert len(plan.blocked) == 1
             assert isinstance(plan.blocked[0].drift, ConstraintDrift)
             assert plan.blocked[0].drift.kind == DriftKind.CHANGED
-            assert plan.blocked[0].fix is None
+            assert plan.blocked[0].correction is None
 
-            # can_auto_fix returns False for changed constraints
-            assert not can_auto_fix(plan.blocked[0].drift)
+            # can_auto_correct returns False for changed constraints
+            assert not can_auto_correct(plan.blocked[0].drift)
         finally:
             ConstraintExample.model_options.constraints = original_constraints
 
     def test_unique_definition_change_is_blocked(self, isolated_db):
-        """Changed unique columns is blocked — no auto-fix available."""
+        """Changed unique columns is blocked — no auto-correction available."""
         # DB has unique_constraintexample_name_description on ("name", "description")
         # Model declares unique on ("name") only — same name, different columns
         original_constraints = list(ConstraintExample.model_options.constraints)
@@ -750,9 +752,9 @@ class TestApplyConstraintFixes:
             assert len(plan.blocked) == 1
             assert isinstance(plan.blocked[0].drift, ConstraintDrift)
             assert plan.blocked[0].drift.kind == DriftKind.CHANGED
-            assert plan.blocked[0].fix is None
+            assert plan.blocked[0].correction is None
 
-            assert not can_auto_fix(plan.blocked[0].drift)
+            assert not can_auto_correct(plan.blocked[0].drift)
         finally:
             ConstraintExample.model_options.constraints = original_constraints
 
@@ -764,11 +766,11 @@ class TestApplyConstraintFixes:
             "examples_constraintexample", "examples_constraintexample_temp_check"
         )
 
-        fix = DropConstraintFix(
+        correction = DropConstraintCorrection(
             table="examples_constraintexample",
             name="examples_constraintexample_temp_check",
         )
-        fix.apply()
+        correction.apply()
 
         assert not constraint_exists(
             "examples_constraintexample", "examples_constraintexample_temp_check"
@@ -791,12 +793,12 @@ class TestApplyConstraintFixes:
                 break
         assert constraint is not None
 
-        fix = AddConstraintFix(
+        correction = AddConstraintCorrection(
             table="examples_constraintexample",
             constraint=constraint,
             model=ConstraintExample,
         )
-        sql = fix.apply()
+        sql = correction.apply()
 
         assert "CONCURRENTLY" in sql
         assert "USING INDEX" in sql
@@ -823,12 +825,12 @@ class TestApplyConstraintFixes:
         ]
 
         try:
-            fix = AddConstraintFix(
+            correction = AddConstraintCorrection(
                 table="examples_constraintexample",
                 constraint=constraint,
                 model=ConstraintExample,
             )
-            sql = fix.apply()
+            sql = correction.apply()
 
             assert f"DEFERRABLE INITIALLY {deferrable.name}" in sql
             assert constraint_exists("examples_constraintexample", constraint.name)
@@ -935,18 +937,18 @@ class TestConstraintRename:
             ConstraintExample.model_options.constraints = original_constraints
 
     def test_apply_rename_constraint(self, isolated_db):
-        """RenameConstraintFix renames using ALTER TABLE RENAME CONSTRAINT."""
+        """RenameConstraintCorrection renames using ALTER TABLE RENAME CONSTRAINT."""
         execute(
             'ALTER TABLE "examples_constraintexample" ADD CONSTRAINT "old_check" CHECK ("id" >= 0)'
         )
         assert constraint_exists("examples_constraintexample", "old_check")
 
-        fix = RenameConstraintFix(
+        correction = RenameConstraintCorrection(
             table="examples_constraintexample",
             old_name="old_check",
             new_name="new_check",
         )
-        sql = fix.apply()
+        sql = correction.apply()
 
         assert "RENAME CONSTRAINT" in sql
         assert not constraint_exists("examples_constraintexample", "old_check")
@@ -964,12 +966,12 @@ class TestConstraintRename:
         assert constraint_exists("examples_constraintexample", "old_unique")
         assert index_exists("old_unique")
 
-        fix = RenameConstraintFix(
+        correction = RenameConstraintCorrection(
             table="examples_constraintexample",
             old_name="old_unique",
             new_name="new_unique",
         )
-        fix.apply()
+        correction.apply()
 
         assert constraint_exists("examples_constraintexample", "new_unique")
         assert index_exists("new_unique")
@@ -998,9 +1000,9 @@ class TestConstraintRename:
                     conn, cursor, ConstraintExample
                 ).executable()
             assert len(items) == 1
-            assert isinstance(items[0].fix, RenameConstraintFix)
+            assert isinstance(items[0].correction, RenameConstraintCorrection)
 
-            items[0].fix.apply()
+            items[0].correction.apply()
 
             with conn.cursor() as cursor:
                 items = plan_model_convergence(
@@ -1016,7 +1018,7 @@ class TestIndexBackedUniqueConstraints:
     indexes (condition, expressions, opclasses).  These must go through the
     index creation path, not the constraint attachment path."""
 
-    # -- Gap 1: AddConstraintFix should not try USING INDEX for these --
+    # -- Gap 1: AddConstraintCorrection should not try USING INDEX for these --
 
     def test_add_conditional_unique_succeeds(self, isolated_db):
         """A conditional unique constraint should be created as an index, not fail."""
@@ -1038,13 +1040,15 @@ class TestIndexBackedUniqueConstraints:
                     conn, cursor, ConstraintExample
                 ).executable()
 
-            # Should produce a fix
+            # Should produce a correction
             assert len(items) >= 1
-            fix = next(
-                i.fix for i in items if getattr(i.fix, "constraint", None) is constraint
+            correction = next(
+                i.correction
+                for i in items
+                if getattr(i.correction, "constraint", None) is constraint
             )
-            assert fix is not None
-            sql = fix.apply()
+            assert correction is not None
+            sql = correction.apply()
             assert "CONCURRENTLY" in sql
             assert index_exists("examples_constraintexample_name_conditional_uq")
         finally:
@@ -1070,11 +1074,13 @@ class TestIndexBackedUniqueConstraints:
                 ).executable()
 
             assert len(items) >= 1
-            fix = next(
-                i.fix for i in items if getattr(i.fix, "constraint", None) is constraint
+            correction = next(
+                i.correction
+                for i in items
+                if getattr(i.correction, "constraint", None) is constraint
             )
-            assert fix is not None
-            sql = fix.apply()
+            assert correction is not None
+            sql = correction.apply()
             assert "CONCURRENTLY" in sql
             assert index_exists("examples_constraintexample_name_upper_uq")
         finally:
@@ -1215,11 +1221,13 @@ class TestIndexBackedUniqueConstraints:
                 items = plan_model_convergence(
                     conn, cursor, ConstraintExample
                 ).executable()
-            assert any(getattr(i.fix, "constraint", None) is constraint for i in items)
+            assert any(
+                getattr(i.correction, "constraint", None) is constraint for i in items
+            )
             for item in items:
-                if getattr(item.fix, "constraint", None) is constraint:
-                    assert item.fix is not None
-                    item.fix.apply()
+                if getattr(item.correction, "constraint", None) is constraint:
+                    assert item.correction is not None
+                    item.correction.apply()
 
             # Second pass: should be fully converged
             with conn.cursor() as cursor:
@@ -1274,11 +1282,11 @@ class TestIndexBackedUniqueConstraints:
         finally:
             ConstraintExample.model_options.constraints = original_constraints
 
-    # -- Gap 5: rename/drop use correct fix types for index-only --
+    # -- Gap 5: rename/drop use correct correction types for index-only --
 
     def test_undeclared_index_only_unique_uses_drop_index(self, db):
-        """Undeclared index-only unique should use DropIndexFix, not DropConstraintFix."""
-        from plain.postgres.convergence.fixes import DropIndexFix
+        """Undeclared index-only unique should use DropIndexCorrection, not DropConstraintCorrection."""
+        from plain.postgres.convergence.corrections import DropIndexCorrection
 
         execute(
             'CREATE UNIQUE INDEX "examples_constraintexample_old_partial_uq"'
@@ -1294,11 +1302,11 @@ class TestIndexBackedUniqueConstraints:
             and item.drift.name == "examples_constraintexample_old_partial_uq"
         ]
         assert len(undeclared) == 1
-        assert isinstance(undeclared[0].fix, DropIndexFix)
+        assert isinstance(undeclared[0].correction, DropIndexCorrection)
 
     def test_rename_index_only_unique_uses_rename_index(self, db):
-        """Renaming an index-only unique should use RenameIndexFix."""
-        from plain.postgres.convergence.fixes import RenameIndexFix
+        """Renaming an index-only unique should use RenameIndexCorrection."""
+        from plain.postgres.convergence.corrections import RenameIndexCorrection
 
         original_constraints = list(ConstraintExample.model_options.constraints)
         constraint = UniqueConstraint(
@@ -1326,7 +1334,7 @@ class TestIndexBackedUniqueConstraints:
                 and item.drift.kind == DriftKind.RENAMED
             ]
             assert len(rename_items) == 1
-            assert isinstance(rename_items[0].fix, RenameIndexFix)
+            assert isinstance(rename_items[0].correction, RenameIndexCorrection)
         finally:
             ConstraintExample.model_options.constraints = original_constraints
 
