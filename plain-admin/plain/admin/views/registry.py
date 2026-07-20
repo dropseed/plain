@@ -71,9 +71,9 @@ class AdminViewRegistry:
 
     def get_nav_sections(
         self, *, plain_packages: bool, user: Model
-    ) -> dict[str, list[type]]:
+    ) -> dict[str, list[type[AdminView]]]:
         """Returns nav sections filtered by package type."""
-        sections: dict[str, list[type]] = {}
+        sections: dict[str, list[type[AdminView]]] = {}
 
         for view in self.registered_views:
             is_plain = view.__module__.startswith("plain.")

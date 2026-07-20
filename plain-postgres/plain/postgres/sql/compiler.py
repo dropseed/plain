@@ -1260,11 +1260,13 @@ class SQLCompiler:
 
         def _get_field_choices() -> Generator[str]:
             """Yield all allowed field paths in breadth-first search order."""
-            queue = collections.deque([(None, self.klass_info)])
+            queue: collections.deque[tuple[list[str] | None, dict[str, Any] | None]] = (
+                collections.deque([(None, self.klass_info)])
+            )
             while queue:
                 parent_path, klass_info = queue.popleft()
                 if parent_path is None:
-                    path = []
+                    path: list[str] = []
                     yield "self"
                 else:
                     assert klass_info is not None  # Only first iteration has None
