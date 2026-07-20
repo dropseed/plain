@@ -7,7 +7,11 @@ import click
 from plain.runtime import settings
 
 from ..convergence import execute_plan, plan_convergence
-from .decorators import cli_schema_lock, database_management_command
+from .decorators import (
+    cli_schema_lock,
+    cli_wait_for_database,
+    database_management_command,
+)
 
 
 @click.command()
@@ -26,6 +30,8 @@ def sync(check: bool) -> None:
     Undeclared indexes and constraints are automatically dropped — models are
     the source of truth.
     """
+    cli_wait_for_database()
+
     if check:
         _check()
         return

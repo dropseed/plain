@@ -5,7 +5,11 @@ import sys
 import click
 
 from ..convergence import execute_plan, plan_convergence
-from .decorators import cli_schema_lock, database_management_command
+from .decorators import (
+    cli_schema_lock,
+    cli_wait_for_database,
+    database_management_command,
+)
 
 
 @click.command()
@@ -28,6 +32,8 @@ def converge(yes: bool) -> None:
     Each fix is applied and committed independently so partial
     failures don't block subsequent fixes.
     """
+    cli_wait_for_database()
+
     plan = plan_convergence()
     items = plan.executable()
     success = True

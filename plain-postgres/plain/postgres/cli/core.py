@@ -4,11 +4,9 @@ import os
 import signal
 import subprocess
 import sys
-import time
 from collections import defaultdict
 
 import click
-import psycopg
 
 from plain.cli import register_cli
 
@@ -18,6 +16,7 @@ from ..dialect import quote_name
 from .converge import converge
 from .decorators import cli_schema_lock, database_management_command
 from .diagnose import diagnose
+from .ready import ready
 from .schema import schema
 from .sync import sync
 
@@ -30,6 +29,7 @@ def cli() -> None:
 
 cli.add_command(converge)
 cli.add_command(diagnose)
+cli.add_command(ready)
 cli.add_command(schema)
 cli.add_command(sync)
 
@@ -147,29 +147,3 @@ def drop_unknown_tables(yes: bool) -> None:
         f"✓ Dropped {dropped_count} table{'s' if dropped_count != 1 else ''}.",
         fg="green",
     )
-
-
-@cli.command()
-def wait() -> None:
-    """Wait for the database to be ready"""
-    attempts = 0
-    while True:
-        attempts += 1
-        waiting_for = False
-
-        try:
-            get_connection().ensure_connection()
-        except psycopg.OperationalError:
-            waiting_for = True
-
-        if waiting_for:
-            if attempts > 1:
-                # After the first attempt, start printing them
-                click.secho(
-                    f"Waiting for database (attempt {attempts})",
-                    fg="yellow",
-                )
-            time.sleep(1.5)
-        else:
-            click.secho("✔ Database ready", fg="green")
-            break

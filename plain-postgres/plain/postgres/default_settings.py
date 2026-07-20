@@ -47,3 +47,11 @@ POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT: str = "3s"
 # index build.
 POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL: float = 5.0
 POSTGRES_SCHEMA_LOCK_MAX_RETRIES: int = 720
+
+# How long schema commands (sync, migrations apply, converge) wait for the
+# database to accept connections before giving up. Covers a database that's
+# still starting (deploys, dev services, failovers) so those commands don't
+# need a separate wait step in front of them. Configuration errors (bad
+# credentials, bad URL) fail immediately regardless — retrying can't fix
+# them. Set to 0 to fail on the first connection error.
+POSTGRES_WAIT_TIMEOUT: float = 60.0
