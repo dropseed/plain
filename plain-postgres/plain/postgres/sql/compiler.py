@@ -1258,30 +1258,29 @@ class SQLCompiler:
                     return self.select[select_index][0]
             return None
 
-        def _get_field_choices() -> Generator[str]:
+        def _get_field_choices(root_klass_info: dict[str, Any]) -> Generator[str]:
             """Yield all allowed field paths in breadth-first search order."""
-            queue: collections.deque[tuple[list[str] | None, dict[str, Any] | None]] = (
-                collections.deque([(None, self.klass_info)])
+            yield "self"
+
+            queue: collections.deque[tuple[list[str], dict[str, Any]]] = (
+                collections.deque(
+                    ([], related_klass_info)
+                    for related_klass_info in root_klass_info.get(
+                        "related_klass_infos", []
+                    )
+                )
             )
             while queue:
                 parent_path, klass_info = queue.popleft()
-                if parent_path is None:
-                    path: list[str] = []
-                    yield "self"
-                else:
-                    assert klass_info is not None  # Only first iteration has None
-                    field = klass_info["field"]
-                    if klass_info["reverse"]:
-                        field = field.remote_field
-                    path = parent_path + [field.name]
-                    yield LOOKUP_SEP.join(path)
-                if klass_info is not None:
-                    queue.extend(
-                        (path, related_klass_info)
-                        for related_klass_info in klass_info.get(
-                            "related_klass_infos", []
-                        )
-                    )
+                field = klass_info["field"]
+                if klass_info["reverse"]:
+                    field = field.remote_field
+                path = parent_path + [field.name]
+                yield LOOKUP_SEP.join(path)
+                queue.extend(
+                    (path, related_klass_info)
+                    for related_klass_info in klass_info.get("related_klass_infos", [])
+                )
 
         if not self.klass_info:
             return []
@@ -1318,7 +1317,7 @@ class SQLCompiler:
                 "Only relational fields followed in the query are allowed. "
                 "Choices are: {}.".format(
                     ", ".join(invalid_names),
-                    ", ".join(_get_field_choices()),
+                    ", ".join(_get_field_choices(self.klass_info)),
                 )
             )
         return result
