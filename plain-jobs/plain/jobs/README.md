@@ -153,10 +153,20 @@ Day-of-week follows standard cron numbering: **`0` (or `7`) is Sunday** through 
 
 For custom schedules, see [`Schedule`](./scheduling.py#Schedule), which takes the same fields as keyword arguments. Its day-of-month and day-of-week combine with plain AND (both must match); pass `combine_days_with_or=True` for the cron OR behavior.
 
+Workers evaluate the schedule a couple of times a minute and enqueue an entry when its slot comes due — nothing is enqueued ahead of time. Each entry has a [`ScheduleState`](./models.py#ScheduleState) ledger row recording the last slot it handled, which is what makes scheduling safe in the ways you'd hope:
+
+- Removing an entry just stops it from being evaluated. There is no pending future row left behind to error after a deploy. (When deleting a job class, remove its schedule entry too — an entry referencing a missing class fails at worker startup.)
+- Changing an entry's timing takes effect immediately — the old timing can't fire one last time.
+- A slot fires exactly once no matter how many workers are running, via an atomic ledger advance.
+- If every worker is down when a slot passes, the most recent missed slot fires when one starts again — as long as the miss is within the catch-up window (`JOBS_SCHEDULE_CATCHUP_WINDOW`, default 24 hours). Older missed slots are skipped, so a stale ledger row (say, an entry removed and re-added weeks later) never fires a long-gone slot. The default favors completeness: a nightly rollup still runs after a deploy that spanned midnight, at the cost of a missed run firing late. If late runs are worse than skipped ones for your app (a morning digest arriving mid-afternoon), shrink the window.
+
+A new entry's ledger starts at deploy time, so nothing fires retroactively; the first run is the next slot after the entry is deployed. Note that `should_enqueue()` is evaluated when the slot comes due, so hooks that check current state (feature flags, tenant status) see the state at run time.
+
 ## Admin interface
 
 The jobs package includes admin views for monitoring jobs under the "Jobs" section. The admin interface provides:
 
+- **Schedule**: See `JOBS_SCHEDULE` entries with their next slot and the last one handled
 - **Requests**: View pending jobs in the queue
 - **Processes**: Monitor currently running jobs
 - **Results**: Review completed and failed job history
@@ -243,7 +253,7 @@ Per-worker observable gauges (queryable per `messaging.destination.name` where a
 
 - `plain.jobs.worker.processes` — OS processes spawned by this worker
 - `plain.jobs.queue.depth` — pending `JobRequest`s ready to run
-- `plain.jobs.queue.scheduled` — `JobRequest`s with `start_at` in the future
+- `plain.jobs.queue.scheduled` — `JobRequest`s with `start_at` in the future (ad-hoc delayed enqueues and retry backoffs; cron-driven runs enqueue at their slot time, so they never appear here)
 - `plain.jobs.queue.oldest.age` — age in seconds of the oldest ready-to-run `JobRequest`
 - `plain.jobs.running` — `JobProcess` rows currently running
 
@@ -266,6 +276,7 @@ Two contract details to be aware of:
 | `JOBS_HEARTBEAT_TIMEOUT`              | `300` (5 minutes) |
 | `JOBS_MIDDLEWARE`                     | `[...]`           |
 | `JOBS_SCHEDULE`                       | `[]`              |
+| `JOBS_SCHEDULE_CATCHUP_WINDOW`        | `60 * 60 * 24`    |
 | `JOBS_WORKER_MAX_PROCESSES`           | `None`            |
 | `JOBS_WORKER_MAX_JOBS_PER_PROCESS`    | `None`            |
 | `JOBS_WORKER_MAX_PENDING_PER_PROCESS` | `10`              |

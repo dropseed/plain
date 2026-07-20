@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, overload
 
+from .exceptions import JobClassNotRegistered
 from .parameters import JobParameters
 
 if TYPE_CHECKING:
@@ -25,7 +26,10 @@ class JobsRegistry:
         return f"{job_class.__module__}.{job_class.__qualname__}"
 
     def get_job_class(self, name: str) -> type[Job]:
-        return self.jobs[name]
+        try:
+            return self.jobs[name]
+        except KeyError:
+            raise JobClassNotRegistered(name) from None
 
     def load_job(
         self, job_class_name: str, parameters: dict[str, Any] | None = None
