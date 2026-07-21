@@ -7,6 +7,7 @@ commands are the handle on that. The logic lives in `plain.dev.postgres`.
 
 from __future__ import annotations
 
+import json as json_lib
 from pathlib import Path
 
 import click
@@ -14,29 +15,49 @@ import click
 from plain.cli import register_cli
 from plain.runtime import APP_PATH
 
-from .postgres import (
-    Cluster,
-    DevDatabase,
-    current_branch,
-    ensure_database,
-    open_cluster,
-    project_identity,
-    read_pointer,
-    resolve_database_name,
-    write_cached_url,
-    write_pointer,
-)
 from .postgres.backends import (
+    _inspect_container,
     list_managed_containers,
     remove_container,
     stop_container,
 )
-from .postgres.identity import PostgresConfig, clear_pointer, cluster_name, volume_name
+from .postgres.cluster import Cluster, DevDatabase
+from .postgres.identity import (
+    InvalidDatabaseName,
+    PostgresConfig,
+    clear_pointer,
+    cluster_name,
+    find_project_root,
+    project_identity,
+    read_pointer,
+    resolve_database_name,
+    validate_database_name,
+    volume_name,
+    write_pointer,
+)
+from .postgres.resolve import (
+    clear_cached_url,
+    ensure_database,
+    open_cluster,
+    write_cached_url,
+)
 from .postgres.schema_state import pending_migration_count
 
 
 def _project_root() -> Path:
-    return Path(APP_PATH).parent
+    # Same definition `setup()` uses. The app directory is often a level below
+    # the project (`example/`, `backend/`), so anchoring on it directly would
+    # give this CLI a different project — and therefore a different database —
+    # than the resolution that configured the app.
+    return find_project_root(Path(APP_PATH).parent)
+
+
+def _valid(name: str) -> str:
+    """Validate a name a person typed, as a click error rather than a traceback."""
+    try:
+        return validate_database_name(name)
+    except InvalidDatabaseName as e:
+        raise click.ClickException(str(e)) from e
 
 
 def _open() -> tuple[Path, Cluster, str, str]:
@@ -55,7 +76,7 @@ def _open() -> tuple[Path, Cluster, str, str]:
     # a stale cache gets repaired — the TCP probe can tell that *a* server is
     # listening, but not that it's still the right one (a project's cluster
     # identity moves if its git identity does).
-    write_cached_url(project_root, cluster.url(db_name))
+    write_cached_url(project_root, url=cluster.url(db_name))
 
     return project_root, cluster, project_name, db_name
 
@@ -67,19 +88,72 @@ def _format_size(size_bytes: int) -> str:
 @register_cli("db")
 @click.group()
 def cli() -> None:
-    """Manage development databases."""
+    """Manage this project's databases — which ones exist, and which one this checkout uses."""
 
 
 @cli.command()
-def status() -> None:
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
+def status(as_json: bool) -> None:
     """Show this checkout's database."""
-    project_root, cluster, _, db_name = _open()
+    # `_open()` errors when Postgres is disabled, so handle the off-case first
+    # and report it gracefully.
+    config = PostgresConfig.load(_project_root())
+    if config.backend == "off":
+        if as_json:
+            click.echo(json_lib.dumps({"backend": "off"}, indent=2))
+            return
+        click.secho("Backend:   off", bold=True)
+        click.echo("Managed Postgres is disabled for this project.")
+        return
+
+    project_root, cluster, project_name, db_name = _open()
     source = (
         "pointer (.plain/dev/database)"
         if read_pointer(project_root)
         else "derived from directory"
     )
     exists = cluster.database_exists(db_name)
+    database = (
+        next(
+            (d for d in cluster.list_databases(project_name) if d.name == db_name), None
+        )
+        if exists
+        else None
+    )
+
+    # The container/image/volume only exist for the docker backend; a local
+    # Postgres has none of them.
+    container = cluster.server.container
+    image = None
+    if container:
+        state = _inspect_container(container)
+        image = state.image if state else None
+    volume = volume_name(project_root) if container else None
+
+    if as_json:
+        click.echo(
+            json_lib.dumps(
+                {
+                    "database": db_name,
+                    "source": source,
+                    "backend": cluster.server.backend,
+                    "port": cluster.server.port,
+                    "url": cluster.url(db_name),
+                    "exists": exists,
+                    "size_bytes": database.size_bytes if database else None,
+                    "branch": database.branch if database else None,
+                    "created_via": database.created_via if database else None,
+                    "pending_migrations": pending_migration_count(cluster.url(db_name))
+                    if exists
+                    else None,
+                    "container": container,
+                    "image": image,
+                    "volume": volume,
+                },
+                indent=2,
+            )
+        )
+        return
 
     click.secho(f"Database:  {db_name}", bold=True)
     click.echo(f"Source:    {source}")
@@ -87,20 +161,23 @@ def status() -> None:
     click.echo(f"URL:       {cluster.url(db_name)}")
     click.echo(f"Exists:    {'yes' if exists else 'no'}")
 
-    if not exists:
-        return
-
-    database = next(
-        (d for d in cluster.list_databases(db_name) if d.name == db_name), None
-    )
-    if database:
+    if exists and database:
         click.echo(f"Size:      {_format_size(database.size_bytes)}")
         if database.branch:
             click.echo(f"Branch:    {database.branch}")
 
-    pending = pending_migration_count(cluster.url(db_name))
-    if pending:
-        click.secho(f"Pending:   {pending} migration(s) not yet applied", fg="yellow")
+    if exists:
+        pending = pending_migration_count(cluster.url(db_name))
+        if pending:
+            click.secho(
+                f"Pending:   {pending} migration(s) not yet applied", fg="yellow"
+            )
+
+    if container:
+        click.echo(f"Container: {container}")
+        if image:
+            click.echo(f"Image:     {image}")
+        click.echo(f"Volume:    {volume}")
 
 
 @cli.command()
@@ -111,15 +188,39 @@ def url() -> None:
     `export PLAIN_POSTGRES_URL="$(plain db url)"` and rely on it being usable.
     """
     project_root, cluster, _, db_name = _open()
-    ensure_database(cluster, project_root, db_name)
+    ensure_database(cluster, project_root=project_root, db_name=db_name)
     click.echo(cluster.url(db_name))
 
 
 @cli.command(name="list")
-def list_() -> None:
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
+def list_(as_json: bool) -> None:
     """List this project's databases."""
     project_root, cluster, project_name, current = _open()
     databases = cluster.list_databases(project_name)
+
+    if as_json:
+        click.echo(
+            json_lib.dumps(
+                [
+                    {
+                        "name": d.name,
+                        "size_bytes": d.size_bytes,
+                        "checkout": d.checkout,
+                        "checkout_exists": d.checkout_exists,
+                        "branch": d.branch,
+                        "created_via": d.created_via,
+                        "current": d.name == current,
+                        "is_project_main": d.name == project_name,
+                        "is_test": d.is_test,
+                    }
+                    for d in databases
+                ],
+                indent=2,
+            )
+        )
+        return
+
     if not databases:
         click.echo("No databases yet.")
         return
@@ -131,6 +232,8 @@ def list_() -> None:
         detail = database.checkout or ""
         if database.checkout and not database.checkout_exists:
             detail = click.style(f"{database.checkout} (gone)", fg="yellow")
+        elif database.is_test:
+            detail = click.style("(test)", dim=True)
         click.echo(
             f"  {database.name:<34} {_format_size(database.size_bytes):>10}  {detail}{marker}"
         )
@@ -141,19 +244,17 @@ def list_() -> None:
 def create(name: str | None) -> None:
     """Create an empty database (default: this checkout's name)."""
     project_root, cluster, _, db_name = _open()
-    name = name or db_name
+    name = _valid(name) if name else db_name
     if cluster.database_exists(name):
         click.echo(f"{name!r} already exists.")
         return
 
     cluster.create_database(name)
-    cluster.set_metadata(
+    cluster.record_created(
         name,
-        {
-            "checkout": str(project_root.resolve()) if name == db_name else None,
-            "branch": current_branch(project_root),
-            "created_via": "create",
-        },
+        checkout=str(project_root.resolve()) if name == db_name else None,
+        created_via="create",
+        project_root=project_root,
     )
     click.secho(f"✔ Created {name}.", fg="green")
 
@@ -169,7 +270,8 @@ def create(name: str | None) -> None:
 def fork(dest: str, source: str | None, force: bool) -> None:
     """Copy a database, data and all."""
     project_root, cluster, project_name, _ = _open()
-    source = source or project_name
+    dest = _valid(dest)
+    source = _valid(source) if source else project_name
 
     if not cluster.database_exists(source):
         raise click.ClickException(f"Source database {source!r} does not exist.")
@@ -177,25 +279,40 @@ def fork(dest: str, source: str | None, force: bool) -> None:
         raise click.ClickException(f"Destination database {dest!r} already exists.")
 
     click.echo(f"Forking {source} → {dest} ...")
-    mechanism = cluster.fork_database(source, dest, force=force)
-    cluster.set_metadata(
+    try:
+        mechanism = cluster.fork_database(source, dest, force=force)
+    except Exception as e:
+        # fork_database drops the half-copied dest before re-raising; surface
+        # the reason as a clean CLI error rather than a raw traceback.
+        raise click.ClickException(str(e)) from e
+    cluster.record_created(
         dest,
-        {
-            "checkout": None,
-            "branch": current_branch(project_root),
-            "created_via": f"fork:{mechanism}",
-        },
+        checkout=None,
+        created_via=f"fork:{mechanism}",
+        project_root=project_root,
     )
     click.secho(f"✔ Forked via {mechanism}.", fg="green")
 
 
 @cli.command()
-@click.argument("name")
-def use(name: str) -> None:
-    """Point this checkout at a different database."""
+@click.argument("name", required=False)
+def use(name: str | None) -> None:
+    """Point this checkout at a different database (no name: back to the derived one)."""
     project_root, cluster, _, _ = _open()
-    write_pointer(project_root, name)
-    write_cached_url(project_root, cluster.url(name))
+
+    if name is None:
+        if not read_pointer(project_root):
+            click.echo("This checkout already uses its derived database.")
+            return
+        clear_pointer(project_root)
+        db_name = resolve_database_name(project_root)
+        write_cached_url(project_root, url=cluster.url(db_name))
+        click.secho(f"✔ Back to {db_name!r}.", fg="green")
+        return
+
+    name = _valid(name)
+    write_pointer(project_root, db_name=name)
+    write_cached_url(project_root, url=cluster.url(name))
 
     click.secho(f"✔ This checkout now uses {name!r}.", fg="green")
     if not cluster.database_exists(name):
@@ -203,20 +320,6 @@ def use(name: str) -> None:
             "  It doesn't exist yet — `plain db create` or `plain db fork` will make it.",
             dim=True,
         )
-
-
-@cli.command()
-def unuse() -> None:
-    """Go back to this checkout's derived database name."""
-    project_root, cluster, project_name, _ = _open()
-    if not read_pointer(project_root):
-        click.echo("This checkout already uses its derived database.")
-        return
-
-    clear_pointer(project_root)
-    db_name = resolve_database_name(project_root)
-    write_cached_url(project_root, cluster.url(db_name))
-    click.secho(f"✔ Back to {db_name!r}.", fg="green")
 
 
 @cli.command()
@@ -231,13 +334,11 @@ def reset(yes: bool) -> None:
 
     cluster.drop_database(db_name)
     cluster.create_database(db_name)
-    cluster.set_metadata(
+    cluster.record_created(
         db_name,
-        {
-            "checkout": str(project_root.resolve()),
-            "branch": current_branch(project_root),
-            "created_via": "reset",
-        },
+        checkout=str(project_root.resolve()),
+        created_via="reset",
+        project_root=project_root,
     )
     click.secho(
         f"✔ Reset {db_name}. Run `plain postgres sync` to build the schema.", fg="green"
@@ -249,85 +350,98 @@ def reset(yes: bool) -> None:
 @click.option("--yes", "-y", is_flag=True)
 def drop(name: str, yes: bool) -> None:
     """Drop a database."""
-    project_root, cluster, _, db_name = _open()
+    project_root, cluster, project_name, db_name = _open()
+    name = _valid(name)
     if not cluster.database_exists(name):
         click.echo(f"{name!r} does not exist.")
         return
-    if not yes and not click.confirm(f"Drop {name!r}? This cannot be undone."):
+
+    if name == project_name:
+        # Every other checkout forks from this one. Dropping it doesn't just lose
+        # its data — it turns every future worktree into an empty database, which
+        # is the thing this whole feature exists to avoid.
+        click.secho(
+            f"{name!r} is the project's main database — every new checkout is "
+            "forked from it.",
+            fg="yellow",
+        )
+        if not click.confirm("Drop it anyway?", default=False):
+            return
+    elif not yes and not click.confirm(f"Drop {name!r}? This cannot be undone."):
         return
 
     cluster.drop_database(name)
     if name == db_name:
         # The cache would otherwise keep pointing at a database that's gone.
-        (project_root / ".plain" / "dev" / "postgres-url").unlink(missing_ok=True)
+        clear_cached_url(project_root)
     click.secho(f"✔ Dropped {name}.", fg="green")
 
 
 @cli.command()
 @click.option("--yes", "-y", is_flag=True)
 def clean(yes: bool) -> None:
-    """Drop databases whose checkout directory no longer exists.
+    """Reclaim database debris — orphaned checkouts and stale test databases.
 
-    Forking is a full copy, so deleted worktrees leave real disk behind. This
-    only ever removes databases that recorded a checkout path *and* whose path
-    is now gone — a database with no recorded owner is left alone.
+    Two kinds of debris get reclaimed:
+
+    - Databases whose recorded checkout directory no longer exists. Forking is a
+      full copy, so deleted worktrees leave real disk behind. A database with no
+      recorded owner is left alone.
+    - Test databases with no active connections. A normal test run drops its
+      database on exit, so one that's still here — and that nothing is connected
+      to — is left over from a crashed run. One with live connections is a run
+      in progress and is never touched.
+
+    The project's main database is never a candidate, whatever its metadata
+    says. It's the fork source for every checkout, so a stale owner path on it
+    is a reason to correct the metadata, not to reclaim the disk. A test
+    database can never be the project main — the `test_` prefix rules it out.
     """
     project_root, cluster, project_name, current = _open()
 
+    databases = cluster.list_databases(project_name)
     orphans: list[DevDatabase] = [
         database
-        for database in cluster.list_databases(project_name)
+        for database in databases
         if database.checkout
         and not database.checkout_exists
         and database.name != current
+        and database.name != project_name
     ]
-    if not orphans:
+    stale_tests: list[DevDatabase] = [
+        database
+        for database in databases
+        if database.is_test
+        and database.name != current
+        and cluster.connection_count(database.name) == 0
+    ]
+    candidates = orphans + stale_tests
+    if not candidates:
         click.echo("Nothing to clean.")
         return
 
-    reclaimed = sum(d.size_bytes for d in orphans)
-    click.echo(f"Orphaned databases ({_format_size(reclaimed)} total):")
-    for database in orphans:
+    reclaimed = sum(d.size_bytes for d in candidates)
+    click.echo(f"Reclaimable databases ({_format_size(reclaimed)} total):")
+    for database in candidates:
+        detail = "(test database)" if database.is_test else database.checkout
         click.echo(
-            f"  {database.name:<34} {_format_size(database.size_bytes):>10}  {database.checkout}"
+            f"  {database.name:<34} {_format_size(database.size_bytes):>10}  {detail}"
         )
 
     if not yes and not click.confirm("Drop these?"):
         return
 
-    for database in orphans:
+    for database in candidates:
         cluster.drop_database(database.name)
     click.secho(
-        f"✔ Dropped {len(orphans)}, reclaiming {_format_size(reclaimed)}.", fg="green"
+        f"✔ Dropped {len(candidates)}, reclaiming {_format_size(reclaimed)}.",
+        fg="green",
     )
 
 
 @cli.group()
 def server() -> None:
     """Manage the Postgres server itself, not the databases on it."""
-
-
-@server.command(name="status")
-def server_status() -> None:
-    """Show this project's Postgres server."""
-    project_root = _project_root()
-    container = cluster_name(project_root)
-    config = PostgresConfig.load(project_root)
-
-    click.secho(f"Backend:   {config.backend}", bold=True)
-    if config.backend == "local":
-        click.echo("Server:    local Postgres on 127.0.0.1:5432 (not managed by us)")
-        return
-
-    match = next((c for c in list_managed_containers() if c.name == container), None)
-    if match is None:
-        click.echo(f"Container: {container} (not created yet)")
-        return
-
-    click.echo(f"Container: {match.name}")
-    click.echo(f"State:     {'running' if match.running else 'stopped'}")
-    click.echo(f"Image:     {match.image}")
-    click.echo(f"Volume:    {volume_name(project_root)}")
 
 
 @server.command(name="list")

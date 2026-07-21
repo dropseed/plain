@@ -7,15 +7,20 @@ derivation *is* the contract that keeps two worktrees off each other's data.
 
 from __future__ import annotations
 
+import pytest
+
 from plain.dev.postgres.identity import (
     MAX_NAME_LENGTH,
+    InvalidDatabaseName,
     PostgresConfig,
     clear_pointer,
     database_name_for_checkout,
+    find_project_root,
     read_pointer,
     resolve_database_name,
     sanitize,
     truncate_identifier,
+    validate_database_name,
     write_pointer,
 )
 
@@ -44,14 +49,14 @@ def test_main_checkout_uses_the_project_name(tmp_path):
     checkout = tmp_path / "myapp"
     checkout.mkdir()
 
-    assert database_name_for_checkout("myapp", checkout) == "myapp"
+    assert database_name_for_checkout("myapp", checkout=checkout) == "myapp"
 
 
 def test_worktree_is_namespaced_under_the_project(tmp_path):
     checkout = tmp_path / "feature-x"
     checkout.mkdir()
 
-    assert database_name_for_checkout("myapp", checkout) == "myapp_feature_x"
+    assert database_name_for_checkout("myapp", checkout=checkout) == "myapp_feature_x"
 
 
 def test_worktree_named_after_the_project_does_not_stutter(tmp_path):
@@ -59,7 +64,7 @@ def test_worktree_named_after_the_project_does_not_stutter(tmp_path):
     checkout = tmp_path / "myapp-feature"
     checkout.mkdir()
 
-    assert database_name_for_checkout("myapp", checkout) == "myapp_feature"
+    assert database_name_for_checkout("myapp", checkout=checkout) == "myapp_feature"
 
 
 def test_two_worktrees_get_different_databases(tmp_path):
@@ -69,15 +74,15 @@ def test_two_worktrees_get_different_databases(tmp_path):
     first.mkdir()
     second.mkdir()
 
-    assert database_name_for_checkout("myapp", first) != database_name_for_checkout(
-        "myapp", second
-    )
+    assert database_name_for_checkout(
+        "myapp", checkout=first
+    ) != database_name_for_checkout("myapp", checkout=second)
 
 
 def test_pointer_round_trip(tmp_path):
     assert read_pointer(tmp_path) is None
 
-    write_pointer(tmp_path, "some_other_db")
+    write_pointer(tmp_path, db_name="some_other_db")
     assert read_pointer(tmp_path) == "some_other_db"
 
     clear_pointer(tmp_path)
@@ -95,7 +100,7 @@ def test_pointer_overrides_the_derived_name(tmp_path):
 
     assert resolve_database_name(project) == "myapp"
 
-    write_pointer(project, "borrowed")
+    write_pointer(project, db_name="borrowed")
     assert resolve_database_name(project) == "borrowed"
 
 
@@ -104,7 +109,7 @@ def test_empty_pointer_file_is_ignored(tmp_path):
     project = tmp_path / "myapp"
     project.mkdir()
     (project / "pyproject.toml").write_text('[project]\nname = "myapp"\n')
-    write_pointer(project, "   ")
+    write_pointer(project, db_name="   ")
 
     assert resolve_database_name(project) == "myapp"
 
@@ -179,8 +184,73 @@ def test_nested_app_directories_do_not_collide_across_worktrees(tmp_path):
     )
     (worktree / "backend").mkdir(exist_ok=True)
 
-    main_db = database_name_for_checkout("backend", main / "backend")
-    worktree_db = database_name_for_checkout("backend", worktree / "backend")
+    main_db = database_name_for_checkout("backend", checkout=main / "backend")
+    worktree_db = database_name_for_checkout("backend", checkout=worktree / "backend")
 
     assert main_db == "backend"
     assert main_db != worktree_db
+
+
+# -- names people type -----------------------------------------------------
+
+
+@pytest.mark.parametrize("name", ["myapp", "my_app", "_leading", "app2", "a$b", "A"])
+def test_valid_database_names_pass_through(name):
+    assert validate_database_name(name) == name
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "foo/bar",  # a path separator silently renames the database
+        "foo?x=1",  # parsed as a query parameter, breaking every later command
+        "foo bar",
+        "foo@host",
+        "foo:5432",
+        "9lives",  # can't start with a digit
+        "",
+    ],
+)
+def test_names_that_would_corrupt_a_url_are_rejected(name):
+    """These have to fail at the boundary, not once they're in a URL.
+
+    `plain db use 'foo?x=1'` used to write a pointer that made every subsequent
+    command fail while parsing the URL — including the `plain db use` that
+    would have undone it, and leaving no way back out through the CLI.
+    """
+    with pytest.raises(InvalidDatabaseName):
+        validate_database_name(name)
+
+
+def test_overlong_names_are_rejected():
+    with pytest.raises(InvalidDatabaseName):
+        validate_database_name("a" * (MAX_NAME_LENGTH + 1))
+
+
+def test_derived_names_are_always_valid(tmp_path):
+    """Whatever we derive has to satisfy the rule we hold users to."""
+    checkout = tmp_path / "Some Project (v2)!"
+    checkout.mkdir()
+    assert validate_database_name(database_name_for_checkout("proj", checkout=checkout))
+
+
+# -- finding the project ---------------------------------------------------
+
+
+def test_project_root_is_found_from_the_app_directory(tmp_path):
+    """The app is often a level below the project, and both callers must agree.
+
+    `setup()` walks up from the working directory; `plain db` walks up from the
+    app. If those disagree the CLI manages a different database than the one the
+    app was configured with.
+    """
+    (tmp_path / "pyproject.toml").touch()
+    app = tmp_path / "backend" / "app"
+    app.mkdir(parents=True)
+
+    assert find_project_root(app) == tmp_path
+    assert find_project_root(tmp_path) == tmp_path
+
+
+def test_project_root_falls_back_to_where_it_started(tmp_path):
+    assert find_project_root(tmp_path) == tmp_path

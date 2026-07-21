@@ -25,7 +25,7 @@ from .sync import sync
 @register_cli("postgres")
 @click.group()
 def cli() -> None:
-    """Postgres operations"""
+    """Work inside the connected database — schema, health, shell."""
 
 
 cli.add_command(converge)

@@ -112,14 +112,14 @@ def test_comment_survives_quotes(config, scratch):
     assert get_database_comment(config, name=name) == 'it\'s "quoted"'
 
 
-def test_list_databases_filters_by_prefix(config, scratch):
+def test_list_databases(config, scratch):
     first = scratch("list_a")
     second = scratch("list_b")
     create_database(config, name=first)
     create_database(config, name=second)
     set_database_comment(config, name=first, comment="hello")
 
-    listed = list_databases(config, prefix=PREFIX)
+    listed = list_databases(config)
     by_name = {info.name: info for info in listed}
 
     assert first in by_name
@@ -127,7 +127,9 @@ def test_list_databases_filters_by_prefix(config, scratch):
     assert by_name[first].comment == "hello"
     assert by_name[second].comment is None
     assert by_name[first].size_bytes > 0
-    assert all(info.name.startswith(PREFIX) for info in listed)
+    # Cluster furniture is never listed.
+    assert "postgres" not in by_name
+    assert "template1" not in by_name
 
 
 def test_connection_count_and_terminate(config, scratch):

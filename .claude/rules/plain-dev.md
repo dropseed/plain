@@ -26,14 +26,21 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
   worktrees never share data. Test databases derive from it too.
 - A new worktree's database is forked from the project's main database **with
   its data** — don't re-seed by hand, and don't tell users to.
-- `plain db status` before diagnosing anything database-shaped: it shows the
-  database, server, size, branch, and pending migrations.
+- `plain db status --json` before diagnosing anything database-shaped: database,
+  server, size, branch, and pending migration count. `plain db list --json` for
+  every database in the project and which checkout owns it.
+- `plain postgres shell` for a psql prompt on the active database; it accepts
+  piped SQL, so `echo 'select ...' | plain postgres shell` is the way to inspect
+  data.
 - `plain db clean` drops databases whose checkout directory is gone. Forks are
   full copies, so deleted worktrees do leave disk behind.
 - One Postgres container per project, started on demand and never removed
   automatically. `plain db server list` shows them all, `plain db server stop`
   frees one up (~76MB each), `plain db server remove` deletes it and its data.
-- Never edit `.plain/dev/postgres-url` — it's a derived cache, repaired
-  automatically. `.plain/dev/database` is the pointer written by `plain db use`.
+- `plain db` is for _which_ database; `plain postgres sync` is for its schema.
+  Don't reach for one to do the other's job.
+- Don't hand-edit `.plain/dev/`. `postgres-url` is a derived cache that repairs
+  itself, and `database` is the pointer `plain db use` writes — change it with
+  `plain db use` instead.
 
 Run `uv run plain docs dev` for the full picture.

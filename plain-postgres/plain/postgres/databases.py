@@ -113,14 +113,22 @@ def database_exists(config: DatabaseConfig, *, name: str) -> bool:
         return cursor.fetchone() is not None
 
 
-def list_databases(config: DatabaseConfig, *, prefix: str = "") -> list[DatabaseInfo]:
-    """List databases whose name starts with `prefix`, ordered by name."""
+def list_databases(config: DatabaseConfig) -> list[DatabaseInfo]:
+    """List every user database on the cluster, ordered by name.
+
+    Postgres' own `postgres`, `template0` and `template1` are always excluded —
+    they're cluster furniture, never something a caller is managing. Any finer
+    selection is the caller's job: name-pattern filtering in SQL can't express
+    the ownership rules callers actually have (see how plain-dev matches on
+    metadata as well as names).
+    """
     with maintenance_cursor(config) as cursor:
         cursor.execute(
             "SELECT datname, shobj_description(oid, 'pg_database'), "
             "pg_database_size(datname) "
-            "FROM pg_database WHERE datname LIKE %s ORDER BY datname",
-            [prefix + "%"],
+            "FROM pg_database "
+            "WHERE NOT datistemplate AND datname <> 'postgres' "
+            "ORDER BY datname"
         )
         rows = cursor.fetchall()
 

@@ -16,6 +16,9 @@ daemon, and never install Postgres.
 
 from __future__ import annotations
 
+import json
+import os
+import re
 import shutil
 import socket
 import subprocess
@@ -54,36 +57,28 @@ class Server:
         """
         return 5432 if self.container else self.port
 
-    def run_server_shell(self, command: str) -> subprocess.CompletedProcess[str]:
-        """Run a shell command *where the Postgres binaries live*.
+    def server_command(
+        self, *args: str, stdin: bool = False
+    ) -> tuple[list[str], dict[str, str]]:
+        """Argv + env to run a Postgres binary *where the server's binaries live*.
 
-        For Docker that's inside the container, which guarantees `pg_dump` and
-        `pg_restore` match the server version — the host may not have them at
-        all. For a local server they're on the host by definition.
+        For Docker that's inside the container (pass `stdin=True` when the
+        command reads stdin, so `docker exec -i` attaches it), which guarantees
+        `pg_dump`/`pg_restore` match the server version — the host may not have
+        them at all. For a local server they're on the host by definition.
         """
-        env_prefix = f"PGPASSWORD={self.password} "
         if self.container:
-            return subprocess.run(
-                [
-                    "docker",
-                    "exec",
-                    "-e",
-                    f"PGPASSWORD={self.password}",
-                    self.container,
-                    "sh",
-                    "-c",
-                    command,
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-        return subprocess.run(
-            ["sh", "-c", env_prefix + command],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+            argv = [
+                "docker",
+                "exec",
+                *(["-i"] if stdin else []),
+                "-e",
+                f"PGPASSWORD={self.password}",
+                self.container,
+                *args,
+            ]
+            return argv, dict(os.environ)
+        return [*args], {**os.environ, "PGPASSWORD": self.password}
 
 
 def port_is_open(port: int, *, host: str = "127.0.0.1", timeout: float = 0.25) -> bool:
@@ -118,53 +113,134 @@ def docker_available() -> bool:
         return False
 
 
-def _container_exists(name: str) -> bool:
-    return bool(_docker("ps", "-aq", "-f", f"name=^{name}$").stdout.strip())
+@dataclass(frozen=True)
+class ContainerState:
+    """What one `docker inspect` tells us about an existing container."""
+
+    running: bool
+    image: str
+    bound_host_ip: str  # "" means all interfaces
+    host_port: int | None  # the assigned host port for 5432/tcp; None if not running
+    max_connections: int | None  # from the `-c max_connections=N` launch arg
 
 
-def _container_running(name: str) -> bool:
-    return bool(_docker("ps", "-q", "-f", f"name=^{name}$").stdout.strip())
+def _inspect_container(name: str) -> ContainerState | None:
+    """Everything we ask about a container, in a single `docker` call.
+
+    Each `docker` invocation costs ~100-300ms under Docker Desktop, and the
+    questions (exists? running? which image? bound where? which port?) always
+    travel together — separate probes made opening a cluster the slowest part
+    of every `plain db` command.
+    """
+    result = _docker("inspect", name, check=False)
+    if result.returncode != 0:
+        return None  # no such container
+
+    data = json.loads(result.stdout)[0]
+    bindings = (data["HostConfig"].get("PortBindings") or {}).get("5432/tcp") or []
+
+    # The *assigned* host port lives here once the container is running;
+    # HostConfig.PortBindings only holds the requested "0" (pick one for me).
+    published = (data["NetworkSettings"].get("Ports") or {}).get("5432/tcp") or []
+    host_port = (
+        int(published[0]["HostPort"])
+        if published and published[0].get("HostPort")
+        else None
+    )
+
+    # max_connections is fixed at creation via `-c max_connections=N`.
+    cmd = data["Config"].get("Cmd") or []
+    max_connections = None
+    for i, arg in enumerate(cmd):
+        if (
+            arg == "-c"
+            and i + 1 < len(cmd)
+            and cmd[i + 1].startswith("max_connections=")
+        ):
+            max_connections = int(cmd[i + 1].split("=", 1)[1])
+            break
+
+    return ContainerState(
+        running=data["State"]["Running"],
+        image=data["Config"]["Image"],
+        bound_host_ip=bindings[0].get("HostIp", "") if bindings else "",
+        host_port=host_port,
+        max_connections=max_connections,
+    )
 
 
 def _container_host_port(name: str) -> int:
-    out = _docker("port", name, "5432/tcp").stdout.strip().splitlines()[0]
-    return int(out.rsplit(":", 1)[1])
+    lines = _docker("port", name, "5432/tcp").stdout.strip().splitlines()
+    if not lines:
+        raise RuntimeError(
+            f"Container {name!r} has no published port for 5432/tcp. "
+            f"It wasn't created by plain-dev in its current form — recreate it: "
+            f"docker rm -f {name}"
+        )
+    return int(lines[0].rsplit(":", 1)[1])
 
 
-def _container_image(name: str) -> str:
-    result = _docker("inspect", "--format", "{{.Config.Image}}", name, check=False)
-    return result.stdout.strip()
+def _warn_if_container_drifted(
+    container: str,
+    state: ContainerState,
+    *,
+    image: str,
+    max_connections: int,
+) -> None:
+    """Flag an existing container whose creation-time settings no longer match.
 
-
-def _warn_if_image_changed(container: str, image: str) -> None:
-    """Say so when the configured image no longer matches the running one.
-
-    Changing `image` in pyproject.toml doesn't rebuild an existing container —
-    the image is fixed when it's created. Recreating is usually what you want
-    (the data volume is separate and survives), but not always: a different
-    Postgres *major* version can't read an existing data directory, so it needs
-    a dump and reload rather than a new container. We can't tell those apart
-    from a tag, so we say what changed and let you pick.
+    Image, the localhost binding, and `max_connections` are all fixed when the
+    container is created — changing them in code (or picking up a newer
+    plain-dev) doesn't touch a container that already exists. We collect every
+    drift and print the one shared remedy: recreate it. That's cheap, because
+    the data lives on a separate volume and survives — except across a Postgres
+    *major* version bump, where a dump and reload is needed instead.
     """
-    running = _container_image(container)
-    if not running or running == image:
+    lines: list[str] = []
+    major_version_caution = False
+
+    if state.image and state.image != image:
+        lines.append(
+            f"  Image is set to {image!r} but the running container was built "
+            f"from {state.image!r}."
+        )
+        major_version_caution = True
+
+    if state.bound_host_ip in ("", "0.0.0.0"):
+        lines.append(
+            "  It's published on all network interfaces, but the dev "
+            "credentials are fixed — anyone on the same network can log in."
+        )
+
+    if state.max_connections is not None and state.max_connections != max_connections:
+        lines.append(
+            f"  max_connections is {state.max_connections}, code wants "
+            f"{max_connections}."
+        )
+
+    if not lines:
         return
 
     click.secho(
-        f"Postgres image is set to {image!r} but the running container was "
-        f"built from {running!r}.",
+        f"Postgres container {container!r} has drifted from its configuration:",
         fg="yellow",
         err=True,
     )
+    for line in lines:
+        click.echo(line, err=True)
     click.echo(
-        f"  Same Postgres major version (adding an extension, say)? Recreate it; "
-        f"your data is on a separate volume and survives:\n"
-        f"    docker rm -f {container}\n"
-        f"  Different major version? Back up first — a new major can't read the "
-        f"old data directory:\n"
-        f"    plain dev backups create",
+        f"  Recreate it to pick these up; your data is on a separate volume and "
+        f"survives:\n"
+        f"    docker rm -f {container}",
         err=True,
     )
+    if major_version_caution:
+        click.echo(
+            "  If this is a different Postgres major version, back up first — a "
+            "new major can't read the old data directory:\n"
+            '    pg_dump -Fc "$(plain db url)" > backup.dump',
+            err=True,
+        )
 
 
 def _create_container(*args: str) -> None:
@@ -187,11 +263,14 @@ def start_docker_server(
 ) -> Server:
     """Ensure the project's container is running and return how to reach it.
 
-    Published as `-p 0:5432` so Docker picks a free host port — no port
-    registry, no contention between projects. The container is the durable
-    handle; the port is read back from it.
+    Published as `-p 127.0.0.1:0:5432` so Docker picks a free host port — no
+    port registry, no contention between projects — and binds it to localhost
+    only. The credentials are fixed dev credentials (`postgres`/`postgres`), so
+    the cluster must never be reachable from another machine on the network.
+    The container is the durable handle; the port is read back from it.
     """
-    if not _container_exists(container):
+    state = _inspect_container(container)
+    if state is None:
         _create_container(
             "run",
             "-d",
@@ -209,19 +288,26 @@ def start_docker_server(
             "-v",
             f"{volume}:/var/lib/postgresql/data",
             "-p",
-            "0:5432",
+            "127.0.0.1:0:5432",
             image,
             # One cluster serves every worktree's pool plus xdist workers, so
-            # PG's default of 100 runs out fast. See DECISIONS D10.
+            # PG's default of 100 runs out fast.
             "-c",
             f"max_connections={max_connections}",
         )
+        port = _container_host_port(container)
     else:
-        _warn_if_image_changed(container, image)
-        if not _container_running(container):
-            _docker("start", container)
+        _warn_if_container_drifted(
+            container, state, image=image, max_connections=max_connections
+        )
+        if state.running and state.host_port is not None:
+            port = state.host_port  # already parsed from the inspect call
+        else:
+            if not state.running:
+                _docker("start", container)
+            # Ports is only populated once running, so read it back now.
+            port = _container_host_port(container)
 
-    port = _container_host_port(container)
     wait_until_ready(port)
     return Server(
         host="127.0.0.1",
@@ -235,7 +321,8 @@ def start_docker_server(
 
 def stop_container(container: str) -> bool:
     """Stop the container. Returns False if it wasn't running."""
-    if not _container_running(container):
+    state = _inspect_container(container)
+    if state is None or not state.running:
         return False
     _docker("stop", container, check=False)
     return True
@@ -256,6 +343,14 @@ class ManagedContainer:
     running: bool
     image: str
     size: str
+
+
+# The names `cluster_name()` produces: `plain-postgres-{project}-{8 hex}`.
+# Docker's `--filter name=` is a substring match, so it happily returns
+# containers we never created — a hand-rolled `plain-postgres-dev` from some
+# older script matches too. Listing someone else's container as ours invites
+# `plain db server remove` on it, so the shape is checked here.
+MANAGED_CONTAINER_RE = re.compile(r"^plain-postgres-.+-[0-9a-f]{8}$")
 
 
 def list_managed_containers() -> list[ManagedContainer]:
@@ -281,6 +376,8 @@ def list_managed_containers() -> list[ManagedContainer]:
         if len(parts) != 4:
             continue
         name, state, image, size = parts
+        if not MANAGED_CONTAINER_RE.match(name):
+            continue
         containers.append(
             ManagedContainer(
                 name=name, running=state == "running", image=image, size=size
@@ -295,7 +392,42 @@ def list_managed_containers() -> list[ManagedContainer]:
 
 
 def local_available() -> bool:
-    return port_is_open(LOCAL_PORT)
+    """Is there a local Postgres we can actually log into?
+
+    An open port is not enough. Homebrew and Postgres.app — the two most common
+    ways to have Postgres on a Mac — set up a superuser named after your OS
+    account with trust auth and no `postgres` role at all. Treating "something
+    is listening" as availability picked that server and then failed on every
+    connection, with nothing saying why. So the probe is the real question:
+    can we authenticate as the user we're going to use?
+    """
+    if not port_is_open(LOCAL_PORT):
+        return False
+
+    import psycopg
+
+    try:
+        psycopg.connect(
+            host="127.0.0.1",
+            port=LOCAL_PORT,
+            user=DEV_USER,
+            password=DEV_PASSWORD,
+            dbname="postgres",
+            connect_timeout=2,
+        ).close()
+    except psycopg.OperationalError:
+        return False
+    return True
+
+
+def local_rejected_us() -> bool:
+    """Is a local Postgres listening, but not one we can use?
+
+    Distinguishes "you have no Postgres" from "you have one and we can't log
+    into it" — different problems with different fixes, and only the second is
+    worth telling someone their existing server is the reason.
+    """
+    return port_is_open(LOCAL_PORT) and not local_available()
 
 
 def connect_local_server() -> Server:

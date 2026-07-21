@@ -2,7 +2,6 @@ import os
 import subprocess
 import sys
 from importlib.metadata import entry_points
-from importlib.util import find_spec
 
 import click
 
@@ -213,9 +212,3 @@ def entrypoint(show_list: bool, entrypoint: str | None) -> None:
             click.echo(entry_point.name)
         elif entrypoint == entry_point.name:
             entry_point.load()()
-
-
-if find_spec("plain.postgres"):
-    from .backups.cli import cli as backups_cli
-
-    cli.add_command(backups_cli)

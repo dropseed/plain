@@ -8,12 +8,14 @@ depends on.
 
 Drift and corruption are not symmetric. A stale fork is benign; you re-fork it.
 A shared database with someone else's half-finished migration in it is not
-something you can undo. So when divergence is about to happen, we fork instead.
+something you can undo. So when divergence is about to happen, forking is the
+only automatic behavior — never applying. Applying a branch's migrations to a
+shared database is always a deliberate two-command act (`plain db use <name>`
+then `plain postgres sync`), never something that happens by default.
 """
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import click
@@ -25,82 +27,69 @@ from .identity import (
     resolve_database_name,
     write_pointer,
 )
-from .resolve import current_branch, is_managed, open_cluster, write_cached_url
+from .resolve import is_managed, open_cluster, write_cached_url
 from .schema_state import pending_migration_count
-
-
-def database_is_shared(cluster: Cluster, db_name: str, current_checkout: str) -> bool:
-    """True when the database's metadata names a *different* checkout as owner."""
-    metadata = cluster.get_metadata(db_name) or {}
-    owner = metadata.get("checkout")
-    return bool(owner) and owner != current_checkout
 
 
 def guard_shared_database(
     project_root: Path,
+    *,
     cluster: Cluster,
     db_name: str,
-    *,
-    interactive: bool = True,
 ) -> str:
     """Return the database this checkout should actually use.
 
     A no-op unless the database is shared *and* this branch has migrations it
-    hasn't applied. Non-interactively we fork, which is the choice that can't
-    damage anyone else's data — the right default for CI and for agents.
+    hasn't applied. When it acts it forks — the choice that can't damage anyone
+    else's data — which is the right default for people, CI, and agents alike.
     """
     current = str(project_root.resolve())
-    if not database_is_shared(cluster, db_name, current):
+    metadata = cluster.get_metadata(db_name) or {}
+    owner = metadata.get("checkout")
+    # Shared means the metadata names a *different* checkout as the owner.
+    if not owner or owner == current:
         return db_name
     if pending_migration_count(cluster.url(db_name)) == 0:
         return db_name  # shared, but nothing divergent to apply
 
-    owner = (cluster.get_metadata(db_name) or {}).get("checkout", "?")
     project_name, _ = project_identity(project_root)
-    fork_name = database_name_for_checkout(project_name, project_root)
+    fork_name = database_name_for_checkout(project_name, checkout=project_root)
 
-    choice = "f"
-    if interactive and sys.stdin.isatty():
-        click.secho(
-            f"⚠ Database {db_name!r} is shared (owned by {owner}) and this "
-            f"branch adds migrations it doesn't have.",
-            fg="yellow",
-        )
-        choice = click.prompt(
-            "  [f]ork to your own copy and apply / [a]pply to the shared database / [c]ancel",
-            default="f",
-        ).lower()[:1]
-
-    if choice == "c":
-        raise SystemExit("Cancelled — shared database left untouched.")
-    if choice == "a":
-        return db_name
+    click.secho(
+        f"⚠ Database {db_name!r} is shared (owned by {owner}) and this branch "
+        f"adds migrations it doesn't have — forking so the shared database "
+        f"isn't changed for everyone using it.",
+        fg="yellow",
+    )
 
     # This checkout may still own the database it had before it was pointed at
     # the shared one. Going back to it is better than forking over the top of
     # it: no data is destroyed, and `postgres sync` brings its schema current.
     if cluster.database_exists(fork_name):
-        write_pointer(project_root, fork_name)
+        write_pointer(project_root, db_name=fork_name)
         click.secho(
             f"Went back to {fork_name!r} — this checkout's own database — "
             f"leaving {db_name!r} untouched.",
             fg="green",
         )
-        return fork_name
+    else:
+        mechanism = cluster.fork_database(db_name, fork_name)
+        cluster.record_created(
+            fork_name,
+            checkout=current,
+            created_via=f"fork:guard:{mechanism}",
+            project_root=project_root,
+        )
+        write_pointer(project_root, db_name=fork_name)
+        click.secho(
+            f"Forked {db_name!r} → {fork_name!r}; this checkout now uses it.",
+            fg="green",
+        )
 
-    mechanism = cluster.fork_database(db_name, fork_name)
-    cluster.set_metadata(
-        fork_name,
-        {
-            "checkout": current,
-            "branch": current_branch(project_root),
-            "created_via": f"fork:guard:{mechanism}",
-        },
-    )
-    write_pointer(project_root, fork_name)
     click.secho(
-        f"Forked {db_name!r} → {fork_name!r}; this checkout now uses it.",
-        fg="green",
+        f"To apply this branch's migrations to {db_name!r} on purpose: "
+        f"plain db use {db_name} && plain postgres sync",
+        dim=True,
     )
     return fork_name
 
@@ -119,10 +108,10 @@ def guard_dev_database(project_root: Path) -> str | None:
         return None
 
     db_name = resolve_database_name(project_root)
-    new_name = guard_shared_database(project_root, cluster, db_name, interactive=True)
+    new_name = guard_shared_database(project_root, cluster=cluster, db_name=db_name)
     if new_name == db_name:
         return None
 
     url = cluster.url(new_name)
-    write_cached_url(project_root, url)
+    write_cached_url(project_root, url=url)
     return url

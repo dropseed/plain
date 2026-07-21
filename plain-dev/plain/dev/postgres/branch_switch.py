@@ -19,8 +19,8 @@ from pathlib import Path
 import click
 
 from .cluster import Cluster
-from .identity import resolve_database_name
-from .resolve import current_branch, is_managed, open_cluster
+from .identity import current_branch, resolve_database_name
+from .resolve import is_managed, open_cluster
 from .schema_state import migrations_not_on_disk
 
 
@@ -47,12 +47,18 @@ def check_branch_switch(project_root: Path) -> None:
     recorded_branch = metadata.get("branch")
 
     if branch and recorded_branch != branch:
-        _report_if_ahead(cluster, db_name, recorded_branch, branch)
+        _report_if_ahead(
+            cluster,
+            db_name=db_name,
+            previous_branch=recorded_branch,
+            branch=branch,
+        )
         cluster.update_metadata(db_name, branch=branch)
 
 
 def _report_if_ahead(
     cluster: Cluster,
+    *,
     db_name: str,
     previous_branch: str | None,
     branch: str,

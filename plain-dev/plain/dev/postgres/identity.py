@@ -9,10 +9,14 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import subprocess
 import tomllib
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
+
+from ..utils import has_pyproject_toml
 
 MAX_NAME_LENGTH = 63  # Postgres identifier limit
 
@@ -36,8 +40,15 @@ def truncate_identifier(name: str) -> str:
     return name[: MAX_NAME_LENGTH - 9] + "_" + digest
 
 
+@cache
 def _git_common_dir(cwd: Path) -> str | None:
-    """The shared git dir — identical for every worktree of a repo."""
+    """The shared git dir — identical for every worktree of a repo.
+
+    Cached (along with `_git_toplevel`) because the answer can't change within
+    one process, and a single cold `plain dev` start otherwise asks git the
+    same question five times — cluster name, volume name, database name, and
+    checkout label all derive from these two values.
+    """
     return _run_git(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd)
 
 
@@ -65,10 +76,16 @@ def _run_git(args: list[str], cwd: Path) -> str | None:
         return None
 
 
+@cache
 def _git_toplevel(cwd: Path) -> Path | None:
     """The root of *this* worktree — differs for every checkout of a repo."""
     out = _run_git(["rev-parse", "--show-toplevel"], cwd)
     return Path(out) if out else None
+
+
+def current_branch(project_root: Path) -> str | None:
+    # Deliberately not cached: a long-lived `plain dev` can outlive a branch.
+    return _run_git(["rev-parse", "--abbrev-ref", "HEAD"], project_root)
 
 
 def checkout_label(project_root: Path) -> str | None:
@@ -95,6 +112,56 @@ def checkout_label(project_root: Path) -> str | None:
     return sanitize(toplevel.name)
 
 
+# What we're willing to put in a database name. Postgres itself is far more
+# permissive — a quoted identifier can hold almost anything — but the name also
+# has to survive being interpolated into a connection URL, where a `/` or `?`
+# silently turns into a different database or a bogus query parameter. So the
+# limit here is the URL's, not Postgres'.
+VALID_DATABASE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_$]*$")
+
+
+class InvalidDatabaseName(ValueError):
+    """A name that can't be used as-is in both SQL and a connection URL."""
+
+
+def validate_database_name(name: str) -> str:
+    """Return `name` unchanged, or raise `InvalidDatabaseName` explaining why not.
+
+    Checked at the boundary — every command that accepts a name from a person —
+    because the failure otherwise lands far away and hard: `plain db use
+    'foo?x=1'` wrote a pointer that made every subsequent command fail while
+    parsing the URL, including the `plain db use` that would have undone it.
+    """
+    if not name:
+        raise InvalidDatabaseName("Database name is empty.")
+    if len(name) > MAX_NAME_LENGTH:
+        raise InvalidDatabaseName(
+            f"Database name {name!r} is {len(name)} characters; "
+            f"Postgres allows at most {MAX_NAME_LENGTH}."
+        )
+    if not VALID_DATABASE_NAME_RE.match(name):
+        raise InvalidDatabaseName(
+            f"Database name {name!r} must start with a letter or underscore and "
+            "contain only letters, digits, underscores, or '$'."
+        )
+    return name
+
+
+def find_project_root(start: Path) -> Path:
+    """The nearest directory at or above `start` holding a pyproject.toml.
+
+    One definition, used by both the CLI (which starts from the app) and
+    `setup()` (which starts from the working directory), because they have to
+    agree: the project root decides the database name, the cluster identity,
+    and where the URL cache lives. Two answers means two databases.
+    """
+    for directory in [start, *start.parents]:
+        if has_pyproject_toml(directory):
+            return directory
+    return start
+
+
+@cache  # The file can't change within one process; several call sites read it.
 def read_pyproject(project_root: Path) -> dict:
     pyproject = project_root / "pyproject.toml"
     if not pyproject.exists():
@@ -151,7 +218,7 @@ def volume_name(project_root: Path) -> str:
     return cluster_name(project_root) + "-data"
 
 
-def database_name_for_checkout(project_name: str, checkout: Path) -> str:
+def database_name_for_checkout(project_name: str, *, checkout: Path) -> str:
     """The database a given checkout directory owns by default.
 
     The main checkout gets the project name as-is, so it reads naturally and
@@ -187,7 +254,7 @@ def read_pointer(project_root: Path) -> str | None:
     return pointer.read_text().strip() or None
 
 
-def write_pointer(project_root: Path, db_name: str) -> None:
+def write_pointer(project_root: Path, *, db_name: str) -> None:
     pointer = pointer_path(project_root)
     pointer.parent.mkdir(parents=True, exist_ok=True)
     pointer.write_text(db_name)
@@ -202,4 +269,4 @@ def resolve_database_name(project_root: Path) -> str:
     if pointed := read_pointer(project_root):
         return pointed
     project_name, _ = project_identity(project_root)
-    return database_name_for_checkout(project_name, project_root)
+    return database_name_for_checkout(project_name, checkout=project_root)
