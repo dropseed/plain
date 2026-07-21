@@ -161,14 +161,19 @@ class DevSupervisor(Supervisor):
             # migration, fork to a private copy first so the shared DB is never
             # silently mutated. No-op for BYO. Never block dev on it.
             try:
-                from .postgres import guard_dev_database
+                from .postgres import check_branch_switch, guard_dev_database
+                from .postgres.resolve import INJECTED_URL_ENV_VAR
 
                 guarded_url = guard_dev_database(APP_PATH.parent)
                 if guarded_url:
-                    self.plain_env["PLAIN_POSTGRES_URL"] = guarded_url
-                    os.environ["PLAIN_POSTGRES_URL"] = guarded_url
+                    self.plain_env[INJECTED_URL_ENV_VAR] = guarded_url
+                    os.environ[INJECTED_URL_ENV_VAR] = guarded_url
+
+                # Advisory only — tells you when this database still carries a
+                # branch you've moved away from.
+                check_branch_switch(APP_PATH.parent)
             except Exception as e:
-                click.secho(f"Shared-DB guard skipped: {e}", fg="yellow", err=True)
+                click.secho(f"Database checks skipped: {e}", fg="yellow", err=True)
 
             print_event("Waiting for database...", newline=False)
             subprocess.run(

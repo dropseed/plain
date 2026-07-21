@@ -1,3 +1,4 @@
+from importlib.util import find_spec
 from pathlib import Path
 
 from .dotenv import load_dotenv_files
@@ -9,59 +10,52 @@ def setup() -> None:
     from .cli import cli  # noqa
     from .precommit import cli  # noqa
     from .contribute import cli  # noqa
-    from .db import cli  # noqa
     from .services import auto_start_services
+
+    # `plain db` manages Postgres databases, so it only exists when
+    # plain.postgres is installed.
+    if find_spec("plain.postgres"):
+        from .db import cli  # noqa
 
     load_dotenv_files()
 
-    # Ensure managed Postgres (container + per-checkout DB) and inject the URL
-    # BEFORE services start, so DB-dependent services inherit it. No-op when a
-    # URL is already configured (BYO) or plain.postgres isn't installed.
+    # Resolve a database URL before services start, so DB-dependent services
+    # inherit it. No-op when the user configured their own, when managed
+    # Postgres is off, or when plain.postgres isn't installed.
     _ensure_managed_postgres()
 
     # Auto-start dev services for commands that need the runtime
     auto_start_services()
 
 
-def _ensure_managed_postgres() -> None:
-    import sys
-    from importlib.util import find_spec
+def _find_project_root() -> Path | None:
+    """Locate pyproject.toml without touching `plain.runtime`.
 
-    # Only for commands that actually need the database/runtime (mirrors
-    # auto_start_services). `plain db` self-ensures, so it's not listed here.
-    runtime_commands = {
-        "postgres",
-        "dev",
-        "migrations",
-        "preflight",
-        "request",
-        "run",
-        "shell",
-        "test",
-    }
-    if not (runtime_commands & set(sys.argv)):
-        return
+    This runs before settings are configured, so `APP_PATH` isn't available
+    yet — walk up from the working directory instead.
+    """
+    for directory in [Path.cwd(), *Path.cwd().parents]:
+        if (directory / "pyproject.toml").exists():
+            return directory
+    return None
+
+
+def _ensure_managed_postgres() -> None:
     if not find_spec("plain.postgres"):
         return
 
-    # Find the project root WITHOUT touching plain.runtime — this runs before
-    # settings are configured. cwd holds the pyproject.toml when running `plain`.
-    project_root = next(
-        (
-            d
-            for d in [Path.cwd(), *Path.cwd().parents]
-            if (d / "pyproject.toml").exists()
-        ),
-        None,
-    )
+    project_root = _find_project_root()
     if project_root is None:
         return
 
-    try:
-        from .postgres import ensure_postgres
+    from .postgres import ensure_postgres
 
+    try:
         ensure_postgres(project_root)
-    except Exception as e:  # prototype: never block the command on this
+    except Exception as e:
+        # A database problem should surface when something actually needs the
+        # database, with that command's own error — not as a failure of every
+        # command that merely passed through setup().
         import click
 
-        click.secho(f"Managed Postgres skipped: {e}", fg="yellow", err=True)
+        click.secho(f"Managed Postgres unavailable: {e}", fg="yellow", err=True)
