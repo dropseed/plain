@@ -979,7 +979,7 @@ dev = [
 
 [[package]]
 name = "plain-dev"
-version = "0.63.2"
+version = "0.64.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
