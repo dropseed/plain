@@ -8,7 +8,7 @@ from collections import defaultdict
 from decimal import Decimal
 from functools import cached_property
 from types import NoneType
-from typing import TYPE_CHECKING, Any, Protocol, Self, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, Self, cast, runtime_checkable
 from uuid import UUID
 
 import psycopg
@@ -911,10 +911,10 @@ class OuterRef(F):
 class Func(Expression):
     """An SQL function call."""
 
-    function = None
-    template = "%(function)s(%(expressions)s)"
-    arg_joiner = ", "
-    arity = None  # The number of arguments the function accepts.
+    function: str | None = None
+    template: str = "%(function)s(%(expressions)s)"
+    arg_joiner: str = ", "
+    arity: int | None = None  # The number of arguments the function accepts.
 
     def __init__(
         self, *expressions: Any, output_field: Field | None = None, **extra: Any
@@ -1001,10 +1001,14 @@ class Func(Expression):
             data["function"] = function
         else:
             data.setdefault("function", self.function)
-        template = template or data.get("template", self.template)
-        arg_joiner = arg_joiner or data.get("arg_joiner", self.arg_joiner)
-        data["expressions"] = data["field"] = arg_joiner.join(sql_parts)
-        return template % data, params
+        # `data` is typed dict[str, Any], so the override values come back as
+        # Any; they are always strings, so cast to keep the `or` fallback typed.
+        resolved_template = template or cast(str, data.get("template", self.template))
+        resolved_joiner = arg_joiner or cast(
+            str, data.get("arg_joiner", self.arg_joiner)
+        )
+        data["expressions"] = data["field"] = resolved_joiner.join(sql_parts)
+        return resolved_template % data, params
 
     def copy(self) -> Self:
         clone = super().copy()

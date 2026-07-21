@@ -16,7 +16,7 @@ import tarfile
 import zipfile
 
 import click
-import requests
+import httpx
 import tomlkit
 
 from plain.runtime import PLAIN_TEMP_PATH
@@ -107,10 +107,11 @@ class OxcTool:
     @staticmethod
     def get_latest_version() -> str:
         """Find the latest apps_v release tag via the GitHub API."""
-        resp = requests.get(
+        resp = httpx.get(
             "https://api.github.com/repos/oxc-project/oxc/releases",
             params={"per_page": 20},
             headers={"Accept": "application/vnd.github+json"},
+            follow_redirects=True,
         )
         resp.raise_for_status()
         for release in resp.json():
@@ -129,28 +130,27 @@ class OxcTool:
         asset = f"{self.name}-{slug}.{ext}"
         url = f"https://github.com/oxc-project/oxc/releases/download/{TAG_PREFIX}{version}/{asset}"
 
-        resp = requests.get(url, stream=True)
-        resp.raise_for_status()
-
         td = self.target_directory
         if not os.path.isdir(td):
             os.makedirs(td, exist_ok=True)
 
         # Download into memory for extraction
         data = io.BytesIO()
-        total = int(resp.headers.get("Content-Length", 0))
-        if total:
-            with click.progressbar(
-                length=total,
-                label=f"Downloading {self.name}",
-                width=0,
-            ) as bar:
-                for chunk in resp.iter_content(chunk_size=1024 * 1024):
+        with httpx.stream("GET", url, follow_redirects=True) as resp:
+            resp.raise_for_status()
+            total = int(resp.headers.get("Content-Length", 0))
+            if total:
+                with click.progressbar(
+                    length=total,
+                    label=f"Downloading {self.name}",
+                    width=0,
+                ) as bar:
+                    for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
+                        data.write(chunk)
+                        bar.update(len(chunk))
+            else:
+                for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
                     data.write(chunk)
-                    bar.update(len(chunk))
-        else:
-            for chunk in resp.iter_content(chunk_size=1024 * 1024):
-                data.write(chunk)
 
         data.seek(0)
 

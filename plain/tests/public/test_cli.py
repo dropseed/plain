@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from click.testing import CliRunner
 
 from plain.cli.core import cli
@@ -54,6 +56,34 @@ def test_plain_urls_list_renders_both_modes():
         settings.URLS_ROUTER = original
         settings.URLS_TRAILING_SLASH = original_ts
         _get_cached_resolver.cache_clear()
+
+
+def test_plain_request_streaming_response_does_not_crash():
+    """`plain request` against a streaming/file response (e.g. an asset) must
+    not crash. Streaming responses have no readable `.content` — accessing it
+    raises AttributeError — so the command summarizes from headers instead of
+    dumping the body.
+    """
+    runner = CliRunner()
+    result = runner.invoke(cli, ["request", "/stream"], prog_name="plain")
+    assert result.exit_code == 0, result.output
+    assert "Status: 200" in result.output
+    # Body is summarized, not dumped or crashed on.
+    assert "streaming response" in result.output
+    assert "text/plain" in result.output
+    assert "streamed-bytes" not in result.output
+
+
+def test_plain_request_streaming_body_assertion_is_flagged_unverifiable():
+    """A body `--contains` assertion can't be checked on a streaming response
+    (the body isn't readable), so it must fail loudly rather than silently pass.
+    """
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["request", "/stream", "--contains", "streamed"], prog_name="plain"
+    )
+    assert result.exit_code == 1, result.output
+    assert "Cannot check body assertions on a streaming response" in result.output
 
 
 def test_plain_changelog_plain():

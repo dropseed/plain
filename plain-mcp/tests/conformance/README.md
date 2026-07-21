@@ -4,7 +4,7 @@ Runs the [MCP Conformance Test Framework](https://github.com/modelcontextprotoco
 
 ## Layout
 
-- `app/settings.py`, `app/urls.py` — a minimal Plain server that mounts an `MCP` view on `/mcp/`
+- `app/settings.py`, `app/urls.py` — a minimal Plain server that mounts an `MCP` view on `/mcp`
 - `app/mcp.py` — the `ConformanceMCP` subclass and the tools the conformance suite expects (`test_simple_text`, `test_error_handling`)
 - `run` — starts the Plain server on `127.0.0.1:18765`, runs the conformance CLI against it, then shuts the server down
 - `expected-failures.yml` — baseline of scenarios that plain-mcp does not yet pass
@@ -28,6 +28,28 @@ plain-mcp/tests/conformance/run
 ```
 
 Override the port with `MCP_CONFORMANCE_PORT=<port>`.
+
+## Interactive testing with the MCP Inspector
+
+The conformance suite proves plain-mcp obeys the spec. To drive a real server's
+_tools_ — with no Claude/Cursor account — use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector)
+via `./scripts/inspect-mcp`, which boots the **example app**'s `NotesMCP` server
+on a local HTTP port and points the Inspector at it:
+
+```bash
+./scripts/inspect-mcp                            # interactive web UI
+./scripts/inspect-mcp --cli --method tools/list  # scripted, no browser
+./scripts/inspect-mcp --cli --method tools/call --tool-name WhoAmI
+```
+
+`tools/list` works without a database; tool calls that hit the DB need Postgres
+(`./scripts/start-postgres`). Override the port with `INSPECT_MCP_PORT=<port>`.
+
+The `--cli` path sends the bearer correctly with no extra step. In the **web UI**,
+MCP Inspector v0.22.0 prefills the `Authorization` header but doesn't apply a
+_restored_ value until it's edited — re-type the bearer (`local-dev-only`) in
+Authentication → Custom Headers before clicking Connect, or the server returns
+`401 Missing Authorization header`.
 
 ## Updating the baseline
 

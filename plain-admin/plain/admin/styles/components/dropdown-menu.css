@@ -5,7 +5,6 @@
 
     [data-popover] {
       @apply p-1;
-      min-width: anchor-size(width);
 
       [role='menuitem'],
       [role='menuitemcheckbox'],

@@ -216,6 +216,12 @@ class DevSupervisor(Supervisor):
         self.add_entrypoints()
         self.add_pyproject_run()
 
+        # The status bar is invisible in piped output and the log file,
+        # so print the URLs as regular lines too.
+        self.poncho.system_print(f"Server running at {self.url}\n")
+        if self.tunnel_url:
+            self.poncho.system_print(f"Tunnel running at {self.tunnel_url}\n")
+
         try:
             # Start processes we know about and block the main thread
             self.poncho.loop()

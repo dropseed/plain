@@ -8,9 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import click
-import requests
+import httpx
 import tomlkit
-from requests.adapters import HTTPAdapter
 
 from plain.packages import packages_registry
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH, settings
@@ -141,24 +140,19 @@ class Tailwind:
         else:
             url = f"https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-{self.detect_platform_slug()}"
 
-        # Optimized requests session with better connection pooling and headers
-        session = requests.Session()
-
-        # Better connection pooling
-        adapter = HTTPAdapter(
-            pool_connections=1, pool_maxsize=10, max_retries=3, pool_block=True
-        )
-        session.mount("https://", adapter)
-        session.mount("http://", adapter)
-
-        # Optimized headers for better performance
         headers = {
             "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive",
             "User-Agent": "plain-tailwind/1.0",
         }
 
-        with session.get(url, stream=True, headers=headers, timeout=300) as response:
+        with (
+            httpx.Client(
+                transport=httpx.HTTPTransport(retries=3),
+                follow_redirects=True,
+                timeout=300,
+            ) as client,
+            client.stream("GET", url, headers=headers) as response,
+        ):
             response.raise_for_status()
             total = int(response.headers.get("Content-Length", 0))
 
@@ -168,10 +162,7 @@ class Tailwind:
                     label="Downloading Tailwind",
                     width=0,
                 ) as bar:
-                    # Use 8MB chunks for maximum performance
-                    for chunk in response.iter_content(
-                        chunk_size=1024 * 1024, decode_unicode=False
-                    ):
+                    for chunk in response.iter_bytes(chunk_size=1024 * 1024):
                         if chunk:
                             f.write(chunk)
                             bar.update(len(chunk))
@@ -180,7 +171,7 @@ class Tailwind:
 
         if not version:
             # Get the version from the redirect chain (latest -> vX.Y.Z)
-            version = response.history[1].url.split("/")[-2]
+            version = str(response.history[1].url).split("/")[-2]
 
         version = version.lstrip("v")
 

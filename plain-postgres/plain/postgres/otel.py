@@ -68,6 +68,10 @@ from opentelemetry.trace import SpanKind
 from plain.runtime import settings
 from plain.utils.otel import format_exception_type
 
+# The public API of this module — everything else is instrumentation
+# internals wired up by plain.postgres itself.
+__all__ = ["suppress_db_tracing"]
+
 # Use a stable string key so OpenTelemetry context APIs receive the expected type.
 _SUPPRESS_KEY = "plain.postgres.suppress_db_tracing"
 

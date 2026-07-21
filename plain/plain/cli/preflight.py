@@ -7,6 +7,7 @@ import click
 from plain import preflight
 from plain.cli.runtime import common_command
 from plain.packages import packages_registry
+from plain.preflight.registry import count_results_by_severity
 
 
 @common_command
@@ -154,21 +155,8 @@ def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
         if not quiet:
             click.echo()
 
-        # Calculate warning and error counts
-        warning_count = sum(
-            1
-            for _, _, issues in check_results
-            if issues
-            and not any(
-                not issue.warning for issue in issues if not issue.is_silenced()
-            )
-        )
-        error_count = sum(
-            1
-            for _, _, issues in check_results
-            if issues
-            and any(not issue.warning for issue in issues if not issue.is_silenced())
-        )
+        # Tally warnings and errors by each check's visible (non-silenced) issues.
+        error_count, warning_count = count_results_by_severity(check_results)
 
         # Build colored summary parts
         summary_parts = []

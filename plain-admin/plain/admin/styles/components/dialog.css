@@ -1,7 +1,12 @@
-/* Dialog */
+/* Dialog — modal top-layer overlay. Structurally its own thing (centered,
+   with a backdrop, animating its child + ::backdrop rather than itself), but
+   part of the same top-layer-overlay family as popover/dropdown/hovercard:
+   same `@starting-style` + `transition-discrete` enter/exit, sharing the
+   `--admin-overlay-fade` duration knob so the family retunes together. */
 @layer components {
   .admin-dialog {
     @apply inset-y-0 opacity-0 transition-all transition-discrete;
+    transition-duration: var(--admin-overlay-fade);
 
     &:is([open],:popover-open) {
       @apply opacity-100;
@@ -26,11 +31,13 @@
     }
     &::backdrop {
       @apply bg-black/50 opacity-0 transition-all transition-discrete;
+      transition-duration: var(--admin-overlay-fade);
     }
     > * {
       @apply bg-admin-background fixed top-[50%] left-[50%] z-50 flex flex-col w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 border p-6 shadow-lg sm:max-w-lg max-h-[calc(100%_-_2rem)];
       border-radius: var(--radius-dialog);
       @apply transition-all scale-95;
+      transition-duration: var(--admin-overlay-fade);
 
       > header {
         @apply flex flex-col gap-2 text-center sm:text-left;
@@ -55,6 +62,20 @@
       > button,
       > form[method='dialog'] > button {
         @apply ring-offset-admin-background focus:ring-admin-ring data-[state=open]:bg-admin-accent data-[state=open]:text-admin-muted-foreground  rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4;
+      }
+    }
+
+    /* Reduced motion: keep the opacity/backdrop fade, drop the scale-in. The
+       centering translate lives in the same transform, so neutralize just the
+       scale (scale-100) rather than zeroing the transform. */
+    @media (prefers-reduced-motion: reduce) {
+      > * {
+        @apply scale-100;
+      }
+      &:is([open], :popover-open) > * {
+        @starting-style {
+          @apply scale-100;
+        }
       }
     }
   }

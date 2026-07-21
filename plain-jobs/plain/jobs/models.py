@@ -11,6 +11,7 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
     MESSAGING_MESSAGE_ID,
     MESSAGING_OPERATION_NAME,
 )
+from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import Link, SpanContext, SpanKind, TraceFlags
 
 from plain import postgres
@@ -331,7 +332,8 @@ class JobProcess(postgres.Model):
                     # second log line. Rare; correct outcome; not worth
                     # pre-checking on every successful job.
                     logger.exception(e)
-                    error_type = record_span_error(span, e, metric_attributes)
+                    error_type = record_span_error(span, e)
+                    metric_attributes[ERROR_TYPE] = error_type
                     return self.convert_to_result(
                         status=JobResultStatuses.ERRORED,
                         error="".join(traceback.format_tb(e.__traceback__)),

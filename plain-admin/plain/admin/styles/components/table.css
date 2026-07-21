@@ -15,10 +15,10 @@
       @apply hover:bg-admin-muted/50 border-b transition-colors;
     }
     th {
-      @apply text-admin-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px];
+      @apply text-admin-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap;
     }
     td {
-      @apply p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px];
+      @apply p-2 align-middle whitespace-nowrap;
     }
     caption {
       @apply text-admin-muted-foreground mt-4 text-sm;

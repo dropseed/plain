@@ -9,6 +9,7 @@ from typing import Any
 
 import h2.config
 import h2.connection
+import h2.errors
 import h2.events
 import h2.exceptions
 import h2.settings
@@ -307,6 +308,7 @@ async def async_handle_h2_connection(
     executor: ThreadPoolExecutor,
     stream_budget: asyncio.Semaphore | None = None,
     on_stream_complete: Callable[[], None] | None = None,
+    shutdown_event: asyncio.Event | None = None,
 ) -> None:
     """Async HTTP/2 connection loop.
 
@@ -314,6 +316,10 @@ async def async_handle_h2_connection(
     stream as an independent asyncio task. All I/O goes through asyncio's
     transport layer (memory BIO for TLS), eliminating the need for a
     dedicated reader thread.
+
+    When shutdown_event is set, the connection drains: new streams are
+    refused (REFUSED_STREAM, safe for clients to retry), dispatched streams
+    run to completion, and the connection then closes with GOAWAY.
     """
     config = h2.config.H2Configuration(client_side=False)
     conn = h2.connection.H2Connection(config=config)
@@ -345,20 +351,55 @@ async def async_handle_h2_connection(
 
     stream_tasks: dict[int, asyncio.Task[None]] = {}
 
+    loop = asyncio.get_running_loop()
+    draining = False
+    shutdown_wait: asyncio.Task[bool] | None = (
+        loop.create_task(shutdown_event.wait()) if shutdown_event is not None else None
+    )
+    read_task: asyncio.Task[bytes] | None = None
+
     try:
         # Send connection preface
         async with state.write_lock:
             await state.flush()
 
         while True:
-            try:
-                data = await asyncio.wait_for(
-                    reader.read(65535),
-                    timeout=H2_IDLE_TIMEOUT,
-                )
-            except TimeoutError:
+            if draining and not stream_tasks and not state.streams:
+                # All accepted streams finished — close out (the finally
+                # block sends GOAWAY). state.streams matters too: a stream
+                # whose HEADERS arrived but whose body hasn't finished has
+                # no task yet, and GOAWAY's last_stream_id would tell the
+                # client it was processed — keep reading until it
+                # completes (bounded by the worker's drain deadline).
+                break
+
+            if read_task is None:
+                read_task = loop.create_task(reader.read(65535))
+
+            # Keep reading while draining — in-flight responses depend on
+            # WINDOW_UPDATE frames from the client — but wake regularly to
+            # notice the last stream finishing even if the client is quiet.
+            waiters: set[asyncio.Task[Any]] = {read_task}
+            if shutdown_wait is not None and not draining:
+                waiters.add(shutdown_wait)
+            done, _ = await asyncio.wait(
+                waiters,
+                timeout=0.5 if draining else H2_IDLE_TIMEOUT,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+
+            if shutdown_wait is not None and shutdown_wait in done:
+                draining = True
+                continue
+
+            if read_task not in done:
+                if draining:
+                    continue
                 log.debug("HTTP/2 idle timeout", extra={"client": client})
                 break
+
+            data = read_task.result()
+            read_task = None
             if not data:
                 break
 
@@ -366,6 +407,15 @@ async def async_handle_h2_connection(
 
             for event in h2_events:
                 if isinstance(event, h2.events.RequestReceived):
+                    if draining:
+                        # Refuse streams opened during shutdown — the
+                        # client can safely retry them (REFUSED_STREAM
+                        # means nothing was processed).
+                        conn.reset_stream(
+                            event.stream_id,
+                            error_code=h2.errors.ErrorCodes.REFUSED_STREAM,
+                        )
+                        continue
                     stream = H2Stream(event.stream_id)
                     stream.headers = [
                         (
@@ -505,6 +555,11 @@ async def async_handle_h2_connection(
             extra={"client": client},
         )
     finally:
+        if read_task is not None:
+            read_task.cancel()
+        if shutdown_wait is not None:
+            shutdown_wait.cancel()
+
         for task in stream_tasks.values():
             task.cancel()
         if stream_tasks:
@@ -515,17 +570,26 @@ async def async_handle_h2_connection(
             goaway_data = conn.data_to_send()
             if goaway_data:
                 writer.write(goaway_data)
-                await writer.drain()
+                # Bounded — a backpressured peer must not stall teardown.
+                await asyncio.wait_for(writer.drain(), timeout=0.5)
         except Exception:
             pass
 
         # Close the connection — writer.close() sends TLS close_notify
-        # and closes the underlying transport.
+        # and closes the underlying transport. Every wait here is bounded
+        # so the whole teardown fits inside the worker's
+        # DRAIN_TEARDOWN_MARGIN: a peer that never answers the
+        # close_notify would otherwise pin this task for
+        # ssl_shutdown_timeout (30s) and lose the race to the arbiter's
+        # SIGKILL. On timeout, abort the transport outright.
         if not writer.is_closing():
             writer.close()
+        try:
+            await asyncio.wait_for(writer.wait_closed(), timeout=1.0)
+        except (TimeoutError, OSError):
             try:
-                await writer.wait_closed()
-            except OSError:
+                writer.transport.abort()
+            except Exception:
                 pass
 
 

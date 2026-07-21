@@ -16,7 +16,7 @@ from ..database_url import postgres_cli_args, postgres_cli_env
 from ..db import get_connection
 from ..dialect import quote_name
 from .converge import converge
-from .decorators import database_management_command
+from .decorators import cli_schema_lock, database_management_command
 from .diagnose import diagnose
 from .schema import schema
 from .sync import sync
@@ -126,13 +126,27 @@ def drop_unknown_tables(yes: bool) -> None:
         if not click.confirm(f"Drop {tables_label} (CASCADE)? This cannot be undone."):
             return
 
-    with conn.cursor() as cursor:
-        for table in unknown_tables:
-            click.echo(f"  Dropping {table}...", nl=False)
-            cursor.execute(f"DROP TABLE IF EXISTS {quote_name(table)} CASCADE")
-            click.echo(" OK")
+    with cli_schema_lock():
+        # Re-check under the lock — while we sat at the prompt or waited for
+        # the lock, another process may have claimed one of these names for a
+        # real table (e.g. a migration creating a model table). Only drop
+        # what was unknown at confirm time AND is still unknown now.
+        still_unknown = set(get_unknown_tables(conn))
+        dropped_count = 0
+        with conn.cursor() as cursor:
+            for table in unknown_tables:
+                if table not in still_unknown:
+                    click.secho(f"  Skipping {table} — no longer unknown.", fg="yellow")
+                    continue
+                click.echo(f"  Dropping {table}...", nl=False)
+                cursor.execute(f"DROP TABLE IF EXISTS {quote_name(table)} CASCADE")
+                click.echo(" OK")
+                dropped_count += 1
 
-    click.secho(f"✓ Dropped {tables_label}.", fg="green")
+    click.secho(
+        f"✓ Dropped {dropped_count} table{'s' if dropped_count != 1 else ''}.",
+        fg="green",
+    )
 
 
 @cli.command()

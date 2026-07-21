@@ -29,6 +29,11 @@ plain-cache
 plain-jobs
 plain-flags
 plain-connect
+plain-cloud
+plain-portal
+plain-scan
+plain-redirection
+plain-tunnel
 plain-admin
 plain-oauth
 plain-auth
@@ -39,6 +44,7 @@ plain-elements
 plain-htmx
 plain-email
 plain-mcp
+plain-oauthserver
 plain-pages
 EOF
 )"
@@ -118,6 +124,15 @@ else
   echo
   bold "Running h2-worker-test"
   tools/h2-worker-test
+
+  # Graceful shutdown behavior
+  echo
+  bold "Running shutdown-test"
+  tools/shutdown-test
+
+  echo
+  bold "Running h2-shutdown-test"
+  tools/h2-shutdown-test
 
   # HTTP/1.1 conformance tests (h1spec)
   echo

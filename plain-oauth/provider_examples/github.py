@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Any
 
-import requests
+import httpx
 
 from plain.oauth.exceptions import OAuthError
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
@@ -21,7 +21,7 @@ class GitHubOAuthProvider(OAuthProvider):
     github_emails_url = "https://api.github.com/user/emails"
 
     def _get_token(self, request_data: dict[str, Any]) -> OAuthToken:
-        response = requests.post(
+        response = httpx.post(
             self.github_token_url,
             headers={
                 "Accept": "application/json",
@@ -71,7 +71,7 @@ class GitHubOAuthProvider(OAuthProvider):
         )
 
     def get_oauth_user(self, *, oauth_token: OAuthToken) -> OAuthUser:
-        response = requests.get(
+        response = httpx.get(
             self.github_user_url,
             headers={
                 "Accept": "application/json",
@@ -84,7 +84,7 @@ class GitHubOAuthProvider(OAuthProvider):
         username = data["login"]
 
         # Use the verified, primary email address (not the public profile email, which is optional anyway)
-        response = requests.get(
+        response = httpx.get(
             self.github_emails_url,
             headers={
                 "Accept": "application/json",

@@ -1,5 +1,60 @@
 # plain-postgres changelog
 
+## [0.111.2](https://github.com/dropseed/plain/releases/plain-postgres@0.111.2) (2026-07-15)
+
+### What's changed
+
+- The `setup_db` pytest fixture is now pytest-xdist aware: each worker gets its own test database (`gw0_<db>`, `gw1_<db>`, …), so `plain test -n <N>` runs in parallel without workers colliding while creating, migrating, and dropping the same database. Off-xdist the database name is unchanged (`test_<db>`). ([a8880771d2](https://github.com/dropseed/plain/commit/a8880771d2))
+- Removed an unnecessary `type: ignore` comment in the SQL compiler. ([2a1bf46f13](https://github.com/dropseed/plain/commit/2a1bf46f13))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.111.1](https://github.com/dropseed/plain/releases/plain-postgres@0.111.1) (2026-07-10)
+
+### What's changed
+
+- `suppress_db_tracing` is now documented public API (`plain.postgres.otel.suppress_db_tracing`), with a new [Tracing](https://github.com/dropseed/plain/blob/master/plain-postgres/plain/postgres/README.md#tracing) section in the README. Use it around framework-style housekeeping queries (pollers, gauge callbacks) that run outside any entry span, where each query would otherwise export as its own single-span root trace. ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+- Hardened the schema-convergence invariants behind `plain postgres sync` / `converge` / `schema`: a malformed drift now fails loudly at plan time instead of constructing a fix with missing fields, and column/foreign-key comparison asserts it never silently drops a detected drift. ([cb9aa7087c](https://github.com/dropseed/plain/commit/cb9aa7087c))
+- Internal restructuring of the convergence subsystem: the per-kind drift classes were decomposed into shape dataclasses, and `plain.postgres.convergence` no longer re-exports the drift, fix, and status types — it is an internal subsystem driven through the CLI commands, and its `__init__` now only exposes what the CLI uses. No CLI behavior changes. ([75216e16c9](https://github.com/dropseed/plain/commit/75216e16c9), [2b2e57f876](https://github.com/dropseed/plain/commit/2b2e57f876))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.111.0](https://github.com/dropseed/plain/releases/plain-postgres@0.111.0) (2026-06-30)
+
+### What's changed
+
+- Slicing a `QuerySet` now always returns a `QuerySet`, even when its results are already cached — previously, slicing an already-evaluated queryset returned a plain `list`. The returned queryset carries the sliced cache, so iterating it won't re-query, but re-chaining it (adding a `.filter()`, ordering, etc.) drops the cache and applies the slice as SQL `LIMIT`/`OFFSET` so the rows stay correct. ([d60e07d6ad](https://github.com/dropseed/plain/commit/d60e07d6ad))
+- Step slicing (e.g. `qs[::2]`) now raises `ValueError` instead of silently evaluating the queryset and returning a stepped `list`. Negative indexing and negative slice bounds continue to raise, as before. `RawQuerySet` is unaffected — it is always fully materialized, so its slicing keeps plain `list` semantics, where step and negative slicing still work. ([d60e07d6ad](https://github.com/dropseed/plain/commit/d60e07d6ad), [a873a521d4](https://github.com/dropseed/plain/commit/a873a521d4))
+
+### Upgrade instructions
+
+- If you relied on `queryset[a:b]` returning a `list` — for example checking `isinstance(result, list)`, calling list methods like `.append()` on it, or re-slicing it with a step — wrap it in `list(queryset[a:b])` to materialize it explicitly.
+- Replace any step slicing of a queryset (`queryset[::2]`) with a `list(...)` conversion first, since it now raises `ValueError`.
+
+## [0.110.2](https://github.com/dropseed/plain/releases/plain-postgres@0.110.2) (2026-06-26)
+
+### What's changed
+
+- Internal type-annotation cleanups (`Func` expression attributes, enum choices) and a dev-dependency bump (pytest 9.1.1) to clear a security advisory. No public API changes. ([288bbf0bb1](https://github.com/dropseed/plain/commit/288bbf0bb1))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.110.1](https://github.com/dropseed/plain/releases/plain-postgres@0.110.1) (2026-06-22)
+
+### What's changed
+
+- Internal: the ordering infinite-loop guard builds its join signature with `isinstance(alias, Join)` instead of `getattr(alias, "join_col", None)`, keeping `.join_col` greppable and type-checked. No behavior change. ([c813405f](https://github.com/dropseed/plain/commit/c813405f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.110.0](https://github.com/dropseed/plain/releases/plain-postgres@0.110.0) (2026-06-17)
 
 ### What's changed

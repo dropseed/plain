@@ -1,9 +1,39 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import pytest
 
 from plain.postgres.connection import DatabaseConnection
-from plain.postgres.db import _db_conn
+from plain.postgres.db import _db_conn, get_connection
+
+
+@pytest.fixture
+def capture_queries():
+    """Return a context manager that records the SQL run within its block.
+
+        with capture_queries() as queries:
+            list(qs)
+        assert len(queries) == 1
+
+    ``queries`` is populated when the block exits with the executed query
+    dicts (each has a ``"sql"`` key), so inspect it after the ``with``.
+    """
+
+    @contextmanager
+    def _capture():
+        conn = get_connection()
+        previous = conn.force_debug_cursor
+        conn.force_debug_cursor = True
+        conn.queries_log.clear()
+        captured: list[dict] = []
+        try:
+            yield captured
+        finally:
+            captured.extend(conn.queries_log)
+            conn.force_debug_cursor = previous
+
+    return _capture
 
 
 @pytest.fixture

@@ -7,7 +7,7 @@ import click
 from plain.runtime import settings
 
 from ..convergence import execute_plan, plan_convergence
-from .decorators import database_management_command
+from .decorators import cli_schema_lock, database_management_command
 
 
 @click.command()
@@ -33,8 +33,12 @@ def sync(check: bool) -> None:
     if settings.DEBUG:
         _create_migrations()
 
-    _migrate()
-    _converge()
+    with cli_schema_lock() as verify_lock:
+        _migrate()
+        # If the lock session died during migrations, another process may
+        # already be converging — stop instead of interleaving with it.
+        verify_lock()
+        _converge()
 
 
 def _check() -> None:

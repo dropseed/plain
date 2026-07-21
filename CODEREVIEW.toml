@@ -1,0 +1,15 @@
+# Review configuration for the Plain framework monorepo.
+#
+# Most PRs here are opened by agents under the maintainer's own GitHub
+# account. PullApprove never counts an author's review toward `require`, so
+# `require` stays 0 for now — the scope requests review and carries
+# instructions, but does not hard-block. Once agents open PRs under a separate
+# bot identity, raise this to `require = 1`.
+
+[[scopes]]
+name = "all"
+description = "Everything in the monorepo — framework core, packages, tooling, and docs."
+paths = ["**/*"]
+reviewers = ["davegaeddert"]
+require = 0
+request = 1

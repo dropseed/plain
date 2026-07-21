@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.63.2](https://github.com/dropseed/plain/releases/plain-dev@0.63.2) (2026-07-15)
+
+### What's changed
+
+- `plain dev` now prints the server URL (and the tunnel URL, when running) as plain log lines at startup, in addition to the status bar — so the URLs are visible in piped output and the dev log file, where the status bar isn't. ([c3f47658cb](https://github.com/dropseed/plain/commit/c3f47658cb))
+- Dropped the unused `inotify` and `requests` dependencies from `plain.dev`. ([66dde7d39d](https://github.com/dropseed/plain/commit/66dde7d39d), [17570d71cf](https://github.com/dropseed/plain/commit/17570d71cf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.63.1](https://github.com/dropseed/plain/releases/plain-dev@0.63.1) (2026-06-08)
 
 ### What's changed

@@ -29,7 +29,7 @@ Run `uv run plain docs runtime` for full details on env var syntax, `.env` files
 
 ## Key Differences from Django
 
-Plain is a Django fork but has different APIs. Package-specific differences are in their respective rules (plain-postgres, plain-templates, plain-test). These are the core framework differences:
+Plain is a Django fork but has different APIs. Package-specific differences are in their respective rules (plain-postgres, plain-templates) under a `## Differences from Django` section. These are the core framework differences:
 
 - **URLs**: Use `Router` with `urls` list, not Django's `urlpatterns`
 - **Request data**: Use `request.query_params` not `request.GET`, `request.form_data` not `request.POST`, `request.json_data` not `json.loads(request.body)`, `request.files` not `request.FILES`
@@ -83,7 +83,8 @@ If the exception propagates out of the span context, the SDK auto-records and se
 - View 5xx attachment — `plain/views/base.py:_respond_to_exception` (records on the SERVER span via `_finalize_span`)
 - Job enqueue — PRODUCER (`plain-jobs/jobs/jobs.py`)
 - Job execute — CONSUMER (`plain-jobs/jobs/models.py`), plus a fallback CONSUMER span in `plain-jobs/jobs/workers.py:process_job` that catches lookup-time failures before `run()` is reached
-- Worker maintenance loop — CONSUMER (`plain-jobs/jobs/workers.py`)
+- Worker maintenance loop — CONSUMER (`plain-jobs/jobs/workers.py`), opened only on ticks where a maintenance task is due — fully idle ticks emit no spans at all
+- Worker claim/heartbeat failures — one-off `claim job` / `worker heartbeat` CONSUMER error spans via `emit_error_consumer_span` (`plain-jobs/jobs/otel.py`); the claim transaction, heartbeat writes, gauge queries, and done-callback bookkeeping are otherwise untraced (`plain.postgres.otel.suppress_db_tracing`)
 - Chore execution — CONSUMER (`plain/cli/chores.py`)
 - MCP RPC dispatch — SERVER (`plain-mcp/mcp/views.py`)
 
@@ -104,7 +105,7 @@ Trace-context-only (not error attribution): template render (`plain-templates`),
 
 **Workflow**: Use `--search <term>` to find which module has what you need, then read the full doc, or run `<name> --search <term>` to print just the matching sections.
 
-Packages: plain, plain-admin, plain-api, plain-assets, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-pages, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-tailwind, plain-templates, plain-toolbar, plain-tunnel, plain-vendor
+Packages: plain, plain-admin, plain-api, plain-assets, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-elements, plain-email, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-pages, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-tailwind, plain-templates, plain-toolbar, plain-tunnel, plain-vendor
 
 Core modules: agents, chores, cli, csrf, forms, http, logs, packages, preflight, runtime, server, test, urls, utils, views
 
@@ -114,8 +115,7 @@ Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/pat
 
 - `uv run plain check` — run linting, preflight, migration, and test checks (add `--skip-test` for faster iteration)
 - `uv run plain pre-commit` — `check` plus commit-specific steps (custom commands, uv lock, build)
-- `uv run plain shell` — interactive Python shell with Plain configured (`-c "..."` for one-off commands)
-- `uv run plain run script.py` — run a script with Plain configured
+- `uv run plain shell` — interactive Python REPL with the app configured (`-c "..."` for one-off code, piped stdin works). For standalone scripts, put `import plain.runtime; plain.runtime.setup()` at the top and run with `uv run python script.py`.
 - `uv run plain request /path` — test HTTP request against the dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`). Add `--json` for context-frugal output — response metadata and trace analysis (query counts, N+1s, span tree), no response body.
 
 ## Debugging and verifying changes

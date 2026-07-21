@@ -1,5 +1,39 @@
 # plain-jobs changelog
 
+## [0.57.0](https://github.com/dropseed/plain/releases/plain-jobs@0.57.0) (2026-07-15)
+
+### What's changed
+
+- Updated the built-in job admin (`JobRequest`, `JobProcess`, `JobResult` viewsets) to plain-admin 0.84.0's new `perform_action(self, action, objects)` signature. The bulk Delete and Retry actions now operate on the selected queryset directly. ([d35face4a6](https://github.com/dropseed/plain/commit/d35face4a6), [53c58701fd](https://github.com/dropseed/plain/commit/53c58701fd))
+- The `JobResult` retry detail action now redirects back to the current page (preserving query params) instead of the list root. ([d35face4a6](https://github.com/dropseed/plain/commit/d35face4a6))
+
+### Upgrade instructions
+
+- No changes required. If you subclass the jobs admin viewsets and override `perform_action`, update the override to the new `(action, objects)` signature — see plain-admin 0.84.0. Requires plain-admin 0.84.0.
+
+## [0.56.1](https://github.com/dropseed/plain/releases/plain-jobs@0.56.1) (2026-07-10)
+
+### What's changed
+
+- Idle workers no longer flood trace search with noise. Previously, every worker exported a `worker loop` span per second plus orphan query spans from the job poll — roughly 120 single-span root traces per minute per idle worker. Now the `worker loop` span only opens on ticks where a maintenance task (heartbeat, stats, job-result rescue, scheduling) is actually due, and the framework's housekeeping queries — the job-claim poll and transaction, heartbeat writes, metric gauge callbacks, and done-callback bookkeeping — run with DB tracing suppressed. A fully idle worker now exports about 2 maintenance traces per minute, while per-job and per-request telemetry is unchanged. ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+- Worker-side failures that previously had no home in trace data now get proper error attribution: a failing job claim or heartbeat write emits a one-off `claim job` / `worker heartbeat` CONSUMER error span. ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+- A transient database failure while claiming a job no longer kills the worker — it logs, emits the error span, and retries, only crashing (so the supervisor restarts it visibly) after 30 consecutive claim failures. ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+- A failure partway through a scheduled-jobs pass now retries on the next tick instead of waiting out the 60-second window and skipping the missed occurrence — the pass only stamps its check time after completing, and re-runs are deduped by the scheduled concurrency key. ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+
+### Upgrade instructions
+
+- No changes required. If you had trace-volume alerts or dashboards keyed on `worker loop` spans, expect their count to drop sharply — idle ticks no longer produce them.
+
+## [0.56.0](https://github.com/dropseed/plain/releases/plain-jobs@0.56.0) (2026-06-22)
+
+### What's changed
+
+- Collapsed the migration history into a single fresh `0001_initial`. The database schema is unchanged — only the migration files were squashed. ([802f2d87](https://github.com/dropseed/plain/commit/802f2d87))
+
+### Upgrade instructions
+
+- Run `plain migrations prune` after upgrading to clear the now-orphaned history records for this package's old migrations. No SQL runs — it only cleans up migration-history records and is safe and idempotent. If `migrations prune` is already part of your deploy steps, no action is needed.
+
 ## [0.55.1](https://github.com/dropseed/plain/releases/plain-jobs@0.55.1) (2026-06-09)
 
 ### What's changed

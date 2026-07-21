@@ -27,7 +27,7 @@ from ..migrations.recorder import MigrationRecorder
 from ..migrations.state import ModelState, ProjectState
 from ..migrations.writer import MigrationWriter
 from ..registry import models_registry
-from .decorators import database_management_command
+from .decorators import cli_schema_lock, database_management_command
 
 if TYPE_CHECKING:
     from ..connection import DatabaseConnection
@@ -511,68 +511,84 @@ def apply(
             click.secho(package_label, dim=True)
             click.echo()  # Add newline after package
 
-    pre_migrate_state = executor._create_project_state(with_applied_migrations=True)
-
     if migration_plan:
-        # Determine whether to use atomic batch
-        use_atomic_batch = False
-        atomic_batch_message = None
-        if len(migration_plan) > 1:
-            # Check if all migrations support atomic
-            non_atomic_migrations = [m for m in migration_plan if not m.atomic]
+        with cli_schema_lock():
+            # Re-plan under the lock — another process may have applied some
+            # or all of these migrations while we waited for it.
+            executor = MigrationExecutor(get_connection(), migration_progress_callback)
+            migration_plan = executor.migration_plan(targets)
+            if not migration_plan:
+                if not quiet:
+                    click.echo(
+                        "No migrations to apply (another process already applied them)."
+                    )
+                return
 
-            if atomic_batch is True:
-                # User explicitly requested atomic batch
-                if non_atomic_migrations:
-                    names = ", ".join(
-                        f"{m.package_label}.{m.name}" for m in non_atomic_migrations[:3]
-                    )
-                    if len(non_atomic_migrations) > 3:
-                        names += f", and {len(non_atomic_migrations) - 3} more"
-                    raise click.UsageError(
-                        f"--atomic-batch requested but these migrations have atomic=False: {names}"
-                    )
-                use_atomic_batch = True
-                atomic_batch_message = (
-                    f"Running {len(migration_plan)} migrations in atomic batch"
-                )
-            elif atomic_batch is False:
-                # User explicitly disabled atomic batch
-                use_atomic_batch = False
-                if len(migration_plan) > 1:
-                    atomic_batch_message = (
-                        f"Running {len(migration_plan)} migrations separately"
-                    )
-            else:
-                # Auto-detect (atomic_batch is None)
-                # Use atomic batch by default
-                if not non_atomic_migrations:
+            # Determine whether to use atomic batch
+            use_atomic_batch = False
+            atomic_batch_message = None
+            if len(migration_plan) > 1:
+                # Check if all migrations support atomic
+                non_atomic_migrations = [m for m in migration_plan if not m.atomic]
+
+                if atomic_batch is True:
+                    # User explicitly requested atomic batch
+                    if non_atomic_migrations:
+                        names = ", ".join(
+                            f"{m.package_label}.{m.name}"
+                            for m in non_atomic_migrations[:3]
+                        )
+                        if len(non_atomic_migrations) > 3:
+                            names += f", and {len(non_atomic_migrations) - 3} more"
+                        raise click.UsageError(
+                            f"--atomic-batch requested but these migrations have atomic=False: {names}"
+                        )
                     use_atomic_batch = True
                     atomic_batch_message = (
                         f"Running {len(migration_plan)} migrations in atomic batch"
                     )
-                else:
+                elif atomic_batch is False:
+                    # User explicitly disabled atomic batch
                     use_atomic_batch = False
                     if len(migration_plan) > 1:
-                        atomic_batch_message = f"Running {len(migration_plan)} migrations separately (some have atomic=False)"
+                        atomic_batch_message = (
+                            f"Running {len(migration_plan)} migrations separately"
+                        )
+                else:
+                    # Auto-detect (atomic_batch is None)
+                    # Use atomic batch by default
+                    if not non_atomic_migrations:
+                        use_atomic_batch = True
+                        atomic_batch_message = (
+                            f"Running {len(migration_plan)} migrations in atomic batch"
+                        )
+                    else:
+                        use_atomic_batch = False
+                        if len(migration_plan) > 1:
+                            atomic_batch_message = f"Running {len(migration_plan)} migrations separately (some have atomic=False)"
 
-        if not quiet:
-            click.echo()  # Add blank line before applying
+            if not quiet:
+                click.echo()  # Add blank line before applying
 
-        if not quiet:
-            if atomic_batch_message:
-                click.secho(
-                    f"Applying migrations ({atomic_batch_message.lower()}):", bold=True
-                )
-            else:
-                click.secho("Applying migrations:", bold=True)
-        post_migrate_state = executor.migrate(
-            targets,
-            plan=migration_plan,
-            state=pre_migrate_state.clone(),
-            fake=fake,
-            atomic_batch=use_atomic_batch,
-        )
+            if not quiet:
+                if atomic_batch_message:
+                    click.secho(
+                        f"Applying migrations ({atomic_batch_message.lower()}):",
+                        bold=True,
+                    )
+                else:
+                    click.secho("Applying migrations:", bold=True)
+
+            pre_migrate_state = executor._create_project_state(
+                with_applied_migrations=True
+            )
+            post_migrate_state = executor.migrate(
+                targets,
+                plan=migration_plan,
+                state=pre_migrate_state.clone(),
+                fake=fake,
+                atomic_batch=use_atomic_batch,
+            )
         # post_migrate signals have access to all models. Ensure that all models
         # are reloaded in case any are delayed.
         post_migrate_state.clear_delayed_models_cache()

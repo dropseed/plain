@@ -18,13 +18,20 @@ from plain.runtime import settings
 from plain.utils.otel import format_exception_type
 from plain.views.base import View
 
-from .exceptions import MCPInvalidParams, MCPUnauthorized
+from .exceptions import MCPInvalidParams, MCPToolError, MCPUnauthorized
 from .resources import MCPResource
+from .schema import validate_arguments
 from .tools import MCPTool
 
 tracer = trace.get_tracer("plain.mcp")
 
-PROTOCOL_VERSION = "2025-03-26"
+PROTOCOL_VERSION = "2025-11-25"
+
+# Streamable HTTP transport revisions this server speaks. initialize echoes the
+# client's requested version when it's one of these (MCP version negotiation),
+# the MCP-Protocol-Version header is validated against the same set, and an
+# absent header means the legacy 2025-03-26 default.
+SUPPORTED_PROTOCOL_VERSIONS = frozenset({"2025-03-26", "2025-06-18", PROTOCOL_VERSION})
 
 PARSE_ERROR = -32700
 INVALID_REQUEST = -32600
@@ -54,7 +61,7 @@ class MCPView(View):
             tools = [Greet]
 
         # app/urls.py
-        path("mcp/", AppMCP, name="mcp")
+        path("mcp", AppMCP, name="mcp")
 
     MCPView itself does no authentication. Compose with `plain.auth.views.AuthView`
     for session auth (put `MCPView` first in the base list), or override
@@ -148,8 +155,15 @@ class MCPView(View):
         JSON-RPC error objects at appropriate status codes.
         """
         if isinstance(exc, MCPUnauthorized):
+            headers = (
+                {"WWW-Authenticate": exc.www_authenticate}
+                if exc.www_authenticate
+                else None
+            )
             return JsonResponse(
-                _error_response(None, UNAUTHORIZED, str(exc)), status_code=401
+                _error_response(None, UNAUTHORIZED, str(exc)),
+                status_code=401,
+                headers=headers,
             )
 
         status = exc.status_code if isinstance(exc, HTTPException) else 500
@@ -165,9 +179,22 @@ class MCPView(View):
         )
 
     def post(self) -> Response:
+        # Spec MUST: reject a request that declares a protocol version we don't
+        # speak. An absent header is the legacy 2025-03-26 default, so allowed.
+        version = self.request.headers.get("MCP-Protocol-Version")
+        if version is not None and version not in SUPPORTED_PROTOCOL_VERSIONS:
+            return JsonResponse(
+                _error_response(
+                    None,
+                    INVALID_REQUEST,
+                    f"Unsupported MCP-Protocol-Version: {version}",
+                ),
+                status_code=400,
+            )
         response = self.handle_message(self.request.body)
         if response is None:
-            return Response(status_code=204)
+            # Spec MUST: a notification (no `id`) is acknowledged with 202, no body.
+            return Response(status_code=202)
         return JsonResponse(response)
 
     def handle_message(self, raw: bytes | str) -> dict[str, Any] | None:
@@ -261,8 +288,15 @@ class MCPView(View):
         return capabilities
 
     def rpc_initialize(self, params: dict[str, Any]) -> dict[str, Any]:
+        # MCP version negotiation: echo the client's requested version when we
+        # speak it, otherwise offer our preferred one (the client then decides).
+        requested = params.get("protocolVersion")
+        if requested in SUPPORTED_PROTOCOL_VERSIONS:
+            version = requested
+        else:
+            version = PROTOCOL_VERSION
         return {
-            "protocolVersion": PROTOCOL_VERSION,
+            "protocolVersion": version,
             "capabilities": self.get_capabilities(),
             "serverInfo": {
                 "name": self.name,
@@ -274,16 +308,20 @@ class MCPView(View):
         return {}
 
     def rpc_tools_list(self, params: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "tools": [
-                {
-                    "name": tool_cls.name,
-                    "description": tool_cls.description,
-                    "inputSchema": tool_cls.input_schema,
-                }
-                for tool_cls in self.get_tools()
-            ]
-        }
+        tools = []
+        for tool_cls in self.get_tools():
+            tool: dict[str, Any] = {
+                "name": tool_cls.name,
+                "description": tool_cls.description,
+                "inputSchema": tool_cls.input_schema,
+            }
+            # `annotations` is optional in the spec — omit it when unset (None)
+            # so a tool that sets no hints doesn't carry an empty object.
+            annotations = tool_cls.annotations
+            if annotations:
+                tool["annotations"] = annotations
+            tools.append(tool)
+        return {"tools": tools}
 
     def rpc_tools_call(self, params: dict[str, Any]) -> dict[str, Any]:
         tool_name = params.get("name")
@@ -294,29 +332,33 @@ class MCPView(View):
         # hit this same "unknown" path — existence isn't leaked.
         tool_cls = next((t for t in self.get_tools() if t.name == tool_name), None)
         if tool_cls is None:
-            return {
-                "content": [{"type": "text", "text": f"Unknown tool: {tool_name}"}],
-                "isError": True,
-            }
+            return _tool_error(f"Unknown tool: {tool_name}")
 
+        # Validate against the advertised input schema before instantiating, so a
+        # bad-typed argument returns a clear, model-fixable tool error instead of
+        # failing inside `run()` and being logged as a server exception (SEP-1303).
         arguments = params.get("arguments", {})
+        if validation_errors := validate_arguments(
+            tool_cls.input_schema or {}, arguments
+        ):
+            return _tool_error("Invalid arguments: " + "; ".join(validation_errors))
+
         try:
             tool = tool_cls(**arguments)
         except TypeError as e:
-            return {
-                "content": [{"type": "text", "text": f"Invalid arguments: {e}"}],
-                "isError": True,
-            }
+            return _tool_error(f"Invalid arguments: {e}")
         tool.mcp = self
 
         try:
             result = tool.run()
+        except MCPToolError as e:
+            # Expected, caller-facing failure — surface the message via the
+            # in-result error channel and don't log it as a server exception.
+            return _tool_error(str(e))
         except Exception as e:
+            # Unexpected bug — log for the operator, stay opaque to the caller.
             log_exception(self.request, e)
-            return {
-                "content": [{"type": "text", "text": "Tool execution failed"}],
-                "isError": True,
-            }
+            return _tool_error("Tool execution failed")
 
         return {"content": _to_content_blocks(result)}
 
@@ -393,6 +435,11 @@ class MCPView(View):
 
 
 _CONTENT_BLOCK_TYPES = {"text", "image", "audio", "resource", "resource_link"}
+
+
+def _tool_error(text: str) -> dict[str, Any]:
+    """A `tools/call` result carrying a caller-facing failure via `isError`."""
+    return {"content": [{"type": "text", "text": text}], "isError": True}
 
 
 def _b64(data: bytes) -> str:
