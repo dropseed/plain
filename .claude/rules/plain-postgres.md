@@ -58,16 +58,7 @@ Do NOT import field classes directly from `plain.postgres` or `plain.postgres.fi
 
 ## Schema Changes
 
-When creating new models or modifying existing model fields/relationships, always enter plan mode first. Database schema is hard to change after the fact, so get the design right before writing code.
-
-In your plan, present:
-
-- Proposed schema as a table (model, field, type, constraints)
-- Relationship cardinality (1:1, 1:N, M:N)
-- Key decisions: nullable vs default, indexing, cascade behavior
-- Whether the data could live on an existing model instead of a new one
-
-Get approval before writing any model code or generating migrations.
+Migrations are annoying to revise after the fact; convergence is cheap. So before making a batch of migration-generating changes — new models, new columns, or column-type changes — think the design through first. Nullability, defaults, indexes, constraints, `on_delete`, and `choices` aren't migrations; they're convergence (edit the model and re-sync), so they stay cheap to revise. For a large set of migration-dependent changes, surfacing the design first (plan mode fits) is worth it.
 
 ## Migrations vs Convergence
 

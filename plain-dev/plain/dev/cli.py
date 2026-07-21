@@ -11,8 +11,8 @@ from plain.cli.runtime import common_command
 from plain.runtime import PLAIN_TEMP_PATH
 
 from .alias import AliasManager
-from .core import ENTRYPOINT_GROUP, DevProcess
-from .services import ServicesProcess
+from .core import ENTRYPOINT_GROUP, DevSupervisor
+from .services import ServicesSupervisor
 
 
 @common_command
@@ -81,11 +81,11 @@ def cli(
 
     os.environ["DEV_SERVICES_AUTO"] = "false"
 
-    dev = DevProcess()
+    dev = DevSupervisor()
 
     if stop:
-        if ServicesProcess.running_pid():
-            ServicesProcess().stop_process()
+        if ServicesSupervisor.running_pid():
+            ServicesSupervisor().stop_process()
             click.secho("Services stopped.", fg="green")
 
         if not dev.running_pid():
@@ -97,26 +97,21 @@ def cli(
         return
 
     if running_pid := dev.running_pid():
-        click.secho(f"`plain dev` already running (pid={running_pid})", fg="yellow")
+        click.secho(dev.already_running_message(running_pid), fg="yellow")
         sys.exit(1)
 
     if start:
-        args = [sys.executable, "-m", "plain", "dev"]
+        extra_args = []
         if port:
-            args.extend(["--port", port])
+            extra_args.extend(["--port", port])
         if hostname:
-            args.extend(["--hostname", hostname])
+            extra_args.extend(["--hostname", hostname])
         if log_level:
-            args.extend(["--log-level", log_level])
+            extra_args.extend(["--log-level", log_level])
 
-        result = subprocess.Popen(
-            args=args,
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        pid = DevSupervisor.spawn_background(*extra_args)
         click.secho(
-            f"Development server started in the background (pid={result.pid}).",
+            f"Development server started in the background (pid={pid}).",
             fg="green",
         )
         return
@@ -146,30 +141,25 @@ def services(start: bool, stop: bool) -> None:
         )
 
     if stop:
-        if not ServicesProcess.running_pid():
+        if not ServicesSupervisor.running_pid():
             click.secho("No services running.", fg="yellow")
             return
-        ServicesProcess().stop_process()
+        ServicesSupervisor().stop_process()
         click.secho("Services stopped.", fg="green")
         return
 
-    if running_pid := ServicesProcess.running_pid():
-        click.secho(f"Services already running (pid={running_pid})", fg="yellow")
+    if running_pid := ServicesSupervisor.running_pid():
+        click.secho(
+            ServicesSupervisor.already_running_message(running_pid), fg="yellow"
+        )
         sys.exit(1)
 
     if start:
-        result = subprocess.Popen(
-            args=[sys.executable, "-m", "plain", "dev", "services"],
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        click.secho(
-            f"Services started in the background (pid={result.pid}).", fg="green"
-        )
+        pid = ServicesSupervisor.spawn_background()
+        click.secho(f"Services started in the background (pid={pid}).", fg="green")
         return
 
-    ServicesProcess().run()
+    ServicesSupervisor().run()
 
 
 @cli.command()

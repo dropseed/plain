@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from plain.postgres import types
 from plain.postgres.base import ModelBase
-from plain.postgres.preflight import CheckTypedConstruction
+from plain.postgres.preflight.models import CheckTypedConstruction
 
 
 def test_no_model_leaks_an_accessor_into_its_constructor():

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from plain.postgres import get_connection, transaction
+from plain.postgres.dialect import quote_name
 from plain.utils import timezone
 
 if TYPE_CHECKING:
@@ -146,6 +149,83 @@ class Cache:
         value = default() if callable(default) else default
         self.set(key, value, expiration=expiration)
         return value
+
+    # Counters ----------------------------------------------------------------
+
+    def increment(
+        self, key: str, delta: int = 1, *, expiration: Expiration = None
+    ) -> int | float:
+        """Atomically add `delta` to the number at `key` and return the new total.
+
+        One `INSERT ... ON CONFLICT` statement, so concurrent callers can't lose
+        updates the way a read-then-`set()` would -- the right primitive for
+        counters and fixed-window rate limiters.
+
+        Expiry follows a fixed-window rule:
+
+        - A **missing or expired** key starts fresh at `delta` and takes
+          `expiration` -- a lapsed window resets cleanly to a new deadline.
+        - A **live** key adds `delta` to the existing total and keeps its
+          current `expires_at` -- the window holds its original deadline,
+          regardless of the `expiration` argument. (To slide the expiry too,
+          call `touch()`.)
+
+        A key with no numeric value yet -- missing, or storing `None` -- counts
+        as `0`, so the first increment starts from `delta`. Incrementing a key
+        that stores a non-numeric value (a string, list, etc.) raises.
+        """
+        now = timezone.now()
+        expires_at = _coerce_expiration(expiration, now=now)
+        table = quote_name(self._model.model_options.db_table)
+
+        # The existing-row expiry test matches `expired()` (the inverse of the
+        # `live()` filter reads use): an expired row counts as absent, so the
+        # counter restarts from `delta` with a new deadline instead of resuming a
+        # stale total whose window already lapsed. A never-expiring row has
+        # expires_at = NULL, and `NULL < now` is NULL (falsy in CASE), so it
+        # correctly falls through to the accumulate branch.
+        sql = f"""
+            INSERT INTO {table} (key, value, expires_at, created_at, updated_at)
+            VALUES (%(key)s, to_jsonb(%(delta)s::numeric), %(expires_at)s, %(now)s, %(now)s)
+            ON CONFLICT (key) DO UPDATE SET
+                value = CASE
+                    WHEN {table}.expires_at < %(now)s
+                    THEN EXCLUDED.value
+                    -- `value::text` keeps JSON syntax, so a string like "5"
+                    -- stays quoted and fails ::numeric -- only a real JSON
+                    -- number parses. NULLIF maps JSON null to SQL NULL so
+                    -- COALESCE treats a null/absent value as 0.
+                    ELSE to_jsonb(COALESCE(NULLIF({table}.value, 'null'::jsonb)::text::numeric, 0) + %(delta)s)
+                END,
+                expires_at = CASE
+                    WHEN {table}.expires_at < %(now)s
+                    THEN EXCLUDED.expires_at
+                    ELSE {table}.expires_at
+                END,
+                updated_at = %(now)s
+            RETURNING value::text
+        """
+        params = {"key": key, "delta": delta, "expires_at": expires_at, "now": now}
+        # A non-numeric value raises DataError, which leaves the DB transaction
+        # aborted. Mark the connection so an enclosing atomic() block rolls back
+        # even if the caller catches the error -- the same guard ORM writes use.
+        with (
+            transaction.mark_for_rollback_on_error(),
+            get_connection().cursor() as cursor,
+        ):
+            cursor.execute(sql, params)
+            row = cursor.fetchone()
+        assert row is not None  # INSERT ... ON CONFLICT DO UPDATE always returns a row
+
+        # `value::text` returns the new total as JSON text regardless of driver;
+        # decode it to the same Python number `get()` would yield.
+        return json.loads(row[0])
+
+    def decrement(
+        self, key: str, delta: int = 1, *, expiration: Expiration = None
+    ) -> int | float:
+        """Atomically subtract `delta` from the number at `key`. See `increment()`."""
+        return self.increment(key, -delta, expiration=expiration)
 
     def touch(self, key: str, *, expiration: Expiration = None) -> bool:
         """Change a live entry's expiration *without* rewriting its value.

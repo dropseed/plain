@@ -41,3 +41,8 @@ server:
   # streams on POST yet.
   - server-sse-polling
   - server-sse-multiple-streams
+
+  # NOTE: dns-rebinding-protection PASSES — Plain's builtin CsrfViewMiddleware
+  # rejects a forged non-localhost Origin with a 400 (the MCP MUST), and valid
+  # localhost requests are accepted now that the runner targets `/mcp` (no
+  # trailing slash — `/mcp/` 308-redirected, which the raw probe didn't follow).

@@ -47,6 +47,24 @@
   --radius-checkbox: calc(var(--radius) - 4px);
   --radius-tabs-focus: calc(var(--radius) - 4px);
 
+  /* Top-layer overlay enter/exit fade, shared by every overlay that toggles
+     the top layer — dialog, popover, dropdown-menu, hovercard. Animating
+     these requires transitioning `display` + `overlay` with `allow-discrete`
+     (so the panel stays put through its exit) plus `@starting-style` for the
+     enter; this token carries that recipe once so the four components can't
+     drift. `visibility` is transitioned too so a panel that hides via
+     `visibility: hidden` (the robust hide, since a `display` utility can
+     override the UA's popover `display: none`) still fades on exit. Override
+     `--admin-overlay-fade` per component to retune the duration (the hovercard
+     runs snappier). See the modern-web-guidance "animate-to-from-top-layer". */
+  --admin-overlay-fade: 150ms;
+  --admin-overlay-transition:
+    opacity var(--admin-overlay-fade) ease,
+    scale var(--admin-overlay-fade) ease,
+    visibility var(--admin-overlay-fade),
+    display var(--admin-overlay-fade) allow-discrete,
+    overlay var(--admin-overlay-fade) allow-discrete;
+
   /* Fonts. Tailwind v4 wires the `font-sans` / `font-mono` utilities to
      these names automatically — overriding either retheme the admin's
      typography without touching templates. Inter and JetBrains Mono are
@@ -101,6 +119,7 @@
   --chevron-down-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.556 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>');
   --chevron-down-icon-50: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.556 0 0 / 0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>');
   --check-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-icon lucide-check"><path d="M20 6 9 17l-5-5"/></svg>');
+  --minus-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-minus-icon lucide-minus"><path d="M5 12h14"/></svg>');
 
   /* Plain-only semantic slots. Earthy, brand-coordinated hues — sage
      green / warm amber / steel blue — desaturated enough to read
@@ -189,6 +208,7 @@
   --chevron-down-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.708 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>');
   --chevron-down-icon-50: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.708 0 0 / 0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>');
   --check-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.708 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-icon lucide-check"><path d="M20 6 9 17l-5-5"/></svg>');
+  --minus-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.708 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-minus-icon lucide-minus"><path d="M5 12h14"/></svg>');
   color-scheme: dark;
 }
 

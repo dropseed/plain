@@ -1,8 +1,16 @@
 from __future__ import annotations
 
 import hmac
+from typing import cast
 
-from plain.mcp import MCPTool, MCPUnauthorized, MCPView
+from plain.mcp import (
+    MCPProtectedResourceView,
+    MCPTool,
+    MCPUnauthorized,
+    MCPView,
+    OAuthResourceServer,
+    TokenInfo,
+)
 from plain.urls import Router, path
 
 
@@ -29,7 +37,7 @@ class PublicMCP(MCPView):
 
 
 class AuthedMCP(MCPView):
-    """Bearer token auth via `check_auth` override — mirrors the README recipe."""
+    """Bearer token auth via `before_request` override — mirrors the README recipe."""
 
     name = "authed"
     tools = [Secret]
@@ -66,6 +74,35 @@ class RPCBoomMCP(MCPView):
         raise RuntimeError("rpc handler boom")
 
 
+class WhoAmI(MCPTool):
+    """Reflect the authenticated identity so tests can assert propagation."""
+
+    def run(self) -> dict:
+        mcp = cast("OAuthMCP", self.mcp)
+        return {"user": mcp.user, "scopes": sorted(mcp.scopes)}
+
+
+class OAuthMCP(OAuthResourceServer, MCPView):
+    """OAuth-protected endpoint with a stub token validator."""
+
+    name = "oauth"
+    tools = [Secret, WhoAmI]
+
+    def authenticate_token(self, token: str) -> TokenInfo | None:
+        if token == "valid-token":
+            return TokenInfo(user="alice", scopes=frozenset({"read"}))
+        return None
+
+
+class OAuthPRM(MCPProtectedResourceView):
+    authorization_servers = ["https://auth.example.com"]
+    oauth_scopes_supported = ["read"]
+
+
+class OAuthPRMSameApp(MCPProtectedResourceView):
+    """No authorization_servers set — defaults to this app's own origin."""
+
+
 class AppRouter(Router):
     namespace = ""
     urls = [
@@ -73,4 +110,15 @@ class AppRouter(Router):
         path("authed", AuthedMCP, name="authed_mcp"),
         path("boom", BoomMCP, name="boom_mcp"),
         path("rpc-boom", RPCBoomMCP, name="rpc_boom_mcp"),
+        path("oauth-mcp", OAuthMCP, name="oauth_mcp"),
+        path(
+            ".well-known/oauth-protected-resource/oauth-mcp",
+            OAuthPRM,
+            name="oauth_prm",
+        ),
+        path(
+            ".well-known/oauth-protected-resource/oauth-mcp-sameapp",
+            OAuthPRMSameApp,
+            name="oauth_prm_sameapp",
+        ),
     ]

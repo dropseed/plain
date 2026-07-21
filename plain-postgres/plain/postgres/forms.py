@@ -771,7 +771,7 @@ def modelfield_to_formfield(
             **defaults,
         )
 
-    # TODO related (OneToOne, m2m)
+    # TODO related (m2m)
 
     # If there's a form field of the exact same name, use it
     # (models.URLField -> forms.URLField)

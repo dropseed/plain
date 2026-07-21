@@ -421,6 +421,36 @@ def test_run_loop_returns_connection_each_tick(
     assert ticks == 2
 
 
+def test_run_loop_claims_job_and_submits(db, worker: Worker, monkeypatch) -> None:
+    """A full claim through _run_loop: poll finds the JobRequest, converts it
+    to a JobProcess, and submits it to the executor. Submission is stubbed —
+    spawned worker processes can't see the test transaction's data anyway."""
+    name = jobs_registry.get_job_class_name(_RecordingJob)
+    request = JobRequest.query.create(
+        job_class=name,
+        parameters={"args": [], "kwargs": {}},
+    )
+    worker.register_heartbeat()
+
+    submitted: list[str] = []
+
+    def fake_submit(fn, job_process_uuid: str) -> Future:
+        submitted.append(job_process_uuid)
+        return Future()
+
+    monkeypatch.setattr(worker.executor, "submit", fake_submit)
+    # After the claim, the next tick's empty poll sleeps — use it to exit.
+    monkeypatch.setattr(
+        "plain.jobs.workers.time.sleep", lambda seconds: worker.shutdown()
+    )
+
+    worker._run_loop()
+
+    process = JobProcess.query.get(job_request_uuid=request.uuid)
+    assert submitted == [str(process.uuid)]
+    assert not JobRequest.query.filter(uuid=request.uuid).exists()
+
+
 def test_future_finished_callback_rescues_orphan_jobprocess(db) -> None:
     """If a future completes "successfully" but the JobProcess row survives
     (because process_job's outer except-Exception swallowed a framework error

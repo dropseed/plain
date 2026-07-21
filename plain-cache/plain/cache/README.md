@@ -5,6 +5,7 @@
 - [Overview](#overview)
 - [Setting expiration](#setting-expiration)
 - [Get-or-set](#get-or-set)
+- [Counters](#counters)
 - [Batch operations](#batch-operations)
 - [Refreshing expiration](#refreshing-expiration)
 - [Checking and deleting](#checking-and-deleting)
@@ -73,6 +74,47 @@ data = cache.get_or_set(
 ```
 
 A stored `None` counts as a hit, so caching a computed `None` won't recompute it every time.
+
+## Counters
+
+`increment()` (and `decrement()`) atomically adjust a stored number in a single `INSERT ... ON CONFLICT` statement and return the new total. Because it's one statement, concurrent callers can't lose updates the way a read-then-`set()` would.
+
+```python
+from plain.cache import cache
+
+cache.increment("page-views")          # 1 (starts at the delta on a miss)
+cache.increment("page-views")          # 2
+cache.increment("page-views", 10)      # 12
+cache.decrement("page-views", 2)       # 10
+```
+
+A key with no numeric value yet — missing, or storing `None` — counts as `0`, so the first increment starts from the delta. Incrementing a key that holds a non-numeric value (a string, list, etc.) raises.
+
+### Expiration
+
+When you pass `expiration`, the counter behaves as a **fixed window**:
+
+- A **missing or expired** key starts fresh at the delta and takes the `expiration` you pass — a lapsed window resets cleanly to a new deadline.
+- A **live** key adds to the existing total and keeps its current `expires_at` — the window holds its original deadline, regardless of the `expiration` argument.
+
+This makes a "count per period" limiter straightforward — e.g. capping requests per IP:
+
+```python
+from plain.cache import cache
+
+def check_rate_limit(key: str, *, limit: int, period: int) -> bool:
+    """Allow up to `limit` calls per `period` seconds. Returns True if allowed."""
+    return cache.increment(key, expiration=period) <= limit
+```
+
+Note this is a _fixed_ window, so it permits a boundary burst (up to `limit` just before the window resets and `limit` just after). For smooth sliding-window or token-bucket limiting you need extra state this primitive doesn't carry.
+
+For a **sliding TTL** — reset only after a stretch of inactivity, rather than on a fixed schedule — refresh the expiry on each increment with [`touch()`](#refreshing-expiration). The count stays atomic; the TTL refresh is a cheap second statement:
+
+```python
+cache.increment("failed-logins:42", expiration=900)
+cache.touch("failed-logins:42", expiration=900)  # push the deadline out on every attempt
+```
 
 ## Batch operations
 

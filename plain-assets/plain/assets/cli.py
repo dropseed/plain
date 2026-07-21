@@ -69,7 +69,7 @@ def compile_cmd(keep_original: bool, fingerprint: bool, compress: bool) -> None:
                 click.secho(f"Error in {name} (exit {result.returncode})", fg="red")
                 sys.exit(result.returncode)
 
-    # Then run installed package pre-compile hooks (like tailwind, esbuild)
+    # Then run installed package pre-compile hooks (like tailwind)
     for entry_point in entry_points(group="plain.assets.compile"):
         print_event(f"{entry_point.name}...")
         entry_point.load()()

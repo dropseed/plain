@@ -99,7 +99,7 @@ Python where you want it, JS where you need it.
 - **Templates:** Jinja2
 - **Frontend:** htmx, Tailwind CSS
 - **Python tooling:** uv (packages), ruff (lint/format), ty (type checking)
-- **JavaScript tooling:** oxc (lint/format), esbuild (bundling)
+- **JavaScript tooling:** oxc (lint/format)
 - **Testing:** pytest
 
 Models declare fields as annotated attributes, and that typing carries through views, forms, and URLs. `plain check` runs `ty` on every pass — what your IDE shows, CI enforces, and agents read from the same signatures.
@@ -157,7 +157,6 @@ plain docs --search "queryset"         # search across all packages
 - [plain.tailwind](https://plainframework.com/docs/plain-tailwind/plain/tailwind/) — CSS framework
 - [plain.elements](https://plainframework.com/docs/plain-elements/plain/elements/) — HTML components
 - [plain.pages](https://plainframework.com/docs/plain-pages/plain/pages/) — static pages
-- [plain.esbuild](https://plainframework.com/docs/plain-esbuild/plain/esbuild/) — JS bundling
 
 **Development:**
 

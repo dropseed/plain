@@ -1,5 +1,63 @@
 # plain-admin changelog
 
+## [0.84.0](https://github.com/dropseed/plain/releases/plain-admin@0.84.0) (2026-07-15)
+
+### What's changed
+
+- **`perform_action` now receives the selected objects, not their ids.** The signature changed from `perform_action(self, action, target_ids)` to `perform_action(self, action, objects)`. On a model list, `objects` is a lazy queryset already narrowed to the selection, so you can call `.update()` / `.delete()` directly without re-querying — and "Select all N" scales, because the selected ids never have to be materialized. On the generic base list it's a plain list. ([d35face4a6](https://github.com/dropseed/plain/commit/d35face4a6))
+- Reworked the list bulk-action selection UX. Actions now live in an **Actions** dropdown menu (always visible, its items disabled until rows are selected) that confirms before running. The header checkbox toggles the whole current page and shows an indeterminate state for a partial selection, an explicit "Select all N" mode targets every row across all pages, and a live selection summary plus a "Clear" affordance round it out. ([53c58701fd](https://github.com/dropseed/plain/commit/53c58701fd), [2c59420319](https://github.com/dropseed/plain/commit/2c59420319))
+- Admin hovercards accept a `data-hovercard-side="right|left|top|bottom"` placement option. Set it on the panel or on any ancestor (e.g. a table column) so a whole column of hovercards can open to one side, keeping the trigger column clear for vertical scanning. ([d0dd713df8](https://github.com/dropseed/plain/commit/d0dd713df8))
+- The admin menu popover now groups pages by usage rather than code provenance: your app's pages sit unlabeled at the top, framework tooling is separated below a divider under a "System" label, and the filter shows a "No pages found" empty state when nothing matches. The filter input is restyled as a seamless field. ([f2d6d9d69e](https://github.com/dropseed/plain/commit/f2d6d9d69e), [2c59420319](https://github.com/dropseed/plain/commit/2c59420319))
+
+### Upgrade instructions
+
+- Update any `perform_action(self, action, target_ids)` overrides to `perform_action(self, action, objects)`. Instead of re-querying with `Model.query.filter(id__in=target_ids)`, use the `objects` you're handed — on a model list it's already a queryset scoped to the selection, so `objects.update(...)`, `objects.delete()`, or iterating it works directly.
+
+## [0.83.2](https://github.com/dropseed/plain/releases/plain-admin@0.83.2) (2026-06-30)
+
+### What's changed
+
+- Clicking a sorted column header now cycles through three states — ascending, descending, then cleared (back to the default order) — instead of only toggling between ascending and descending. The sort indicators are now icons rather than unicode arrows, an "x" is revealed on hover/focus when the next click will clear the sort, and column headers expose `aria-sort` and descriptive `aria-label`s for screen readers. ([6c3aa8ce99](https://github.com/dropseed/plain/commit/6c3aa8ce99))
+- The active sort now survives pagination, search, and filtering. GET forms that stay on the current list view merge their fields onto the existing query string rather than rebuilding it from scratch, so unrelated state like `order_by` carries over; changing any non-pagination control still resets back to the first page, and forms that navigate elsewhere (e.g. global search) start from a clean query string. ([d6762c0490](https://github.com/dropseed/plain/commit/d6762c0490))
+- Fixed list previews on the global search page never rendering in the compact "preview" style. Preview detection now compares the request path against the admin search URL instead of substring-matching `/search/`, so it works regardless of where the admin is mounted. ([8dd51b733b](https://github.com/dropseed/plain/commit/8dd51b733b))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.83.1](https://github.com/dropseed/plain/releases/plain-admin@0.83.1) (2026-06-26)
+
+### What's changed
+
+- Admin overlays (dropdown menus, hovercards, popovers) now open in the browser's top layer with anchor positioning, so they're no longer clipped by tables or scroll/overflow containers. ([91680dd514](https://github.com/dropseed/plain/commit/91680dd514))
+- Overlay open/close animations honor `prefers-reduced-motion`, and a missing-popover-attribute edge case is guarded. ([f0025f287a](https://github.com/dropseed/plain/commit/f0025f287a))
+- Closed overlays are hidden with `visibility` rather than `aria-hidden`. ([93009be121](https://github.com/dropseed/plain/commit/93009be121))
+- The list table's scroll box no longer clips focus rings, and a copy button inside an autolinked row now copies instead of following the row link. ([f2b2baf426](https://github.com/dropseed/plain/commit/f2b2baf426))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.83.0](https://github.com/dropseed/plain/releases/plain-admin@0.83.0) (2026-06-22)
+
+### What's changed
+
+- Collapsed the migration history into a single fresh `0001_initial`. The database schema is unchanged — only the migration files were squashed. ([802f2d87](https://github.com/dropseed/plain/commit/802f2d87))
+
+### Upgrade instructions
+
+- Run `plain migrations prune` after upgrading to clear the now-orphaned history records for this package's old migrations. No SQL runs — it only cleans up migration-history records and is safe and idempotent. If `migrations prune` is already part of your deploy steps, no action is needed.
+
+## [0.82.4](https://github.com/dropseed/plain/releases/plain-admin@0.82.4) (2026-06-08)
+
+### What's changed
+
+- Internal: typing-only changes for the `ty` 0.0.45 upgrade. `register_view` and `register_viewset` gain explicit `@overload` signatures so they type-check whether used bare (`@register_view`) or called (`@register_view()`), and `ty: ignore` comments were added where `AdminViewset` stamps dynamic URL helpers (`get_list_url`, etc.) onto its views. No runtime behavior changes. ([95f54e880d](https://github.com/dropseed/plain/commit/95f54e880d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.82.3](https://github.com/dropseed/plain/releases/plain-admin@0.82.3) (2026-05-25)
 
 ### What's changed

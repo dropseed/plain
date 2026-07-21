@@ -43,7 +43,7 @@ class PathInfo(NamedTuple):
 
     from_meta: Meta
     to_meta: Meta
-    target_fields: tuple[Field, ...]
+    target_field: Field
     join_field: ForeignKeyField | ForeignObjectRel
     m2m: bool
     direct: bool

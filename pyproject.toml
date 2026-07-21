@@ -16,7 +16,6 @@ dev = [
   "plain-code",
   "plain-dev",
   "plain-elements",
-  "plain-esbuild",
   "plain-flags",
   "plain-htmx",
   "plain-jobs",
@@ -26,6 +25,7 @@ dev = [
   "plain-portal",
   "plain-postgres",
   "plain-oauth",
+  "plain-oauthserver",
   "plain-pages",
   "plain-passwords",
   "plain-pytest",
@@ -38,7 +38,7 @@ dev = [
   "plain-tunnel",
   "plain-vendor",
   # Type checking and better dev experience
-  "ty>=0.0.33",
+  "ty>=0.0.61",
   "psycopg[binary]>=3.2.12",
 ]
 
@@ -54,7 +54,6 @@ dev = [
 "plain-code" = { workspace = true }
 "plain-dev" = { workspace = true }
 "plain-elements" = { workspace = true }
-"plain-esbuild" = { workspace = true }
 "plain-flags" = { workspace = true }
 "plain-htmx" = { workspace = true }
 "plain-jobs" = { workspace = true }
@@ -64,6 +63,7 @@ dev = [
 "plain-portal" = { workspace = true }
 "plain-postgres" = { workspace = true }
 "plain-oauth" = { workspace = true }
+"plain-oauthserver" = { workspace = true }
 "plain-pages" = { workspace = true }
 "plain-passwords" = { workspace = true }
 "plain-pytest" = { workspace = true }
@@ -93,4 +93,10 @@ version = "1.50.0"
 exclude = ["example", "scratch", "scripts"]
 
 [tool.ty.environment]
-extra-paths = ["plain-postgres/tests", "plain/tests", "plain-admin/tests", "example"]
+extra-paths = [
+  "plain-postgres/tests",
+  "plain/tests",
+  "plain-admin/tests",
+  "plain-oauthserver/tests",
+  "example",
+]

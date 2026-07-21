@@ -5,17 +5,23 @@ from conftest_convergence import column_default_sql, execute
 
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
-    ColumnDefaultDrift,
-    DriftKind,
-    NullabilityDrift,
-    SetColumnDefaultFix,
-    SetNotNullFix,
     analyze_model,
-    can_auto_fix,
+    can_auto_correct,
     execute_plan,
     plan_model_convergence,
 )
-from plain.postgres.convergence.fixes import DropColumnDefaultFix
+from plain.postgres.convergence.analysis import (
+    ColumnDefaultDrift,
+    ColumnDefaultExpectedDrift,
+    ColumnDefaultUndeclaredDrift,
+    ColumnShouldBeNotNullDrift,
+    DriftKind,
+)
+from plain.postgres.convergence.corrections import (
+    DropColumnDefaultCorrection,
+    SetColumnDefaultCorrection,
+    SetNotNullCorrection,
+)
 
 
 class TestColumnDefaultDetection:
@@ -43,7 +49,7 @@ class TestColumnDefaultDetection:
             analysis = analyze_model(conn, cursor, DBDefaultsExample)
 
         default_drifts = [
-            d for d in analysis.drifts if isinstance(d, ColumnDefaultDrift)
+            d for d in analysis.drifts if isinstance(d, ColumnDefaultExpectedDrift)
         ]
         assert len(default_drifts) == 1
         assert default_drifts[0].kind == DriftKind.MISSING
@@ -65,7 +71,7 @@ class TestColumnDefaultDetection:
             analysis = analyze_model(conn, cursor, DBDefaultsExample)
 
         default_drifts = [
-            d for d in analysis.drifts if isinstance(d, ColumnDefaultDrift)
+            d for d in analysis.drifts if isinstance(d, ColumnDefaultExpectedDrift)
         ]
         assert len(default_drifts) == 1
         assert default_drifts[0].kind == DriftKind.CHANGED
@@ -137,7 +143,7 @@ class TestColumnDefaultDetection:
             analysis = analyze_model(conn, cursor, DefaultsExample)
 
         default_drifts = [
-            d for d in analysis.drifts if isinstance(d, ColumnDefaultDrift)
+            d for d in analysis.drifts if isinstance(d, ColumnDefaultExpectedDrift)
         ]
         assert len(default_drifts) == 1
         assert default_drifts[0].kind == DriftKind.CHANGED
@@ -161,19 +167,18 @@ class TestColumnDefaultDetection:
             analysis = analyze_model(conn, cursor, DefaultsExample)
 
         default_drifts = [
-            d for d in analysis.drifts if isinstance(d, ColumnDefaultDrift)
+            d for d in analysis.drifts if isinstance(d, ColumnDefaultUndeclaredDrift)
         ]
         assert len(default_drifts) == 1
         assert default_drifts[0].kind == DriftKind.UNDECLARED
         assert default_drifts[0].column == "name"
         assert default_drifts[0].db_default_sql is not None
         assert "manual-default" in default_drifts[0].db_default_sql
-        assert default_drifts[0].model_default_sql is None
 
 
 class TestColumnDefaultPlanning:
     def test_plans_set_default_for_missing(self, db):
-        """MISSING drift → executable SetColumnDefaultFix."""
+        """MISSING drift → executable SetColumnDefaultCorrection."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
             'ALTER COLUMN "db_uuid" DROP DEFAULT'
@@ -183,16 +188,20 @@ class TestColumnDefaultPlanning:
         with conn.cursor() as cursor:
             plan = plan_model_convergence(conn, cursor, DBDefaultsExample)
 
-        fixes = [i for i in plan.executable() if isinstance(i.fix, SetColumnDefaultFix)]
-        assert len(fixes) == 1
-        fix = fixes[0].fix
-        assert isinstance(fix, SetColumnDefaultFix)
-        assert fix.table == "examples_dbdefaultsexample"
-        assert fix.column == "db_uuid"
-        assert "gen_random_uuid()" in fix.default_sql
+        plan_items = [
+            i
+            for i in plan.executable()
+            if isinstance(i.correction, SetColumnDefaultCorrection)
+        ]
+        assert len(plan_items) == 1
+        correction = plan_items[0].correction
+        assert isinstance(correction, SetColumnDefaultCorrection)
+        assert correction.table == "examples_dbdefaultsexample"
+        assert correction.column == "db_uuid"
+        assert "gen_random_uuid()" in correction.default_sql
 
     def test_plans_set_default_for_changed(self, db):
-        """CHANGED drift → executable SetColumnDefaultFix that overwrites."""
+        """CHANGED drift → executable SetColumnDefaultCorrection that overwrites."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
             'ALTER COLUMN "created_at" SET DEFAULT clock_timestamp()'
@@ -202,15 +211,19 @@ class TestColumnDefaultPlanning:
         with conn.cursor() as cursor:
             plan = plan_model_convergence(conn, cursor, DBDefaultsExample)
 
-        fixes = [i for i in plan.executable() if isinstance(i.fix, SetColumnDefaultFix)]
-        assert len(fixes) == 1
-        fix = fixes[0].fix
-        assert isinstance(fix, SetColumnDefaultFix)
-        assert fix.column == "created_at"
-        assert "statement_timestamp" in fix.default_sql.lower()
+        plan_items = [
+            i
+            for i in plan.executable()
+            if isinstance(i.correction, SetColumnDefaultCorrection)
+        ]
+        assert len(plan_items) == 1
+        correction = plan_items[0].correction
+        assert isinstance(correction, SetColumnDefaultCorrection)
+        assert correction.column == "created_at"
+        assert "statement_timestamp" in correction.default_sql.lower()
 
     def test_blocks_sync(self, db):
-        """SetColumnDefaultFix blocks sync (correctness convergence)."""
+        """SetColumnDefaultCorrection blocks sync (correctness convergence)."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
             'ALTER COLUMN "db_uuid" DROP DEFAULT'
@@ -220,32 +233,33 @@ class TestColumnDefaultPlanning:
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, DBDefaultsExample).executable()
 
-        fixes = [i for i in items if isinstance(i.fix, SetColumnDefaultFix)]
-        assert len(fixes) == 1
-        assert fixes[0].blocks_sync is True
+        plan_items = [
+            i for i in items if isinstance(i.correction, SetColumnDefaultCorrection)
+        ]
+        assert len(plan_items) == 1
+        assert plan_items[0].blocks_sync is True
 
-    def test_can_auto_fix_missing(self):
-        drift = ColumnDefaultDrift(
+    def test_can_auto_correct_missing(self):
+        drift = ColumnDefaultExpectedDrift(
+            table="t",
+            column="c",
             kind=DriftKind.MISSING,
-            table="t",
-            column="c",
-            db_default_sql=None,
             model_default_sql="gen_random_uuid()",
         )
-        assert can_auto_fix(drift)
+        assert can_auto_correct(drift)
 
-    def test_can_auto_fix_changed(self):
-        drift = ColumnDefaultDrift(
-            kind=DriftKind.CHANGED,
+    def test_can_auto_correct_changed(self):
+        drift = ColumnDefaultExpectedDrift(
             table="t",
             column="c",
-            db_default_sql="now()",
+            kind=DriftKind.CHANGED,
             model_default_sql="gen_random_uuid()",
+            db_default_sql="now()",
         )
-        assert can_auto_fix(drift)
+        assert can_auto_correct(drift)
 
     def test_plans_drop_default_for_undeclared(self, db):
-        """UNDECLARED drift → executable DropColumnDefaultFix."""
+        """UNDECLARED drift → executable DropColumnDefaultCorrection."""
         execute(
             'ALTER TABLE "examples_defaultsexample" '
             "ALTER COLUMN \"name\" SET DEFAULT 'manual-default'"
@@ -255,41 +269,41 @@ class TestColumnDefaultPlanning:
         with conn.cursor() as cursor:
             plan = plan_model_convergence(conn, cursor, DefaultsExample)
 
-        fixes = [
-            i for i in plan.executable() if isinstance(i.fix, DropColumnDefaultFix)
+        plan_items = [
+            i
+            for i in plan.executable()
+            if isinstance(i.correction, DropColumnDefaultCorrection)
         ]
-        assert len(fixes) == 1
-        fix = fixes[0].fix
-        assert isinstance(fix, DropColumnDefaultFix)
-        assert fix.column == "name"
-        assert fixes[0].blocks_sync is True
+        assert len(plan_items) == 1
+        correction = plan_items[0].correction
+        assert isinstance(correction, DropColumnDefaultCorrection)
+        assert correction.column == "name"
+        assert plan_items[0].blocks_sync is True
 
-    def test_can_auto_fix_undeclared(self):
-        drift = ColumnDefaultDrift(
-            kind=DriftKind.UNDECLARED,
+    def test_can_auto_correct_undeclared(self):
+        drift = ColumnDefaultUndeclaredDrift(
             table="t",
             column="c",
             db_default_sql="'x'::text",
-            model_default_sql=None,
         )
-        assert can_auto_fix(drift)
+        assert can_auto_correct(drift)
 
 
 class TestColumnDefaultFixes:
     def test_apply_set_default(self, isolated_db):
-        """SetColumnDefaultFix installs the provided SQL as the column DEFAULT."""
+        """SetColumnDefaultCorrection installs the provided SQL as the column DEFAULT."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
             'ALTER COLUMN "db_uuid" DROP DEFAULT'
         )
         assert column_default_sql("examples_dbdefaultsexample", "db_uuid") is None
 
-        fix = SetColumnDefaultFix(
+        correction = SetColumnDefaultCorrection(
             table="examples_dbdefaultsexample",
             column="db_uuid",
             default_sql="gen_random_uuid()",
         )
-        sql = fix.apply()
+        sql = correction.apply()
 
         assert "SET DEFAULT gen_random_uuid()" in sql
         default = column_default_sql("examples_dbdefaultsexample", "db_uuid")
@@ -297,18 +311,18 @@ class TestColumnDefaultFixes:
         assert "gen_random_uuid()" in default
 
     def test_apply_set_default_replaces_existing(self, isolated_db):
-        """SetColumnDefaultFix overwrites an existing DEFAULT in one statement."""
+        """SetColumnDefaultCorrection overwrites an existing DEFAULT in one statement."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
             'ALTER COLUMN "created_at" SET DEFAULT clock_timestamp()'
         )
 
-        fix = SetColumnDefaultFix(
+        correction = SetColumnDefaultCorrection(
             table="examples_dbdefaultsexample",
             column="created_at",
             default_sql="statement_timestamp()",
         )
-        fix.apply()
+        correction.apply()
 
         default = column_default_sql("examples_dbdefaultsexample", "created_at")
         assert default is not None
@@ -316,36 +330,43 @@ class TestColumnDefaultFixes:
         assert "clock_timestamp" not in default
 
     def test_apply_drop_default(self, isolated_db):
-        """DropColumnDefaultFix removes the column DEFAULT."""
+        """DropColumnDefaultCorrection removes the column DEFAULT."""
         assert column_default_sql("examples_dbdefaultsexample", "db_uuid") is not None
 
-        fix = DropColumnDefaultFix(table="examples_dbdefaultsexample", column="db_uuid")
-        sql = fix.apply()
+        correction = DropColumnDefaultCorrection(
+            table="examples_dbdefaultsexample", column="db_uuid"
+        )
+        sql = correction.apply()
 
         assert "DROP DEFAULT" in sql
         assert column_default_sql("examples_dbdefaultsexample", "db_uuid") is None
 
     def test_set_default_describe(self):
-        fix = SetColumnDefaultFix(
+        correction = SetColumnDefaultCorrection(
             table="examples_dbdefaultsexample",
             column="db_uuid",
             default_sql="gen_random_uuid()",
         )
         assert (
-            fix.describe()
+            correction.describe()
             == "examples_dbdefaultsexample: set DEFAULT gen_random_uuid() on db_uuid"
         )
 
     def test_drop_default_describe(self):
-        fix = DropColumnDefaultFix(table="examples_dbdefaultsexample", column="db_uuid")
-        assert fix.describe() == "examples_dbdefaultsexample: drop DEFAULT on db_uuid"
+        correction = DropColumnDefaultCorrection(
+            table="examples_dbdefaultsexample", column="db_uuid"
+        )
+        assert (
+            correction.describe()
+            == "examples_dbdefaultsexample: drop DEFAULT on db_uuid"
+        )
 
     def test_set_default_pass_order(self):
-        """SetColumnDefaultFix runs at pass 2 alongside NOT NULL changes."""
-        assert SetColumnDefaultFix.pass_order == 2
+        """SetColumnDefaultCorrection runs at pass 2 alongside NOT NULL changes."""
+        assert SetColumnDefaultCorrection.pass_order == 2
 
     def test_drop_default_pass_order(self):
-        assert DropColumnDefaultFix.pass_order == 2
+        assert DropColumnDefaultCorrection.pass_order == 2
 
 
 class TestColumnDefaultLifecycle:
@@ -358,12 +379,14 @@ class TestColumnDefaultLifecycle:
 
         conn = get_connection()
 
-        # First pass: detect drift, plan fix
+        # First pass: detect drift, plan correction
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, DBDefaultsExample).executable()
 
-        fixes = [i for i in items if isinstance(i.fix, SetColumnDefaultFix)]
-        assert len(fixes) == 1
+        plan_items = [
+            i for i in items if isinstance(i.correction, SetColumnDefaultCorrection)
+        ]
+        assert len(plan_items) == 1
 
         result = execute_plan(items)
         assert result.ok
@@ -375,7 +398,9 @@ class TestColumnDefaultLifecycle:
         # Second pass: fully converged
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, DBDefaultsExample).executable()
-        default_fixes = [i for i in items if isinstance(i.fix, SetColumnDefaultFix)]
+        default_fixes = [
+            i for i in items if isinstance(i.correction, SetColumnDefaultCorrection)
+        ]
         assert default_fixes == []
 
     def test_undeclared_default_end_to_end(self, isolated_db):
@@ -391,7 +416,9 @@ class TestColumnDefaultLifecycle:
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, DefaultsExample).executable()
 
-        drop_items = [i for i in items if isinstance(i.fix, DropColumnDefaultFix)]
+        drop_items = [
+            i for i in items if isinstance(i.correction, DropColumnDefaultCorrection)
+        ]
         assert len(drop_items) == 1
 
         result = execute_plan(items)
@@ -401,11 +428,13 @@ class TestColumnDefaultLifecycle:
         # Second pass: fully converged
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, DefaultsExample).executable()
-        assert not [i for i in items if isinstance(i.fix, DropColumnDefaultFix)]
+        assert not [
+            i for i in items if isinstance(i.correction, DropColumnDefaultCorrection)
+        ]
 
     def test_column_carries_both_nullability_and_default_drifts(self, isolated_db):
         """A column with both kinds of drift populates `drifts` with both,
-        and convergence applies both fixes in one plan."""
+        and convergence applies both plan_items in one plan."""
         execute(
             'ALTER TABLE "examples_dbdefaultsexample" '
             'ALTER COLUMN "db_uuid" DROP DEFAULT'
@@ -422,20 +451,20 @@ class TestColumnDefaultLifecycle:
         db_uuid_col = [c for c in analysis.columns if c.name == "db_uuid"]
         assert len(db_uuid_col) == 1
         drift_types = {type(d) for d in db_uuid_col[0].drifts}
-        assert NullabilityDrift in drift_types
-        assert ColumnDefaultDrift in drift_types
+        assert ColumnShouldBeNotNullDrift in drift_types
+        assert ColumnDefaultExpectedDrift in drift_types
 
-        # Plan carries both fixes
+        # Plan carries both plan_items
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, DBDefaultsExample).executable()
 
-        fix_types = {type(item.fix) for item in items}
-        assert SetNotNullFix in fix_types
-        assert SetColumnDefaultFix in fix_types
+        correction_types = {type(item.correction) for item in items}
+        assert SetNotNullCorrection in correction_types
+        assert SetColumnDefaultCorrection in correction_types
 
         assert execute_plan(items).ok
 
-        # Both fixes applied — column is NOT NULL again and DEFAULT restored
+        # Both plan_items applied — column is NOT NULL again and DEFAULT restored
         default = column_default_sql("examples_dbdefaultsexample", "db_uuid")
         assert default is not None
         assert "gen_random_uuid()" in default
@@ -451,12 +480,14 @@ class TestColumnDefaultLifecycle:
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, DBDefaultsExample).executable()
 
-        fixes = [i for i in items if isinstance(i.fix, SetColumnDefaultFix)]
+        plan_items = [
+            i for i in items if isinstance(i.correction, SetColumnDefaultCorrection)
+        ]
         # Only `created_at` should need fixing; db_uuid already matches.
         assert any(
-            f.fix.column == "created_at"
-            for f in fixes
-            if isinstance(f.fix, SetColumnDefaultFix)
+            f.correction.column == "created_at"
+            for f in plan_items
+            if isinstance(f.correction, SetColumnDefaultCorrection)
         )
 
         assert execute_plan(items).ok
@@ -467,5 +498,7 @@ class TestColumnDefaultLifecycle:
 
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, DBDefaultsExample).executable()
-        default_fixes = [i for i in items if isinstance(i.fix, SetColumnDefaultFix)]
+        default_fixes = [
+            i for i in items if isinstance(i.correction, SetColumnDefaultCorrection)
+        ]
         assert default_fixes == []

@@ -23,6 +23,8 @@ class MCPTool(ABC):
     - `description` — the class docstring (override with `description = "..."`)
     - `input_schema` — derived from `__init__`'s typed signature
       (override by setting `input_schema = {...}` for custom shapes)
+    - `annotations` — optional MCP annotation hints as a raw dict, e.g.
+      `{"readOnlyHint": True}` (clients group read-only tools); see the README
 
         class Greet(MCPTool):
             '''Greet someone by name.'''
@@ -34,17 +36,38 @@ class MCPTool(ABC):
                 return f"Hello, {self.name}!"
 
     Tool instances have `self.mcp` set by the dispatcher before `run()`
-    is called — use it to read `self.mcp.request`, `self.mcp.user`, etc.
+    is called — use it to read `self.mcp.request`, and (on an authed view)
+    `self.mcp.user`, `self.mcp.scopes`, etc. `self.mcp` is typed as the
+    base `MCPView`; for typed access to attributes your auth mixin or
+    subclass adds, re-annotate `mcp` on a per-app base tool and subclass it:
+
+        class AppTool(MCPTool):
+            mcp: AppMCP  # forward ref — resolved lazily, so order is free
+
     Override `allowed_for(mcp)` (as a classmethod) to filter when the
     tool is included — auth gating, feature flags, tenant checks. Filters
     run *before* instantiation, so they can't depend on the caller's args.
+
+    To signal an expected, caller-facing failure from `run()` (bad input,
+    not found, forbidden), raise `MCPToolError(message)` — the dispatcher
+    returns `message` with `isError: true` and does not log it as a server
+    exception. Any other exception is logged and surfaces as an opaque
+    "Tool execution failed".
     """
 
     name: str = ""
     description: str = ""
     input_schema: dict[str, Any] | None = None
 
-    # Set by the MCPView dispatcher before `run()` is called.
+    # Optional MCP tool annotations — hints the client may use (e.g. Claude
+    # groups `readOnlyHint` tools and gates approval on the rest). A raw wire-
+    # format dict, e.g. `annotations = {"readOnlyHint": True}`; emitted as-is, so
+    # any hint the spec defines (current or future) works without a plain-mcp
+    # change. See the README. Inherited by subclasses like any class attribute.
+    annotations: dict[str, Any] | None = None
+
+    # Set by the MCPView dispatcher before `run()` is called. Re-annotate on a
+    # per-app base tool (`mcp: AppMCP`) for typed access to your view's attrs.
     mcp: MCPView
 
     def __init__(self) -> None:

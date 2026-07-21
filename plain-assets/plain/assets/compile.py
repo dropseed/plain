@@ -8,7 +8,7 @@ from pathlib import Path
 
 from plain.runtime import PLAIN_TEMP_PATH
 
-from .finders import Asset, _iter_assets
+from .finders import Asset, _iter_assets, is_build_output
 from .manifest import AssetsManifest, compute_fingerprint
 
 _SKIP_COMPRESS_EXTENSIONS = (
@@ -68,15 +68,23 @@ def compile_assets(
 
     for asset in _iter_assets():
         url_path = asset.url_path
+
+        # Output under dist/ is already content-hashed by the build tool: copy
+        # it as-is (no md5 rename) and serve it immutable at its own name.
+        build_output = is_build_output(url_path)
+
         fingerprinted_path, compiled_paths = compile_asset(
             asset=asset,
             target_dir=target_dir,
-            keep_original=keep_original,
-            fingerprint=fingerprint,
+            keep_original=keep_original or build_output,
+            fingerprint=fingerprint and not build_output,
             compress=compress,
         )
 
-        if fingerprinted_path:
+        if build_output:
+            manifest.add_already_hashed(url_path)
+            resolved_path = url_path
+        elif fingerprinted_path:
             manifest.add_fingerprinted(url_path, fingerprinted_path)
             resolved_path = fingerprinted_path
         else:

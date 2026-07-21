@@ -11,6 +11,7 @@
 - [Authentication](#authentication)
     - [Session auth](#session-auth-compose-with-authview)
     - [Bearer token auth](#bearer-token-auth)
+    - [OAuth for MCP clients](#oauth-for-mcp-clients)
     - [Public endpoints](#public-endpoints)
 - [Filtering tools per request](#filtering-tools-per-request)
 - [Custom JSON-RPC methods](#custom-json-rpc-methods)
@@ -58,7 +59,7 @@ class AppRouter(Router):
     ]
 ```
 
-AI clients connect to `https://yourapp.com/mcp/` using the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http).
+AI clients connect to `https://yourapp.com/mcp` using the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http).
 
 `name` is required. `version` defaults to `settings.VERSION` (from your `pyproject.toml`). Auth and authorization are covered below.
 
@@ -69,6 +70,8 @@ Every tool is an [`MCPTool`](./tools.py#MCPTool) subclass. Arguments from the cl
 - **Name** defaults to the class name — override with `name = "..."`
 - **Description** comes from the class docstring (used verbatim — override with `description = "..."`)
 - **Input schema** is derived from `__init__`'s typed signature; override by setting `input_schema = {...}` if you need custom per-parameter descriptions or JSON Schema features
+
+**Argument validation.** Incoming arguments are checked against the derived input schema before your `__init__` runs, so a wrong-typed or missing argument comes back as a clear `isError` message the model can fix (`"'limit' must be an integer"`) instead of blowing up inside `run()` and being logged as a server bug. Validation covers the shapes plain-mcp derives from type hints (primitives, `Literal` enums, `list[T]`, `T | None`); if you hand-write `input_schema` with richer JSON Schema (`oneOf`, `$ref`, numeric bounds), those keywords pass through untouched — validate them in `__init__` or `run()` yourself.
 
 ```python
 class SearchOrders(MCPTool):
@@ -82,19 +85,52 @@ class SearchOrders(MCPTool):
         return "\n".join(str(o) for o in Order.query.filter(...))
 ```
 
-**Reading the invoking context.** Before `run()` is called, the dispatcher sets `self.mcp` to the `MCPView` instance that invoked the tool. Use it to read the caller's user, the HTTP request, or any subclass-specific state:
+**Reading the invoking context.** Before `run()` is called, the dispatcher sets `self.mcp` to the `MCPView` instance that invoked the tool — read the HTTP request through it, plus the caller's user and any subclass state. `self.mcp` is typed as the base `MCPView`, which has no `user`; for typed access to attributes an auth mixin or your subclass adds, define a per-app base tool that re-annotates `mcp` to your view, then subclass it:
 
 ```python
-from plain.mcp import MCPTool
+from plain.mcp import MCPTool, MCPView, OAuthResourceServer, TokenInfo
 
 
-class ListMyNotes(MCPTool):
+class AppTool(MCPTool):
+    mcp: AppMCP  # forward ref — typed access to AppMCP's user, scopes, etc.
+
+
+class ListMyNotes(AppTool):
     """List notes owned by the caller."""
 
     def run(self) -> list[dict]:
         return list(
             Note.query.filter(author=self.mcp.user).values("id", "title")
         )
+
+
+class AppMCP(OAuthResourceServer, MCPView):
+    name = "myapp"
+    tools = [ListMyNotes]
+
+    def authenticate_token(self, token: str) -> TokenInfo | None:
+        ...
+```
+
+The `mcp: AppMCP` annotation is a forward reference (resolved lazily), so this natural order just works — base tool and tools first, then the view with `tools = [...]`. A tool that needs nothing view-specific stays bare — `class Greet(MCPTool)` — and `self.mcp` is the base `MCPView` (request, no user).
+
+**Signaling errors.** Raise [`MCPToolError`](./exceptions.py#MCPToolError) from `run()` for an expected, caller-facing failure — bad input, not found, forbidden. The message goes back to the client with `isError: true` (MCP's in-result error channel) so the model can self-correct, and it is _not_ logged as a server exception. Any other exception is treated as a bug: logged server-side and returned as an opaque "Tool execution failed".
+
+```python
+from plain.mcp import MCPTool, MCPToolError
+
+
+class GetOrder(MCPTool):
+    """Look up an order by ID."""
+
+    def __init__(self, order_id: int):
+        self.order_id = order_id
+
+    def run(self) -> dict:
+        order = Order.query.filter(id=self.order_id).first()
+        if order is None:
+            raise MCPToolError(f"No order with id {self.order_id}")
+        return {"id": order.id, "status": order.status}
 ```
 
 **Shared state.** Tool instances are short-lived — one per MCP request. Don't use `__init__` for heavy setup; stash lookups in modules or on the MCP class.
@@ -106,7 +142,7 @@ class ListMyNotes(MCPTool):
 - **a list of such dicts** → those blocks, in order (mixed content)
 - **any other `dict`/`list`** → one text block with the value JSON-serialized
 
-The dict shape matches the MCP spec wire format directly — you can copy from the [MCP docs](https://modelcontextprotocol.io/specification/2025-03-26/server/tools#tool-result) and return it. `bytes` in `data` (image/audio) or `resource.blob` (embedded resource) are base64-encoded automatically, so you don't touch base64 yourself:
+The dict shape matches the MCP spec wire format directly — you can copy from the [MCP docs](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#tool-result) and return it. `bytes` in `data` (image/audio) or `resource.blob` (embedded resource) are base64-encoded automatically, so you don't touch base64 yourself:
 
 ```python
 class Screenshot(MCPTool):
@@ -124,6 +160,39 @@ class Screenshot(MCPTool):
 ```
 
 Returning a non-content dict like `{"id": 1, "name": "Alice"}` JSON-serializes into a text block — the "here's some structured data" case still works without ceremony.
+
+### Tool annotations
+
+Tools can advertise [MCP annotations](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#tool-annotations) — hints the client uses to present and gate them — by setting `annotations` to a dict in MCP wire format:
+
+```python
+class ListOrders(MCPTool):
+    """List orders."""
+
+    annotations = {"readOnlyHint": True}
+```
+
+`readOnlyHint` is the load-bearing one: clients (e.g. Claude's connector settings) **group read-only tools** and let users auto-allow them while requiring approval for the rest. The spec defines these hints:
+
+| Key               | Meaning                                                   | Spec default |
+| ----------------- | --------------------------------------------------------- | ------------ |
+| `readOnlyHint`    | tool does not modify state                                | `false`      |
+| `destructiveHint` | may perform destructive updates (only when not read-only) | `true`       |
+| `idempotentHint`  | repeated calls have no additional effect                  | `false`      |
+| `openWorldHint`   | interacts with an open / external world                   | `true`       |
+
+The dict is emitted verbatim, so any hint the spec adds later (or one this version doesn't list) works without a plain-mcp update — and a tool that sets no `annotations` carries no `annotations` object at all. Annotations are inherited like any class attribute, so a shared base tool can set them once:
+
+```python
+class ReadTool(MCPTool):
+    annotations = {"readOnlyHint": True}
+
+
+class ListOrders(ReadTool):
+    """List orders."""  # inherits readOnlyHint
+```
+
+> Annotations are advisory: per the spec, clients must treat them as untrusted from untrusted servers, so don't rely on them as an access control — gate writes in the tool itself.
 
 ## Resources
 
@@ -168,7 +237,7 @@ Metadata is derived automatically:
 
 **Text vs binary.** `read()` returns `str` for text (emitted as `text`) or `bytes` for binary (emitted as base64 `blob`).
 
-**Reading the invoking context.** As with tools, `self.mcp` is set before `read()` is called — use `self.mcp.user` or `self.mcp.request` for user-scoped resources.
+**Reading the invoking context.** As with tools, `self.mcp` is set before `read()` is called — use `self.mcp.request`, and (for typed access to your view's `user` and other attributes) re-annotate `mcp` on a per-app base resource: `class AppResource(MCPResource): mcp: AppMCP`.
 
 **Authorization.** Override `allowed_for(mcp)` on the resource (classmethod) to filter who can see it — resources that return `False` are hidden from listings and rejected from reads. Same model and hooks as tools; see [Filtering tools per request](#filtering-tools-per-request).
 
@@ -230,8 +299,8 @@ class StaffMCP(MCPView, AuthView):
 ```python
 # app/urls.py
 urls = [
-    path("api/mcp/", AppMCP, name="app_mcp"),
-    path("staff/mcp/", StaffMCP, name="staff_mcp"),
+    path("api/mcp", AppMCP, name="app_mcp"),
+    path("staff/mcp", StaffMCP, name="staff_mcp"),
 ]
 ```
 
@@ -323,12 +392,73 @@ Clients send the token in their config:
 {
   "mcpServers": {
     "my-app": {
-      "url": "https://myapp.com/mcp/",
-      "headers": {"Authorization": "Bearer <token>"}
+      "url": "https://myapp.com/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
     }
   }
 }
 ```
+
+### OAuth for MCP clients
+
+Hosted MCP clients (Claude's custom connectors, etc.) authenticate over OAuth 2.1 — they discover your authorization server, register, and complete a browser login, with no token to paste. Compose [`OAuthResourceServer`](./oauth.py#OAuthResourceServer) with `MCPView` and implement `authenticate_token` to validate the bearer against whatever issued it:
+
+```python
+# app/mcp.py
+from plain.mcp import MCPView, OAuthResourceServer, TokenInfo
+from plain.oauthserver import validate_access_token
+
+
+class AppMCP(OAuthResourceServer, MCPView):
+    name = "myapp"
+    tools = [...]
+
+    def authenticate_token(self, token: str) -> TokenInfo | None:
+        at = validate_access_token(token, resource=self.oauth_resource)
+        return TokenInfo(at.user, at.scopes) if at else None
+```
+
+On success `self.user` and `self.scopes` are set for tools to read. On failure the request gets a `401` with an RFC 9728 `WWW-Authenticate` challenge that points the client at a **protected-resource metadata** document — that document names the authorization server, which is how the client knows where to authenticate.
+
+Serve the metadata with [`MCPProtectedResourceView`](./oauth.py#MCPProtectedResourceView), mounted at the challenge path (`.well-known/oauth-protected-resource/` + your MCP path):
+
+```python
+# app/urls.py
+from plain.mcp import MCPProtectedResourceView
+from plain.urls import Router, path
+
+from app.mcp import AppMCP
+
+
+class AppMCPMetadata(MCPProtectedResourceView):
+    pass  # authorization_servers defaults to this app's own origin
+
+
+class AppRouter(Router):
+    namespace = ""
+    urls = [
+        path("mcp", AppMCP, name="mcp"),
+        path(
+            ".well-known/oauth-protected-resource/mcp",
+            AppMCPMetadata,
+            name="mcp_prm",
+        ),
+    ]
+```
+
+`authorization_servers` defaults to this app's origin, so the same-app case (above) needs nothing set. Override it only when an external IdP issues the tokens.
+
+The metadata view derives `resource` from the request path, so an app with several MCP endpoints can mount one catch-all instead of a metadata view per endpoint: `path(".well-known/oauth-protected-resource/<path:resource_path>", AppMCPMetadata)`.
+
+`plain.mcp` only validates tokens and emits the challenge — it never issues them. The authorization server is yours to run; [`plain.oauthserver`](../../plain-oauthserver/plain/oauthserver/README.md) is a drop-in one. `authenticate_token` is the seam, so any issuer (a third-party IdP, a custom JWT service) works the same way.
+
+Behind the scenes the client drives the whole handshake — you don't write any of it:
+
+1. Calls your MCP endpoint with no token → gets the `401` + `WWW-Authenticate` challenge.
+2. Reads the protected-resource metadata it points to → finds your authorization server.
+3. Fetches the server's metadata (`/.well-known/oauth-authorization-server`) and **registers itself** — no manual setup.
+4. Opens a browser to the authorize endpoint; the user logs in and approves.
+5. Exchanges the code (with PKCE) for an access + refresh token, then re-calls the endpoint with `Authorization: Bearer <token>`.
 
 ### Public endpoints
 
@@ -387,9 +517,11 @@ class AppMCP(MCPView, AuthView):
 
 The pattern:
 
-1. Write an `rpc_<method>` method that takes a `params` dict and returns the response dict (as defined by the [MCP spec](https://modelcontextprotocol.io/specification/2025-03-26/server) for that method)
+1. Write an `rpc_<method>` method that takes a `params` dict and returns the response dict (as defined by the [MCP spec](https://modelcontextprotocol.io/specification/2025-11-25/server) for that method)
 2. Advertise the capability in `get_capabilities()` so clients know to call it
 3. Raise `MCPInvalidParams` for bad caller input; anything else becomes a generic `INTERNAL_ERROR` with the exception logged server-side
+
+`MCPInvalidParams` is the error channel for these custom `rpc_*` handlers (and `resources/read`). Tools are different: a tool's `run()` reports failures in its _result_ via `isError`, so raise [`MCPToolError`](./exceptions.py#MCPToolError) there instead — see [Tools → Signaling errors](#tools).
 
 ### Example: prompts
 
@@ -475,7 +607,7 @@ The shipped handlers (`rpc_initialize`, `rpc_ping`, `rpc_tools_list`, `rpc_tools
 
 #### What MCP protocol version is supported?
 
-The `2025-03-26` version of the MCP specification, using the Streamable HTTP transport. The older SSE transport is not supported.
+The `2025-11-25` version of the MCP specification, using the Streamable HTTP transport. The older SSE transport is not supported.
 
 #### Are resource subscriptions supported?
 

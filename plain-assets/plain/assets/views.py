@@ -197,10 +197,10 @@ class AssetView(View):
         manifest = self.get_manifest()
 
         # Check the path directly, then without compression extension
-        if manifest.is_fingerprinted(url_path):
+        if manifest.is_immutable(url_path):
             return True
         if url_path.endswith((".gz", ".br")):
-            return manifest.is_fingerprinted(url_path[:-3])
+            return manifest.is_immutable(url_path[:-3])
         return False
 
     def get_encoded_path(self, path: str) -> str | None:
@@ -255,9 +255,8 @@ class AssetView(View):
         if path not in manifest:
             return None
 
-        redirect_target = manifest[path]
-        final_path = redirect_target or path
-        is_immutable = redirect_target is None and manifest.is_fingerprinted(path)
+        final_path = manifest.resolve(path) or path
+        is_immutable = manifest.is_immutable(path)
 
         if is_immutable:
             status_code = 301

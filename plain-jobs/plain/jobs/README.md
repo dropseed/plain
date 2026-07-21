@@ -149,7 +149,9 @@ Cron expressions support standard syntax and special strings:
 - `@daily` or `@midnight` - Run once a day
 - `@hourly` - Run once an hour
 
-For custom schedules, see [`Schedule`](./scheduling.py#Schedule).
+Day-of-week follows standard cron numbering: **`0` (or `7`) is Sunday** through `6` for Saturday, and three-letter names (`SUN`–`SAT`, `JAN`–`DEC`) are accepted. Also as in standard cron, when **both** the day-of-month and day-of-week fields are restricted, the job runs whenever **either** matches — so `30 4 1,15 * 5` runs at 4:30 AM on the 1st and 15th _plus_ every Friday.
+
+For custom schedules, see [`Schedule`](./scheduling.py#Schedule), which takes the same fields as keyword arguments. Its day-of-month and day-of-week combine with plain AND (both must match); pass `combine_days_with_or=True` for the cron OR behavior.
 
 ## Admin interface
 
@@ -227,6 +229,8 @@ The worker integrates with OpenTelemetry for distributed tracing. Spans are crea
 - Job completion/failure — recorded as the span's status and `error.type` attribute on failure
 
 Jobs are linked to the originating trace context, allowing you to follow jobs initiated from web requests.
+
+Worker housekeeping is deliberately untraced: the idle job poll, the claim transaction, heartbeat writes, and the gauge queries emit no spans, so an idle worker exports no traces at all. Worker-side failures (a failing claim or heartbeat) still surface as one-off `claim job` / `worker heartbeat` error spans.
 
 Messaging metrics:
 

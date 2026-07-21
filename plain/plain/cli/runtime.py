@@ -21,7 +21,7 @@ def without_runtime_setup[F: Callable](f: F) -> F:
         def server(**options):
             ...
     """
-    f.without_runtime_setup = True  # dynamic attribute for decorator
+    f.without_runtime_setup = True  # ty: ignore[unresolved-attribute] (dynamic attribute for decorator)
     return f
 
 
@@ -38,5 +38,5 @@ def common_command[F: Callable](f: F) -> F:
         def dev(**options):
             ...
     """
-    f.is_common_command = True  # dynamic attribute for decorator
+    f.is_common_command = True  # ty: ignore[unresolved-attribute] (dynamic attribute for decorator)
     return f

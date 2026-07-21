@@ -1,0 +1,26 @@
+#!/bin/bash -e
+
+# H1 graceful shutdown test: SIGTERM the example server and assert in-flight
+# requests drain, the master exits 0, and nothing is logged at ERROR.
+#
+# Usage:
+#   ./tools/shutdown-test
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+SERVER_LOG="$(mktemp)"
+
+# Cover failures before start-example-server installs its own trap; that
+# trap owns kill/wait and log removal for the rest of the run.
+trap 'rm -f "$SERVER_LOG"' EXIT
+
+source "$(dirname "$0")/start-example-server"
+
+uv run python "$REPO_ROOT/tools/shutdown-test.py" "127.0.0.1:$PORT" \
+    --pid "$SERVER_PID" --log "$SERVER_LOG"
+
+# The test SIGTERMed the server; a graceful shutdown must exit 0.
+if ! wait "$SERVER_PID"; then
+    echo "Server exited non-zero after graceful SIGTERM" >&2
+    exit 1
+fi

@@ -145,13 +145,22 @@ class Arbiter:
         self._listeners = []
 
         sig = signal.SIGTERM if graceful else signal.SIGQUIT
-        limit = time.time() + settings.SERVER_GRACEFUL_TIMEOUT
+        # Monotonic, to share one clock with the workers' drain deadlines
+        # (WorkerHeartbeat relies on CLOCK_MONOTONIC being system-wide).
+        limit = time.monotonic() + settings.SERVER_GRACEFUL_TIMEOUT
+
+        # This shutdown ends in SIGKILL at the limit — publish it so the
+        # workers cap their drains and finish teardown first. (Retirement
+        # SIGTERMs in manage_workers have no SIGKILL follower and don't
+        # set this.)
+        for info in self._workers.values():
+            info.heartbeat.set_kill_deadline(limit)
 
         # Instruct the workers to exit
         self._kill_workers(sig)
 
         # Wait until the graceful timeout
-        while self._workers and time.time() < limit:
+        while self._workers and time.monotonic() < limit:
             self.reap_workers()
             time.sleep(0.1)
 

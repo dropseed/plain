@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.23.2](https://github.com/dropseed/plain/releases/plain-tailwind@0.23.2) (2026-07-15)
+
+### What's changed
+
+- Migrated the Tailwind CLI downloader from `requests` to `httpx`, keeping connection retries and the streamed download with a progress bar. `requests` is no longer a dependency. ([17570d71cf](https://github.com/dropseed/plain/commit/17570d71cf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.23.1](https://github.com/dropseed/plain/releases/plain-tailwind@0.23.1) (2026-05-12)
 
 ### What's changed

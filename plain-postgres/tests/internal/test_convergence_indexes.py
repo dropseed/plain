@@ -11,17 +11,22 @@ from conftest_convergence import (
 
 from plain.postgres import Index, Q, get_connection
 from plain.postgres.convergence import (
-    CreateIndexFix,
-    DropIndexFix,
     ReadOnlyConnectionError,
-    RebuildIndexFix,
-    RenameIndexFix,
     plan_model_convergence,
 )
 from plain.postgres.convergence.analysis import (
     DriftKind,
     IndexDrift,
+    IndexModelDrift,
+    IndexRenameDrift,
+    IndexUndeclaredDrift,
     analyze_model,
+)
+from plain.postgres.convergence.corrections import (
+    CreateIndexCorrection,
+    DropIndexCorrection,
+    RebuildIndexCorrection,
+    RenameIndexCorrection,
 )
 from plain.postgres.db import read_only
 from plain.postgres.functions.text import Upper
@@ -66,8 +71,8 @@ class TestUnmanagedIndexTypes:
             items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
         assert not any(
-            isinstance(item.fix, DropIndexFix)
-            and item.fix.name == "examples_indexexample_name_hash_idx"
+            isinstance(item.correction, DropIndexCorrection)
+            and item.correction.name == "examples_indexexample_name_hash_idx"
             for item in items
         )
 
@@ -120,7 +125,7 @@ class TestUnmanagedIndexTypes:
             assert conflict.issue is not None
             assert "name conflict" in conflict.issue
             assert "hash" in conflict.issue
-            assert conflict.drift is None  # no auto-fix
+            assert conflict.drift is None  # no auto-correction
         finally:
             IndexExample.model_options.indexes = original_indexes
 
@@ -174,11 +179,15 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             index_items = [
-                item for item in items if isinstance(item.fix, CreateIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, CreateIndexCorrection)
             ]
             assert len(index_items) == 1
-            assert isinstance(index_items[0].fix, CreateIndexFix)
-            assert index_items[0].fix.index.name == "examples_indexexample_name_idx"
+            assert isinstance(index_items[0].correction, CreateIndexCorrection)
+            assert (
+                index_items[0].correction.index.name == "examples_indexexample_name_idx"
+            )
         finally:
             IndexExample.model_options.indexes = original_indexes
 
@@ -193,14 +202,16 @@ class TestDetectIndexFixes:
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
-        index_items = [item for item in items if isinstance(item.fix, DropIndexFix)]
+        index_items = [
+            item for item in items if isinstance(item.correction, DropIndexCorrection)
+        ]
         assert len(index_items) == 1
-        fix = index_items[0].fix
-        assert isinstance(fix, DropIndexFix)
-        assert fix.name == "examples_indexexample_extra_idx"
+        correction = index_items[0].correction
+        assert isinstance(correction, DropIndexCorrection)
+        assert correction.name == "examples_indexexample_extra_idx"
 
     def test_detects_invalid_index(self, isolated_db):
-        """An INVALID index matching a model index produces a RebuildIndexFix."""
+        """An INVALID index matching a model index produces a RebuildIndexCorrection."""
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
             *original_indexes,
@@ -222,17 +233,19 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_idx"
         finally:
             IndexExample.model_options.indexes = original_indexes
 
     def test_detects_index_definition_changed(self, db):
-        """An index with the same name but different columns produces a RebuildIndexFix."""
+        """An index with the same name but different columns produces a RebuildIndexCorrection."""
         original_indexes = list(IndexExample.model_options.indexes)
         # Model declares index on "name" field
         IndexExample.model_options.indexes = [
@@ -252,19 +265,21 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_idx"
         finally:
             IndexExample.model_options.indexes = original_indexes
 
     def test_detects_index_sort_order_changed(self, db):
         """An index whose model declaration is DESC but the live index is
         ASC must be detected as drift. Round-tripping the model side through
-        pg_get_indexdef preserves the sort modifier in the canonical text."""
+        pg_get_indexdef preserves the sort modifier in the normalized text."""
         original_indexes = list(IndexExample.model_options.indexes)
         # Model declares DESC ordering on `name`.
         IndexExample.model_options.indexes = [
@@ -281,11 +296,16 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            assert isinstance(rebuild_items[0].fix, RebuildIndexFix)
-            assert rebuild_items[0].fix.index.name == "examples_indexexample_name_idx"
+            assert isinstance(rebuild_items[0].correction, RebuildIndexCorrection)
+            assert (
+                rebuild_items[0].correction.index.name
+                == "examples_indexexample_name_idx"
+            )
         finally:
             IndexExample.model_options.indexes = original_indexes
 
@@ -315,7 +335,9 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
         finally:
@@ -324,7 +346,7 @@ class TestDetectIndexFixes:
     def test_detects_partial_index_predicate_case_change(self, db):
         """Partial index predicate that differs only in literal case (e.g.
         `status='abc'` vs `status='ABC'`) must be detected as drift —
-        pg_get_indexdef preserves literal contents verbatim, so the canonical
+        pg_get_indexdef preserves literal contents verbatim, so the normalized
         tails differ."""
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
@@ -346,7 +368,9 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
         finally:
@@ -355,7 +379,7 @@ class TestDetectIndexFixes:
     def test_detects_index_include_changed(self, db):
         """An index with the same key columns but a different INCLUDE list
         is real drift — convergence must rebuild it. Earlier the
-        canonicalization stripped INCLUDE entirely, so a missing or extra
+        normalization stripped INCLUDE entirely, so a missing or extra
         covered column went unreported."""
         original_indexes = list(IndexExample.model_options.indexes)
         # Model declares INCLUDE ("description") on the name index.
@@ -380,17 +404,19 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_idx"
         finally:
             IndexExample.model_options.indexes = original_indexes
 
     def test_detects_expression_index_definition_changed(self, db):
-        """An expression index with the same name but different expression produces a RebuildIndexFix."""
+        """An expression index with the same name but different expression produces a RebuildIndexCorrection."""
         original_indexes = list(IndexExample.model_options.indexes)
         # Model declares UPPER(name)
         IndexExample.model_options.indexes = [
@@ -410,19 +436,21 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_expr_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_expr_idx"
         finally:
             IndexExample.model_options.indexes = original_indexes
 
     def test_detects_expression_index_sort_order_change(self, db):
         """An expression index with the same expression but different sort
         direction must be detected as drift. Round-tripping the model side
-        through pg_get_indexdef makes ASC/DESC visible in the canonical text
+        through pg_get_indexdef makes ASC/DESC visible in the normalized text
         (`UPPER(name)` vs `UPPER(name) DESC`), so a tail-string compare
         catches the drift even though indoption sits outside indexprs."""
         original_indexes = list(IndexExample.model_options.indexes)
@@ -443,7 +471,9 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
         finally:
@@ -476,7 +506,9 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
         finally:
@@ -531,7 +563,7 @@ class TestDetectIndexFixes:
     def test_detects_opclass_change(self, db):
         """An index whose model declares an opclass (e.g. text_pattern_ops
         for prefix-match support) but whose live index uses the default
-        opclass must be detected as drift. The canonical-tail compare puts
+        opclass must be detected as drift. The normalized-tail compare puts
         the opclass inline in the `USING ...` body — a tail-string compare
         catches the drift directly."""
         original_indexes = list(IndexExample.model_options.indexes)
@@ -553,12 +585,14 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_opclass_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_opclass_idx"
         finally:
             IndexExample.model_options.indexes = original_indexes
 
@@ -596,7 +630,7 @@ class TestDetectIndexFixes:
             IndexExample.model_options.indexes = original_indexes
 
     def test_detects_partial_index_condition_changed(self, db):
-        """A partial index with same name/columns but different WHERE produces a RebuildIndexFix."""
+        """A partial index with same name/columns but different WHERE produces a RebuildIndexCorrection."""
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
             *original_indexes,
@@ -619,12 +653,14 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_partial_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_partial_idx"
         finally:
             IndexExample.model_options.indexes = original_indexes
 
@@ -688,23 +724,19 @@ class TestDetectIndexFixes:
             assert len(rename_drifts) == 0
 
             # Should be a missing + undeclared instead
-            missing = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
-            ]
+            missing = [d for d in analysis.drifts if isinstance(d, IndexModelDrift)]
             assert len(missing) == 1
             assert missing[0].index is not None
             assert missing[0].index.name == "examples_indexexample_name_new_idx"
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_no_false_index_rename_when_canonicalization_fails(self, db):
-        """On a half-migrated DB the round-trip canonicalization can return
+    def test_no_false_index_rename_when_normalization_fails(self, db):
+        """On a half-migrated DB the round-trip normalization can return
         the empty sentinel for every missing index. The rename detector
         must NOT bucket sentinel-failing indexes under "" — that would let
         unrelated missing/extra pairs collide and produce a falsely
-        "renamed" report. Patches the canonicalizer to "" globally and
+        "renamed" report. Patches the normalizer to "" globally and
         asserts the missing/extra fall through to MISSING + UNDECLARED
         instead."""
         from unittest.mock import patch
@@ -716,7 +748,7 @@ class TestDetectIndexFixes:
             Index(fields=["name"], name="examples_indexexample_name_new_idx"),
         ]
         # DB has a same-shape index under a different name — the structural
-        # case that *would* be a rename if canonicalization worked.
+        # case that *would* be a rename if normalization worked.
         execute(
             'CREATE INDEX "examples_indexexample_name_old_idx"'
             ' ON "examples_indexexample" ("name")'
@@ -724,7 +756,7 @@ class TestDetectIndexFixes:
 
         try:
             with patch(
-                "plain.postgres.convergence.analysis._canonicalize_index_def",
+                "plain.postgres.convergence.analysis._normalize_index_def",
                 return_value="",
             ):
                 conn = get_connection()
@@ -740,29 +772,23 @@ class TestDetectIndexFixes:
             assert renames == []
 
             # Both sides reported separately instead.
-            missing = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
-            ]
+            missing = [d for d in analysis.drifts if isinstance(d, IndexModelDrift)]
             assert len(missing) == 1
             assert missing[0].index is not None
             assert missing[0].index.name == "examples_indexexample_name_new_idx"
 
             undeclared = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
+                d for d in analysis.drifts if isinstance(d, IndexUndeclaredDrift)
             ]
             assert len(undeclared) == 1
             assert undeclared[0].name == "examples_indexexample_name_old_idx"
         finally:
             IndexExample.model_options.indexes = original_indexes
 
-    def test_index_drift_diagnostic_when_canonicalization_fails(self, db):
+    def test_index_drift_diagnostic_when_normalization_fails(self, db):
         """When the model and DB share an index name but
-        `_canonicalize_index_def` returns "" (model SQL incompatible with
-        live shape), `_compare_canonical_index` must still emit a CHANGED
+        `_normalize_index_def` returns "" (model SQL incompatible with
+        live shape), `_compare_normalized_index` must still emit a CHANGED
         drift with the abridged "definition differs: DB has ..." message —
         no "model expects ..." half. Mirrors the constraint-side fallback
         diagnostic test."""
@@ -771,17 +797,17 @@ class TestDetectIndexFixes:
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [
             *original_indexes,
-            Index(fields=["name"], name="examples_indexexample_canon_idx"),
+            Index(fields=["name"], name="examples_indexexample_normalize_idx"),
         ]
         # DB has the same index name with a different definition.
         execute(
-            'CREATE INDEX "examples_indexexample_canon_idx"'
+            'CREATE INDEX "examples_indexexample_normalize_idx"'
             ' ON "examples_indexexample" ("description")'
         )
 
         try:
             with patch(
-                "plain.postgres.convergence.analysis._canonicalize_index_def",
+                "plain.postgres.convergence.analysis._normalize_index_def",
                 return_value="",
             ):
                 conn = get_connection()
@@ -791,7 +817,7 @@ class TestDetectIndexFixes:
             status = next(
                 idx
                 for idx in analysis.indexes
-                if idx.name == "examples_indexexample_canon_idx"
+                if idx.name == "examples_indexexample_normalize_idx"
             )
             assert isinstance(status.drift, IndexDrift)
             assert status.drift.kind == DriftKind.CHANGED
@@ -804,7 +830,7 @@ class TestDetectIndexFixes:
 
     def test_detects_multiple_expression_index_renames_in_one_pass(self, db):
         """Multiple expression-based index renames in a single analyze pass
-        each trigger their own `_canonicalize_index_def` round-trip — every
+        each trigger their own `_normalize_index_def` round-trip — every
         call wraps the temp-table create/drop in `cursor.connection.transaction()`,
         which nests as a savepoint inside the outer analyze transaction. A
         broken nesting helper would either abort the cursor after the first
@@ -833,9 +859,7 @@ class TestDetectIndexFixes:
                 analysis = analyze_model(conn, cursor, IndexExample)
 
             rename_drifts = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+                d for d in analysis.drifts if isinstance(d, IndexRenameDrift)
             ]
             assert len(rename_drifts) == 2
             assert {d.old_name for d in rename_drifts} == {
@@ -864,7 +888,7 @@ class TestDetectIndexFixes:
 
 class TestApplyIndexFixes:
     def test_create_index(self, isolated_db):
-        """CreateIndexFix creates an index using CONCURRENTLY."""
+        """CreateIndexCorrection creates an index using CONCURRENTLY."""
         original_indexes = list(IndexExample.model_options.indexes)
         index = Index(fields=["name"], name="examples_indexexample_name_idx")
         IndexExample.model_options.indexes = [*original_indexes, index]
@@ -872,10 +896,10 @@ class TestApplyIndexFixes:
         try:
             assert not index_exists("examples_indexexample_name_idx")
 
-            fix = CreateIndexFix(
+            correction = CreateIndexCorrection(
                 table="examples_indexexample", index=index, model=IndexExample
             )
-            sql = fix.apply()
+            sql = correction.apply()
 
             assert "CONCURRENTLY" in sql
             assert index_exists("examples_indexexample_name_idx")
@@ -883,23 +907,23 @@ class TestApplyIndexFixes:
             IndexExample.model_options.indexes = original_indexes
 
     def test_drop_index(self, isolated_db):
-        """DropIndexFix drops an index using CONCURRENTLY."""
+        """DropIndexCorrection drops an index using CONCURRENTLY."""
         execute(
             'CREATE INDEX "examples_indexexample_temp_idx"'
             ' ON "examples_indexexample" ("name")'
         )
         assert index_exists("examples_indexexample_temp_idx")
 
-        fix = DropIndexFix(
+        correction = DropIndexCorrection(
             table="examples_indexexample", name="examples_indexexample_temp_idx"
         )
-        sql = fix.apply()
+        sql = correction.apply()
 
         assert "CONCURRENTLY" in sql
         assert not index_exists("examples_indexexample_temp_idx")
 
     def test_rebuild_invalid_index(self, isolated_db):
-        """RebuildIndexFix drops an INVALID index and recreates it."""
+        """RebuildIndexCorrection drops an INVALID index and recreates it."""
         original_indexes = list(IndexExample.model_options.indexes)
         index = Index(fields=["name"], name="examples_indexexample_name_idx")
         IndexExample.model_options.indexes = [*original_indexes, index]
@@ -914,12 +938,12 @@ class TestApplyIndexFixes:
             assert index_exists("examples_indexexample_name_idx")
             assert not index_is_valid("examples_indexexample_name_idx")
 
-            fix = RebuildIndexFix(
+            correction = RebuildIndexCorrection(
                 table="examples_indexexample",
                 index=index,
                 model=IndexExample,
             )
-            sql = fix.apply()
+            sql = correction.apply()
 
             assert "DROP" in sql
             assert "CONCURRENTLY" in sql
@@ -931,19 +955,19 @@ class TestApplyIndexFixes:
 
 class TestApplyRenameIndex:
     def test_rename_index(self, isolated_db):
-        """RenameIndexFix renames using ALTER INDEX ... RENAME TO."""
+        """RenameIndexCorrection renames using ALTER INDEX ... RENAME TO."""
         execute(
             'CREATE INDEX "examples_indexexample_old_idx"'
             ' ON "examples_indexexample" ("name")'
         )
         assert index_exists("examples_indexexample_old_idx")
 
-        fix = RenameIndexFix(
+        correction = RenameIndexCorrection(
             table="examples_indexexample",
             old_name="examples_indexexample_old_idx",
             new_name="examples_indexexample_new_idx",
         )
-        sql = fix.apply()
+        sql = correction.apply()
 
         assert "RENAME TO" in sql
         assert not index_exists("examples_indexexample_old_idx")
@@ -968,9 +992,9 @@ class TestApplyRenameIndex:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             assert len(items) == 1
-            assert isinstance(items[0].fix, RenameIndexFix)
+            assert isinstance(items[0].correction, RenameIndexCorrection)
 
-            items[0].fix.apply()
+            items[0].correction.apply()
             assert index_exists("examples_indexexample_name_new_idx")
             assert not index_exists("examples_indexexample_name_old_idx")
 
@@ -983,12 +1007,12 @@ class TestApplyRenameIndex:
 
 
 class TestReadOnlyConnection:
-    """Convergence analysis canonicalizes the model side via temp-table DDL,
+    """Convergence analysis normalizes the model side via temp-table DDL,
     so it can't run on a read-only / standby connection. Surface that as a
     clean domain error rather than a raw psycopg ReadOnlySqlTransaction."""
 
     def test_analyze_inside_read_only_raises_clean_error(self, isolated_db):
-        # Same-name match → canonicalization runs → first DDL attempt under
+        # Same-name match → normalization runs → first DDL attempt under
         # read_only() raises ReadOnlySqlTransaction, which we translate.
         original_indexes = list(IndexExample.model_options.indexes)
         IndexExample.model_options.indexes = [

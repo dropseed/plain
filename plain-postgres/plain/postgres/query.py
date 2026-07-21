@@ -423,38 +423,47 @@ class QuerySet[T: "Model"]:
     def __getitem__(self, k: int) -> T: ...
 
     @overload
-    def __getitem__(self, k: slice) -> QuerySet[T] | list[T]: ...
+    def __getitem__(self, k: slice) -> QuerySet[T]: ...
 
-    def __getitem__(self, k: int | slice) -> T | QuerySet[T] | list[T]:
-        """Retrieve an item or slice from the set of results."""
+    def __getitem__(self, k: int | slice) -> T | QuerySet[T]:
+        """Retrieve an item or slice from the set of results.
+
+        Slicing always returns a QuerySet, even when the results are
+        already cached. The returned QuerySet behaves exactly like one
+        sliced before evaluation — same allowed operations — except it
+        carries the sliced cache so iterating it won't re-query. The slice
+        is also applied as SQL limits, so any operation that re-chains the
+        QuerySet drops the cache and re-queries the correct rows.
+
+        Negative indexing and step slicing both raise.
+        """
         if not isinstance(k, int | slice):
             raise TypeError(
                 f"QuerySet indices must be integers or slices, not {type(k).__name__}."
             )
-        if (isinstance(k, int) and k < 0) or (
-            isinstance(k, slice)
-            and (
-                (k.start is not None and k.start < 0)
-                or (k.stop is not None and k.stop < 0)
-            )
-        ):
-            raise ValueError("Negative indexing is not supported.")
-
-        if self._result_cache is not None:
-            return self._result_cache[k]
 
         if isinstance(k, slice):
+            if (k.start is not None and k.start < 0) or (
+                k.stop is not None and k.stop < 0
+            ):
+                raise ValueError("Negative indexing is not supported.")
+            if k.step is not None:
+                raise ValueError("Step slicing is not supported.")
             qs = self._chain()
-            if k.start is not None:
-                start = int(k.start)
-            else:
-                start = None
-            if k.stop is not None:
-                stop = int(k.stop)
-            else:
-                stop = None
+            start = int(k.start) if k.start is not None else None
+            stop = int(k.stop) if k.stop is not None else None
             qs.sql_query.set_limits(start, stop)
-            return list(qs)[:: k.step] if k.step else qs
+            if self._result_cache is not None:
+                # Carry the sliced cache so the new QuerySet won't re-query on
+                # iteration. The SQL limits above keep it correct if it's later
+                # re-chained, which drops the cache.
+                self._attach_result_cache(qs, self._result_cache[k])
+            return qs
+
+        if k < 0:
+            raise ValueError("Negative indexing is not supported.")
+        if self._result_cache is not None:
+            return self._result_cache[k]
 
         qs = self._chain()
         qs.sql_query.set_limits(k, k + 1)
@@ -809,6 +818,7 @@ class QuerySet[T: "Model"]:
                 case_statement = Case(*when_statements, output_field=field)
                 # PostgreSQL requires casted CASE in updates
                 case_statement = Cast(case_statement, output_field=field)
+                assert field.name is not None
                 update_kwargs[field.name] = case_statement
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
@@ -1135,9 +1145,8 @@ class QuerySet[T: "Model"]:
         """
         obj = self._chain()
         # Preserve cache since all() doesn't modify the query.
-        # This is important for prefetch_related() to work correctly.
-        obj._result_cache = self._result_cache
-        obj._prefetch_done = self._prefetch_done
+        if self._result_cache is not None:
+            self._attach_result_cache(obj, self._result_cache)
         return obj
 
     def filter(self, *args: Any, **kwargs: Any) -> Self:
@@ -1174,23 +1183,6 @@ class QuerySet[T: "Model"]:
             self._query.add_q(~Q(*args, **kwargs))
         else:
             self._query.add_q(Q(*args, **kwargs))
-
-    def complex_filter(self, filter_obj: Q | dict[str, Any]) -> QuerySet[T]:
-        """
-        Return a new QuerySet instance with filter_obj added to the filters.
-
-        filter_obj can be a Q object or a dictionary of keyword lookup
-        arguments.
-
-        This exists to support framework features such as 'limit_choices_to',
-        and usually it will be more natural to use other methods.
-        """
-        if isinstance(filter_obj, Q):
-            clone = self._chain()
-            clone.sql_query.add_q(filter_obj)
-            return clone
-        else:
-            return self._filter_or_exclude(False, args=(), kwargs=filter_obj)
 
     def select_for_update(
         self,
@@ -1527,6 +1519,17 @@ class QuerySet[T: "Model"]:
         c._fields = self._fields
         return c
 
+    def _attach_result_cache(self, obj: Self, cache: list[T]) -> None:
+        """Carry a result cache onto a chained QuerySet.
+
+        Whenever a cache is moved onto a new QuerySet, the prefetch state
+        must ride along with it — otherwise prefetch_related() would re-run
+        (or be skipped). Keep both writes together here so callers can't
+        forget the pairing.
+        """
+        obj._result_cache = cache
+        obj._prefetch_done = self._prefetch_done
+
     def _fetch_all(self) -> None:
         if self._result_cache is None:
             self._result_cache = list(self._iterable_class(self))
@@ -1707,6 +1710,9 @@ class RawQuerySet:
         return f"<{self.__class__.__name__}: {self.sql_query}>"
 
     def __getitem__(self, k: int | slice) -> Model | list[Model]:
+        # Unlike QuerySet, a RawQuerySet is always fully materialized — there's
+        # no lazy query to push a slice into — so indexing keeps plain list
+        # semantics: a slice returns a list (and step/negative slicing work).
         return list(self)[k]
 
     @cached_property

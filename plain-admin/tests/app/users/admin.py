@@ -24,7 +24,15 @@ class UserAdmin(AdminViewset):
         model = User
         title = "Users"
         nav_section = "Users"
-        fields = ["id", "username", "is_admin"]
+        fields = ["id", "username", "is_admin", "username_upper"]
+        search_fields = ["username"]
+        actions = ["Make admin"]
+
+        def perform_action(self, action, objects):
+            if action == "Make admin":
+                # .update() only works on a queryset, so this call also proves
+                # the queryset contract holds end to end.
+                objects.update(is_admin=True)
 
     class DetailView(AdminModelDetailView):
         model = User

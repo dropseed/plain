@@ -53,15 +53,6 @@ class ChildNoAction(postgres.Model):
     )
 
 
-@postgres.register_model
-class UnconstrainedChild(postgres.Model):
-    """FK with db_constraint=False — no DB constraint, convergence should ignore."""
-
-    parent: Field[DeleteParent] = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.NO_ACTION, db_constraint=False
-    )
-
-
 class _HideGhostsQuerySet(postgres.QuerySet):
     """QuerySet with a default filter. Rows named "ghost" are hidden from
     the public queryset — mirrors real-world patterns like soft-delete or

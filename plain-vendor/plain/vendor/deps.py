@@ -4,7 +4,7 @@ import re
 from collections.abc import Generator
 from pathlib import Path
 
-import requests
+import httpx
 import tomlkit
 
 from plain.assets.finders import _APP_ASSETS_DIR
@@ -54,11 +54,11 @@ class Dependency:
     def __str__(self) -> str:
         return f"{self.name} -> {self.url}"
 
-    def download(self, version: str) -> tuple[str, requests.Response]:
+    def download(self, version: str) -> tuple[str, httpx.Response]:
         # If the string contains a {version} placeholder, replace it
         download_url = self.url.replace("{version}", version)
 
-        response = requests.get(download_url)
+        response = httpx.get(download_url, follow_redirects=True)
         response.raise_for_status()
 
         content_type = response.headers.get("content-type", "").lower()
@@ -74,7 +74,7 @@ class Dependency:
             )
 
         # Good chance it will redirect to a more final URL (which we hope is versioned)
-        url = response.url
+        url = str(response.url)
         version = self.parse_version_from_url(url)
 
         return version, response
@@ -91,11 +91,11 @@ class Dependency:
             return self.update()
 
     def update(self) -> Path:
-        def try_version(v: str) -> tuple[str, requests.Response | None]:
+        def try_version(v: str) -> tuple[str, httpx.Response | None]:
             try:
                 version, response = self.download(v)
                 return version, response
-            except requests.RequestException:
+            except httpx.HTTPError:
                 return "", None
 
         if not self.installed:
@@ -118,7 +118,7 @@ class Dependency:
             version, response = self.download(self.installed)
 
         if not response:
-            raise requests.RequestException("Unable to download dependency")
+            raise httpx.HTTPError("Unable to download dependency")
 
         vendored_path = self.vendor(response)
         self.installed = version
@@ -166,17 +166,18 @@ class Dependency:
         with open("pyproject.toml", "w") as f:
             f.write(tomlkit.dumps(pyproject))
 
-    def vendor(self, response: requests.Response) -> Path:
+    def vendor(self, response: httpx.Response) -> Path:
         if not VENDOR_DIR.exists():
             VENDOR_DIR.mkdir(parents=True)
+
+        response_url = str(response.url)
 
         if self.filename:
             # Use a specific filename from config
             filename = self.filename
         else:
             # Otherwise, use the filename from the URL
-            assert response.url is not None
-            filename = response.url.split("/")[-1]
+            filename = response_url.split("/")[-1]
             # Remove any query string or fragment
             filename = filename.split("?")[0].split("#")[0]
 
@@ -194,11 +195,10 @@ class Dependency:
                 # Use a specific filename from config
                 sourcemap_filename = str(self.sourcemap)
 
-            assert response.url is not None
             sourcemap_url = "/".join(
-                response.url.split("/")[:-1] + [sourcemap_filename]
+                response_url.split("/")[:-1] + [sourcemap_filename]
             )
-            sourcemap_response = requests.get(sourcemap_url)
+            sourcemap_response = httpx.get(sourcemap_url, follow_redirects=True)
             sourcemap_response.raise_for_status()
 
             sourcemap_path = VENDOR_DIR / sourcemap_filename

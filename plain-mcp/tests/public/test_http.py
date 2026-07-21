@@ -41,7 +41,45 @@ class TestPublicEndpoint:
         body = json.loads(response.content)
         assert body["jsonrpc"] == "2.0"
         assert body["id"] == 1
-        assert body["result"]["protocolVersion"] == "2025-03-26"
+        assert body["result"]["protocolVersion"] == "2025-11-25"
+
+    def test_initialize_echoes_supported_requested_version(self) -> None:
+        # MCP version negotiation: a supported requested version is echoed back.
+        client = Client()
+        response = client.post(
+            "/mcp",
+            data=_jsonrpc("initialize", {"protocolVersion": "2025-06-18"}),
+            content_type="application/json",
+        )
+        assert json.loads(response.content)["result"]["protocolVersion"] == "2025-06-18"
+
+    def test_initialize_offers_preferred_for_unsupported_version(self) -> None:
+        # An unsupported (or absent) requested version gets the server's preferred one.
+        client = Client()
+        response = client.post(
+            "/mcp",
+            data=_jsonrpc("initialize", {"protocolVersion": "1999-01-01"}),
+            content_type="application/json",
+        )
+        assert json.loads(response.content)["result"]["protocolVersion"] == "2025-11-25"
+
+    def test_unsupported_protocol_version_header_returns_400(self) -> None:
+        # Spec MUST: an unsupported MCP-Protocol-Version header is rejected.
+        client = Client(headers={"MCP-Protocol-Version": "1999-01-01"})
+        response = client.post(
+            "/mcp", data=_jsonrpc("ping"), content_type="application/json"
+        )
+        assert response.status_code == 400
+        assert (
+            json.loads(response.content)["error"]["code"] == -32600
+        )  # INVALID_REQUEST
+
+    def test_supported_protocol_version_header_accepted(self) -> None:
+        client = Client(headers={"MCP-Protocol-Version": "2025-06-18"})
+        response = client.post(
+            "/mcp", data=_jsonrpc("ping"), content_type="application/json"
+        )
+        assert response.status_code == 200
 
     def test_post_tools_call(self) -> None:
         client = Client()
@@ -54,8 +92,8 @@ class TestPublicEndpoint:
         body = json.loads(response.content)
         assert body["result"]["content"][0]["text"] == "hi"
 
-    def test_post_notification_returns_204(self) -> None:
-        """A JSON-RPC notification (no id) has no response body."""
+    def test_post_notification_returns_202(self) -> None:
+        """A JSON-RPC notification (no id) is acknowledged with 202, no body."""
         client = Client()
         response = client.post(
             "/mcp",
@@ -64,7 +102,7 @@ class TestPublicEndpoint:
             ),
             content_type="application/json",
         )
-        assert response.status_code == 204
+        assert response.status_code == 202
 
 
 class TestUnhandledException:

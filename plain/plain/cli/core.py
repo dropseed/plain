@@ -25,7 +25,7 @@ from .request import request
 from .scaffold import create
 from .server import server
 from .settings import settings
-from .shell import run, shell
+from .shell import shell
 from .upgrade import upgrade
 from .urls import urls
 from .utils import utils
@@ -58,7 +58,6 @@ plain_cli.add_command(urls)
 plain_cli.add_command(changelog)
 plain_cli.add_command(settings)
 plain_cli.add_command(shell)
-plain_cli.add_command(run)
 plain_cli.add_command(install)
 plain_cli.add_command(upgrade)
 plain_cli.add_command(server)

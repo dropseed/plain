@@ -22,7 +22,6 @@ KNOWN_PACKAGES = {
     "plain-dev": "Local development server with auto-reload",
     "plain-elements": "HTML template components",
     "plain-email": "Send email",
-    "plain-esbuild": "Build JavaScript with esbuild",
     "plain-flags": "Feature flags via database models",
     "plain-htmx": "HTMX integration for templates and views",
     "plain-jobs": "Background jobs with a database-driven queue",

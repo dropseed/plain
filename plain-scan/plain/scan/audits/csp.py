@@ -6,7 +6,7 @@ from ..results import AuditResult, CheckResult
 from .base import Audit
 
 if TYPE_CHECKING:
-    import requests
+    import httpx
 
     from ..scanner import Scanner
 
@@ -808,7 +808,7 @@ class CSPAudit(Audit):
         )
 
     def _check_reporting(
-        self, directives: dict[str, list[str]], response: requests.Response
+        self, directives: dict[str, list[str]], response: httpx.Response
     ) -> CheckResult:
         """Check if CSP reporting is configured with modern Reporting-Endpoints header.
 

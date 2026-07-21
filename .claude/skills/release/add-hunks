@@ -13,6 +13,32 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
+
+
+def git_apply_cached(patch_file: str) -> subprocess.CompletedProcess:
+    """Apply a patch to the index, retrying briefly if another process is
+    holding .git/index.lock.
+
+    The lock is held for the duration of any index write (a concurrent
+    editor, git hook, file watcher, or a second release agent), so back-to-back
+    `git apply --cached` calls occasionally lose the race and fail with
+    "Unable to create '.git/index.lock': File exists". That's transient, so
+    retry it. Any other failure is a real patch problem — return immediately.
+    """
+    result = subprocess.run(
+        ['git', 'apply', '--cached', patch_file],
+        capture_output=True, text=True,
+    )
+    for _ in range(9):
+        if result.returncode == 0 or 'index.lock' not in result.stderr:
+            return result
+        time.sleep(0.5)
+        result = subprocess.run(
+            ['git', 'apply', '--cached', patch_file],
+            capture_output=True, text=True,
+        )
+    return result
 
 
 class Hunk:
@@ -130,10 +156,7 @@ def main():
 
     try:
         print(f"Staging hunks: {selection}")
-        result = subprocess.run(
-            ['git', 'apply', '--cached', patch_file],
-            capture_output=True, text=True
-        )
+        result = git_apply_cached(patch_file)
         if result.returncode == 0:
             print("Successfully staged selected hunks")
         else:

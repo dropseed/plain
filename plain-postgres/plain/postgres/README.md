@@ -18,6 +18,7 @@
 - [Forms](#forms)
 - [Architecture](#architecture)
 - [Diagnostics](#diagnostics)
+- [Tracing](#tracing)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -773,6 +774,26 @@ Environment overrides: every setting accepts `PLAIN_POSTGRES_*` env vars, so you
 PLAIN_POSTGRES_MIGRATION_STATEMENT_TIMEOUT=30s plain migrations apply
 ```
 
+### Schema lock
+
+Schema-changing commands — `plain postgres sync`, `plain migrations apply`, `plain postgres converge`, and `plain postgres drop-unknown-tables` — serialize on a single session-level advisory lock, so two deploy processes running at once (a retried migrate job, overlapping release phases) can't interleave schema changes. You don't have to do anything to get this.
+
+A second process warns and waits, retrying until the holder finishes:
+
+```python
+# app/settings.py — defaults shown (waits up to an hour total)
+POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL = 5.0
+POSTGRES_SCHEMA_LOCK_MAX_RETRIES = 720
+```
+
+The wait is generous by default because a legitimate holder can be mid index build. If the budget runs out, the command fails with the holder's `pid` so you can see what's blocking. A crashed holder is not a problem — the lock releases automatically when its database session closes.
+
+The lock is held on its own connection, separate from the one running DDL, so non-transactional operations (`CREATE INDEX CONCURRENTLY`, `VALIDATE CONSTRAINT`) work normally while it's held. Session-level locks don't survive transaction-mode poolers like pgbouncer — if your `POSTGRES_URL` points at one, set [`POSTGRES_MANAGEMENT_URL`](#bypassing-a-connection-pooler-for-management-operations) to a direct connection.
+
+The lock connection sits idle while your DDL runs, so it enables TCP keepalives to survive NAT and load-balancer idle timeouts. A server-side `idle_session_timeout` would still kill it (releasing the lock mid-run) — don't set one for the role that runs migrations. `sync` re-verifies the lock between its migrate and converge phases and stops with a clear error if the session died.
+
+To see the lock live: `SELECT * FROM pg_locks WHERE locktype = 'advisory' AND objid = 1047265496`.
+
 ## Fields
 
 You can use many field types for different data:
@@ -943,7 +964,7 @@ book.author.name   # one query — loads the rest of the row
 
 The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `select_related()` to load related rows up front and avoid a query per row.
 
-The partial-instance shortcut relies on the database guaranteeing the row exists. A foreign key declared with `db_constraint=False` has no such guarantee, so it is queried on access instead — a stale key raises `DoesNotExist` right away rather than yielding a placeholder.
+The partial-instance shortcut is safe because Plain always creates a database foreign-key constraint, so the referenced row is guaranteed to exist.
 
 ### Reverse relationships
 
@@ -1423,6 +1444,21 @@ These are static, code-level checks that catch issues before you deploy. The `di
 - **LLM-powered column recommendations for missing indexes** — `missing_index_candidates` shows the culprit queries and lets you decide. For precise column-level suggestions, use a platform tool (PlanetScale Insights, Dexter, pg_qualstats + hypopg).
 - **Historical trending** — `diagnose` is stateless; it reports on the current state of cumulative stats. Continuous monitoring is out of scope.
 - **Niche server checks** (WAL bloat, replication slot age, etc.) — better covered by your Postgres provider's monitoring or a dedicated tool; users on self-hosted setups that need them typically have their own tooling.
+
+## Tracing
+
+Every query runs inside an OpenTelemetry `CLIENT` span with standard `db.*` attributes, so queries show up as children of whatever request, job, or chore triggered them. You don't configure anything for this — it's on by default and only exports if your app exports traces (e.g. with [plain.connect](../../../plain-connect/plain/connect/README.md)).
+
+If code runs a query with _no_ active span — a background thread, a polling loop — that query's span becomes its own single-span trace. For framework-internal housekeeping queries where that's pure noise, you can suppress query tracing entirely:
+
+```python
+from plain.postgres.otel import suppress_db_tracing
+
+with suppress_db_tracing():
+    MyModel.query.count()  # No span, no query metrics
+```
+
+This is meant for infrastructure code (pollers, metric gauge callbacks, test fixtures) — not for hiding application queries, which you almost always want visible in traces.
 
 ## Settings
 

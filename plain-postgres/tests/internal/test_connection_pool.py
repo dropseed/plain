@@ -18,20 +18,6 @@ from plain.postgres.sources import runtime_pool_source
 from plain.runtime import settings
 
 
-@pytest.fixture
-def _clean_connection():
-    """Ensure the ContextVar starts empty and clean up any connection afterward."""
-    token = _db_conn.set(None)
-    yield
-    conn = _db_conn.get()
-    if conn is not None:
-        try:
-            conn.close()
-        except Exception:
-            pass
-    _db_conn.reset(token)
-
-
 class TestPoolCheckoutReturn:
     @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection")
     def test_checkout_and_return(self, setup_db):

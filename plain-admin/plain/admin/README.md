@@ -436,21 +436,19 @@ class ListView(AdminModelListView):
     fields = ["id", "email", "is_active"]
     actions = ["Activate", "Deactivate", "Delete selected"]
 
-    def perform_action(self, action, target_ids):
-        users = User.query.filter(id__in=target_ids)
-
+    def perform_action(self, action, objects):
         if action == "Activate":
-            users.update(is_active=True)
+            objects.update(is_active=True)
         elif action == "Deactivate":
-            users.update(is_active=False)
+            objects.update(is_active=False)
         elif action == "Delete selected":
-            users.delete()
+            objects.delete()
 
         # Return None to redirect back to the list, or return a Response
         return None
 ```
 
-The `target_ids` parameter contains the IDs of selected items. Users can select individual items or use "Select all" to target the entire filtered queryset.
+The `objects` parameter is the set of selected items, already narrowed to the current filtered view. On a model list it's a queryset, so you can run set-based `.update()`/`.delete()` directly without re-querying — and "Select all N" scales, because the whole page's worth of ids never has to be materialized. Users can select individual rows, use the header checkbox to select the whole current page, or click "Select all N" to target the entire filtered queryset across every page. Choosing an action from the **Actions** dropdown confirms before submitting.
 
 ## Toolbar
 
@@ -669,19 +667,19 @@ directly for copy-pasteable markup if you can't open the running admin
 lives one file per primitive in
 [`styles/components/`](./styles/components/).
 
-| Pattern           | Class(es)                                                                                                                                                            |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Buttons           | Compose `.admin-btn` with one of `.admin-btn-primary` / `.admin-btn-secondary` / `.admin-btn-outline` / `.admin-btn-ghost` / `.admin-btn-link`                       |
-| Sizes / icon-only | Stack `.admin-btn-sm` or `.admin-btn-lg`; add `.admin-btn-icon` for a square icon-only button (e.g. `class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost"`) |
-| Status buttons    | `.admin-btn-success`, `.admin-btn-warning`, `.admin-btn-danger`, `.admin-btn-info` (solid fill + paired fg)                                                          |
-| Badges            | Compose `.admin-badge` with one of `.admin-badge-primary` / `.admin-badge-secondary` / `.admin-badge-outline`                                                        |
-| Status badges     | Stack `.admin-badge-success`, `.admin-badge-warning`, `.admin-badge-danger`, `.admin-badge-info` (translucent fill + saturated text)                                 |
-| Alerts            | Compose `.admin-alert` (neutral surface) with `.admin-alert-success` / `.admin-alert-warning` / `.admin-alert-danger` / `.admin-alert-info` for tone                 |
-| Cards             | `.admin-card` — visual shell only (bg + border + radius); compose layout/padding inline (e.g. `class="admin-card flex flex-col gap-6 p-6"`)                          |
-| Form inputs       | `.admin-input`, `.admin-textarea`, `.admin-select` — opt in via class; pair with `-sm` for compact rows                                                              |
-| Dialogs           | `<dialog class="admin-dialog">` opened via `<button command="show-modal" commandfor="…">`                                                                            |
-| Tabs              | `.admin-tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                                                                                                     |
-| Dropdowns         | `.admin-dropdown-menu` wrapping a `<button>` + sibling `[data-popover]` with `[role="menu"]`                                                                         |
+| Pattern           | Class(es)                                                                                                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Buttons           | Compose `.admin-btn` with one of `.admin-btn-primary` / `.admin-btn-secondary` / `.admin-btn-outline` / `.admin-btn-ghost` / `.admin-btn-link`                                                  |
+| Sizes / icon-only | Stack `.admin-btn-sm` or `.admin-btn-lg`; add `.admin-btn-icon` for a square icon-only button (e.g. `class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost"`)                            |
+| Status buttons    | `.admin-btn-success`, `.admin-btn-warning`, `.admin-btn-danger`, `.admin-btn-info` (solid fill + paired fg)                                                                                     |
+| Badges            | Compose `.admin-badge` with one of `.admin-badge-primary` / `.admin-badge-secondary` / `.admin-badge-outline`                                                                                   |
+| Status badges     | Stack `.admin-badge-success`, `.admin-badge-warning`, `.admin-badge-danger`, `.admin-badge-info` (translucent fill + saturated text)                                                            |
+| Alerts            | Compose `.admin-alert` (neutral surface) with `.admin-alert-success` / `.admin-alert-warning` / `.admin-alert-danger` / `.admin-alert-info` for tone                                            |
+| Cards             | `.admin-card` — visual shell only (bg + border + radius); compose layout/padding inline (e.g. `class="admin-card flex flex-col gap-6 p-6"`)                                                     |
+| Form inputs       | `.admin-input`, `.admin-textarea`, `.admin-select` — opt in via class; pair with `-sm` for compact rows                                                                                         |
+| Dialogs           | `<dialog class="admin-dialog">` opened via `<button command="show-modal" commandfor="…">`                                                                                                       |
+| Tabs              | `.admin-tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                                                                                                                                |
+| Dropdowns         | `.admin-dropdown-menu` wrapping a `<button>` + sibling `[data-popover]` (carries `popover="manual"`, opens in the top layer so it's never clipped by a table/overflow box) with `[role="menu"]` |
 
 When writing custom admin templates, prefer the design tokens over hardcoded
 colors so dark mode and theme overrides work automatically:

@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.26.4](https://github.com/dropseed/plain/releases/plain-passwords@0.26.4) (2026-06-08)
+
+### What's changed
+
+- Internal: a commented-out example in `PasswordSignupView.form_valid` updated from `form.save()` to `form.create()` to track the `plain.postgres` `ModelForm` API change. No functional change. ([66634f5af9](https://github.com/dropseed/plain/commit/66634f5af9))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.26.3](https://github.com/dropseed/plain/releases/plain-passwords@0.26.3) (2026-06-03)
 
 ### What's changed

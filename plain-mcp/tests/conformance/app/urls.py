@@ -8,5 +8,5 @@ from plain.urls import Router, path
 class AppRouter(Router):
     namespace = ""
     urls = [
-        path("mcp/", ConformanceMCP, name="mcp"),
+        path("mcp", ConformanceMCP, name="mcp"),
     ]
