@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from typing import Any
 
 import click
@@ -11,9 +12,9 @@ from plain.runtime import settings
 from plain.test import Client
 
 from ._trace import (
-    TraceAnalysis,
-    TraceResult,
-    analyze_trace,
+    CapturedTrace,
+    RawSpan,
+    analyze_traces,
     capture_available,
     capture_spans,
 )
@@ -21,13 +22,42 @@ from ._trace import (
 _HTTP_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE")
 
 _TRACE_UNAVAILABLE = (
-    "Trace capture skipped — opentelemetry-sdk is not installed. "
-    "It ships with plain.connect or plain.pytest."
+    "Trace capture skipped — it needs the OpenTelemetry SDK, which ships with "
+    "plain.connect or plain.pytest."
 )
 
-# Cap on per-query lines shown in the text Trace section; the full list is
-# always in --json.
+_TRACE_EMPTY = (
+    "No spans were captured. Tracing may be turned off in this environment "
+    "(for example OTEL_SDK_DISABLED)."
+)
+
+_TRACE_NOT_REACHED = (
+    "The request failed before it was dispatched, so there is no trace."
+)
+
+
+def _trace_note(traces: list[CapturedTrace] | None) -> str | None:
+    """Explain an unusable `traces`, or None when there is a trace to read.
+
+    Anything that indexes into `traces` needs something to report instead of
+    an IndexError. `traces is None` with the SDK unavailable means capture was
+    skipped; with the SDK available it means dispatch was never reached, since
+    the analyzer runs unconditionally and any bug in it now propagates rather
+    than being folded into this note.
+    """
+    if traces is None:
+        return _TRACE_UNAVAILABLE if not capture_available() else _TRACE_NOT_REACHED
+    if not traces:
+        return _TRACE_EMPTY
+    return None
+
+
+# Cap on per-query lines shown in the text Trace section. `--trace` lifts it;
+# `--json` is never capped.
 _QUERY_LIST_LIMIT = 10
+
+# Width SQL is elided to in the terminal.
+_SQL_DISPLAY_WIDTH = 64
 
 
 def _dispatch_request(
@@ -40,52 +70,183 @@ def _dispatch_request(
     return getattr(client, method.lower())(path, **kwargs)
 
 
-def _truncate(value: str, length: int) -> str:
-    return value if len(value) <= length else value[: length - 1] + "…"
+def _display_sql(sql: str) -> str:
+    """Collapse a statement to one elided line for the terminal.
+
+    The middle goes rather than the tail. A wide SELECT is mostly column
+    list, so two statements against different tables share a long prefix and
+    elide to the same string — it is the FROM and WHERE at the end that tell
+    them apart.
+    """
+    one_line = " ".join(sql.split())
+    if len(one_line) <= _SQL_DISPLAY_WIDTH:
+        return one_line
+    head = _SQL_DISPLAY_WIDTH * 3 // 5
+    tail = _SQL_DISPLAY_WIDTH - head - 1
+    return f"{one_line[:head]}…{one_line[-tail:]}"
+
+
+def _installed_package_path(path: str) -> str | None:
+    """The path below `site-packages`, or None when this is not a dependency.
+
+    Used only to shorten an installed dependency's call site for display.
+    """
+    _, marker, package_path = path.rpartition(f"site-packages{os.sep}")
+    return package_path if marker else None
 
 
 def _format_source(source: str) -> str:
-    """Shorten an absolute source path relative to the working directory."""
-    cwd = os.getcwd()
-    if source.startswith(cwd + os.sep):
-        return source[len(cwd) + 1 :]
-    return source
+    """Shorten a source location for display.
+
+    An installed dependency collapses to its package path; anything else is
+    shown relative to the working directory when that comes out shorter, which
+    keeps sibling checkouts readable without inventing `../../..` chains for
+    paths in a different tree entirely.
+
+    This asks whether the path is *installed*, not whether it is app code —
+    a sibling checkout is neither, and wants the relative form.
+    """
+    if (installed_path := _installed_package_path(source)) is not None:
+        return installed_path
+    try:
+        relative = os.path.relpath(source, os.getcwd())
+    except ValueError:  # different drive on Windows
+        return source
+    return relative if len(relative) < len(source) else source
 
 
-def _render_trace(analysis: TraceAnalysis) -> None:
-    """Render the Trace section body — metrics, queries, and flagged issues."""
-    click.echo(f"  Duration: {analysis['duration_ms']}ms")
-    click.echo(f"  Spans: {analysis['span_count']}")
+def _echo_span(span: RawSpan, *, depth: int) -> None:
+    """Print one row of the span tree, indented to its depth."""
+    name = f"{'  ' * depth}{span['name']}"
+    if span.get("status") == "ERROR":
+        name = click.style(name, fg="red")
+    kind = click.style(f"  {span['kind']}", dim=True)
+    click.echo(f"    {span['duration_ms']:>8.2f}ms  {name}{kind}")
 
-    duplicates = analysis["duplicate_query_count"]
+
+def _render_span_tree(spans: list[RawSpan]) -> None:
+    """Print one trace's spans as an indented tree, parents before children.
+
+    Spans arrive flat and ordered by start time; `parent_span_id` gives the
+    structure. A span whose parent was not captured — the parent hadn't ended
+    when capture stopped — is rendered as a root rather than dropped.
+    """
+    captured_ids = {span["span_id"] for span in spans}
+    children: dict[str | None, list[RawSpan]] = {}
+    for span in spans:
+        parent = span["parent_span_id"]
+        if parent not in captured_ids:
+            parent = None
+        children.setdefault(parent, []).append(span)
+
+    # Malformed instrumentation (a self-parented span, or two spans sharing an
+    # id) would otherwise recurse forever. Tracked by identity rather than by
+    # span_id so that duplicate ids still each get rendered exactly once.
+    rendered: set[int] = set()
+
+    def render(parent_id: str | None, depth: int) -> None:
+        for span in children.get(parent_id, []):
+            if id(span) in rendered:
+                continue
+            rendered.add(id(span))
+            _echo_span(span, depth=depth)
+            render(span["span_id"], depth + 1)
+
+    render(None, 0)
+    # Anything left is unreachable from a root (a parent cycle). Print it flat
+    # rather than silently dropping spans the count above already promised.
+    for span in spans:
+        if id(span) not in rendered:
+            _echo_span(span, depth=0)
+
+
+def _render_trace(*, captured: CapturedTrace, detailed: bool, show_hint: bool) -> None:
+    """Render one trace's body — metrics, queries, and recorded exceptions.
+
+    Every listed statement names its call sites. When `detailed`, the query
+    list is uncapped and the full span tree is printed after the exceptions.
+    `show_hint` advertises `--trace`, and is set on one block only however
+    many traces were captured.
+    """
+    analysis = captured["analysis"]
+
+    click.echo(f"  Duration: {analysis['duration_ms']:.2f}ms")
+
+    spans_line = f"  Spans: {analysis['span_count']}"
+    if show_hint:
+        spans_line += click.style("  (--trace for the span tree)", dim=True)
+    click.echo(spans_line)
+
     queries_line = f"  Queries: {analysis['query_count']}"
-    if duplicates:
-        plural = "" if duplicates == 1 else "s"
-        queries_line += f" ({duplicates} duplicate{plural})"
+    if transactions := analysis["transaction_count"]:
+        plural = "" if transactions == 1 else "s"
+        queries_line += click.style(
+            f"  +{transactions} transaction statement{plural}", dim=True
+        )
     click.echo(queries_line)
 
     queries = analysis["queries"]
-    for query in queries[:_QUERY_LIST_LIMIT]:
-        sql = _truncate(" ".join(query["sql"].split()), 64)
-        click.echo(f"    {query['count']}×  {query['total_duration_ms']}ms  {sql}")
-    if len(queries) > _QUERY_LIST_LIMIT:
-        click.echo(f"    + {len(queries) - _QUERY_LIST_LIMIT} more — see --json")
+    if detailed:
+        shown = queries
+    else:
+        # The cap trims the singleton tail only. Duration-first order would
+        # otherwise push a fast, many-times-repeated statement below the cap —
+        # the one entry the reader most needs to see.
+        shown = queries[:_QUERY_LIST_LIMIT] + [
+            q for q in queries[_QUERY_LIST_LIMIT:] if q["count"] > 1
+        ]
+    for query in shown:
+        sql = _display_sql(query["sql"])
+        click.echo(
+            f"    {query['count']:>3}×  {query['total_duration_ms']:>7.2f}ms  {sql}"
+        )
+        # Truncated SQL alone rarely identifies a wide SELECT — the call site
+        # does, and two wide SELECTs can elide to the same string. Every
+        # listed statement names its call sites.
+        for source in query["sources"]:
+            click.echo(f"      → {_format_source(source)}")
+    if len(queries) > len(shown):
+        click.echo(f"    + {len(queries) - len(shown)} more — see --trace")
 
-    issues = analysis["issues"]
-    if issues:
-        click.secho("  Issues:", fg="red", bold=True)
-        for issue in issues:
-            if issue["type"] == "n_plus_one":
-                location = (
-                    f"  {_format_source(issue['sources'][0])}"
-                    if issue["sources"]
-                    else ""
-                )
-                sql = _truncate(" ".join(issue["sql"].split()), 64)
-                click.secho(f"    ⚠ N+1: {sql} ×{issue['count']}{location}", fg="red")
-            elif issue["type"] == "exception":
-                error_type = issue["error_type"] or "Exception"
-                click.secho(f"    ⚠ {issue['description']} ({error_type})", fg="red")
+    if exceptions := analysis["exceptions"]:
+        click.secho("  Exceptions:", fg="red", bold=True)
+        for exception in exceptions:
+            error_type = exception["error_type"] or "Exception"
+            click.secho(f"    ⚠ {error_type} in {exception['span']}", fg="red")
+            if message := exception["message"]:
+                click.secho(f"      {message}", fg="red")
+
+    if detailed:
+        click.echo("  Span tree:")
+        _render_span_tree(captured["spans"])
+
+
+def _render_traces(traces: list[CapturedTrace] | None, *, detailed: bool) -> None:
+    """Render the Trace section — one block per captured trace.
+
+    A followed redirect chain is several requests, so it gets several blocks
+    rather than one merged summary that would double-count anything the
+    framework does on every request.
+    """
+    if not traces:
+        click.secho("Trace:", fg="yellow", bold=True)
+        click.echo(f"  {_trace_note(traces)}")
+        return
+
+    for index, captured in enumerate(traces, start=1):
+        if index > 1:
+            click.echo()
+        label = (
+            "Trace:"
+            if len(traces) == 1
+            else f"Trace ({index}/{len(traces)}): {captured['name']}"
+        )
+        click.secho(label, fg="yellow", bold=True)
+        _render_trace(
+            captured=captured,
+            detailed=detailed,
+            show_hint=not detailed and index == 1,
+        )
 
 
 @click.command()
@@ -149,10 +310,19 @@ def _render_trace(analysis: TraceAnalysis) -> None:
     help="Assert response body does not contain this text (repeatable)",
 )
 @click.option(
+    "--trace",
+    "show_trace",
+    is_flag=True,
+    help=(
+        "Show the full trace in the text output — the complete query list and "
+        "the span tree. --json always includes it."
+    ),
+)
+@click.option(
     "--json",
     "output_json",
     is_flag=True,
-    help="Output response metadata and trace analysis as JSON (no body)",
+    help="Output response metadata and the full trace as JSON (no body)",
 )
 def request(
     path: str,
@@ -167,9 +337,15 @@ def request(
     assert_status: int | None,
     assert_contains: tuple[str, ...],
     assert_not_contains: tuple[str, ...],
+    show_trace: bool,
     output_json: bool,
 ) -> None:
     """Make HTTP requests against the dev database"""
+
+    # Bound before the try so the failure handler can report a trace even
+    # when the request never got as far as capturing one.
+    traces: list[CapturedTrace] | None = None
+    traces_rendered = False
 
     try:
         # Only allow in DEBUG mode for security
@@ -248,16 +424,18 @@ def request(
         # Dispatch the request, capturing a trace when the OpenTelemetry SDK
         # is available (it ships with plain.connect / plain.pytest, but is
         # not a Plain core dependency).
-        trace_result: TraceResult | None
         if capture_available():
             with capture_spans() as otel_exporter:
-                response = _dispatch_request(client, method, path, kwargs)
-            trace_result = analyze_trace(
-                otel_exporter.get_finished_spans(), app_root=os.getcwd()
-            )
+                try:
+                    response = _dispatch_request(client, method, path, kwargs)
+                finally:
+                    # Analyze in a `finally` so a view that raises still leaves
+                    # a trace behind — that is the request you most want one
+                    # for. Spans are exported as they end, so the ones that
+                    # completed before the raise are already here.
+                    traces = analyze_traces(otel_exporter.get_finished_spans())
         else:
             response = _dispatch_request(client, method, path, kwargs)
-            trace_result = None
 
         # Run assertions (shared by text and JSON output)
         failed: list[str] = []
@@ -313,10 +491,10 @@ def request(
                 response_data["headers"] = dict(response.headers)
             json_output: dict[str, Any] = {
                 "response": response_data,
-                "trace": trace_result,
+                "traces": traces,
             }
-            if trace_result is None:
-                json_output["trace_note"] = _TRACE_UNAVAILABLE
+            if note := _trace_note(traces):
+                json_output["trace_note"] = note
             if failed:
                 json_output["assertion_failures"] = failed
             click.echo(json.dumps(json_output, indent=2))
@@ -356,13 +534,12 @@ def request(
         else:
             click.echo("  User: anonymous")
 
-        # Trace — its own section, paralleling the JSON `trace` key
+        # Trace — its own section, paralleling the JSON `traces` key
         click.echo()
-        click.secho("Trace:", fg="yellow", bold=True)
-        if trace_result is not None:
-            _render_trace(trace_result["analysis"])
-        else:
-            click.echo("  skipped — opentelemetry-sdk not installed")
+        # Set before rendering so a partial render isn't duplicated by the
+        # failure handler if `_render_traces` raises partway through.
+        traces_rendered = True
+        _render_traces(traces, detailed=show_trace)
 
         click.echo()
 
@@ -419,6 +596,25 @@ def request(
 
     except SystemExit:
         raise
+    except BrokenPipeError:
+        # Downstream closed the pipe (`| head`) — not a failure. Point stdout
+        # at devnull so the interpreter's shutdown flush doesn't raise again.
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        raise SystemExit(0)
     except Exception as e:
         click.secho(f"Request failed: {e}", fg="red", err=True)
+        # A failed request still captured a trace, and it is the one worth
+        # reading. Report it in whichever shape was asked for rather than
+        # exiting with nothing on stdout.
+        if output_json:
+            failure: dict[str, Any] = {"error": str(e), "traces": traces}
+            if note := _trace_note(traces):
+                failure["trace_note"] = note
+            click.echo(json.dumps(failure, indent=2))
+        elif traces is not None and not traces_rendered:
+            # Only when a request actually ran — a usage error has no trace to
+            # discuss, and a Trace section would be the whole of stdout.
+            click.echo()
+            _render_traces(traces, detailed=show_trace)
         raise SystemExit(1)

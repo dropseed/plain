@@ -8,9 +8,29 @@ from opentelemetry.semconv.attributes.code_attributes import (
     CODE_LINE_NUMBER,
     CODE_STACKTRACE,
 )
-from opentelemetry.semconv.attributes.db_attributes import DB_QUERY_TEXT
+from opentelemetry.semconv.attributes.db_attributes import (
+    DB_OPERATION_NAME,
+    DB_QUERY_TEXT,
+)
+from opentelemetry.semconv.attributes.http_attributes import HTTP_REQUEST_METHOD
+from opentelemetry.semconv.attributes.url_attributes import URL_PATH
 
-from plain.cli._trace import analyze_trace, capture_spans
+from plain.cli._trace import (
+    CapturedTrace,
+    RawSpan,
+    TraceAnalysis,
+    analyze_traces,
+    capture_available,
+    capture_spans,
+)
+from plain.cli.request import (
+    _TRACE_EMPTY,
+    _TRACE_NOT_REACHED,
+    _TRACE_UNAVAILABLE,
+    _render_span_tree,
+    _render_traces,
+    _trace_note,
+)
 from plain.test.otel import install_test_tracer
 
 _span_exporter = install_test_tracer()
@@ -30,8 +50,17 @@ def _query_attributes(sql: str) -> dict[str, str | int]:
     }
 
 
+def _only_analysis() -> TraceAnalysis:
+    """The analysis of the single trace the test emitted."""
+    traces = analyze_traces(_span_exporter.get_finished_spans())
+    assert len(traces) == 1
+    return traces[0]["analysis"]
+
+
 @pytest.mark.usefixtures("_otel_clean")
-def test_groups_queries_and_flags_n_plus_one() -> None:
+def test_groups_repeated_statements_with_their_call_site() -> None:
+    # Repeats are reported, not diagnosed: one entry carrying the count and
+    # where it ran, for the reader to judge.
     tracer = trace.get_tracer("test")
     with tracer.start_as_current_span("GET /"):
         for _ in range(3):
@@ -42,21 +71,16 @@ def test_groups_queries_and_flags_n_plus_one() -> None:
             ):
                 pass
 
-    analysis = analyze_trace(_span_exporter.get_finished_spans())["analysis"]
+    analysis = _only_analysis()
 
     assert analysis["query_count"] == 3
-    assert analysis["duplicate_query_count"] == 2
     assert len(analysis["queries"]) == 1
     assert analysis["queries"][0]["count"] == 3
-
-    n_plus_one = [i for i in analysis["issues"] if i["type"] == "n_plus_one"]
-    assert len(n_plus_one) == 1
-    assert n_plus_one[0]["count"] == 3
-    assert "/app/views.py:10 in index" in n_plus_one[0]["sources"]
+    assert analysis["queries"][0]["sources"] == ["/app/views.py:10 in index"]
 
 
 @pytest.mark.usefixtures("_otel_clean")
-def test_distinct_queries_are_not_flagged() -> None:
+def test_distinct_statements_stay_separate_entries() -> None:
     tracer = trace.get_tracer("test")
     with tracer.start_as_current_span("GET /"):
         for sql in ("SELECT * FROM users", "SELECT * FROM teams"):
@@ -67,20 +91,24 @@ def test_distinct_queries_are_not_flagged() -> None:
             ):
                 pass
 
-    analysis = analyze_trace(_span_exporter.get_finished_spans())["analysis"]
+    analysis = _only_analysis()
 
     assert analysis["query_count"] == 2
-    assert analysis["duplicate_query_count"] == 0
-    assert analysis["issues"] == []
+    assert [q["count"] for q in analysis["queries"]] == [1, 1]
 
 
 @pytest.mark.usefixtures("_otel_clean")
-def test_same_query_across_traces_is_not_n_plus_one() -> None:
-    # --follow redirects produce one trace per hop; a query that runs once
-    # per request must not be flagged as a duplicate across traces.
+def test_each_redirect_hop_is_analyzed_on_its_own() -> None:
+    # --follow redirects produce one trace per hop. A query that runs once per
+    # request must stay a 1x query in each hop's analysis rather than merging
+    # into a 2x count that reads as a repeat nobody can fix.
     tracer = trace.get_tracer("test")
-    for _ in range(2):
-        with tracer.start_as_current_span("GET /"):
+    for path in ("/old", "/new"):
+        with tracer.start_as_current_span(
+            "GET",
+            kind=trace.SpanKind.SERVER,
+            attributes={HTTP_REQUEST_METHOD: "GET", URL_PATH: path},
+        ):
             with tracer.start_as_current_span(
                 "SELECT users",
                 kind=trace.SpanKind.CLIENT,
@@ -88,54 +116,25 @@ def test_same_query_across_traces_is_not_n_plus_one() -> None:
             ):
                 pass
 
-    analysis = analyze_trace(_span_exporter.get_finished_spans())["analysis"]
+    traces = analyze_traces(_span_exporter.get_finished_spans())
 
-    assert analysis["query_count"] == 2
-    assert analysis["duplicate_query_count"] == 0
-    assert analysis["issues"] == []
+    # Named by method and path, so the hops are tellable apart even though
+    # both root spans are called "GET".
+    assert [t["name"] for t in traces] == ["GET /old", "GET /new"]
+    for captured in traces:
+        assert captured["analysis"]["query_count"] == 1
 
 
 @pytest.mark.usefixtures("_otel_clean")
-def test_n_plus_one_only_flags_app_code() -> None:
-    # With app_root set, a query repeated only in framework code (e.g. a
-    # preflight check under site-packages) is not flagged — only repeats in
-    # project code are.
+def test_query_sources_dedup_distinct_call_sites() -> None:
+    # Each distinct call site is recorded once, as its raw location string —
+    # the path is the information, so no classification travels with it.
     tracer = trace.get_tracer("test")
     with tracer.start_as_current_span("GET /"):
-        for sql, path in (
-            ("SELECT framework", "/my/project/.venv/lib/site-packages/plain/pf.py"),
-            ("SELECT framework", "/my/project/.venv/lib/site-packages/plain/pf.py"),
-            ("SELECT framework", "/my/project/.venv/lib/site-packages/plain/pf.py"),
-            ("SELECT app", "/my/project/app/views.py"),
-            ("SELECT app", "/my/project/app/views.py"),
-            ("SELECT app", "/my/project/app/views.py"),
+        for path in (
+            "/my/project/app/views.py",
+            "/my/project/.venv/lib/site-packages/plain/sessions/core.py",
         ):
-            with tracer.start_as_current_span(
-                "query",
-                kind=trace.SpanKind.CLIENT,
-                attributes={DB_QUERY_TEXT: sql, CODE_FILE_PATH: path},
-            ):
-                pass
-
-    analysis = analyze_trace(
-        _span_exporter.get_finished_spans(), app_root="/my/project"
-    )["analysis"]
-
-    n_plus_one = [i for i in analysis["issues"] if i["type"] == "n_plus_one"]
-    assert [i["sql"] for i in n_plus_one] == ["SELECT app"]
-    assert analysis["duplicate_query_count"] == 2
-    assert analysis["query_count"] == 6
-
-
-@pytest.mark.usefixtures("_otel_clean")
-def test_n_plus_one_ignores_framework_repeats_of_an_app_query() -> None:
-    # A query app code runs once but framework code repeats must not be
-    # flagged — only the app's own per-trace repeats count toward N+1.
-    app_path = "/my/project/app/views.py"
-    framework_path = "/my/project/.venv/lib/site-packages/plain/pf.py"
-    tracer = trace.get_tracer("test")
-    with tracer.start_as_current_span("GET /"):
-        for path in (app_path, framework_path, framework_path, framework_path):
             with tracer.start_as_current_span(
                 "query",
                 kind=trace.SpanKind.CLIENT,
@@ -143,13 +142,40 @@ def test_n_plus_one_ignores_framework_repeats_of_an_app_query() -> None:
             ):
                 pass
 
-    analysis = analyze_trace(
-        _span_exporter.get_finished_spans(), app_root="/my/project"
-    )["analysis"]
+    analysis = _only_analysis()
 
-    assert [i for i in analysis["issues"] if i["type"] == "n_plus_one"] == []
-    assert analysis["duplicate_query_count"] == 0
-    assert analysis["query_count"] == 4
+    assert analysis["queries"][0]["sources"] == [
+        "/my/project/app/views.py",
+        "/my/project/.venv/lib/site-packages/plain/sessions/core.py",
+    ]
+
+
+@pytest.mark.usefixtures("_otel_clean")
+def test_transaction_statements_are_counted_apart_from_queries() -> None:
+    # Savepoint names are unique, so they never group and would otherwise fill
+    # the query list on their own while telling you nothing to fix.
+    tracer = trace.get_tracer("test")
+    with tracer.start_as_current_span("GET /"):
+        for sql, operation in (
+            ("SELECT * FROM users", "SELECT"),
+            ('SAVEPOINT "s1"', "SAVEPOINT"),
+            ('RELEASE SAVEPOINT "s1"', "RELEASE"),
+            # No db.operation.name attribute — falls back to the SQL keyword.
+            ("COMMIT", None),
+        ):
+            attributes: dict[str, str] = {DB_QUERY_TEXT: sql}
+            if operation:
+                attributes[DB_OPERATION_NAME] = operation
+            with tracer.start_as_current_span(
+                "query", kind=trace.SpanKind.CLIENT, attributes=attributes
+            ):
+                pass
+
+    analysis = _only_analysis()
+
+    assert analysis["query_count"] == 1
+    assert analysis["transaction_count"] == 3
+    assert [q["sql"] for q in analysis["queries"]] == ["SELECT * FROM users"]
 
 
 @pytest.mark.usefixtures("_otel_clean")
@@ -159,7 +185,7 @@ def test_emits_flat_raw_spans() -> None:
         with tracer.start_as_current_span("render template"):
             pass
 
-    spans = analyze_trace(_span_exporter.get_finished_spans())["spans"]
+    spans = analyze_traces(_span_exporter.get_finished_spans())[0]["spans"]
 
     assert {s["name"] for s in spans} == {"GET /", "render template"}
     assert all(s["start_offset_ms"] >= 0 for s in spans)
@@ -184,7 +210,7 @@ def test_raw_span_passes_attributes_through_and_drops_stacktrace() -> None:
     ):
         pass
 
-    spans = analyze_trace(_span_exporter.get_finished_spans())["spans"]
+    spans = analyze_traces(_span_exporter.get_finished_spans())[0]["spans"]
 
     attributes = spans[0]["attributes"]
     assert attributes[DB_QUERY_TEXT] == "SELECT 1"
@@ -206,7 +232,7 @@ def test_capture_spans_isolates_other_processors() -> None:
 
 
 @pytest.mark.usefixtures("_otel_clean")
-def test_captures_exception_issue() -> None:
+def test_captures_exceptions() -> None:
     tracer = trace.get_tracer("test")
     try:
         with tracer.start_as_current_span("GET /boom"):
@@ -214,13 +240,190 @@ def test_captures_exception_issue() -> None:
     except ValueError:
         pass
 
-    result = analyze_trace(_span_exporter.get_finished_spans())
+    captured = analyze_traces(_span_exporter.get_finished_spans())[0]
 
-    exceptions = [i for i in result["analysis"]["issues"] if i["type"] == "exception"]
+    exceptions = captured["analysis"]["exceptions"]
     assert len(exceptions) == 1
     assert exceptions[0]["span"] == "GET /boom"
     assert exceptions[0]["error_type"] == "ValueError"
+    assert exceptions[0]["message"] == "boom"
 
     # The exception event also appears verbatim on the raw span.
-    raw_events = result["spans"][0].get("events", [])
+    raw_events = captured["spans"][0].get("events", [])
     assert any(e["name"] == "exception" for e in raw_events)
+
+
+def _raw_span(*, span_id: str, parent: str | None, name: str) -> RawSpan:
+    return {
+        "name": name,
+        "kind": "INTERNAL",
+        "span_id": span_id,
+        "parent_span_id": parent,
+        "start_offset_ms": 0.0,
+        "duration_ms": 1.0,
+    }
+
+
+def test_span_tree_nests_children_under_their_parent(capsys) -> None:
+    _render_span_tree(
+        [
+            _raw_span(span_id="a1", parent=None, name="GET /admin"),
+            _raw_span(span_id="a2", parent="a1", name="render admin.html"),
+            _raw_span(span_id="a3", parent="a2", name="SELECT users"),
+        ]
+    )
+
+    # Parents before children, two spaces deeper per level.
+    assert capsys.readouterr().out.splitlines() == [
+        "        1.00ms  GET /admin  INTERNAL",
+        "        1.00ms    render admin.html  INTERNAL",
+        "        1.00ms      SELECT users  INTERNAL",
+    ]
+
+
+def test_span_tree_keeps_spans_whose_parent_was_not_captured(capsys) -> None:
+    # An uncaptured parent can't be nested under anything, so the orphan
+    # becomes a root rather than disappearing from the tree.
+    _render_span_tree(
+        [_raw_span(span_id="child", parent="missing-parent", name="orphaned work")]
+    )
+
+    assert capsys.readouterr().out.splitlines() == [
+        "        1.00ms  orphaned work  INTERNAL"
+    ]
+
+
+def test_span_tree_survives_a_span_that_parents_itself(capsys) -> None:
+    # Malformed instrumentation must not hang the command or silently drop
+    # spans the reported count already promised.
+    _render_span_tree(
+        [
+            _raw_span(span_id="a1", parent=None, name="GET /"),
+            _raw_span(span_id="a2", parent="a2", name="self parented"),
+        ]
+    )
+
+    assert capsys.readouterr().out.splitlines() == [
+        "        1.00ms  GET /  INTERNAL",
+        "        1.00ms  self parented  INTERNAL",
+    ]
+
+
+def test_span_tree_survives_two_spans_sharing_an_id(capsys) -> None:
+    # A duplicate id used to recurse until RecursionError. Both spans are
+    # still shown — the count printed above the tree promises them.
+    _render_span_tree(
+        [
+            _raw_span(span_id="x", parent=None, name="root"),
+            _raw_span(span_id="x", parent="x", name="duplicate id"),
+        ]
+    )
+
+    assert capsys.readouterr().out.splitlines() == [
+        "        1.00ms  root  INTERNAL",
+        "        1.00ms    duplicate id  INTERNAL",
+    ]
+
+
+def test_capture_available_rejects_a_third_party_tracer_provider(monkeypatch) -> None:
+    # capture_spans mutates the provider's sampler and processor list, which
+    # only works on the SDK's own provider (or the proxy it can replace). A
+    # third-party provider must report unavailable rather than be crashed into.
+    from opentelemetry.sdk.trace import TracerProvider
+
+    monkeypatch.setattr("plain.cli._trace.trace.get_tracer_provider", lambda: object())
+    assert capture_available() is False
+
+    monkeypatch.setattr(
+        "plain.cli._trace.trace.get_tracer_provider", lambda: TracerProvider()
+    )
+    assert capture_available() is True
+
+
+def test_trace_note_states(monkeypatch) -> None:
+    # Each unusable `traces` value gets exactly one truthful note, and a
+    # readable trace gets none.
+    monkeypatch.setattr("plain.cli.request.capture_available", lambda: False)
+    assert _trace_note(None) == _TRACE_UNAVAILABLE
+
+    monkeypatch.setattr("plain.cli.request.capture_available", lambda: True)
+    assert _trace_note(None) == _TRACE_NOT_REACHED
+
+    assert _trace_note([]) == _TRACE_EMPTY
+
+    readable: list[CapturedTrace] = [
+        {
+            "name": "GET /",
+            "request_id": None,
+            "analysis": {
+                "duration_ms": 1.0,
+                "span_count": 1,
+                "query_count": 0,
+                "transaction_count": 0,
+                "exceptions": [],
+                "queries": [],
+            },
+            "spans": [],
+        }
+    ]
+    assert _trace_note(readable) is None
+
+
+def _captured_with_queries(queries: list) -> CapturedTrace:
+    return {
+        "name": "GET /",
+        "request_id": None,
+        "analysis": {
+            "duration_ms": 1.0,
+            "span_count": len(queries),
+            "query_count": sum(q["count"] for q in queries),
+            "transaction_count": 0,
+            "exceptions": [],
+            "queries": queries,
+        },
+        "spans": [],
+    }
+
+
+def test_display_cap_never_cuts_a_repeated_statement(monkeypatch, capsys) -> None:
+    # The cap trims the singleton tail only. Ordered slowest-first, a fast but
+    # many-times-repeated statement would fall past the cap — the one entry
+    # the reader most needs — so it is always kept and only singletons count
+    # toward "+ N more".
+    monkeypatch.setattr("plain.cli.request._QUERY_LIST_LIMIT", 2)
+
+    queries = [
+        {
+            "sql": "SELECT singleton_1",
+            "count": 1,
+            "total_duration_ms": 10.0,
+            "sources": [],
+        },
+        {
+            "sql": "SELECT singleton_2",
+            "count": 1,
+            "total_duration_ms": 8.0,
+            "sources": [],
+        },
+        {
+            "sql": "SELECT singleton_3",
+            "count": 1,
+            "total_duration_ms": 6.0,
+            "sources": [],
+        },
+        {
+            "sql": "SELECT repeated_marker",
+            "count": 4,
+            "total_duration_ms": 2.0,
+            "sources": [],
+        },
+    ]
+
+    _render_traces([_captured_with_queries(queries)], detailed=False)
+
+    output = capsys.readouterr().out
+    # The fast repeated statement survives the cap despite ranking last.
+    assert "repeated_marker" in output
+    # Only the one cut singleton is counted — not the kept repeat.
+    assert "+ 1 more — see --trace" in output
+    assert "singleton_3" not in output
