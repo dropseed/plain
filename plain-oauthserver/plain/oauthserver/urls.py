@@ -30,5 +30,9 @@ class OAuthWellKnownRouter(Router):
             "oauth-authorization-server",
             AuthorizationServerMetadataView,
             name="oauth_authorization_server_metadata",
+            # RFC 8414 fixes this path exactly — clients construct it themselves
+            # and may not follow redirects, so it must serve 200 even when the
+            # app canonicalizes URLs with URLS_TRAILING_SLASH=True.
+            force_trailing_slash=False,
         ),
     ]
