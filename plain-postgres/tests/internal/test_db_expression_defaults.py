@@ -213,7 +213,7 @@ def test_alter_field_nullable_to_not_null_with_expression_default_is_migration_n
 ):
     """A nullable→NOT NULL transition on a column that already carries an
     expression DEFAULT is a schema-editor no-op. Convergence owns the
-    NullabilityDrift (SetNotNullFix blocks if NULL rows exist)."""
+    NullabilityDrift (SetNotNullCorrection blocks if NULL rows exist)."""
     from plain.postgres import fields as plain_fields
 
     connection = get_connection()

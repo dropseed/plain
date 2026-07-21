@@ -99,7 +99,7 @@ def test_alter_field_default_only_change_is_migration_no_op(db):
     """Changing only ``default=`` on an already-NOT-NULL column emits nothing
     from the schema editor — ``default`` is in ``non_migration_attrs``, so the
     migration path short-circuits. Convergence's ``_compare_column_default``
-    detects CHANGED drift and applies ``SetColumnDefaultFix`` on the next sync
+    detects CHANGED drift and applies ``SetColumnDefaultCorrection`` on the next sync
     (covered by ``test_detects_changed_literal_default``)."""
     old_field = plain_fields.TextField(max_length=20, default="active")
     old_field.set_attributes_from_name("role")

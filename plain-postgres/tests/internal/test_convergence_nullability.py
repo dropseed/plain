@@ -8,7 +8,7 @@ from conftest_convergence import column_is_not_null, constraint_exists, execute
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
     analyze_model,
-    can_auto_fix,
+    can_auto_correct,
     plan_model_convergence,
 )
 from plain.postgres.convergence.analysis import (
@@ -16,9 +16,9 @@ from plain.postgres.convergence.analysis import (
     ColumnShouldBeNotNullDrift,
     NullabilityDrift,
 )
-from plain.postgres.convergence.fixes import (
-    DropNotNullFix,
-    SetNotNullFix,
+from plain.postgres.convergence.corrections import (
+    DropNotNullCorrection,
+    SetNotNullCorrection,
 )
 
 
@@ -127,7 +127,7 @@ class TestNotNullDetection:
 
 class TestNotNullPlanning:
     def test_executable_when_no_null_rows(self, db):
-        """No NULL rows → executable SetNotNullFix."""
+        """No NULL rows → executable SetNotNullCorrection."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
         )
@@ -137,12 +137,14 @@ class TestNotNullPlanning:
             plan = plan_model_convergence(conn, cursor, NullabilityExample)
 
         items = plan.executable()
-        null_fixes = [i for i in items if isinstance(i.fix, SetNotNullFix)]
+        null_fixes = [
+            i for i in items if isinstance(i.correction, SetNotNullCorrection)
+        ]
         assert len(null_fixes) == 1
-        fix = null_fixes[0].fix
-        assert isinstance(fix, SetNotNullFix)
-        assert fix.table == "examples_nullabilityexample"
-        assert fix.column == "required_text"
+        correction = null_fixes[0].correction
+        assert isinstance(correction, SetNotNullCorrection)
+        assert correction.table == "examples_nullabilityexample"
+        assert correction.column == "required_text"
 
     def test_blocked_when_null_rows_exist(self, db):
         """NULL rows → blocked plan item with guidance."""
@@ -155,17 +157,21 @@ class TestNotNullPlanning:
         with conn.cursor() as cursor:
             plan = plan_model_convergence(conn, cursor, NullabilityExample)
 
-        null_fixes = [i for i in plan.executable() if isinstance(i.fix, SetNotNullFix)]
+        null_fixes = [
+            i
+            for i in plan.executable()
+            if isinstance(i.correction, SetNotNullCorrection)
+        ]
         assert null_fixes == []
 
         blocked = [i for i in plan.blocked if isinstance(i.drift, NullabilityDrift)]
         assert len(blocked) == 1
-        assert blocked[0].fix is None
+        assert blocked[0].correction is None
         assert blocked[0].guidance is not None
         assert "NULL" in blocked[0].guidance
 
     def test_blocks_sync(self, db):
-        """SetNotNullFix blocks sync (correctness convergence)."""
+        """SetNotNullCorrection blocks sync (correctness convergence)."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
         )
@@ -176,36 +182,40 @@ class TestNotNullPlanning:
                 conn, cursor, NullabilityExample
             ).executable()
 
-        null_fixes = [i for i in items if isinstance(i.fix, SetNotNullFix)]
+        null_fixes = [
+            i for i in items if isinstance(i.correction, SetNotNullCorrection)
+        ]
         assert len(null_fixes) == 1
         assert null_fixes[0].blocks_sync is True
 
-    def test_can_auto_fix_no_nulls(self):
-        """can_auto_fix returns True for NullabilityDrift with no null rows."""
+    def test_can_auto_correct_no_nulls(self):
+        """can_auto_correct returns True for NullabilityDrift with no null rows."""
         drift = ColumnShouldBeNotNullDrift(table="t", column="c", has_null_rows=False)
-        assert can_auto_fix(drift)
+        assert can_auto_correct(drift)
 
-    def test_can_auto_fix_with_nulls(self):
-        """can_auto_fix returns False for NullabilityDrift with null rows."""
+    def test_can_auto_correct_with_nulls(self):
+        """can_auto_correct returns False for NullabilityDrift with null rows."""
         drift = ColumnShouldBeNotNullDrift(table="t", column="c", has_null_rows=True)
-        assert not can_auto_fix(drift)
+        assert not can_auto_correct(drift)
 
-    def test_can_auto_fix_drop_not_null(self):
-        """can_auto_fix returns True for NullabilityDrift (model allows NULL)."""
+    def test_can_auto_correct_drop_not_null(self):
+        """can_auto_correct returns True for NullabilityDrift (model allows NULL)."""
         drift = ColumnShouldAllowNullDrift(table="t", column="c")
-        assert can_auto_fix(drift)
+        assert can_auto_correct(drift)
 
 
 class TestNotNullFixes:
     def test_apply_set_not_null(self, isolated_db):
-        """SetNotNullFix uses safe CHECK NOT VALID → VALIDATE → SET NOT NULL."""
+        """SetNotNullCorrection uses safe CHECK NOT VALID → VALIDATE → SET NOT NULL."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
         )
         assert not column_is_not_null("examples_nullabilityexample", "required_text")
 
-        fix = SetNotNullFix(table="examples_nullabilityexample", column="required_text")
-        sql = fix.apply()
+        correction = SetNotNullCorrection(
+            table="examples_nullabilityexample", column="required_text"
+        )
+        sql = correction.apply()
 
         # Verify the four-step safe pattern
         assert "NOT VALID" in sql
@@ -221,24 +231,26 @@ class TestNotNullFixes:
         )
 
     def test_set_not_null_lifecycle(self, isolated_db):
-        """Full cycle: drop NOT NULL → detect → fix → converged."""
+        """Full cycle: drop NOT NULL → detect → correction → converged."""
         execute(
             'ALTER TABLE "examples_nullabilityexample" ALTER COLUMN "required_text" DROP NOT NULL'
         )
 
         conn = get_connection()
 
-        # First pass: detect drift, plan fix
+        # First pass: detect drift, plan correction
         with conn.cursor() as cursor:
             items = plan_model_convergence(
                 conn, cursor, NullabilityExample
             ).executable()
-        null_fixes = [i for i in items if isinstance(i.fix, SetNotNullFix)]
+        null_fixes = [
+            i for i in items if isinstance(i.correction, SetNotNullCorrection)
+        ]
         assert len(null_fixes) == 1
-        fix = null_fixes[0].fix
-        assert isinstance(fix, SetNotNullFix)
+        correction = null_fixes[0].correction
+        assert isinstance(correction, SetNotNullCorrection)
 
-        fix.apply()
+        correction.apply()
         assert column_is_not_null("examples_nullabilityexample", "required_text")
 
         # Second pass: converged
@@ -248,16 +260,18 @@ class TestNotNullFixes:
         assert null_drifts == []
 
     def test_set_not_null_describe(self):
-        """SetNotNullFix.describe() is clear."""
-        fix = SetNotNullFix(table="examples_nullabilityexample", column="required_text")
+        """SetNotNullCorrection.describe() is clear."""
+        correction = SetNotNullCorrection(
+            table="examples_nullabilityexample", column="required_text"
+        )
         assert (
-            fix.describe()
+            correction.describe()
             == "examples_nullabilityexample: set NOT NULL on required_text"
         )
 
     def test_set_not_null_pass_order(self):
-        """SetNotNullFix runs at pass 2 (alongside constraint additions)."""
-        assert SetNotNullFix.pass_order == 2
+        """SetNotNullCorrection runs at pass 2 (alongside constraint additions)."""
+        assert SetNotNullCorrection.pass_order == 2
 
 
 class TestDropNotNull:
@@ -278,7 +292,7 @@ class TestDropNotNull:
         assert len(null_drifts) == 1
 
     def test_plans_drop_not_null(self, db):
-        """Nullable model + NOT NULL DB → executable DropNotNullFix."""
+        """Nullable model + NOT NULL DB → executable DropNotNullCorrection."""
         execute(
             'ALTER TABLE "examples_childsetnull" ALTER COLUMN "parent_id" SET NOT NULL'
         )
@@ -288,44 +302,50 @@ class TestDropNotNull:
             plan = plan_model_convergence(conn, cursor, ChildSetNull)
 
         items = plan.executable()
-        drop_fixes = [i for i in items if isinstance(i.fix, DropNotNullFix)]
+        drop_fixes = [
+            i for i in items if isinstance(i.correction, DropNotNullCorrection)
+        ]
         assert len(drop_fixes) == 1
-        fix = drop_fixes[0].fix
-        assert isinstance(fix, DropNotNullFix)
-        assert fix.column == "parent_id"
+        correction = drop_fixes[0].correction
+        assert isinstance(correction, DropNotNullCorrection)
+        assert correction.column == "parent_id"
         assert drop_fixes[0].blocks_sync is True
 
     def test_apply_drop_not_null(self, isolated_db):
-        """DropNotNullFix applies DROP NOT NULL on the column."""
-        # parent_id starts nullable; force it NOT NULL then fix it
+        """DropNotNullCorrection applies DROP NOT NULL on the column."""
+        # parent_id starts nullable; force it NOT NULL then correction it
         execute(
             'ALTER TABLE "examples_childsetnull" ALTER COLUMN "parent_id" SET NOT NULL'
         )
         assert column_is_not_null("examples_childsetnull", "parent_id")
 
-        fix = DropNotNullFix(table="examples_childsetnull", column="parent_id")
-        sql = fix.apply()
+        correction = DropNotNullCorrection(
+            table="examples_childsetnull", column="parent_id"
+        )
+        sql = correction.apply()
 
         assert "DROP NOT NULL" in sql
         assert not column_is_not_null("examples_childsetnull", "parent_id")
 
     def test_drop_not_null_lifecycle(self, isolated_db):
-        """Full cycle: set NOT NULL → detect → fix → converged."""
+        """Full cycle: set NOT NULL → detect → correction → converged."""
         execute(
             'ALTER TABLE "examples_childsetnull" ALTER COLUMN "parent_id" SET NOT NULL'
         )
 
         conn = get_connection()
 
-        # First pass: detect drift, plan fix
+        # First pass: detect drift, plan correction
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, ChildSetNull).executable()
-        drop_fixes = [i for i in items if isinstance(i.fix, DropNotNullFix)]
+        drop_fixes = [
+            i for i in items if isinstance(i.correction, DropNotNullCorrection)
+        ]
         assert len(drop_fixes) == 1
-        fix = drop_fixes[0].fix
-        assert isinstance(fix, DropNotNullFix)
+        correction = drop_fixes[0].correction
+        assert isinstance(correction, DropNotNullCorrection)
 
-        fix.apply()
+        correction.apply()
         assert not column_is_not_null("examples_childsetnull", "parent_id")
 
         # Second pass: converged
@@ -335,11 +355,11 @@ class TestDropNotNull:
         assert null_drifts == []
 
     def test_drop_not_null_describe(self):
-        """DropNotNullFix.describe() is clear."""
-        fix = DropNotNullFix(
+        """DropNotNullCorrection.describe() is clear."""
+        correction = DropNotNullCorrection(
             table="examples_nullabilityexample", column="required_text"
         )
         assert (
-            fix.describe()
+            correction.describe()
             == "examples_nullabilityexample: drop NOT NULL on required_text"
         )

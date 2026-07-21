@@ -220,7 +220,7 @@ class ColumnShouldBeNotNullDrift:
 
     table: str
     column: str
-    has_null_rows: bool = False  # existing NULL rows block an auto-fix
+    has_null_rows: bool = False  # existing NULL rows block an auto-correction
 
     def describe(self) -> str:
         if self.has_null_rows:
@@ -1166,7 +1166,7 @@ def _compare_check_constraints(
             )
 
     # Build set of framework-owned temp NOT NULL check names so leftover
-    # artifacts from a partially-completed SetNotNullFix are silently
+    # artifacts from a partially-completed SetNotNullCorrection are silently
     # ignored rather than surfaced as undeclared user constraints.
     internal_checks = {
         generate_notnull_check_name(table, f.column)
@@ -1326,7 +1326,7 @@ def _compare_foreign_keys(
 def generate_notnull_check_name(table: str, column: str) -> str:
     """Generate a hashed name for the temporary NOT NULL check constraint.
 
-    Used by SetNotNullFix for the CHECK NOT VALID → VALIDATE → SET NOT NULL
+    Used by SetNotNullCorrection for the CHECK NOT VALID → VALIDATE → SET NOT NULL
     pattern, and by analysis to recognize (and ignore) leftover temp checks.
     """
     from ..utils import generate_identifier_name
