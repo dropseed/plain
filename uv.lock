@@ -1318,7 +1318,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-postgres"
-version = "0.111.2"
+version = "0.112.0"
 source = { editable = "plain-postgres" }
 dependencies = [
     { name = "plain" },

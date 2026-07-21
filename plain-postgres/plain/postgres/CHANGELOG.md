@@ -1,5 +1,19 @@
 # plain-postgres changelog
 
+## [0.112.0](https://github.com/dropseed/plain/releases/plain-postgres@0.112.0) (2026-07-21)
+
+### What's changed
+
+- **Schema-changing commands now serialize on an advisory schema lock.** `plain postgres sync`, `plain migrations apply`, `plain postgres converge`, and `plain postgres drop-unknown-tables` take a session-level advisory lock, so two deploy processes running at once (a retried migrate job, overlapping release phases) can't interleave schema changes. A second process warns and waits, retrying up to an hour by default (`POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL`, `POSTGRES_SCHEMA_LOCK_MAX_RETRIES`), and each command re-checks its plan after acquiring the lock — `migrations apply` skips work another process already did, `converge` refuses to execute corrections the operator never approved, and `drop-unknown-tables` skips tables that became known while waiting. The lock is held on its own connection so `CREATE INDEX CONCURRENTLY` still works, and it releases automatically if the holder crashes. ([f12f5f1bd4](https://github.com/dropseed/plain/commit/f12f5f1bd4))
+- **New `plain.postgres.databases` module** for cluster-level database management — `create_database` (with `TEMPLATE` support), `drop_database`, `database_exists`, `list_databases`, database comments, connection counting/termination, and a `maintenance_cursor` helper. It's a development/test capability (it needs `CREATEDB` and a connection to the `postgres` maintenance database) and is what powers plain-dev's managed development databases; test database creation now uses it too. ([0a747b8933](https://github.com/dropseed/plain/commit/0a747b8933))
+- Fixed a stale `rollback_exc` on reused connections: entering an outermost atomic block now clears it, and a rollback caused by an exception inside a non-savepoint block records that exception — so a broken-transaction error chains from the real cause instead of a stale or absent one. ([350f34b291](https://github.com/dropseed/plain/commit/350f34b291))
+- Convergence terminology changed from "fix" to "correction" in CLI output and internals — `plain postgres converge` now reports "N corrections to apply" and `plain postgres schema` marks drift as `(auto-correct)`. ([08da420a9b](https://github.com/dropseed/plain/commit/08da420a9b))
+- The unconfigured-database error now points at `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) instead of `DATABASE_URL`-first wording. ([8b7aa38e95](https://github.com/dropseed/plain/commit/8b7aa38e95))
+
+### Upgrade instructions
+
+- No changes required. If your migration role's Postgres server sets `idle_session_timeout`, note the schema lock holds an idle session for the duration of a schema command — exempt that role, or the lock can be lost mid-run. If `POSTGRES_URL` points at a transaction-mode pooler (pgbouncer), set `POSTGRES_MANAGEMENT_URL` to a direct connection so the session-level lock works.
+
 ## [0.111.2](https://github.com/dropseed/plain/releases/plain-postgres@0.111.2) (2026-07-15)
 
 ### What's changed
