@@ -5,8 +5,7 @@ import sys
 from collections.abc import Generator
 from contextlib import contextmanager
 
-import psycopg
-from psycopg import errors, sql
+from psycopg import errors
 
 from plain.postgres.connection import DatabaseConnection
 from plain.postgres.database_url import (
@@ -14,10 +13,11 @@ from plain.postgres.database_url import (
     parse_database_url,
     replace_database_name,
 )
+from plain.postgres.databases import create_database, drop_database
 from plain.postgres.db import _db_conn
 from plain.postgres.dialect import MAX_NAME_LENGTH
 from plain.postgres.migrations.executor import MigrationExecutor
-from plain.postgres.sources import DirectSource, build_connection_params
+from plain.postgres.sources import DirectSource
 from plain.postgres.utils import names_digest
 from plain.runtime import settings
 
@@ -39,61 +39,41 @@ def _compute_test_db_name(base_name: str, prefix: str = "") -> str:
     return TEST_DATABASE_PREFIX + base_name
 
 
-@contextmanager
-def _maintenance_cursor(config: DatabaseConfig) -> Generator[psycopg.Cursor]:
-    """Yield a cursor on the `postgres` maintenance DB.
-
-    CREATE DATABASE / DROP DATABASE can't run against the target database
-    itself and can't run inside a transaction — so connect to `postgres`
-    with autocommit and use a raw psycopg cursor (no wrapper machinery,
-    no pool).
-    """
-    maint_config: DatabaseConfig = {**config, "DATABASE": "postgres"}
-    params = build_connection_params(maint_config)
-    with psycopg.connect(**params, autocommit=True) as conn:
-        with conn.cursor() as cursor:
-            yield cursor
-
-
-def _create_database_on_server(
+def _create_test_database(
     config: DatabaseConfig, *, name: str, verbosity: int, autoclobber: bool
 ) -> None:
-    """CREATE DATABASE via the maintenance connection, with autoclobber fallback."""
-    ident = sql.Identifier(name)
-    create = sql.SQL("CREATE DATABASE {}").format(ident)
-    drop = sql.SQL("DROP DATABASE {}").format(ident)
-    with _maintenance_cursor(config) as cursor:
-        try:
-            cursor.execute(create)
-            return
-        except errors.DuplicateDatabase as e:
-            _log(f"Got an error creating the test database: {e}")
-        except Exception as e:
-            _log(f"Got an error creating the test database: {e}")
-            sys.exit(2)
+    """Create the test database, clobbering a leftover one if present.
 
-        if not autoclobber:
-            confirm = input(
-                "Type 'yes' if you would like to try deleting the test "
-                f"database '{name}', or 'no' to cancel: "
-            )
-            if confirm != "yes":
-                _log("Tests cancelled.")
-                sys.exit(1)
+    The clobber policy lives here rather than in `plain.postgres.databases`
+    because it's specific to running tests: an existing test database is
+    debris from a previous run, so recreating it is the right default.
+    """
+    try:
+        create_database(config, name=name)
+        return
+    except errors.DuplicateDatabase as e:
+        _log(f"Got an error creating the test database: {e}")
+    except Exception as e:
+        _log(f"Got an error creating the test database: {e}")
+        sys.exit(2)
 
-        try:
-            if verbosity >= 1:
-                _log(f"Destroying old test database '{name}'...")
-            cursor.execute(drop)
-            cursor.execute(create)
-        except Exception as e:
-            _log(f"Got an error recreating the test database: {e}")
-            sys.exit(2)
+    if not autoclobber:
+        confirm = input(
+            "Type 'yes' if you would like to try deleting the test "
+            f"database '{name}', or 'no' to cancel: "
+        )
+        if confirm != "yes":
+            _log("Tests cancelled.")
+            sys.exit(1)
 
-
-def _drop_database_on_server(config: DatabaseConfig, name: str) -> None:
-    with _maintenance_cursor(config) as cursor:
-        cursor.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(name)))
+    try:
+        if verbosity >= 1:
+            _log(f"Destroying old test database '{name}'...")
+        drop_database(config, name=name)
+        create_database(config, name=name)
+    except Exception as e:
+        _log(f"Got an error recreating the test database: {e}")
+        sys.exit(2)
 
 
 @contextmanager
@@ -129,7 +109,7 @@ def use_test_database(*, verbosity: int = 1, prefix: str = "") -> Generator[str]
     # Create the test database on the server via a direct `postgres`-DB
     # connection — test_conn itself can't connect to a DB that doesn't
     # exist yet, so we open a sibling connection against `postgres`.
-    _create_database_on_server(
+    _create_test_database(
         test_config, name=test_db_name, verbosity=verbosity, autoclobber=True
     )
 
@@ -168,6 +148,6 @@ def use_test_database(*, verbosity: int = 1, prefix: str = "") -> Generator[str]
         if verbosity >= 1:
             _log(f"Destroying test database '{test_db_name}'...")
         try:
-            _drop_database_on_server(test_config, test_db_name)
+            drop_database(test_config, name=test_db_name)
         except Exception as e:
             _log(f"Got an error destroying the test database: {e}")
