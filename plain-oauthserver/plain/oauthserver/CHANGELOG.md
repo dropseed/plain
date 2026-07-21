@@ -1,5 +1,15 @@
 # plain-oauthserver changelog
 
+## [0.1.2](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.2) (2026-07-21)
+
+### What's changed
+
+- The `.well-known/oauth-authorization-server` metadata endpoint now serves 200 directly instead of a 308 redirect when the app sets `URLS_TRAILING_SLASH = True`. RFC 8414 fixes this path exactly — clients construct it themselves and may not follow redirects. ([53e2970723](https://github.com/dropseed/plain/commit/53e2970723))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.1](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.1) (2026-06-28)
 
 ### What's changed
