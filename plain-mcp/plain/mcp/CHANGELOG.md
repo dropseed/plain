@@ -1,5 +1,15 @@
 # plain-mcp changelog
 
+## [0.3.1](https://github.com/dropseed/plain/releases/plain-mcp@0.3.1) (2026-07-21)
+
+### What's changed
+
+- Documented that apps with `URLS_TRAILING_SLASH = True` should mount the OAuth protected-resource metadata paths with `force_trailing_slash=False`, since MCP clients won't reliably follow a 308 trailing-slash redirect to the `.well-known` URL. ([53e2970723](https://github.com/dropseed/plain/commit/53e2970723))
+
+### Upgrade instructions
+
+- If your app sets `URLS_TRAILING_SLASH = True` and serves OAuth-protected MCP endpoints, mount the `.well-known/oauth-protected-resource` paths with `force_trailing_slash=False` as shown in the README.
+
 ## [0.3.0](https://github.com/dropseed/plain/releases/plain-mcp@0.3.0) (2026-07-10)
 
 ### What's changed
