@@ -1,16 +1,24 @@
 """Trace capture and analysis for the `plain request` CLI command.
 
-Captures the OpenTelemetry spans emitted while handling a single request and
-summarizes them — query grouping, N+1/exception detection, a span tree — for
-human and agent inspection. Internal to the `request` command; not public API.
+Captures the OpenTelemetry spans emitted while handling a request and groups
+them — by statement, by trace — for human and agent inspection. Spans come
+back as a flat list per trace; `request.py` turns that into the printed tree.
+Internal to `request`; not public API.
+
+This reports, it does not diagnose. Repeated statements are counted and their
+call sites recorded, but nothing here decides that a repeat is an N+1 — the
+reader has the trace and better judgment about the loop that produced it.
+
+One request is one trace, so a followed redirect chain produces several. They
+are analyzed separately and never merged: counting a once-per-request query
+across three hops would read as a 3x repeat that no one can fix.
 """
 
 from __future__ import annotations
 
-import os
 from contextlib import contextmanager
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, cast
 
 from opentelemetry import trace
 from opentelemetry.semconv.attributes.code_attributes import (
@@ -19,13 +27,22 @@ from opentelemetry.semconv.attributes.code_attributes import (
     CODE_LINE_NUMBER,
     CODE_STACKTRACE,
 )
-from opentelemetry.semconv.attributes.db_attributes import DB_QUERY_TEXT
+from opentelemetry.semconv.attributes.db_attributes import (
+    DB_OPERATION_NAME,
+    DB_QUERY_TEXT,
+)
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.semconv.attributes.exception_attributes import (
     EXCEPTION_MESSAGE,
     EXCEPTION_STACKTRACE,
     EXCEPTION_TYPE,
 )
+from opentelemetry.semconv.attributes.http_attributes import HTTP_REQUEST_METHOD
+from opentelemetry.semconv.attributes.url_attributes import URL_PATH, URL_QUERY
+
+# The handler stamps this on every request span; it joins a captured trace
+# back to the response the CLI reports for that hop.
+_REQUEST_ID_ATTRIBUTE = "plain.request.id"
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Mapping, Sequence
@@ -67,13 +84,14 @@ def _text(value: Any) -> str | None:
     return None if value is None else str(value)
 
 
-def _is_app_path(path: str, app_root: str) -> bool:
-    """Whether a source path belongs to the project, not an installed dependency."""
-    return path.startswith(app_root + os.sep) and "site-packages" not in path
-
-
 class QueryEntry(TypedDict):
-    """One distinct SQL statement and its aggregated occurrences."""
+    """One distinct SQL statement and its occurrences in this trace.
+
+    `count` means one thing — how many times the statement ran — so it can be
+    read without asking which executions it covers. Judging whether a repeat
+    is a problem is left to the reader: `sources` says where each execution
+    came from.
+    """
 
     sql: str
     count: int
@@ -81,29 +99,13 @@ class QueryEntry(TypedDict):
     sources: list[str]
 
 
-class NPlusOneIssue(TypedDict):
-    """A query repeated within a single trace — a likely N+1."""
-
-    type: Literal["n_plus_one"]
-    description: str
-    sql: str
-    count: int
-    total_duration_ms: float
-    sources: list[str]
-
-
-class ExceptionIssue(TypedDict):
+class TraceException(TypedDict):
     """An exception recorded on a span."""
 
-    type: Literal["exception"]
-    description: str
     span: str
     error_type: str | None
     message: str | None
     stacktrace: str | None
-
-
-type Issue = NPlusOneIssue | ExceptionIssue
 
 
 class SpanEvent(TypedDict):
@@ -119,13 +121,14 @@ class RawSpan(TypedDict):
     Attributes and events are passed through verbatim, minus `code.stacktrace`
     (a multi-KB debug stack the postgres instrumentation records on every
     query span). The span list is flat; `parent_span_id` gives the structure.
+    The trace id belongs to the containing `CapturedTrace` rather than being
+    repeated on every span.
     """
 
     name: str
     kind: str
     span_id: str
     parent_span_id: str | None
-    trace_id: str
     start_offset_ms: float
     duration_ms: float
     status: NotRequired[str]
@@ -150,7 +153,6 @@ def _span_dict(span: ReadableSpan, trace_start: int | None) -> RawSpan:
             if span.parent is not None
             else None
         ),
-        "trace_id": trace.format_trace_id(span.context.trace_id),
         "start_offset_ms": round(_span_start_offset_ms(span, trace_start), 2),
         "duration_ms": round(_span_duration_ms(span), 2),
     }
@@ -174,162 +176,176 @@ def _span_dict(span: ReadableSpan, trace_start: int | None) -> RawSpan:
 
 
 class TraceAnalysis(TypedDict):
-    """Derived analysis of a captured trace — counts, issues, query grouping."""
+    """Derived analysis of one trace — counts, exceptions, query grouping."""
 
     duration_ms: float
     span_count: int
     query_count: int
-    duplicate_query_count: int
-    issues: list[Issue]
+    transaction_count: int
+    exceptions: list[TraceException]
     queries: list[QueryEntry]
 
 
-class TraceResult(TypedDict):
-    """The `analyze_trace` result: derived `analysis` plus the raw `spans`.
+class CapturedTrace(TypedDict):
+    """One captured trace — a single request — identified, read, and raw.
 
-    `analysis` is everything computed; `spans` is the raw captured trace in
-    generic OpenTelemetry shape. The split keeps the opinionated read and the
-    untouched source data cleanly separated.
+    `name` and `request_id` identify the hop, `analysis` is the opinionated
+    read, and `spans` is the untouched OpenTelemetry shape. `request_id`
+    joins a trace back to the response the CLI reports for it.
     """
 
+    name: str
+    request_id: str | None
     analysis: TraceAnalysis
     spans: list[RawSpan]
 
 
-def analyze_trace(
-    spans: Sequence[ReadableSpan], *, app_root: str | None = None
-) -> TraceResult:
-    """Summarize captured OpenTelemetry spans for human and agent inspection.
+# Statements that manage a transaction rather than read or write data. They
+# are counted apart from real queries: savepoint names are unique, so they
+# never group, and a handful of them can fill a query list on their own.
+# With plain.postgres only the savepoint three can actually appear —
+# BEGIN/COMMIT are issued outside the instrumented cursor and emit no span —
+# but any db instrumentation that does span them classifies the same way.
+_TRANSACTION_OPERATIONS = frozenset(
+    {"BEGIN", "START", "COMMIT", "END", "ROLLBACK", "SAVEPOINT", "RELEASE"}
+)
 
-    Returns a JSON-serializable `TraceResult`: derived `analysis` (query
-    grouping, N+1/exception issues, counts) and `spans` — the raw captured
-    trace in generic OpenTelemetry shape, a flat list ordered by start time.
 
-    When `app_root` is given, N+1 flagging is limited to queries originating
-    in project code — framework-internal repeats are not flagged.
+def _db_operation(attributes: Mapping[str, Any], sql: str) -> str:
+    """The statement's leading SQL keyword, uppercased."""
+    if operation := attributes.get(DB_OPERATION_NAME):
+        return str(operation).upper()
+    keywords = sql.lstrip("( \t\r\n").split(maxsplit=1)
+    return keywords[0].upper() if keywords else ""
+
+
+def _trace_name(*, root: ReadableSpan | None, spans: Sequence[ReadableSpan]) -> str:
+    """Label a trace by its root span — method and path when it is a request.
+
+    The path is what makes hops of a redirect chain tellable apart; the root
+    span's own name carries the matched route, which is identical across a
+    trailing-slash redirect and missing entirely when resolution failed. The
+    query string is included because an auth bounce revisits one path with
+    different params, and those hops have to stay distinguishable.
     """
+    if root is None:
+        return spans[0].name
+    attributes = root.attributes or {}
+    method = attributes.get(HTTP_REQUEST_METHOD)
+    path = attributes.get(URL_PATH)
+    if not (method and path):
+        return root.name
+    if query := attributes.get(URL_QUERY):
+        return f"{method} {path}?{query}"
+    return f"{method} {path}"
+
+
+def analyze_traces(spans: Sequence[ReadableSpan]) -> list[CapturedTrace]:
+    """Summarize captured OpenTelemetry spans, one entry per trace.
+
+    Traces come back in the order they started, which for a followed redirect
+    is hop order.
+    """
+    spans_by_trace: dict[int, list[ReadableSpan]] = {}
+    for span in sorted(spans, key=lambda s: s.start_time or 0):
+        spans_by_trace.setdefault(span.context.trace_id, []).append(span)
+
+    return [_analyze_trace(trace_spans) for trace_spans in spans_by_trace.values()]
+
+
+def _analyze_trace(spans: list[ReadableSpan]) -> CapturedTrace:
+    """Analyze one trace's spans, which arrive ordered by start time."""
     queries_by_sql: dict[str, QueryEntry] = {}
-    # Per-trace occurrence counts, keyed (trace_id, sql). N+1 detection must
-    # stay within a single trace — otherwise --follow redirects (one trace
-    # per hop) inflate once-per-request queries into false duplicates.
-    counts_by_trace: dict[tuple[int, str], int] = {}
-    # The same per-trace counts, restricted to occurrences whose call site is
-    # project code. When app_root is given, N+1 detection counts only these,
-    # so a query the framework repeats (preflight, the toolbar) is not flagged
-    # just because app code happened to run it once too.
-    app_counts_by_trace: dict[tuple[int, str], int] = {}
-    issues: list[Issue] = []
+    transaction_count = 0
+    exceptions: list[TraceException] = []
 
     for span in spans:
         attributes = span.attributes or {}
 
         if (raw_sql := attributes.get(DB_QUERY_TEXT)) is not None:
             sql = str(raw_sql)
-            trace_key = (span.context.trace_id, sql)
-            counts_by_trace[trace_key] = counts_by_trace.get(trace_key, 0) + 1
-            entry: QueryEntry | None = queries_by_sql.get(sql)
-            if entry is None:
-                entry = {
-                    "sql": sql,
-                    "count": 0,
-                    "total_duration_ms": 0.0,
-                    "sources": [],
-                }
-                queries_by_sql[sql] = entry
-            entry["count"] += 1
-            entry["total_duration_ms"] += _span_duration_ms(span)
-            source = _source_location(attributes)
-            if source and source not in entry["sources"]:
-                entry["sources"].append(source)
-            if app_root is not None:
-                file_path = attributes.get(CODE_FILE_PATH)
-                if file_path and _is_app_path(str(file_path), app_root):
-                    app_counts_by_trace[trace_key] = (
-                        app_counts_by_trace.get(trace_key, 0) + 1
-                    )
+            if _db_operation(attributes, sql) in _TRANSACTION_OPERATIONS:
+                transaction_count += 1
+            else:
+                entry = queries_by_sql.setdefault(
+                    sql,
+                    {"sql": sql, "count": 0, "total_duration_ms": 0.0, "sources": []},
+                )
+                entry["count"] += 1
+                entry["total_duration_ms"] += _span_duration_ms(span)
+                if (location := _source_location(attributes)) and (
+                    location not in entry["sources"]
+                ):
+                    entry["sources"].append(location)
 
         for event in span.events:
             if event.name == "exception":
                 event_attributes = event.attributes or {}
-                exception_issue: ExceptionIssue = {
-                    "type": "exception",
-                    "description": f"Exception in {span.name}",
-                    "span": span.name,
-                    "error_type": _text(
-                        event_attributes.get(EXCEPTION_TYPE)
-                        or attributes.get(ERROR_TYPE)
-                    ),
-                    "message": _text(event_attributes.get(EXCEPTION_MESSAGE)),
-                    "stacktrace": _text(event_attributes.get(EXCEPTION_STACKTRACE)),
-                }
-                issues.append(exception_issue)
+                exceptions.append(
+                    {
+                        "span": span.name,
+                        "error_type": _text(
+                            event_attributes.get(EXCEPTION_TYPE)
+                            or attributes.get(ERROR_TYPE)
+                        ),
+                        "message": _text(event_attributes.get(EXCEPTION_MESSAGE)),
+                        "stacktrace": _text(event_attributes.get(EXCEPTION_STACKTRACE)),
+                    }
+                )
 
-    # Counts that drive N+1 detection: app-originated occurrences when scoped
-    # to a project, every occurrence otherwise.
-    detection_counts = counts_by_trace if app_root is None else app_counts_by_trace
-
-    # Highest single-trace occurrence count per query — the N+1 signal.
-    max_in_trace: dict[str, int] = {}
-    duplicate_query_count = 0
-    for (_trace_id, sql), count in detection_counts.items():
-        max_in_trace[sql] = max(max_in_trace.get(sql, 0), count)
-        if count > 1:
-            duplicate_query_count += count - 1
-
-    queries: list[QueryEntry] = []
-    query_count = 0
-
-    for query in sorted(
+    # Slowest first — the list answers "where did the time go", and a repeat
+    # count is visible on its own row for anyone asking the other question.
+    queries = sorted(
         queries_by_sql.values(),
-        key=lambda q: (-q["count"], -q["total_duration_ms"]),
-    ):
+        key=lambda q: (-q["total_duration_ms"], -q["count"]),
+    )
+    query_count = sum(query["count"] for query in queries)
+    for query in queries:
         query["total_duration_ms"] = round(query["total_duration_ms"], 2)
-        query_count += query["count"]
-        repeated = max_in_trace.get(query["sql"], 0)
-        if repeated > 1:
-            n_plus_one: NPlusOneIssue = {
-                "type": "n_plus_one",
-                "description": f"Query executed {repeated} times — likely N+1",
-                "sql": query["sql"],
-                "count": repeated,
-                "total_duration_ms": query["total_duration_ms"],
-                "sources": query["sources"],
-            }
-            issues.insert(0, n_plus_one)
-        queries.append(query)
 
-    # Trace wall-clock duration: first span start to last span end.
-    start_times = [s.start_time for s in spans if s.start_time is not None]
-    end_times = [s.end_time for s in spans if s.end_time is not None]
-    trace_start = min(start_times) if start_times else None
-    trace_end = max(end_times) if end_times else None
+    # Trace wall-clock duration: first span start to last span end. Spans
+    # arrive sorted by start time, so the earliest is spans[0]; end times can
+    # still be out of order, so those do need a scan.
+    trace_start = spans[0].start_time
+    trace_end = max((s.end_time for s in spans if s.end_time is not None), default=None)
     if trace_start is not None and trace_end is not None:
         duration_ms = round((trace_end - trace_start) / 1_000_000, 2)
     else:
         duration_ms = 0.0
 
-    ordered_spans = sorted(spans, key=lambda s: s.start_time or 0)
+    # The trace's entry span — the one nothing else in the trace started.
+    root = next((span for span in spans if span.parent is None), None)
+    request_id = (root.attributes or {}).get(_REQUEST_ID_ATTRIBUTE) if root else None
 
     return {
+        "name": _trace_name(root=root, spans=spans),
+        "request_id": _text(request_id),
         "analysis": {
             "duration_ms": duration_ms,
             "span_count": len(spans),
             "query_count": query_count,
-            "duplicate_query_count": duplicate_query_count,
-            "issues": issues,
+            "transaction_count": transaction_count,
+            "exceptions": exceptions,
             "queries": queries,
         },
-        "spans": [_span_dict(s, trace_start) for s in ordered_spans],
+        "spans": [_span_dict(s, trace_start) for s in spans],
     }
 
 
 def capture_available() -> bool:
-    """Whether `capture_spans` can run — the OpenTelemetry SDK must be installed.
+    """Whether `capture_spans` can run.
 
-    The SDK is not a Plain core dependency; it ships with `plain.connect`
-    and `plain.pytest`.
+    Needs the OpenTelemetry SDK importable (it ships with `plain.connect`
+    and `plain.pytest`) and a global tracer provider `capture_spans` knows
+    how to mutate — the SDK's own, or the proxy it can replace. A
+    third-party provider is left alone rather than crashed into.
     """
-    return find_spec("opentelemetry.sdk") is not None
+    if find_spec("opentelemetry.sdk") is None:
+        return False
+    from opentelemetry.sdk.trace import TracerProvider
+
+    provider = trace.get_tracer_provider()
+    return isinstance(provider, TracerProvider | trace.ProxyTracerProvider)
 
 
 @contextmanager

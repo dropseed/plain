@@ -62,6 +62,27 @@ class TestQuerySpanAttributes:
         assert "server.port" in attrs
         assert attrs["server.port"] == attrs.get("network.peer.port")
 
+    @pytest.mark.usefixtures("db")
+    def test_query_spans_carry_the_attributes_trace_readers_rely_on(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # `plain request` groups statements by `db.query.text`, splits
+        # transaction bookkeeping out by `db.operation.name`, and classifies
+        # call sites by `code.file.path`. It cannot import this package to
+        # check, so pin the keys here — dropping one silently costs it query
+        # grouping or call sites with nothing failing on that side.
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+
+        spans = [s for s in otel_spans.get_finished_spans() if s.name == "SELECT"]
+        assert spans, "no SELECT span captured"
+        attrs = spans[-1].attributes
+        assert attrs is not None
+        assert attrs["db.query.text"] == "SELECT 1"
+        assert attrs["db.operation.name"] == "SELECT"
+        assert str(attrs["code.file.path"]).endswith(".py")
+
     def test_not_recording_skips_stack_walk(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
