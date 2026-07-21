@@ -1262,7 +1262,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-passwords"
-version = "0.26.4"
+version = "0.26.5"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },

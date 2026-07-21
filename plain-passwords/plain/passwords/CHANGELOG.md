@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.26.5](https://github.com/dropseed/plain/releases/plain-passwords@0.26.5) (2026-07-21)
+
+### What's changed
+
+- Removed dead code in `identify_hasher` that detected ancient unsalted MD5/SHA1 password formats — no `unsalted_md5` or `unsalted_sha1` hashers exist to handle them, so those branches could only raise. ([76afc81605](https://github.com/dropseed/plain/commit/76afc81605))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.26.4](https://github.com/dropseed/plain/releases/plain-passwords@0.26.4) (2026-06-08)
 
 ### What's changed
