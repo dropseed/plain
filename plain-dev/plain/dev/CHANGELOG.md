@@ -1,5 +1,19 @@
 # plain-dev changelog
 
+## [0.65.0](https://github.com/dropseed/plain/releases/plain-dev@0.65.0) (2026-07-22)
+
+### What's changed
+
+- The downloaded `mkcert` binary now lives in the machine-level cache at `~/.cache/plain/mkcert/` instead of `~/.plain/dev/`, alongside the other cached tool binaries. (This only applies when `mkcert` isn't already installed system-wide.) ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The mkcert download now writes to a temporary file and atomically moves it into place, so an interrupted download can't leave a partial binary that later fails to execute. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The `p` alias prompt marker moved from `~/.plain/dev/.alias_prompted` to the cache directory as well. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- `MkcertManager.setup_mkcert()` no longer takes an `install_path` argument — the cache location is now fixed. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The shipped `plain-dev` agent rule now documents that `.plain/` is disposable per-checkout state and must never be symlinked or shared between checkouts — shared pid files block `plain dev`, and shared assets or db pointers cross-contaminate. With binaries cached machine-wide and worktree databases forked automatically, there's nothing left in `.plain/` worth sharing. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+
+### Upgrade instructions
+
+- No changes required. `mkcert` re-downloads to the new location on the next `plain dev`; `~/.plain/dev/mkcert` can be deleted. You will be prompted about the `p` alias once more, since the marker file moved.
+
 ## [0.64.0](https://github.com/dropseed/plain/releases/plain-dev@0.64.0) (2026-07-21)
 
 ### What's changed
