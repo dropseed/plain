@@ -25,17 +25,19 @@ from plain.runtime import PLAIN_CACHE_PATH, PLAIN_TEMP_PATH
 
 TAG_PREFIX = "apps_v"
 
-# Paths that should never be linted or formatted. These are passed on the
-# command line rather than through a config file: as of oxc 1.75, config-file
-# `ignorePatterns` only apply to files underneath the config file's own
-# directory, and ours ships inside the installed package.
+# Older versions resolve ignore patterns differently, so we don't support them.
+MIN_VERSION = (1, 75, 0)
+
+# Committed third-party code that we don't want to lint or format. Everything
+# else worth skipping (node_modules, .venv, htmlcov, .pytest_cache) is already
+# gitignored, and both tools read .gitignore on their own.
+#
+# These go on the command line rather than in a config file, because config-file
+# `ignorePatterns` only match files underneath the config file's own directory
+# and ours ships inside the installed package.
 IGNORE_PATTERNS = [
     "**/vendor/**",
-    "**/node_modules/**",
     "**/*.min.*",
-    "**/htmlcov/**",
-    "**/.venv/**",
-    "**/.pytest_cache/**",
 ]
 
 
@@ -191,6 +193,11 @@ class OxcTool:
         if not version:
             raise RuntimeError(
                 "No Oxc version configured in pyproject.toml — run `plain code install`"
+            )
+        if tuple(int(part) for part in version.split(".")) < MIN_VERSION:
+            minimum = ".".join(str(part) for part in MIN_VERSION)
+            raise RuntimeError(
+                f"Oxc {version} is too old (minimum is {minimum}) — run `plain code update`"
             )
         if self.name == "oxlint":
             # oxlint takes ignores as repeated --ignore-pattern flags.
