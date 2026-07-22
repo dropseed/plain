@@ -44,4 +44,4 @@ tunnel = { cmd = "plain tunnel $DEV_URL --subdomain plain-example --quiet" }
 worker = { cmd = "plain jobs worker --stats-every 300" }
 
 [tool.plain.code.oxc]
-version = "1.51.0"
+version = "1.75.0"

@@ -1,7 +1,7 @@
 /* Radio */
 @layer components {
-  :is(.form, .admin-field) input[type='radio'],
-  .admin-input[type='radio'] {
+  :is(.form, .admin-field) input[type="radio"],
+  .admin-input[type="radio"] {
     @apply focus-control appearance-none border-admin-input text-admin-primary dark:bg-admin-input/30 aspect-square size-4 shrink-0 rounded-full border shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 relative;
 
     &:checked:before {
