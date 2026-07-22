@@ -215,7 +215,15 @@ class OxcTool:
         ):
             result.returncode = 0
         elif result.stderr:
-            print(result.stderr, end="", file=sys.stderr)
+            # We deliberately don't pass a config file, so drop oxfmt's nudge to
+            # add one — projects can still add their own `.oxfmtrc.json`.
+            stderr = "".join(
+                line
+                for line in result.stderr.splitlines(keepends=True)
+                if "No config found, using defaults" not in line
+            )
+            if stderr:
+                print(stderr, end="", file=sys.stderr)
         return result
 
 
