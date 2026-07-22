@@ -1,5 +1,17 @@
 # plain-templates changelog
 
+## [0.5.0](https://github.com/dropseed/plain/releases/plain-templates@0.5.0) (2026-07-21)
+
+### What's changed
+
+- **`ListView` can paginate.** Set `page_size` and the objects are wrapped in a `Paginator`, the page number is read from the `?page` query param (invalid values clamp to the first or last page), and the current `Page` is what lands in the template context as `objects` — iterate it exactly like the full list. Override `get_page_size()` to compute the size per request; return `None` (the default) to render the full list. ([4cf9576c12](https://github.com/dropseed/plain/commit/4cf9576c12))
+- **`page_obj` is in the list template context**, holding the current `Page` for rendering pagination controls, or `None` when pagination is off. An empty `Page` is falsy, so test with `{% if page_obj is not none %}` rather than a plain truthiness check. ([4cf9576c12](https://github.com/dropseed/plain/commit/4cf9576c12))
+
+### Upgrade instructions
+
+- No changes required. `ListView` renders the full list as before until you set `page_size`.
+- A paginated queryset needs a deterministic order (an `order_by()` or a model default) — unordered results can shift between pages.
+
 ## [0.4.0](https://github.com/dropseed/plain/releases/plain-templates@0.4.0) (2026-06-07)
 
 ### What's changed

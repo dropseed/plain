@@ -1473,7 +1473,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-templates"
-version = "0.4.0"
+version = "0.5.0"
 source = { editable = "plain-templates" }
 dependencies = [
     { name = "jinja2" },
