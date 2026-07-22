@@ -25,6 +25,19 @@ from plain.runtime import PLAIN_CACHE_PATH, PLAIN_TEMP_PATH
 
 TAG_PREFIX = "apps_v"
 
+# Paths that should never be linted or formatted. These are passed on the
+# command line rather than through a config file: as of oxc 1.75, config-file
+# `ignorePatterns` only apply to files underneath the config file's own
+# directory, and ours ships inside the installed package.
+IGNORE_PATTERNS = [
+    "**/vendor/**",
+    "**/node_modules/**",
+    "**/*.min.*",
+    "**/htmlcov/**",
+    "**/.venv/**",
+    "**/.pytest_cache/**",
+]
+
 
 class OxcTool:
     """Download, install, and invoke an Oxc CLI binary (oxlint or oxfmt)."""
@@ -174,16 +187,21 @@ class OxcTool:
         return resolved
 
     def invoke(self, *args: str, cwd: str | None = None) -> subprocess.CompletedProcess:
-        config_path = os.path.join(
-            os.path.dirname(__file__), f"{self.name}_defaults.json"
-        )
         version = self.get_version_from_config()
         if not version:
             raise RuntimeError(
                 "No Oxc version configured in pyproject.toml — run `plain code install`"
             )
+        if self.name == "oxlint":
+            # oxlint takes ignores as repeated --ignore-pattern flags.
+            ignore_args = []
+            for pattern in IGNORE_PATTERNS:
+                ignore_args += ["--ignore-pattern", pattern]
+        else:
+            # oxfmt has no --ignore-pattern; it excludes via `!`-prefixed paths.
+            ignore_args = [f"!{pattern}" for pattern in IGNORE_PATTERNS]
         result = subprocess.run(
-            [self.binary_path(version), "-c", config_path, *args],
+            [self.binary_path(version), *args, *ignore_args],
             cwd=cwd,
             capture_output=True,
             text=True,
