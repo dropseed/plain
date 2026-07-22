@@ -9,6 +9,7 @@ from plain.exceptions import ImproperlyConfigured
 from plain.forms import BaseForm, Form
 from plain.http import HTTPException, NotFoundError404, RedirectResponse, Response
 from plain.logs import get_framework_logger
+from plain.paginator import Page, Paginator
 from plain.runtime import settings
 from plain.views import View
 
@@ -289,11 +290,19 @@ class DeleteView(DetailView, FormView):
 
 class ListView(TemplateView, ABC):
     """
-    Render some list of objects, set by `self.get_queryset()`, with a response
+    Render some list of objects, set by `self.get_objects()`, with a response
     rendered by a template.
+
+    Set `page_size` to paginate: the objects are wrapped in a `Paginator`, the
+    page number is read from the `?page` query param (invalid values fall back
+    to the first or last page), and the current `Page` is what lands in the
+    template context — iterate it exactly like the full list. The page is also
+    available as `page_obj` for rendering pagination controls; it is `None`
+    when pagination is off.
     """
 
     context_object_name = ""
+    page_size: int | None = None
 
     @cached_property
     def objects(self) -> Any:
@@ -302,12 +311,23 @@ class ListView(TemplateView, ABC):
     @abstractmethod
     def get_objects(self) -> Any: ...
 
+    @cached_property
+    def page_obj(self) -> Page | None:
+        if self.page_size is None:
+            return None
+        return Paginator(self.objects, self.page_size).get_page(
+            self.request.query_params.get("page", 1)
+        )
+
     def get_template_context(self) -> dict[str, Any]:
-        """Insert the single object into the context dict."""
+        """Insert the list of objects (or the current page of it) into the context dict."""
         context = super().get_template_context()
-        context["objects"] = self.objects
+        page_obj = self.page_obj
+        objects = page_obj if page_obj is not None else self.objects
+        context["objects"] = objects
+        context["page_obj"] = page_obj
         if self.context_object_name:
-            context[self.context_object_name] = self.objects
+            context[self.context_object_name] = objects
         return context
 
 
