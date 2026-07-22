@@ -136,10 +136,7 @@ class DevSupervisor(Supervisor):
             return 1
 
         mkcert_manager = MkcertManager()
-        mkcert_manager.setup_mkcert(
-            install_path=Path.home() / ".plain" / "dev",
-            force_reinstall=reinstall_ssl,
-        )
+        mkcert_manager.setup_mkcert(force_reinstall=reinstall_ssl)
         self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
             domain=self.hostname,
             storage_path=Path(PLAIN_TEMP_PATH) / "dev" / "certs",

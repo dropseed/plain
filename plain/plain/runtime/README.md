@@ -220,14 +220,19 @@ settings.DEBUG = True
 
 #### What paths are available without setup?
 
-`APP_PATH` and `PLAIN_TEMP_PATH` are available immediately without calling `setup()`:
+`APP_PATH`, `PLAIN_TEMP_PATH`, and `PLAIN_CACHE_PATH` are available immediately without calling `setup()`:
 
 ```python
-from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
+from plain.runtime import APP_PATH, PLAIN_CACHE_PATH, PLAIN_TEMP_PATH
 
 print(APP_PATH)  # /path/to/project/app
 print(PLAIN_TEMP_PATH)  # /path/to/project/.plain
+print(PLAIN_CACHE_PATH)  # ~/.cache/plain
 ```
+
+`PLAIN_TEMP_PATH` (`.plain`) is per-checkout state — pid files, logs, compiled assets, dev certificates. It is disposable and should never be shared or symlinked between checkouts (e.g. git worktrees).
+
+`PLAIN_CACHE_PATH` is a machine-level cache for downloaded binaries (Tailwind, Oxc, mkcert), shared across projects and checkouts. Tailwind and Oxc binaries are stored under version-specific paths, so multiple checkouts pinned to different versions coexist without re-downloading; mkcert is not version-pinned and is cached as a single copy. It defaults to `$XDG_CACHE_HOME/plain` (or `~/.cache/plain`) and can be overridden with the `PLAIN_CACHE_PATH` environment variable.
 
 ## Installation
 

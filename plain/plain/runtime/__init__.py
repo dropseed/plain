@@ -1,4 +1,5 @@
 import importlib.metadata
+import os
 import sys
 from importlib.metadata import entry_points
 from pathlib import Path
@@ -18,6 +19,15 @@ except importlib.metadata.PackageNotFoundError:
 # Made available without setup or settings
 APP_PATH = Path.cwd() / "app"
 PLAIN_TEMP_PATH = Path.cwd() / ".plain"
+
+# Machine-level cache for downloaded binaries (Tailwind, Oxc, mkcert),
+# shared across projects and checkouts.
+if _cache_env := os.environ.get("PLAIN_CACHE_PATH"):
+    PLAIN_CACHE_PATH = Path(_cache_env).expanduser()
+elif _xdg_cache := os.environ.get("XDG_CACHE_HOME"):
+    PLAIN_CACHE_PATH = Path(_xdg_cache).expanduser() / "plain"
+else:
+    PLAIN_CACHE_PATH = Path.home() / ".cache" / "plain"
 
 # from plain.runtime import settings
 settings = Settings()
@@ -76,6 +86,7 @@ def setup() -> None:
 __all__ = [
     "APP_PATH",
     "AppPathNotFound",
+    "PLAIN_CACHE_PATH",
     "PLAIN_TEMP_PATH",
     "Secret",
     "SetupError",

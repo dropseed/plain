@@ -15,6 +15,16 @@ line, that tunnel URL is the canonical app URL — use it for browser navigation
 screenshots, and shared links. Use the localhost `Server running at ...` URL only
 when there's no tunnel, or for local CLI checks (`curl`, `plain request`).
 
+## Worktrees and `.plain/`
+
+- `.plain/` is disposable per-checkout state (pid files, logs, compiled assets,
+  db pointer). Never symlink or share it between checkouts/worktrees — shared
+  pid files block `plain dev`, and shared assets/db pointers silently
+  cross-contaminate. Each checkout builds its own automatically.
+- There's nothing in `.plain/` worth sharing: downloaded tool binaries
+  (Tailwind, Oxc, mkcert) are cached machine-wide in `~/.cache/plain`, and each
+  worktree's database is forked from the main checkout's data (see below).
+
 ## Dev databases
 
 A database URL is never required. With `plain.postgres` installed and no URL
