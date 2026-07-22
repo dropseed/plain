@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.154.0](https://github.com/dropseed/plain/releases/plain@0.154.0) (2026-07-22)
+
+### What's changed
+
+- New `PLAIN_CACHE_PATH` export from `plain.runtime` — a machine-level cache directory shared across projects and checkouts, intended for downloaded binaries and other reusable artifacts. Like `APP_PATH` and `PLAIN_TEMP_PATH`, it's available without calling `setup()`. It defaults to `$XDG_CACHE_HOME/plain` (or `~/.cache/plain`) and can be overridden with the `PLAIN_CACHE_PATH` environment variable. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The runtime docs now spell out the split between the two paths: `PLAIN_TEMP_PATH` (`.plain`) is disposable per-checkout state and should never be shared or symlinked between checkouts, while `PLAIN_CACHE_PATH` is shared machine-wide. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.153.0](https://github.com/dropseed/plain/releases/plain@0.153.0) (2026-07-21)
 
 ### What's changed
