@@ -42,3 +42,4 @@ def test_paginated_empty_list(list_client):
     response = list_client.get("/empty")
     assert response.status_code == 200
     assert "items:\n" in response.content.decode()
+    assert "page:1/1" in response.content.decode()

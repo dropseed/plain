@@ -144,6 +144,8 @@ class ExampleListView(ListView):
         return MyObjectClass.query.order_by("-created_at")
 ```
 
+Override `get_page_size()` to compute the page size per request. A paginated queryset needs a deterministic order (an `order_by()` or a model default) — unordered results can shift between pages. An empty `Page` is falsy, so check `{% if page_obj is not none %}` to test whether pagination is on.
+
 ## Error views
 
 `TemplateView` overrides `handle_exception` to render `{status}.html` for any exception that escapes the handler — `404.html` for `NotFoundError404`, `500.html` for unhandled errors, etc. The context is `{request, status_code, exception, DEBUG}`. On `TemplateFileMissing` the view returns a plain-text status response (`404 Not Found`, `500 Internal Server Error`); on any other render failure it logs and returns a bare-status `Response` so `_respond_to_exception` can still attach `response.exception` for observability.

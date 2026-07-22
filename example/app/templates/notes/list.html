@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import back_link %}
+{% from "_macros.html" import back_link, pagination %}
 
 {% block title %}Notes{% endblock %}
 
@@ -26,21 +26,7 @@
         {% endfor %}
     </ul>
 
-    {% if page_obj and page_obj.paginator.num_pages > 1 %}
-    <div class="mt-6 flex items-center justify-between text-sm text-muted">
-        {% if page_obj.has_previous() %}
-        <a class="body-link" href="?page={{ page_obj.previous_page_number() }}">← Previous</a>
-        {% else %}
-        <span class="opacity-40">← Previous</span>
-        {% endif %}
-        <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-        {% if page_obj.has_next() %}
-        <a class="body-link" href="?page={{ page_obj.next_page_number() }}">Next →</a>
-        {% else %}
-        <span class="opacity-40">Next →</span>
-        {% endif %}
-    </div>
-    {% endif %}
+    {{ pagination(page_obj) }}
     {% else %}
     <p class="mt-6 text-sm text-muted">No notes yet. Create your first one.</p>
     {% endif %}

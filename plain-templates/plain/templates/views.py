@@ -298,7 +298,13 @@ class ListView(TemplateView, ABC):
     to the first or last page), and the current `Page` is what lands in the
     template context — iterate it exactly like the full list. The page is also
     available as `page_obj` for rendering pagination controls; it is `None`
-    when pagination is off.
+    when pagination is off. Override `get_page_size()` to compute the size per
+    request.
+
+    A paginated queryset needs a deterministic order (an `order_by()` or a
+    model default) — unordered results can shift between pages. An empty
+    `Page` is falsy, so check `page_obj is not none` to test whether
+    pagination is on.
     """
 
     context_object_name = ""
@@ -311,11 +317,15 @@ class ListView(TemplateView, ABC):
     @abstractmethod
     def get_objects(self) -> Any: ...
 
+    def get_page_size(self) -> int | None:
+        """Page size for pagination, or `None` to render the full list."""
+        return self.page_size
+
     @cached_property
     def page_obj(self) -> Page | None:
-        if self.page_size is None:
+        if (page_size := self.get_page_size()) is None:
             return None
-        return Paginator(self.objects, self.page_size).get_page(
+        return Paginator(self.objects, page_size).get_page(
             self.request.query_params.get("page", 1)
         )
 
