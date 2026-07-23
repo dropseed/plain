@@ -5,13 +5,14 @@ The main QuerySet implementation. This provides the public API for the ORM.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import inspect
 import operator
 import warnings
 from collections.abc import Callable, Iterator, Sequence
 from functools import cached_property
 from itertools import islice
-from typing import TYPE_CHECKING, Any, Never, Self, overload
+from typing import TYPE_CHECKING, Any, Literal, Never, Self, overload
 
 import psycopg
 
@@ -28,13 +29,21 @@ from plain.postgres.exceptions import (
     FieldError,
     ObjectDoesNotExist,
 )
-from plain.postgres.expressions import Case, F, ResolvableExpression, Value, When
+from plain.postgres.expressions import (
+    BaseExpression,
+    Case,
+    F,
+    ResolvableExpression,
+    Value,
+    When,
+)
 from plain.postgres.fields import (
     Field,
     PrimaryKeyField,
 )
 from plain.postgres.functions import Cast
 from plain.postgres.query_utils import Q
+from plain.postgres.selectable import Selectable
 from plain.postgres.sql import (
     AND,
     CURSOR,
@@ -49,9 +58,11 @@ from plain.postgres.utils import resolve_callables
 from plain.utils.functional import partition
 
 # Re-exports for public API
-__all__ = ["F", "Q", "QuerySet", "RawQuerySet", "Prefetch"]
+__all__ = ["F", "Q", "QuerySet", "RowQuerySet", "RawQuerySet", "Prefetch"]
 
 if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
     from plain.postgres import Model
 
 # The maximum number of results to fetch in a get() query.
@@ -252,6 +263,24 @@ class FlatValuesListIterable(BaseIterable):
             yield row[0]
 
 
+class SelectDataclassIterable(BaseIterable):
+    """
+    Iterable returned by QuerySet.select(result_type=...) that builds one
+    dataclass instance per row. Columns map to dataclass fields positionally,
+    so the tuple rows from ValuesListIterable are zipped onto the dataclass
+    field names in order.
+    """
+
+    def __iter__(self) -> Iterator[Any]:
+        queryset = self.queryset
+        result_type = queryset._select_result_type
+        assert result_type is not None
+        field_names = [f.name for f in dataclasses.fields(result_type)]
+        tuple_rows = ValuesListIterable(queryset, chunked_fetch=self.chunked_fetch)
+        for row in tuple_rows:
+            yield result_type(**dict(zip(field_names, row, strict=True)))
+
+
 class QuerySet[T: "Model"]:
     """
     Represent a lazy database lookup for a set of objects.
@@ -285,6 +314,8 @@ class QuerySet[T: "Model"]:
     _known_related_objects: dict[Any, dict[Any, Any]]
     _iterable_class: type[BaseIterable]
     _fields: tuple[str, ...] | None
+    # Set by select(result_type=...); drives SelectDataclassIterable.
+    _select_result_type: type[DataclassInstance] | None
     _defer_next_filter: bool
     _deferred_filter: tuple[bool, tuple[Any, ...], dict[str, Any]] | None
 
@@ -305,6 +336,7 @@ class QuerySet[T: "Model"]:
         instance._known_related_objects = {}
         instance._iterable_class = ModelIterable
         instance._fields = None
+        instance._select_result_type = None
         instance._defer_next_filter = False
         instance._deferred_filter = None
         return instance
@@ -1069,12 +1101,19 @@ class QuerySet[T: "Model"]:
         return clone
 
     def values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
+        if isinstance(self, RowQuerySet):
+            raise TypeError("Cannot call values() after select().")
         fields += tuple(expressions)
         clone = self._values(*fields, **expressions)
         clone._iterable_class = ValuesIterable
         return clone
 
     def values_list(self, *fields: str, flat: bool = False) -> QuerySet[Any]:
+        if isinstance(self, RowQuerySet):
+            raise TypeError("Cannot call values_list() after select().")
+        return self._values_list(fields, flat=flat)
+
+    def _values_list(self, fields: tuple[Any, ...], *, flat: bool) -> QuerySet[Any]:
         if flat and len(fields) > 1:
             raise TypeError(
                 "'flat' is not valid when values_list is called with more than one "
@@ -1102,6 +1141,197 @@ class QuerySet[T: "Model"]:
 
         clone = self._values(*_fields, **expressions)
         clone._iterable_class = FlatValuesListIterable if flat else ValuesListIterable
+        return clone
+
+    # ---- select(): typed column selection returning honest rows ----
+    #
+    # The ladder unwraps each Field[T] argument to its T and reassembles the
+    # row type. The precise row rides on RowQuerySet[R], a QuerySet flavor
+    # whose iteration yields R instead of model instances.
+    #
+    # The ladder is written over Field[T], not the wider Selectable[T] base
+    # that expressions also share: the pinned type checker (ty 0.0.61) unwraps
+    # a Field parameter's T through the field descriptor chain but fails to
+    # unwrap it through the intermediate Selectable base inside an overloaded
+    # method on a generic class. Fields are the overwhelmingly common case, so
+    # they get precise per-column types; a select() that mixes in an
+    # expression matches the Selectable fallback and types as tuple[Any, ...].
+
+    @overload
+    def select[S](
+        self, item: Field[S], /, *, flat: Literal[True]
+    ) -> RowQuerySet[S]: ...
+
+    @overload
+    def select(
+        self, item: Selectable[Any], /, *, flat: Literal[True]
+    ) -> RowQuerySet[Any]: ...
+
+    @overload
+    def select[D](
+        self, *items: Selectable[Any], result_type: type[D]
+    ) -> RowQuerySet[D]: ...
+
+    @overload
+    def select[T0](
+        self, i0: Field[T0], /, *, flat: Literal[False] = False
+    ) -> RowQuerySet[tuple[T0]]: ...
+
+    @overload
+    def select[T0, T1](
+        self, i0: Field[T0], i1: Field[T1], /, *, flat: Literal[False] = False
+    ) -> RowQuerySet[tuple[T0, T1]]: ...
+
+    @overload
+    def select[T0, T1, T2](
+        self,
+        i0: Field[T0],
+        i1: Field[T1],
+        i2: Field[T2],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3](
+        self,
+        i0: Field[T0],
+        i1: Field[T1],
+        i2: Field[T2],
+        i3: Field[T3],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4](
+        self,
+        i0: Field[T0],
+        i1: Field[T1],
+        i2: Field[T2],
+        i3: Field[T3],
+        i4: Field[T4],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5](
+        self,
+        i0: Field[T0],
+        i1: Field[T1],
+        i2: Field[T2],
+        i3: Field[T3],
+        i4: Field[T4],
+        i5: Field[T5],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6](
+        self,
+        i0: Field[T0],
+        i1: Field[T1],
+        i2: Field[T2],
+        i3: Field[T3],
+        i4: Field[T4],
+        i5: Field[T5],
+        i6: Field[T6],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6, T7](
+        self,
+        i0: Field[T0],
+        i1: Field[T1],
+        i2: Field[T2],
+        i3: Field[T3],
+        i4: Field[T4],
+        i5: Field[T5],
+        i6: Field[T6],
+        i7: Field[T7],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6, T7]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6, T7, T8](
+        self,
+        i0: Field[T0],
+        i1: Field[T1],
+        i2: Field[T2],
+        i3: Field[T3],
+        i4: Field[T4],
+        i5: Field[T5],
+        i6: Field[T6],
+        i7: Field[T7],
+        i8: Field[T8],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6, T7, T8]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9](
+        self,
+        i0: Field[T0],
+        i1: Field[T1],
+        i2: Field[T2],
+        i3: Field[T3],
+        i4: Field[T4],
+        i5: Field[T5],
+        i6: Field[T6],
+        i7: Field[T7],
+        i8: Field[T8],
+        i9: Field[T9],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9]]: ...
+
+    @overload
+    def select(
+        self, *items: Selectable[Any], flat: Literal[False] = False
+    ) -> RowQuerySet[tuple[Any, ...]]: ...
+
+    def select(
+        self,
+        *items: Selectable[Any],
+        flat: bool = False,
+        result_type: type | None = None,
+    ) -> Any:
+        if not items:
+            raise TypeError("select() requires at least one column to select.")
+        if flat and result_type is not None:
+            raise TypeError("select() cannot combine flat=True with result_type=.")
+        if not isinstance(self, RowQuerySet) and self._fields is not None:
+            raise TypeError("Cannot call select() after values() or values_list().")
+
+        dataclass_type: type[DataclassInstance] | None = None
+        if result_type is not None:
+            if not (
+                isinstance(result_type, type) and dataclasses.is_dataclass(result_type)
+            ):
+                raise TypeError("select(result_type=...) requires a dataclass.")
+            dataclass_type = result_type
+            _check_result_type_matches(dataclass_type, items)
+
+        columns = [_selectable_to_column(item) for item in items]
+
+        clone = self._values_list(tuple(columns), flat=flat)
+        clone.__class__ = RowQuerySet
+        clone._select_result_type = dataclass_type
+        if dataclass_type is not None:
+            clone._iterable_class = SelectDataclassIterable
         return clone
 
     def none(self) -> QuerySet[T]:
@@ -1448,6 +1678,7 @@ class QuerySet[T: "Model"]:
         c._known_related_objects = self._known_related_objects
         c._iterable_class = self._iterable_class
         c._fields = self._fields
+        c._select_result_type = self._select_result_type
         return c
 
     def _attach_result_cache(self, obj: Self, cache: list[T]) -> None:
@@ -1529,6 +1760,108 @@ class QuerySet[T: "Model"]:
                     ", ".join(invalid_args),
                 )
             )
+
+
+def _selectable_to_column(item: Selectable[Any]) -> str | BaseExpression:
+    """Turn a select() argument into something the values_list plumbing accepts.
+
+    A field becomes its column name; an expression is passed through (the
+    plumbing auto-aliases it). Strings and FK-traversal refs get their own
+    error so the message points at the real fix.
+    """
+    # Local import: related_typed pulls in fields.related, which imports this
+    # module at load time (circular).
+    from plain.postgres.fields.related_typed import (
+        PrefixedFieldRef,
+        RelatedFieldRef,
+    )
+
+    if isinstance(item, str):
+        raise TypeError(
+            f"select() takes typed column references like User.email, not "
+            f"strings. Got {item!r}."
+        )
+    if isinstance(item, RelatedFieldRef | PrefixedFieldRef):
+        raise TypeError(
+            "select() does not support related-field traversal like "
+            "User.profile.city yet. Select columns on the queried model."
+        )
+    if isinstance(item, Field):
+        assert item.name is not None
+        return item.name
+    if isinstance(item, BaseExpression):
+        return item
+    raise TypeError(
+        f"select() takes fields and expressions, got {type(item).__name__}."
+    )
+
+
+def _check_result_type_matches(
+    result_type: type[DataclassInstance], items: tuple[Selectable[Any], ...]
+) -> None:
+    """Validate a dataclass result_type against the selected items.
+
+    Arity must match, and each selected field's name must equal the dataclass
+    field at the same position — expressions are anonymous and only need the
+    position to line up.
+    """
+    dataclass_fields = dataclasses.fields(result_type)
+    if len(dataclass_fields) != len(items):
+        raise TypeError(
+            f"select(result_type={result_type.__name__}) has "
+            f"{len(dataclass_fields)} fields but {len(items)} columns were "
+            f"selected."
+        )
+    for item, dataclass_field in zip(items, dataclass_fields, strict=True):
+        if isinstance(item, Field) and item.name != dataclass_field.name:
+            raise TypeError(
+                f"select(result_type={result_type.__name__}) maps columns "
+                f"positionally: field {item.name!r} does not match dataclass "
+                f"field {dataclass_field.name!r} at the same position."
+            )
+
+
+class RowQuerySet[R](QuerySet[Any]):
+    """A QuerySet in row mode, returned by `select()`.
+
+    Iteration yields the selected row type `R` — a tuple, a scalar (flat), or a
+    dataclass (result_type) — never a model instance. It reuses the parent's
+    values_list machinery for SQL and row building; the overrides here only
+    refine the return types and block operations that don't make sense on rows.
+    """
+
+    def __iter__(self) -> Iterator[R]:
+        return super().__iter__()
+
+    def first(self) -> R | None:
+        return super().first()
+
+    def last(self) -> R | None:
+        return super().last()
+
+    def get(self, *args: Any, **kwargs: Any) -> R:
+        return super().get(*args, **kwargs)
+
+    @overload
+    def __getitem__(self, k: int) -> R: ...
+
+    @overload
+    def __getitem__(self, k: slice) -> RowQuerySet[R]: ...
+
+    def __getitem__(self, k: int | slice) -> Any:
+        return super().__getitem__(k)
+
+    def update(self, **kwargs: Any) -> int:
+        raise TypeError("Cannot call update() on a select() queryset.")
+
+    def delete(self) -> int:
+        raise TypeError("Cannot call delete() on a select() queryset.")
+
+    def values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
+        raise TypeError("Cannot call values() after select().")
+
+    def values_list(self, *fields: str, flat: bool = False) -> QuerySet[Any]:
+        raise TypeError("Cannot call values_list() after select().")
 
 
 class InstanceCheckMeta(type):
