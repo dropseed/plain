@@ -633,62 +633,18 @@ class QuerySet[T: "Model"]:
         for obj in objs:
             obj._prepare_related_fields_for_save(operation_name="bulk_create")
 
-    def _check_bulk_create_options(
-        self,
-        update_conflicts: bool,
-        update_fields: list[Field] | None,
-        unique_fields: list[Field] | None,
-    ) -> OnConflict | None:
-        if update_conflicts:
-            if not update_fields:
-                raise ValueError(
-                    "Fields that will be updated when a row insertion fails "
-                    "on conflicts must be provided."
-                )
-            if not unique_fields:
-                raise ValueError(
-                    "Unique fields that can trigger the upsert must be provided."
-                )
-            # Updating primary keys and non-concrete fields is forbidden.
-            from plain.postgres.fields.related import ManyToManyField
-
-            if any(
-                not f.concrete or isinstance(f, ManyToManyField) for f in update_fields
-            ):
-                raise ValueError(
-                    "bulk_create() can only be used with concrete fields in "
-                    "update_fields."
-                )
-            if any(f.primary_key for f in update_fields):
-                raise ValueError(
-                    "bulk_create() cannot be used with primary keys in update_fields."
-                )
-            if unique_fields:
-                from plain.postgres.fields.related import ManyToManyField
-
-                if any(
-                    not f.concrete or isinstance(f, ManyToManyField)
-                    for f in unique_fields
-                ):
-                    raise ValueError(
-                        "bulk_create() can only be used with concrete fields "
-                        "in unique_fields."
-                    )
-            return OnConflict.UPDATE
-        return None
-
     def bulk_create(
         self,
         objs: Sequence[T],
         batch_size: int | None = None,
-        update_conflicts: bool = False,
-        update_fields: list[str] | None = None,
-        unique_fields: list[str] | None = None,
     ) -> list[T]:
         """
         Insert each of the instances into the database. Do *not* call
         save() on each of the instances. Primary keys are set on the objects
         via the PostgreSQL RETURNING clause. Multi-table models are not supported.
+
+        This is insert-only -- to insert-or-update on a conflict, use
+        bulk_upsert().
         """
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
@@ -697,21 +653,6 @@ class QuerySet[T: "Model"]:
         if not objs:
             return objs
         meta = self.model._model_meta
-        unique_fields_objs: list[Field] | None = None
-        update_fields_objs: list[Field] | None = None
-        if unique_fields:
-            unique_fields_objs = [
-                meta.get_forward_field(name) for name in unique_fields
-            ]
-        if update_fields:
-            update_fields_objs = [
-                meta.get_forward_field(name) for name in update_fields
-            ]
-        on_conflict = self._check_bulk_create_options(
-            update_conflicts,
-            update_fields_objs,
-            unique_fields_objs,
-        )
         fields = meta.concrete_fields
         self._prepare_for_bulk_create(objs)
         with transaction.atomic(savepoint=False):
@@ -721,9 +662,6 @@ class QuerySet[T: "Model"]:
                     objs_with_id,
                     fields,
                     batch_size,
-                    on_conflict=on_conflict,
-                    update_fields=update_fields_objs,
-                    unique_fields=unique_fields_objs,
                 )
                 id_field = meta.get_forward_field("id")
                 for obj_with_id, results in zip(objs_with_id, returned_columns):
@@ -739,17 +677,141 @@ class QuerySet[T: "Model"]:
                     objs_without_id,
                     fields,
                     batch_size,
-                    on_conflict=on_conflict,
-                    update_fields=update_fields_objs,
-                    unique_fields=unique_fields_objs,
                 )
-                if on_conflict is None:
-                    assert len(returned_columns) == len(objs_without_id)
+                assert len(returned_columns) == len(objs_without_id)
                 for obj_without_id, results in zip(objs_without_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
                         assert field.name is not None
                         setattr(obj_without_id, field.name, result)
                     obj_without_id._state.adding = False
+
+        return objs
+
+    def _check_bulk_upsert_options(
+        self,
+        update_fields: list[Field],
+        unique_fields: list[Field],
+    ) -> None:
+        model_name = self.model.__name__
+
+        if not unique_fields:
+            raise ValueError("bulk_upsert() requires unique_fields.")
+        if not self.model.model_options.unique_fields_match_constraint(
+            {f.name for f in unique_fields}
+        ):
+            names = [f.name for f in unique_fields]
+            raise ValueError(
+                f"bulk_upsert() unique_fields {names} on {model_name} must name "
+                "the primary key or a UniqueConstraint declared on the model "
+                "without a condition or expressions."
+            )
+
+        if not update_fields:
+            raise ValueError("bulk_upsert() requires update_fields.")
+        if any(not f.concrete for f in update_fields):
+            raise ValueError("bulk_upsert() update_fields must be concrete fields.")
+        if any(f.primary_key for f in update_fields):
+            raise ValueError("bulk_upsert() cannot update primary key fields.")
+        overlap = {f.name for f in update_fields} & {f.name for f in unique_fields}
+        if overlap:
+            raise ValueError(
+                "bulk_upsert() update_fields cannot overlap unique_fields: "
+                f"{sorted(overlap)}."
+            )
+
+    def bulk_upsert(
+        self,
+        objs: Sequence[T],
+        *,
+        update_fields: list[Field],
+        unique_fields: list[Field],
+        batch_size: int | None = None,
+    ) -> list[T]:
+        """
+        Insert each instance, updating update_fields on any row that already
+        exists for the unique_fields key. Issues one
+        INSERT ... ON CONFLICT (unique_fields) DO UPDATE ... RETURNING per batch.
+
+        Both inserted and updated objects come back with their DB-returned
+        fields (primary key, DB defaults) populated. update_fields and
+        unique_fields take field references (`Model.field`); unique_fields must
+        name the primary key or a UniqueConstraint declared on the model.
+        """
+        if batch_size is not None and batch_size <= 0:
+            raise ValueError("Batch size must be a positive integer.")
+
+        objs = list(objs)
+        if not objs:
+            return objs
+
+        self._validate_field_refs(unique_fields, where="bulk_upsert() unique_fields")
+        self._validate_field_refs(update_fields, where="bulk_upsert() update_fields")
+
+        meta = self.model._model_meta
+        self._check_bulk_upsert_options(update_fields, unique_fields)
+
+        self._prepare_for_bulk_create(objs)
+
+        # Compute each object's conflict key exactly once, rejecting nulls as we
+        # go (NULL never conflicts in Postgres, so it can't be upserted). Reused
+        # below to sort the batch and to match RETURNING rows back to objects.
+        keyed: list[tuple[tuple[Any, ...], T]] = []
+        for obj in objs:
+            key = []
+            for field in unique_fields:
+                value = field.value_from_object(obj)
+                if value is None:
+                    raise ValueError(
+                        f"bulk_upsert() requires a non-null {field.name} on every "
+                        "object; NULL never conflicts in Postgres, so it cannot "
+                        "be upserted."
+                    )
+                key.append(value)
+            keyed.append((tuple(key), obj))
+
+        # Include the PK column only when it is itself the conflict key;
+        # otherwise let Postgres generate the identity value.
+        pk_is_unique = any(f.primary_key for f in unique_fields)
+        fields = meta.concrete_fields
+        if not pk_is_unique:
+            fields = [f for f in fields if not isinstance(f, PrimaryKeyField)]
+
+        # RETURNING must carry the DB-returned fields (to populate the objects)
+        # plus the unique fields (to match each returned row to its object).
+        returning_fields = list(meta.db_returning_fields)
+        for field in unique_fields:
+            if field not in returning_fields:
+                returning_fields.append(field)
+        unique_indices = [returning_fields.index(f) for f in unique_fields]
+        db_returning_indices = list(enumerate(meta.db_returning_fields))
+
+        # Sort by the conflict key so concurrent upserts touching overlapping
+        # keys lock rows in the same order and can't deadlock each other.
+        keyed.sort(key=lambda pair: pair[0])
+
+        with transaction.atomic(savepoint=False):
+            returned_rows = self._batched_insert(
+                [obj for _, obj in keyed],
+                fields,
+                batch_size,
+                returning_fields=returning_fields,
+                on_conflict=OnConflict.UPDATE,
+                update_fields=update_fields,
+                unique_fields=unique_fields,
+            )
+
+        # RETURNING order isn't guaranteed to match VALUES order under ON
+        # CONFLICT, so match each returned row to its object by the unique key.
+        row_by_key = {}
+        for row in returned_rows:
+            key = tuple(row[i] for i in unique_indices)
+            row_by_key[key] = row
+        for key, obj in keyed:
+            row = row_by_key[key]
+            for index, field in db_returning_indices:
+                assert field.name is not None
+                setattr(obj, field.name, row[index])
+            obj._state.adding = False
 
         return objs
 
@@ -959,30 +1021,40 @@ class QuerySet[T: "Model"]:
         clone._returning_fields = clone._resolve_returning_fields()
         return cast("ReturningQuerySet[T, Any]", clone)
 
-    def _resolve_returning_fields(self) -> list[Field]:
-        """Validate self._returning and produce the concrete fields to RETURN."""
+    def _validate_field_refs(self, fields: Sequence[Any], *, where: str) -> None:
+        """Require each item to be a Field reference on this queryset's model.
+
+        `where` names the call in the error (e.g. "returning()", "bulk_upsert()
+        unique_fields") so a bad argument points the user at Model.field.
+        """
         object_name = self.model.model_options.object_name
-        if not self._returning:
-            # No references given: RETURN every concrete column so the rows can
-            # be hydrated into full model instances.
-            return list(self.model._model_meta.concrete_fields)
-        for field in self._returning:
+        for field in fields:
             if isinstance(field, str):
                 raise TypeError(
-                    f"returning() takes field references, not strings. "
+                    f"{where} takes field references, not strings. "
                     f"Pass {object_name}.{field} instead of {field!r}."
                 )
             if not isinstance(field, Field):
                 raise TypeError(
-                    f"returning() takes field references like "
-                    f"{object_name}.<field>, not {field!r}."
+                    f"{where} takes field references like {object_name}.<field>, "
+                    f"not {field!r}."
                 )
             if field.model is not self.model:
                 raise FieldError(
-                    f"Cannot use {field.model.model_options.object_name}."
-                    f"{field.name} in returning() for {object_name}: it "
-                    "belongs to a different model."
+                    f"{where} cannot use {field.model.model_options.object_name}."
+                    f"{field.name}: it belongs to a different model, not "
+                    f"{object_name}."
                 )
+
+    def _resolve_returning_fields(self) -> list[Field]:
+        """Validate self._returning and produce the concrete fields to RETURN."""
+        if not self._returning:
+            # No references given: RETURN every concrete column so the rows can
+            # be hydrated into full model instances.
+            return list(self.model._model_meta.concrete_fields)
+        self._validate_field_refs(self._returning, where="returning()")
+        object_name = self.model.model_options.object_name
+        for field in self._returning:
             if not field.concrete:
                 raise FieldError(
                     f"Cannot use {object_name}.{field.name} in returning(): "
@@ -1470,34 +1542,34 @@ class QuerySet[T: "Model"]:
         objs: list[T],
         fields: list[Field],
         batch_size: int | None,
+        *,
+        returning_fields: list[Field] | None = None,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
     ) -> list[tuple[Any, ...]]:
         """
-        Helper method for bulk_create() to insert objs one batch at a time.
+        Helper method for bulk_create()/bulk_upsert() to insert objs one batch
+        at a time, collecting the RETURNING rows from every batch. Pass the
+        on_conflict kwargs to run each batch as ON CONFLICT DO UPDATE.
         """
+        if returning_fields is None:
+            returning_fields = self.model._model_meta.db_returning_fields
         max_batch_size = max(len(objs), 1)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
-        inserted_rows = []
+        returned_rows = []
         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
-            if on_conflict is None:
-                inserted_rows.extend(
-                    self._insert(  # ty: ignore[invalid-argument-type]
-                        item,
-                        fields=fields,
-                        returning_fields=self.model._model_meta.db_returning_fields,
-                    )
-                )
-            else:
-                self._insert(
+            returned_rows.extend(
+                self._insert(  # ty: ignore[invalid-argument-type]
                     item,
                     fields=fields,
+                    returning_fields=returning_fields,
                     on_conflict=on_conflict,
                     update_fields=update_fields,
                     unique_fields=unique_fields,
                 )
-        return inserted_rows
+            )
+        return returned_rows
 
     def _chain(self) -> Self:
         """

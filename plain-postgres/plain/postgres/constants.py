@@ -9,5 +9,4 @@ LOOKUP_SEP = "__"
 
 
 class OnConflict(Enum):
-    IGNORE = "ignore"
     UPDATE = "update"

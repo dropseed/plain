@@ -584,8 +584,6 @@ def on_conflict_suffix_sql(
     update_fields: Iterable[str],
     unique_fields: Iterable[str],
 ) -> str:
-    if on_conflict == OnConflict.IGNORE:
-        return "ON CONFLICT DO NOTHING"
     if on_conflict == OnConflict.UPDATE:
         return "ON CONFLICT({}) DO UPDATE SET {}".format(
             ", ".join(map(quote_name, unique_fields)),
