@@ -4,13 +4,11 @@ Code to manage the creation and SQL rendering of 'where' constraints.
 
 from __future__ import annotations
 
-import operator
-from functools import cached_property, reduce
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.exceptions import EmptyResultSet, FullResultSet
-from plain.postgres.expressions import Case, ResolvableExpression, When
-from plain.postgres.lookups import Exact
+from plain.postgres.expressions import ResolvableExpression
 from plain.utils import tree
 
 if TYPE_CHECKING:
@@ -21,7 +19,6 @@ if TYPE_CHECKING:
 # Connection types
 AND = "AND"
 OR = "OR"
-XOR = "XOR"
 
 
 class WhereNode(tree.Node):
@@ -57,10 +54,8 @@ class WhereNode(tree.Node):
         in_negated = negated ^ self.negated
         # Whether or not children must be connected in the same filtering
         # clause (WHERE > HAVING > QUALIFY) to maintain logical semantic.
-        must_remain_connected = (
-            (in_negated and self.connector == AND)
-            or (not in_negated and self.connector == OR)
-            or self.connector == XOR
+        must_remain_connected = (in_negated and self.connector == AND) or (
+            not in_negated and self.connector == OR
         )
         if (
             must_remain_connected
@@ -136,21 +131,6 @@ class WhereNode(tree.Node):
             full_needed, empty_needed = len(self.children), 1
         else:
             full_needed, empty_needed = 1, len(self.children)
-
-        if self.connector == XOR:
-            # PostgreSQL doesn't have a native XOR operator, so convert:
-            #   a XOR b XOR c XOR ...
-            # to:
-            #   (a OR b OR c OR ...) AND (a + b + c + ...) == 1
-            lhs = self.__class__(self.children, OR)
-            rhs_sum = reduce(
-                operator.add,
-                (Case(When(c, then=1), default=0) for c in self.children),
-            )
-            rhs = Exact(1, rhs_sum)
-            return self.__class__([lhs, rhs], AND, self.negated).as_sql(
-                compiler, connection
-            )
 
         for child in self.children:
             try:

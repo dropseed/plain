@@ -38,7 +38,6 @@ from plain.postgres.sql import (
     AND,
     CURSOR,
     OR,
-    XOR,
     DeleteQuery,
     InsertQuery,
     Query,
@@ -499,26 +498,6 @@ class QuerySet[T: "Model"]:
                 id__in=other.values("id")
             )
         combined.sql_query.combine(other.sql_query, OR)
-        return combined
-
-    def __xor__(self, other: QuerySet[T]) -> QuerySet[T]:
-        self._merge_sanity_check(other)
-        if isinstance(self, EmptyQuerySet):
-            return other
-        if isinstance(other, EmptyQuerySet):
-            return self
-        query = (
-            self
-            if self.sql_query.can_filter()
-            else self.model._model_meta.base_queryset.filter(id__in=self.values("id"))
-        )
-        combined = query._chain()
-        combined._merge_known_related_objects(other)
-        if not other.sql_query.can_filter():
-            other = other.model._model_meta.base_queryset.filter(
-                id__in=other.values("id")
-            )
-        combined.sql_query.combine(other.sql_query, XOR)
         return combined
 
     ####################################
@@ -1245,17 +1224,6 @@ class QuerySet[T: "Model"]:
         Return a query set in which the returned objects have been annotated
         with extra data or aggregations.
         """
-        return self._annotate(args, kwargs, select=True)
-
-    def alias(self, *args: Any, **kwargs: Any) -> Self:
-        """
-        Return a query set with added aliases for extra data or aggregations.
-        """
-        return self._annotate(args, kwargs, select=False)
-
-    def _annotate(
-        self, args: tuple[Any, ...], kwargs: dict[str, Any], select: bool = True
-    ) -> Self:
         self._validate_values_are_expressions(
             args + tuple(kwargs.values()), method_name="annotate"
         )
@@ -1283,11 +1251,7 @@ class QuerySet[T: "Model"]:
                 raise ValueError(
                     f"The annotation '{alias}' conflicts with a field on the model."
                 )
-            clone.sql_query.add_annotation(
-                annotation,
-                alias,
-                select=select,
-            )
+            clone.sql_query.add_annotation(annotation, alias)
         for alias, annotation in clone.sql_query.annotations.items():
             if alias in annotations and annotation.contains_aggregate:
                 if clone._fields is None:
