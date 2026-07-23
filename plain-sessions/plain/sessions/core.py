@@ -161,7 +161,7 @@ class SessionStore(MutableMapping):
 
     def save(self) -> None:
         """
-        Save the current session data to the database using update_or_create.
+        Save the current session data to the database using upsert.
         """
         data = self._get_session_data(no_load=False)
 
@@ -169,13 +169,14 @@ class SessionStore(MutableMapping):
             if self.session_key is None:
                 self.session_key = self._get_new_session_key()
 
-            self._session_instance, created = self._model.query.update_or_create(
+            self._session_instance, created = self._model.query.upsert(
                 session_key=self.session_key,
                 defaults={
                     "session_data": data,
                     "expires_at": timezone.now()
                     + timedelta(seconds=settings.SESSION_COOKIE_AGE),
                 },
+                unique_fields=["session_key"],
             )
 
         if created:
