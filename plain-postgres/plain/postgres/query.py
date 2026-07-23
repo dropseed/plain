@@ -40,6 +40,7 @@ from plain.postgres.sql import (
     OR,
     DeleteQuery,
     InsertQuery,
+    LockMode,
     Query,
     RawQuery,
     UpdateQuery,
@@ -1164,7 +1165,7 @@ class QuerySet[T: "Model"]:
         of: tuple[str, ...] = (),
     ) -> QuerySet[T]:
         """Return a new QuerySet that locks selected rows with FOR UPDATE."""
-        return self._lock_rows("FOR UPDATE", nowait, skip_locked, of)
+        return self._lock_rows("update", nowait, skip_locked, of)
 
     def for_no_key_update(
         self,
@@ -1173,7 +1174,7 @@ class QuerySet[T: "Model"]:
         of: tuple[str, ...] = (),
     ) -> QuerySet[T]:
         """Return a new QuerySet that locks selected rows with FOR NO KEY UPDATE."""
-        return self._lock_rows("FOR NO KEY UPDATE", nowait, skip_locked, of)
+        return self._lock_rows("no_key_update", nowait, skip_locked, of)
 
     def for_share(
         self,
@@ -1182,7 +1183,7 @@ class QuerySet[T: "Model"]:
         of: tuple[str, ...] = (),
     ) -> QuerySet[T]:
         """Return a new QuerySet that locks selected rows with FOR SHARE."""
-        return self._lock_rows("FOR SHARE", nowait, skip_locked, of)
+        return self._lock_rows("share", nowait, skip_locked, of)
 
     def for_key_share(
         self,
@@ -1191,11 +1192,11 @@ class QuerySet[T: "Model"]:
         of: tuple[str, ...] = (),
     ) -> QuerySet[T]:
         """Return a new QuerySet that locks selected rows with FOR KEY SHARE."""
-        return self._lock_rows("FOR KEY SHARE", nowait, skip_locked, of)
+        return self._lock_rows("key_share", nowait, skip_locked, of)
 
     def _lock_rows(
         self,
-        mode: str,
+        mode: LockMode,
         nowait: bool,
         skip_locked: bool,
         of: tuple[str, ...],

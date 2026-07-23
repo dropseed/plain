@@ -24,6 +24,7 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.postgres.fields import Field
+    from plain.postgres.sql.query import LockMode
 
 # Start and end points for window expressions.
 PRECEDING: str = "PRECEDING"
@@ -312,15 +313,23 @@ def distinct_sql(
         return ["DISTINCT"], []
 
 
+LOCK_MODE_SQL = {
+    "update": "FOR UPDATE",
+    "no_key_update": "FOR NO KEY UPDATE",
+    "share": "FOR SHARE",
+    "key_share": "FOR KEY SHARE",
+}
+
+
 def lock_sql(
-    mode: str,
+    mode: LockMode,
     nowait: bool = False,
     skip_locked: bool = False,
     of: tuple[str, ...] = (),
 ) -> str:
     """Return a row-level locking clause (FOR UPDATE, FOR SHARE, etc.)."""
     return "{}{}{}{}".format(
-        mode,
+        LOCK_MODE_SQL[mode],
         " OF {}".format(", ".join(of)) if of else "",
         " NOWAIT" if nowait else "",
         " SKIP LOCKED" if skip_locked else "",

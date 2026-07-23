@@ -188,6 +188,10 @@ class TransformWrapper:
 
 QueryType = TypeVar("QueryType", bound="Query")
 
+# Row-level locking mode requested via QuerySet.for_update() and friends.
+# dialect.lock_sql() maps each token to its actual SQL keywords.
+LockMode = Literal["update", "no_key_update", "share", "key_share"]
+
 
 class Query(BaseExpression):
     """A single SQL query."""
@@ -226,7 +230,7 @@ class Query(BaseExpression):
     high_mark = None  # Used for offset/limit.
     distinct = False
     distinct_fields: tuple[str, ...] = ()
-    lock_mode: str | None = None  # The row-level locking clause, e.g. "FOR UPDATE".
+    lock_mode: LockMode | None = None  # See LockMode.
     lock_nowait = False
     lock_skip_locked = False
     lock_of: tuple[str, ...] = ()
