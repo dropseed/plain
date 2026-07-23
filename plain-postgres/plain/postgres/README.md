@@ -221,6 +221,49 @@ A traversed field offers exactly the same conditions as the field itself — a t
 
 [Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`.
 
+### Selecting columns with select()
+
+`select()` pulls back specific columns as typed rows instead of model instances. You pass typed field references, and a type checker knows the exact shape of each row:
+
+```python
+from plain.postgres import types
+
+@postgres.register_model
+class User(postgres.Model):
+    email: str = types.EmailField()
+    age: int = types.IntegerField(allow_null=True)
+
+    query: postgres.QuerySet[User] = postgres.QuerySet()
+
+# list-like of tuple[str, int | None], precisely typed
+rows = User.query.where(User.age.gte(18)).select(User.email, User.age)
+for email, age in rows:
+    ...
+```
+
+There are three modes:
+
+- **Tuples** (default) — one tuple per row, typed per column: `select(User.email, User.age)` yields `tuple[str, int | None]`.
+- **Flat scalars** — a single column unwrapped, with `flat=True`: `select(User.email, flat=True)` yields `str`. `flat=True` accepts exactly one column.
+- **Dataclasses** — map each column onto a dataclass with `result_type=`: `select(User.email, User.age, result_type=UserStats)` yields `UserStats`. Columns map to dataclass fields **positionally**, so the selection order must match the dataclass field order, and each selected field's name must match the dataclass field at the same position.
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class UserStats:
+    email: str
+    age: int | None
+
+stats = User.query.select(User.email, User.age, result_type=UserStats)
+```
+
+You can select expression columns too — `select(User.id, Sum("amount"))` — but an expression contributes `Any` to the row type, and mixing an expression into a `select()` types the whole row as `tuple[Any, ...]` (the values are still correct at runtime).
+
+**`select()` returns rows, not partial model instances.** This is deliberate: a model instance with only some columns loaded is a type-level lie — the type checker thinks every field is present, so touching an unselected column looks fine but fails or fires a hidden query at runtime. Honest tuples/dataclasses keep the types truthful. As a result, iteration, `first()`, `get()`, and slicing all return rows, and writes (`update()`, `delete()`) raise `TypeError` on a selected queryset — the same as after `values()`.
+
+`select()` takes typed references only — a bare string like `select("email")` raises `TypeError` (use `User.email`). Foreign-key traversal (`User.profile.city`) is not supported yet and raises `TypeError`; select columns on the queried model.
+
 ### Custom QuerySets
 
 You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods. Define a custom QuerySet and assign it to your model's `query` attribute:
