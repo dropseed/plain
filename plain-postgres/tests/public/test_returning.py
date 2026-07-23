@@ -1,8 +1,8 @@
 """QuerySet.returning() captures the rows touched by update() and delete().
 
 Without returning(), update()/delete() return an int rowcount as always.
-With it, no-arg returning() hydrates full model instances and returning(*names)
-returns a list of dicts holding just those columns.
+With it, no-arg returning() hydrates full model instances and
+returning(*Model.field) returns a list of dicts holding just those columns.
 """
 
 from __future__ import annotations
@@ -48,7 +48,9 @@ def test_update_returning_instances_reflect_new_values(db):
 def test_update_returning_named_fields_are_dicts(db):
     _seed_events()
     rows = (
-        ReturningEvent.query.filter(label="a").returning("id", "count").update(count=7)
+        ReturningEvent.query.filter(label="a")
+        .returning(ReturningEvent.id, ReturningEvent.count)
+        .update(count=7)
     )
 
     assert len(rows) == 2
@@ -76,7 +78,13 @@ def test_delete_without_returning_returns_int(db):
 
 def test_delete_returning_named_fields_gives_deleted_rows(db):
     _seed_events()
-    rows = ReturningEvent.query.filter(label="a").returning("id", "payload").delete()
+    rows = (
+        ReturningEvent.query.filter(label="a")
+        # payload is an explicitly annotated JSONField, so it types as dict|None
+        # at class access rather than Field; it is a Field at runtime.
+        .returning(ReturningEvent.id, ReturningEvent.payload)  # ty: ignore[invalid-argument-type]
+        .delete()
+    )
 
     assert len(rows) == 2
     assert all(isinstance(row, dict) and set(row) == {"id", "payload"} for row in rows)
@@ -98,7 +106,11 @@ def test_delete_returning_instances(db):
 
 
 def test_delete_returning_empty_result_is_empty_list(db):
-    rows = ReturningEvent.query.filter(label="missing").returning("id").delete()
+    rows = (
+        ReturningEvent.query.filter(label="missing")
+        .returning(ReturningEvent.id)
+        .delete()
+    )
     assert rows == []
 
 
@@ -109,12 +121,19 @@ def test_delete_returning_empty_result_is_empty_list(db):
 
 def test_returning_returns_a_returning_queryset(db):
     assert isinstance(ReturningEvent.query.returning(), ReturningQuerySet)
-    assert isinstance(ReturningEvent.query.returning("id"), ReturningQuerySet)
+    assert isinstance(
+        ReturningEvent.query.returning(ReturningEvent.id), ReturningQuerySet
+    )
 
 
-def test_returning_bad_field_name_errors(db):
-    with pytest.raises(FieldError, match="no such field"):
-        ReturningEvent.query.returning("not_a_field")
+def test_returning_string_arg_errors(db):
+    with pytest.raises(TypeError, match="takes field references, not strings"):
+        ReturningEvent.query.returning("count")  # ty: ignore[invalid-argument-type]
+
+
+def test_returning_wrong_model_field_errors(db):
+    with pytest.raises(FieldError, match="belongs to a different model"):
+        ReturningEvent.query.returning(DeleteParent.name)
 
 
 def test_returning_before_filter_is_preserved(db):
@@ -140,7 +159,11 @@ def test_delete_returning_excludes_cascade_deleted_children(db):
     ChildCascade(parent=parent).create()
     ChildCascade(parent=parent).create()
 
-    rows = DeleteParent.query.filter(id=parent.id).returning("id", "name").delete()
+    rows = (
+        DeleteParent.query.filter(id=parent.id)
+        .returning(DeleteParent.id, DeleteParent.name)
+        .delete()
+    )
 
     # Only the parent row comes back, even though two children were cascaded.
     assert len(rows) == 1

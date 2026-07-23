@@ -403,11 +403,13 @@ with its DB-generated fields (primary key, DB defaults) populated.
 # Insert new items, refresh `value`/`expires_at` on any existing key.
 CacheItem.query.bulk_upsert(
     [CacheItem(key=k, value=v, expires_at=exp) for k, v in items],
-    update_fields=["value", "expires_at"],
-    unique_fields=["key"],
+    update_fields=[CacheItem.value, CacheItem.expires_at],
+    unique_fields=[CacheItem.key],
 )
 ```
 
+- `update_fields` and `unique_fields` take field references (`Model.field`), not
+  strings.
 - `unique_fields` must name the **primary key** or a `UniqueConstraint` declared
   on the model (no condition, no expressions) — this is the conflict target.
 - `update_fields` must be concrete, non-primary-key, and must not overlap
@@ -510,14 +512,14 @@ running = Job.query.filter(status="pending").returning().update(status="running"
 for job in running:
     print(job.id, job.status)  # reflects the post-update values
 
-# Field names: rows come back as dicts of just those columns.
-deleted = Event.query.filter(created_at__lt=cutoff).returning("id", "payload").delete()
+# Field references: rows come back as dicts of just those columns.
+deleted = Event.query.filter(created_at__lt=cutoff).returning(Event.id, Event.payload).delete()
 for row in deleted:
     print(row["id"], row["payload"])  # the rows as they were deleted
 ```
 
 - **`returning()`** returns full model instances. For `update()` they hold the new values; for `delete()`, the rows as they were.
-- **`returning("field", ...)`** returns a list of dicts with only those columns. Passing an unknown or non-concrete field name raises `FieldError` at the `returning()` call.
+- **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a non-concrete field or one from another model raises an error at the `returning()` call.
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
 
 `RETURNING` only reports rows of the statement's own target table. Rows removed by a cascading `ON DELETE` are never included — a `delete()` with `returning()` gives you the parent rows you deleted, not the children Postgres cascaded.

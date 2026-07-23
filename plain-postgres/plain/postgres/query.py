@@ -288,10 +288,10 @@ class QuerySet[T: "Model"]:
     _deferred_filter: tuple[bool, tuple[Any, ...], dict[str, Any]] | None
     # None => plain update()/delete() returning an int rowcount.
     # () => RETURNING every concrete column, hydrated into model instances.
-    # (name, ...) => RETURNING those columns, returned as dicts.
-    _returning: tuple[str, ...] | None
-    # The concrete fields resolved from _returning, or None for a plain write.
-    # Set once by returning() so update()/delete() don't re-resolve at execute.
+    # (field, ...) => RETURNING those columns, returned as dicts.
+    _returning: tuple[Field, ...] | None
+    # The concrete fields to RETURN, or None for a plain write. Set once by
+    # returning() so update()/delete() don't recompute them at execute.
     _returning_fields: list[Field] | None
 
     def __init__(self):
@@ -747,8 +747,8 @@ class QuerySet[T: "Model"]:
         self,
         objs: Sequence[T],
         *,
-        update_fields: list[str],
-        unique_fields: list[str],
+        update_fields: list[Field],
+        unique_fields: list[Field],
         batch_size: int | None = None,
     ) -> list[T]:
         """
@@ -757,8 +757,9 @@ class QuerySet[T: "Model"]:
         INSERT ... ON CONFLICT (unique_fields) DO UPDATE ... RETURNING per batch.
 
         Both inserted and updated objects come back with their DB-returned
-        fields (primary key, DB defaults) populated. unique_fields must name the
-        primary key or a UniqueConstraint declared on the model.
+        fields (primary key, DB defaults) populated. update_fields and
+        unique_fields take field references (`Model.field`); unique_fields must
+        name the primary key or a UniqueConstraint declared on the model.
         """
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
@@ -767,10 +768,11 @@ class QuerySet[T: "Model"]:
         if not objs:
             return objs
 
+        self._validate_field_refs(unique_fields, where="bulk_upsert() unique_fields")
+        self._validate_field_refs(update_fields, where="bulk_upsert() update_fields")
+
         meta = self.model._model_meta
-        unique_fields_objs = [meta.get_forward_field(name) for name in unique_fields]
-        update_fields_objs = [meta.get_forward_field(name) for name in update_fields]
-        self._check_bulk_upsert_options(update_fields_objs, unique_fields_objs)
+        self._check_bulk_upsert_options(update_fields, unique_fields)
 
         self._prepare_for_bulk_create(objs)
 
@@ -780,7 +782,7 @@ class QuerySet[T: "Model"]:
         keyed: list[tuple[tuple[Any, ...], T]] = []
         for obj in objs:
             key = []
-            for field in unique_fields_objs:
+            for field in unique_fields:
                 value = field.value_from_object(obj)
                 self._reject_null_upsert_key(field, value, operation_name="bulk_upsert")
                 key.append(value)
@@ -788,7 +790,7 @@ class QuerySet[T: "Model"]:
 
         # Include the PK column only when it is itself the conflict key;
         # otherwise let Postgres generate the identity value.
-        pk_is_unique = any(f.primary_key for f in unique_fields_objs)
+        pk_is_unique = any(f.primary_key for f in unique_fields)
         fields = meta.concrete_fields
         if not pk_is_unique:
             fields = [f for f in fields if not isinstance(f, PrimaryKeyField)]
@@ -796,10 +798,10 @@ class QuerySet[T: "Model"]:
         # RETURNING must carry the DB-returned fields (to populate the objects)
         # plus the unique fields (to match each returned row to its object).
         returning_fields = list(meta.db_returning_fields)
-        for field in unique_fields_objs:
+        for field in unique_fields:
             if field not in returning_fields:
                 returning_fields.append(field)
-        unique_indices = [returning_fields.index(f) for f in unique_fields_objs]
+        unique_indices = [returning_fields.index(f) for f in unique_fields]
         db_returning_indices = list(enumerate(meta.db_returning_fields))
 
         # Sort by the conflict key so concurrent upserts touching overlapping
@@ -813,8 +815,8 @@ class QuerySet[T: "Model"]:
                 batch_size,
                 returning_fields=returning_fields,
                 on_conflict=OnConflict.UPDATE,
-                update_fields=update_fields_objs,
-                unique_fields=unique_fields_objs,
+                update_fields=update_fields,
+                unique_fields=unique_fields,
             )
 
         # RETURNING order isn't guaranteed to match VALUES order under ON
@@ -1082,17 +1084,20 @@ class QuerySet[T: "Model"]:
     def returning(self) -> ReturningQuerySet[T, list[T]]: ...
 
     @overload
-    def returning(self, *fields: str) -> ReturningQuerySet[T, list[dict[str, Any]]]: ...
+    def returning(
+        self, *fields: Field[Any]
+    ) -> ReturningQuerySet[T, list[dict[str, Any]]]: ...
 
-    def returning(self, *fields: str) -> ReturningQuerySet[T, Any]:
+    def returning(self, *fields: Field[Any]) -> ReturningQuerySet[T, Any]:
         """Capture the rows touched by the next update() or delete().
 
         With no arguments, update()/delete() return the affected rows as
         model instances (RETURNING every concrete column). Given field
-        names, they return a list of dicts holding just those columns.
-        Without returning(), update()/delete() return an int rowcount.
+        references (`Model.field`), they return a list of dicts holding just
+        those columns. Without returning(), update()/delete() return an int
+        rowcount.
 
-        The field names are validated here, so a bad name errors at the
+        The references are validated here, so a bad one errors at the
         returning() call rather than when the write runs.
         """
         clone = self._chain()
@@ -1101,29 +1106,46 @@ class QuerySet[T: "Model"]:
         clone._returning_fields = clone._resolve_returning_fields()
         return cast("ReturningQuerySet[T, Any]", clone)
 
+    def _validate_field_refs(self, fields: Sequence[Any], *, where: str) -> None:
+        """Require each item to be a Field reference on this queryset's model.
+
+        `where` names the call in the error (e.g. "returning()", "bulk_upsert()
+        unique_fields") so a bad argument points the user at Model.field.
+        """
+        object_name = self.model.model_options.object_name
+        for field in fields:
+            if isinstance(field, str):
+                raise TypeError(
+                    f"{where} takes field references, not strings. "
+                    f"Pass {object_name}.{field} instead of {field!r}."
+                )
+            if not isinstance(field, Field):
+                raise TypeError(
+                    f"{where} takes field references like {object_name}.<field>, "
+                    f"not {field!r}."
+                )
+            if field.model is not self.model:
+                raise FieldError(
+                    f"{where} cannot use {field.model.model_options.object_name}."
+                    f"{field.name}: it belongs to a different model, not "
+                    f"{object_name}."
+                )
+
     def _resolve_returning_fields(self) -> list[Field]:
-        """Translate self._returning into the concrete fields to RETURN."""
-        meta = self.model._model_meta
+        """Validate self._returning and produce the concrete fields to RETURN."""
         if not self._returning:
-            # No names given: RETURN every concrete column so the rows can be
-            # hydrated into full model instances.
-            return list(meta.concrete_fields)
-        fields = []
-        for name in self._returning:
-            try:
-                field = meta.get_field(name)
-            except FieldDoesNotExist:
+            # No references given: RETURN every concrete column so the rows can
+            # be hydrated into full model instances.
+            return list(self.model._model_meta.concrete_fields)
+        self._validate_field_refs(self._returning, where="returning()")
+        object_name = self.model.model_options.object_name
+        for field in self._returning:
+            if not field.concrete:
                 raise FieldError(
-                    f"Cannot resolve '{name}' in returning() for "
-                    f"{self.model.model_options.object_name}: no such field."
+                    f"Cannot use {object_name}.{field.name} in returning(): "
+                    "only concrete database columns can be returned."
                 )
-            if not isinstance(field, Field) or not field.concrete:
-                raise FieldError(
-                    f"Cannot use '{name}' in returning(): only concrete "
-                    "database columns can be returned."
-                )
-            fields.append(field)
-        return fields
+        return list(self._returning)
 
     def _hydrate_returning(self, fields: list[Field], rows: list[list]) -> list[Any]:
         """Turn converted RETURNING rows into instances (no names) or dicts."""

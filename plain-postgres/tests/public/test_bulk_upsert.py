@@ -8,7 +8,10 @@ fields (primary key, DB defaults) populated, matched to its row by unique key.
 from __future__ import annotations
 
 import pytest
+from app.examples.models.returning import ReturningEvent
 from app.examples.models.upsert import UpsertItem
+
+from plain.postgres.exceptions import FieldError
 
 
 def test_bulk_upsert_inserts_new_rows_and_sets_pks(db):
@@ -17,7 +20,7 @@ def test_bulk_upsert_inserts_new_rows_and_sets_pks(db):
         UpsertItem(key="b", value=2),
     ]
     returned = UpsertItem.query.bulk_upsert(
-        items, update_fields=["value"], unique_fields=["key"]
+        items, update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
     )
 
     assert [r.id for r in returned] == [item.id for item in items]
@@ -34,7 +37,9 @@ def test_bulk_upsert_mixed_batch_inserts_and_updates(db):
         UpsertItem(key="a", value=10),  # conflicts -> update
         UpsertItem(key="b", value=20),  # new -> insert
     ]
-    UpsertItem.query.bulk_upsert(items, update_fields=["value"], unique_fields=["key"])
+    UpsertItem.query.bulk_upsert(
+        items, update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
+    )
 
     by_key = {item.key: item for item in items}
     # The updated row keeps its original primary key.
@@ -51,8 +56,8 @@ def test_bulk_upsert_updates_only_named_fields(db):
 
     UpsertItem.query.bulk_upsert(
         [UpsertItem(key="a", value=99, label="ignored")],
-        update_fields=["value"],
-        unique_fields=["key"],
+        update_fields=[UpsertItem.value],
+        unique_fields=[UpsertItem.key],
     )
 
     row = UpsertItem.query.get(key="a")
@@ -73,7 +78,9 @@ def test_bulk_upsert_matches_returned_rows_by_key_not_order(db):
         UpsertItem(key="a", value=1),
         UpsertItem(key="b", value=2),
     ]
-    UpsertItem.query.bulk_upsert(items, update_fields=["value"], unique_fields=["key"])
+    UpsertItem.query.bulk_upsert(
+        items, update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
+    )
 
     for item in items:
         assert item.id == seeded_ids[item.key]
@@ -84,7 +91,9 @@ def test_bulk_upsert_matches_returned_rows_by_key_not_order(db):
 
 def test_bulk_upsert_empty_returns_empty(db):
     assert (
-        UpsertItem.query.bulk_upsert([], update_fields=["value"], unique_fields=["key"])
+        UpsertItem.query.bulk_upsert(
+            [], update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
+        )
         == []
     )
 
@@ -92,7 +101,10 @@ def test_bulk_upsert_empty_returns_empty(db):
 def test_bulk_upsert_batches(db):
     items = [UpsertItem(key=f"k{i}", value=i) for i in range(5)]
     UpsertItem.query.bulk_upsert(
-        items, update_fields=["value"], unique_fields=["key"], batch_size=2
+        items,
+        update_fields=[UpsertItem.value],
+        unique_fields=[UpsertItem.key],
+        batch_size=2,
     )
 
     assert all(item.id is not None for item in items)
@@ -103,8 +115,8 @@ def test_bulk_upsert_unique_fields_must_match_a_constraint(db):
     with pytest.raises(ValueError, match="must name the primary key"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1)],
-            update_fields=["value"],
-            unique_fields=["value"],  # no unique constraint on value
+            update_fields=[UpsertItem.value],
+            unique_fields=[UpsertItem.value],  # no unique constraint on value
         )
 
 
@@ -112,8 +124,8 @@ def test_bulk_upsert_null_unique_value_rejected(db):
     with pytest.raises(ValueError, match="non-null key"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key=None, value=1)],
-            update_fields=["value"],
-            unique_fields=["key"],
+            update_fields=[UpsertItem.value],
+            unique_fields=[UpsertItem.key],
         )
 
 
@@ -121,8 +133,8 @@ def test_bulk_upsert_update_fields_cannot_overlap_unique_fields(db):
     with pytest.raises(ValueError, match="cannot overlap unique_fields"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1)],
-            update_fields=["key"],
-            unique_fields=["key"],
+            update_fields=[UpsertItem.key],
+            unique_fields=[UpsertItem.key],
         )
 
 
@@ -131,7 +143,25 @@ def test_bulk_upsert_requires_update_fields(db):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1)],
             update_fields=[],
-            unique_fields=["key"],
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_bulk_upsert_string_field_rejected(db):
+    with pytest.raises(TypeError, match="takes field references, not strings"):
+        UpsertItem.query.bulk_upsert(
+            [UpsertItem(key="a", value=1)],
+            update_fields=["value"],  # ty: ignore[invalid-argument-type]
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_bulk_upsert_wrong_model_field_rejected(db):
+    with pytest.raises(FieldError, match="belongs to a different model"):
+        UpsertItem.query.bulk_upsert(
+            [UpsertItem(key="a", value=1)],
+            update_fields=[UpsertItem.value],
+            unique_fields=[ReturningEvent.label],
         )
 
 
