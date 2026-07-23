@@ -22,11 +22,22 @@ import httpx
 import tomlkit
 
 from plain.runtime import PLAIN_CACHE_PATH, PLAIN_TEMP_PATH
+from plain.utils.version import compare_versions
 
 TAG_PREFIX = "apps_v"
 
 # Older versions resolve ignore patterns differently, so we don't support them.
 MIN_VERSION = (1, 75, 0)
+
+
+def check_min_version(version: str) -> None:
+    """Raise when `version` predates the oldest Oxc we support."""
+    minimum = ".".join(str(part) for part in MIN_VERSION)
+    if compare_versions(version, minimum) < 0:
+        raise RuntimeError(
+            f"Oxc {version} is too old (minimum is {minimum}) — run `plain code update`"
+        )
+
 
 # Committed third-party code that we don't want to lint or format. Everything
 # else worth skipping (node_modules, .venv, htmlcov, .pytest_cache) is already
@@ -194,11 +205,7 @@ class OxcTool:
             raise RuntimeError(
                 "No Oxc version configured in pyproject.toml — run `plain code install`"
             )
-        if tuple(int(part) for part in version.split(".")) < MIN_VERSION:
-            minimum = ".".join(str(part) for part in MIN_VERSION)
-            raise RuntimeError(
-                f"Oxc {version} is too old (minimum is {minimum}) — run `plain code update`"
-            )
+        check_min_version(version)
         if self.name == "oxlint":
             # oxlint takes ignores as repeated --ignore-pattern flags.
             ignore_args = []
@@ -236,6 +243,12 @@ class OxcTool:
 
 def install_oxc(version: str = "") -> str:
     """Install both oxlint and oxfmt, return the resolved version."""
+    if version:
+        # Before downloading, so a pin below the minimum is rejected instead of
+        # installing, reporting success, and then failing on first use — which
+        # `plain fix` would repeat on every run, since installing "worked".
+        check_min_version(version)
+
     oxlint = OxcTool("oxlint")
     oxfmt = OxcTool("oxfmt")
 
