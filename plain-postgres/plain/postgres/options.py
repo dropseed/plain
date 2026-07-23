@@ -201,6 +201,17 @@ class Options:
             )
         ]
 
+    def unique_fields_match_constraint(self, field_names: set[str | None]) -> bool:
+        """True if field_names names the primary key, or a UniqueConstraint on
+        the model that has no condition and no expressions."""
+        pk_field = self.model._model_meta.get_forward_field("id")
+        if field_names == {pk_field.name}:
+            return True
+        for constraint in self.total_unique_constraints:
+            if set(constraint.fields) == field_names:
+                return True
+        return False
+
     def __repr__(self) -> str:
         return f"<Options for {self.model.__name__}>"
 
