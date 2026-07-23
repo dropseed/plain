@@ -418,6 +418,48 @@ CacheItem.query.bulk_upsert(
   objects by that key, so it's safe to run concurrently without deadlocking on
   overlapping keys.
 
+#### Use `upsert` for a single insert-or-update
+
+`upsert(*, unique_fields, defaults=None, create_defaults=None, conflict_defaults=None, **kwargs)`
+is the single-row counterpart to `bulk_upsert`. It runs one
+`INSERT ... ON CONFLICT (unique_fields) DO UPDATE SET ... RETURNING` statement and
+returns `(obj, created)` — `created` is `True` when a new row was inserted,
+`False` when the conflicting row was updated. The object is hydrated from the
+post-write row, so there's no second query.
+
+```python
+# Insert the flag, or refresh used_at on the existing one.
+flag, created = Flag.query.upsert(
+    name="beta-dashboard",
+    defaults={"used_at": timezone.now()},
+    unique_fields=["name"],
+)
+```
+
+Value sources:
+
+- `**kwargs` and `defaults` are applied on **both** insert and conflict-update.
+  `kwargs` carries the identifying values (including `unique_fields`).
+- `create_defaults` is applied on **insert only** — extras that must not change
+  when the row already exists.
+- `conflict_defaults` overrides the `DO UPDATE SET` for specific columns. A value
+  can be a plain value or an expression, so `{"count": F("count") + 1}` is an
+  atomic counter that reads the existing row:
+
+```python
+view, created = PageView.query.upsert(
+    path="/home",
+    conflict_defaults={"count": F("count") + 1},
+    unique_fields=["path"],
+)
+```
+
+On conflict, every non-unique, non-PK column from `kwargs`/`defaults` is set to the
+value the INSERT proposed, minus any column a `conflict_defaults` override
+replaces. As with `bulk_upsert`, `unique_fields` must name the primary key or a
+`UniqueConstraint` (no condition, no expressions), every unique field must be
+non-null, and the merged result is not validated.
+
 #### Use queryset `.update()` / `.delete()` for mass operations
 
 ```python
