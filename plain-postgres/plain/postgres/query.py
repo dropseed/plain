@@ -288,10 +288,10 @@ class QuerySet[T: "Model"]:
     _deferred_filter: tuple[bool, tuple[Any, ...], dict[str, Any]] | None
     # None => plain update()/delete() returning an int rowcount.
     # () => RETURNING every concrete column, hydrated into model instances.
-    # (name, ...) => RETURNING those columns, returned as dicts.
-    _returning: tuple[str, ...] | None
-    # The concrete fields resolved from _returning, or None for a plain write.
-    # Set once by returning() so update()/delete() don't re-resolve at execute.
+    # (field, ...) => RETURNING those columns, returned as dicts.
+    _returning: tuple[Field, ...] | None
+    # The concrete fields to RETURN, or None for a plain write. Set once by
+    # returning() so update()/delete() don't recompute them at execute.
     _returning_fields: list[Field] | None
 
     def __init__(self):
@@ -997,17 +997,20 @@ class QuerySet[T: "Model"]:
     def returning(self) -> ReturningQuerySet[T, list[T]]: ...
 
     @overload
-    def returning(self, *fields: str) -> ReturningQuerySet[T, list[dict[str, Any]]]: ...
+    def returning(
+        self, *fields: Field[Any]
+    ) -> ReturningQuerySet[T, list[dict[str, Any]]]: ...
 
-    def returning(self, *fields: str) -> ReturningQuerySet[T, Any]:
+    def returning(self, *fields: Field[Any]) -> ReturningQuerySet[T, Any]:
         """Capture the rows touched by the next update() or delete().
 
         With no arguments, update()/delete() return the affected rows as
         model instances (RETURNING every concrete column). Given field
-        names, they return a list of dicts holding just those columns.
-        Without returning(), update()/delete() return an int rowcount.
+        references (`Model.field`), they return a list of dicts holding just
+        those columns. Without returning(), update()/delete() return an int
+        rowcount.
 
-        The field names are validated here, so a bad name errors at the
+        The references are validated here, so a bad one errors at the
         returning() call rather than when the write runs.
         """
         clone = self._chain()
@@ -1017,28 +1020,35 @@ class QuerySet[T: "Model"]:
         return cast("ReturningQuerySet[T, Any]", clone)
 
     def _resolve_returning_fields(self) -> list[Field]:
-        """Translate self._returning into the concrete fields to RETURN."""
-        meta = self.model._model_meta
+        """Validate self._returning and produce the concrete fields to RETURN."""
+        object_name = self.model.model_options.object_name
         if not self._returning:
-            # No names given: RETURN every concrete column so the rows can be
-            # hydrated into full model instances.
-            return list(meta.concrete_fields)
-        fields = []
-        for name in self._returning:
-            try:
-                field = meta.get_field(name)
-            except FieldDoesNotExist:
-                raise FieldError(
-                    f"Cannot resolve '{name}' in returning() for "
-                    f"{self.model.model_options.object_name}: no such field."
+            # No references given: RETURN every concrete column so the rows can
+            # be hydrated into full model instances.
+            return list(self.model._model_meta.concrete_fields)
+        for field in self._returning:
+            if isinstance(field, str):
+                raise TypeError(
+                    f"returning() takes field references, not strings. "
+                    f"Pass {object_name}.{field} instead of {field!r}."
                 )
-            if not isinstance(field, Field) or not field.concrete:
-                raise FieldError(
-                    f"Cannot use '{name}' in returning(): only concrete "
-                    "database columns can be returned."
+            if not isinstance(field, Field):
+                raise TypeError(
+                    f"returning() takes field references like "
+                    f"{object_name}.<field>, not {field!r}."
                 )
-            fields.append(field)
-        return fields
+            if field.model is not self.model:
+                raise FieldError(
+                    f"Cannot use {field.model.model_options.object_name}."
+                    f"{field.name} in returning() for {object_name}: it "
+                    "belongs to a different model."
+                )
+            if not field.concrete:
+                raise FieldError(
+                    f"Cannot use {object_name}.{field.name} in returning(): "
+                    "only concrete database columns can be returned."
+                )
+        return list(self._returning)
 
     def _hydrate_returning(self, fields: list[Field], rows: list[list]) -> list[Any]:
         """Turn converted RETURNING rows into instances (no names) or dicts."""
