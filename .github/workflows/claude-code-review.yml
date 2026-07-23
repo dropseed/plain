@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  # Lets the action exchange an OIDC token for a Claude GitHub App token,
+  # so reviews post as the branded app instead of github-actions[bot].
+  id-token: write
 
 jobs:
   review:
