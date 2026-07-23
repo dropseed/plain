@@ -434,14 +434,17 @@ post-write row, so there's no second query.
 flag, created = Flag.query.upsert(
     name="beta-dashboard",
     defaults={"used_at": timezone.now()},
-    unique_fields=["name"],
+    unique_fields=[Flag.name],
 )
 ```
+
+`unique_fields` takes field references (`Model.field`), like `bulk_upsert`. The
+value sources below stay string-keyed — they follow the `kwargs` idiom.
 
 Value sources:
 
 - `**kwargs` and `defaults` are applied on **both** insert and conflict-update.
-  `kwargs` carries the identifying values (including `unique_fields`).
+  `kwargs` carries the identifying values (including the unique fields).
 - `create_defaults` is applied on **insert only** — extras that must not change
   when the row already exists.
 - `conflict_defaults` overrides the `DO UPDATE SET` for specific columns. A value
@@ -452,7 +455,7 @@ Value sources:
 view, created = PageView.query.upsert(
     path="/home",
     conflict_defaults={"count": F("count") + 1},
-    unique_fields=["path"],
+    unique_fields=[PageView.path],
 )
 ```
 

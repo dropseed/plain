@@ -932,7 +932,7 @@ class QuerySet[T: "Model"]:
         defaults: dict[str, Any] | None = None,
         create_defaults: dict[str, Any] | None = None,
         conflict_defaults: dict[str, Any] | None = None,
-        unique_fields: list[str],
+        unique_fields: list[Field],
         **kwargs: Any,
     ) -> tuple[T, bool]:
         """
@@ -958,13 +958,18 @@ class QuerySet[T: "Model"]:
         in the update. The merged result is not validated -- consistent with
         the other bulk write paths.
 
-        unique_fields must name the primary key or a UniqueConstraint declared
-        on the model without a condition or expressions, and every unique field
-        must have a non-null value (NULL never conflicts in Postgres).
+        unique_fields takes field references (`Model.field`) and must name the
+        primary key or a UniqueConstraint declared on the model without a
+        condition or expressions; every unique field must have a non-null value
+        (NULL never conflicts in Postgres). The value sources above stay
+        string-keyed -- they follow the kwargs idiom, not field references.
         """
         meta = self.model._model_meta
 
-        self._validate_upsert_unique_fields(unique_fields, operation_name="upsert")
+        self._validate_field_refs(unique_fields, where="upsert() unique_fields")
+        self._validate_upsert_unique_fields(
+            [f.name for f in unique_fields], operation_name="upsert"
+        )
 
         defaults = defaults or {}
         create_defaults = create_defaults or {}
@@ -981,8 +986,7 @@ class QuerySet[T: "Model"]:
         # more confusingly, matching get_or_create()'s validation.
         self._validate_model_field_names(insert_values)
 
-        unique_field_objs = [meta.get_forward_field(name) for name in unique_fields]
-        for field in unique_field_objs:
+        for field in unique_fields:
             assert field.name is not None
             self._reject_null_upsert_key(
                 field, insert_values.get(field.name), operation_name="upsert"
@@ -991,7 +995,7 @@ class QuerySet[T: "Model"]:
         # The conflict-update columns: everything from kwargs and defaults that
         # isn't a unique field or the PK. create_defaults are insert-only, so
         # they never appear here.
-        unique_field_names = {f.name for f in unique_field_objs}
+        unique_field_names = {f.name for f in unique_fields}
         update_names = {
             name for name in (*kwargs, *defaults) if name not in unique_field_names
         }
@@ -1022,7 +1026,7 @@ class QuerySet[T: "Model"]:
                 returning_fields=returning_fields,
                 on_conflict=OnConflict.UPDATE,
                 update_fields=update_field_objs,
-                unique_fields=unique_field_objs,
+                unique_fields=unique_fields,
                 conflict_defaults=conflict_default_objs,
                 returning_created=True,
             )

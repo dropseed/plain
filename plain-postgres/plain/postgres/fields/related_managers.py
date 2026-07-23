@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
     from plain.postgres.base import Model
+    from plain.postgres.fields.base import Field
     from plain.postgres.fields.related import ForeignKeyField, ManyToManyField
 
 import builtins
@@ -218,7 +219,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         defaults: dict[str, Any] | None = None,
         create_defaults: dict[str, Any] | None = None,
         conflict_defaults: dict[str, Any] | None = None,
-        unique_fields: list[str],
+        unique_fields: list[Field],
         **kwargs: Any,
     ) -> tuple[T, bool]:
         self._check_fk_val()
@@ -521,7 +522,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         defaults: dict[str, Any] | None = None,
         create_defaults: dict[str, Any] | None = None,
         conflict_defaults: dict[str, Any] | None = None,
-        unique_fields: list[str],
+        unique_fields: list[Field],
         **kwargs: Any,
     ) -> tuple[T, bool]:
         obj, created = self.model.query.upsert(

@@ -16,7 +16,9 @@ from plain.postgres.expressions import F
 
 
 def test_upsert_inserts_new_row(db):
-    obj, created = UpsertItem.query.upsert(key="a", value=1, unique_fields=["key"])
+    obj, created = UpsertItem.query.upsert(
+        key="a", value=1, unique_fields=[UpsertItem.key]
+    )
 
     assert created is True
     assert obj.id is not None
@@ -29,7 +31,9 @@ def test_upsert_updates_conflicting_row(db):
     UpsertItem(key="a", value=1).create()
     existing_id = UpsertItem.query.get(key="a").id
 
-    obj, created = UpsertItem.query.upsert(key="a", value=99, unique_fields=["key"])
+    obj, created = UpsertItem.query.upsert(
+        key="a", value=99, unique_fields=[UpsertItem.key]
+    )
 
     assert created is False
     # The updated row keeps its primary key, and obj carries the merged value.
@@ -41,12 +45,12 @@ def test_upsert_updates_conflicting_row(db):
 
 def test_upsert_defaults_apply_on_insert_and_update(db):
     obj, created = UpsertItem.query.upsert(
-        key="a", defaults={"value": 5}, unique_fields=["key"]
+        key="a", defaults={"value": 5}, unique_fields=[UpsertItem.key]
     )
     assert (created, obj.value) == (True, 5)
 
     obj, created = UpsertItem.query.upsert(
-        key="a", defaults={"value": 7}, unique_fields=["key"]
+        key="a", defaults={"value": 7}, unique_fields=[UpsertItem.key]
     )
     assert (created, obj.value) == (False, 7)
 
@@ -56,7 +60,7 @@ def test_upsert_create_defaults_apply_on_insert_only(db):
         key="a",
         defaults={"value": 1},
         create_defaults={"label": "created"},
-        unique_fields=["key"],
+        unique_fields=[UpsertItem.key],
     )
     assert (created, obj.label) == (True, "created")
 
@@ -66,7 +70,7 @@ def test_upsert_create_defaults_apply_on_insert_only(db):
         key="a",
         defaults={"value": 2},
         create_defaults={"label": "ignored-on-conflict"},
-        unique_fields=["key"],
+        unique_fields=[UpsertItem.key],
     )
     assert created is False
     assert obj.label == "created"
@@ -80,7 +84,7 @@ def test_upsert_conflict_defaults_increment_counter_atomically(db):
         key="a",
         value=0,  # the value the INSERT would have proposed (ignored on conflict)
         conflict_defaults={"value": F("value") + 1},
-        unique_fields=["key"],
+        unique_fields=[UpsertItem.key],
     )
 
     assert created is False
@@ -95,7 +99,7 @@ def test_upsert_conflict_defaults_apply_on_insert_uses_inserted_value(db):
         key="a",
         value=3,
         conflict_defaults={"value": F("value") + 100},
-        unique_fields=["key"],
+        unique_fields=[UpsertItem.key],
     )
     assert (created, obj.value) == (True, 3)
 
@@ -104,10 +108,10 @@ def test_upsert_all_unique_fields_is_idempotent(db):
     # When every inserted column is a unique field there's nothing to update;
     # the second call must still return the existing row (created=False).
     obj1, created1 = Widget.query.upsert(
-        name="Toyota", size="Tundra", unique_fields=["name", "size"]
+        name="Toyota", size="Tundra", unique_fields=[Widget.name, Widget.size]
     )
     obj2, created2 = Widget.query.upsert(
-        name="Toyota", size="Tundra", unique_fields=["name", "size"]
+        name="Toyota", size="Tundra", unique_fields=[Widget.name, Widget.size]
     )
 
     assert created1 is True
@@ -123,12 +127,26 @@ def test_upsert_requires_unique_fields(db):
 
 def test_upsert_unique_fields_must_match_a_constraint(db):
     with pytest.raises(ValueError, match="must name the primary key"):
-        UpsertItem.query.upsert(key="a", value=1, unique_fields=["value"])
+        UpsertItem.query.upsert(key="a", value=1, unique_fields=[UpsertItem.value])
 
 
 def test_upsert_rejects_null_unique_value(db):
     with pytest.raises(ValueError, match="non-null"):
-        UpsertItem.query.upsert(key=None, unique_fields=["key"])
+        UpsertItem.query.upsert(key=None, unique_fields=[UpsertItem.key])
+
+
+def test_upsert_string_unique_field_rejected(db):
+    with pytest.raises(TypeError, match="takes field references, not strings"):
+        UpsertItem.query.upsert(
+            key="a",
+            value=1,
+            unique_fields=["key"],  # ty: ignore[invalid-argument-type]
+        )
+
+
+def test_upsert_wrong_model_unique_field_rejected(db):
+    with pytest.raises(FieldError, match="belongs to a different model"):
+        UpsertItem.query.upsert(key="a", value=1, unique_fields=[Widget.name])
 
 
 def test_upsert_conflict_defaults_accepts_related_instance(db):
@@ -141,7 +159,7 @@ def test_upsert_conflict_defaults_accepts_related_instance(db):
         key="a",
         value=2,
         conflict_defaults={"owner": owner},
-        unique_fields=["key"],
+        unique_fields=[UpsertItem.key],
     )
 
     assert created is False
@@ -155,13 +173,13 @@ def test_upsert_conflict_defaults_accepts_related_instance(db):
 def test_upsert_rejects_unknown_field_name(db):
     with pytest.raises(FieldError, match="typo_field"):
         UpsertItem.query.upsert(
-            key="a", defaults={"typo_field": 1}, unique_fields=["key"]
+            key="a", defaults={"typo_field": 1}, unique_fields=[UpsertItem.key]
         )
 
 
 def test_upsert_insert_is_one_statement(db, capture_queries):
     with capture_queries() as queries:
-        UpsertItem.query.upsert(key="a", value=1, unique_fields=["key"])
+        UpsertItem.query.upsert(key="a", value=1, unique_fields=[UpsertItem.key])
 
     assert len(queries) == 1
 
@@ -170,6 +188,6 @@ def test_upsert_conflict_is_one_statement(db, capture_queries):
     UpsertItem(key="a", value=1).create()
 
     with capture_queries() as queries:
-        UpsertItem.query.upsert(key="a", value=2, unique_fields=["key"])
+        UpsertItem.query.upsert(key="a", value=2, unique_fields=[UpsertItem.key])
 
     assert len(queries) == 1

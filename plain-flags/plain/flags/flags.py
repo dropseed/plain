@@ -83,7 +83,7 @@ class Flag(ABC):
             flag_obj, _ = Flag.query.upsert(
                 name=flag_name,
                 defaults={"used_at": timezone.now()},
-                unique_fields=["name"],
+                unique_fields=[Flag.name],
             )
 
             if not flag_obj.enabled:

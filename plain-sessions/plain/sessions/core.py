@@ -176,7 +176,7 @@ class SessionStore(MutableMapping):
                     "expires_at": timezone.now()
                     + timedelta(seconds=settings.SESSION_COOKIE_AGE),
                 },
-                unique_fields=["session_key"],
+                unique_fields=[self._model.session_key],
             )
 
         if created:

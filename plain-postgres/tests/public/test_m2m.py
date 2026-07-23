@@ -32,8 +32,12 @@ def test_create_unique_constraint(db):
 
 
 def test_upsert_unique_constraint(db):
-    Widget.query.upsert(name="Toyota", size="Tundra", unique_fields=["name", "size"])
-    Widget.query.upsert(name="Toyota", size="Tundra", unique_fields=["name", "size"])
+    Widget.query.upsert(
+        name="Toyota", size="Tundra", unique_fields=[Widget.name, Widget.size]
+    )
+    Widget.query.upsert(
+        name="Toyota", size="Tundra", unique_fields=[Widget.name, Widget.size]
+    )
 
     assert Widget.query.count() == 1
 
@@ -44,7 +48,7 @@ def test_m2m_manager_upsert_adds_relationship_on_insert(db):
     """
     widget = Widget.query.create(name="Tesla", size="Model 3")
 
-    tag, created = widget.tags.upsert(name="GPS", unique_fields=["name"])
+    tag, created = widget.tags.upsert(name="GPS", unique_fields=[Tag.name])
     assert created is True
     assert widget.tags.query.count() == 1
     assert widget.tags.query.first() == tag
@@ -57,7 +61,7 @@ def test_m2m_manager_upsert_does_not_readd_on_conflict(db):
 
     # The tag already exists and is already related; upsert must not create a
     # duplicate through-row.
-    tag, created = widget.tags.upsert(name="GPS", unique_fields=["name"])
+    tag, created = widget.tags.upsert(name="GPS", unique_fields=[Tag.name])
     assert created is False
     assert tag.id == gps.id
     assert widget.tags.query.count() == 1
