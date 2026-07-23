@@ -33,7 +33,7 @@ from plain.postgres.fields import (
     PrimaryKeyField,
 )
 from plain.postgres.functions import Cast
-from plain.postgres.query_utils import FilteredRelation, Q
+from plain.postgres.query_utils import Q
 from plain.postgres.sql import (
     AND,
     CURSOR,
@@ -49,7 +49,7 @@ from plain.postgres.utils import resolve_callables
 from plain.utils.functional import partition
 
 # Re-exports for public API
-__all__ = ["F", "Q", "QuerySet", "RawQuerySet", "Prefetch", "FilteredRelation"]
+__all__ = ["F", "Q", "QuerySet", "RawQuerySet", "Prefetch"]
 
 if TYPE_CHECKING:
     from plain.postgres import Model
@@ -1237,18 +1237,6 @@ class QuerySet[T: "Model"]:
         if lookups == (None,):
             clone._prefetch_related_lookups = ()
         else:
-            for lookup in lookups:
-                lookup_str: str
-                if isinstance(lookup, Prefetch):
-                    lookup_str = lookup.prefetch_to
-                else:
-                    assert isinstance(lookup, str)
-                    lookup_str = lookup
-                lookup_str = lookup_str.split(LOOKUP_SEP, 1)[0]
-                if lookup_str in self.sql_query._filtered_relations:
-                    raise ValueError(
-                        "prefetch_related() is not supported with FilteredRelation."
-                    )
             clone._prefetch_related_lookups = clone._prefetch_related_lookups + lookups
         return clone
 
@@ -1295,14 +1283,11 @@ class QuerySet[T: "Model"]:
                 raise ValueError(
                     f"The annotation '{alias}' conflicts with a field on the model."
                 )
-            if isinstance(annotation, FilteredRelation):
-                clone.sql_query.add_filtered_relation(annotation, alias)
-            else:
-                clone.sql_query.add_annotation(
-                    annotation,
-                    alias,
-                    select=select,
-                )
+            clone.sql_query.add_annotation(
+                annotation,
+                alias,
+                select=select,
+            )
         for alias, annotation in clone.sql_query.annotations.items():
             if alias in annotations and annotation.contains_aggregate:
                 if clone._fields is None:
@@ -1370,10 +1355,6 @@ class QuerySet[T: "Model"]:
             # Can only pass None to defer(), not only(), as the rest option.
             # That won't stop people trying to do this, so let's be explicit.
             raise TypeError("Cannot pass None as an argument to only().")
-        for field in fields:
-            field = field.split(LOOKUP_SEP, 1)[0]
-            if field in self.sql_query._filtered_relations:
-                raise ValueError("only() is not supported with FilteredRelation.")
         clone = self._chain()
         clone.sql_query.add_immediate_loading(set(fields))
         return clone

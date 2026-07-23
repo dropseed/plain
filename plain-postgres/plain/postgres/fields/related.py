@@ -390,7 +390,8 @@ class ForeignKeyField(ColumnField, RelatedField):
             return (self.target_field.column, self.column)
         return (self.column, self.target_field.column)
 
-    def get_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
+    @cached_property
+    def path_infos(self) -> list[PathInfo]:
         """Get path from this field to the related model."""
         meta = self.remote_field.model._model_meta
         from_meta = self.model._model_meta
@@ -402,15 +403,11 @@ class ForeignKeyField(ColumnField, RelatedField):
                 join_field=self,
                 m2m=False,
                 direct=True,
-                filtered_relation=filtered_relation,
             )
         ]
 
     @cached_property
-    def path_infos(self) -> list[PathInfo]:
-        return self.get_path_info()
-
-    def get_reverse_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
+    def reverse_path_infos(self) -> list[PathInfo]:
         """Get path from the related model to this field's model."""
         meta = self.model._model_meta
         from_meta = self.remote_field.model._model_meta
@@ -423,13 +420,8 @@ class ForeignKeyField(ColumnField, RelatedField):
                 # The reverse of a foreign key always fans out to many rows.
                 m2m=True,
                 direct=False,
-                filtered_relation=filtered_relation,
             )
         ]
-
-    @cached_property
-    def reverse_path_infos(self) -> list[PathInfo]:
-        return self.get_reverse_path_info()
 
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
         super().contribute_to_class(cls, name)
@@ -870,9 +862,7 @@ class ManyToManyField(RelatedField):
 
         return name, path, args, kwargs
 
-    def _get_path_info(
-        self, direct: bool = False, filtered_relation: Any = None
-    ) -> list[PathInfo]:
+    def _get_path_info(self, direct: bool = False) -> list[PathInfo]:
         """Called by both direct and indirect m2m traversal."""
         int_model = self.remote_field.through
         # M2M through model fields are always ForeignKey
@@ -886,32 +876,20 @@ class ManyToManyField(RelatedField):
         )
         if direct:
             join1infos = linkfield1.reverse_path_infos
-            if filtered_relation:
-                join2infos = linkfield2.get_path_info(filtered_relation)
-            else:
-                join2infos = linkfield2.path_infos
+            join2infos = linkfield2.path_infos
         else:
             join1infos = linkfield2.reverse_path_infos
-            if filtered_relation:
-                join2infos = linkfield1.get_path_info(filtered_relation)
-            else:
-                join2infos = linkfield1.path_infos
+            join2infos = linkfield1.path_infos
 
         return [*join1infos, *join2infos]
 
-    def get_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
-        return self._get_path_info(direct=True, filtered_relation=filtered_relation)
-
     @cached_property
     def path_infos(self) -> list[PathInfo]:
-        return self.get_path_info()
-
-    def get_reverse_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
-        return self._get_path_info(direct=False, filtered_relation=filtered_relation)
+        return self._get_path_info(direct=True)
 
     @cached_property
     def reverse_path_infos(self) -> list[PathInfo]:
-        return self.get_reverse_path_info()
+        return self._get_path_info(direct=False)
 
     def _get_m2m_db_table(self) -> str:
         """

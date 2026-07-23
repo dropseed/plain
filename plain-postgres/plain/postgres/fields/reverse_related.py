@@ -139,15 +139,9 @@ class ForeignObjectRel(FieldCacheMixin):
     def get_joining_columns(self) -> tuple[str, str]:
         return self.field.get_joining_columns(reverse_join=True)
 
-    def get_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
-        if filtered_relation:
-            return self.field.get_reverse_path_info(filtered_relation)
-        else:
-            return self.field.reverse_path_infos
-
     @cached_property
     def path_infos(self) -> list[PathInfo]:
-        return self.get_path_info()
+        return self.field.reverse_path_infos
 
     def get_cache_name(self) -> str:
         """

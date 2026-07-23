@@ -4,7 +4,7 @@ import collections
 import json
 import re
 from collections.abc import Generator, Iterable, Sequence
-from functools import cached_property, partial
+from functools import cached_property
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -980,9 +980,7 @@ class SQLCompiler:
                 for f in opts.related_objects
                 if f.field.primary_key
             )
-            return chain(
-                direct_choices, reverse_choices, self.query._filtered_relations
-            )
+            return chain(direct_choices, reverse_choices)
 
         # Setup for the case when only particular related fields should be
         # included in the related selection.
@@ -1111,63 +1109,7 @@ class SQLCompiler:
                 )
                 get_related_klass_infos(klass_info, next_klass_infos)
 
-            def local_setter(final_field: Any, obj: Any, from_obj: Any) -> None:
-                # Set a reverse fk object when relation is non-empty.
-                if from_obj:
-                    final_field.remote_field.set_cached_value(from_obj, obj)
-
-            def local_setter_noop(obj: Any, from_obj: Any) -> None:
-                pass
-
-            def remote_setter(name: str, obj: Any, from_obj: Any) -> None:
-                setattr(from_obj, name, obj)
-
             assert requested is not None
-            for name in list(requested):
-                # Filtered relations work only on the topmost level.
-                if cur_depth > 1:
-                    break
-                if name in self.query._filtered_relations:
-                    fields_found.add(name)
-                    final_field, _, join_opts, joins, _, _ = self.query.setup_joins(
-                        [name], opts, root_alias
-                    )
-                    model = join_opts.model
-                    alias = joins[-1]
-                    klass_info: dict[str, Any] = {
-                        "model": model,
-                        "field": final_field,
-                        "reverse": True,
-                        "local_setter": (
-                            partial(local_setter, final_field)
-                            if len(joins) <= 2
-                            else local_setter_noop
-                        ),
-                        "remote_setter": partial(remote_setter, name),
-                    }
-                    related_klass_infos.append(klass_info)
-                    select_fields = []
-                    field_select_mask = select_mask.get((name, final_field)) or {}
-                    columns = self.get_default_columns(
-                        field_select_mask,
-                        start_alias=alias,
-                        opts=model._model_meta,
-                    )
-                    for col in columns:
-                        select_fields.append(len(select))
-                        select.append((col, None))
-                    klass_info["select_fields"] = select_fields
-                    next_requested = requested.get(name, {})
-                    next_klass_infos = self.get_related_selections(
-                        select,
-                        field_select_mask,
-                        opts=model._model_meta,
-                        root_alias=alias,
-                        cur_depth=cur_depth + 1,
-                        requested=next_requested,
-                        restricted=restricted,
-                    )
-                    get_related_klass_infos(klass_info, next_klass_infos)
             fields_not_found = set(requested).difference(fields_found)
             if fields_not_found:
                 invalid_fields = (f"'{s}'" for s in fields_not_found)
