@@ -438,14 +438,14 @@ running = Job.query.filter(status="pending").returning().update(status="running"
 for job in running:
     print(job.id, job.status)  # reflects the post-update values
 
-# Field names: rows come back as dicts of just those columns.
-deleted = Event.query.filter(created_at__lt=cutoff).returning("id", "payload").delete()
+# Field references: rows come back as dicts of just those columns.
+deleted = Event.query.filter(created_at__lt=cutoff).returning(Event.id, Event.payload).delete()
 for row in deleted:
     print(row["id"], row["payload"])  # the rows as they were deleted
 ```
 
 - **`returning()`** returns full model instances. For `update()` they hold the new values; for `delete()`, the rows as they were.
-- **`returning("field", ...)`** returns a list of dicts with only those columns. Passing an unknown or non-concrete field name raises `FieldError` at the `returning()` call.
+- **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a non-concrete field or one from another model raises an error at the `returning()` call.
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
 
 `RETURNING` only reports rows of the statement's own target table. Rows removed by a cascading `ON DELETE` are never included — a `delete()` with `returning()` gives you the parent rows you deleted, not the children Postgres cascaded.
