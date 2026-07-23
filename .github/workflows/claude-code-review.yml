@@ -58,4 +58,12 @@ jobs:
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
           prompt: "/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}"
-          claude_args: "--model opus"
+          claude_args: "--model opus --debug"
+
+      # Surface Claude's execution log when a run fails — the stream output
+      # in the job log omits the underlying error message.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: claude-execution-output
+          path: /home/runner/work/_temp/claude-execution-output.json
