@@ -33,6 +33,7 @@ from pathlib import Path
 
 import click
 
+from ..state import checkout_id, checkout_state_path
 from .backends import (
     LOCAL_PORT,
     Server,
@@ -127,7 +128,7 @@ def command_may_start_server() -> bool:
 
 
 def cache_path(project_root: Path) -> Path:
-    return project_root / ".plain" / "dev" / "postgres-url"
+    return checkout_state_path(project_root) / "postgres-url"
 
 
 class CachedURL(Enum):
@@ -299,7 +300,7 @@ def ensure_database(cluster: Cluster, *, project_root: Path, db_name: str) -> No
 
     cluster.record_created(
         db_name,
-        checkout=str(project_root.resolve()),
+        checkout=checkout_id(project_root),
         created_via=mechanism,
         project_root=project_root,
     )

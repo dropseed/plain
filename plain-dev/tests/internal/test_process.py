@@ -15,11 +15,11 @@ from plain.dev.process import Supervisor
 
 @pytest.fixture
 def supervisor(tmp_path):
-    """Build a Supervisor whose pidfile lives in an isolated tmp dir."""
+    """Build a Supervisor whose pidfile lands in the isolated cache root."""
 
     def _make():
         class _Supervisor(Supervisor):
-            pidfile = tmp_path / "dev" / "thing.pid"
+            state_filename = "thing.pid"
             log_dir = tmp_path / "dev" / "logs"
 
         return _Supervisor()
@@ -74,8 +74,8 @@ def test_release_clears_recorded_pid(supervisor):
 def test_acquire_reclaims_a_dead_supervisors_marker(supervisor):
     """A pidfile left by a crashed supervisor (lock already gone) is reclaimed."""
     s = supervisor()
-    s.pidfile.parent.mkdir(parents=True, exist_ok=True)
-    s.pidfile.write_text(str(_dead_pid()))  # stale marker, no lock held
+    s.pidfile_path().parent.mkdir(parents=True, exist_ok=True)
+    s.pidfile_path().write_text(str(_dead_pid()))  # stale marker, no lock held
 
     try:
         assert s.acquire() is True
@@ -86,15 +86,15 @@ def test_acquire_reclaims_a_dead_supervisors_marker(supervisor):
 
 def test_running_pid_is_none_for_dead_process(supervisor):
     s = supervisor()
-    s.pidfile.parent.mkdir(parents=True, exist_ok=True)
-    s.pidfile.write_text(str(_dead_pid()))
+    s.pidfile_path().parent.mkdir(parents=True, exist_ok=True)
+    s.pidfile_path().write_text(str(_dead_pid()))
     assert s.running_pid() is None
 
 
 def test_corrupted_pidfile_reads_as_absent(supervisor):
     s = supervisor()
-    s.pidfile.parent.mkdir(parents=True, exist_ok=True)
-    s.pidfile.write_text("not-a-pid")
+    s.pidfile_path().parent.mkdir(parents=True, exist_ok=True)
+    s.pidfile_path().write_text("not-a-pid")
     assert s.read_pidfile() is None
     assert s.running_pid() is None
     try:
@@ -108,9 +108,9 @@ def test_stop_process_ignores_a_stale_marker(supervisor):
     """A stale pid (its supervisor is gone) must not be signalled — that pid
     could have been recycled by an unrelated process."""
     s = supervisor()
-    s.pidfile.parent.mkdir(parents=True, exist_ok=True)
+    s.pidfile_path().parent.mkdir(parents=True, exist_ok=True)
     dead = _dead_pid()
-    s.pidfile.write_text(str(dead))
+    s.pidfile_path().write_text(str(dead))
 
     s.stop_process()  # No live owner holds the lock → no signal sent.
     # The marker is left untouched; it self-heals on the next acquire().

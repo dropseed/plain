@@ -83,7 +83,7 @@ def auto_start_services() -> None:
 
 
 class ServicesSupervisor(Supervisor):
-    pidfile = PLAIN_TEMP_PATH / "dev" / "services.pid"
+    state_filename = "services.pid"
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "services"
     background_command = ["dev", "services"]
     display_name = "Services"

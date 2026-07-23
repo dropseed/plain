@@ -27,7 +27,6 @@ from .postgres.identity import (
     PostgresConfig,
     clear_pointer,
     cluster_name,
-    find_project_root,
     project_identity,
     read_pointer,
     resolve_database_name,
@@ -42,6 +41,7 @@ from .postgres.resolve import (
     write_cached_url,
 )
 from .postgres.schema_state import pending_migration_count
+from .state import checkout_id, find_project_root
 
 
 def _project_root() -> Path:
@@ -108,7 +108,7 @@ def status(as_json: bool) -> None:
 
     project_root, cluster, project_name, db_name = _open()
     source = (
-        "pointer (.plain/dev/database)"
+        "pointer (plain db use)"
         if read_pointer(project_root)
         else "derived from directory"
     )
@@ -252,7 +252,7 @@ def create(name: str | None) -> None:
     cluster.create_database(name)
     cluster.record_created(
         name,
-        checkout=str(project_root.resolve()) if name == db_name else None,
+        checkout=checkout_id(project_root) if name == db_name else None,
         created_via="create",
         project_root=project_root,
     )
@@ -336,7 +336,7 @@ def reset(yes: bool) -> None:
     cluster.create_database(db_name)
     cluster.record_created(
         db_name,
-        checkout=str(project_root.resolve()),
+        checkout=checkout_id(project_root),
         created_via="reset",
         project_root=project_root,
     )

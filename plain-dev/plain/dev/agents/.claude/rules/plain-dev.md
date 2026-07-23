@@ -17,13 +17,15 @@ when there's no tunnel, or for local CLI checks (`curl`, `plain request`).
 
 ## Worktrees and `.plain/`
 
-- `.plain/` is disposable per-checkout state (pid files, logs, compiled assets,
-  db pointer). Never symlink or share it between checkouts/worktrees — shared
-  pid files block `plain dev`, and shared assets/db pointers silently
-  cross-contaminate. Each checkout builds its own automatically.
-- There's nothing in `.plain/` worth sharing: downloaded tool binaries
-  (Tailwind, Oxc, mkcert) are cached machine-wide in `~/.cache/plain`, and each
-  worktree's database is forked from the main checkout's data (see below).
+- `.plain/` holds a checkout's disposable _artifacts_ — logs, compiled assets,
+  certificates. It's rebuilt automatically, so there's nothing in it worth
+  sharing, but sharing it between checkouts is at worst confusing, not
+  corrupting: the _facts_ that decide which database and which dev server are
+  this checkout's live outside it (see below), so a shared `.plain/` can't
+  cross-contaminate them.
+- Downloaded tool binaries (Tailwind, Oxc, mkcert) are cached machine-wide in
+  `~/.cache/plain`, and each worktree's database is forked from the main
+  checkout's data (see below).
 
 ## Dev databases
 
@@ -49,8 +51,10 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
   frees one up (~76MB each), `plain db server remove` deletes it and its data.
 - `plain db` is for _which_ database; `plain postgres sync` is for its schema.
   Don't reach for one to do the other's job.
-- Don't hand-edit `.plain/dev/`. `postgres-url` is a derived cache that repairs
-  itself, and `database` is the pointer `plain db use` writes — change it with
-  `plain db use` instead.
+- Facts about a checkout — which database it uses, whether its dev server is
+  running — live outside it, keyed by its path (under `PLAIN_CACHE_PATH`), so
+  copying or symlinking a working tree can't make two checkouts share a
+  database or a dev slot. Change the database with `plain db use`, not by
+  editing files. `.plain/` keeps only artifacts: logs, compiled assets, certs.
 
 Run `uv run plain docs dev` for the full picture.

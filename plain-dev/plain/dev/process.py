@@ -9,6 +9,7 @@ from typing import Any
 
 from .poncho.manager import Manager as PonchoManager
 from .poncho.printer import Printer
+from .state import checkout_state_path, find_project_root
 
 
 def _pid_is_alive(pid: int) -> bool:
@@ -32,12 +33,27 @@ class Supervisor:
     is not what guards against duplicates.
     """
 
-    pidfile: Path
+    # Filename this supervisor records its pid under, e.g. "dev.pid".
+    state_filename: str
     log_dir: Path
     # Foreground command that re-runs this supervisor, e.g. ["dev", "services"].
     background_command: list[str]
     # Human label for "already running" warnings, e.g. "Services".
     display_name: str
+
+    @classmethod
+    def pidfile_path(cls) -> Path:
+        """Where this checkout records which process owns the supervisor slot.
+
+        Kept beside the checkout's other facts rather than in its `.plain`, so
+        two worktrees that end up sharing one can't each report the other's
+        server as already running — see `plain.dev.state`.
+
+        Derived on use rather than at import, because it depends on the working
+        directory: as a class attribute it would freeze before the process has
+        finished deciding where it is, while reading like a constant.
+        """
+        return checkout_state_path(find_project_root(Path.cwd())) / cls.state_filename
 
     def __init__(self):
         self.pid = os.getpid()
@@ -51,9 +67,9 @@ class Supervisor:
     # ------------------------------------------------------------------
     @classmethod
     def read_pidfile(cls) -> int | None:
-        """Return the PID recorded in *cls.pidfile* (or ``None``)."""
+        """Return the PID recorded in the pidfile (or ``None``)."""
         try:
-            return int(cls.pidfile.read_text())
+            return int(cls.pidfile_path().read_text())
         except (ValueError, OSError):
             # Missing, empty (released), or partial – treat as absent.
             return None
@@ -82,8 +98,9 @@ class Supervisor:
         would collide on shared services like the database). A pidfile left by a
         dead supervisor is reclaimed automatically: its lock is already gone.
         """
-        self.pidfile.parent.mkdir(parents=True, exist_ok=True)
-        fd = os.open(self.pidfile, os.O_CREAT | os.O_RDWR, 0o644)
+        pidfile = self.pidfile_path()
+        pidfile.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(pidfile, os.O_CREAT | os.O_RDWR, 0o644)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
@@ -122,7 +139,7 @@ class Supervisor:
         can't be misread by a concurrent command (unlike claiming the lock).
         """
         try:
-            fd = os.open(cls.pidfile, os.O_RDONLY)
+            fd = os.open(cls.pidfile_path(), os.O_RDONLY)
         except OSError:
             return False
         try:

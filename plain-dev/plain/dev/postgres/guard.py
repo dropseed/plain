@@ -20,6 +20,7 @@ from pathlib import Path
 
 import click
 
+from ..state import checkout_id
 from .cluster import Cluster
 from .identity import (
     database_name_for_checkout,
@@ -43,7 +44,7 @@ def guard_shared_database(
     hasn't applied. When it acts it forks — the choice that can't damage anyone
     else's data — which is the right default for people, CI, and agents alike.
     """
-    current = str(project_root.resolve())
+    current = checkout_id(project_root)
     metadata = cluster.get_metadata(db_name) or {}
     owner = metadata.get("checkout")
     # Shared means the metadata names a *different* checkout as the owner.

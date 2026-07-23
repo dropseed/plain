@@ -18,13 +18,14 @@ from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .mkcert import MkcertManager
 from .process import Supervisor
+from .state import find_project_root
 from .utils import has_pyproject_toml
 
 ENTRYPOINT_GROUP = "plain.dev"
 
 
 class DevSupervisor(Supervisor):
-    pidfile = PLAIN_TEMP_PATH / "dev" / "dev.pid"
+    state_filename = "dev.pid"
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "run"
     background_command = ["dev"]
     display_name = "`plain dev`"
@@ -158,7 +159,6 @@ class DevSupervisor(Supervisor):
             try:
                 from .postgres.branch_switch import check_branch_switch
                 from .postgres.guard import guard_dev_database
-                from .postgres.identity import find_project_root
                 from .postgres.resolve import INJECTED_URL_ENV_VAR
 
                 # The app directory is often a level below the project root

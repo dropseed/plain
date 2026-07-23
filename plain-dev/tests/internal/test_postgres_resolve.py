@@ -11,7 +11,11 @@ import os
 
 import pytest
 
-from plain.dev.postgres.identity import resolve_database_name
+from plain.dev.postgres.identity import (
+    read_pointer,
+    resolve_database_name,
+    write_pointer,
+)
 from plain.dev.postgres.resolve import (
     CachedURL,
     cache_path,
@@ -123,6 +127,26 @@ def test_cache_round_trip(tmp_path):
     write_cached_url(tmp_path, url="postgres://u:p@127.0.0.1:5999/db")
 
     assert cache_path(tmp_path).read_text() == "postgres://u:p@127.0.0.1:5999/db"
+
+
+def test_two_checkouts_never_share_pointer_or_cache(tmp_path):
+    """Two checkouts get separate answers here — see `plain.dev.state` for why
+    that's keyed by the checkout rather than stored inside it."""
+    main = tmp_path / "main"
+    main.mkdir()
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+
+    write_pointer(main, db_name="mains_db")
+    write_cached_url(main, url="postgres://u:p@127.0.0.1:5999/mains_db")
+
+    assert read_pointer(worktree) is None
+    assert read_cached_url(worktree) == (CachedURL.MISSING, None)
+
+    # And the worktree writing doesn't disturb what main recorded.
+    write_pointer(worktree, db_name="worktrees_db")
+    assert read_pointer(main) == "mains_db"
+    assert read_pointer(worktree) == "worktrees_db"
 
 
 def test_stopped_server_still_yields_a_url_for_database_free_commands(

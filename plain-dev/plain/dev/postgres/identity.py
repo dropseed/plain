@@ -7,7 +7,6 @@ only when a checkout has been deliberately repointed with `plain db use`.
 
 from __future__ import annotations
 
-import hashlib
 import os
 import re
 import subprocess
@@ -16,7 +15,7 @@ from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
-from ..utils import has_pyproject_toml
+from ..state import checkout_id, checkout_state_path, sanitize, short_digest
 
 MAX_NAME_LENGTH = 63  # Postgres identifier limit
 
@@ -27,17 +26,11 @@ DEV_PASSWORD = "postgres"
 DEFAULT_POSTGRES_IMAGE = "postgres:16"
 
 
-def sanitize(value: str) -> str:
-    """Lowercase and reduce to `[a-z0-9_]` so it's a legal Postgres identifier."""
-    return "".join(c if c.isalnum() else "_" for c in value.lower()).strip("_")
-
-
 def truncate_identifier(name: str) -> str:
     """Keep `name` inside Postgres' 63-char limit, hash-suffixing if truncated."""
     if len(name) <= MAX_NAME_LENGTH:
         return name
-    digest = hashlib.sha256(name.encode()).hexdigest()[:8]
-    return name[: MAX_NAME_LENGTH - 9] + "_" + digest
+    return name[: MAX_NAME_LENGTH - 9] + "_" + short_digest(name)
 
 
 @cache
@@ -147,20 +140,6 @@ def validate_database_name(name: str) -> str:
     return name
 
 
-def find_project_root(start: Path) -> Path:
-    """The nearest directory at or above `start` holding a pyproject.toml.
-
-    One definition, used by both the CLI (which starts from the app) and
-    `setup()` (which starts from the working directory), because they have to
-    agree: the project root decides the database name, the cluster identity,
-    and where the URL cache lives. Two answers means two databases.
-    """
-    for directory in [start, *start.parents]:
-        if has_pyproject_toml(directory):
-            return directory
-    return start
-
-
 @cache  # The file can't change within one process; several call sites read it.
 def read_pyproject(project_root: Path) -> dict:
     pyproject = project_root / "pyproject.toml"
@@ -204,8 +183,8 @@ def project_identity(project_root: Path) -> tuple[str, str]:
     if project_name := read_pyproject(project_root).get("project", {}).get("name"):
         name = project_name
     name = sanitize(name)
-    anchor = _git_common_dir(project_root) or str(project_root.resolve())
-    return name, hashlib.sha256(anchor.encode()).hexdigest()[:8]
+    anchor = _git_common_dir(project_root) or checkout_id(project_root)
+    return name, short_digest(anchor)
 
 
 def cluster_name(project_root: Path) -> str:
@@ -239,7 +218,7 @@ def database_name_for_checkout(project_name: str, *, checkout: Path) -> str:
 
 
 def pointer_path(project_root: Path) -> Path:
-    return project_root / ".plain" / "dev" / "database"
+    return checkout_state_path(project_root) / "database"
 
 
 def read_pointer(project_root: Path) -> str | None:

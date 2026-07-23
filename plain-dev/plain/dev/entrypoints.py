@@ -37,7 +37,7 @@ def _ensure_managed_postgres() -> None:
     # settings are configured, so `APP_PATH` isn't available yet. `plain db`
     # walks up from the app instead and must land in the same place — see
     # `find_project_root`.
-    from .postgres.identity import find_project_root
+    from .state import find_project_root
 
     project_root = find_project_root(Path.cwd())
     if not has_pyproject_toml(project_root):

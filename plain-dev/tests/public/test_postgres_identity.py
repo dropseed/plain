@@ -15,20 +15,12 @@ from plain.dev.postgres.identity import (
     PostgresConfig,
     clear_pointer,
     database_name_for_checkout,
-    find_project_root,
     read_pointer,
     resolve_database_name,
-    sanitize,
     truncate_identifier,
     validate_database_name,
     write_pointer,
 )
-
-
-def test_sanitize_makes_legal_identifiers():
-    assert sanitize("My-App") == "my_app"
-    assert sanitize("app.name") == "app_name"
-    assert sanitize("--leading--") == "leading"
 
 
 def test_truncate_identifier_leaves_short_names_alone():
@@ -232,25 +224,3 @@ def test_derived_names_are_always_valid(tmp_path):
     checkout = tmp_path / "Some Project (v2)!"
     checkout.mkdir()
     assert validate_database_name(database_name_for_checkout("proj", checkout=checkout))
-
-
-# -- finding the project ---------------------------------------------------
-
-
-def test_project_root_is_found_from_the_app_directory(tmp_path):
-    """The app is often a level below the project, and both callers must agree.
-
-    `setup()` walks up from the working directory; `plain db` walks up from the
-    app. If those disagree the CLI manages a different database than the one the
-    app was configured with.
-    """
-    (tmp_path / "pyproject.toml").touch()
-    app = tmp_path / "backend" / "app"
-    app.mkdir(parents=True)
-
-    assert find_project_root(app) == tmp_path
-    assert find_project_root(tmp_path) == tmp_path
-
-
-def test_project_root_falls_back_to_where_it_started(tmp_path):
-    assert find_project_root(tmp_path) == tmp_path
