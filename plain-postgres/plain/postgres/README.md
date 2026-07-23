@@ -258,7 +258,7 @@ class UserStats:
 stats = User.query.select(User.email, User.age, result_type=UserStats)
 ```
 
-You can select expression columns too — `select(User.id, Sum("amount"))` — but an expression contributes `Any` to the row type, and mixing an expression into a `select()` types the whole row as `tuple[Any, ...]` (the values are still correct at runtime).
+You can select expression columns too — `select(User.id, Sum("amount"))` — but an expression column types as `Any` (its output type isn't tracked yet). The fields around it stay precise, so `select(User.id, Sum("amount"))` types as `tuple[int, Any]`.
 
 **`select()` returns rows, not partial model instances.** This is deliberate: a model instance with only some columns loaded is a type-level lie — the type checker thinks every field is present, so touching an unselected column looks fine but fails or fires a hidden query at runtime. Honest tuples/dataclasses keep the types truthful. As a result, iteration, `first()`, `get()`, and slicing all return rows, and writes (`update()`, `delete()`) raise `TypeError` on a selected queryset — the same as after `values()`.
 

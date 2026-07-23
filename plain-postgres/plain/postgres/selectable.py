@@ -7,9 +7,11 @@ honest (an aggregate's output type isn't tracked yet) and can be tightened later
 without touching `select()`.
 
 The overload ladder on `QuerySet.select()` binds each argument's `T` through
-this shared base. A type checker resolves `T` per argument against a common base
-class, but not through a `Field[T] | Expression[T]` union — hence the single
-base rather than a union.
+this shared base. For the type checker to solve that per-column typevar, `T`
+must appear in an *annotated member* of `Selectable[T]` — a bare `class
+Selectable[T]: pass` gives it nothing to unify against inside an overloaded
+method on a generic class. `__plain_selected_type__` is that member; it exists
+only under `TYPE_CHECKING` and is never called.
 
 Because `Field` and the SQL `Query` clone themselves with the
 `Empty()` + `__class__`-reassignment trick, adding `Selectable` to their bases
@@ -20,6 +22,11 @@ layout-compatible.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 
 class Selectable[T]:
-    pass
+    if TYPE_CHECKING:
+        # Reference T in an annotated member so ty can solve the per-column
+        # typevar when select()'s overload ladder is keyed on Selectable[T].
+        def __plain_selected_type__(self) -> T: ...

@@ -34,9 +34,8 @@ class MultiJoin(Exception):
 
 
 class Empty(Selectable[Any]):
-    # Query subclasses Selectable (via BaseExpression), shifting its solid
-    # base. Query.clone() reassigns __class__ from an Empty to the Query
-    # class, so Empty must share that layout.
+    # Subclasses Selectable to stay layout-compatible with Query's clone trick;
+    # see selectable.py's module docstring.
     pass
 
 

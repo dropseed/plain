@@ -275,10 +275,15 @@ class SelectDataclassIterable(BaseIterable):
         queryset = self.queryset
         result_type = queryset._select_result_type
         assert result_type is not None
-        field_names = [f.name for f in dataclasses.fields(result_type)]
+        fields = dataclasses.fields(result_type)
         tuple_rows = ValuesListIterable(queryset, chunked_fetch=self.chunked_fetch)
-        for row in tuple_rows:
-            yield result_type(**dict(zip(field_names, row, strict=True)))
+        if any(f.kw_only for f in fields):
+            field_names = [f.name for f in fields]
+            for row in tuple_rows:
+                yield result_type(**dict(zip(field_names, row, strict=True)))
+        else:
+            for row in tuple_rows:
+                yield result_type(*row)
 
 
 class QuerySet[T: "Model"]:
@@ -1101,16 +1106,12 @@ class QuerySet[T: "Model"]:
         return clone
 
     def values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
-        if isinstance(self, RowQuerySet):
-            raise TypeError("Cannot call values() after select().")
         fields += tuple(expressions)
         clone = self._values(*fields, **expressions)
         clone._iterable_class = ValuesIterable
         return clone
 
     def values_list(self, *fields: str, flat: bool = False) -> QuerySet[Any]:
-        if isinstance(self, RowQuerySet):
-            raise TypeError("Cannot call values_list() after select().")
         return self._values_list(fields, flat=flat)
 
     def _values_list(self, fields: tuple[Any, ...], *, flat: bool) -> QuerySet[Any]:
@@ -1145,21 +1146,15 @@ class QuerySet[T: "Model"]:
 
     # ---- select(): typed column selection returning honest rows ----
     #
-    # The ladder unwraps each Field[T] argument to its T and reassembles the
-    # row type. The precise row rides on RowQuerySet[R], a QuerySet flavor
-    # whose iteration yields R instead of model instances.
-    #
-    # The ladder is written over Field[T], not the wider Selectable[T] base
-    # that expressions also share: the pinned type checker (ty 0.0.61) unwraps
-    # a Field parameter's T through the field descriptor chain but fails to
-    # unwrap it through the intermediate Selectable base inside an overloaded
-    # method on a generic class. Fields are the overwhelmingly common case, so
-    # they get precise per-column types; a select() that mixes in an
-    # expression matches the Selectable fallback and types as tuple[Any, ...].
+    # The ladder unwraps each Selectable[T] argument to its T and reassembles
+    # the row type. The precise row rides on RowQuerySet[R], a QuerySet flavor
+    # whose iteration yields R instead of model instances. A field binds its
+    # real value type; an expression is Selectable[Any], so it contributes Any
+    # while the fields around it stay precise.
 
     @overload
     def select[S](
-        self, item: Field[S], /, *, flat: Literal[True]
+        self, item: Selectable[S], /, *, flat: Literal[True]
     ) -> RowQuerySet[S]: ...
 
     @overload
@@ -1174,20 +1169,20 @@ class QuerySet[T: "Model"]:
 
     @overload
     def select[T0](
-        self, i0: Field[T0], /, *, flat: Literal[False] = False
+        self, i0: Selectable[T0], /, *, flat: Literal[False] = False
     ) -> RowQuerySet[tuple[T0]]: ...
 
     @overload
     def select[T0, T1](
-        self, i0: Field[T0], i1: Field[T1], /, *, flat: Literal[False] = False
+        self, i0: Selectable[T0], i1: Selectable[T1], /, *, flat: Literal[False] = False
     ) -> RowQuerySet[tuple[T0, T1]]: ...
 
     @overload
     def select[T0, T1, T2](
         self,
-        i0: Field[T0],
-        i1: Field[T1],
-        i2: Field[T2],
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
         /,
         *,
         flat: Literal[False] = False,
@@ -1196,10 +1191,10 @@ class QuerySet[T: "Model"]:
     @overload
     def select[T0, T1, T2, T3](
         self,
-        i0: Field[T0],
-        i1: Field[T1],
-        i2: Field[T2],
-        i3: Field[T3],
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
         /,
         *,
         flat: Literal[False] = False,
@@ -1208,11 +1203,11 @@ class QuerySet[T: "Model"]:
     @overload
     def select[T0, T1, T2, T3, T4](
         self,
-        i0: Field[T0],
-        i1: Field[T1],
-        i2: Field[T2],
-        i3: Field[T3],
-        i4: Field[T4],
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
         /,
         *,
         flat: Literal[False] = False,
@@ -1221,12 +1216,12 @@ class QuerySet[T: "Model"]:
     @overload
     def select[T0, T1, T2, T3, T4, T5](
         self,
-        i0: Field[T0],
-        i1: Field[T1],
-        i2: Field[T2],
-        i3: Field[T3],
-        i4: Field[T4],
-        i5: Field[T5],
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
         /,
         *,
         flat: Literal[False] = False,
@@ -1235,13 +1230,13 @@ class QuerySet[T: "Model"]:
     @overload
     def select[T0, T1, T2, T3, T4, T5, T6](
         self,
-        i0: Field[T0],
-        i1: Field[T1],
-        i2: Field[T2],
-        i3: Field[T3],
-        i4: Field[T4],
-        i5: Field[T5],
-        i6: Field[T6],
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
         /,
         *,
         flat: Literal[False] = False,
@@ -1250,14 +1245,14 @@ class QuerySet[T: "Model"]:
     @overload
     def select[T0, T1, T2, T3, T4, T5, T6, T7](
         self,
-        i0: Field[T0],
-        i1: Field[T1],
-        i2: Field[T2],
-        i3: Field[T3],
-        i4: Field[T4],
-        i5: Field[T5],
-        i6: Field[T6],
-        i7: Field[T7],
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
+        i7: Selectable[T7],
         /,
         *,
         flat: Literal[False] = False,
@@ -1266,15 +1261,15 @@ class QuerySet[T: "Model"]:
     @overload
     def select[T0, T1, T2, T3, T4, T5, T6, T7, T8](
         self,
-        i0: Field[T0],
-        i1: Field[T1],
-        i2: Field[T2],
-        i3: Field[T3],
-        i4: Field[T4],
-        i5: Field[T5],
-        i6: Field[T6],
-        i7: Field[T7],
-        i8: Field[T8],
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
+        i7: Selectable[T7],
+        i8: Selectable[T8],
         /,
         *,
         flat: Literal[False] = False,
@@ -1283,16 +1278,16 @@ class QuerySet[T: "Model"]:
     @overload
     def select[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9](
         self,
-        i0: Field[T0],
-        i1: Field[T1],
-        i2: Field[T2],
-        i3: Field[T3],
-        i4: Field[T4],
-        i5: Field[T5],
-        i6: Field[T6],
-        i7: Field[T7],
-        i8: Field[T8],
-        i9: Field[T9],
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
+        i7: Selectable[T7],
+        i8: Selectable[T8],
+        i9: Selectable[T9],
         /,
         *,
         flat: Literal[False] = False,
@@ -1325,7 +1320,15 @@ class QuerySet[T: "Model"]:
             dataclass_type = result_type
             _check_result_type_matches(dataclass_type, items)
 
-        columns = [_selectable_to_column(item) for item in items]
+        # Local import: related_typed pulls in fields.related, which imports
+        # this module at load time (circular). Import once here, not per column.
+        from plain.postgres.fields.related_typed import (
+            PrefixedFieldRef,
+            RelatedFieldRef,
+        )
+
+        related_field_refs = (RelatedFieldRef, PrefixedFieldRef)
+        columns = [_selectable_to_column(item, related_field_refs) for item in items]
 
         clone = self._values_list(tuple(columns), flat=flat)
         clone.__class__ = RowQuerySet
@@ -1762,26 +1765,21 @@ class QuerySet[T: "Model"]:
             )
 
 
-def _selectable_to_column(item: Selectable[Any]) -> str | BaseExpression:
+def _selectable_to_column(
+    item: Selectable[Any], related_field_refs: tuple[type, ...]
+) -> str | BaseExpression:
     """Turn a select() argument into something the values_list plumbing accepts.
 
     A field becomes its column name; an expression is passed through (the
     plumbing auto-aliases it). Strings and FK-traversal refs get their own
     error so the message points at the real fix.
     """
-    # Local import: related_typed pulls in fields.related, which imports this
-    # module at load time (circular).
-    from plain.postgres.fields.related_typed import (
-        PrefixedFieldRef,
-        RelatedFieldRef,
-    )
-
     if isinstance(item, str):
         raise TypeError(
             f"select() takes typed column references like User.email, not "
             f"strings. Got {item!r}."
         )
-    if isinstance(item, RelatedFieldRef | PrefixedFieldRef):
+    if isinstance(item, related_field_refs):
         raise TypeError(
             "select() does not support related-field traversal like "
             "User.profile.city yet. Select columns on the queried model."

@@ -35,9 +35,8 @@ if TYPE_CHECKING:
 
 
 class Empty(Selectable[Any]):
-    # Field subclasses Selectable, which shifts their solid base. The
-    # _empty()/__copy__() clone trick reassigns __class__ from an Empty to a
-    # Field subclass, so Empty must share that layout.
+    # Subclasses Selectable to stay layout-compatible with Field's clone trick;
+    # see selectable.py's module docstring.
     pass
 
 

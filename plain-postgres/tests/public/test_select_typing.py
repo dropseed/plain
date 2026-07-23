@@ -5,8 +5,9 @@ the module still has to import cleanly. The `# ty: ignore[...]` markers on the
 misuse cases are load-bearing: if `select()` stopped rejecting them, ty would
 report the suppression as unused and this file would fail the type check.
 
-Fields flow to precise per-column types. A select() that mixes in an
-expression types as `tuple[Any, ...]` — see `test_expression_column_is_any_row`.
+Fields flow to precise per-column types. An expression column contributes
+`Any`, but the fields around it stay precise — see
+`test_mixed_field_and_expression_row`.
 """
 
 from __future__ import annotations
@@ -61,11 +62,11 @@ def test_result_type_row_type() -> None:
     assert_type(result, RowQuerySet[NameStat])
 
 
-def test_expression_column_is_any_row() -> None:
-    # An expression argument matches the Selectable fallback, so the whole row
-    # types as tuple[Any, ...] rather than the per-column precise form.
+def test_mixed_field_and_expression_row() -> None:
+    # An expression column contributes Any, but the field beside it keeps its
+    # precise per-column type.
     result = D.query.select(D.priority, Upper("name"))
-    assert_type(result, RowQuerySet[tuple[Any, ...]])
+    assert_type(result, RowQuerySet[tuple[int, Any]])
 
 
 if TYPE_CHECKING:
