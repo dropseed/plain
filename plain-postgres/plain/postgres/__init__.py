@@ -47,7 +47,7 @@ from .fields.reverse_descriptors import (
 )
 from .indexes import Index
 from .options import Options
-from .query import QuerySet
+from .query import QuerySet, RowQuerySet
 from .query_utils import Q
 from . import types
 
@@ -95,6 +95,7 @@ __all__ = [
     "Options",
     # From query
     "QuerySet",
+    "RowQuerySet",
     # From query_utils
     "Q",
     # From expressions

@@ -29,6 +29,7 @@ from plain.postgres.dialect import (
 )
 from plain.postgres.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.postgres.query_utils import Q
+from plain.postgres.selectable import Selectable
 from plain.utils.deconstruct import deconstructible
 from plain.utils.hashable import make_hashable
 
@@ -218,7 +219,7 @@ class Combinable:
         return NegatedExpression(self)
 
 
-class BaseExpression:
+class BaseExpression(Selectable[Any]):
     """Base class for all query expressions."""
 
     empty_result_set_value = NotImplemented
