@@ -205,10 +205,12 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         kwargs[self.field.name] = self.instance
         return self.model.query.create(**kwargs)
 
-    def get_or_create(self, **kwargs: Any) -> tuple[T, bool]:
+    def get_or_create(
+        self, *, defaults: dict[str, Any] | None = None, **kwargs: Any
+    ) -> tuple[T, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return self.model.query.get_or_create(**kwargs)
+        return self.model.query.get_or_create(defaults=defaults, **kwargs)
 
     def upsert(
         self,
@@ -499,9 +501,13 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         return new_obj
 
     def get_or_create(
-        self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
+        self,
+        *,
+        defaults: dict[str, Any] | None = None,
+        through_defaults: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> tuple[T, bool]:
-        obj, created = self.model.query.get_or_create(**kwargs)
+        obj, created = self.model.query.get_or_create(defaults=defaults, **kwargs)
         # We only need to add() if created because if we got an object back
         # from get() then the relationship already exists.
         if created:
