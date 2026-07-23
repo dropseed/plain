@@ -114,10 +114,14 @@ class Cache:
         # update_fields, so it's preserved on conflict.
         now = timezone.now()
         expires_at = _coerce_expiration(expiration, now=now)
-        items = [
-            self._model(key=key, value=value, expires_at=expires_at, created_at=now)
-            for key, value in mapping.items()
-        ]
+        items = []
+        for key, value in mapping.items():
+            item = self._model(key=key, value=value, expires_at=expires_at)
+            # created_at is a create_now field (DB-owned), so it's not a
+            # constructor argument -- stamp it from the shared `now` after
+            # construction so created_at <= updated_at (see comment above).
+            item.created_at = now
+            items.append(item)
         self._model.query.bulk_create(
             items,
             update_conflicts=True,

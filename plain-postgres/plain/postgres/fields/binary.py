@@ -8,7 +8,7 @@ import psycopg
 
 from plain.validators import MaxLengthValidator
 
-from .base import ColumnField
+from .base import NOT_PROVIDED, ColumnField
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
@@ -26,14 +26,16 @@ class BinaryField[
         self,
         *,
         max_length: int | None = None,
+        default: Any = NOT_PROVIDED,
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # `default` is intentionally not accepted: a str default on a bytes
-        # field is a type mismatch.
+        # `default` accepts only None (the nullable-optional marker); a literal
+        # bytes default isn't supported as a persistent column DEFAULT.
         self.max_length = max_length
         super().__init__(
+            default=default,
             required=required,
             allow_null=allow_null,
             validators=validators,

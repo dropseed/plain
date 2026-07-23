@@ -11,7 +11,7 @@ from plain.preflight import PreflightResult
 from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time
 
-from .base import NOT_PROVIDED, ColumnField, DefaultableField
+from .base import NOT_PROVIDED, DefaultableField
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
@@ -153,7 +153,7 @@ class DateField[T: (datetime.date, datetime.date | None) = datetime.date](
 
 class DateTimeField[
     T: (datetime.datetime, datetime.datetime | None) = datetime.datetime
-](ColumnField[T]):
+](DefaultableField[T]):
     db_type_sql = "timestamp with time zone"
     empty_strings_allowed = False
 
@@ -162,6 +162,7 @@ class DateTimeField[
         *,
         create_now: bool = False,
         update_now: bool = False,
+        default: Any = NOT_PROVIDED,
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
@@ -169,6 +170,7 @@ class DateTimeField[
         self.create_now = create_now
         self.update_now = update_now
         super().__init__(
+            default=default,
             required=required,
             allow_null=allow_null,
             validators=validators,
@@ -193,7 +195,39 @@ class DateTimeField[
         return [
             *super().preflight(**kwargs),
             *self._check_update_now_backfill(),
+            *self._check_create_now_default_conflict(),
+            *self._check_fix_default_value(),
         ]
+
+    def _check_fix_default_value(self) -> list[PreflightResult]:
+        # A literal default within ~10s of "now" is almost always a botched
+        # "current time" default -- the user wants create_now=True, not a frozen
+        # timestamp (DateField/TimeField run the same check). None and the
+        # create_now/update_now DB default aren't persistent literals, so exempt.
+        if not self.has_persistent_literal_default():
+            return []
+        value = self.default
+        if not isinstance(value, datetime.datetime):
+            return []
+        return _check_if_value_fixed(self, value)
+
+    def _check_create_now_default_conflict(self) -> list[PreflightResult]:
+        # create_now/update_now install a DB-side default (Now()); a literal
+        # default would fight it. default=None is exempt -- it's just the
+        # "omittable -> NULL" marker, not a persistent DB default.
+        if (
+            self.create_now or self.update_now
+        ) and self.has_persistent_literal_default():
+            return [
+                PreflightResult(
+                    fix="DateTimeField can't combine create_now/update_now with "
+                    "a literal default -- the DB default and the literal "
+                    "conflict. Drop one.",
+                    obj=self,
+                    id="fields.datetime_create_now_default_conflict",
+                )
+            ]
+        return []
 
     def _check_update_now_backfill(self) -> list[PreflightResult]:
         # update_now=True never implies a DB DEFAULT on its own (it only fires

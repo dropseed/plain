@@ -176,6 +176,10 @@ class AuthorizeView(AuthView):
         if form.get("action") != "approve":
             return _redirect(redirect_uri, {"error": "access_denied", "state": state})
 
+        # login_required=True guarantees a user, but the checker can't see that
+        # from the class attribute -- AuthView.user stays `User | None`.
+        assert self.user is not None
+
         auth_code = AuthorizationCode(
             application=application,
             user=self.user,

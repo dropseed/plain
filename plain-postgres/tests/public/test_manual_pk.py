@@ -19,7 +19,7 @@ def test_constructing_with_id_raises():
         ValueError,
         match=r"Cannot set the auto-generated primary key 'id'.*query\.get",
     ):
-        DefaultQuerySetModel(id=1, name="x")
+        DefaultQuerySetModel(id=1, name="x")  # ty: ignore[unknown-argument]
 
 
 def test_query_create_with_id_raises():
@@ -37,7 +37,7 @@ def test_constructing_without_id_is_fine():
 def test_explicit_id_none_is_allowed():
     # id=None is the field's own default — not a manual assignment, so it's
     # allowed rather than treated as a collision risk.
-    obj = DefaultQuerySetModel(id=None, name="x")
+    obj = DefaultQuerySetModel(id=None, name="x")  # ty: ignore[unknown-argument]
     assert obj.id is None
 
 

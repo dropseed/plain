@@ -20,7 +20,7 @@ from plain import exceptions, preflight
 from plain.runtime import settings
 from plain.utils.encoding import force_bytes
 
-from .base import ColumnField
+from .base import NOT_PROVIDED, ColumnField
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -197,14 +197,17 @@ class EncryptedTextField[T: (str, str | None) = str](
         self,
         *,
         max_length: int | None = None,
+        default: Any = NOT_PROVIDED,
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # `default` is intentionally not accepted: Fernet encryption is
-        # non-deterministic, so a literal column DEFAULT cannot be expressed.
+        # `default` accepts only None (the nullable-optional marker). A literal
+        # column DEFAULT can't be expressed: Fernet encryption is
+        # non-deterministic.
         self.max_length = max_length
         super().__init__(
+            default=default,
             required=required,
             allow_null=allow_null,
             validators=validators,
@@ -275,12 +278,14 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
         *,
         encoder: type[json.JSONEncoder] | None = None,
         decoder: type[json.JSONDecoder] | None = None,
+        default: Any = NOT_PROVIDED,
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # `default` is intentionally not accepted: Fernet encryption is
-        # non-deterministic, so a literal column DEFAULT cannot be expressed.
+        # `default` accepts only None (the nullable-optional marker). A literal
+        # column DEFAULT can't be expressed: Fernet encryption is
+        # non-deterministic.
         if encoder and not callable(encoder):
             raise ValueError("The encoder parameter must be a callable object.")
         if decoder and not callable(decoder):
@@ -288,6 +293,7 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
         self.encoder = encoder
         self.decoder = decoder
         super().__init__(
+            default=default,
             required=required,
             allow_null=allow_null,
             validators=validators,

@@ -18,6 +18,7 @@ from .enums import TextChoices
 from .fields import (
     BigIntegerField,
     BinaryField,
+    Field,
     BooleanField,
     DateField,
     DateTimeField,
@@ -101,6 +102,9 @@ __all__ = [
     "F",
     # From base
     "Model",
+    # The typed descriptor base, for annotating model fields:
+    #   name: Field[str] = types.TextField()
+    "Field",
     # From fields.related
     "ForeignKeyField",
     "ManyToManyField",

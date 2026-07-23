@@ -1,16 +1,16 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
 class DefaultQuerySetModel(postgres.Model):
     """Model that uses the default objects QuerySet."""
 
-    name = types.TextField(max_length=100)
-
-    query: postgres.QuerySet[DefaultQuerySetModel] = postgres.QuerySet()
+    name: Field[str] = types.TextField(max_length=100)
 
 
 class CustomQuerySet(postgres.QuerySet):
@@ -27,15 +27,15 @@ class CustomSpecialQuerySet(postgres.QuerySet):
 class CustomQuerySetModel(postgres.Model):
     """Model with a custom QuerySet."""
 
-    name = types.TextField(max_length=100)
+    name: Field[str] = types.TextField(max_length=100)
 
-    query = CustomQuerySet()
+    query: ClassVar[CustomQuerySet] = CustomQuerySet()
 
 
 @postgres.register_model
 class CustomSpecialQuerySetModel(postgres.Model):
     """Model with a custom special QuerySet."""
 
-    name = types.TextField(max_length=100)
+    name: Field[str] = types.TextField(max_length=100)
 
-    query = CustomSpecialQuerySet()
+    query: ClassVar[CustomSpecialQuerySet] = CustomSpecialQuerySet()

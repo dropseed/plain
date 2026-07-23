@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.users.models import User
 from oauth_helpers import generate_pkce_pair
 
 from plain.oauthserver.models import (
@@ -9,23 +10,39 @@ from plain.oauthserver.models import (
     OAuthApplication,
     _hash_token,
 )
+from plain.utils import timezone
+
+
+def unsaved_code(*, code_challenge: str) -> AuthorizationCode:
+    """An in-memory AuthorizationCode for exercising its pure methods.
+
+    The typed constructor requires every non-defaulted field, so the relation
+    and expiry values are filler — `verify_code_challenge` reads none of them.
+    """
+    return AuthorizationCode(
+        application=OAuthApplication(redirect_uris="https://app.example.com/cb"),
+        user=User(email="pkce@example.com"),
+        redirect_uri="https://app.example.com/cb",
+        expires_at=timezone.now(),
+        code_challenge=code_challenge,
+    )
 
 
 class TestPKCE:
     def test_s256_match(self):
         verifier, challenge = generate_pkce_pair()
-        code = AuthorizationCode(code_challenge=challenge)
+        code = unsaved_code(code_challenge=challenge)
         assert code.verify_code_challenge(verifier) is True
 
     def test_s256_mismatch(self):
         _, challenge = generate_pkce_pair()
-        code = AuthorizationCode(code_challenge=challenge)
+        code = unsaved_code(code_challenge=challenge)
         assert code.verify_code_challenge("wrong") is False
 
     def test_non_s256_challenge_rejected(self):
         # Verification is always S256, so a plain-style challenge (the challenge
         # equal to the verifier) can't match — PKCE downgrade is impossible.
-        code = AuthorizationCode(code_challenge="abc")
+        code = unsaved_code(code_challenge="abc")
         assert code.verify_code_challenge("abc") is False
 
 
