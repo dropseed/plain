@@ -17,4 +17,5 @@ from . import (  # noqa: F401
     storage_parameters,
     trees,
     unregistered,
+    upsert,
 )

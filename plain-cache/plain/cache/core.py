@@ -118,9 +118,8 @@ class Cache:
             self._model(key=key, value=value, expires_at=expires_at, created_at=now)
             for key, value in mapping.items()
         ]
-        self._model.query.bulk_create(
+        self._model.query.bulk_upsert(
             items,
-            update_conflicts=True,
             update_fields=["value", "expires_at", "updated_at"],
             unique_fields=["key"],
         )
