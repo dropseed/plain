@@ -58,4 +58,10 @@ jobs:
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
           prompt: "/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}"
-          claude_args: "--model opus"
+          # Always end with a submitted PR review, even when clean — it's the
+          # visible "this ran" record, and tools that wait on bot reviews
+          # (e.g. PullApprove agents) treat a submitted review as the answer.
+          claude_args: |
+            --model opus
+            --append-system-prompt "After completing the review, always submit a GitHub review on the pull request with 'gh pr review <number> --comment --body <summary>'. Summarize the findings, or state that no issues were found. Do this even when the review is clean."
+            --allowedTools "Bash(gh pr review:*)"
