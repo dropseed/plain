@@ -14,12 +14,13 @@ permissions:
   contents: read
   pull-requests: write
 
-concurrency:
-  group: claude-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}
-  cancel-in-progress: true
-
 jobs:
   review:
+    # Job-level so that skipped runs (e.g. unrelated PR comments) never enter
+    # the group and cancel a review in progress.
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}
+      cancel-in-progress: true
     # Automatic on non-draft PRs from this repo (fork PRs can't read the token
     # secret), or manually via an "@claude review" PR comment from a
     # collaborator, or via workflow_dispatch with a PR number.
