@@ -18,6 +18,7 @@ from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import quote_name
 from plain.postgres.enums import ChoicesMeta
 from plain.postgres.query_utils import Q, RegisterLookupMixin
+from plain.postgres.selectable import Selectable
 from plain.preflight import PreflightResult
 from plain.utils.datastructures import DictWrapper
 from plain.utils.functional import Promise
@@ -33,7 +34,10 @@ if TYPE_CHECKING:
     from plain.postgres.sql.compiler import SQLCompiler
 
 
-class Empty:
+class Empty(Selectable[Any]):
+    # Field subclasses Selectable, which shifts their solid base. The
+    # _empty()/__copy__() clone trick reassigns __class__ from an Empty to a
+    # Field subclass, so Empty must share that layout.
     pass
 
 
@@ -96,7 +100,7 @@ def _empty(of_cls: type) -> Empty:
     return new
 
 
-class Field[T](RegisterLookupMixin):
+class Field[T](Selectable[T], RegisterLookupMixin):
     """Base class for all field types"""
 
     # SQL type for this field (e.g. "text", "integer", "boolean").

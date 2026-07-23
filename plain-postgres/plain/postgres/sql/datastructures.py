@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.dialect import quote_name
+from plain.postgres.selectable import Selectable
 from plain.postgres.sql.constants import INNER, LOUTER
 
 if TYPE_CHECKING:
@@ -32,7 +33,10 @@ class MultiJoin(Exception):
         self.names_with_path = path_with_names
 
 
-class Empty:
+class Empty(Selectable[Any]):
+    # Query subclasses Selectable (via BaseExpression), shifting its solid
+    # base. Query.clone() reassigns __class__ from an Empty to the Query
+    # class, so Empty must share that layout.
     pass
 
 
