@@ -1483,12 +1483,19 @@ class SQLInsertCompiler(SQLCompiler):
 
         placeholder_rows, param_rows = self.assemble_as_sql(fields, value_rows)
 
+        # conflict_defaults compile to per-column SQL fragments (with their own
+        # params) that override the default "col = EXCLUDED.col" assignment.
+        # Their params follow the VALUES params, since DO UPDATE SET comes after
+        # VALUES in the statement.
+        conflict_overrides, conflict_params = self._conflict_override_sql()
         conflict_suffix_sql = on_conflict_suffix_sql(
             fields,  # ty: ignore[invalid-argument-type]
             self.query.on_conflict,
             (f.column for f in self.query.update_fields),
             (f.column for f in self.query.unique_fields),
+            conflict_overrides,
         )
+        extra_returning = "(xmax = 0)" if self.query.returning_created else ""
         if self.returning_fields:
             # Use RETURNING clause to get inserted values
             result.append(
@@ -1496,15 +1503,57 @@ class SQLInsertCompiler(SQLCompiler):
             )
             if conflict_suffix_sql:
                 result.append(conflict_suffix_sql)
-            if returning := returning_columns(self.returning_fields):
+            if returning := returning_columns(self.returning_fields, extra_returning):
                 result.append(returning)
-            return [(" ".join(result), tuple(chain.from_iterable(param_rows)))]
+            params = tuple(chain.from_iterable(param_rows)) + tuple(conflict_params)
+            return [(" ".join(result), params)]
 
         # Bulk insert without returning fields
         result.append(bulk_insert_sql(fields, placeholder_rows))  # ty: ignore[invalid-argument-type]
         if conflict_suffix_sql:
             result.append(conflict_suffix_sql)
-        return [(" ".join(result), tuple(p for ps in param_rows for p in ps))]
+        params = tuple(p for ps in param_rows for p in ps) + tuple(conflict_params)
+        return [(" ".join(result), params)]
+
+    def _conflict_override_sql(self) -> tuple[dict[str, str], list[Any]]:
+        """Compile conflict_defaults into {column: SQL fragment} plus params.
+
+        Reuses the same value-compilation as UPDATE ... SET so an override can
+        be a plain value or an expression (e.g. F("count") + 1, which resolves
+        to the target row's existing column for an atomic counter).
+        """
+        overrides: dict[str, str] = {}
+        params: list[Any] = []
+        for field, val in self.query.conflict_defaults.items():
+            if isinstance(val, ResolvableExpression):
+                val = val.resolve_expression(
+                    self.query, allow_joins=False, for_save=True
+                )
+                if val.contains_aggregate:
+                    raise FieldError(
+                        "Aggregate functions are not allowed in this query "
+                        f"({field.name}={val!r})."
+                    )
+                if val.contains_over_clause:
+                    raise FieldError(
+                        "Window expressions are not allowed in this query "
+                        f"({field.name}={val!r})."
+                    )
+            val = field.get_db_prep_save(val, connection=self.connection)
+            if hasattr(field, "get_placeholder"):
+                placeholder = field.get_placeholder(val, self, self.connection)  # ty: ignore[call-non-callable]
+            else:
+                placeholder = "%s"
+            if hasattr(val, "as_sql"):
+                sql, val_params = self.compile(val)
+                overrides[field.column] = placeholder % sql
+                params.extend(val_params)
+            elif val is not None:
+                overrides[field.column] = placeholder
+                params.append(val)
+            else:
+                overrides[field.column] = "NULL"
+        return overrides, params
 
     def execute_sql(  # ty: ignore[invalid-method-override]
         self, returning_fields: list | None = None

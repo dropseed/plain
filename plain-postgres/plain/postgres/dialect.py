@@ -380,14 +380,21 @@ def lookup_cast(lookup_type: str, field: Field | None = None) -> str:
     return lookup
 
 
-def returning_columns(fields: list[Field]) -> str:
-    """Return the RETURNING clause SQL for the given fields, or "" when empty."""
-    if not fields:
-        return ""
+def returning_columns(fields: list[Field], extra: str = "") -> str:
+    """Return the RETURNING clause SQL for the given fields, or "" when empty.
+
+    `extra` is a raw SQL expression appended as a trailing RETURNING column.
+    upsert() uses it to return the "(xmax = 0)" created flag alongside the
+    field columns.
+    """
     columns = [
         f"{quote_name(field.model.model_options.db_table)}.{quote_name(field.column)}"
         for field in fields
     ]
+    if extra:
+        columns.append(extra)
+    if not columns:
+        return ""
     return "RETURNING {}".format(", ".join(columns))
 
 
@@ -583,15 +590,40 @@ def on_conflict_suffix_sql(
     on_conflict: OnConflict | None,
     update_fields: Iterable[str],
     unique_fields: Iterable[str],
+    conflict_overrides: dict[str, str] | None = None,
 ) -> str:
-    if on_conflict == OnConflict.UPDATE:
-        return "ON CONFLICT({}) DO UPDATE SET {}".format(
-            ", ".join(map(quote_name, unique_fields)),
-            ", ".join(
-                [
-                    f"{field} = EXCLUDED.{field}"
-                    for field in map(quote_name, update_fields)
-                ]
-            ),
-        )
-    return ""
+    if on_conflict != OnConflict.UPDATE:
+        return ""
+
+    conflict_overrides = conflict_overrides or {}
+    unique_columns = list(unique_fields)
+    update_columns = list(update_fields)
+
+    # Each base update column is set to its EXCLUDED value (the value the
+    # INSERT proposed), except where conflict_overrides supplies a per-column
+    # SQL fragment (e.g. an atomic "count = count + 1" counter).
+    assignments = []
+    for column in update_columns:
+        quoted = quote_name(column)
+        if column in conflict_overrides:
+            assignments.append(f"{quoted} = {conflict_overrides[column]}")
+        else:
+            assignments.append(f"{quoted} = EXCLUDED.{quoted}")
+
+    # Override-only columns aren't among the EXCLUDED update columns, so append
+    # them after (a counter column, say, that isn't otherwise being set).
+    for column, fragment in conflict_overrides.items():
+        if column not in update_columns:
+            assignments.append(f"{quote_name(column)} = {fragment}")
+
+    if not assignments:
+        # Nothing to update -- Postgres still requires a DO UPDATE SET body,
+        # and only DO UPDATE (not DO NOTHING) returns the conflicting row via
+        # RETURNING. Set a unique column to itself as a no-op.
+        first = quote_name(unique_columns[0])
+        assignments.append(f"{first} = EXCLUDED.{first}")
+
+    return "ON CONFLICT({}) DO UPDATE SET {}".format(
+        ", ".join(map(quote_name, unique_columns)),
+        ", ".join(assignments),
+    )
