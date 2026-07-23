@@ -66,7 +66,7 @@ class Tag(postgres.Model):
 class TaskTag(postgres.Model):
     """Through model for Task ↔ Tag M2M."""
 
-    task: Task = types.ForeignKeyField("Task", on_delete=postgres.CASCADE)
+    task = types.ForeignKeyField("Task", on_delete=postgres.CASCADE)
     task_id: int
     tag = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
     tag_id: int

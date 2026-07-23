@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Never
 
 try:
     from cryptography.fernet import Fernet, InvalidToken, MultiFernet
@@ -104,18 +104,49 @@ def _decrypt(value: str) -> str:
         )
 
 
+# Shared tail explaining why encrypted fields reject value comparisons — used
+# by both the lookup-construction guard (_exact_for_encrypted) and the
+# typed-query method guard (_lookup_unsupported_message).
+_NON_DETERMINISTIC_EXPLANATION = (
+    "ciphertext is non-deterministic. Use .is_null() instead."
+)
+
+
 # isnull is obviously needed. exact is required so that `filter(field=None)`
 # works — the ORM resolves "exact" first and then rewrites None to isnull.
-# Exact lookups on non-None values will silently return no results (since
-# ciphertext is non-deterministic), but blocking exact entirely would break
-# the None/isnull path.
+# get_lookup() below wraps the exact lookup class to reject non-None right-hand
+# values at lookup construction time, so the silent-no-rows behavior on
+# `filter(field='something')` is also blocked.
 _ALLOWED_LOOKUPS = {"isnull", "exact"}
+
+
+@cache
+def _exact_for_encrypted(base: type[Lookup]) -> type[Lookup]:
+    """Return a subclass of `base` (the Exact lookup) that rejects non-None
+    right-hand values. None passes through so the ORM's exact-None → isnull
+    rewrite in `build_lookup` still works.
+    """
+
+    class _EncryptedExact(base):  # ty: ignore[unsupported-base]
+        def __init__(self, lhs: Any, rhs: Any) -> None:
+            if rhs is not None:
+                target = getattr(lhs, "target", None)
+                field_name = getattr(target, "name", None) or "<encrypted>"
+                raise TypeError(
+                    f"Encrypted field {field_name!r} cannot be filtered by "
+                    f"equality against a non-None value — "
+                    f"{_NON_DETERMINISTIC_EXPLANATION}"
+                )
+            super().__init__(lhs, rhs)
+
+    return _EncryptedExact
 
 
 class EncryptedFieldMixin:
     """Shared behavior for all encrypted fields.
 
-    Blocks lookups (except isnull and exact) since encrypted values are non-deterministic.
+    Blocks lookups (except isnull) since encrypted values are non-deterministic.
+    Allows exact only for the None-rewrite path; rejects non-None exact rhs.
     Errors at preflight if the field is used in indexes or unique constraints.
 
     Must be used with Field as a co-base class.
@@ -129,12 +160,54 @@ class EncryptedFieldMixin:
         if lookup_name not in _ALLOWED_LOOKUPS:
             return None
         get_lookup = getattr(super(), "get_lookup")
-        return get_lookup(lookup_name)
+        base = get_lookup(lookup_name)
+        if lookup_name == "exact" and base is not None:
+            return _exact_for_encrypted(base)
+        return base
 
     def get_transform(
         self, lookup_name: str
     ) -> type[Transform] | Callable[..., Any] | None:
         return None
+
+    # Block typed-query comparison methods. Ciphertext is non-deterministic,
+    # so equality/ordering against a Python value can't match anything
+    # meaningful. The parameter type is `Never` so a type checker rejects any
+    # call site; the runtime raises if someone bypasses the type checker.
+    # Return type is `Never` (not `Q`) to reflect that control never returns —
+    # `Never` is assignable to `Q` so `where(field.equals(...))` still
+    # type-checks at the use site, and the parameter error is the one that
+    # surfaces.
+    def equals(self, value: Never) -> Never:
+        raise TypeError(self._lookup_unsupported_message("equals"))
+
+    def not_equal(self, value: Never) -> Never:
+        raise TypeError(self._lookup_unsupported_message("not_equal"))
+
+    def gt(self, value: Never) -> Never:
+        raise TypeError(self._lookup_unsupported_message("gt"))
+
+    def gte(self, value: Never) -> Never:
+        raise TypeError(self._lookup_unsupported_message("gte"))
+
+    def lt(self, value: Never) -> Never:
+        raise TypeError(self._lookup_unsupported_message("lt"))
+
+    def lte(self, value: Never) -> Never:
+        raise TypeError(self._lookup_unsupported_message("lte"))
+
+    def is_in(self, values: Never) -> Never:
+        raise TypeError(self._lookup_unsupported_message("is_in"))
+
+    def _lookup_unsupported_message(self, method: str) -> str:
+        assert self.name is not None, (
+            "Encrypted field must be attached to a model before its typed-query "
+            "methods can produce a meaningful error message."
+        )
+        return (
+            f"Encrypted field {self.name!r} does not support .{method}() — "
+            f"{_NON_DETERMINISTIC_EXPLANATION}"
+        )
 
     def _check_encrypted_constraints(self) -> list[PreflightResult]:
         errors: list[PreflightResult] = []

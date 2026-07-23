@@ -11,6 +11,7 @@ from .base import NOT_PROVIDED, ChoicesField, ColumnField
 
 if TYPE_CHECKING:
     from plain.postgres.functions.random import RandomString
+    from plain.postgres.query_utils import Q
 
 
 class TextField[T: (str, str | None) = str](ChoicesField[T]):
@@ -85,6 +86,18 @@ class TextField[T: (str, str | None) = str](ChoicesField[T]):
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         return self.to_python(value)
+
+    def contains(self, value: str) -> Q:
+        return self._build_q("contains", value)
+
+    def icontains(self, value: str) -> Q:
+        return self._build_q("icontains", value)
+
+    def startswith(self, value: str) -> Q:
+        return self._build_q("startswith", value)
+
+    def endswith(self, value: str) -> Q:
+        return self._build_q("endswith", value)
 
 
 class EmailField[T: (str, str | None) = str](TextField[T]):

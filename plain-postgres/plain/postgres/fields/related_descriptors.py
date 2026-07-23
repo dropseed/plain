@@ -106,9 +106,7 @@ class ForwardForeignKeyDescriptor:
             False,
         )
 
-    def __get__(
-        self, instance: Any | None, cls: type | None = None
-    ) -> ForwardForeignKeyDescriptor | Any | None:
+    def __get__(self, instance: Any | None, cls: type | None = None) -> Any:
         """
         Get the related instance through the forward relation.
 
@@ -117,9 +115,26 @@ class ForwardForeignKeyDescriptor:
         - ``self`` is the descriptor managing the ``parent`` attribute
         - ``instance`` is the ``child`` instance
         - ``cls`` is the ``Child`` class (we don't need it)
+
+        Class-level access (``Child.parent``) returns a fresh
+        ``RelatedFieldRef`` traversal proxy so typed where() can walk into the
+        related model's fields:
+
+            Child.parent.name.equals("x")    →    Q(parent__name="x")
+
+        The proxy exposes only traversal machinery, so a related field whose
+        name collides with one of this descriptor's own attributes (``field``,
+        ``is_cached``, ``get_queryset`` …) still resolves to the field, not the
+        descriptor attribute. Framework code that needs the descriptor itself
+        (prefetching) reaches it with ``inspect.getattr_static`` to bypass this
+        proxy.
         """
         if instance is None:
-            return self
+            from plain.postgres.fields.related_typed import RelatedFieldRef
+
+            return RelatedFieldRef(
+                model=self.field.remote_field.model, prefix=self.field.name
+            )
 
         # The related object is cached on the model state -- by select_related,
         # prefetch, the reverse accessor, a prior access, or assignment.

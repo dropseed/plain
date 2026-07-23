@@ -13,6 +13,7 @@ from . import (  # noqa: F401
     nullability,
     querysets,
     relationships,
+    shadowing,
     storage_parameters,
     trees,
     unregistered,
