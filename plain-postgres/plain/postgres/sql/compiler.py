@@ -50,7 +50,12 @@ from plain.utils.regex_helper import _lazy_re_compile
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.expressions import BaseExpression
-    from plain.postgres.sql.query import AggregateQuery, InsertQuery
+    from plain.postgres.sql.query import (
+        AggregateQuery,
+        DeleteQuery,
+        InsertQuery,
+        UpdateQuery,
+    )
 
 # Type aliases for SQL compilation results
 SqlParams = tuple[Any, ...]
@@ -101,6 +106,21 @@ def apply_converters(
                 value = converter(value, expression, connection)
             row[pos] = value
         yield row
+
+
+def convert_returning_rows(
+    rows: Iterable, fields: list[Any], connection: DatabaseConnection
+) -> list[list]:
+    """Apply each field's DB converters to the raw rows of a RETURNING clause.
+
+    The fields are given in the same order as the emitted RETURNING columns,
+    so each field lines up with its value in every row.
+    """
+    cols = [field.get_col(field.model.model_options.db_table) for field in fields]
+    converters = get_converters(cols, connection)
+    if converters:
+        return list(apply_converters(rows, converters, connection))
+    return [list(row) for row in rows]
 
 
 class SQLCompiler:
@@ -1509,6 +1529,8 @@ class SQLInsertCompiler(SQLCompiler):
 
 
 class SQLDeleteCompiler(SQLCompiler):
+    query: DeleteQuery
+
     @cached_property
     def single_alias(self) -> bool:
         # Ensure base table is in aliases.
@@ -1537,11 +1559,16 @@ class SQLDeleteCompiler(SQLCompiler):
 
     def _as_sql(self, query: Query) -> SqlWithParams:
         delete = f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"  # ty: ignore[invalid-argument-type]
+        returning = ""
+        if self.query.returning_fields:
+            r_sql, _ = return_insert_columns(self.query.returning_fields)
+            if r_sql:
+                returning = f" {r_sql}"
         try:
             where, params = self.compile(query.where)
         except FullResultSet:
-            return delete, ()
-        return f"{delete} WHERE {where}", tuple(params)
+            return f"{delete}{returning}", ()
+        return f"{delete} WHERE {where}{returning}", tuple(params)
 
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
@@ -1564,6 +1591,8 @@ class SQLDeleteCompiler(SQLCompiler):
 
 
 class SQLUpdateCompiler(SQLCompiler):
+    query: UpdateQuery
+
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
     ) -> SqlWithParams:
@@ -1628,16 +1657,29 @@ class SQLUpdateCompiler(SQLCompiler):
             params = []
         else:
             result.append(f"WHERE {where}")
+        if self.query.returning_fields:
+            r_sql, _ = return_insert_columns(self.query.returning_fields)
+            if r_sql:
+                result.append(r_sql)
         return " ".join(result), tuple(update_params + list(params))
 
-    def execute_sql(self, result_type: str) -> int:  # ty: ignore[invalid-method-override]
-        """Execute the update and return the number of rows affected."""
+    def execute_sql(self, result_type: str) -> Any:  # ty: ignore[invalid-method-override]
+        """Execute the update.
+
+        Return the number of rows affected, or — when the query carries
+        returning_fields — the converted RETURNING rows.
+        """
         cursor = super().execute_sql(result_type)
+        if not cursor:
+            return [] if self.query.returning_fields else 0
         try:
-            return cursor.rowcount if cursor else 0
+            if self.query.returning_fields:
+                return convert_returning_rows(
+                    cursor.fetchall(), self.query.returning_fields, self.connection
+                )
+            return cursor.rowcount
         finally:
-            if cursor:
-                cursor.close()
+            cursor.close()
 
     def pre_sql_setup(
         self, with_col_aliases: bool = False

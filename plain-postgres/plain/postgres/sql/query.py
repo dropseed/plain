@@ -2472,6 +2472,9 @@ class JoinPromoter:
 class DeleteQuery(Query):
     """A DELETE SQL query."""
 
+    # Concrete fields to emit in a RETURNING clause, or None for a plain DELETE.
+    returning_fields: list[Field] | None = None
+
     def get_compiler(self, *, elide_empty: bool = True) -> SQLDeleteCompiler:
         from plain.postgres.sql.compiler import SQLDeleteCompiler
 
@@ -2514,6 +2517,9 @@ class DeleteQuery(Query):
 
 class UpdateQuery(Query):
     """An UPDATE SQL query."""
+
+    # Concrete fields to emit in a RETURNING clause, or None for a plain UPDATE.
+    returning_fields: list[Field] | None = None
 
     def get_compiler(self, *, elide_empty: bool = True) -> SQLUpdateCompiler:
         from plain.postgres.sql.compiler import SQLUpdateCompiler
