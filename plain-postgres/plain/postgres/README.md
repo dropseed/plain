@@ -179,6 +179,46 @@ first_10_users = User.query.all()[:10]
 
 For more advanced querying options, see the [`QuerySet`](./query.py#QuerySet) class.
 
+### Typed conditions with where()
+
+`where()` is a typed alternative to `filter()`. Instead of string keyword lookups, you build each condition from a field, so a type checker catches a misspelled field or a wrong value type at the call site:
+
+```python
+from plain.postgres import types
+
+@postgres.register_model
+class User(postgres.Model):
+    email: str = types.EmailField()
+    role: str = types.TextField(max_length=20)
+    age: int = types.IntegerField(allow_null=True)
+
+    query: postgres.QuerySet[User] = postgres.QuerySet()
+
+# Each argument is a condition; multiple arguments are ANDed together.
+admins = User.query.where(
+    User.role.equals("admin"),
+    User.age.gte(18),
+)
+```
+
+Every field exposes `equals`, `not_equal`, `gt`, `gte`, `lt`, `lte`, `is_null`, and `is_in`. Text fields add `contains`, `icontains`, `startswith`, and `endswith`. Each returns a `Q`, so you can combine them with `|` and `&` or negate with `~`:
+
+```python
+# Membership, negation, and OR
+User.query.where(User.role.is_in(["admin", "staff"]))
+User.query.where(~User.role.equals("guest"))
+User.query.where(User.email.endswith("@example.com") | User.role.equals("admin"))
+```
+
+Conditions traverse foreign keys — accessing a field through a relation builds the joined lookup:
+
+```python
+# Q(author__email="a@example.com")
+Post.query.where(Post.author.email.equals("a@example.com"))
+```
+
+[Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`.
+
 ### Custom QuerySets
 
 You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods. Define a custom QuerySet and assign it to your model's `query` attribute:
