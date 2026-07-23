@@ -104,6 +104,14 @@ def _decrypt(value: str) -> str:
         )
 
 
+# Shared tail explaining why encrypted fields reject value comparisons — used
+# by both the lookup-construction guard (_exact_for_encrypted) and the
+# typed-query method guard (_lookup_unsupported_message).
+_NON_DETERMINISTIC_EXPLANATION = (
+    "ciphertext is non-deterministic. Use .is_null() instead."
+)
+
+
 # isnull is obviously needed. exact is required so that `filter(field=None)`
 # works — the ORM resolves "exact" first and then rewrites None to isnull.
 # get_lookup() below wraps the exact lookup class to reject non-None right-hand
@@ -126,9 +134,8 @@ def _exact_for_encrypted(base: type[Lookup]) -> type[Lookup]:
                 field_name = getattr(target, "name", None) or "<encrypted>"
                 raise TypeError(
                     f"Encrypted field {field_name!r} cannot be filtered by "
-                    "equality against a non-None value — ciphertext is "
-                    "non-deterministic. Use Model.field.is_null() or "
-                    "filter(field__isnull=True) for null checks."
+                    f"equality against a non-None value — "
+                    f"{_NON_DETERMINISTIC_EXPLANATION}"
                 )
             super().__init__(lhs, rhs)
 
@@ -199,7 +206,7 @@ class EncryptedFieldMixin:
         )
         return (
             f"Encrypted field {self.name!r} does not support .{method}() — "
-            "ciphertext is non-deterministic. Use .is_null() instead."
+            f"{_NON_DETERMINISTIC_EXPLANATION}"
         )
 
     def _check_encrypted_constraints(self) -> list[PreflightResult]:

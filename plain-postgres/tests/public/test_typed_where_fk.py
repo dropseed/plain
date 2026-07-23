@@ -166,8 +166,8 @@ class TestEncryptedFieldTraversalBlocked:
         from plain.postgres.fields.related_typed import PrefixedFieldRef
 
         ref = PrefixedFieldRef(
-            field=SecretStore._model_meta.get_field("api_key"),
-            prefix="store__api_key",
+            field=SecretStore._model_meta.get_forward_field("api_key"),
+            parent_path="store",
         )
         with pytest.raises(
             TypeError, match=r"Encrypted field.*does not support \.equals\("
@@ -178,19 +178,32 @@ class TestEncryptedFieldTraversalBlocked:
         from plain.postgres.fields.related_typed import PrefixedFieldRef
 
         ref = PrefixedFieldRef(
-            field=SecretStore._model_meta.get_field("api_key"),
-            prefix="store__api_key",
+            field=SecretStore._model_meta.get_forward_field("api_key"),
+            parent_path="store",
         )
-        for method in ("not_equal", "gt", "gte", "lt", "lte", "contains"):
+        for method in ("not_equal", "gt", "gte", "lt", "lte"):
             with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
                 getattr(ref, method)("x")
+
+    def test_traversed_text_method_absent_raises_attribute_error(self):
+        # Traversal exposes exactly the field's own surface. An encrypted field
+        # never defines .contains(), so traversing to it raises AttributeError,
+        # matching direct access (SecretStore.api_key.contains would too).
+        from plain.postgres.fields.related_typed import PrefixedFieldRef
+
+        ref = PrefixedFieldRef(
+            field=SecretStore._model_meta.get_forward_field("api_key"),
+            parent_path="store",
+        )
+        with pytest.raises(AttributeError):
+            ref.contains("x")
 
     def test_traversed_is_in_raises(self):
         from plain.postgres.fields.related_typed import PrefixedFieldRef
 
         ref = PrefixedFieldRef(
-            field=SecretStore._model_meta.get_field("api_key"),
-            prefix="store__api_key",
+            field=SecretStore._model_meta.get_forward_field("api_key"),
+            parent_path="store",
         )
         with pytest.raises(TypeError, match=r"does not support \.is_in\("):
             ref.is_in(["x", "y"])
@@ -199,11 +212,26 @@ class TestEncryptedFieldTraversalBlocked:
         from plain.postgres.fields.related_typed import PrefixedFieldRef
 
         ref = PrefixedFieldRef(
-            field=SecretStore._model_meta.get_field("api_key"),
-            prefix="store__api_key",
+            field=SecretStore._model_meta.get_forward_field("api_key"),
+            parent_path="store",
         )
         q = ref.is_null()
         assert q.children == [("store__api_key__isnull", True)]
+
+
+def test_traversed_surface_matches_direct_field_surface():
+    """Traversal exposes exactly the field's own condition surface. A text-only
+    method (.contains) is present when traversing to a TextField and absent when
+    traversing to a non-text field — the same as direct field access."""
+    from plain.postgres.fields.related_typed import _CONDITION_METHODS
+
+    for field_name in ("name", "id"):
+        direct = DeleteParent._model_meta.get_forward_field(field_name)
+        traversed = getattr(ChildCascade.parent, field_name)
+        for method in _CONDITION_METHODS:
+            assert hasattr(traversed, method) == hasattr(direct, method), (
+                f"{field_name}.{method}"
+            )
 
 
 # ---------------------------------------------------------------------------

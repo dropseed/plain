@@ -180,17 +180,15 @@ class Field[T](RegisterLookupMixin):
         return self._build_q("in", values)
 
     def _build_q(self, suffix: str, value: Any) -> Q:
-        """Build a Q from a lookup suffix + value, bypassing Q's reserved
-        `_connector`/`_negated` kwargs that confuse the type checker on
-        `**{name: value}` expansion."""
+        """Build a Q from a lookup suffix + value. Uses Q's positional-tuple
+        constructor to bypass its reserved `_connector`/`_negated` kwargs that
+        confuse the type checker on `**{name: value}` expansion."""
         assert self.name is not None, (
             "Field name must be set before building a query condition; "
             "the field must be attached to a model."
         )
         name = f"{self.name}__{suffix}" if suffix else self.name
-        q = Q()
-        q.children.append((name, value))
-        return q
+        return Q((name, value))
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [*self._check_field_name()]

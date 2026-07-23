@@ -10,163 +10,129 @@ related model to build the lookup path.
 
 from __future__ import annotations
 
-import inspect
 from typing import TYPE_CHECKING, Any
 
+from plain.postgres.exceptions import FieldDoesNotExist
+from plain.postgres.fields.related import ForeignKeyField
 from plain.postgres.query_utils import Q
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
+    from plain.postgres.fields.base import Field
+
+
+# Condition-method names a traversed field exposes. Traversal offers exactly the
+# surface the field itself offers: an attribute outside this set is not a
+# condition method and raises AttributeError rather than silently building a
+# wrong-shaped Q.
+_CONDITION_METHODS = frozenset(
+    {
+        "equals",
+        "not_equal",
+        "gt",
+        "gte",
+        "lt",
+        "lte",
+        "is_null",
+        "is_in",
+        "contains",
+        "icontains",
+        "startswith",
+        "endswith",
+    }
+)
+
+
+def _prefix_q(q: Q, parent_path: str) -> Q:
+    """Prepend `parent_path__` to every leaf lookup key in a Q tree, in place.
+
+    A leaf child is a `(key, value)` tuple; a nested Q node is recursed into.
+    Negation and connector are left untouched — only the lookup keys change,
+    turning a Q built against a field's bare name into one whose keys carry the
+    full relation path.
+    """
+    for i, child in enumerate(q.children):
+        if isinstance(child, Q):
+            _prefix_q(child, parent_path)
+        else:
+            key, value = child
+            q.children[i] = (f"{parent_path}__{key}", value)
+    return q
 
 
 class RelatedFieldRef:
-    """Class-level proxy that walks attribute access into the related model
-    and accumulates the lookup path prefix as it goes.
+    """Class-level proxy that walks attribute access into the related model and
+    accumulates the lookup-path prefix as it goes.
 
-    Returned by `ForwardForeignKeyDescriptor.__get__` for the first hop;
-    chained traversal (`Order.user.profile.city`) builds nested
-    `RelatedFieldRef` instances until a concrete field is reached.
+    Returned by `ForwardForeignKeyDescriptor.__get__` for the first hop; chained
+    traversal (`Order.user.profile.city`) builds nested `RelatedFieldRef`
+    instances until a concrete field is reached, then a `PrefixedFieldRef`.
 
-    The proxy's own namespace holds only traversal machinery, so a related
-    field whose name collides with a public attribute on the FK descriptor
-    (`field`, `is_cached`, `get_queryset`, …) still resolves to that field.
-    Attribute lookup reads the related model with `inspect.getattr_static`,
-    which returns the raw field/descriptor without invoking its `__get__`.
+    Names resolve through the related model's metadata (`get_forward_field`),
+    not attribute lookup, so a related field whose name collides with a public
+    attribute on the FK descriptor (`field`, `is_cached`, `get_queryset`, …)
+    still resolves to that field.
     """
 
-    def __init__(self, model: type[Model] | str, prefix: str) -> None:
+    def __init__(self, model: type[Model], prefix: str) -> None:
+        assert not isinstance(model, str), (
+            "RelatedFieldRef requires a resolved model class; the FK's "
+            "remote_field.model is replaced with the class at registration."
+        )
         self._model = model
         self._prefix = prefix
 
     def __repr__(self) -> str:
-        name = self._model if isinstance(self._model, str) else self._model.__name__
-        return f"<RelatedFieldRef {self._prefix} → {name}>"
+        return f"<RelatedFieldRef {self._prefix} → {self._model.__name__}>"
 
     def __getattr__(self, name: str) -> Any:
         if name.startswith("_"):
             # Avoid infinite recursion on internals and let pickling/hasattr
             # checks fail cleanly.
             raise AttributeError(name)
-        if isinstance(self._model, str):
-            # Relation not yet resolved (still a lazy string ref). Fail
-            # loudly rather than silently producing wrong-shaped queries.
-            raise AttributeError(
-                f"Cannot traverse {self._prefix}.{name}: relation is "
-                "still a string reference; the related model has not "
-                "been registered yet."
-            )
-        from plain.postgres.fields.base import Field
-        from plain.postgres.fields.related_descriptors import (
-            ForwardForeignKeyDescriptor,
-        )
 
         try:
-            attr = inspect.getattr_static(self._model, name)
-        except AttributeError:
-            raise AttributeError(name) from None
+            field = self._model._model_meta.get_forward_field(name)
+        except FieldDoesNotExist:
+            raise AttributeError(
+                f"{self._prefix}.{name} is not a traversable field or relation"
+            ) from None
 
-        next_prefix = f"{self._prefix}__{name}"
-        if isinstance(attr, Field):
-            return PrefixedFieldRef(field=attr, prefix=next_prefix)
-        if isinstance(attr, ForwardForeignKeyDescriptor):
+        if isinstance(field, ForeignKeyField):
             return RelatedFieldRef(
-                model=attr.field.remote_field.model, prefix=next_prefix
+                model=field.remote_field.model, prefix=f"{self._prefix}__{name}"
             )
-        raise AttributeError(
-            f"{self._prefix}.{name} is not a traversable field or relation"
-        )
+        return PrefixedFieldRef(field=field, parent_path=self._prefix)
 
 
 class PrefixedFieldRef:
-    """A field-like reference that produces Q objects with a multi-segment
-    lookup path. Mirrors the typed-query method surface of `Field` and
-    `TextField` so chained access reads identically to direct access:
+    """A field-like reference that rewrites the wrapped field's own Q conditions
+    onto a multi-segment lookup path, so chained access reads identically to
+    direct access:
 
-        Order.user.email.equals("x")    # PrefixedFieldRef("user__email")
-        Order.email.equals("x")         # Field/TextField on Order
+        Order.user.email.equals("x")    # PrefixedFieldRef(email_field, "user")
+        Order.email.equals("x")         # TextField on Order
+
+    A condition call delegates to the wrapped field's own method (which builds a
+    Q against the field's bare name, or raises — e.g. an encrypted field), then
+    prefixes every leaf key in that Q with the parent relation path. The
+    traversed surface is therefore exactly the field's own surface: a method the
+    field doesn't define raises AttributeError, same as direct access.
     """
 
-    def __init__(self, field: Any, prefix: str) -> None:
+    def __init__(self, field: Field, parent_path: str) -> None:
         self._field = field
-        self._prefix = prefix
+        self._parent_path = parent_path
 
     def __repr__(self) -> str:
-        return f"<PrefixedFieldRef {self._prefix}>"
+        return f"<PrefixedFieldRef {self._parent_path}__{self._field.name}>"
 
-    # Mirror Field[T] typed-query methods. Lookup suffixes match the strings
-    # the base Field methods produce via _build_q, so SQL resolution is the
-    # same as for a direct field reference.
-    def equals(self, value: Any) -> Q:
-        self._reject_if_blocked("equals")
-        return self._q("", value)
+    def __getattr__(self, name: str) -> Any:
+        if name not in _CONDITION_METHODS:
+            raise AttributeError(name)
+        field_method = getattr(self._field, name)
 
-    def not_equal(self, value: Any) -> Q:
-        self._reject_if_blocked("not_equal")
-        return ~self._q("", value)
+        def build(*args: Any, **kwargs: Any) -> Q:
+            return _prefix_q(field_method(*args, **kwargs), self._parent_path)
 
-    def gt(self, value: Any) -> Q:
-        self._reject_if_blocked("gt")
-        return self._q("gt", value)
-
-    def gte(self, value: Any) -> Q:
-        self._reject_if_blocked("gte")
-        return self._q("gte", value)
-
-    def lt(self, value: Any) -> Q:
-        self._reject_if_blocked("lt")
-        return self._q("lt", value)
-
-    def lte(self, value: Any) -> Q:
-        self._reject_if_blocked("lte")
-        return self._q("lte", value)
-
-    def is_null(self, value: bool = True) -> Q:
-        return self._q("isnull", value)
-
-    def is_in(self, values: Any) -> Q:
-        self._reject_if_blocked("is_in")
-        return self._q("in", values)
-
-    # TextField-specific lookups — always exposed at the proxy layer because
-    # callers go through the typing lie (`Order.user.email` reads as
-    # TextField[str] to the type checker). At runtime, calling .contains on
-    # a non-text field's PrefixedFieldRef would build SQL that errors at
-    # query time, which is the same failure mode as a manual
-    # `filter(user__priority__contains=...)`.
-    def contains(self, value: str) -> Q:
-        self._reject_if_blocked("contains")
-        return self._q("contains", value)
-
-    def icontains(self, value: str) -> Q:
-        self._reject_if_blocked("icontains")
-        return self._q("icontains", value)
-
-    def startswith(self, value: str) -> Q:
-        self._reject_if_blocked("startswith")
-        return self._q("startswith", value)
-
-    def endswith(self, value: str) -> Q:
-        self._reject_if_blocked("endswith")
-        return self._q("endswith", value)
-
-    def _q(self, suffix: str, value: Any) -> Q:
-        key = f"{self._prefix}__{suffix}" if suffix else self._prefix
-        q = Q()
-        q.children.append((key, value))
-        return q
-
-    def _reject_if_blocked(self, method_name: str) -> None:
-        """Forward the typed-query block from fields that reject value
-        comparisons (currently EncryptedFieldMixin). Direct access raises
-        TypeError at the call site; without this hook, traversing through
-        a relation (Order.user.api_token.equals(...)) would silently build
-        a Q that only errors later at SQL build time."""
-        from plain.postgres.fields.encrypted import EncryptedFieldMixin
-
-        if isinstance(self._field, EncryptedFieldMixin):
-            field_name = getattr(self._field, "name", None) or "<encrypted>"
-            raise TypeError(
-                f"Encrypted field {field_name!r} (reached via "
-                f"{self._prefix!r}) does not support .{method_name}() — "
-                "ciphertext is non-deterministic. Use .is_null() instead."
-            )
+        return build
