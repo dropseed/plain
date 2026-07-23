@@ -17,6 +17,7 @@ from app.examples.models.delete import (
 )
 from app.examples.models.encrypted import SecretStore
 from app.examples.models.relationships import Tag, Widget, WidgetTag
+from app.examples.models.shadowing import ShadowSource, ShadowTarget
 
 from plain.postgres.query_utils import Q
 
@@ -193,31 +194,42 @@ class TestEncryptedFieldTraversalBlocked:
 
 
 # ---------------------------------------------------------------------------
-# Known limitation: descriptor attributes shadow same-named related fields.
+# Descriptor attribute shadowing: a related field whose name collides with a
+# public attribute on ForwardForeignKeyDescriptor (`field`, `is_cached`,
+# `get_queryset`, `get_prefetch_queryset`) must still traverse to the field.
+# `__get__` returns a RelatedFieldRef proxy for class access, so the
+# descriptor's own attributes are unreachable through the relation.
 # ---------------------------------------------------------------------------
 
 
-def test_known_limitation_descriptor_attr_shadows_field_name():
-    """ForwardForeignKeyDescriptor has public attributes (`field`,
-    `is_cached`, `get_queryset`, `get_prefetch_queryset`,
-    `RelatedObjectDoesNotExist`). __getattr__ doesn't fire when normal
-    attribute lookup succeeds, so if a related model defines a field with
-    one of those names, traversal silently returns the descriptor's own
-    attribute instead of building a typed Q.
+@pytest.mark.parametrize(
+    "name",
+    ["field", "is_cached", "get_queryset", "get_prefetch_queryset"],
+)
+def test_shadowed_field_name_traverses_to_field(name):
+    """ShadowTarget defines fields named after descriptor attributes.
+    Traversal through ShadowSource.ref resolves each to the field, building
+    a `ref__<name>` path rather than returning the descriptor's attribute."""
+    ref = getattr(ShadowSource.ref, name)
+    q = ref.equals("x")
+    assert q.children == [(f"ref__{name}", "x")]
 
-    This test pins current behavior so a future fix won't regress
-    silently. It does NOT use a model with a colliding field name — none
-    of the existing fixture models do — it asserts the access pattern that
-    would shadow."""
-    # `.field` on the descriptor is the FK Field instance — not a Q-builder.
-    # ty's view (via the typing lie) is that `ChildCascade.parent` is
-    # `type[DeleteParent]`, which doesn't have `.field` — this access is
-    # only meaningful at runtime.
-    fk_field = ChildCascade.parent.field  # ty: ignore[unresolved-attribute]
-    from plain.postgres.fields.related import ForeignKeyField
 
-    assert isinstance(fk_field, ForeignKeyField)
-    # If someone wrote `class DeleteParent(Model): field = TextField()`,
-    # `ChildCascade.parent.field.equals("x")` would build Q(parent="x")
-    # via the FK's own .equals, NOT Q(parent__field="x"). See the docstring
-    # on RelatedFieldRef for the full list of shadowed names.
+def test_shadowed_field_traversal_runs(db):
+    """End-to-end: a where() through the shadowed `field` name filters rows."""
+    matched = ShadowTarget.query.create(
+        field="hit",
+        is_cached="a",
+        get_queryset="b",
+        get_prefetch_queryset="c",
+    )
+    ShadowTarget.query.create(
+        field="miss",
+        is_cached="a",
+        get_queryset="b",
+        get_prefetch_queryset="c",
+    )
+    ShadowSource.query.create(ref=matched)
+
+    rows = list(ShadowSource.query.where(ShadowSource.ref.field.equals("hit")))
+    assert [r.ref.id for r in rows] == [matched.id]

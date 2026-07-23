@@ -5,6 +5,7 @@ The main QuerySet implementation. This provides the public API for the ORM.
 from __future__ import annotations
 
 import copy
+import inspect
 import operator
 import warnings
 from collections.abc import Callable, Iterator, Sequence
@@ -1927,8 +1928,10 @@ def get_prefetcher(
 
     # For singly related objects, we have to avoid getting the attribute
     # from the object, as this will trigger the query. So we first try
-    # on the class, in order to get the descriptor object.
-    rel_obj_descriptor = getattr(instance.__class__, through_attr, None)
+    # on the class, in order to get the descriptor object. Use
+    # getattr_static so a forward FK yields its descriptor rather than the
+    # RelatedFieldRef traversal proxy its __get__ returns for class access.
+    rel_obj_descriptor = inspect.getattr_static(instance.__class__, through_attr, None)
     if rel_obj_descriptor is None:
         attr_found = hasattr(instance, through_attr)
     else:

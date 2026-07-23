@@ -3,12 +3,14 @@
 When `Order.user` is a ForeignKey, accessing `.email` at the class level (as in
 `where(Order.user.email.equals("x"))`) needs to produce
 `Q(user__email="x")` so the existing SQL builder's join machinery resolves the
-right column. The descriptor doesn't expose the related model's fields directly,
-so we proxy attribute access through these two helpers.
+right column. `ForwardForeignKeyDescriptor.__get__` returns a `RelatedFieldRef`
+for class-level access, and these two helpers walk attribute access into the
+related model to build the lookup path.
 """
 
 from __future__ import annotations
 
+import inspect
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.query_utils import Q
@@ -21,65 +23,55 @@ class RelatedFieldRef:
     """Class-level proxy that walks attribute access into the related model
     and accumulates the lookup path prefix as it goes.
 
-    Yielded by `ForwardForeignKeyDescriptor.__getattr__` for the first hop;
+    Returned by `ForwardForeignKeyDescriptor.__get__` for the first hop;
     chained traversal (`Order.user.profile.city`) builds nested
     `RelatedFieldRef` instances until a concrete field is reached.
 
-    Known limitation — descriptor attribute shadowing
-    -------------------------------------------------
-    For the first hop, `Child.parent` is the FK descriptor itself.
-    `__getattr__` only fires when normal attribute lookup *fails*, so if a
-    related model defines a field whose name collides with a public
-    attribute on `ForwardForeignKeyDescriptor` — currently `field`,
-    `is_cached`, `get_queryset`, `get_prefetch_queryset`, or
-    `RelatedObjectDoesNotExist` — `Child.parent.<that_name>` silently
-    returns the descriptor's attribute instead of building a `PrefixedFieldRef`.
-    The typed-where call against it then produces wrong SQL.
-
-    The architectural fix is to return a fresh proxy object from
-    `ForwardForeignKeyDescriptor.__get__(instance=None)` instead of `self`,
-    so the descriptor's own attributes aren't reachable through class
-    access. That's a bigger change with a wider blast radius (framework
-    code reads `Child.parent.field` etc.) and is deferred.
+    The proxy's own namespace holds only traversal machinery, so a related
+    field whose name collides with a public attribute on the FK descriptor
+    (`field`, `is_cached`, `get_queryset`, …) still resolves to that field.
+    Attribute lookup reads the related model with `inspect.getattr_static`,
+    which returns the raw field/descriptor without invoking its `__get__`.
     """
 
-    def __init__(self, model: type[Model], prefix: str) -> None:
+    def __init__(self, model: type[Model] | str, prefix: str) -> None:
         self._model = model
         self._prefix = prefix
 
     def __repr__(self) -> str:
-        return f"<RelatedFieldRef {self._prefix} → {self._model.__name__}>"
+        name = self._model if isinstance(self._model, str) else self._model.__name__
+        return f"<RelatedFieldRef {self._prefix} → {name}>"
 
     def __getattr__(self, name: str) -> Any:
         if name.startswith("_"):
             # Avoid infinite recursion on internals and let pickling/hasattr
             # checks fail cleanly.
             raise AttributeError(name)
+        if isinstance(self._model, str):
+            # Relation not yet resolved (still a lazy string ref). Fail
+            # loudly rather than silently producing wrong-shaped queries.
+            raise AttributeError(
+                f"Cannot traverse {self._prefix}.{name}: relation is "
+                "still a string reference; the related model has not "
+                "been registered yet."
+            )
         from plain.postgres.fields.base import Field
         from plain.postgres.fields.related_descriptors import (
             ForwardForeignKeyDescriptor,
         )
 
         try:
-            attr = self._model.__dict__[name]
-        except KeyError:
-            # Fall back to a full lookup so inherited fields resolve.
-            attr = getattr(self._model, name, None)
-            if attr is None:
-                raise AttributeError(name) from None
+            attr = inspect.getattr_static(self._model, name)
+        except AttributeError:
+            raise AttributeError(name) from None
 
         next_prefix = f"{self._prefix}__{name}"
         if isinstance(attr, Field):
             return PrefixedFieldRef(field=attr, prefix=next_prefix)
         if isinstance(attr, ForwardForeignKeyDescriptor):
-            remote_model = attr.field.remote_field.model
-            if isinstance(remote_model, str):
-                raise AttributeError(
-                    f"Cannot traverse {self._prefix}.{name}: relation is "
-                    "still a string reference; the related model has not "
-                    "been registered yet."
-                )
-            return RelatedFieldRef(model=remote_model, prefix=next_prefix)
+            return RelatedFieldRef(
+                model=attr.field.remote_field.model, prefix=next_prefix
+            )
         raise AttributeError(
             f"{self._prefix}.{name} is not a traversable field or relation"
         )
