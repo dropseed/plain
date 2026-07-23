@@ -35,6 +35,9 @@ def test_fk_field_access_supports_other_lookups():
     assert ChildCascade.parent.name.is_null().children == [
         ("parent__name__isnull", True)
     ]
+    assert ChildCascade.parent.name.is_in(["a", "b"]).children == [
+        ("parent__name__in", ["a", "b"])
+    ]
 
 
 def test_fk_traversal_in_where_clause(db):
@@ -181,6 +184,16 @@ class TestEncryptedFieldTraversalBlocked:
         for method in ("not_equal", "gt", "gte", "lt", "lte", "contains"):
             with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
                 getattr(ref, method)("x")
+
+    def test_traversed_is_in_raises(self):
+        from plain.postgres.fields.related_typed import PrefixedFieldRef
+
+        ref = PrefixedFieldRef(
+            field=SecretStore._model_meta.get_field("api_key"),
+            prefix="store__api_key",
+        )
+        with pytest.raises(TypeError, match=r"does not support \.is_in\("):
+            ref.is_in(["x", "y"])
 
     def test_traversed_is_null_still_works(self):
         from plain.postgres.fields.related_typed import PrefixedFieldRef

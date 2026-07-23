@@ -3,7 +3,7 @@ from __future__ import annotations
 import collections.abc
 import copy
 import enum
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -175,6 +175,9 @@ class Field[T](RegisterLookupMixin):
 
     def is_null(self, value: bool = True) -> Q:
         return self._build_q("isnull", value)
+
+    def is_in(self, values: Iterable[T]) -> Q:
+        return self._build_q("in", values)
 
     def _build_q(self, suffix: str, value: Any) -> Q:
         """Build a Q from a lookup suffix + value, bypassing Q's reserved

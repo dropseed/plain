@@ -59,6 +59,15 @@ if TYPE_CHECKING:
         # runtime would store it (and only fail later at validate/save).
         row.name = None  # ty: ignore[invalid-assignment]
 
+    def _typed_check_is_in_element_type() -> None:
+        # is_in takes an iterable of the field's value type. A matching
+        # iterable type-checks clean; a wrong element type is flagged. The
+        # ignore marker is load-bearing — if the parameter were typed loosely
+        # (e.g. Iterable[Any]), ty would report it as an unused suppression.
+        DefaultsExample.priority.is_in([1, 2, 3])
+        DefaultsExample.name.is_in(["a", "b"])
+        DefaultsExample.priority.is_in(["no", "ints"])  # ty: ignore[invalid-argument-type]
+
 
 def test_field_methods_return_q_objects():
     """The methods are usable before any DB hit and produce Q objects."""
@@ -66,6 +75,7 @@ def test_field_methods_return_q_objects():
     assert isinstance(DefaultsExample.priority.gte(5), Q)
     assert isinstance(DefaultsExample.name.contains("oo"), Q)
     assert isinstance(DefaultsExample.note.is_null(), Q)
+    assert isinstance(DefaultsExample.priority.is_in([1, 2]), Q)
 
 
 def test_where_filters_by_equals(db):
@@ -122,6 +132,32 @@ def test_text_field_string_lookups(db):
         )
     )
     assert [r.name for r in starts] == ["alice", "alpha"]
+
+
+def test_where_filters_by_is_in(db):
+    DefaultsExample.query.create(name="alice")
+    DefaultsExample.query.create(name="bob")
+    DefaultsExample.query.create(name="carol")
+
+    rows = list(
+        DefaultsExample.query.where(
+            DefaultsExample.name.is_in(["alice", "carol"])
+        ).order_by("name")
+    )
+    assert [r.name for r in rows] == ["alice", "carol"]
+
+
+def test_is_in_negation_excludes_members(db):
+    DefaultsExample.query.create(name="alice")
+    DefaultsExample.query.create(name="bob")
+    DefaultsExample.query.create(name="carol")
+
+    rows = list(
+        DefaultsExample.query.where(
+            ~DefaultsExample.name.is_in(["alice", "carol"])
+        ).order_by("name")
+    )
+    assert [r.name for r in rows] == ["bob"]
 
 
 def test_is_null_with_explicit_default(db):

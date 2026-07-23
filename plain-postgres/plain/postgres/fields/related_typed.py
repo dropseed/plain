@@ -123,6 +123,10 @@ class PrefixedFieldRef:
     def is_null(self, value: bool = True) -> Q:
         return self._q("isnull", value)
 
+    def is_in(self, values: Any) -> Q:
+        self._reject_if_blocked("is_in")
+        return self._q("in", values)
+
     # TextField-specific lookups — always exposed at the proxy layer because
     # callers go through the typing lie (`Order.user.email` reads as
     # TextField[str] to the type checker). At runtime, calling .contains on

@@ -189,6 +189,9 @@ class EncryptedFieldMixin:
     def lte(self, value: Never) -> Never:
         raise TypeError(self._lookup_unsupported_message("lte"))
 
+    def is_in(self, values: Never) -> Never:
+        raise TypeError(self._lookup_unsupported_message("is_in"))
+
     def _lookup_unsupported_message(self, method: str) -> str:
         assert self.name is not None, (
             "Encrypted field must be attached to a model before its typed-query "
