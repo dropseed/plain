@@ -127,7 +127,7 @@ class APIKeyView(View[APIResult]):
         Override this to perform other actions with a valid API key.
         """
         self.api_key.last_used_at = timezone.now()
-        self.api_key.save(update_fields=["last_used_at"])
+        self.api_key.update(fields=["last_used_at"])
 
     def get_api_key(self) -> Any:
         """
@@ -195,11 +195,8 @@ class APIView(View[APIResult]):
                 )
             status_code, result = cast(tuple[int, dict[str, Any] | list[Any]], result)
 
-        if isinstance(result, dict):
+        if isinstance(result, dict | list):
             return JsonResponse(result, status_code=status_code)
-
-        if isinstance(result, list):
-            return JsonResponse(result, status_code=status_code, safe=False)
 
         raise TypeError(f"Unexpected APIView return type: {type(result).__name__}")
 

@@ -36,7 +36,6 @@ FULLY_TYPED_PATHS = [
     "plain-dev",
     "plain-elements",
     "plain-email",
-    "plain-esbuild",
     "plain-flags",
     "plain-htmx",
     "plain-loginlink",
@@ -46,7 +45,6 @@ FULLY_TYPED_PATHS = [
     "plain-pytest",
     "plain-redirection",
     "plain-sessions",
-    "plain-observer",
     "plain-tailwind",
     "plain-toolbar",
     "plain-tunnel",
@@ -73,7 +71,10 @@ def check_type_coverage(path: str) -> tuple[float, int, int, int, int, int]:
     # Run from example directory since plain code requires a Plain app context
     # Use relative path from example to the target
     relative_path = f"../{path}"
-    env = {**os.environ, "DATABASE_URL": "postgres://postgres:postgres@localhost/plain_example"}
+    env = {
+        **os.environ,
+        "PLAIN_POSTGRES_URL": "postgres://postgres:postgres@localhost/plain_example",
+    }
     result = subprocess.run(
         ["uv", "run", "plain", "code", "annotations", relative_path, "--json"],
         capture_output=True,

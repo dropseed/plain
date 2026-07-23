@@ -1,5 +1,79 @@
 # plain-cache changelog
 
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-cache@0.31.0) (2026-06-22)
+
+### What's changed
+
+- Collapsed the migration history into a single fresh `0001_initial`. The database schema is unchanged — only the migration files were squashed. ([802f2d87](https://github.com/dropseed/plain/commit/802f2d87))
+
+### Upgrade instructions
+
+- Run `plain migrations prune` after upgrading to clear the now-orphaned history records for this package's old migrations. No SQL runs — it only cleans up migration-history records and is safe and idempotent. If `migrations prune` is already part of your deploy steps, no action is needed.
+
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-cache@0.30.0) (2026-06-07)
+
+### What's changed
+
+- **New `increment(key, delta=1, *, expiration=None)` and `decrement(key, delta=1, *, expiration=None)`** — atomically adjust a stored number in a single `INSERT ... ON CONFLICT` statement and return the new total. Because it's one statement, concurrent callers can't lose updates the way a read-then-`set()` would, making it the right primitive for counters and fixed-window rate limiters. A missing key (or one storing `None`) counts as `0`, so the first increment starts from `delta`; a non-numeric stored value raises. ([99a5d1f6a1](https://github.com/dropseed/plain/commit/99a5d1f6a1))
+
+    Expiry follows a **fixed-window** rule: a missing or expired key starts fresh at `delta` and takes the `expiration` you pass, while a live key adds to the existing total and keeps its current `expires_at` (regardless of the `expiration` argument). To slide the TTL on each call instead, follow up with `touch()`.
+
+- **Removed `cache.exists()`.** A single `get()` answers presence _and_ returns the value in one query, so check it directly: `if cache.get("k") is not None:`. If `None` is a value you legitimately store, pass a sentinel default to tell "absent" from a stored `None`. ([6ff26a98c8](https://github.com/dropseed/plain/commit/6ff26a98c8))
+
+### Upgrade instructions
+
+- Replace `cache.exists("key")` with `cache.get("key") is not None`. If you store `None` as a real value, use a sentinel: `missing = object(); cache.get("key", missing) is not missing`. To compute-and-store on a miss, prefer `get_or_set()` over a check-then-set.
+
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-cache@0.29.0) (2026-06-07)
+
+### What's changed
+
+- **`plain.cache` is redesigned around a stateless, module-level `cache` singleton.** The `Cached(key)` class is gone; import `cache` and pass the key per call. ([ab0f4b876f](https://github.com/dropseed/plain/commit/ab0f4b876f))
+
+    | Before                              | After                              |
+    | ----------------------------------- | ---------------------------------- |
+    | `Cached("k").set(v, expiration=60)` | `cache.set("k", v, expiration=60)` |
+    | `Cached("k").value`                 | `cache.get("k")`                   |
+    | `Cached("k").exists()`              | `cache.exists("k")`                |
+    | `Cached("k").delete()`              | `cache.delete("k")`                |
+
+- **`get()` replaces the `.value` property** and takes an optional default — `cache.get("k", default)` returns the default on a miss or expiry (instead of always `None`).
+- **`set()` is now `cache.set(key, value, *, expiration=...)`** — `expiration` is keyword-only, and `set()` returns `None` (it previously returned the stored value). It still rewrites the whole entry, including its expiry.
+- **New `get_or_set(key, default, *, expiration=None)`** — returns the cached value, or computes/stores/returns it on a miss. `default` may be a value or a zero-arg callable (invoked only on a miss). A stored `None` counts as a hit.
+- **New batch methods** — `get_many(keys)` (a single query, returns only live entries), `set_many(mapping, *, expiration=None)`, and `delete_many(keys)`.
+- **New `touch(key, *, expiration=None)`** — change a live entry's expiration _without_ rewriting its value. It writes only `expires_at`/`updated_at`, reusing the existing TOAST pointer, so refreshing the TTL of a multi-megabyte value doesn't re-TOAST the blob. Returns `True` if a live entry was updated, `False` for a missing/expired key. Ideal for sliding-TTL caches of large values.
+- **New `clear()`** — delete every entry; returns the number of rows deleted. (`delete()` returns a bool; `delete_many()` and `clear()` return counts.)
+- **New `CachedItem.query.live()` queryset method** — the never-expiring-or-not-yet-expired filter that reads now use, so an entry past its `expires_at` reads as absent. `expired()`/`unexpired()`/`forever()` are unchanged; note `unexpired()` still matches only rows with a _future_ expiry (excluding forever rows), whereas `live()` includes them.
+- **Stricter `expiration` validation** — a `bool` or a bare `date` passed as `expiration` now raises `TypeError` instead of being silently treated as "never expires."
+
+### Upgrade instructions
+
+- Replace `Cached("key")` with the `cache` singleton (see the table above): `from plain.cache import cache`, then `cache.get("key")` / `cache.set("key", value, expiration=...)` / `cache.exists("key")` / `cache.delete("key")`.
+- `expiration` is now keyword-only on `set()` — use `cache.set("k", v, expiration=60)`, not a positional third argument.
+- If you read `Cached(...).value`, switch to `cache.get(key)` (pass a default if you don't want `None`).
+- If you relied on `set()` returning the stored value, note it now returns `None`.
+- No migration required — the `CachedItem` model is unchanged.
+
+## [0.28.2](https://github.com/dropseed/plain/releases/plain-cache@0.28.2) (2026-06-03)
+
+### What's changed
+
+- A raced unique-key conflict during `set()` now surfaces as a `ValidationError` (mapped at the save boundary in `plain.postgres`), so the retry path catches `(psycopg.IntegrityError, ValidationError)` rather than `IntegrityError` alone. ([40c97521c5](https://github.com/dropseed/plain/commit/40c97521c5))
+
+### Upgrade instructions
+
+- No changes required. Requires `plain.postgres>=0.106.0`.
+
+## [0.28.1](https://github.com/dropseed/plain/releases/plain-cache@0.28.1) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-cache@0.28.0) (2026-05-06)
 
 ### What's changed

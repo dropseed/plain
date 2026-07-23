@@ -15,8 +15,10 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
+from opentelemetry.trace import NoOpTracer
 from psycopg_pool import PoolTimeout
 
+from plain.postgres import otel as postgres_otel
 from plain.postgres.db import get_connection
 from plain.postgres.otel import register_pool_observables
 from plain.postgres.sources import runtime_pool_source
@@ -59,6 +61,54 @@ class TestQuerySpanAttributes:
         assert attrs["server.address"] == attrs.get("network.peer.address")
         assert "server.port" in attrs
         assert attrs["server.port"] == attrs.get("network.peer.port")
+
+    @pytest.mark.usefixtures("db")
+    def test_query_spans_carry_the_attributes_trace_readers_rely_on(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # `plain request` groups statements by `db.query.text`, splits
+        # transaction bookkeeping out by `db.operation.name`, and classifies
+        # call sites by `code.file.path`. It cannot import this package to
+        # check, so pin the keys here — dropping one silently costs it query
+        # grouping or call sites with nothing failing on that side.
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+
+        spans = [s for s in otel_spans.get_finished_spans() if s.name == "SELECT"]
+        assert spans, "no SELECT span captured"
+        attrs = spans[-1].attributes
+        assert attrs is not None
+        assert attrs["db.query.text"] == "SELECT 1"
+        assert attrs["db.operation.name"] == "SELECT"
+        assert str(attrs["code.file.path"]).endswith(".py")
+
+    def test_not_recording_skips_stack_walk(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Cheap attributes still build unconditionally (attribute-aware
+        # samplers see them at span creation), but the per-query stack walk
+        # must only happen when the span actually records.
+        stack_walks: list[int] = []
+
+        def counting_code_attributes() -> dict[str, Any]:
+            stack_walks.append(1)
+            return {}
+
+        monkeypatch.setattr(
+            postgres_otel, "_get_code_attributes", counting_code_attributes
+        )
+        monkeypatch.setattr(postgres_otel, "tracer", NoOpTracer())
+
+        class StubDb:
+            settings_dict: dict[str, Any] = {}
+
+        with postgres_otel.db_span(StubDb(), "SELECT 1") as span:  # ty: ignore[invalid-argument-type]
+            pass
+
+        assert span is not None
+        assert not span.is_recording()
+        assert not stack_walks
 
 
 class TestReturnedRowsMetric:

@@ -13,7 +13,7 @@ def check_user_password(user: Any, password: str) -> bool:
     # Update the stored hashed password if the hashing algorithm changed
     def setter(raw_password: str) -> None:
         user.password = raw_password
-        user.save(update_fields=["password"])
+        user.update(fields=["password"])
 
     password_is_correct = check_password(password, user.password, setter)
 

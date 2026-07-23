@@ -13,15 +13,43 @@ import platform
 import subprocess
 import sys
 import tarfile
+import tomllib
 import zipfile
+from pathlib import Path
 
 import click
-import requests
+import httpx
 import tomlkit
 
-from plain.runtime import PLAIN_TEMP_PATH
+from plain.runtime import PLAIN_CACHE_PATH, PLAIN_TEMP_PATH
+from plain.utils.version import compare_versions
 
 TAG_PREFIX = "apps_v"
+
+# Older versions resolve ignore patterns differently, so we don't support them.
+MIN_VERSION = (1, 75, 0)
+
+
+def check_min_version(version: str) -> None:
+    """Raise when `version` predates the oldest Oxc we support."""
+    minimum = ".".join(str(part) for part in MIN_VERSION)
+    if compare_versions(version, minimum) < 0:
+        raise RuntimeError(
+            f"Oxc {version} is too old (minimum is {minimum}) — run `plain code update`"
+        )
+
+
+# Committed third-party code that we don't want to lint or format. Everything
+# else worth skipping (node_modules, .venv, htmlcov, .pytest_cache) is already
+# gitignored, and both tools read .gitignore on their own.
+#
+# These go on the command line rather than in a config file, because config-file
+# `ignorePatterns` only match files underneath the config file's own directory
+# and ours ships inside the installed package.
+IGNORE_PATTERNS = [
+    "**/vendor/**",
+    "**/*.min.*",
+]
 
 
 class OxcTool:
@@ -32,33 +60,14 @@ class OxcTool:
             raise ValueError(f"Unknown Oxc tool: {name}")
         self.name = name
 
-    @property
-    def target_directory(self) -> str:
-        return str(PLAIN_TEMP_PATH)
-
-    @property
-    def standalone_path(self) -> str:
+    def binary_path(self, version: str) -> Path:
+        """Machine-level cache path for a specific Oxc version."""
         exe = ".exe" if platform.system() == "Windows" else ""
-        return os.path.join(self.target_directory, f"{self.name}{exe}")
-
-    @property
-    def version_lockfile_path(self) -> str:
-        return os.path.join(self.target_directory, "oxc.version")
+        return PLAIN_CACHE_PATH / "oxc" / version / f"{self.name}{exe}"
 
     def is_installed(self) -> bool:
-        td = self.target_directory
-        if not os.path.isdir(td):
-            os.makedirs(td, exist_ok=True)
-        return os.path.exists(self.standalone_path)
-
-    def needs_update(self) -> bool:
-        if not self.is_installed():
-            return True
-        if not os.path.exists(self.version_lockfile_path):
-            return True
-        with open(self.version_lockfile_path) as f:
-            locked = f.read().strip()
-        return locked != self.get_version_from_config()
+        version = self.get_version_from_config()
+        return bool(version) and self.binary_path(version).exists()
 
     @staticmethod
     def get_version_from_config() -> str:
@@ -66,7 +75,8 @@ class OxcTool:
         pyproject = os.path.join(project_root, "pyproject.toml")
         if not os.path.exists(pyproject):
             return ""
-        doc = tomlkit.loads(open(pyproject, "rb").read().decode())
+        with open(pyproject, "rb") as f:
+            doc = tomllib.load(f)
         return (
             doc.get("tool", {})
             .get("plain", {})
@@ -81,11 +91,13 @@ class OxcTool:
         pyproject = os.path.join(project_root, "pyproject.toml")
         if not os.path.exists(pyproject):
             return
-        doc = tomlkit.loads(open(pyproject, "rb").read().decode())
+        with open(pyproject) as f:
+            doc = tomlkit.load(f)
         doc.setdefault("tool", {}).setdefault("plain", {}).setdefault(
             "code", {}
         ).setdefault("oxc", {})["version"] = version
-        open(pyproject, "w").write(tomlkit.dumps(doc))
+        with open(pyproject, "w") as f:
+            tomlkit.dump(doc, f)
 
     def detect_platform_slug(self) -> str:
         system = platform.system()
@@ -107,10 +119,11 @@ class OxcTool:
     @staticmethod
     def get_latest_version() -> str:
         """Find the latest apps_v release tag via the GitHub API."""
-        resp = requests.get(
+        resp = httpx.get(
             "https://api.github.com/repos/oxc-project/oxc/releases",
             params={"per_page": 20},
             headers={"Accept": "application/vnd.github+json"},
+            follow_redirects=True,
         )
         resp.raise_for_status()
         for release in resp.json():
@@ -129,61 +142,80 @@ class OxcTool:
         asset = f"{self.name}-{slug}.{ext}"
         url = f"https://github.com/oxc-project/oxc/releases/download/{TAG_PREFIX}{version}/{asset}"
 
-        resp = requests.get(url, stream=True)
-        resp.raise_for_status()
-
-        td = self.target_directory
-        if not os.path.isdir(td):
-            os.makedirs(td, exist_ok=True)
-
         # Download into memory for extraction
         data = io.BytesIO()
-        total = int(resp.headers.get("Content-Length", 0))
-        if total:
-            with click.progressbar(
-                length=total,
-                label=f"Downloading {self.name}",
-                width=0,
-            ) as bar:
-                for chunk in resp.iter_content(chunk_size=1024 * 1024):
+        with httpx.stream("GET", url, follow_redirects=True) as resp:
+            resp.raise_for_status()
+            total = int(resp.headers.get("Content-Length", 0))
+            if total:
+                with click.progressbar(
+                    length=total,
+                    label=f"Downloading {self.name}",
+                    width=0,
+                ) as bar:
+                    for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
+                        data.write(chunk)
+                        bar.update(len(chunk))
+            else:
+                for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
                     data.write(chunk)
-                    bar.update(len(chunk))
-        else:
-            for chunk in resp.iter_content(chunk_size=1024 * 1024):
-                data.write(chunk)
 
         data.seek(0)
 
-        # Extract the binary from the archive
-        if is_windows:
-            with zipfile.ZipFile(data) as zf:
-                # Find the binary inside the archive
-                members = zf.namelist()
-                binary_name = next(m for m in members if m.startswith(self.name))
-                with (
-                    zf.open(binary_name) as src,
-                    open(self.standalone_path, "wb") as dst,
-                ):
-                    dst.write(src.read())
-        else:
-            with tarfile.open(fileobj=data, mode="r:gz") as tf:
-                members = tf.getnames()
-                binary_name = next(m for m in members if m.startswith(self.name))
-                extracted = tf.extractfile(binary_name)
-                if extracted is None:
-                    raise RuntimeError(f"Failed to extract {binary_name} from archive")
-                with open(self.standalone_path, "wb") as dst:
-                    dst.write(extracted.read())
+        # Extract to a temp file first, then atomically move it into the
+        # versioned cache path (parallel checkouts can download concurrently).
+        resolved = version.lstrip("v")
+        binary_path = self.binary_path(resolved)
+        binary_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = binary_path.parent / f".{self.name}-download-{os.getpid()}"
 
-        os.chmod(self.standalone_path, 0o755)
-        return version.lstrip("v")
+        try:
+            if is_windows:
+                with zipfile.ZipFile(data) as zf:
+                    # Find the binary inside the archive
+                    members = zf.namelist()
+                    binary_name = next(m for m in members if m.startswith(self.name))
+                    with (
+                        zf.open(binary_name) as src,
+                        open(tmp_path, "wb") as dst,
+                    ):
+                        dst.write(src.read())
+            else:
+                with tarfile.open(fileobj=data, mode="r:gz") as tf:
+                    members = tf.getnames()
+                    binary_name = next(m for m in members if m.startswith(self.name))
+                    extracted = tf.extractfile(binary_name)
+                    if extracted is None:
+                        raise RuntimeError(
+                            f"Failed to extract {binary_name} from archive"
+                        )
+                    with open(tmp_path, "wb") as dst:
+                        dst.write(extracted.read())
+
+            os.chmod(tmp_path, 0o755)
+            os.replace(tmp_path, binary_path)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+        return resolved
 
     def invoke(self, *args: str, cwd: str | None = None) -> subprocess.CompletedProcess:
-        config_path = os.path.join(
-            os.path.dirname(__file__), f"{self.name}_defaults.json"
-        )
+        version = self.get_version_from_config()
+        if not version:
+            raise RuntimeError(
+                "No Oxc version configured in pyproject.toml — run `plain code install`"
+            )
+        check_min_version(version)
+        if self.name == "oxlint":
+            # oxlint takes ignores as repeated --ignore-pattern flags.
+            ignore_args = []
+            for pattern in IGNORE_PATTERNS:
+                ignore_args += ["--ignore-pattern", pattern]
+        else:
+            # oxfmt has no --ignore-pattern; it excludes via `!`-prefixed paths.
+            ignore_args = [f"!{pattern}" for pattern in IGNORE_PATTERNS]
         result = subprocess.run(
-            [self.standalone_path, "-c", config_path, *args],
+            [self.binary_path(version), *args, *ignore_args],
             cwd=cwd,
             capture_output=True,
             text=True,
@@ -197,21 +229,31 @@ class OxcTool:
         ):
             result.returncode = 0
         elif result.stderr:
-            print(result.stderr, end="", file=sys.stderr)
+            # We deliberately don't pass a config file, so drop oxfmt's nudge to
+            # add one — projects can still add their own `.oxfmtrc.json`.
+            stderr = "".join(
+                line
+                for line in result.stderr.splitlines(keepends=True)
+                if "No config found, using defaults" not in line
+            )
+            if stderr:
+                print(stderr, end="", file=sys.stderr)
         return result
 
 
 def install_oxc(version: str = "") -> str:
     """Install both oxlint and oxfmt, return the resolved version."""
+    if version:
+        # Before downloading, so a pin below the minimum is rejected instead of
+        # installing, reporting success, and then failing on first use — which
+        # `plain fix` would repeat on every run, since installing "worked".
+        check_min_version(version)
+
     oxlint = OxcTool("oxlint")
     oxfmt = OxcTool("oxfmt")
 
     resolved = oxlint.download(version)
     oxfmt.download(resolved)
-
-    # Write version lockfile once (shared by both tools)
-    with open(oxlint.version_lockfile_path, "w") as f:
-        f.write(resolved)
 
     OxcTool.set_version_in_config(resolved)
     return resolved

@@ -25,9 +25,15 @@ plain-postgres
 plain-assets
 plain-templates
 plain-sessions
+plain-cache
 plain-jobs
 plain-flags
 plain-connect
+plain-cloud
+plain-portal
+plain-scan
+plain-redirection
+plain-tunnel
 plain-admin
 plain-oauth
 plain-auth
@@ -38,6 +44,7 @@ plain-elements
 plain-htmx
 plain-email
 plain-mcp
+plain-oauthserver
 plain-pages
 EOF
 )"
@@ -65,12 +72,11 @@ bold() { printf '\033[1m%s\033[0m\n' "$1"; }
 # ---------------------------------------------------------------------------
 # Database URL (PostgreSQL required)
 # ---------------------------------------------------------------------------
-# Use a unique DB name per checkout so parallel worktrees don't collide.
-_repo_dir=$(basename "$(git rev-parse --show-toplevel)")
-_db_suffix=$(echo "$_repo_dir" | tr '-' '_')
-source scripts/start-postgres "plain_tests_${_db_suffix}"
+# plain.dev already gives each checkout its own database, so parallel worktrees
+# don't collide without us naming anything here.
+source scripts/start-postgres
 
-echo "Using DATABASE_URL: $DATABASE_URL"
+echo "Using PLAIN_POSTGRES_URL: $PLAIN_POSTGRES_URL"
 
 # PostgreSQL driver
 WITH="--with psycopg[binary]"
@@ -117,6 +123,15 @@ else
   echo
   bold "Running h2-worker-test"
   tools/h2-worker-test
+
+  # Graceful shutdown behavior
+  echo
+  bold "Running shutdown-test"
+  tools/shutdown-test
+
+  echo
+  bold "Running h2-shutdown-test"
+  tools/h2-shutdown-test
 
   # HTTP/1.1 conformance tests (h1spec)
   echo

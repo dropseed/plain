@@ -223,21 +223,21 @@ class PullRequestDetailView(HTMXView, DetailView):
             raise ValueError("Only a closed pull request can be opened")
 
         self.object.state = "closed"
-        self.object.save()
+        self.object.update()
 
     def htmx_post_close(self):
         if self.object.state != "open":
             raise ValueError("Only an open pull request can be closed")
 
         self.object.state = "open"
-        self.object.save()
+        self.object.update()
 
     def htmx_post_merge(self):
         if self.object.state != "open":
             raise ValueError("Only an open pull request can be merged")
 
         self.object.state = "merged"
-        self.object.save()
+        self.object.update()
 ```
 
 This can be a matter of preference, but typically you may end up building out an entire form, API, or set of URLs to handle these behaviors. If your application is only going to handle these actions via HTMX, then a single View may be a simpler way to do it.
@@ -264,7 +264,7 @@ class PullRequestDetailView(HTMXView, DetailView):
 
 ## Dedicated templates
 
-A small additional feature is that `plain.htmx` will automatically find templates named `{template_name}_htmx.html` for HTMX requests. More than anything, this is just a nice way to formalize a naming scheme for template "partials" dedicated to HTMX.
+A nice convention is to name template "partials" dedicated to HTMX as `{template_name}_htmx.html`, and `{% include %}` them wherever they're rendered.
 
 For cases where loop items need their own URL (e.g., each item has a detail page), you can define dedicated URLs to handle the HTMX behaviors for individual items. You can sometimes think of these as "pages within a page". (For simpler cases, [fragments in loops](#fragments-in-loops) may be sufficient.)
 

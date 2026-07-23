@@ -26,7 +26,6 @@ INSTALLED_PACKAGES = [
     "plain.templates",
     "plain.toolbar",
     "plain.redirection",
-    "plain.observer",
     "app.users",
     "app.notes",
     "app.contacts",

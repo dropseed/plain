@@ -5,7 +5,7 @@ import sys
 import click
 
 from ..convergence import execute_plan, plan_convergence
-from .decorators import database_management_command
+from .decorators import cli_schema_lock, database_management_command
 
 
 @click.command()
@@ -17,16 +17,16 @@ from .decorators import database_management_command
 )
 @database_management_command
 def converge(yes: bool) -> None:
-    """Fix schema mismatches between models and the database.
+    """Correct schema mismatches between models and the database.
 
-    Detects and fixes:
+    Detects and corrects:
     - Missing indexes (using CONCURRENTLY)
     - Missing constraints (check, unique)
     - NOT VALID constraints needing validation
     - Undeclared indexes and constraints (dropped automatically)
 
-    Each fix is applied and committed independently so partial
-    failures don't block subsequent fixes.
+    Each correction is applied and committed independently so partial
+    failures don't block subsequent corrections.
     """
     plan = plan_convergence()
     items = plan.executable()
@@ -34,7 +34,7 @@ def converge(yes: bool) -> None:
 
     if items:
         click.secho(
-            f"{len(items)} fix{'es' if len(items) != 1 else ''} to apply:\n",
+            f"{len(items)} correction{'s' if len(items) != 1 else ''} to apply:\n",
             bold=True,
         )
         for item in items:
@@ -48,7 +48,27 @@ def converge(yes: bool) -> None:
 
         click.echo()
 
-        result = execute_plan(items)
+        with cli_schema_lock():
+            # Re-plan under the lock — another converge or sync may have
+            # already applied (or changed) these corrections while we waited.
+            confirmed = {item.describe() for item in items}
+            plan = plan_convergence()
+            items = plan.executable()
+
+            new_items = [item for item in items if item.describe() not in confirmed]
+            if new_items and not yes:
+                # The plan grew while we waited at the prompt or for the
+                # lock — don't execute work the operator never approved.
+                click.secho(
+                    "The schema changed while waiting — new corrections not in the confirmed plan:",
+                    fg="red",
+                    bold=True,
+                )
+                for item in new_items:
+                    click.secho(f"  {item.describe()}", fg="red")
+                raise click.ClickException("Re-run to review the updated plan.")
+
+            result = execute_plan(items)
 
         for r in result.results:
             if r.ok:
@@ -73,4 +93,4 @@ def converge(yes: bool) -> None:
     if not success:
         sys.exit(1)
     elif not items:
-        click.secho("Schema is converged — nothing to fix.", fg="green")
+        click.secho("Schema is converged — nothing to correct.", fg="green")

@@ -10,30 +10,62 @@
 
 {% htmxfragment "list" %}
 
-<header class="flex items-center justify-between">
-    <div>
+<header class="group flex items-center justify-between flex-wrap gap-2">
+    <div class="flex items-center gap-2 flex-wrap">
         {% if table_style == "preview" %}
             <div class="text-sm font-medium text-admin-foreground/80 mb-2">{{ title }}</div>
         {% else %}
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground">{{ page.paginator.count }} result{{ page.paginator.count|pluralize }}</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground group-data-[selecting]:hidden">{{ page_obj.paginator.count }} result{{ page_obj.paginator.count|pluralize }}</h3>
+
+            {% if actions %}
+            <span data-selection-summary class="text-sm text-admin-muted-foreground hidden group-data-[selecting]:inline"></span>
+
+            <form method="POST" data-actions-form data-total-count="{{ page_obj.paginator.count }}">
+                <div class="admin-dropdown-menu">
+                    <button
+                        type="button"
+                        aria-haspopup="menu"
+                        aria-expanded="false"
+                        aria-controls="list-actions-menu"
+                        class="admin-btn admin-btn-sm admin-btn-outline"
+                    >
+                        Actions
+                        <admin.Icon name="caret-down-fill" class="text-[10px]" />
+                    </button>
+                    <div
+                        id="list-actions-menu"
+                        popover="manual"
+                        data-popover
+                        data-align="start"
+                        class="w-48"
+                    >
+                        <div role="menu">
+                            <div role="heading" class="text-xs font-normal text-admin-muted-foreground group-data-[selecting]:hidden">Select rows to run actions</div>
+                            <hr role="separator" class="group-data-[selecting]:hidden" />
+                            {% for action in actions %}
+                            {# Every action opens a confirmation, so every item gets the "…" suffix. #}
+                            <button type="button" role="menuitem" data-action-name="{{ action }}">{{ action }}{% if not action.endswith(("…", "...")) %}…{% endif %}</button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <input type="hidden" name="action_ids" value="" />
+                <input type="hidden" name="action_name" value="" />
+            </form>
+
+            {% if page_obj.has_other_pages() %}
+            <button type="button" data-action-select-all class="hidden admin-btn admin-btn-sm admin-btn-link">Select all {{ page_obj.paginator.count }}</button>
+            {% endif %}
+
+            <button type="button" data-action-clear class="hidden group-data-[selecting]:inline-flex admin-btn admin-btn-sm admin-btn-ghost">Clear</button>
+            {% endif %}
         {% endif %}
     </div>
     <div class="flex space-x-2">
         {% if table_style == "preview" %}
-        <a class="text-sm" href="{{ request.path }}{% if search_query %}?search={{ search_query }}{% endif %}">View {{ page.paginator.count }} result{{ "s" if page.paginator.count != 1 else "" }}</a>
+        <a class="text-sm" href="{{ request.path }}{% if search_query %}?search={{ search_query }}{% endif %}">View {{ page_obj.paginator.count }} result{{ "s" if page_obj.paginator.count != 1 else "" }}</a>
         {% else %}
-        {% if actions %}
-        <form method="POST" data-actions-form>
-            <select name="action_name" class="admin-select admin-select-sm w-auto">
-                <option value="">Actions...</option>
-                {% for action in actions %}
-                <option>{{ action }}</option>
-                {% endfor %}
-            </select>
-            <input type="hidden" name="action_ids" value="" />
-        </form>
-        {% endif %}
-
         <form method="GET" class="inline-flex space-x-2">
             {% if filter_names %}
             <select data-autosubmit name="filter" class="admin-select admin-select-sm w-auto">
@@ -58,7 +90,11 @@
 </header>
 
 {% if objects %}
-<div class="w-full overflow-auto mt-2">
+{# The overflow-auto box (needed for horizontal scroll) also clips vertically,
+   cutting off focus rings on the top/bottom rows. `py-1` gives them room; the
+   smaller top margin and negative bottom margin keep the table in the same
+   place (net top = mt-1 + pt-1 = the original mt-2; net bottom unchanged). #}
+<div class="w-full overflow-auto mt-1 -mb-1 py-1">
     <table class="admin-table table-auto">
         <thead>
             <tr class="[&>:first-child]:rounded-l-admin-md [&>:last-child]:rounded-r-admin-md">
@@ -66,39 +102,57 @@
                 <th class="p-0 pl-1">
                     <input
                         data-action-checkbox-all
-                        class="admin-input"
+                        class="admin-input block"
                         type="checkbox"
                     />
                 </th>
                 {% endif %}
 
                 {% for field in fields %}
+                    {% set label = get_field_label(field) %}
                     {% if order_by_field is defined %}
-                    <th>
+                        {# 3-state sort cycle: unsorted -> ascending -> descending -> cleared. #}
+                        {% if field != order_by_field %}
+                            {% set next_order_by = field %}
+                            {% set aria_sort = "none" %}
+                            {% set sort_action = "Sort by " ~ label ~ " ascending" %}
+                        {% elif order_by_direction != "-" %}
+                            {% set next_order_by = "-" ~ field %}
+                            {% set aria_sort = "ascending" %}
+                            {% set sort_action = "Sort by " ~ label ~ " descending" %}
+                        {% else %}
+                            {% set next_order_by = "" %}
+                            {% set aria_sort = "descending" %}
+                            {% set sort_action = "Stop sorting by " ~ label %}
+                        {% endif %}
+                    <th{% if table_style != "preview" %} aria-sort="{{ aria_sort }}"{% endif %}>
                         {% if table_style == "preview" %}
                         <div class="text-xs font-normal">
-                            {{ get_field_label(field) }}
+                            {{ label }}
                         </div>
                         {% else %}
                         <a
                             data-merge-params
+                            aria-label="{{ sort_action }}"
                             class="text-xs font-normal flex items-center gap-1 hover:text-admin-foreground group"
-                            href="?page=1&order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
-                            <span>{{ get_field_label(field) }}</span>
+                            href="?page=1&order_by={{ next_order_by }}">
+                            <span>{{ label }}</span>
                             {% if field == order_by_field %}
                                 {% if order_by_direction == "-" %}
-                                <span class="text-[10px]">▼</span>
+                                {# Sorted descending; the next click clears, so reveal an x on hover/focus. #}
+                                <admin.Icon name="caret-down-fill" class="text-[10px] group-hover:hidden group-focus:hidden" />
+                                <admin.Icon name="x-lg" class="text-[10px] hidden group-hover:inline group-focus:inline" />
                                 {% else %}
-                                <span class="text-[10px]">▲</span>
+                                <admin.Icon name="caret-up-fill" class="text-[10px]" />
                                 {% endif %}
                             {% else %}
-                            <span class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100">▼</span>
+                            <admin.Icon name="caret-up-fill" class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100 group-focus:opacity-100" />
                             {% endif %}
                         </a>
                         {% endif %}
                     </th>
                     {% else %}
-                    <th class="text-xs font-normal text-admin-muted-foreground">{{ get_field_label(field) }}</th>
+                    <th class="text-xs font-normal text-admin-muted-foreground">{{ label }}</th>
                     {% endif %}
                 {% endfor %}
 
@@ -114,7 +168,7 @@
 
                 {% if table_style != "preview" and actions %}
                 <td class="p-0 pl-1">
-                    <input data-action-checkbox class="admin-input" type="checkbox" name="{{ get_object_id(object) }}" />
+                    <input data-action-checkbox class="admin-input block" type="checkbox" name="{{ get_object_id(object) }}" />
                 </td>
                 {% endif %}
 
@@ -142,7 +196,7 @@
                         >
                             <admin.Icon name="three-dots" />
                         </button>
-                        <div id="row-actions-{{ loop.index }}" data-popover data-align="end" aria-hidden="true" class="w-48">
+                        <div id="row-actions-{{ loop.index }}" popover="manual" data-popover data-align="end" class="w-48">
                             <div role="menu">
                                 {% for text, url in object_links.items() %}
                                 <a role="menuitem" href="{{ url }}">{{ text }}</a>
@@ -169,27 +223,26 @@
 </div>
 {% endif %}
 
-{% if table_style != "preview" and page.has_other_pages() %}
+{% if table_style != "preview" and page_obj.has_other_pages() %}
 <footer class="mt-4 sticky bottom-0 [body[data-toolbar-fullbar]_&]:pb-12 bg-admin-background/95 backdrop-blur-sm border-t border-admin-border pt-4 pb-3">
     <div class="flex items-center justify-between text-sm">
         <span class="text-admin-muted-foreground">
-            Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results, {{ page.paginator.per_page }} per page)
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} results, {{ page_obj.paginator.per_page }} per page)
         </span>
         <div class="flex items-center gap-2">
-            {% if page.has_previous() %}
-            <a data-merge-params href="?page={{ page.previous_page_number() }}" class="admin-btn admin-btn-sm admin-btn-outline">&lt;</a>
+            {% if page_obj.has_previous() %}
+            <a data-merge-params href="?page={{ page_obj.previous_page_number() }}" class="admin-btn admin-btn-sm admin-btn-outline">&lt;</a>
             {% endif %}
+            {# submitFormClean merges this onto the current URL, so search/filter/sort carry over without hidden inputs. #}
             <form data-autosubmit method="GET">
-                {% if search_fields and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
-                {% if filter_names and current_filter %}<input type="hidden" name="filter" value="{{ current_filter }}" />{% endif %}
                 <select name="page" class="admin-select admin-select-sm w-auto">
-                {% for page_num in page.paginator.page_range %}
-                    <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>
+                {% for page_num in page_obj.paginator.page_range %}
+                    <option value="{{ page_num }}" {% if page_num == page_obj.number %}selected{% endif %}>Page {{ page_num }}</option>
                 {% endfor %}
                 </select>
             </form>
-            {% if page.has_next() %}
-            <a data-merge-params href="?page={{ page.next_page_number() }}" class="admin-btn admin-btn-sm admin-btn-outline">&gt;</a>
+            {% if page_obj.has_next() %}
+            <a data-merge-params href="?page={{ page_obj.next_page_number() }}" class="admin-btn admin-btn-sm admin-btn-outline">&gt;</a>
             {% endif %}
         </div>
     </div>

@@ -1,5 +1,87 @@
 # plain-jobs changelog
 
+## [0.57.0](https://github.com/dropseed/plain/releases/plain-jobs@0.57.0) (2026-07-15)
+
+### What's changed
+
+- Updated the built-in job admin (`JobRequest`, `JobProcess`, `JobResult` viewsets) to plain-admin 0.84.0's new `perform_action(self, action, objects)` signature. The bulk Delete and Retry actions now operate on the selected queryset directly. ([d35face4a6](https://github.com/dropseed/plain/commit/d35face4a6), [53c58701fd](https://github.com/dropseed/plain/commit/53c58701fd))
+- The `JobResult` retry detail action now redirects back to the current page (preserving query params) instead of the list root. ([d35face4a6](https://github.com/dropseed/plain/commit/d35face4a6))
+
+### Upgrade instructions
+
+- No changes required. If you subclass the jobs admin viewsets and override `perform_action`, update the override to the new `(action, objects)` signature — see plain-admin 0.84.0. Requires plain-admin 0.84.0.
+
+## [0.56.1](https://github.com/dropseed/plain/releases/plain-jobs@0.56.1) (2026-07-10)
+
+### What's changed
+
+- Idle workers no longer flood trace search with noise. Previously, every worker exported a `worker loop` span per second plus orphan query spans from the job poll — roughly 120 single-span root traces per minute per idle worker. Now the `worker loop` span only opens on ticks where a maintenance task (heartbeat, stats, job-result rescue, scheduling) is actually due, and the framework's housekeeping queries — the job-claim poll and transaction, heartbeat writes, metric gauge callbacks, and done-callback bookkeeping — run with DB tracing suppressed. A fully idle worker now exports about 2 maintenance traces per minute, while per-job and per-request telemetry is unchanged. ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+- Worker-side failures that previously had no home in trace data now get proper error attribution: a failing job claim or heartbeat write emits a one-off `claim job` / `worker heartbeat` CONSUMER error span. ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+- A transient database failure while claiming a job no longer kills the worker — it logs, emits the error span, and retries, only crashing (so the supervisor restarts it visibly) after 30 consecutive claim failures. ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+- A failure partway through a scheduled-jobs pass now retries on the next tick instead of waiting out the 60-second window and skipping the missed occurrence — the pass only stamps its check time after completing, and re-runs are deduped by the scheduled concurrency key. ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+
+### Upgrade instructions
+
+- No changes required. If you had trace-volume alerts or dashboards keyed on `worker loop` spans, expect their count to drop sharply — idle ticks no longer produce them.
+
+## [0.56.0](https://github.com/dropseed/plain/releases/plain-jobs@0.56.0) (2026-06-22)
+
+### What's changed
+
+- Collapsed the migration history into a single fresh `0001_initial`. The database schema is unchanged — only the migration files were squashed. ([802f2d87](https://github.com/dropseed/plain/commit/802f2d87))
+
+### Upgrade instructions
+
+- Run `plain migrations prune` after upgrading to clear the now-orphaned history records for this package's old migrations. No SQL runs — it only cleans up migration-history records and is safe and idempotent. If `migrations prune` is already part of your deploy steps, no action is needed.
+
+## [0.55.1](https://github.com/dropseed/plain/releases/plain-jobs@0.55.1) (2026-06-09)
+
+### What's changed
+
+- The worker's done-callback thread (which records each job's result after its future completes) now returns its pooled database connection after every callback instead of holding one for the worker's lifetime. This stops the callback thread from occupying a pool slot while idle between job completions, and means the pool re-validates the connection on the next checkout — so a server-side close (Postgres restart, failover) no longer wedges result recording on a dead connection. ([c43ee70517](https://github.com/dropseed/plain/commit/c43ee70517))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.55.0](https://github.com/dropseed/plain/releases/plain-jobs@0.55.0) (2026-06-08)
+
+### What's changed
+
+- **Cron schedules now use standard cron day-of-week numbering.** `Schedule.from_cron(...)` previously numbered weekdays Monday=0…Sunday=6 (Python's `weekday()`); it now follows the cron convention where **`0` (or `7`) is Sunday** through `6` for Saturday. So `0 9 * * 1` now fires on Monday (was Tuesday) and `* * * * 0` now fires on Sunday (was Monday). Three-letter names (`SUN`–`SAT`) still match the same actual day they always did — only **numeric** weekday fields shift. `7` is now also accepted as an alias for Sunday. ([69fe57c4f9](https://github.com/dropseed/plain/commit/69fe57c4f9))
+- **A cron string that restricts _both_ the day-of-month and day-of-week fields now matches when _either_ one does** — the standard cron rule — where it previously required both (AND). For example `30 4 1,15 * 5` now runs at 4:30 AM on the 1st and the 15th _and_ every Friday, instead of only on a 1st/15th that also lands on a Friday. A field counts as "restricted" only when it contains no `*`, so a stepped wildcard like `*/2` stays unrestricted. ([69fe57c4f9](https://github.com/dropseed/plain/commit/69fe57c4f9))
+- The keyword `Schedule(...)` constructor keeps the more obvious AND semantics for its `day_of_month` / `day_of_week` arguments; pass the new **`combine_days_with_or=True`** to opt into the cron OR behavior. (`Schedule.from_cron` sets it for you.) ([69fe57c4f9](https://github.com/dropseed/plain/commit/69fe57c4f9))
+- **Dropped the unused `last_heartbeat_at` index on `WorkerHeartbeat`.** It wasn't serving a query path and only cost write overhead; the model's ordering doesn't require it. ([f3cfcc5e29](https://github.com/dropseed/plain/commit/f3cfcc5e29))
+- Internal: `register_job` gains explicit `@overload` signatures for the `ty` 0.0.45 upgrade so it type-checks whether used bare (`@register_job`) or with an alias (`@register_job(alias=...)`). ([95f54e880d](https://github.com/dropseed/plain/commit/95f54e880d))
+
+### Upgrade instructions
+
+- **Audit any cron schedules that use numeric weekday fields.** The same number now selects a different day (e.g. `1` was Tuesday, is now Monday). Renumber using cron's Sunday=0…Saturday=6, or switch to three-letter day names (`MON`, `FRI`, …), which match the same day under both the old and new numbering.
+- **Check any cron schedule that restricts both the day-of-month and day-of-week fields.** If you relied on the old AND behavior (run only when both match), it now runs when _either_ matches. Split the constraints into separate schedules, or switch to the keyword `Schedule(...)` API, which stays AND unless you pass `combine_days_with_or=True`.
+- The dropped index is removed automatically by schema convergence on your next `plain postgres sync` / deploy — no manual migration.
+
+## [0.54.2](https://github.com/dropseed/plain/releases/plain-jobs@0.54.2) (2026-06-03)
+
+### What's changed
+
+- **Dropped several unused single-column indexes** from the job models: `trace_id` on `JobRequest`, `JobProcess`, and `JobResult`, plus `started_at`, `ended_at`, `job_request_uuid`, `job_class`, and `queue` on `JobResult`. They weren't serving query paths and cost write overhead and storage on every job. ([c7882f0a08](https://github.com/dropseed/plain/commit/c7882f0a08))
+- Internal: model writes adopt plain.postgres's new `create()`/`update()` API. As a side effect the per-write uniqueness pre-check `SELECT` that dominated the jobs write path is gone — the database enforces the constraint. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- Requires `plain.postgres>=0.106.0`.
+- The dropped indexes are removed automatically by schema convergence on your next `plain postgres sync` / deploy — no manual migration. If you query `JobResult` by any of those columns in your own dashboards, add an index on your side.
+
+## [0.54.1](https://github.com/dropseed/plain/releases/plain-jobs@0.54.1) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. The queue-wait calculation in `JobProcess.run_job` now keeps `started_at` as a local since the descriptor reads back as `datetime | None`. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.54.0](https://github.com/dropseed/plain/releases/plain-jobs@0.54.0) (2026-05-20)
 
 ### What's changed

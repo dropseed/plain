@@ -39,7 +39,7 @@ def install(ctx: click.Context, force: bool) -> None:
     """Install Tailwind CSS binary"""
     tailwind = Tailwind()
 
-    if force or not tailwind.is_installed() or tailwind.needs_update():
+    if force or not tailwind.is_installed():
         version_to_install = tailwind.get_version_from_config()
         if version_to_install:
             click.secho(
@@ -102,14 +102,14 @@ def version() -> None:
     """Show Tailwind CSS version"""
     tailwind = Tailwind()
 
-    if not tailwind.is_installed():
-        click.secho("Tailwind CSS is not installed", fg="red")
-        return
+    configured_version = tailwind.get_version_from_config()
 
-    if installed_version := tailwind.get_installed_version():
-        click.echo(installed_version)
+    if not configured_version:
+        click.secho("No Tailwind version configured", fg="red")
+    elif not tailwind.is_installed():
+        click.secho(f"{configured_version} (configured but not installed)", fg="yellow")
     else:
-        click.secho("Could not determine Tailwind CSS version", fg="red")
+        click.echo(configured_version)
 
 
 if __name__ == "__main__":

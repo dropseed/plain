@@ -29,7 +29,7 @@ def test_admin_required(db):
     assert client.get("/admin").status_code == 404
 
     user.is_admin = True
-    user.save()
+    user.update()
     # now admin -> success
     resp = client.get("/admin")
     assert resp.status_code == 200

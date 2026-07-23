@@ -131,7 +131,7 @@ def test_alter_nullable_to_not_null_is_autodetector_no_op() -> None:
 def test_alter_nullable_to_not_null_with_default_is_autodetector_no_op() -> None:
     """Declaring a default alongside NOT NULL still emits no migration — both
     allow_null and default are non_migration_attrs. Convergence applies the DEFAULT
-    and SetNotNullFix on the next sync."""
+    and SetNotNullCorrection on the next sync."""
     from_model = ModelState(
         package_label="examples",
         name="Thing",

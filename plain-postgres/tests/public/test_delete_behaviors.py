@@ -35,7 +35,6 @@ from app.examples.models.delete import (
     Grandparent,
     HideableItem,
     MidParent,
-    UnconstrainedChild,
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.trees import TreeNode
@@ -196,7 +195,7 @@ def test_diamond_shared_child_deleted_once(db):
 
 def test_self_referential_tree_cascade(db):
     root = TreeNode(name="root", parent=None)
-    root.save(clean_and_validate=False)
+    root.create(clean_and_validate=False)
     mid = TreeNode.query.create(name="mid", parent=root)
     leaf = TreeNode.query.create(name="leaf", parent=mid)
 
@@ -258,7 +257,7 @@ def test_circular_fk_cascade_inside_atomic(db):
         a = CircA.query.create(name="a")
         b = CircB.query.create(name="b", partner=a)
         a.partner = b
-        a.save()
+        a.update()
 
     with transaction.atomic():
         a.delete()
@@ -284,7 +283,7 @@ def test_delete_and_reinsert_replacement_in_one_atomic(db):
     with transaction.atomic():
         replacement = DeleteParent.query.create(name="replacement")
         child.parent = replacement
-        child.save()
+        child.update()
         parent.delete()
 
     child.refresh_from_db()
@@ -310,10 +309,15 @@ def test_child_insert_before_parent_in_one_atomic(db):
             (new_id,) = row
 
         child = ChildCascade(parent=new_id)
-        child.save(clean_and_validate=False)
+        child.create(clean_and_validate=False)
 
-        parent = DeleteParent(id=new_id, name="late")
-        parent.save(clean_and_validate=False)
+        # Insert the parent with the reserved id. The constructor rejects a
+        # manual `id`, so set it via attribute, then create() -- the deliberate
+        # path for the rare case (here, a sequence-reserved id for a deferred
+        # FK) where you genuinely own the value.
+        parent = DeleteParent(name="late")
+        parent.id = new_id
+        parent.create(clean_and_validate=False)
 
     assert DeleteParent.query.filter(id=new_id).exists()
     assert ChildCascade.query.filter(parent=new_id).exists()
@@ -372,7 +376,7 @@ def test_delete_rejects_sliced_queryset(db):
     _create_parents()
     qs = DeleteParent.query.all()[:1]
     with pytest.raises(TypeError):
-        qs.delete()  # ty: ignore[unresolved-attribute]
+        qs.delete()
 
 
 def test_delete_rejects_distinct_queryset(db):
@@ -481,52 +485,21 @@ def test_delete_already_deleted_instance_raises(db):
 # ===========================================================================
 
 
-def test_cascade_delete_issues_one_query(db):
+def test_cascade_delete_issues_one_query(db, capture_queries):
     """Single-level CASCADE fires exactly one DELETE — Postgres handles the
     cascade internally. This is the headline win of the DB-level rewrite."""
-    from plain.postgres.db import get_connection
-
     _create_parents()
     parent = DeleteParent.query.get(name="parent")
     for _ in range(5):
         ChildCascade.query.create(parent=parent)
 
-    conn = get_connection()
-    prev_force = conn.force_debug_cursor
-    conn.force_debug_cursor = True
-    conn.queries_log.clear()
-    try:
+    with capture_queries() as queries:
         parent.delete()
-        query_count = len(conn.queries_log)
-    finally:
-        conn.force_debug_cursor = prev_force
+    query_count = len(queries)
 
     assert query_count == 1, (
         f"Expected one DELETE; got {query_count} queries — Collector may have "
         f"crept back, or _raw_delete lost its single-statement property."
-    )
-
-
-# ===========================================================================
-# 9. db_constraint=False requires on_delete=NO_ACTION (preflight)
-# ===========================================================================
-
-
-def test_unconstrained_with_cascade_is_rejected_at_preflight():
-    """db_constraint=False has no FK constraint to attach on_delete to, so
-    anything other than NO_ACTION is rejected at model-check."""
-    from plain import postgres
-    from plain.postgres.fields.related import ForeignKeyField
-
-    field = ForeignKeyField(
-        DeleteParent, on_delete=postgres.CASCADE, db_constraint=False
-    )
-    field.set_attributes_from_name("parent")
-    field.model = UnconstrainedChild
-    results = field._check_on_delete()
-
-    assert any(
-        r.id == "fields.foreign_key_unconstrained_requires_no_action" for r in results
     )
 
 
@@ -537,9 +510,9 @@ def test_instance_delete_bypasses_custom_query_filters(db):
     uses `_model_meta.base_queryset` to route around custom filtering.
     """
     ghost = HideableItem(name="ghost")
-    ghost.save()
+    ghost.create()
     visible = HideableItem(name="visible")
-    visible.save()
+    visible.create()
 
     # Public queryset filters out ghost rows by default
     assert HideableItem.query.filter(id=ghost.id).count() == 0

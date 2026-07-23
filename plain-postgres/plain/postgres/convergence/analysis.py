@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextvars
 import json
 import re
 from collections.abc import Iterator
@@ -7,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 import psycopg
 
@@ -57,176 +58,288 @@ class DriftKind(StrEnum):
 
 
 @dataclass
-class IndexDrift:
-    """A schema difference for an index."""
+class IndexModelDrift:
+    """Model declares an index the DB is missing (MISSING), has marked INVALID,
+    or has with a different definition (CHANGED)."""
 
-    kind: DriftKind
     table: str
-    index: Index | None = None
-    model: type[Model] | None = None
-    old_name: str | None = None
-    new_name: str | None = None
-    name: str | None = None
+    index: Index
+    model: type[Model]
+    kind: Literal[DriftKind.MISSING, DriftKind.INVALID, DriftKind.CHANGED]
 
     def describe(self) -> str:
-        match self.kind:
-            case DriftKind.MISSING:
-                assert self.index is not None
-                return f"{self.table}: index {self.index.name} missing"
-            case DriftKind.INVALID:
-                assert self.index is not None
-                return f"{self.table}: index {self.index.name} INVALID"
-            case DriftKind.CHANGED:
-                assert self.index is not None
-                return f"{self.table}: index {self.index.name} definition changed"
-            case DriftKind.RENAMED:
-                return f"{self.table}: index {self.old_name} → {self.new_name}"
-            case _:
-                return f"{self.table}: index {self.name} not declared"
+        if self.kind is DriftKind.MISSING:
+            return f"{self.table}: index {self.index.name} missing"
+        if self.kind is DriftKind.INVALID:
+            return f"{self.table}: index {self.index.name} INVALID"
+        return f"{self.table}: index {self.index.name} definition changed"
 
 
 @dataclass
-class ConstraintDrift:
-    """A schema difference for a constraint."""
+class IndexRenameDrift:
+    """An index whose DB name differs from the model's declared name."""
 
-    kind: DriftKind
     table: str
-    constraint: CheckConstraint | UniqueConstraint | None = None
-    model: type[Model] | None = None
-    old_name: str | None = None
-    new_name: str | None = None
-    name: str | None = None
+    old_name: str
+    new_name: str
+
+    kind: ClassVar[DriftKind] = DriftKind.RENAMED
 
     def describe(self) -> str:
-        match self.kind:
-            case DriftKind.MISSING:
-                assert self.constraint is not None
-                return f"{self.table}: constraint {self.constraint.name} missing"
-            case DriftKind.UNVALIDATED:
-                return f"{self.table}: constraint {self.name} NOT VALID"
-            case DriftKind.CHANGED:
-                assert self.constraint is not None
-                return f"{self.table}: constraint {self.constraint.name} definition changed"
-            case DriftKind.RENAMED:
-                return f"{self.table}: constraint {self.old_name} → {self.new_name}"
-            case _:
-                return f"{self.table}: constraint {self.name} not declared"
+        return f"{self.table}: index {self.old_name} → {self.new_name}"
 
 
 @dataclass
-class ForeignKeyDrift:
-    """A schema difference for a foreign key constraint."""
+class IndexUndeclaredDrift:
+    """DB has an index the model doesn't declare."""
 
-    kind: DriftKind
     table: str
-    name: str | None = None
-    column: str | None = None
-    target_table: str | None = None
-    target_column: str | None = None
+    name: str
+
+    kind: ClassVar[DriftKind] = DriftKind.UNDECLARED
+
+    def describe(self) -> str:
+        return f"{self.table}: index {self.name} not declared"
+
+
+# Per-category unions of the shape variants above. These (and the `Drift` /
+# `ColumnDrift` unions below) are plain `|` unions, not PEP 695 `type` aliases,
+# so they stay usable in isinstance() checks against the concrete shapes.
+IndexDrift = IndexModelDrift | IndexRenameDrift | IndexUndeclaredDrift
+
+
+@dataclass
+class ConstraintModelDrift:
+    """Model declares a constraint the DB is missing (MISSING) or has with a
+    different definition (CHANGED)."""
+
+    table: str
+    constraint: CheckConstraint | UniqueConstraint
+    model: type[Model]
+    kind: Literal[DriftKind.MISSING, DriftKind.CHANGED]
+
+    def describe(self) -> str:
+        if self.kind is DriftKind.MISSING:
+            return f"{self.table}: constraint {self.constraint.name} missing"
+        return f"{self.table}: constraint {self.constraint.name} definition changed"
+
+
+@dataclass
+class ConstraintNameDrift:
+    """An existing constraint to validate (UNVALIDATED) or drop (UNDECLARED)."""
+
+    table: str
+    name: str
+    kind: Literal[DriftKind.UNVALIDATED, DriftKind.UNDECLARED]
+
+    def describe(self) -> str:
+        if self.kind is DriftKind.UNVALIDATED:
+            return f"{self.table}: constraint {self.name} NOT VALID"
+        return f"{self.table}: constraint {self.name} not declared"
+
+
+@dataclass
+class ConstraintRenameDrift:
+    """A constraint whose DB name differs from the model's declared name."""
+
+    table: str
+    old_name: str
+    new_name: str
+
+    kind: ClassVar[DriftKind] = DriftKind.RENAMED
+
+    def describe(self) -> str:
+        return f"{self.table}: constraint {self.old_name} → {self.new_name}"
+
+
+ConstraintDrift = ConstraintModelDrift | ConstraintNameDrift | ConstraintRenameDrift
+
+
+@dataclass
+class ForeignKeyMissingDrift:
+    """Model declares an FK constraint the DB doesn't have."""
+
+    table: str
+    name: str
+    column: str
+    target_table: str
+    target_column: str
     on_delete_clause: str = ""  # SQL clause to emit, e.g. " ON DELETE CASCADE"
-    actual_action: str | None = None  # CHANGED only: current DB confdeltype
-    expected_action: str | None = None  # CHANGED only: expected confdeltype
+
+    kind: ClassVar[DriftKind] = DriftKind.MISSING
 
     def describe(self) -> str:
-        match self.kind:
-            case DriftKind.MISSING:
-                return f"{self.table}: FK {self.name} missing ({self.column} → {self.target_table}.{self.target_column})"
-            case DriftKind.UNVALIDATED:
-                return f"{self.table}: FK {self.name} NOT VALID"
-            case DriftKind.CHANGED:
-                return (
-                    f"{self.table}: FK {self.name} on_delete changed "
-                    f"({self.actual_action!r} → {self.expected_action!r})"
-                )
-            case _:
-                return f"{self.table}: FK {self.name} not declared"
+        return (
+            f"{self.table}: FK {self.name} missing "
+            f"({self.column} → {self.target_table}.{self.target_column})"
+        )
 
 
 @dataclass
-class NullabilityDrift:
-    """Mismatch between model and DB column nullability."""
+class ForeignKeyChangedDrift:
+    """An existing FK constraint's ON DELETE action differs from the model."""
+
+    table: str
+    name: str
+    column: str
+    target_table: str
+    target_column: str
+    actual_action: str  # current DB confdeltype
+    expected_action: str  # expected confdeltype
+    on_delete_clause: str = ""
+
+    kind: ClassVar[DriftKind] = DriftKind.CHANGED
+
+    def describe(self) -> str:
+        return (
+            f"{self.table}: FK {self.name} on_delete changed "
+            f"({self.actual_action!r} → {self.expected_action!r})"
+        )
+
+
+@dataclass
+class ForeignKeyNameDrift:
+    """An existing FK constraint to validate (UNVALIDATED) or drop (UNDECLARED)."""
+
+    table: str
+    name: str
+    kind: Literal[DriftKind.UNVALIDATED, DriftKind.UNDECLARED]
+
+    def describe(self) -> str:
+        if self.kind is DriftKind.UNVALIDATED:
+            return f"{self.table}: FK {self.name} NOT VALID"
+        return f"{self.table}: FK {self.name} not declared"
+
+
+ForeignKeyDrift = ForeignKeyMissingDrift | ForeignKeyChangedDrift | ForeignKeyNameDrift
+
+
+@dataclass
+class ColumnShouldBeNotNullDrift:
+    """Model declares the column NOT NULL but the DB column allows NULL."""
 
     table: str
     column: str
-    model_allows_null: bool
-    has_null_rows: bool = False  # Only checked when model_allows_null is False
+    has_null_rows: bool = False  # existing NULL rows block an auto-correction
 
     def describe(self) -> str:
-        if not self.model_allows_null:
-            if self.has_null_rows:
-                return (
-                    f"{self.table}: column {self.column} allows NULL (NULL rows exist)"
-                )
-            return f"{self.table}: column {self.column} allows NULL"
+        if self.has_null_rows:
+            return f"{self.table}: column {self.column} allows NULL (NULL rows exist)"
+        return f"{self.table}: column {self.column} allows NULL"
+
+
+@dataclass
+class ColumnShouldAllowNullDrift:
+    """Model allows NULL but the DB column is NOT NULL."""
+
+    table: str
+    column: str
+
+    def describe(self) -> str:
         return f"{self.table}: column {self.column} is NOT NULL, model allows NULL"
 
 
-@dataclass
-class ColumnDefaultDrift:
-    """Mismatch between the model's declared default and the DB column DEFAULT."""
+NullabilityDrift = ColumnShouldBeNotNullDrift | ColumnShouldAllowNullDrift
 
-    kind: DriftKind
+
+@dataclass
+class ColumnDefaultExpectedDrift:
+    """Model declares a column DEFAULT the DB is missing (MISSING) or has set
+    to a different value (CHANGED)."""
+
     table: str
     column: str
-    db_default_sql: str | None
-    model_default_sql: str | None
+    kind: Literal[DriftKind.MISSING, DriftKind.CHANGED]
+    model_default_sql: str
+    db_default_sql: str | None = None  # set only for CHANGED
 
     def describe(self) -> str:
-        match self.kind:
-            case DriftKind.MISSING:
-                return (
-                    f"{self.table}: column {self.column} missing DEFAULT "
-                    f"(expected {self.model_default_sql})"
-                )
-            case DriftKind.CHANGED:
-                return (
-                    f"{self.table}: column {self.column} DEFAULT mismatch — "
-                    f"db has {self.db_default_sql}, model declares "
-                    f"{self.model_default_sql}"
-                )
-            case _:
-                return (
-                    f"{self.table}: column {self.column} has undeclared DEFAULT "
-                    f"{self.db_default_sql}"
-                )
+        if self.kind is DriftKind.MISSING:
+            return (
+                f"{self.table}: column {self.column} missing DEFAULT "
+                f"(expected {self.model_default_sql})"
+            )
+        return (
+            f"{self.table}: column {self.column} DEFAULT mismatch — "
+            f"db has {self.db_default_sql}, model declares "
+            f"{self.model_default_sql}"
+        )
 
 
 @dataclass
-class StorageParameterDrift:
-    """Mismatch between declared and live `pg_class.reloptions` for a table.
+class ColumnDefaultUndeclaredDrift:
+    """DB column has a DEFAULT the model doesn't declare."""
+
+    table: str
+    column: str
+    db_default_sql: str
+
+    kind: ClassVar[DriftKind] = DriftKind.UNDECLARED
+
+    def describe(self) -> str:
+        return (
+            f"{self.table}: column {self.column} has undeclared DEFAULT "
+            f"{self.db_default_sql}"
+        )
+
+
+ColumnDefaultDrift = ColumnDefaultExpectedDrift | ColumnDefaultUndeclaredDrift
+
+
+@dataclass
+class StorageParameterDeclaredDrift:
+    """Model declares a storage parameter the DB is missing (MISSING) or has
+    set to a different value (CHANGED).
 
     `key` carries a `toast.` prefix when the parameter belongs to the table's
     TOAST relation; convergence emits and reads it accordingly.
     """
 
-    kind: DriftKind
     table: str
     key: str
-    declared_value: str | None = None
-    actual_value: str | None = None
+    kind: Literal[DriftKind.MISSING, DriftKind.CHANGED]
+    declared_value: str
+    actual_value: str | None = None  # set only for CHANGED
 
     def describe(self) -> str:
-        match self.kind:
-            case DriftKind.MISSING:
-                return (
-                    f"{self.table}: storage parameter {self.key} missing "
-                    f"(expected {self.declared_value})"
-                )
-            case DriftKind.CHANGED:
-                return (
-                    f"{self.table}: storage parameter {self.key} mismatch — "
-                    f"db has {self.actual_value}, model declares "
-                    f"{self.declared_value}"
-                )
-            case _:
-                return (
-                    f"{self.table}: storage parameter {self.key} not declared "
-                    f"(db has {self.actual_value})"
-                )
+        if self.kind is DriftKind.MISSING:
+            return (
+                f"{self.table}: storage parameter {self.key} missing "
+                f"(expected {self.declared_value})"
+            )
+        return (
+            f"{self.table}: storage parameter {self.key} mismatch — "
+            f"db has {self.actual_value}, model declares "
+            f"{self.declared_value}"
+        )
 
 
-type ColumnDrift = NullabilityDrift | ColumnDefaultDrift
-type Drift = (
+@dataclass
+class StorageParameterUndeclaredDrift:
+    """DB has a storage parameter the model doesn't declare.
+
+    `key` carries a `toast.` prefix when the parameter belongs to the table's
+    TOAST relation; convergence emits and reads it accordingly.
+    """
+
+    table: str
+    key: str
+    actual_value: str
+
+    kind: ClassVar[DriftKind] = DriftKind.UNDECLARED
+
+    def describe(self) -> str:
+        return (
+            f"{self.table}: storage parameter {self.key} not declared "
+            f"(db has {self.actual_value})"
+        )
+
+
+StorageParameterDrift = StorageParameterDeclaredDrift | StorageParameterUndeclaredDrift
+
+
+ColumnDrift = NullabilityDrift | ColumnDefaultDrift
+Drift = (
     IndexDrift | ConstraintDrift | ForeignKeyDrift | ColumnDrift | StorageParameterDrift
 )
 
@@ -343,7 +456,11 @@ class ModelAnalysis:
                 {
                     "key": d.key,
                     "kind": d.kind,
-                    "declared_value": d.declared_value,
+                    "declared_value": (
+                        d.declared_value
+                        if isinstance(d, StorageParameterDeclaredDrift)
+                        else None
+                    ),
                     "actual_value": d.actual_value,
                 }
                 for d in self.storage_parameter_drifts
@@ -370,14 +487,15 @@ def analyze_model(
             table_issues=["table missing from database"],
         )
 
-    return ModelAnalysis(
-        label=model.model_options.label,
-        table=table_name,
-        columns=_compare_columns(model, db, table_name, cursor),
-        indexes=_compare_indexes(cursor, model, db, table_name),
-        constraints=_compare_constraints(cursor, model, db, table_name),
-        storage_parameter_drifts=_compare_storage_parameters(model, db, table_name),
-    )
+    with _probe_session(cursor, model):
+        return ModelAnalysis(
+            label=model.model_options.label,
+            table=table_name,
+            columns=_compare_columns(model, db, table_name, cursor),
+            indexes=_compare_indexes(cursor, model, db, table_name),
+            constraints=_compare_constraints(cursor, model, db, table_name),
+            storage_parameter_drifts=_compare_storage_parameters(model, db, table_name),
+        )
 
 
 def _compare_storage_parameters(
@@ -397,19 +515,19 @@ def _compare_storage_parameters(
         actual_value = actual.get(key)
         if actual_value is None:
             drifts.append(
-                StorageParameterDrift(
-                    kind=DriftKind.MISSING,
+                StorageParameterDeclaredDrift(
                     table=table,
                     key=key,
+                    kind=DriftKind.MISSING,
                     declared_value=declared_value,
                 )
             )
         elif actual_value != declared_value:
             drifts.append(
-                StorageParameterDrift(
-                    kind=DriftKind.CHANGED,
+                StorageParameterDeclaredDrift(
                     table=table,
                     key=key,
+                    kind=DriftKind.CHANGED,
                     declared_value=declared_value,
                     actual_value=actual_value,
                 )
@@ -418,8 +536,7 @@ def _compare_storage_parameters(
     for key, actual_value in actual.items():
         if key not in declared:
             drifts.append(
-                StorageParameterDrift(
-                    kind=DriftKind.UNDECLARED,
+                StorageParameterUndeclaredDrift(
                     table=table,
                     key=key,
                     actual_value=actual_value,
@@ -471,20 +588,18 @@ def _compare_columns(
                 else:
                     issue = "expected NOT NULL, actual NULL"
                 drifts.append(
-                    NullabilityDrift(
+                    ColumnShouldBeNotNullDrift(
                         table=table,
                         column=f.column,
-                        model_allows_null=False,
                         has_null_rows=has_nulls,
                     )
                 )
             elif f.allow_null and actual.not_null:
                 issue = "expected NULL, actual NOT NULL"
                 drifts.append(
-                    NullabilityDrift(
+                    ColumnShouldAllowNullDrift(
                         table=table,
                         column=f.column,
-                        model_allows_null=True,
                     )
                 )
 
@@ -497,6 +612,7 @@ def _compare_columns(
         if f.primary_key:
             pk_suffix = f.db_type_suffix() or ""
 
+        # Fields reached via local_fields are always contributed (name set).
         assert f.name is not None
         statuses.append(
             ColumnStatus(
@@ -538,7 +654,7 @@ def _extract_jsonb_literal(sql: str) -> str | None:
     return m.group(1).replace("''", "'")
 
 
-def _canonicalize_default_expr(
+def _normalize_default_expr(
     cursor: CursorWrapper, model: type[Model], column: str, default_sql: str
 ) -> str:
     """Round-trip a column DEFAULT through Postgres so both sides of the
@@ -550,9 +666,9 @@ def _canonicalize_default_expr(
     comparison then sees inequality and reports drift.
     """
     try:
-        with _canon_table(cursor, model):
+        with _probe_table(cursor, model):
             cursor.execute(
-                f"ALTER TABLE {_CANON_TABLE} ALTER COLUMN {quote_name(column)} "
+                f"ALTER TABLE {_PROBE_TABLE} ALTER COLUMN {quote_name(column)} "
                 f"SET DEFAULT {default_sql}"
             )
             cursor.execute(
@@ -561,11 +677,11 @@ def _canonicalize_default_expr(
                 "WHERE a.attrelid = (SELECT oid FROM pg_class WHERE relname = %s "
                 "AND relnamespace = pg_my_temp_schema()) "
                 "AND a.attname = %s",
-                [_CANON_TABLE, column],
+                [_PROBE_TABLE, column],
             )
             row = cursor.fetchone()
             return row[0] if row else ""
-    except _CANON_FALLBACK_ERRORS:
+    except _PROBE_FALLBACK_ERRORS:
         return ""
 
 
@@ -581,22 +697,21 @@ def _compare_column_default(
 
     if expected_sql is not None:
         if actual.default_sql is None:
-            return ColumnDefaultDrift(
-                kind=DriftKind.MISSING,
+            return ColumnDefaultExpectedDrift(
                 table=table,
                 column=field.column,
-                db_default_sql=None,
+                kind=DriftKind.MISSING,
                 model_default_sql=expected_sql,
             )
 
-        canonical_expected = _canonicalize_default_expr(
+        normalized_expected = _normalize_default_expr(
             cursor, field.model, field.column, expected_sql
         )
-        if canonical_expected == actual.default_sql:
+        if normalized_expected == actual.default_sql:
             return None
-        # Semantic compare for jsonb — PG canonicalizes object keys, which
+        # Semantic compare for jsonb — PG normalizes object keys, which
         # won't match Python's dict-insertion order even after a round-trip.
-        m_json = _extract_jsonb_literal(canonical_expected)
+        m_json = _extract_jsonb_literal(normalized_expected)
         d_json = _extract_jsonb_literal(actual.default_sql)
         if m_json is not None and d_json is not None:
             try:
@@ -605,23 +720,21 @@ def _compare_column_default(
             except json.JSONDecodeError:
                 pass
 
-        return ColumnDefaultDrift(
-            kind=DriftKind.CHANGED,
+        return ColumnDefaultExpectedDrift(
             table=table,
             column=field.column,
-            db_default_sql=actual.default_sql,
+            kind=DriftKind.CHANGED,
             model_default_sql=expected_sql,
+            db_default_sql=actual.default_sql,
         )
 
     if actual.default_sql is None:
         return None
 
-    return ColumnDefaultDrift(
-        kind=DriftKind.UNDECLARED,
+    return ColumnDefaultUndeclaredDrift(
         table=table,
         column=field.column,
         db_default_sql=actual.default_sql,
-        model_default_sql=None,
     )
 
 
@@ -669,11 +782,11 @@ def _compare_indexes(
                     name=index.name,
                     fields=list(index.fields),
                     issue="INVALID — needs drop and recreate",
-                    drift=IndexDrift(
-                        kind=DriftKind.INVALID,
+                    drift=IndexModelDrift(
                         table=table,
                         index=index,
                         model=model,
+                        kind=DriftKind.INVALID,
                     ),
                 )
             )
@@ -681,7 +794,7 @@ def _compare_indexes(
 
         # Check if definition matches
         if db_idx.definition:
-            issue = _compare_canonical_index(
+            issue = _compare_normalized_index(
                 cursor=cursor,
                 model=model,
                 expressions=index.expressions,
@@ -697,11 +810,11 @@ def _compare_indexes(
                         name=index.name,
                         fields=list(index.fields),
                         issue=issue,
-                        drift=IndexDrift(
-                            kind=DriftKind.CHANGED,
+                        drift=IndexModelDrift(
                             table=table,
                             index=index,
                             model=model,
+                            kind=DriftKind.CHANGED,
                         ),
                     )
                 )
@@ -725,9 +838,9 @@ def _compare_indexes(
         if non_unique_indexes[n].access_method in MANAGED_INDEX_ACCESS_METHODS
     ]
 
-    # Detect renames by canonical (round-tripped) index body. Build the cheap
+    # Detect renames by normalized (round-tripped) index body. Build the cheap
     # already-introspected side first so we can skip the per-missing
-    # canonicalization loop on the steady-state path.
+    # normalization loop on the steady-state path.
     renamed_missing: set[str] = set()
     renamed_extra: set[str] = set()
 
@@ -740,7 +853,7 @@ def _compare_indexes(
     missing_by_def: dict[str, list[Index]] = {}
     if extra_by_def:
         for index in missing:
-            expected_tail = _canonicalize_index_def(
+            expected_tail = _normalize_index_def(
                 cursor,
                 model,
                 expressions=index.expressions,
@@ -750,7 +863,7 @@ def _compare_indexes(
                 include=index.include,
             )
             if not expected_tail:
-                # Canonicalization failed; bucketing under "" would conflate
+                # Normalization failed; bucketing under "" would conflate
                 # multiple sentinel-failing indexes and disable rename
                 # detection for the rest.
                 continue
@@ -766,8 +879,7 @@ def _compare_indexes(
                     name=index.name,
                     fields=list(index.fields),
                     issue=f"rename from {old_name}",
-                    drift=IndexDrift(
-                        kind=DriftKind.RENAMED,
+                    drift=IndexRenameDrift(
                         table=table,
                         old_name=old_name,
                         new_name=index.name,
@@ -785,11 +897,11 @@ def _compare_indexes(
                     name=index.name,
                     fields=list(index.fields),
                     issue="missing from database",
-                    drift=IndexDrift(
-                        kind=DriftKind.MISSING,
+                    drift=IndexModelDrift(
                         table=table,
                         index=index,
                         model=model,
+                        kind=DriftKind.MISSING,
                     ),
                 )
             )
@@ -802,8 +914,7 @@ def _compare_indexes(
                     name=name,
                     fields=non_unique_indexes[name].columns,
                     issue="not in model",
-                    drift=IndexDrift(
-                        kind=DriftKind.UNDECLARED,
+                    drift=IndexUndeclaredDrift(
                         table=table,
                         name=name,
                     ),
@@ -892,10 +1003,10 @@ def _compare_unique_constraints(
 
         if not actual[constraint.name].validated:
             issue = "NOT VALID — needs validation"
-            drift = ConstraintDrift(
-                kind=DriftKind.UNVALIDATED,
+            drift = ConstraintNameDrift(
                 table=table,
                 name=constraint.name,
+                kind=DriftKind.UNVALIDATED,
             )
         elif constraint.index_only:
             issue, drift = _compare_index_only_unique(
@@ -908,14 +1019,14 @@ def _compare_unique_constraints(
                 if expected_def:
                     issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
                 else:
-                    # Round-trip canonicalization couldn't complete; canonical
+                    # Round-trip normalization couldn't complete; normalized
                     # model text is unavailable for the diagnostic.
                     issue = f"definition differs: DB has {actual_def!r}"
-                drift = ConstraintDrift(
-                    kind=DriftKind.CHANGED,
+                drift = ConstraintModelDrift(
                     table=table,
                     constraint=constraint,
                     model=model,
+                    kind=DriftKind.CHANGED,
                 )
 
         statuses.append(
@@ -942,11 +1053,11 @@ def _compare_unique_constraints(
                     constraint_type=ConType.UNIQUE,
                     fields=list(constraint.fields),
                     issue="missing from database",
-                    drift=ConstraintDrift(
-                        kind=DriftKind.MISSING,
+                    drift=ConstraintModelDrift(
                         table=table,
                         constraint=constraint,
                         model=model,
+                        kind=DriftKind.MISSING,
                     ),
                 )
             )
@@ -957,12 +1068,10 @@ def _compare_unique_constraints(
             # IndexDrift so the planner uses DROP INDEX, not DROP CONSTRAINT.
             undeclared_drift: Drift
             if name in actual_indexes:
-                undeclared_drift = IndexDrift(
-                    kind=DriftKind.UNDECLARED, table=table, name=name
-                )
+                undeclared_drift = IndexUndeclaredDrift(table=table, name=name)
             else:
-                undeclared_drift = ConstraintDrift(
-                    kind=DriftKind.UNDECLARED, table=table, name=name
+                undeclared_drift = ConstraintNameDrift(
+                    table=table, name=name, kind=DriftKind.UNDECLARED
                 )
             statuses.append(
                 ConstraintStatus(
@@ -1001,10 +1110,10 @@ def _compare_check_constraints(
 
         if not actual[constraint.name].validated:
             issue = "NOT VALID — needs validation"
-            drift = ConstraintDrift(
-                kind=DriftKind.UNVALIDATED,
+            drift = ConstraintNameDrift(
                 table=table,
                 name=constraint.name,
+                kind=DriftKind.UNVALIDATED,
             )
         elif actual_def := actual[constraint.name].definition:
             expected_def = _get_expected_check_definition(cursor, model, constraint)
@@ -1013,14 +1122,14 @@ def _compare_check_constraints(
                 if expected_def:
                     issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
                 else:
-                    # Round-trip canonicalization couldn't complete; canonical
+                    # Round-trip normalization couldn't complete; normalized
                     # model text is unavailable for the diagnostic.
                     issue = f"definition differs: DB has {actual_def!r}"
-                drift = ConstraintDrift(
-                    kind=DriftKind.CHANGED,
+                drift = ConstraintModelDrift(
                     table=table,
                     constraint=constraint,
                     model=model,
+                    kind=DriftKind.CHANGED,
                 )
 
         statuses.append(
@@ -1047,17 +1156,17 @@ def _compare_check_constraints(
                     constraint_type=ConType.CHECK,
                     fields=[],
                     issue="missing from database",
-                    drift=ConstraintDrift(
-                        kind=DriftKind.MISSING,
+                    drift=ConstraintModelDrift(
                         table=table,
                         constraint=constraint,
                         model=model,
+                        kind=DriftKind.MISSING,
                     ),
                 )
             )
 
     # Build set of framework-owned temp NOT NULL check names so leftover
-    # artifacts from a partially-completed SetNotNullFix are silently
+    # artifacts from a partially-completed SetNotNullCorrection are silently
     # ignored rather than surfaced as undeclared user constraints.
     internal_checks = {
         generate_notnull_check_name(table, f.column)
@@ -1073,10 +1182,10 @@ def _compare_check_constraints(
                     constraint_type=ConType.CHECK,
                     fields=actual[name].columns,
                     issue="not in model",
-                    drift=ConstraintDrift(
-                        kind=DriftKind.UNDECLARED,
+                    drift=ConstraintNameDrift(
                         table=table,
                         name=name,
+                        kind=DriftKind.UNDECLARED,
                     ),
                 )
             )
@@ -1099,7 +1208,9 @@ def _compare_foreign_keys(
     # Value: (field_name, constraint_name, expected_on_delete_clause, expected_confdeltype)
     expected_fks: dict[tuple[str, str, str], tuple[str, str, str, str]] = {}
     for f in model._model_meta.local_fields:
-        if isinstance(f, ForeignKeyField) and f.db_constraint:
+        if isinstance(f, ForeignKeyField):
+            # Contributed fields always have a name; never silently exclude an
+            # FK from expected_fks (that would flag a live constraint UNDECLARED).
             assert f.name is not None
             to_table = f.target_field.model.model_options.db_table
             to_column = f.target_field.column
@@ -1147,8 +1258,7 @@ def _compare_foreign_keys(
                     f"({cs.on_delete_action!r} → {expected_action!r})"
                 )
                 col, to_table, to_column = key
-                drift = ForeignKeyDrift(
-                    kind=DriftKind.CHANGED,
+                drift = ForeignKeyChangedDrift(
                     table=table,
                     name=actual_name,
                     column=col,
@@ -1160,10 +1270,10 @@ def _compare_foreign_keys(
                 )
             elif not cs.validated:
                 issue = "NOT VALID — needs validation"
-                drift = ForeignKeyDrift(
-                    kind=DriftKind.UNVALIDATED,
+                drift = ForeignKeyNameDrift(
                     table=table,
                     name=actual_name,
+                    kind=DriftKind.UNVALIDATED,
                 )
 
             statuses.append(
@@ -1183,8 +1293,7 @@ def _compare_foreign_keys(
                     constraint_type=ConType.FOREIGN_KEY,
                     fields=[col],
                     issue="missing from database",
-                    drift=ForeignKeyDrift(
-                        kind=DriftKind.MISSING,
+                    drift=ForeignKeyMissingDrift(
                         table=table,
                         name=constraint_name,
                         column=col,
@@ -1203,10 +1312,10 @@ def _compare_foreign_keys(
                 constraint_type=ConType.FOREIGN_KEY,
                 fields=cs.columns,
                 issue=f"not in model (→ {cs.target_table}.{cs.target_column})",
-                drift=ForeignKeyDrift(
-                    kind=DriftKind.UNDECLARED,
+                drift=ForeignKeyNameDrift(
                     table=table,
                     name=name,
+                    kind=DriftKind.UNDECLARED,
                 ),
             )
         )
@@ -1217,7 +1326,7 @@ def _compare_foreign_keys(
 def generate_notnull_check_name(table: str, column: str) -> str:
     """Generate a hashed name for the temporary NOT NULL check constraint.
 
-    Used by SetNotNullFix for the CHECK NOT VALID → VALIDATE → SET NOT NULL
+    Used by SetNotNullCorrection for the CHECK NOT VALID → VALIDATE → SET NOT NULL
     pattern, and by analysis to recognize (and ignore) leftover temp checks.
     """
     from ..utils import generate_identifier_name
@@ -1251,7 +1360,7 @@ def _detect_unique_renames(
     """Match missing and extra unique constraints by structure.
 
     Constraint-backed (not index_only): matched by resolved column tuple.
-    Index-only (condition/expression/opclass): matched by canonical
+    Index-only (condition/expression/opclass): matched by normalized
     (round-tripped) index definition, which captures the full semantics
     including WHERE clauses, opclasses, and expressions.
     """
@@ -1290,7 +1399,7 @@ def _detect_unique_renames(
                 old_def = actual_dict[old_name].definition
                 if not old_def:
                     continue
-                expected_tail = _canonicalize_index_def(
+                expected_tail = _normalize_index_def(
                     cursor,
                     model,
                     expressions=constraint.expressions,
@@ -1304,25 +1413,30 @@ def _detect_unique_renames(
                 )
                 if _index_def_tail(old_def) != expected_tail:
                     continue
-            DriftType = IndexDrift if constraint.index_only else ConstraintDrift
+            rename_drift: IndexRenameDrift | ConstraintDrift
+            if constraint.index_only:
+                rename_drift = IndexRenameDrift(
+                    table=table, old_name=old_name, new_name=constraint.name
+                )
+            else:
+                rename_drift = ConstraintRenameDrift(
+                    table=table,
+                    old_name=old_name,
+                    new_name=constraint.name,
+                )
             statuses.append(
                 ConstraintStatus(
                     name=constraint.name,
                     constraint_type=ConType.UNIQUE,
                     fields=list(constraint.fields),
                     issue=f"rename from {old_name}",
-                    drift=DriftType(
-                        kind=DriftKind.RENAMED,
-                        table=table,
-                        old_name=old_name,
-                        new_name=constraint.name,
-                    ),
+                    drift=rename_drift,
                 )
             )
             renamed_missing.add(constraint.name)
             renamed_extra.add(old_name)
 
-    # Phase 2: Expression-based — match by canonical (round-tripped) index
+    # Phase 2: Expression-based — match by normalized (round-tripped) index
     # body. Build the cheap already-introspected extras side first so we can
     # skip the per-missing round-trip on the steady-state path.
     extra_by_def: dict[str, list[str]] = {}
@@ -1340,7 +1454,7 @@ def _detect_unique_renames(
                 continue
             # constraint.fields is empty here (filtered above), so this is
             # the expression-based path — fields_orders is unused.
-            expected_tail = _canonicalize_index_def(
+            expected_tail = _normalize_index_def(
                 cursor,
                 model,
                 expressions=constraint.expressions,
@@ -1367,8 +1481,7 @@ def _detect_unique_renames(
                     constraint_type=ConType.UNIQUE,
                     fields=list(constraint.fields),
                     issue=f"rename from {old_name}",
-                    drift=IndexDrift(
-                        kind=DriftKind.RENAMED,
+                    drift=IndexRenameDrift(
                         table=table,
                         old_name=old_name,
                         new_name=constraint.name,
@@ -1389,12 +1502,12 @@ def _detect_check_renames(
     model: type[Model],
     table: str,
 ) -> tuple[list[ConstraintStatus], set[str], set[str]]:
-    """Match missing and extra check constraints by canonical definition."""
+    """Match missing and extra check constraints by normalized definition."""
     statuses: list[ConstraintStatus] = []
     renamed_missing: set[str] = set()
     renamed_extra: set[str] = set()
 
-    # Skip the round-trip canonicalization loop if there are no extras to
+    # Skip the round-trip normalization loop if there are no extras to
     # potentially match — the steady-state path with no drift.
     extra_by_def: dict[str, list[str]] = {}
     for name in extra_names:
@@ -1406,7 +1519,7 @@ def _detect_check_renames(
         for constraint in missing:
             expected_def = _get_expected_check_definition(cursor, model, constraint)
             if not expected_def:
-                # Canonicalization failed; bucketing under "" would conflate
+                # Normalization failed; bucketing under "" would conflate
                 # multiple sentinel-failing constraints and disable rename
                 # detection for the rest.
                 continue
@@ -1423,8 +1536,7 @@ def _detect_check_renames(
                     constraint_type=ConType.CHECK,
                     fields=[],
                     issue=f"rename from {old_name}",
-                    drift=ConstraintDrift(
-                        kind=DriftKind.RENAMED,
+                    drift=ConstraintRenameDrift(
                         table=table,
                         old_name=old_name,
                         new_name=constraint.name,
@@ -1454,7 +1566,7 @@ def _compare_index_only_unique(
     if not actual_def:
         return None, None
 
-    issue = _compare_canonical_index(
+    issue = _compare_normalized_index(
         cursor=cursor,
         model=model,
         expressions=constraint.expressions,
@@ -1466,15 +1578,15 @@ def _compare_index_only_unique(
         unique=True,
     )
     if issue:
-        changed = ConstraintDrift(
-            kind=DriftKind.CHANGED, table=table, constraint=constraint, model=model
+        changed = ConstraintModelDrift(
+            table=table, constraint=constraint, model=model, kind=DriftKind.CHANGED
         )
         return issue, changed
 
     return None, None
 
 
-def _compare_canonical_index(
+def _compare_normalized_index(
     *,
     cursor: CursorWrapper,
     model: type[Model],
@@ -1489,11 +1601,11 @@ def _compare_canonical_index(
     """Compare a model index/constraint against pg_get_indexdef text.
 
     Round-trips the model side through Postgres so both sides come from
-    pg_get_indexdef, then string-compares the canonical `USING ...` bodies.
+    pg_get_indexdef, then string-compares the normalized `USING ...` bodies.
 
     Returns an issue string if definitions differ, None if they match.
     """
-    expected_tail = _canonicalize_index_def(
+    expected_tail = _normalize_index_def(
         cursor,
         model,
         expressions=expressions,
@@ -1505,9 +1617,9 @@ def _compare_canonical_index(
     )
     actual_tail = _index_def_tail(actual_def)
     if not expected_tail:
-        # Round-trip canonicalization couldn't complete (model SQL
+        # Round-trip normalization couldn't complete (model SQL
         # incompatible with live shape). Report drift with the actual text;
-        # the canonical model text is unavailable for the diagnostic.
+        # the normalized model text is unavailable for the diagnostic.
         return f"definition differs: DB has {actual_tail!r}"
 
     if actual_tail != expected_tail:
@@ -1518,11 +1630,11 @@ def _compare_canonical_index(
     return None
 
 
-# Round-trip canonicalization: feed model-side SQL to Postgres on a
+# Round-trip normalization: feed model-side SQL to Postgres on a
 # session-private temp table, read back via pg_get_*.
-_CANON_TABLE = "_plain_canon"
-_CANON_CONSTRAINT = "_c"
-_CANON_INDEX = "_canon_ix"
+_PROBE_TABLE = "_plain_convergence_probe"
+_PROBE_CONSTRAINT = "_c"
+_PROBE_INDEX = "_probe_ix"
 
 # Errors raised by Postgres when the model SQL is incompatible with the live
 # table shape (unmigrated column types, references to dropped columns, etc.).
@@ -1534,7 +1646,7 @@ _CANON_INDEX = "_canon_ix"
 # privilege failures (InsufficientPrivilege, also a ProgrammingError) and
 # plain-side syntax bugs must propagate so users get a clear diagnostic
 # instead of silent drift noise.
-_CANON_FALLBACK_ERRORS: tuple[type[Exception], ...] = (
+_PROBE_FALLBACK_ERRORS: tuple[type[Exception], ...] = (
     psycopg.errors.UndefinedColumn,
     psycopg.errors.UndefinedFunction,
     psycopg.errors.UndefinedObject,
@@ -1553,45 +1665,120 @@ _CANON_FALLBACK_ERRORS: tuple[type[Exception], ...] = (
 class ReadOnlyConnectionError(RuntimeError):
     """Raised when convergence analysis runs on a read-only connection.
 
-    Analysis canonicalizes the model side of each comparison by round-tripping
+    Analysis normalizes the model side of each comparison by round-tripping
     SQL through a session-private temp table. That requires DDL, which is
     rejected on standby connections and inside `read_only()` blocks.
     """
 
 
+_READ_ONLY_MESSAGE = (
+    "Convergence analysis requires write access — it normalizes model SQL by "
+    "creating a session-private temp table. The current connection rejected "
+    "DDL (read-only transaction or standby). Run analysis against a "
+    "primary/writable connection."
+)
+
+
+@dataclass
+class _ProbeSession:
+    """Reuse scope for one model's probe table (see `_probe_session`)."""
+
+    model: type[Model]
+    created: bool = False
+
+
+# Set while `analyze_model` runs so the per-comparison probes share one temp
+# table instead of creating and dropping one each. A single connection is
+# single-threaded, but a ContextVar keeps the scope clean and never leaks the
+# session if analysis raises.
+_active_probe_session: contextvars.ContextVar[_ProbeSession | None] = (
+    contextvars.ContextVar("active_probe_session", default=None)
+)
+
+
 @contextmanager
-def _canon_table(cursor: CursorWrapper, model: type[Model]) -> Iterator[None]:
-    """Set up a session-private temp table mirroring the model's real table.
+def _probe_session(cursor: CursorWrapper, model: type[Model]) -> Iterator[None]:
+    """Reuse one probe table across every round-trip in a model's analysis.
 
-    `cursor.connection.transaction()` issues a SAVEPOINT when nested (or BEGIN
-    when run in autocommit). Either way, a model SQL statement incompatible
-    with the live column shape (e.g. a CHECK referencing a column whose live
-    type differs from what the model now declares) rolls back to this scope
-    rather than poisoning the surrounding analyze transaction. Helpers catch
-    psycopg errors and fall back to a sentinel — drift still gets reported,
-    just without the canonical model text.
+    The temp table is created lazily by the first probe inside this scope and
+    dropped once on exit, so a model with no expression/constraint round-trips
+    creates nothing while a model with many shares a single table instead of
+    churning one per comparison. The exit DROP runs only on the success path —
+    on an error it's skipped to avoid dropping against an aborted connection, so
+    the table can briefly outlive the analysis (autocommit commits the CREATE);
+    the next analysis recreates it cleanly (see `_create_probe_table`).
+    """
+    session = _ProbeSession(model=model)
+    token = _active_probe_session.set(session)
+    try:
+        yield
+    finally:
+        _active_probe_session.reset(token)
+    if session.created:
+        cursor.execute(f"DROP TABLE pg_temp.{_PROBE_TABLE}")
 
-    The trailing DROP is schema-qualified to `pg_temp` so a stray real table
-    sharing the name (in the user's own schema) can't be hit by mistake. A
-    single connection is always single-threaded, so reusing the name across
-    helpers is safe.
+
+def _create_probe_table(cursor: CursorWrapper, model: type[Model]) -> None:
+    """(Re)create the session-private probe table mirroring the model's real table.
+
+    Drops any stale table of the same name first so a leak can't wedge analysis:
+    the shipped CLI runs convergence in autocommit, so the CREATE commits before
+    later probes run, and a non-fallback error escaping `analyze_model` would
+    otherwise leave the table on a pooled connection to collide with the next
+    run's CREATE. The
+    DROP is schema-qualified to `pg_temp` so a real table sharing the name (in
+    the user's own schema) can't be hit by mistake. Raises ReadOnlyConnectionError
+    when the connection rejects the DDL.
     """
     table = quote_name(model.model_options.db_table)
     try:
         with cursor.connection.transaction():
-            cursor.execute(f"CREATE TEMP TABLE {_CANON_TABLE} (LIKE {table})")
-            yield
-            cursor.execute(f"DROP TABLE pg_temp.{_CANON_TABLE}")
+            cursor.execute(f"DROP TABLE IF EXISTS pg_temp.{_PROBE_TABLE}")
+            cursor.execute(f"CREATE TEMP TABLE {_PROBE_TABLE} (LIKE {table})")
     except psycopg.errors.ReadOnlySqlTransaction as exc:
-        raise ReadOnlyConnectionError(
-            "Convergence analysis requires write access — it canonicalizes "
-            "model SQL by creating a session-private temp table. The current "
-            "connection rejected DDL (read-only transaction or standby). Run "
-            "analysis against a primary/writable connection."
-        ) from exc
+        raise ReadOnlyConnectionError(_READ_ONLY_MESSAGE) from exc
 
 
-def _canonicalize_constraint_def(
+@contextmanager
+def _probe_table(cursor: CursorWrapper, model: type[Model]) -> Iterator[None]:
+    """Provide an empty temp table mirroring the model's real table for one
+    round-trip, isolating the probe's DDL so it can't leak into the analyze
+    transaction.
+
+    Inside an active `_probe_session` for the same model, the table is created
+    once and reused: each probe runs in a SAVEPOINT that is always rolled back,
+    undoing the probe's ADD/ALTER while leaving the shared table in place.
+    Outside a session, the table is created and dropped for this one probe.
+
+    `cursor.connection.transaction()` issues a SAVEPOINT when nested (or BEGIN in
+    autocommit), so model SQL incompatible with the live column shape rolls back
+    to this scope instead of poisoning the surrounding transaction; helpers catch
+    the psycopg error and fall back to a sentinel.
+    """
+    session = _active_probe_session.get()
+    if session is not None and session.model is model:
+        # Reuse the session's shared table; `_probe_session` owns its lifetime.
+        if not session.created:
+            _create_probe_table(cursor, model)
+            session.created = True
+        drop_on_exit = False
+    else:
+        # No session: this probe owns the table for its lifetime.
+        _create_probe_table(cursor, model)
+        drop_on_exit = True
+
+    try:
+        with cursor.connection.transaction() as savepoint:
+            yield
+            # Probe read its definition; undo the ADD/ALTER but keep the table.
+            # psycopg rolls the SAVEPOINT back without surfacing an error.
+            raise psycopg.Rollback(savepoint)
+    finally:
+        if drop_on_exit:
+            cursor.execute(f"DROP TABLE pg_temp.{_PROBE_TABLE}")
+
+
+def _normalize_constraint_def(
     cursor: CursorWrapper, model: type[Model], constraint_clause: str
 ) -> str:
     """Round-trip a constraint clause through Postgres so both sides of the
@@ -1601,28 +1788,28 @@ def _canonicalize_constraint_def(
 
     Returns "" if the model SQL is incompatible with the live table shape
     (e.g. unmigrated column-type drift). Drift still gets reported via the
-    inequality with the actual live definition; only the canonical model
+    inequality with the actual live definition; only the normalized model
     text is omitted from the diagnostic.
     """
     try:
-        with _canon_table(cursor, model):
+        with _probe_table(cursor, model):
             # Add as validated: the temp table is empty so the implicit scan is
             # instant. NOT VALID would leave a trailing " NOT VALID" suffix in
             # pg_get_constraintdef that the live constraint won't have.
             cursor.execute(
-                f"ALTER TABLE {_CANON_TABLE} "
-                f"ADD CONSTRAINT {_CANON_CONSTRAINT} {constraint_clause}"
+                f"ALTER TABLE {_PROBE_TABLE} "
+                f"ADD CONSTRAINT {_PROBE_CONSTRAINT} {constraint_clause}"
             )
             cursor.execute(
                 "SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c "
                 "WHERE c.conname = %s "
                 "AND c.conrelid = (SELECT oid FROM pg_class WHERE relname = %s "
                 "AND relnamespace = pg_my_temp_schema())",
-                [_CANON_CONSTRAINT, _CANON_TABLE],
+                [_PROBE_CONSTRAINT, _PROBE_TABLE],
             )
             row = cursor.fetchone()
             return row[0] if row else ""
-    except _CANON_FALLBACK_ERRORS:
+    except _PROBE_FALLBACK_ERRORS:
         return ""
 
 
@@ -1630,10 +1817,10 @@ def _get_expected_check_definition(
     cursor: CursorWrapper, model: type[Model], constraint: CheckConstraint
 ) -> str:
     check_sql = compile_expression_sql(model, constraint.check)
-    return _canonicalize_constraint_def(cursor, model, f"CHECK ({check_sql})")
+    return _normalize_constraint_def(cursor, model, f"CHECK ({check_sql})")
 
 
-def _canonicalize_index_def(
+def _normalize_index_def(
     cursor: CursorWrapper,
     model: type[Model],
     *,
@@ -1644,7 +1831,7 @@ def _canonicalize_index_def(
     include: tuple[str, ...] | None = None,
     unique: bool = False,
 ) -> str:
-    """Round-trip an index through Postgres and return its canonical body.
+    """Round-trip an index through Postgres and return its normalized body.
 
     Returns the `USING ... [INCLUDE (...)] [WHERE (...)]` tail of pg_get_indexdef,
     safe to compare directly against `_index_def_tail(actual_def)` from the
@@ -1653,7 +1840,7 @@ def _canonicalize_index_def(
 
     Returns "" if the model SQL is incompatible with the live table shape;
     comparison sites then see inequality and report drift without the
-    canonical model text.
+    normalized model text.
     """
     if expressions:
         columns_sql = compile_index_expressions_sql(model, expressions)
@@ -1676,25 +1863,25 @@ def _canonicalize_index_def(
     create_kw = "CREATE UNIQUE INDEX" if unique else "CREATE INDEX"
 
     try:
-        with _canon_table(cursor, model):
+        with _probe_table(cursor, model):
             cursor.execute(
-                f"{create_kw} {_CANON_INDEX} ON {_CANON_TABLE} "
+                f"{create_kw} {_PROBE_INDEX} ON {_PROBE_TABLE} "
                 f"({columns_sql}){include_sql}{where_sql}"
             )
             cursor.execute(
                 "SELECT pg_get_indexdef(c.oid) FROM pg_class c "
                 "WHERE c.relname = %s AND c.relnamespace = pg_my_temp_schema()",
-                [_CANON_INDEX],
+                [_PROBE_INDEX],
             )
             row = cursor.fetchone()
             return _index_def_tail(row[0]) if row else ""
-    except _CANON_FALLBACK_ERRORS:
+    except _PROBE_FALLBACK_ERRORS:
         return ""
 
 
 def _index_def_tail(definition: str) -> str:
     """Strip the `CREATE [UNIQUE] INDEX <name> ON <schema>.<table>` prefix
-    from a pg_get_indexdef output, leaving the canonical body that's safe to
+    from a pg_get_indexdef output, leaving the normalized body that's safe to
     compare across different index names/tables."""
     using_pos = definition.find("USING ")
     return definition[using_pos:] if using_pos >= 0 else definition
@@ -1703,7 +1890,7 @@ def _index_def_tail(definition: str) -> str:
 def _get_expected_unique_definition(
     cursor: CursorWrapper, model: type[Model], constraint: UniqueConstraint
 ) -> str:
-    """Canonical UNIQUE definition for the model's constraint, as Postgres
+    """Normalized UNIQUE definition for the model's constraint, as Postgres
     prints it.
 
     PostgreSQL only stores field-based unique constraints (with optional
@@ -1718,4 +1905,4 @@ def _get_expected_unique_definition(
     include_sql = build_include_sql(model, constraint.include)
     defer_sql = deferrable_sql(constraint.deferrable)
     clause = f"UNIQUE ({columns_sql}){include_sql}{defer_sql}"
-    return _canonicalize_constraint_def(cursor, model, clause)
+    return _normalize_constraint_def(cursor, model, clause)

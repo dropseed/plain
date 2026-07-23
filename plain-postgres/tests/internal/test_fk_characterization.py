@@ -30,7 +30,7 @@ def test_forward_access_returns_related_object(db):
 def test_construct_with_related_object(db):
     parent = DeleteParent.query.create(name="P")
     child = ChildCascade(parent=parent)
-    child.save()
+    child.create()
     assert ChildCascade.query.get(id=child.id).parent == parent
 
 
@@ -39,7 +39,7 @@ def test_reassign_related_object(db):
     p2 = DeleteParent.query.create(name="P2")
     child = ChildCascade.query.create(parent=p1)
     child.parent = p2
-    child.save()
+    child.update()
     assert ChildCascade.query.get(id=child.id).parent == p2
 
 
@@ -72,7 +72,7 @@ def test_save_roundtrip(db):
     parent = DeleteParent.query.create(name="P")
     child = ChildCascade.query.create(parent=parent)
     reloaded = ChildCascade.query.get(id=child.id)
-    reloaded.save()
+    reloaded.update()
     assert ChildCascade.query.get(id=child.id).parent == parent
 
 
@@ -98,7 +98,7 @@ def test_construct_with_id_kwarg(db):
     with pytest.raises(TypeError, match="unexpected keyword"):
         ChildCascade(parent_id=parent.id)
     child = ChildCascade(parent=parent.id)
-    child.save()
+    child.create()
     assert ChildCascade.query.get(id=child.id).parent == parent
 
 
@@ -111,7 +111,7 @@ def test_id_attribute_write(db):
     p2 = DeleteParent.query.create(name="P2")
     child = ChildCascade.query.create(parent=p1)
     child.parent_id = p2.id  # ty: ignore[unresolved-attribute]
-    child.save()
+    child.update()
     assert ChildCascade.query.get(id=child.id).parent == p1  # unchanged!
 
 

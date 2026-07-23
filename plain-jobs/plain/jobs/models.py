@@ -11,6 +11,7 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
     MESSAGING_MESSAGE_ID,
     MESSAGING_OPERATION_NAME,
 )
+from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import Link, SpanContext, SpanKind, TraceFlags
 
 from plain import postgres
@@ -103,9 +104,6 @@ class JobRequest(postgres.Model):
             postgres.Index(
                 name="plainjobs_jobrequest_concurrency_key_idx",
                 fields=["concurrency_key"],
-            ),
-            postgres.Index(
-                name="plainjobs_jobrequest_trace_id_idx", fields=["trace_id"]
             ),
             # Used for job grouping queries
             postgres.Index(
@@ -214,9 +212,6 @@ class JobProcess(postgres.Model):
                 fields=["job_request_uuid"],
             ),
             postgres.Index(
-                name="plainjobs_jobprocess_trace_id_idx", fields=["trace_id"]
-            ),
-            postgres.Index(
                 name="plainjobs_jobprocess_worker_id_idx", fields=["worker_id"]
             ),
             # Used for job grouping queries
@@ -293,7 +288,7 @@ class JobProcess(postgres.Model):
                 # is `allow_null=True`), which doesn't subtract cleanly below.
                 started_at = timezone.now()
                 self.started_at = started_at
-                self.save(update_fields=["started_at"])
+                self.update(fields=["started_at"])
 
                 if self.requested_at:
                     queue_wait = (started_at - self.requested_at).total_seconds()
@@ -337,7 +332,8 @@ class JobProcess(postgres.Model):
                     # second log line. Rare; correct outcome; not worth
                     # pre-checking on every successful job.
                     logger.exception(e)
-                    error_type = record_span_error(span, e, metric_attributes)
+                    error_type = record_span_error(span, e)
+                    metric_attributes[ERROR_TYPE] = error_type
                     return self.convert_to_result(
                         status=JobResultStatuses.ERRORED,
                         error="".join(traceback.format_tb(e.__traceback__)),
@@ -564,7 +560,7 @@ class JobResultQuerySet(postgres.QuerySet["JobResult"]):
                     extra={"result": str(result)},
                 )
                 result.retry_attempt += 1
-                result.save(update_fields=["retry_attempt"])
+                result.update(fields=["retry_attempt"])
 
 
 class JobResultStatuses(postgres.TextChoices):
@@ -624,24 +620,7 @@ class JobResult(postgres.Model):
             postgres.Index(
                 name="plainjobs_jobresult_created_at_idx", fields=["created_at"]
             ),
-            postgres.Index(
-                name="plainjobs_jobresult_started_at_idx", fields=["started_at"]
-            ),
-            postgres.Index(
-                name="plainjobs_jobresult_ended_at_idx", fields=["ended_at"]
-            ),
             postgres.Index(name="plainjobs_jobresult_status_idx", fields=["status"]),
-            postgres.Index(
-                name="plainjobs_jobresult_job_request_uuid_idx",
-                fields=["job_request_uuid"],
-            ),
-            postgres.Index(
-                name="plainjobs_jobresult_job_class_idx", fields=["job_class"]
-            ),
-            postgres.Index(name="plainjobs_jobresult_queue_idx", fields=["queue"]),
-            postgres.Index(
-                name="plainjobs_jobresult_trace_id_idx", fields=["trace_id"]
-            ),
         ],
         constraints=[
             postgres.UniqueConstraint(
@@ -708,7 +687,7 @@ class JobResult(postgres.Model):
             )
             if result:
                 self.retry_job_request_uuid = result.uuid
-                self.save(update_fields=["retry_job_request_uuid"])
+                self.update(fields=["retry_job_request_uuid"])
                 return result
 
         return None
@@ -734,12 +713,6 @@ class WorkerHeartbeat(postgres.Model):
 
     model_options = postgres.Options(
         ordering=["-last_heartbeat_at"],
-        indexes=[
-            postgres.Index(
-                name="plainjobs_workerheartbeat_last_heartbeat_at_idx",
-                fields=["last_heartbeat_at"],
-            ),
-        ],
         constraints=[
             # The unique constraint provides the worker_id lookup index.
             postgres.UniqueConstraint(

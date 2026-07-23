@@ -58,7 +58,7 @@ class ChoicesMeta(enum.EnumMeta):
     @property
     def choices(cls) -> list[tuple[Any, str]]:
         empty = [(None, cls.__empty__)] if hasattr(cls, "__empty__") else []
-        return empty + [(member.value, member.label) for member in cls]  # ty: ignore[unresolved-attribute, invalid-return-type]
+        return empty + [(member.value, member.label) for member in cls]  # ty: ignore[unresolved-attribute]
 
     @property
     def labels(cls) -> list[str]:

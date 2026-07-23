@@ -9,6 +9,7 @@ from plain.exceptions import ImproperlyConfigured
 from plain.forms import BaseForm, Form
 from plain.http import HTTPException, NotFoundError404, RedirectResponse, Response
 from plain.logs import get_framework_logger
+from plain.paginator import Page, Paginator
 from plain.runtime import settings
 from plain.views import View
 
@@ -193,8 +194,8 @@ class CreateView(FormView):
         return url
 
     def form_valid(self, form: BaseForm) -> Response:
-        """If the form is valid, save the associated model."""
-        self.object = form.save()  # ty: ignore[unresolved-attribute]
+        """If the form is valid, create the associated model."""
+        self.object = form.create()  # ty: ignore[unresolved-attribute]
         return super().form_valid(form)
 
 
@@ -257,8 +258,8 @@ class UpdateView(DetailView, FormView):
         return url
 
     def form_valid(self, form: BaseForm) -> Response:
-        """If the form is valid, save the associated model."""
-        form.save()  # ty: ignore[unresolved-attribute]
+        """If the form is valid, update the associated model."""
+        self.object = form.update()  # ty: ignore[unresolved-attribute]
         return super().form_valid(form)
 
     def get_form_kwargs(self) -> dict[str, Any]:
@@ -274,35 +275,40 @@ class DeleteView(DetailView, FormView):
     response rendered by a template.
     """
 
+    # An empty confirmation form -- deletion is the view's job, not the
+    # form's, so it carries no fields and no model write.
     class EmptyDeleteForm(Form):
-        def __init__(self, instance: Any, **kwargs: Any) -> None:
-            self.instance = instance
-            super().__init__(**kwargs)
-
-        def save(self) -> None:
-            self.instance.delete()
+        pass
 
     form_class = EmptyDeleteForm
 
-    def get_form_kwargs(self) -> dict[str, Any]:
-        """Return the keyword arguments for instantiating the form."""
-        kwargs = super().get_form_kwargs()
-        kwargs.update({"instance": self.object})
-        return kwargs
-
     def form_valid(self, form: BaseForm) -> Response:
-        """If the form is valid, save the associated model."""
-        form.save()  # ty: ignore[unresolved-attribute]
+        """If the confirmation form is valid, delete the object."""
+        self.object.delete()
         return super().form_valid(form)
 
 
 class ListView(TemplateView, ABC):
     """
-    Render some list of objects, set by `self.get_queryset()`, with a response
+    Render some list of objects, set by `self.get_objects()`, with a response
     rendered by a template.
+
+    Set `page_size` to paginate: the objects are wrapped in a `Paginator`, the
+    page number is read from the `?page` query param (invalid values fall back
+    to the first or last page), and the current `Page` is what lands in the
+    template context — iterate it exactly like the full list. The page is also
+    available as `page_obj` for rendering pagination controls; it is `None`
+    when pagination is off. Override `get_page_size()` to compute the size per
+    request.
+
+    A paginated queryset needs a deterministic order (an `order_by()` or a
+    model default) — unordered results can shift between pages. An empty
+    `Page` is falsy, so check `page_obj is not none` to test whether
+    pagination is on.
     """
 
     context_object_name = ""
+    page_size: int | None = None
 
     @cached_property
     def objects(self) -> Any:
@@ -311,12 +317,27 @@ class ListView(TemplateView, ABC):
     @abstractmethod
     def get_objects(self) -> Any: ...
 
+    def get_page_size(self) -> int | None:
+        """Page size for pagination, or `None` to render the full list."""
+        return self.page_size
+
+    @cached_property
+    def page_obj(self) -> Page | None:
+        if (page_size := self.get_page_size()) is None:
+            return None
+        return Paginator(self.objects, page_size).get_page(
+            self.request.query_params.get("page", 1)
+        )
+
     def get_template_context(self) -> dict[str, Any]:
-        """Insert the single object into the context dict."""
+        """Insert the list of objects (or the current page of it) into the context dict."""
         context = super().get_template_context()
-        context["objects"] = self.objects
+        page_obj = self.page_obj
+        objects = page_obj if page_obj is not None else self.objects
+        context["objects"] = objects
+        context["page_obj"] = page_obj
         if self.context_object_name:
-            context[self.context_object_name] = self.objects
+            context[self.context_object_name] = objects
         return context
 
 

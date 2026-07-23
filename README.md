@@ -99,14 +99,14 @@ Python where you want it, JS where you need it.
 - **Templates:** Jinja2
 - **Frontend:** htmx, Tailwind CSS
 - **Python tooling:** uv (packages), ruff (lint/format), ty (type checking)
-- **JavaScript tooling:** oxc (lint/format), esbuild (bundling)
+- **JavaScript tooling:** oxc (lint/format)
 - **Testing:** pytest
 
 Models declare fields as annotated attributes, and that typing carries through views, forms, and URLs. `plain check` runs `ty` on every pass — what your IDE shows, CI enforces, and agents read from the same signatures.
 
 ## Observability at the core
 
-OpenTelemetry traces, a built-in request observer, and slow-query detection ship in the box. The first time an N+1 matters, you already have the tools to see it.
+OpenTelemetry traces and slow-query detection ship in the box. The first time an N+1 matters, you already have the tools to see it.
 
 ## Agents at the forefront
 
@@ -132,7 +132,7 @@ plain docs --search "queryset"         # search across all packages
 
 ## First-party ecosystem
 
-32 packages, one framework. All with built-in docs. Decisions that usually take a sprint are already made.
+31 packages, one framework. All with built-in docs. Decisions that usually take a sprint are already made.
 
 **Foundation:**
 
@@ -157,7 +157,6 @@ plain docs --search "queryset"         # search across all packages
 - [plain.tailwind](https://plainframework.com/docs/plain-tailwind/plain/tailwind/) — CSS framework
 - [plain.elements](https://plainframework.com/docs/plain-elements/plain/elements/) — HTML components
 - [plain.pages](https://plainframework.com/docs/plain-pages/plain/pages/) — static pages
-- [plain.esbuild](https://plainframework.com/docs/plain-esbuild/plain/esbuild/) — JS bundling
 
 **Development:**
 
@@ -172,7 +171,6 @@ plain docs --search "queryset"         # search across all packages
 **Production:**
 
 - [plain.admin](https://plainframework.com/docs/plain-admin/plain/admin/) — database admin
-- [plain.observer](https://plainframework.com/docs/plain-observer/plain/observer/) — request tracing
 - [plain.connect](https://plainframework.com/docs/plain-connect/plain/connect/) — OTLP export to Plain Cloud
 - [plain.flags](https://plainframework.com/docs/plain-flags/plain/flags/) — feature flags
 - [plain.scan](https://plainframework.com/docs/plain-scan/plain/scan/) — security scanning

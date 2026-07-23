@@ -20,7 +20,7 @@ import builtins
 from plain.postgres import transaction
 from plain.postgres.db import get_connection
 from plain.postgres.dialect import quote_name
-from plain.postgres.expressions import Window
+from plain.postgres.expressions import RawSQL, Window
 from plain.postgres.functions import RowNumber
 from plain.postgres.lookups import GreaterThan, LessThanOrEqual
 from plain.postgres.query import QuerySet
@@ -97,12 +97,12 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         self.allow_null = self.field.allow_null
 
     def _check_fk_val(self) -> None:
-        for field in self.field.foreign_related_fields:
-            if getattr(self.instance, field.name) is None:
-                raise ValueError(
-                    f'"{self.instance!r}" needs to have a value for field '
-                    f'"{field.name}" before this relationship can be used.'
-                )
+        field = self.field.target_field
+        if getattr(self.instance, field.name) is None:
+            raise ValueError(
+                f'"{self.instance!r}" needs to have a value for field '
+                f'"{field.name}" before this relationship can be used.'
+            )
 
     def _apply_rel_filters(self, queryset: QuerySet) -> QuerySet:
         """
@@ -110,13 +110,10 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         """
         queryset._defer_next_filter = True
         queryset = queryset.filter(**self.core_filters)
-        for field in self.field.foreign_related_fields:
-            val = getattr(self.instance, field.name)
-            if val is None:
-                return queryset.none()
-
         target_field = self.field.target_field
         rel_obj_id = getattr(self.instance, target_field.name)
+        if rel_obj_id is None:
+            return queryset.none()
         queryset._known_related_objects = {self.field: {rel_obj_id: self.instance}}
         return queryset
 
@@ -129,9 +126,8 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
             pass  # nothing to clear from cache
 
     def get_queryset(self) -> QS:
-        # Even if this relation is not to primary key, we require still primary key value.
-        # The wish is that the instance has been already saved to DB,
-        # although having a primary key value isn't a guarantee of that.
+        # The instance must have a primary key value to be related against,
+        # though that isn't a guarantee it has actually been saved to the DB.
         if self.instance.id is None:
             raise ValueError(
                 f"{self.instance.__class__.__name__!r} instance needs to have a "
@@ -197,7 +193,12 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
             with transaction.atomic(savepoint=False):
                 for obj in objs:
                     check_and_update_obj(obj)
-                    obj.save()
+                    # bulk=False is the documented way to add unsaved objects,
+                    # so an obj here may be new or already persisted.
+                    if obj._state.adding:
+                        obj.create()
+                    else:
+                        obj.update()
 
     def create(self, **kwargs: Any) -> T:
         self._check_fk_val()
@@ -259,7 +260,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
             with transaction.atomic(savepoint=False):
                 for obj in queryset:
                     setattr(obj, self.field.name, None)
-                    obj.save(update_fields=[self.field.name])
+                    obj.update(fields=[self.field.name])
 
     def set(self, objs: Any, *, bulk: bool = True, clear: bool = False) -> None:
         self._check_fk_val()
@@ -307,8 +308,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
     target_field_name: str
     symmetrical: bool
     core_filters: dict[str, Any]
-    id_field_names: dict[str, str]
-    related_val: tuple[Any, ...]
+    related_val: Any
 
     def __init__(
         self,
@@ -352,22 +352,20 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
             self.through._model_meta.get_forward_field(self.target_field_name),
         )
 
-        self.core_filters = {}
-        self.id_field_names = {}
-        for lh_field, rh_field in self.source_field.related_fields:
-            rh_name = rh_field.name
-            assert rh_name is not None
-            core_filter_key = f"{self.query_field_name}__{rh_name}"
-            self.core_filters[core_filter_key] = getattr(instance, rh_name)
-            self.id_field_names[lh_field.name] = rh_field.name  # ty: ignore[invalid-assignment]
+        source_fk = self.source_field
+        rh_name = source_fk.target_field.name
+        assert rh_name is not None
+        self.core_filters = {
+            f"{self.query_field_name}__{rh_name}": getattr(instance, rh_name)
+        }
 
-        self.related_val = self.source_field.get_foreign_related_value(instance)
-        if None in self.related_val:
+        self.related_val = source_fk.get_foreign_related_value(instance)
+        if self.related_val is None:
             raise ValueError(
-                f'"{instance!r}" needs to have a value for field "{self.id_field_names[self.source_field_name]}" before '
+                f'"{instance!r}" needs to have a value for field "{rh_name}" before '
                 "this many-to-many relationship can be used."
             )
-        # Even if this relation is not to primary key, we require still primary key value.
+        # The instance must have a primary key value to be related against.
         if instance.id is None:
             raise ValueError(
                 f"{instance.__class__.__name__!r} instance needs to have a primary key value before "
@@ -416,22 +414,22 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         )  # M2M through model fields are always ForeignKey
         join_table = fk.model.model_options.db_table
         qn = quote_name
-        queryset = queryset.extra(
-            select={
-                f"_prefetch_related_val_{f.name}": f"{qn(join_table)}.{qn(f.column)}"
-                for f in fk.local_related_fields
+        # Expose the through-table FK column so the prefetch loader can match
+        # each secondary row back to the primary instance that owns it.
+        queryset = queryset.annotate(
+            **{
+                f"_prefetch_related_val_{fk.name}": RawSQL(
+                    f"{qn(join_table)}.{qn(fk.column)}", []
+                )
             }
         )
         conn = get_connection()
+        target_field = fk.target_field
         return (
             queryset,
-            lambda result: tuple(
-                getattr(result, f"_prefetch_related_val_{f.name}")
-                for f in fk.local_related_fields
-            ),
-            lambda inst: tuple(
-                f.get_db_prep_value(f.value_from_object(inst), conn)
-                for f in fk.foreign_related_fields
+            lambda result: getattr(result, f"_prefetch_related_val_{fk.name}"),
+            lambda inst: target_field.get_db_prep_value(
+                target_field.value_from_object(inst), conn
             ),
             False,
             self.prefetch_cache_name,
@@ -467,7 +465,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
                 new_objs = []
                 for obj in objs:
                     fk_val = (
-                        self.target_field.get_foreign_related_value(obj)[0]
+                        self.target_field.get_foreign_related_value(obj)
                         if isinstance(obj, self.model)
                         else self.target_field.get_prep_value(obj)
                     )
@@ -520,7 +518,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         )  # M2M through model fields are always ForeignKey
         for obj in objs:
             if isinstance(obj, self.model):
-                target_id = target_field.get_foreign_related_value(obj)[0]
+                target_id = target_field.get_foreign_related_value(obj)
                 if target_id is None:
                     raise ValueError(
                         f'Cannot add "{obj!r}": the value for field "{target_field_name}" is None'
@@ -543,7 +541,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         """Return the subset of ids of `objs` that aren't already assigned to this relationship."""
         vals = self.through.query.values_list(target_field_name, flat=True).filter(
             **{
-                source_field_name: self.related_val[0],
+                source_field_name: self.related_val,
                 f"{target_field_name}__in": target_ids,
             }
         )
@@ -572,7 +570,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
                     self.through(
                         **through_defaults,
                         **{
-                            source_field_name: self.related_val[0],
+                            source_field_name: self.related_val,
                             target_field_name: target_id,
                         },
                     )
@@ -590,7 +588,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         old_ids = set()
         for obj in objs:
             if isinstance(obj, self.model):
-                fk_val = self.target_field.get_foreign_related_value(obj)[0]
+                fk_val = self.target_field.get_foreign_related_value(obj)
                 old_ids.add(fk_val)
             else:
                 old_ids.add(obj)

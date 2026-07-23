@@ -60,6 +60,8 @@ class OAuthCallbackView(TemplateView):
 
 
 class OAuthConnectView(AuthView):
+    login_required = True
+
     def post(self) -> Response:
         request = self.request
         provider = self.url_kwargs["provider"]
@@ -68,6 +70,8 @@ class OAuthConnectView(AuthView):
 
 
 class OAuthDisconnectView(AuthView):
+    login_required = True
+
     def post(self) -> Response:
         request = self.request
         provider = self.url_kwargs["provider"]

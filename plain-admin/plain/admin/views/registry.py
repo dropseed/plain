@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from plain.auth import get_request_user
 from plain.sessions import get_request_session
@@ -33,6 +33,10 @@ class AdminViewRegistry:
         """Path -> view lookup dict, built once on first access."""
         return {view.get_path(): view for view in self.registered_views}
 
+    @overload
+    def register_view(self, view: type[T], /) -> type[T]: ...
+    @overload
+    def register_view(self) -> Callable[[type[T]], type[T]]: ...
     def register_view(
         self, view: type[T] | None = None
     ) -> type[T] | Callable[[type[T]], type[T]]:
@@ -48,6 +52,10 @@ class AdminViewRegistry:
         else:
             return inner
 
+    @overload
+    def register_viewset(self, viewset: type[VS], /) -> type[VS]: ...
+    @overload
+    def register_viewset(self) -> Callable[[type[VS]], type[VS]]: ...
     def register_viewset(
         self, viewset: type[VS] | None = None
     ) -> type[VS] | Callable[[type[VS]], type[VS]]:
@@ -63,9 +71,9 @@ class AdminViewRegistry:
 
     def get_nav_sections(
         self, *, plain_packages: bool, user: Model
-    ) -> dict[str, list[type]]:
+    ) -> dict[str, list[type[AdminView]]]:
         """Returns nav sections filtered by package type."""
-        sections: dict[str, list[type]] = {}
+        sections: dict[str, list[type[AdminView]]] = {}
 
         for view in self.registered_views:
             is_plain = view.__module__.startswith("plain.")

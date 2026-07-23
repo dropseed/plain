@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: ${{ matrix.postgres-image }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -23,8 +23,17 @@ jobs:
           --health-timeout=5s
           --health-retries=5
     strategy:
+      # Test the floor (16, the minimum we enforce) and the latest Postgres,
+      # since our introspection/health checks lean heavily on system catalogs
+      # that drift across major versions.
       matrix:
-        python-version: ["3.13", "3.14"]
+        include:
+          - python-version: "3.13"
+            postgres-image: "postgres:16"
+          - python-version: "3.14"
+            postgres-image: "postgres:16"
+          - python-version: "3.14"
+            postgres-image: "postgres:18"
 
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +44,7 @@ jobs:
       - name: Test (PostgreSQL)
         run: ./scripts/test
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/plain
+          PLAIN_POSTGRES_URL: postgres://postgres:postgres@localhost:5432/plain
 
   lint:
     runs-on: ubuntu-latest

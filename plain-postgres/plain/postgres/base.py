@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import copy
 import warnings
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Collection, Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
     from plain.postgres.meta import Meta
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
 import psycopg
 
 import plain.runtime
-from plain.exceptions import NON_FIELD_ERRORS, ValidationError
+from plain.exceptions import ValidationError
 from plain.postgres import models_registry, transaction, types
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.constraints import CheckConstraint, UniqueConstraint
@@ -22,11 +23,12 @@ from plain.postgres.dialect import MAX_NAME_LENGTH
 from plain.postgres.exceptions import (
     DoesNotExistDescriptor,
     FieldDoesNotExist,
+    FieldError,
     MultipleObjectsReturnedDescriptor,
 )
 from plain.postgres.expressions import RawSQL, Value
-from plain.postgres.fields import DATABASE_DEFAULT, NOT_PROVIDED, Field
-from plain.postgres.fields.base import ColumnField, DefaultableField
+from plain.postgres.fields import DATABASE_DEFAULT, Field
+from plain.postgres.fields.base import ColumnField
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ForeignObjectRel
 from plain.postgres.meta import Meta
@@ -71,10 +73,11 @@ class ModelBase(type):
 class ModelState:
     """Store model instance state."""
 
-    # If true, uniqueness validation checks will consider this a new, unsaved
-    # object. Necessary for correct validation of new instances of objects with
-    # explicit (non-auto) PKs. This impacts validation only; it has no effect
-    # on the actual save.
+    # True until the instance is first persisted (cleared after create() and by
+    # from_db; set back to True by delete()). Read by: create()/update()'s
+    # lifecycle guards, UniqueConstraint.validate (to exclude the current row
+    # from its uniqueness lookup when editing), the ModelForm created/changed
+    # message, and related-manager unsaved checks.
     adding = True
 
     def __init__(self) -> None:
@@ -92,7 +95,7 @@ class Model(metaclass=ModelBase):
     DoesNotExist = DoesNotExistDescriptor()
     MultipleObjectsReturned = MultipleObjectsReturnedDescriptor()
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, *, _from_db: bool = False, **kwargs: Any):
         # Alias some things as locals to avoid repeat global lookups
         cls = self.__class__
         meta = cls._model_meta
@@ -102,6 +105,20 @@ class Model(metaclass=ModelBase):
 
         # Set up the storage for instance state
         self._state = ModelState()
+
+        # Postgres owns the identity primary key -- it's generated on INSERT.
+        # Passing `id` to the constructor almost always means "give me the
+        # existing row with this id", which is a query (query.get), not a
+        # constructor argument. Reject it so a freshly constructed instance is
+        # unambiguously new. from_db() loads real rows and passes _from_db=True
+        # to skip this.
+        if not _from_db and kwargs.get("id") is not None:
+            raise ValueError(
+                f"Cannot set the auto-generated primary key 'id' when "
+                f"constructing a {cls.__name__}. To load an existing row, "
+                f"use {cls.__name__}.query.get(id=...); to create a new "
+                f"one, omit 'id' and let the database assign it."
+            )
 
         # Process all fields from kwargs or use defaults
         for field in meta.fields:
@@ -187,7 +204,7 @@ class Model(metaclass=ModelBase):
         field_dict = dict(
             zip((f.name for f in cls._model_meta.concrete_fields), values)
         )
-        new = cls(**field_dict)
+        new = cls(_from_db=True, **field_dict)
         new._state.adding = False
         return new
 
@@ -343,224 +360,170 @@ class Model(metaclass=ModelBase):
             return getattr(self, field_name)
         return field.value_from_object(self)
 
-    def save(
+    def create(self, *, clean_and_validate: bool = True) -> Self:
+        """INSERT this instance as a new row and return self.
+
+        Raises ValueError if the instance is already persisted (use update()).
+        With clean_and_validate (the default) the instance's shape is validated
+        first; the database enforces constraints, and a violation surfaces as
+        the ValidationError a pre-check would raise. A hand-set id is inserted
+        as given -- a collision raises IntegrityError.
+        """
+        if not self._state.adding:
+            raise ValueError(
+                f"Cannot create() a {self.__class__.__name__} that is already "
+                "persisted -- use update() instead."
+            )
+        self._prepare_related_fields_for_save(operation_name="create")
+        if clean_and_validate:
+            self.full_clean()
+        with self._mapped_write():
+            self._insert_row()
+        self._state.adding = False
+        return self
+
+    def update(
         self,
         *,
         clean_and_validate: bool = True,
-        force_insert: bool = False,
-        force_update: bool = False,
-        update_fields: Iterable[str] | None = None,
-    ) -> None:
+        fields: Iterable[str] | None = None,
+    ) -> Self:
+        """UPDATE this instance's existing row and return self.
+
+        Raises ValueError if the instance hasn't been created yet (use
+        create()). `fields` limits the write to those columns; otherwise every
+        loaded field is written (deferred fields are skipped). Raises if no row
+        matched -- the row was deleted out from under us.
         """
-        Save the current instance. Override this in a subclass if you want to
-        control the saving process.
-
-        The 'force_insert' and 'force_update' parameters can be used to insist
-        that the "save" must be an SQL INSERT or UPDATE, respectively.
-        Normally, they should not be set.
-        """
-        self._prepare_related_fields_for_save(operation_name="save")
-
-        if force_insert and (force_update or update_fields):
-            raise ValueError("Cannot force both insert and updating in model saving.")
-
+        if self._state.adding:
+            raise ValueError(
+                f"Cannot update() a {self.__class__.__name__} that hasn't been "
+                "created yet -- use create() instead."
+            )
         deferred_fields = self.get_deferred_fields()
-        if update_fields is not None:
-            # Empty update_fields is a no-op save — skip the whole pipeline.
-            if not update_fields:
-                return
-
-            update_fields = frozenset(update_fields)
+        if fields is not None:
+            if not fields:
+                return self  # explicit "update nothing" -- no-op
+            fields = frozenset(fields)
             field_names = self._model_meta._non_pk_concrete_field_names
-            non_model_fields = update_fields.difference(field_names)
-
+            non_model_fields = fields.difference(field_names)
             if non_model_fields:
                 raise ValueError(
                     "The following fields do not exist in this model, are m2m "
-                    "fields, or are non-concrete fields: {}".format(
-                        ", ".join(non_model_fields)
-                    )
+                    "fields, or are non-concrete fields: "
+                    f"{', '.join(sorted(non_model_fields))}"
                 )
-
-        # If this model is deferred, automatically do an "update_fields" save
-        # on the loaded fields.
-        elif not force_insert and deferred_fields:
-            field_names = set()
-            for field in self._model_meta.concrete_fields:
-                if not field.primary_key and not hasattr(field, "through"):
-                    field_names.add(field.name)
-            loaded_fields = field_names.difference(deferred_fields)
-            if loaded_fields:
-                update_fields = frozenset(loaded_fields)
-
+            deferred_in_update = fields & deferred_fields
+            if deferred_in_update:
+                raise FieldError(
+                    "Cannot update deferred fields: "
+                    f"{', '.join(sorted(deferred_in_update))}"
+                )
+        elif deferred_fields:
+            # Loaded via .only()/.defer() -- write just the loaded fields.
+            loaded = self._model_meta._non_pk_concrete_field_names - deferred_fields
+            if loaded:
+                fields = loaded
+        self._prepare_related_fields_for_save(
+            operation_name="update", field_names=fields
+        )
         if clean_and_validate:
             self.full_clean(exclude=deferred_fields)
+        with self._mapped_write():
+            self._update_row(fields)
+        return self
 
-        self.save_base(
-            force_insert=force_insert,
-            force_update=force_update,
-            update_fields=update_fields,
+    def _integrity_error_to_validation_error(
+        self, exc: psycopg.IntegrityError
+    ) -> ValidationError | None:
+        """
+        Map a Postgres constraint violation back to the constraint that raised
+        it and return the ValidationError the in-Python check produces for that
+        constraint, or None when the violation doesn't correspond to a declared
+        constraint that can describe it (PK collisions, FK violations, and NOT
+        NULL — which carries no constraint name — all fall through to None and
+        re-raise as the original IntegrityError). A PK collision reaches here
+        when create() inserts a hand-set id that's already taken.
+        """
+        constraint_name = exc.diag.constraint_name
+        if not constraint_name:
+            return None
+        constraint = self._model_meta.constraints_by_name.get(constraint_name)
+        if constraint is None:
+            return None
+        error = constraint._db_violation_error(self, self.__class__)
+        if error is None:
+            return None
+        # Normalize to the same dict shape validate_constraints() produces so
+        # the error routes identically whether it was caught before or after
+        # the write: flat errors land under NON_FIELD_ERRORS, field-routed
+        # errors keep their field.
+        return ValidationError(error.update_error_dict({}))
+
+    @contextmanager
+    def _mapped_write(self) -> Iterator[None]:
+        """Run a table write inside the rollback guard, mapping a
+        declared-constraint IntegrityError to the ValidationError a pre-check
+        would have raised -- so the same violation surfaces identically whether
+        it's caught before the write or by the database. Anything we can't map
+        to a declared constraint re-raises as the original IntegrityError.
+        """
+        try:
+            with transaction.mark_for_rollback_on_error():
+                yield
+        except psycopg.IntegrityError as exc:
+            if (error := self._integrity_error_to_validation_error(exc)) is not None:
+                raise error from exc
+            raise
+
+    def _insert_row(self) -> None:
+        """INSERT this instance as a new row, filling id and any DB-default
+        fields from RETURNING. Omits id from the INSERT when unset so Postgres
+        generates the identity value."""
+        meta = self._model_meta
+        fields = list(meta.local_concrete_fields)
+        if self.id is None:
+            id_field = meta.get_forward_field("id")
+            fields = [f for f in fields if f is not id_field]
+        returning_fields = list(meta.db_returning_fields)
+        results = meta.base_queryset._insert(
+            [self], fields=fields, returning_fields=returning_fields or None
         )
+        if results:
+            for value, field in zip(results[0], returning_fields):
+                assert field.name is not None
+                setattr(self, field.name, value)
 
-    def save_base(
-        self,
-        *,
-        raw: bool = False,
-        force_insert: bool = False,
-        force_update: bool = False,
-        update_fields: Iterable[str] | None = None,
-    ) -> None:
-        """
-        Handle the parts of saving shared between the normal and raw paths.
-
-        The 'raw' argument tells save_base to skip per-field value
-        conversions — used by fixture loading, which has already produced
-        values in their final form.
-        """
-        assert not (force_insert and (force_update or update_fields))
-        assert update_fields is None or update_fields
-        cls = self.__class__
-
-        with transaction.mark_for_rollback_on_error():
-            self._save_table(
-                raw=raw,
-                cls=cls,
-                force_insert=force_insert,
-                force_update=force_update,
-                update_fields=update_fields,
-            )
-        # Once saved, this is no longer a to-be-added instance.
-        self._state.adding = False
-
-    def _save_table(
-        self,
-        *,
-        raw: bool,
-        cls: type[Model],
-        force_insert: bool = False,
-        force_update: bool = False,
-        update_fields: Iterable[str] | None = None,
-    ) -> bool:
-        """
-        Do the heavy-lifting involved in saving. Update or insert the data
-        for a single table.
-        """
-        meta = cls._model_meta
+    def _update_row(self, fields: Iterable[str] | None) -> None:
+        """UPDATE this instance's row from its current field values. Raise if no
+        row matched -- update() targets an existing row and has no INSERT
+        fallback (that's create())."""
+        meta = self._model_meta
         non_pks = [f for f in meta.local_concrete_fields if not f.primary_key]
-
-        if update_fields:
-            non_pks = [f for f in non_pks if f.name in update_fields]
-
-        id_field = meta.get_forward_field("id")
-        id_val = self.id
-        if id_val is None:
-            # User-declared literal default on the PK? Materialize it so the
-            # INSERT carries the Python value rather than letting the DB
-            # generate one. Identity PKs have no such default, so id_val
-            # stays None and the INSERT emits DEFAULT.
-            if isinstance(id_field, DefaultableField) and id_field.has_default():
-                id_val = id_field.get_default()
-            setattr(self, id_field.name, id_val)
-        id_set = id_val is not None
-        if not id_set and (force_update or update_fields):
-            raise ValueError("Cannot force an update in save() with no primary key.")
-        updated = False
-        # Skip an UPDATE when adding an instance and primary key has a default.
-        if (
-            not raw
-            and not force_insert
-            and self._state.adding
-            and isinstance(id_field, DefaultableField)
-            and id_field.default
-            and id_field.default is not NOT_PROVIDED
-        ):
-            force_insert = True
-        # If possible, try an UPDATE. If that doesn't update anything, do an INSERT.
-        if id_set and not force_insert:
-            base_qs = meta.base_queryset
-            values = [
-                (f, (f.value_from_object(self) if raw else f.pre_save(self, False)))
-                for f in non_pks
-            ]
-            # DATABASE_DEFAULT fields represent "let the DB produce this on
-            # INSERT" — they have no meaningful UPDATE semantic, so skip them
-            # on the UPDATE path. If the row doesn't exist the INSERT fallback
-            # below handles them correctly. If the UPDATE *does* succeed, we
-            # need to refresh those fields from the DB so the in-memory
-            # instance doesn't keep the sentinel.
-            db_default_names = [v[0].name for v in values if v[1] is DATABASE_DEFAULT]
-            values = [v for v in values if v[1] is not DATABASE_DEFAULT]
-            forced_update = bool(update_fields or force_update)
-            updated = self._do_update(
-                base_qs, id_val, values, update_fields, forced_update
-            )
-            if force_update and not updated:
-                raise psycopg.DatabaseError("Forced update did not affect any rows.")
-            if update_fields and not updated:
-                raise psycopg.DatabaseError(
-                    "Save with update_fields did not affect any rows."
-                )
-            if updated and db_default_names:
-                self.refresh_from_db(fields=db_default_names)
-        if not updated:
-            fields = meta.local_concrete_fields
-            if not id_set:
-                id_field = meta.get_forward_field("id")
-                fields = [f for f in fields if f is not id_field]
-
-            returning_fields = meta.db_returning_fields
-            results = self._do_insert(meta.base_queryset, fields, returning_fields, raw)
-            if results:
-                for value, field in zip(results[0], returning_fields):
-                    assert field.name is not None
-                    setattr(self, field.name, value)
-        return updated
-
-    def _do_update(
-        self,
-        base_qs: QuerySet,
-        id_val: Any,
-        values: list[tuple[Any, Any]],
-        update_fields: Iterable[str] | None,
-        forced_update: bool,
-    ) -> bool:
-        """
-        Try to update the model. Return True if the model was updated (if an
-        update query was done and a matching row was found in the DB).
-        """
-        filtered = base_qs.filter(id=id_val)
+        if fields:
+            non_pks = [f for f in non_pks if f.name in fields]
+        values = [(f, f.pre_save(self, False)) for f in non_pks]
+        filtered = meta.base_queryset.filter(id=self.id)
         if not values:
-            # Nothing to update — either the caller passed update_fields
-            # (so "success" means "we ran with no fields"), or the model has
-            # only its PK (in which case confirm the row still exists).
-            return update_fields is not None or filtered.exists()
-        return filtered._update(values) > 0
-
-    def _do_insert(
-        self,
-        manager: QuerySet,
-        fields: Sequence[Any],
-        returning_fields: Sequence[Any],
-        raw: bool,
-    ) -> list[tuple[Any, ...]] | None:
-        """
-        Do an INSERT. If returning_fields is defined then this method should
-        return the newly created data for the model.
-        """
-        return manager._insert(
-            [self],
-            fields=list(fields),
-            returning_fields=list(returning_fields) if returning_fields else None,
-            raw=raw,
-        )
+            # PK-only model -- nothing to write; the UPDATE "succeeds" as long
+            # as the row still exists. (A non-None `fields` is always validated
+            # to real non-pk columns, so it can never filter down to empty here.)
+            updated = filtered.exists()
+        else:
+            updated = filtered._update(values) > 0
+        if not updated:
+            raise psycopg.DatabaseError(
+                f"update() of {self.__class__.__name__} affected no rows -- the "
+                "row no longer exists (it may have been deleted)."
+            )
 
     def _prepare_related_fields_for_save(
-        self, operation_name: str, fields: Sequence[Any] | None = None
+        self, operation_name: str, field_names: Collection[str] | None = None
     ) -> None:
         # Ensure that a model instance without a PK hasn't been assigned to
         # a ForeignKeyField on this model. If the field is nullable, allowing the save would result in silent data loss.
         for field in self._model_meta.concrete_fields:
-            if fields and field not in fields:
+            if field_names and field.name not in field_names:
                 continue
             # If the related field isn't cached, then an instance hasn't been
             # assigned and there's no need to worry about this check.
@@ -575,9 +538,6 @@ class Model(metaclass=ModelBase):
                 # constraints aren't supported by the database, there's the
                 # unavoidable risk of data corruption.
                 if obj.id is None:
-                    # Remove the object from a related instance cache.
-                    if not field.remote_field.multiple:
-                        field.remote_field.delete_cached_value(obj)
                     raise ValueError(
                         f"{operation_name}() prohibited to prevent data loss due to unsaved "
                         f"related object '{field.name}'."
@@ -586,10 +546,10 @@ class Model(metaclass=ModelBase):
                     # Set related object if it has been saved after an
                     # assignment.
                     setattr(self, field.name, obj)
-                # If the relationship's pk/to_field was changed, clear the
-                # cached relationship. Compare the cached object's key against
-                # the raw key value -- not getattr(self, field.name), which
-                # for a foreign key returns the related object, not the key.
+                # If the relationship's key was changed, clear the cached
+                # relationship. Compare the cached object's key against the raw
+                # key value -- not getattr(self, field.name), which for a
+                # foreign key returns the related object, not the key.
                 if getattr(obj, field.target_field.name) != field.value_from_object(
                     self
                 ):
@@ -619,6 +579,11 @@ class Model(metaclass=ModelBase):
         id_field = self._model_meta.get_forward_field("id")
         assert id_field.name is not None
         setattr(self, id_field.name, None)
+        # Only the id is cleared -- every other field value survives so callers
+        # can still reference a deleted row (correlate it, log it, check it's
+        # gone). The row is "new" again: create() re-inserts it (re-inserting the
+        # instance's current values, server-defaults included), update() refuses.
+        self._state.adding = True
         return count
 
     def get_field_display(self, field_name: str) -> str:
@@ -654,7 +619,7 @@ class Model(metaclass=ModelBase):
             raise ValueError(
                 f"Unsaved model instance {self!r} cannot be used in an ORM query."
             )
-        return getattr(self, field.remote_field.get_related_field().name)
+        return getattr(self, field.target_field.name)
 
     def clean(self) -> None:
         """
@@ -665,137 +630,28 @@ class Model(metaclass=ModelBase):
         """
         pass
 
-    def validate_unique(self, exclude: set[str] | None = None) -> None:
-        """
-        Check unique constraints on the model and raise ValidationError if any
-        failed.
-        """
-        unique_checks = self._get_unique_checks(exclude=exclude)
-
-        if errors := self._perform_unique_checks(unique_checks):
-            raise ValidationError(errors)
-
-    def _get_unique_checks(
-        self, exclude: set[str] | None = None
-    ) -> list[tuple[type[Model], tuple[str, ...]]]:
-        """
-        Return a list of checks to perform. Since validate_unique() could be
-        called from a ModelForm, some fields may have been excluded; we can't
-        perform a unique check on a model that is missing fields involved
-        in that check. Fields that did not validate should also be excluded,
-        but they need to be passed in via the exclude argument.
-        """
-        if exclude is None:
-            exclude = set()
-        unique_checks = []
-
-        # Gather a list of checks for fields declared as unique and add them to
-        # the list of checks.
-
-        fields_with_class = [(self.__class__, self._model_meta.local_fields)]
-
-        for model_class, fields in fields_with_class:
-            for f in fields:
-                name = f.name
-                if name in exclude:
-                    continue
-                if f.primary_key:
-                    unique_checks.append((model_class, (name,)))
-
-        return unique_checks
-
-    def _perform_unique_checks(
-        self, unique_checks: list[tuple[type[Model], tuple[str, ...]]]
-    ) -> dict[str, list[ValidationError]]:
-        errors = {}
-
-        for model_class, unique_check in unique_checks:
-            # Try to look up an existing object with the same values as this
-            # object's values for all the unique field.
-
-            lookup_kwargs = {}
-            for field_name in unique_check:
-                f = self._model_meta.get_forward_field(field_name)
-                lookup_value = f.value_from_object(self)
-                if lookup_value is None:
-                    # no value, skip the lookup
-                    continue
-                if f.primary_key and not self._state.adding:
-                    # no need to check for unique primary key when editing
-                    continue
-                lookup_kwargs[str(field_name)] = lookup_value
-
-            # some fields were skipped, no reason to do the check
-            if len(unique_check) != len(lookup_kwargs):
-                continue
-
-            qs = model_class.query.filter(**lookup_kwargs)
-
-            # Exclude the current object from the query if we are editing an
-            # instance (as opposed to creating a new one).
-            model_class_id = getattr(self, "id")
-            if not self._state.adding and model_class_id is not None:
-                qs = qs.exclude(id=model_class_id)
-            if qs.exists():
-                if len(unique_check) == 1:
-                    key = unique_check[0]
-                else:
-                    key = NON_FIELD_ERRORS
-                errors.setdefault(key, []).append(
-                    self.unique_error_message(model_class, unique_check)
-                )
-
-        return errors
-
-    def unique_error_message(
-        self, model_class: type[Model], unique_check: tuple[str, ...]
-    ) -> ValidationError:
-        meta = model_class._model_meta
-
-        params = {
-            "model": self,
-            "model_class": model_class,
-            "model_name": model_class.model_options.model_name,
-            "unique_check": unique_check,
-        }
-
-        if len(unique_check) == 1:
-            field = meta.get_forward_field(unique_check[0])
-            params["field_label"] = field.name  # ty: ignore[invalid-assignment]
-            return ValidationError(
-                message=field.unique_error_message,
-                code="unique",
-                params=params,
-            )
-        else:
-            field_names = [meta.get_forward_field(f).name for f in unique_check]
-
-            # Put an "and" before the last one
-            field_names[-1] = f"and {field_names[-1]}"
-
-            if len(field_names) > 2:
-                # Comma join if more than 2
-                params["field_label"] = ", ".join(cast(list[str], field_names))
-            else:
-                # Just a space if there are only 2
-                params["field_label"] = " ".join(cast(list[str], field_names))
-
-            # Use the first field as the message format...
-            message = meta.get_forward_field(unique_check[0]).unique_error_message
-
-            return ValidationError(
-                message=message,
-                code="unique",
-                params=params,
-            )
-
     def get_constraints(self) -> list[tuple[type[Model], list[Any]]]:
         constraints: list[tuple[type[Model], list[Any]]] = [
             (self.__class__, list(self.model_options.constraints))
         ]
         return constraints
 
+    def _unresolved_field_names(self) -> set[str]:
+        """Field names whose Python value isn't resolved yet -- either a
+        DATABASE_DEFAULT sentinel (the database fills it on INSERT) or an
+        auto_fills_on_save field (pre_save fills it just before the write).
+        Neither shape validation nor a constraint lookup can use such a value,
+        so both exclude these. Read via __dict__ to avoid triggering
+        refresh_from_db on deferred fields."""
+        names = set()
+        for f in self._model_meta.fields:
+            if self.__dict__.get(f.name) is DATABASE_DEFAULT or f.auto_fills_on_save:
+                names.add(f.name)
+        return names
+
     def validate_constraints(self, exclude: set[str] | None = None) -> None:
+        exclude = set(exclude) if exclude else set()
+        exclude |= self._unresolved_field_names()
         constraints = self.get_constraints()
 
         errors: dict[str, list[ValidationError]] = {}
@@ -812,66 +668,31 @@ class Model(metaclass=ModelBase):
         self,
         *,
         exclude: set[str] | Iterable[str] | None = None,
-        validate_unique: bool = True,
-        validate_constraints: bool = True,
     ) -> None:
         """
-        Call clean_fields(), clean(), validate_unique(), and
-        validate_constraints() on the model. Raise a ValidationError for any
-        errors that occur.
+        Validate the instance's *shape*: clean_fields() + the clean() hook.
+        Raise a ValidationError aggregating any field- or model-level errors.
+
+        Constraint checks are deliberately separate -- call
+        validate_constraints() for those. create()/update() leave them to the
+        database (mapping the resulting IntegrityError to the same
+        ValidationError a pre-check would raise); forms call
+        validate_constraints() in _post_clean to surface every violation at once.
         """
         errors = {}
-        if exclude is None:
-            exclude = set()
-        else:
-            exclude = set(exclude)
-
-        # Fields holding the DATABASE_DEFAULT sentinel will be produced by
-        # the database on INSERT — there's no Python value to clean,
-        # uniqueness-check, or feed into a constraint lookup. Exclude them
-        # from every validation step until the value is populated. Read via
-        # __dict__ to avoid triggering refresh_from_db on deferred fields.
-        # Also exclude fields that pre_save fills in (e.g. update_now) —
-        # the value isn't present yet but will be before the INSERT/UPDATE.
-        for f in self._model_meta.fields:
-            if f.name in exclude:
-                continue
-            if self.__dict__.get(f.name) is DATABASE_DEFAULT:
-                exclude.add(f.name)
-            elif f.auto_fills_on_save:
-                exclude.add(f.name)
+        exclude = set(exclude) if exclude else set()
+        exclude |= self._unresolved_field_names()
 
         try:
             self.clean_fields(exclude=exclude)
         except ValidationError as e:
             errors = e.update_error_dict(errors)
 
-        # Form.clean() is run even if other validation fails, so do the
-        # same with Model.clean() for consistency.
+        # clean() runs even if clean_fields() failed, mirroring Form.clean().
         try:
             self.clean()
         except ValidationError as e:
             errors = e.update_error_dict(errors)
-
-        # Run unique checks, but only for fields that passed validation.
-        if validate_unique:
-            for name in errors:
-                if name != NON_FIELD_ERRORS and name not in exclude:
-                    exclude.add(name)
-            try:
-                self.validate_unique(exclude=exclude)
-            except ValidationError as e:
-                errors = e.update_error_dict(errors)
-
-        # Run constraints checks, but only for fields that passed validation.
-        if validate_constraints:
-            for name in errors:
-                if name != NON_FIELD_ERRORS and name not in exclude:
-                    exclude.add(name)
-            try:
-                self.validate_constraints(exclude=exclude)
-            except ValidationError as e:
-                errors = e.update_error_dict(errors)
 
         if errors:
             raise ValidationError(errors)

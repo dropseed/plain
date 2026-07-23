@@ -33,12 +33,11 @@ from plain.postgres.fields import (
     PrimaryKeyField,
 )
 from plain.postgres.functions import Cast
-from plain.postgres.query_utils import FilteredRelation, Q
+from plain.postgres.query_utils import Q
 from plain.postgres.sql import (
     AND,
     CURSOR,
     OR,
-    XOR,
     DeleteQuery,
     InsertQuery,
     Query,
@@ -49,7 +48,7 @@ from plain.postgres.utils import resolve_callables
 from plain.utils.functional import partition
 
 # Re-exports for public API
-__all__ = ["F", "Q", "QuerySet", "RawQuerySet", "Prefetch", "FilteredRelation"]
+__all__ = ["F", "Q", "QuerySet", "RawQuerySet", "Prefetch"]
 
 if TYPE_CHECKING:
     from plain.postgres import Model
@@ -194,9 +193,7 @@ class ValuesIterable(BaseIterable):
         query = queryset.sql_query
         compiler = query.get_compiler()
 
-        # extra(select=...) cols are always at the start of the row.
         names = [
-            *query.extra_select,
             *query.values_select,
             *query.annotation_select,
         ]
@@ -217,9 +214,7 @@ class ValuesListIterable(BaseIterable):
         compiler = query.get_compiler()
 
         if queryset._fields:
-            # extra(select=...) cols are always at the start of the row.
             names = [
-                *query.extra_select,
                 *query.values_select,
                 *query.annotation_select,
             ]
@@ -284,7 +279,6 @@ class QuerySet[T: "Model"]:
     _query: Query
     _result_cache: list[T] | None
     _sticky_filter: bool
-    _for_write: bool
     _prefetch_related_lookups: tuple[Any, ...]
     _prefetch_done: bool
     _known_related_objects: dict[Any, dict[Any, Any]]
@@ -305,7 +299,6 @@ class QuerySet[T: "Model"]:
         instance._query = query or Query(model)
         instance._result_cache = None
         instance._sticky_filter = False
-        instance._for_write = False
         instance._prefetch_related_lookups = ()
         instance._prefetch_done = False
         instance._known_related_objects = {}
@@ -425,38 +418,47 @@ class QuerySet[T: "Model"]:
     def __getitem__(self, k: int) -> T: ...
 
     @overload
-    def __getitem__(self, k: slice) -> QuerySet[T] | list[T]: ...
+    def __getitem__(self, k: slice) -> QuerySet[T]: ...
 
-    def __getitem__(self, k: int | slice) -> T | QuerySet[T] | list[T]:
-        """Retrieve an item or slice from the set of results."""
+    def __getitem__(self, k: int | slice) -> T | QuerySet[T]:
+        """Retrieve an item or slice from the set of results.
+
+        Slicing always returns a QuerySet, even when the results are
+        already cached. The returned QuerySet behaves exactly like one
+        sliced before evaluation — same allowed operations — except it
+        carries the sliced cache so iterating it won't re-query. The slice
+        is also applied as SQL limits, so any operation that re-chains the
+        QuerySet drops the cache and re-queries the correct rows.
+
+        Negative indexing and step slicing both raise.
+        """
         if not isinstance(k, int | slice):
             raise TypeError(
                 f"QuerySet indices must be integers or slices, not {type(k).__name__}."
             )
-        if (isinstance(k, int) and k < 0) or (
-            isinstance(k, slice)
-            and (
-                (k.start is not None and k.start < 0)
-                or (k.stop is not None and k.stop < 0)
-            )
-        ):
-            raise ValueError("Negative indexing is not supported.")
-
-        if self._result_cache is not None:
-            return self._result_cache[k]
 
         if isinstance(k, slice):
+            if (k.start is not None and k.start < 0) or (
+                k.stop is not None and k.stop < 0
+            ):
+                raise ValueError("Negative indexing is not supported.")
+            if k.step is not None:
+                raise ValueError("Step slicing is not supported.")
             qs = self._chain()
-            if k.start is not None:
-                start = int(k.start)
-            else:
-                start = None
-            if k.stop is not None:
-                stop = int(k.stop)
-            else:
-                stop = None
+            start = int(k.start) if k.start is not None else None
+            stop = int(k.stop) if k.stop is not None else None
             qs.sql_query.set_limits(start, stop)
-            return list(qs)[:: k.step] if k.step else qs
+            if self._result_cache is not None:
+                # Carry the sliced cache so the new QuerySet won't re-query on
+                # iteration. The SQL limits above keep it correct if it's later
+                # re-chained, which drops the cache.
+                self._attach_result_cache(qs, self._result_cache[k])
+            return qs
+
+        if k < 0:
+            raise ValueError("Negative indexing is not supported.")
+        if self._result_cache is not None:
+            return self._result_cache[k]
 
         qs = self._chain()
         qs.sql_query.set_limits(k, k + 1)
@@ -496,26 +498,6 @@ class QuerySet[T: "Model"]:
                 id__in=other.values("id")
             )
         combined.sql_query.combine(other.sql_query, OR)
-        return combined
-
-    def __xor__(self, other: QuerySet[T]) -> QuerySet[T]:
-        self._merge_sanity_check(other)
-        if isinstance(self, EmptyQuerySet):
-            return other
-        if isinstance(other, EmptyQuerySet):
-            return self
-        query = (
-            self
-            if self.sql_query.can_filter()
-            else self.model._model_meta.base_queryset.filter(id__in=self.values("id"))
-        )
-        combined = query._chain()
-        combined._merge_known_related_objects(other)
-        if not other.sql_query.can_filter():
-            other = other.model._model_meta.base_queryset.filter(
-                id__in=other.values("id")
-            )
-        combined.sql_query.combine(other.sql_query, XOR)
         return combined
 
     ####################################
@@ -632,23 +614,14 @@ class QuerySet[T: "Model"]:
         and returning the created object.
         """
         obj = self.model(**kwargs)
-        self._for_write = True
-        obj.save(force_insert=True)
+        obj.create()
         return obj
 
     def _prepare_for_bulk_create(self, objs: list[T]) -> None:
-        from plain.postgres.fields.base import DefaultableField
-
-        id_field = self.model._model_meta.get_forward_field("id")
-        has_id_default = (
-            isinstance(id_field, DefaultableField) and id_field.has_default()
-        )
+        # The identity PK is the only PK type, so there's no literal Python
+        # default to materialize -- obj.id stays None and the INSERT takes the
+        # DB's DEFAULT path.
         for obj in objs:
-            if obj.id is None and has_id_default:
-                # User-declared literal default on the PK — materialize it
-                # so the INSERT carries a Python value. Identity PKs take the
-                # DB's DEFAULT path and leave obj.id as None.
-                obj.id = id_field.get_default()
             obj._prepare_related_fields_for_save(operation_name="bulk_create")
 
     def _check_bulk_create_options(
@@ -730,7 +703,6 @@ class QuerySet[T: "Model"]:
             update_fields_objs,
             unique_fields_objs,
         )
-        self._for_write = True
         fields = meta.concrete_fields
         self._prepare_for_bulk_create(objs)
         with transaction.atomic(savepoint=False):
@@ -798,11 +770,10 @@ class QuerySet[T: "Model"]:
             return 0
         for obj in objs_tuple:
             obj._prepare_related_fields_for_save(
-                operation_name="bulk_update", fields=fields_list
+                operation_name="bulk_update", field_names=fields
             )
         # PK is used twice in the resulting update query, once in the filter
         # and once in the WHEN. Each field will also have one CAST.
-        self._for_write = True
         max_batch_size = len(objs_tuple)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
         batches = (
@@ -822,6 +793,7 @@ class QuerySet[T: "Model"]:
                 case_statement = Case(*when_statements, output_field=field)
                 # PostgreSQL requires casted CASE in updates
                 case_statement = Cast(case_statement, output_field=field)
+                assert field.name is not None
                 update_kwargs[field.name] = case_statement
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
@@ -841,7 +813,6 @@ class QuerySet[T: "Model"]:
         """
         # The get() needs to be targeted at the write database in order
         # to avoid potential transaction consistency problems.
-        self._for_write = True
         try:
             return self.get(**kwargs), False
         except self.model.DoesNotExist:
@@ -883,7 +854,6 @@ class QuerySet[T: "Model"]:
             update_defaults = create_defaults = defaults or {}
         else:
             update_defaults = defaults or {}
-        self._for_write = True
         with transaction.atomic():
             # Lock the row so that a concurrent update is blocked until
             # update_or_create() has performed its save.
@@ -908,9 +878,9 @@ class QuerySet[T: "Model"]:
                         field.primary_key or field.__class__.pre_save is Field.pre_save
                     ):
                         update_fields.add(field.name)
-                obj.save(update_fields=update_fields)
+                obj.update(fields=update_fields)
             else:
-                obj.save()
+                obj.update()
         return obj, False
 
     def _extract_model_params(
@@ -969,7 +939,6 @@ class QuerySet[T: "Model"]:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
         del_query = self._chain()
-        del_query._for_write = True
         del_query.sql_query.select_for_update = False
         del_query.sql_query.select_related = False
         del_query.sql_query.clear_ordering(force=True)
@@ -1004,7 +973,6 @@ class QuerySet[T: "Model"]:
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
-        self._for_write = True
         query = self.sql_query.chain(UpdateQuery)
         query.add_update_values(kwargs)
 
@@ -1152,9 +1120,8 @@ class QuerySet[T: "Model"]:
         """
         obj = self._chain()
         # Preserve cache since all() doesn't modify the query.
-        # This is important for prefetch_related() to work correctly.
-        obj._result_cache = self._result_cache
-        obj._prefetch_done = self._prefetch_done
+        if self._result_cache is not None:
+            self._attach_result_cache(obj, self._result_cache)
         return obj
 
     def filter(self, *args: Any, **kwargs: Any) -> Self:
@@ -1204,23 +1171,6 @@ class QuerySet[T: "Model"]:
         else:
             self._query.add_q(Q(*args, **kwargs))
 
-    def complex_filter(self, filter_obj: Q | dict[str, Any]) -> QuerySet[T]:
-        """
-        Return a new QuerySet instance with filter_obj added to the filters.
-
-        filter_obj can be a Q object or a dictionary of keyword lookup
-        arguments.
-
-        This exists to support framework features such as 'limit_choices_to',
-        and usually it will be more natural to use other methods.
-        """
-        if isinstance(filter_obj, Q):
-            clone = self._chain()
-            clone.sql_query.add_q(filter_obj)
-            return clone
-        else:
-            return self._filter_or_exclude(False, args=(), kwargs=filter_obj)
-
     def select_for_update(
         self,
         nowait: bool = False,
@@ -1235,7 +1185,6 @@ class QuerySet[T: "Model"]:
         if nowait and skip_locked:
             raise ValueError("The nowait option cannot be used with skip_locked.")
         obj = self._chain()
-        obj._for_write = True
         obj.sql_query.select_for_update = True
         obj.sql_query.select_for_update_nowait = nowait
         obj.sql_query.select_for_update_skip_locked = skip_locked
@@ -1279,18 +1228,6 @@ class QuerySet[T: "Model"]:
         if lookups == (None,):
             clone._prefetch_related_lookups = ()
         else:
-            for lookup in lookups:
-                lookup_str: str
-                if isinstance(lookup, Prefetch):
-                    lookup_str = lookup.prefetch_to
-                else:
-                    assert isinstance(lookup, str)
-                    lookup_str = lookup
-                lookup_str = lookup_str.split(LOOKUP_SEP, 1)[0]
-                if lookup_str in self.sql_query._filtered_relations:
-                    raise ValueError(
-                        "prefetch_related() is not supported with FilteredRelation."
-                    )
             clone._prefetch_related_lookups = clone._prefetch_related_lookups + lookups
         return clone
 
@@ -1299,17 +1236,6 @@ class QuerySet[T: "Model"]:
         Return a query set in which the returned objects have been annotated
         with extra data or aggregations.
         """
-        return self._annotate(args, kwargs, select=True)
-
-    def alias(self, *args: Any, **kwargs: Any) -> Self:
-        """
-        Return a query set with added aliases for extra data or aggregations.
-        """
-        return self._annotate(args, kwargs, select=False)
-
-    def _annotate(
-        self, args: tuple[Any, ...], kwargs: dict[str, Any], select: bool = True
-    ) -> Self:
         self._validate_values_are_expressions(
             args + tuple(kwargs.values()), method_name="annotate"
         )
@@ -1337,14 +1263,7 @@ class QuerySet[T: "Model"]:
                 raise ValueError(
                     f"The annotation '{alias}' conflicts with a field on the model."
                 )
-            if isinstance(annotation, FilteredRelation):
-                clone.sql_query.add_filtered_relation(annotation, alias)
-            else:
-                clone.sql_query.add_annotation(
-                    annotation,
-                    alias,
-                    select=select,
-                )
+            clone.sql_query.add_annotation(annotation, alias)
         for alias, annotation in clone.sql_query.annotations.items():
             if alias in annotations and annotation.contains_aggregate:
                 if clone._fields is None:
@@ -1375,29 +1294,6 @@ class QuerySet[T: "Model"]:
         obj = self._chain()
         obj.sql_query.add_distinct_fields(*field_names)
         return obj
-
-    def extra(
-        self,
-        select: dict[str, str] | None = None,
-        where: list[str] | None = None,
-        params: list[Any] | None = None,
-        tables: list[str] | None = None,
-        order_by: list[str] | None = None,
-        select_params: list[Any] | None = None,
-    ) -> QuerySet[T]:
-        """Add extra SQL fragments to the query."""
-        if self.sql_query.is_sliced:
-            raise TypeError("Cannot change a query once a slice has been taken.")
-        clone = self._chain()
-        clone.sql_query.add_extra(
-            select or {},
-            select_params,
-            where or [],
-            params or [],
-            tables or [],
-            tuple(order_by) if order_by else (),
-        )
-        return clone
 
     def reverse(self) -> QuerySet[T]:
         """Reverse the ordering of the QuerySet."""
@@ -1435,10 +1331,6 @@ class QuerySet[T: "Model"]:
             # Can only pass None to defer(), not only(), as the rest option.
             # That won't stop people trying to do this, so let's be explicit.
             raise TypeError("Cannot pass None as an argument to only().")
-        for field in fields:
-            field = field.split(LOOKUP_SEP, 1)[0]
-            if field in self.sql_query._filtered_relations:
-                raise ValueError("only() is not supported with FilteredRelation.")
         clone = self._chain()
         clone.sql_query.add_immediate_loading(set(fields))
         return clone
@@ -1455,7 +1347,7 @@ class QuerySet[T: "Model"]:
         """
         if isinstance(self, EmptyQuerySet):
             return True
-        if self.sql_query.extra_order_by or self.sql_query.order_by:
+        if self.sql_query.order_by:
             return True
         elif (
             self.sql_query.default_ordering
@@ -1478,23 +1370,21 @@ class QuerySet[T: "Model"]:
         objs: list[T],
         fields: list[Field],
         returning_fields: list[Field] | None = None,
-        raw: bool = False,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
     ) -> list[tuple[Any, ...]] | None:
         """
         Insert a new record for the given model. This provides an interface to
-        the InsertQuery class and is how Model.save() is implemented.
+        the InsertQuery class and is how Model.create() is implemented.
         """
-        self._for_write = True
         query = InsertQuery(
             self.model,
             on_conflict=on_conflict if on_conflict else None,
             update_fields=update_fields,
             unique_fields=unique_fields,
         )
-        query.insert_values(fields, objs, raw=raw)
+        query.insert_values(fields, objs)
         # InsertQuery returns SQLInsertCompiler which has different execute_sql signature
         return query.get_compiler().execute_sql(returning_fields)
 
@@ -1553,12 +1443,22 @@ class QuerySet[T: "Model"]:
             query=self.sql_query.chain(),
         )
         c._sticky_filter = self._sticky_filter
-        c._for_write = self._for_write
         c._prefetch_related_lookups = self._prefetch_related_lookups[:]
         c._known_related_objects = self._known_related_objects
         c._iterable_class = self._iterable_class
         c._fields = self._fields
         return c
+
+    def _attach_result_cache(self, obj: Self, cache: list[T]) -> None:
+        """Carry a result cache onto a chained QuerySet.
+
+        Whenever a cache is moved onto a new QuerySet, the prefetch state
+        must ride along with it — otherwise prefetch_related() would re-run
+        (or be skipped). Keep both writes together here so callers can't
+        forget the pairing.
+        """
+        obj._result_cache = cache
+        obj._prefetch_done = self._prefetch_done
 
     def _fetch_all(self) -> None:
         if self._result_cache is None:
@@ -1584,7 +1484,6 @@ class QuerySet[T: "Model"]:
         """Check that two QuerySet classes may be merged."""
         if self._fields is not None and (
             set(self.sql_query.values_select) != set(other.sql_query.values_select)
-            or set(self.sql_query.extra_select) != set(other.sql_query.extra_select)
             or set(self.sql_query.annotation_select)
             != set(other.sql_query.annotation_select)
         ):
@@ -1740,6 +1639,9 @@ class RawQuerySet:
         return f"<{self.__class__.__name__}: {self.sql_query}>"
 
     def __getitem__(self, k: int | slice) -> Model | list[Model]:
+        # Unlike QuerySet, a RawQuerySet is always fully materialized — there's
+        # no lazy query to push a slice into — so indexing keeps plain list
+        # semantics: a slice returns a list (and step/negative slicing work).
         return list(self)[k]
 
     @cached_property

@@ -1,5 +1,25 @@
 # plain-loginlink changelog
 
+## [0.21.7](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.7) (2026-07-15)
+
+### What's changed
+
+- Already-logged-in users hitting the login pages are now redirected safely. The `next` query param is honored, but an empty or external `next` falls back to the default target instead of raising, and redirect handling across the login views is unified through one helper. ([1486c685ed](https://github.com/dropseed/plain/commit/1486c685ed))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.21.6](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.6) (2026-06-03)
+
+### What's changed
+
+- Added a test-only dev dependency group (`plain.pytest`, `plain.auth`) for new behavior regression tests. No runtime changes. ([891a0c1c41](https://github.com/dropseed/plain/commit/891a0c1c41))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.5](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.5) (2026-05-13)
 
 ### What's changed

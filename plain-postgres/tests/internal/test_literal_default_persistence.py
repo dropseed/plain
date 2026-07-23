@@ -99,7 +99,7 @@ def test_alter_field_default_only_change_is_migration_no_op(db):
     """Changing only ``default=`` on an already-NOT-NULL column emits nothing
     from the schema editor — ``default`` is in ``non_migration_attrs``, so the
     migration path short-circuits. Convergence's ``_compare_column_default``
-    detects CHANGED drift and applies ``SetColumnDefaultFix`` on the next sync
+    detects CHANGED drift and applies ``SetColumnDefaultCorrection`` on the next sync
     (covered by ``test_detects_changed_literal_default``)."""
     old_field = plain_fields.TextField(max_length=20, default="active")
     old_field.set_attributes_from_name("role")
@@ -148,11 +148,11 @@ def test_compile_literal_default_sql_handles_jsonfield():
 def test_special_char_string_default_round_trip(isolated_db):
     """Literal string defaults with quotes, newlines, and other typical
     non-ASCII punctuation must survive the round trip: compile → SET DEFAULT
-    → pg_get_expr → canonicalize the model side → compare. Otherwise every
+    → pg_get_expr → normalize the model side → compare. Otherwise every
     sync would flag CHANGED for safe-but-ugly inputs."""
     from conftest_convergence import column_default_sql, execute
 
-    from plain.postgres.convergence.analysis import _canonicalize_default_expr
+    from plain.postgres.convergence.analysis import _normalize_default_expr
     from plain.postgres.ddl import compile_literal_default_sql
 
     cases = [
@@ -178,12 +178,12 @@ def test_special_char_string_default_round_trip(isolated_db):
         assert actual_sql is not None
         connection = get_connection()
         with connection.cursor() as cursor:
-            canonical_expected = _canonicalize_default_expr(
+            normalized_expected = _normalize_default_expr(
                 cursor, DefaultsExample, "status", expected_sql
             )
-        assert canonical_expected == actual_sql, (
+        assert normalized_expected == actual_sql, (
             f"round-trip drift for default={value!r}: "
-            f"compiled={expected_sql!r} canonical={canonical_expected!r} "
+            f"compiled={expected_sql!r} normalized={normalized_expected!r} "
             f"catalog={actual_sql!r}"
         )
 

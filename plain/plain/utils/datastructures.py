@@ -124,15 +124,15 @@ class MultiValueDict(dict[str, list[Any]]):
             self.setlist(k, v)
         self.__dict__.update(obj_dict)
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: object, default: Any = None) -> Any:
         """
         Return the last data value for the passed key. If key doesn't exist
         or value is an empty list, return `default`.
         """
-        try:
-            val = self[key]
-        except KeyError:
+        list_ = super().get(key)
+        if not list_:
             return default
+        val = list_[-1]
         if val == []:
             return default
         return val

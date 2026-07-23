@@ -26,13 +26,13 @@ _MONTH_NAMES = {
     "DEC": 12,
 }
 _DAY_NAMES = {
-    "MON": 0,
-    "TUE": 1,
-    "WED": 2,
-    "THU": 3,
-    "FRI": 4,
-    "SAT": 5,
-    "SUN": 6,
+    "SUN": 0,
+    "MON": 1,
+    "TUE": 2,
+    "WED": 3,
+    "THU": 4,
+    "FRI": 5,
+    "SAT": 6,
 }
 
 
@@ -48,6 +48,16 @@ class _ScheduleComponent:
 
     def __eq__(self, other: Any) -> bool:
         return self.values == other.values
+
+    @property
+    def is_wildcard(self) -> bool:
+        """Whether this field contains a ``*``.
+
+        Cron's day-of-month/day-of-week OR rule treats a field as restricted
+        only when it has no ``*``, so a stepped wildcard like ``*/2`` counts as
+        unrestricted here too.
+        """
+        return "*" in str(self._raw)
 
     @classmethod
     def parse(
@@ -113,6 +123,7 @@ class Schedule:
         day_of_month: int | str = "*",
         month: int | str = "*",
         day_of_week: int | str = "*",
+        combine_days_with_or: bool = False,
         raw: str = "",
     ) -> None:
         self.minute = _ScheduleComponent.parse(minute, min_allowed=0, max_allowed=59)
@@ -126,12 +137,26 @@ class Schedule:
             max_allowed=12,
             str_conversions=_MONTH_NAMES,
         )
-        self.day_of_week = _ScheduleComponent.parse(
+        # Cron numbers weekdays Sunday=0..Saturday=6 and also accepts 7 as an
+        # alias for Sunday. Parse over 0..7, then fold 7 into 0 so the values
+        # line up with the cron weekday computed in next().
+        parsed_days = _ScheduleComponent.parse(
             day_of_week,
             min_allowed=0,
-            max_allowed=6,
+            max_allowed=7,
             str_conversions=_DAY_NAMES,
         )
+        self.day_of_week = _ScheduleComponent(
+            sorted({0 if value == 7 else value for value in parsed_days.values}),
+            raw=day_of_week,
+        )
+
+        # Standard cron runs a job when *either* the day-of-month or the
+        # day-of-week matches, but only when both fields are restricted. That
+        # quirk is faithful to cron strings; the keyword API keeps the more
+        # obvious AND semantics unless you opt in here.
+        self.combine_days_with_or = combine_days_with_or
+
         self._raw = raw
 
     def __str__(self) -> str:
@@ -165,6 +190,7 @@ class Schedule:
             day_of_month=day_of_month,
             month=month,
             day_of_week=day_of_week,
+            combine_days_with_or=True,
             raw=raw,
         )
 
@@ -189,12 +215,27 @@ class Schedule:
         # then the schedule is probably never going to match (i.e. Feb 31)
         max_future = dt + datetime.timedelta(days=500)
 
+        # Only combine the two day fields with OR when both are restricted.
+        # This doesn't depend on the candidate day, so decide it once up front.
+        use_or_for_days = (
+            self.combine_days_with_or
+            and not self.day_of_month.is_wildcard
+            and not self.day_of_week.is_wildcard
+        )
+
         while True:
-            is_valid_day = (
-                dt.month in self.month.values
-                and dt.day in self.day_of_month.values
-                and dt.weekday() in self.day_of_week.values
-            )
+            # Cron numbers weekdays Sunday=0..Saturday=6; Python's weekday() is
+            # Monday=0..Sunday=6, so shift it before comparing.
+            cron_weekday = (dt.weekday() + 1) % 7
+            day_of_month_matches = dt.day in self.day_of_month.values
+            day_of_week_matches = cron_weekday in self.day_of_week.values
+
+            if use_or_for_days:
+                day_matches = day_of_month_matches or day_of_week_matches
+            else:
+                day_matches = day_of_month_matches and day_of_week_matches
+
+            is_valid_day = dt.month in self.month.values and day_matches
             if is_valid_day:
                 # We're on a valid day, now find the next valid hour and minute
                 for hour in self.hour.values:

@@ -5,6 +5,7 @@ from typing import Any
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
+from plain.postgres import QuerySet
 from plain.templates.views import (
     CreateView,
     DeleteView,
@@ -23,12 +24,15 @@ class TaskListView(AuthView, ListView):
     template_name = "tasks/list.html"
     context_object_name = "tasks"
     login_required = True
+    page_size = 20
 
-    def get_objects(self) -> list[Task]:
-        return list(
+    def get_objects(self) -> QuerySet[Task]:
+        # Ordering comes from Task.model_options (is_complete, -created_at),
+        # so pagination is deterministic.
+        return (
             Task.query.filter(owner=self.user)
             .select_related("project")
-            .prefetch_related("tags")[:100]
+            .prefetch_related("tags")
         )
 
 
@@ -57,7 +61,7 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
         form = TaskTitleForm(request=self.request)
         if form.is_valid():
             self.object.title = form.cleaned_data["title"]
-            self.object.save()
+            self.object.update()
 
 
 class TaskCreateView(AuthView, CreateView):

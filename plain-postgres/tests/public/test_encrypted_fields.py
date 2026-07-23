@@ -65,7 +65,7 @@ class TestEncryptedTextField:
     def test_update(self, db):
         obj = SecretStore.query.create(name="test", api_key="sk-old")
         obj.api_key = "sk-new"
-        obj.save()
+        obj.update()
         obj.refresh_from_db()
         assert obj.api_key == "sk-new"
 

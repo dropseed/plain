@@ -27,6 +27,5 @@ echo "${BOLD}Running tests${NORMAL}"
 
 echo ""
 echo "${BOLD}Running preflight in example${NORMAL}"
-source scripts/start-postgres plain_example
-PGPASSWORD=postgres createdb -h localhost -U postgres plain_example 2>/dev/null || true
+source scripts/start-postgres
 cd example && uv run plain preflight

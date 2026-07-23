@@ -1,5 +1,123 @@
 # plain changelog
 
+## [0.154.0](https://github.com/dropseed/plain/releases/plain@0.154.0) (2026-07-22)
+
+### What's changed
+
+- New `PLAIN_CACHE_PATH` export from `plain.runtime` — a machine-level cache directory shared across projects and checkouts, intended for downloaded binaries and other reusable artifacts. Like `APP_PATH` and `PLAIN_TEMP_PATH`, it's available without calling `setup()`. It defaults to `$XDG_CACHE_HOME/plain` (or `~/.cache/plain`) and can be overridden with the `PLAIN_CACHE_PATH` environment variable. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The runtime docs now spell out the split between the two paths: `PLAIN_TEMP_PATH` (`.plain`) is disposable per-checkout state and should never be shared or symlinked between checkouts, while `PLAIN_CACHE_PATH` is shared machine-wide. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.153.0](https://github.com/dropseed/plain/releases/plain@0.153.0) (2026-07-21)
+
+### What's changed
+
+- `plain request` trace output has been reworked to report rather than diagnose. The automatic N+1/issue detection is gone — every distinct statement is now listed with its execution count, total duration (slowest first), and the call sites that issued it, leaving the judgment about what's a problem to the reader. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- A followed redirect chain now produces one trace block per request hop (labeled with method, path, and query string) instead of a single merged summary that could double-count once-per-request queries. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- New `--trace` flag for `plain request` shows the full detail in text output: the complete uncapped query list plus an indented span tree. Without it, the summary caps the query list but always keeps repeated statements visible. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- Transaction-control statements (savepoint bookkeeping, etc.) are now counted separately from queries instead of cluttering the query list. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- A request that raises now still reports its captured trace — in text output the Trace section renders before exiting, and in `--json` the command emits `{"error": ..., "traces": [...]}` on stdout with exit code 1, with `analysis.exceptions` carrying the stacktrace. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- The `--json` shape changed: the `trace` object is now `traces`, a list with one entry per request, each carrying `name`, `request_id` (matching `response.request_id` for the hop that rendered), `analysis`, and `spans`. `analysis.issues` and `analysis.duplicate_query_count` were replaced by `analysis.exceptions` and `analysis.transaction_count`, and a `trace_note` key explains a missing or empty `traces`. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- `plain request` is now documented in the CLI README, and piping its output (`| head`) no longer produces a BrokenPipeError traceback. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+
+### Upgrade instructions
+
+- If you have scripts or agents parsing `plain request --json` output: read `traces` (a list, one entry per request) instead of `trace`, use `analysis.exceptions` instead of filtering `analysis.issues`, and detect repeats yourself via each query's `count` instead of `analysis.duplicate_query_count`. Check `trace_note` before indexing into `traces`, and note that a failed request now exits 1 with `{"error", "traces"}` and no `response` key.
+
+## [0.152.0](https://github.com/dropseed/plain/releases/plain@0.152.0) (2026-07-15)
+
+### What's changed
+
+- **`plain run` has been removed.** One-off code now runs through `plain shell` — either `plain shell -c "..."` or piped stdin (`cat script.py | plain shell`) — which executes it as the `__main__` module with clean, `python -c`–style tracebacks. For a standalone script file, call `plain.runtime.setup()` yourself at the top of the script and run it with `python`. The interactive REPL enrichment (banner, `SHELL_IMPORT`) continues to apply only to interactive sessions. ([7e55115d82](https://github.com/dropseed/plain/commit/7e55115d82))
+- Worker shutdown now drains in-flight connections gracefully instead of cutting them off. HTTP/1 keep-alive connections stop accepting new keep-alive requests once shutdown begins (responding `Connection: close`) across every shutdown path, and HTTP/2 connections drain by refusing new streams with `REFUSED_STREAM` (safe for clients to retry), letting dispatched streams finish, then closing with `GOAWAY`. ([b7187f56fb](https://github.com/dropseed/plain/commit/b7187f56fb), [5ebd413253](https://github.com/dropseed/plain/commit/5ebd413253))
+- The worker drain now shares one monotonic clock with the arbiter and caps itself against the arbiter's published SIGKILL deadline, so teardown reliably finishes before the process is force-killed. Connection teardown (GOAWAY flush, TLS `close_notify`, transport close) is fully time-bounded, so a slow or unresponsive peer can't stall shutdown. ([0a0ddb0ac6](https://github.com/dropseed/plain/commit/0a0ddb0ac6), [c0b7ce91e3](https://github.com/dropseed/plain/commit/c0b7ce91e3), [67520992e0](https://github.com/dropseed/plain/commit/67520992e0), [8efdc43c3a](https://github.com/dropseed/plain/commit/8efdc43c3a))
+- Connections aborted mid-TLS-handshake (port scans, load-balancer health checks) are now logged at debug instead of surfacing as errors with tracebacks. ([5a14c74223](https://github.com/dropseed/plain/commit/5a14c74223))
+- Removed a false-positive "Server stopped serving unexpectedly" error that the worker heartbeat could log during normal shutdown. ([c90350fdad](https://github.com/dropseed/plain/commit/c90350fdad))
+
+### Upgrade instructions
+
+- Replace any `plain run script.py` usage. For a quick one-off, pipe it into `plain shell` (`plain shell -c "..."` or `cat script.py | plain shell`). For a script file you keep, add `import plain.runtime; plain.runtime.setup()` at the top and run it with `python script.py`, or register it as a CLI command.
+
+## [0.151.2](https://github.com/dropseed/plain/releases/plain@0.151.2) (2026-07-10)
+
+### What's changed
+
+- Fixed the `plain preflight` summary counting a check as a warning when all of its issues were silenced — a fully-silenced check now counts as neither a warning nor an error. The CLI summary and the cached check counts (used by `plain check`) now share the same tally logic, so the two can no longer disagree. ([abe4ffcae7](https://github.com/dropseed/plain/commit/abe4ffcae7))
+- The shipped agents rule for OTel instrumentation now documents the quieter worker tracing behavior from plain-jobs 0.56.1 (idle ticks emit no spans; claim/heartbeat failures get one-off error spans). ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.151.1](https://github.com/dropseed/plain/releases/plain@0.151.1) (2026-06-26)
+
+### What's changed
+
+- `plain check` now surfaces preflight warnings instead of hiding them: a passing run shows a warning count (e.g. duplicate indexes) and a failing run prints preflight's full report. ([8f0b014276](https://github.com/dropseed/plain/commit/8f0b014276))
+- Removed the `plain.esbuild` entry from the package list in the docs now that the package is retired. ([c6b3c7efc9](https://github.com/dropseed/plain/commit/c6b3c7efc9))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.151.0](https://github.com/dropseed/plain/releases/plain@0.151.0) (2026-06-22)
+
+### What's changed
+
+- `patch_cache_control()` now takes explicit keyword-only directives instead of `**kwargs`, covering the full standard set (`max_age`, `s_maxage`, `stale_while_revalidate`, `stale_if_error`, `no_cache`, `no_store`, `no_transform`, `must_revalidate`, `proxy_revalidate`, `must_understand`, `public`, `private`, `immutable`). Unknown directive names now raise `TypeError` instead of being silently emitted, and `max_age` is coerced to an `int`. ([b100fa67](https://github.com/dropseed/plain/commit/b100fa67))
+- `plain request` now handles streaming/file responses (such as assets) instead of failing on their unreadable body — it summarizes them from the `Content-Type`/`Content-Length` headers, and a `--contains`/`--not-contains` check against a streaming response is reported as a failure rather than silently passing. ([f1860e1d](https://github.com/dropseed/plain/commit/f1860e1d))
+- Removed the dead `_to_tuple()` cache helper. ([3a54e8aa](https://github.com/dropseed/plain/commit/3a54e8aa))
+
+### Upgrade instructions
+
+- If you call `patch_cache_control()` with non-standard directive names, set those headers another way — the standard directives are unchanged (e.g. `patch_cache_control(response, max_age=60, no_cache=True)`). Otherwise no changes required.
+
+## [0.150.0](https://github.com/dropseed/plain/releases/plain@0.150.0) (2026-06-09)
+
+### What's changed
+
+- `PREFLIGHT_SILENCED_RESULTS` now accepts obj-qualified entries in the form `"<id>:<obj>"`, silencing a result for one specific object while the same result ID keeps warning everywhere else. For example, `"postgres.missing_fk_index:app.InsightEvent.sender_account"` silences the missing-FK-index warning for that one field only. The object label is whatever appears before the result ID in the preflight output. ([efd02c5ee2](https://github.com/dropseed/plain/commit/efd02c5ee2))
+- A new `preflight.unused_silences` check runs last on full preflight runs (`plain preflight --deploy`) and warns about `PREFLIGHT_SILENCED_RESULTS` entries that matched nothing — an unused entry is either a typo or stale (the issue it silenced has been fixed). It can be silenced via `PREFLIGHT_SILENCED_CHECKS` like any other check, and the matching logic is available as `plain.preflight.unused_silenced_results()`. ([f5863c70be](https://github.com/dropseed/plain/commit/f5863c70be))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.149.1](https://github.com/dropseed/plain/releases/plain@0.149.1) (2026-06-08)
+
+### What's changed
+
+- Internal: typing-only changes for the `ty` 0.0.45 upgrade. `@deconstructible` gains explicit `@overload` signatures so it type-checks correctly whether applied bare (`@deconstructible`) or with arguments (`@deconstructible(path=...)`), `Worker`'s `sockets` parameter widens from `list` to `Sequence`, and a few `ty: ignore` comments were added or removed to match. No runtime behavior changes. ([95f54e880d](https://github.com/dropseed/plain/commit/95f54e880d))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.149.0](https://github.com/dropseed/plain/releases/plain@0.149.0) (2026-06-07)
+
+### What's changed
+
+- **`JsonResponse` no longer accepts a `safe` argument.** Previously it defaulted to `safe=True` and raised `TypeError` unless `data` was a `dict`; you passed `safe=False` to serialize a list or any other non-dict value. The dict-only guard and the parameter are both gone — `JsonResponse` now serializes any JSON-serializable value directly. ([52338f58da](https://github.com/dropseed/plain/commit/52338f58da))
+
+### Upgrade instructions
+
+- Drop `safe=` from `JsonResponse(...)` calls. If you passed `safe=False` to serialize a list (or any non-dict), just remove the argument — the value now serializes as-is. `safe=True` was the default and is likewise gone.
+
+## [0.148.1](https://github.com/dropseed/plain/releases/plain@0.148.1) (2026-06-03)
+
+### What's changed
+
+- **`plain.observer` has been retired.** Its references are removed from core: the package listing, the `plain docs` known-packages list, and the internal request-span plumbing that passed cookies/headers to the observer sampler. ([1bab9f784a](https://github.com/dropseed/plain/commit/1bab9f784a))
+- The `plain-upgrade` skill now summarizes what changed in each release, not just the upgrade steps. ([bfdfb9a45a](https://github.com/dropseed/plain/commit/bfdfb9a45a))
+- Docs: model write examples updated to `create()`/`update()`. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- No changes required. If you used `plain.observer`, switch to `plain.connect` for production telemetry export and `plain.pytest`/`plain.connect` for the OpenTelemetry SDK — observer is no longer published.
+
 ## [0.148.0](https://github.com/dropseed/plain/releases/plain@0.148.0) (2026-05-22)
 
 ### What's changed
@@ -101,7 +219,7 @@
 
 ### Upgrade instructions
 
-- **Replace `path(re.compile(...), ...)` with converter syntax.** The `<converter:name>` form (`<int:>`, `<str:>`, `<uuid:>`, `<path:>`, `<slug:>`) plus a custom `register_converter()` covers anything raw regex did. The `/plain-upgrade` skill rewrites the common cases.
+- **Replace `path(re.compile(...), ...)` with converter syntax.** The `<converter:name>` form (`<int:>`, `<str:>`, `<uuid:>`, `<path:>`, `<slug:>`) plus a custom `register_converter()` covers anything raw regex did.
 - **Drop `APPEND_SLASH` from `app/settings.py`** — it has no effect. Trailing-slash behavior is now decided per-route by whether `path("…/")` or `path("…")` is registered.
 - **Remove `RedirectSlashMiddleware` from `MIDDLEWARE`** if you had it.
 - **Update `request.get_full_path()` callers** to drop `force_append_slash=`. There was only one such caller in the framework itself (the deleted middleware).
@@ -131,7 +249,7 @@
         "plain.templates",
     ]
     ```
-- **Rewrite view imports**: anything that was `from plain.views import TemplateView` (or `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) is now `from plain.templates.views import ...`. The `/plain-upgrade` skill rewrites these automatically.
+- **Rewrite view imports**: anything that was `from plain.views import TemplateView` (or `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) is now `from plain.templates.views import ...`.
 - **Rewrite `from plain.templates import Template, register_template_*`** — the import path is unchanged, but you now need the `plain.templates` package installed for those imports to resolve at all.
 - **Drop any direct use of `request.path_info`** — replace with `request.path`. They've been equal in practice; there's no behavior change beyond the name.
 - **Custom subclasses of `Request`** that accepted a `path_info=` constructor kwarg must drop it.

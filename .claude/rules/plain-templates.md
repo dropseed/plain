@@ -14,4 +14,3 @@ paths:
 
 - Plain uses Jinja2, not Django's template engine. Most syntax is similar but custom filters differ.
 - CSRF is automatic (header-based via Sec-Fetch-Site) — no `{{ csrf_input }}` or `{% csrf_token %}`
-- Forms are headless — no `as_p()`, `as_table()`, or `as_elements()`. Validate at form/model level, not just in views.

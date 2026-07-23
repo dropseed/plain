@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 import copy
-import operator
 from collections.abc import Callable, Sequence
 from functools import cached_property, partial
 from typing import TYPE_CHECKING, Any, Self, cast
 
-from plain import exceptions
 from plain.postgres.constants import LOOKUP_SEP
-from plain.postgres.deletion import NO_ACTION, SET_NULL, OnDelete
-from plain.postgres.exceptions import FieldDoesNotExist, FieldError
+from plain.postgres.deletion import SET_NULL, OnDelete
+from plain.postgres.exceptions import FieldDoesNotExist
 from plain.postgres.query_utils import PathInfo
 from plain.postgres.utils import make_model_tuple
 from plain.preflight import PreflightResult
 
 from ..registry import models_registry
-from . import BLANK_CHOICE_DASH, Field
+from . import Field
 from .base import ColumnField
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
@@ -98,7 +96,6 @@ class RelatedField(FieldCacheMixin, Field):
 
     non_migration_attrs = (
         *Field.non_migration_attrs,
-        "limit_choices_to",
         "related_query_name",
     )
 
@@ -110,10 +107,9 @@ class RelatedField(FieldCacheMixin, Field):
     # here so RelatedField methods (deconstruct, related_query_name) can
     # reference them without isinstance-narrowing.
     _related_query_name: str | None
-    _limit_choices_to: Any
 
     # No __init__: ForeignKeyField and ManyToManyField each set
-    # _related_query_name, _limit_choices_to, and remote_field themselves.
+    # _related_query_name and remote_field themselves.
 
     def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
         # Handle remote_field deepcopy for RelatedFields
@@ -273,8 +269,6 @@ class RelatedField(FieldCacheMixin, Field):
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
-        if self._limit_choices_to:
-            kwargs["limit_choices_to"] = self._limit_choices_to
         if self._related_query_name is not None:
             kwargs["related_query_name"] = self._related_query_name
         return name, path, args, kwargs
@@ -283,45 +277,9 @@ class RelatedField(FieldCacheMixin, Field):
         self.name = self.name or (
             self.remote_field.model.model_options.model_name + "_" + "id"
         )
-        self.remote_field.set_field_name()
 
     def do_related_class(self, other: type[Model], cls: type[Model]) -> None:
         self.set_attributes_from_rel()
-
-    def get_limit_choices_to(self) -> Any:
-        """
-        Return ``limit_choices_to`` for this model field.
-
-        If it is a callable, it will be invoked and the result will be
-        returned.
-        """
-        if callable(self.remote_field.limit_choices_to):
-            return self.remote_field.limit_choices_to()  # ty: ignore[call-top-callable]
-        return self.remote_field.limit_choices_to
-
-    def get_choices(
-        self,
-        include_blank: bool = True,
-        blank_choice: list[tuple[str, str]] = BLANK_CHOICE_DASH,
-        limit_choices_to: Any = None,
-        ordering: tuple[str, ...] = (),
-    ) -> list[tuple[Any, str]]:
-        """Return choices from the related model, for use as <select> options."""
-        rel_model = self.remote_field.model
-        if rel_model is None:
-            return blank_choice if include_blank else []
-        limit_choices_to = limit_choices_to or self.get_limit_choices_to()
-        get_related_field = getattr(self.remote_field, "get_related_field", None)
-        related_field_name = (
-            get_related_field().name if get_related_field is not None else "id"
-        )
-        choice_func = operator.attrgetter(related_field_name)
-        qs = rel_model.query.complex_filter(limit_choices_to)
-        if ordering:
-            qs = qs.order_by(*ordering)
-        return (blank_choice if include_blank else []) + [
-            (choice_func(x), str(x)) for x in qs
-        ]
 
     def related_query_name(self) -> str:
         """
@@ -335,16 +293,12 @@ class RelatedField(FieldCacheMixin, Field):
     @property
     def target_field(self) -> Field:
         """
-        When filtering against this relation, return the field on the remote
-        model against which the filtering should happen.
+        The remote field this relation filters against. Read dynamically by the
+        related-lookup prep path (`output_field.target_field`). ForeignKeyField
+        overrides this with a direct, cached lookup; ManyToManyField uses this
+        path-based form.
         """
-        target_fields = self.path_infos[-1].target_fields
-        if len(target_fields) > 1:
-            raise FieldError(
-                "The relation has multiple target fields, but only single target field "
-                "was asked for"
-            )
-        return target_fields[0]
+        return self.path_infos[-1].target_field
 
     def get_cache_name(self) -> str:
         assert self.name is not None, "Field name must be set"
@@ -376,8 +330,6 @@ class ForeignKeyField(ColumnField, RelatedField):
         to: type[Model] | str,
         on_delete: OnDelete,
         related_query_name: str | None = None,
-        limit_choices_to: Any = None,
-        db_constraint: bool = True,
         *,
         required: bool = True,
         allow_null: bool = False,
@@ -385,8 +337,7 @@ class ForeignKeyField(ColumnField, RelatedField):
     ):
         # `default` and `choices` are intentionally not accepted: a hardcoded
         # FK id default is a portability/existence footgun, and the related
-        # model itself already defines the valid set. Use `limit_choices_to`
-        # to constrain the target rows.
+        # model itself already defines the valid set.
         if not isinstance(to, str):
             try:
                 to.model_options.model_name
@@ -407,63 +358,40 @@ class ForeignKeyField(ColumnField, RelatedField):
             validators=validators,
         )
         self._related_query_name = related_query_name
-        self._limit_choices_to = limit_choices_to
         self.remote_field = ForeignKeyRel(
             field=self,
             to=to,
             on_delete=on_delete,
             related_query_name=related_query_name,
-            limit_choices_to=limit_choices_to,
         )
-        self.db_constraint = db_constraint
 
     def __copy__(self) -> ForeignKeyField:
         obj = super().__copy__()
-        # Remove any cached PathInfo values.
+        # Remove cached values that depend on the (possibly not-yet-resolved)
+        # remote model.
+        obj.__dict__.pop("target_field", None)
         obj.__dict__.pop("path_infos", None)
         obj.__dict__.pop("reverse_path_infos", None)
         return obj
 
-    @cached_property
-    def related_fields(self) -> list[tuple[ForeignKeyField, Field]]:
-        return self.resolve_related_fields()
+    def get_local_related_value(self, instance: Model) -> Any:
+        # The local field is the foreign key itself; read its raw key value, not
+        # the related object the descriptor returns.
+        return self._get_raw_value(instance)
 
-    @cached_property
-    def local_related_fields(self) -> tuple[Field, ...]:
-        return tuple(lhs_field for lhs_field, rhs_field in self.related_fields)
+    def get_foreign_related_value(self, instance: Model) -> Any:
+        # A foreign key always points at the remote instance's id.
+        return instance.id
 
-    @cached_property
-    def foreign_related_fields(self) -> tuple[Field, ...]:
-        return tuple(
-            rhs_field for lhs_field, rhs_field in self.related_fields if rhs_field
-        )
-
-    def get_local_related_value(self, instance: Model) -> tuple[Any, ...]:
-        # The single local field is the foreign key itself.
-        if self.primary_key:
-            return (instance.id,)
-        # Read the raw key value, not the related object the descriptor returns.
-        return (self._get_raw_value(instance),)
-
-    def get_foreign_related_value(self, instance: Model) -> tuple[Any, ...]:
-        # Always returns the id of the foreign instance
-        return (instance.id,)
-
-    def get_joining_columns(
-        self, reverse_join: bool = False
-    ) -> tuple[tuple[str, str], ...]:
-        # Always returns a single column pair
+    def get_joining_columns(self, reverse_join: bool = False) -> tuple[str, str]:
+        # A foreign key joins one column pair: this field's column and the
+        # target's id column.
         if reverse_join:
-            from_field, to_field = self.related_fields[0]
-            return ((to_field.column, from_field.column),)
-        else:
-            from_field, to_field = self.related_fields[0]
-            return ((from_field.column, to_field.column),)
+            return (self.target_field.column, self.column)
+        return (self.column, self.target_field.column)
 
-    def get_reverse_joining_columns(self) -> tuple[tuple[str, str], ...]:
-        return self.get_joining_columns(reverse_join=True)
-
-    def get_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
+    @cached_property
+    def path_infos(self) -> list[PathInfo]:
         """Get path from this field to the related model."""
         meta = self.remote_field.model._model_meta
         from_meta = self.model._model_meta
@@ -471,19 +399,15 @@ class ForeignKeyField(ColumnField, RelatedField):
             PathInfo(
                 from_meta=from_meta,
                 to_meta=meta,
-                target_fields=self.foreign_related_fields,
+                target_field=self.target_field,
                 join_field=self,
                 m2m=False,
                 direct=True,
-                filtered_relation=filtered_relation,
             )
         ]
 
     @cached_property
-    def path_infos(self) -> list[PathInfo]:
-        return self.get_path_info()
-
-    def get_reverse_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
+    def reverse_path_infos(self) -> list[PathInfo]:
         """Get path from the related model to this field's model."""
         meta = self.model._model_meta
         from_meta = self.remote_field.model._model_meta
@@ -491,17 +415,13 @@ class ForeignKeyField(ColumnField, RelatedField):
             PathInfo(
                 from_meta=from_meta,
                 to_meta=meta,
-                target_fields=(meta.get_forward_field("id"),),
+                target_field=meta.get_forward_field("id"),
                 join_field=self.remote_field,
-                m2m=not self.primary_key,
+                # The reverse of a foreign key always fans out to many rows.
+                m2m=True,
                 direct=False,
-                filtered_relation=filtered_relation,
             )
         ]
-
-    @cached_property
-    def reverse_path_infos(self) -> list[PathInfo]:
-        return self.get_reverse_path_info()
 
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
         super().contribute_to_class(cls, name)
@@ -527,18 +447,6 @@ class ForeignKeyField(ColumnField, RelatedField):
                     id="fields.foreign_key_null_constraint_violation",
                 )
             )
-        if not self.db_constraint and on_delete is not NO_ACTION:
-            results.append(
-                PreflightResult(
-                    fix=(
-                        "db_constraint=False requires on_delete=NO_ACTION. "
-                        "Without a FOREIGN KEY constraint there is no place for "
-                        "Postgres to apply the delete behavior."
-                    ),
-                    obj=self,
-                    id="fields.foreign_key_unconstrained_requires_no_action",
-                )
-            )
         return results
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
@@ -554,58 +462,19 @@ class ForeignKeyField(ColumnField, RelatedField):
         else:
             kwargs["to"] = self.remote_field.model.model_options.label_lower
 
-        if self.db_constraint is not True:
-            kwargs["db_constraint"] = self.db_constraint
-
         return name, path, args, kwargs
 
     def to_python(self, value: Any) -> Any:
         return self.target_field.to_python(value)
 
-    @property
+    @cached_property
     def target_field(self) -> Field:
-        return self.foreign_related_fields[0]
-
-    def validate(self, value: Any, model_instance: Model) -> None:
-        super().validate(value, model_instance)
-        if value is None:
-            return None
-
-        field_name = self.remote_field.field_name
-        if field_name is None:
-            raise ValueError("remote_field.field_name cannot be None")
-        qs = self.remote_field.model._model_meta.base_queryset.filter(
-            **{field_name: value}
-        )
-        qs = qs.complex_filter(self.get_limit_choices_to())
-        if not qs.exists():
-            raise exceptions.ValidationError(
-                "%(model)s instance with %(field)s %(value)r does not exist.",
-                code="invalid",
-                params={
-                    "model": self.remote_field.model.model_options.model_name,
-                    "id": value,
-                    "field": self.remote_field.field_name,
-                    "value": value,
-                },
-            )
-
-    def resolve_related_fields(self) -> list[tuple[ForeignKeyField, Field]]:
+        """A foreign key points at exactly one column: the remote model's id."""
         if isinstance(self.remote_field.model, str):
             raise ValueError(
                 f"Related model {self.remote_field.model!r} cannot be resolved"
             )
-        from_field = self
-        to_field = self.remote_field.model._model_meta.get_forward_field("id")
-        related_fields: list[tuple[ForeignKeyField, Field]] = [(from_field, to_field)]
-
-        for from_field, to_field in related_fields:
-            if to_field and to_field.model != self.remote_field.model:
-                raise FieldError(
-                    f"'{self.model.model_options.label}.{self.name}' refers to field '{to_field.name}' which is not local to model "
-                    f"'{self.remote_field.model.model_options.label}'."
-                )
-        return related_fields
+        return self.remote_field.model._model_meta.get_forward_field("id")
 
     def set_attributes_from_name(self, name: str) -> None:
         super().set_attributes_from_name(name)
@@ -660,11 +529,8 @@ class ForeignKeyField(ColumnField, RelatedField):
 
     def get_col(self, alias: str | None, output_field: Field | None = None) -> Any:
         if output_field is None:
+            # A foreign key resolves to its target's id column.
             output_field = self.target_field
-            while isinstance(output_field, ForeignKeyField):
-                output_field = output_field.target_field
-                if output_field is self:
-                    raise ValueError("Cannot resolve output_field.")
         return super().get_col(alias, output_field)
 
 
@@ -698,13 +564,11 @@ class ManyToManyField(RelatedField):
         through: type[Model] | str,
         through_fields: tuple[str, str] | None = None,
         related_query_name: str | None = None,
-        limit_choices_to: Any = None,
         symmetrical: bool | None = None,
     ):
         # M2M has no database column, so `required`, `allow_null`, `default`,
         # `validators`, and `choices` are intentionally not accepted. Membership
-        # is managed through the related manager; filter target rows with
-        # `limit_choices_to`.
+        # is managed through the related manager.
         if not isinstance(to, str):
             try:
                 to._model_meta
@@ -724,7 +588,6 @@ class ManyToManyField(RelatedField):
             field=self,
             to=to,
             related_query_name=related_query_name,
-            limit_choices_to=limit_choices_to,
             symmetrical=symmetrical,
             through=through,
             through_fields=through_fields,
@@ -732,7 +595,6 @@ class ManyToManyField(RelatedField):
 
         super().__init__()
         self._related_query_name = related_query_name
-        self._limit_choices_to = limit_choices_to
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
@@ -983,9 +845,6 @@ class ManyToManyField(RelatedField):
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
 
-        if self.remote_field.db_constraint is not True:
-            kwargs["db_constraint"] = self.remote_field.db_constraint
-
         # Lowercase model names as they should be treated as case-insensitive.
         if isinstance(self.remote_field.model, str):
             if "." in self.remote_field.model:
@@ -1003,9 +862,7 @@ class ManyToManyField(RelatedField):
 
         return name, path, args, kwargs
 
-    def _get_path_info(
-        self, direct: bool = False, filtered_relation: Any = None
-    ) -> list[PathInfo]:
+    def _get_path_info(self, direct: bool = False) -> list[PathInfo]:
         """Called by both direct and indirect m2m traversal."""
         int_model = self.remote_field.through
         # M2M through model fields are always ForeignKey
@@ -1019,32 +876,20 @@ class ManyToManyField(RelatedField):
         )
         if direct:
             join1infos = linkfield1.reverse_path_infos
-            if filtered_relation:
-                join2infos = linkfield2.get_path_info(filtered_relation)
-            else:
-                join2infos = linkfield2.path_infos
+            join2infos = linkfield2.path_infos
         else:
             join1infos = linkfield2.reverse_path_infos
-            if filtered_relation:
-                join2infos = linkfield1.get_path_info(filtered_relation)
-            else:
-                join2infos = linkfield1.path_infos
+            join2infos = linkfield1.path_infos
 
         return [*join1infos, *join2infos]
 
-    def get_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
-        return self._get_path_info(direct=True, filtered_relation=filtered_relation)
-
     @cached_property
     def path_infos(self) -> list[PathInfo]:
-        return self.get_path_info()
-
-    def get_reverse_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
-        return self._get_path_info(direct=False, filtered_relation=filtered_relation)
+        return self._get_path_info(direct=True)
 
     @cached_property
     def reverse_path_infos(self) -> list[PathInfo]:
-        return self.get_reverse_path_info()
+        return self._get_path_info(direct=False)
 
     def _get_m2m_db_table(self) -> str:
         """
@@ -1140,13 +985,6 @@ class ManyToManyField(RelatedField):
         self.m2m_reverse_field_name = partial(
             self._get_m2m_reverse_attr, related, "name"
         )
-
-        get_m2m_rel = partial(self._get_m2m_attr, related, "remote_field")
-        self.m2m_target_field_name = lambda: get_m2m_rel().field_name
-        get_m2m_reverse_rel = partial(
-            self._get_m2m_reverse_attr, related, "remote_field"
-        )
-        self.m2m_reverse_target_field_name = lambda: get_m2m_reverse_rel().field_name
 
     def set_attributes_from_rel(self) -> None:
         pass

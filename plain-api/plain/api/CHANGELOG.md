@@ -1,5 +1,56 @@
 # plain-api changelog
 
+## [0.34.0](https://github.com/dropseed/plain/releases/plain-api@0.34.0) (2026-06-22)
+
+### What's changed
+
+- Collapsed the migration history into a single fresh `0001_initial`. The database schema is unchanged — only the migration files were squashed. ([802f2d87](https://github.com/dropseed/plain/commit/802f2d87))
+
+### Upgrade instructions
+
+- Run `plain migrations prune` after upgrading to clear the now-orphaned history records for this package's old migrations. No SQL runs — it only cleans up migration-history records and is safe and idempotent. If `migrations prune` is already part of your deploy steps, no action is needed.
+
+## [0.33.9](https://github.com/dropseed/plain/releases/plain-api@0.33.9) (2026-06-08)
+
+### What's changed
+
+- Internal: `ty: ignore` comments added to the OpenAPI decorators where they stamp dynamic `openapi_schema` / `openapi_components` attributes onto the wrapped function, for the `ty` 0.0.45 upgrade. No runtime behavior changes. ([95f54e880d](https://github.com/dropseed/plain/commit/95f54e880d))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.33.8](https://github.com/dropseed/plain/releases/plain-api@0.33.8) (2026-06-07)
+
+### What's changed
+
+- Internal: `APIView` now returns `JsonResponse(result, ...)` for both `dict` and `list` results, following the removal of `JsonResponse`'s `safe` parameter in `plain` 0.149.0 (lists previously went through `safe=False`). ([52338f58da](https://github.com/dropseed/plain/commit/52338f58da))
+- Docs: README examples updated from `form.save()` to `form.update()` for the `plain-postgres` `ModelForm` API change. ([66634f5af9](https://github.com/dropseed/plain/commit/66634f5af9))
+
+### Upgrade instructions
+
+- No changes required. Now requires `plain>=0.149.0` (which removed `JsonResponse(safe=...)`).
+
+## [0.33.7](https://github.com/dropseed/plain/releases/plain-api@0.33.7) (2026-06-03)
+
+### What's changed
+
+- Internal: `APIKeyView.use_api_key` records `last_used_at` via the new `update(fields=[...])` API instead of `save(update_fields=[...])`. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- No changes required. If you override `use_api_key` or use a `plain.postgres`-backed API key model, it needs `plain.postgres>=0.106.0` (which provides `update()`).
+
+## [0.33.6](https://github.com/dropseed/plain/releases/plain-api@0.33.6) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.33.5](https://github.com/dropseed/plain/releases/plain-api@0.33.5) (2026-05-13)
 
 ### What's changed

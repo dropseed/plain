@@ -1,5 +1,30 @@
 # plain-tailwind changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.24.0) (2026-07-22)
+
+### What's changed
+
+- The Tailwind CLI binary is now downloaded to the machine-level cache at `~/.cache/plain/tailwind/<version>/` instead of the per-checkout `.plain/` directory, so every checkout and worktree on the machine shares one download. Because the path is version-addressed, projects pinned to different Tailwind versions coexist without re-downloading when you switch between them. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The `.plain/tailwind.version` sidecar lockfile is gone — the version in the cache path is the state. `Tailwind.needs_update()` and `Tailwind.get_installed_version()` were removed, and `plain tailwind install` now installs whenever the configured version isn't present in the cache. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- `plain tailwind version` now reports the version configured in `pyproject.toml`, distinguishing "configured but not installed" from "no version configured" instead of just saying the binary is missing. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- Downloads stream to a temporary file and are atomically moved into place, so two checkouts installing at the same time can't leave a truncated binary behind. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- Running Tailwind with no version configured in `pyproject.toml` now raises a clear error pointing at `plain tailwind install`. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+
+### Upgrade instructions
+
+- No changes required — the binary downloads to the new location on the next `plain tailwind install` or build. The stale `tailwind` and `tailwind.version` files in each checkout's `.plain/` can be deleted.
+- If you called `Tailwind.needs_update()`, `get_installed_version()`, or `standalone_path` directly, use `is_installed()`, `get_version_from_config()`, and `binary_path(version)` instead.
+
+## [0.23.2](https://github.com/dropseed/plain/releases/plain-tailwind@0.23.2) (2026-07-15)
+
+### What's changed
+
+- Migrated the Tailwind CLI downloader from `requests` to `httpx`, keeping connection retries and the streamed download with a progress bar. `requests` is no longer a dependency. ([17570d71cf](https://github.com/dropseed/plain/commit/17570d71cf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.23.1](https://github.com/dropseed/plain/releases/plain-tailwind@0.23.1) (2026-05-12)
 
 ### What's changed

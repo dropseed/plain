@@ -5,6 +5,7 @@ and database field objects.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from itertools import chain
 from typing import TYPE_CHECKING, Any, cast
 
@@ -264,10 +265,6 @@ class BaseModelForm(BaseForm):
         # if initial was provided, it should override the values from instance
         if initial is not None:
             object_data.update(initial)
-        # self._validate_unique will be set to True by BaseModelForm.clean().
-        # It is False by default so overriding self.clean() and failing to call
-        # super will stop validate_unique from being called.
-        self._validate_unique = False
         super().__init__(
             request=request,
             auto_id=auto_id,
@@ -318,10 +315,6 @@ class BaseModelForm(BaseForm):
                     exclude.add(f.name)
         return exclude
 
-    def clean(self) -> dict[str, Any]:
-        self._validate_unique = True
-        return self.cleaned_data
-
     def _update_errors(self, errors: ValidationError) -> None:
         # Override any validation error messages raised during model clean
         # with the form field's error_messages when the error code matches.
@@ -353,23 +346,22 @@ class BaseModelForm(BaseForm):
         except ValidationError as e:
             self._update_errors(e)
 
+        # Shape validation: clean_fields() + the model clean() hook.
         try:
-            self.instance.full_clean(exclude=exclude, validate_unique=False)
+            self.instance.full_clean(exclude=exclude)
         except ValidationError as e:
             self._update_errors(e)
 
-        # Validate uniqueness if needed.
-        if self._validate_unique:
-            self.validate_unique()
-
-    def validate_unique(self) -> None:
-        """
-        Call the instance's validate_unique() method and update the form's
-        validation errors if any were raised.
-        """
-        exclude = self._get_validation_exclusions()
+        # Constraint pre-check, explicit: forms surface every violation at once,
+        # unlike save() which leaves constraints to the database. Recompute the
+        # exclusions so any field that just failed shape validation is skipped --
+        # _get_validation_exclusions() reads self._errors, so the failures we
+        # just recorded are now excluded, and a constraint over an invalid value
+        # is neither double-reported nor crashed on.
         try:
-            self.instance.validate_unique(exclude=exclude)
+            self.instance.validate_constraints(
+                exclude=self._get_validation_exclusions()
+            )
         except ValidationError as e:
             self._update_errors(e)
 
@@ -389,27 +381,36 @@ class BaseModelForm(BaseForm):
             if f.name in cleaned_data:
                 f.save_form_data(self.instance, cleaned_data[f.name])
 
-    def save(self, commit: bool = True) -> Any:
-        """
-        Save this form's self.instance object if commit=True. Otherwise, add
-        a save_m2m() method to the form which can be called after the instance
-        is saved manually at a later time. Return the model instance.
-        """
+    def _raise_if_invalid(self, action: str) -> None:
+        """Guard the write methods -- a form with errors can't be persisted."""
         if self.errors:
             raise ValueError(
-                "The {} could not be {} because the data didn't validate.".format(
-                    self.instance.model_options.object_name,
-                    "created" if self.instance._state.adding else "changed",
-                )
+                f"The {self.instance.model_options.object_name} could not be "
+                f"{action} because the data didn't validate."
             )
-        if commit:
-            # If committing, save the instance and the m2m data immediately.
-            self.instance.save(clean_and_validate=False)
-            self._save_m2m()
-        else:
-            # If not committing, add a method to the form to allow deferred
-            # saving of m2m data.
-            self.save_m2m = self._save_m2m
+
+    def create(self) -> Any:
+        """INSERT this form's instance (and its m2m data) and return it.
+
+        Shape and constraints were already validated in _post_clean, so the
+        write trusts them (clean_and_validate=False). This mirrors
+        Model.create(); use it from a create flow and update() to UPDATE.
+        """
+        self._raise_if_invalid("created")
+        self.instance.create(clean_and_validate=False)
+        self._save_m2m()
+        return self.instance
+
+    def update(self, *, fields: Iterable[str] | None = None) -> Any:
+        """UPDATE this form's instance (and its m2m data) and return it.
+
+        `fields` is passed straight through to Model.update() to limit the
+        columns written; the default writes every loaded field. Validation
+        already ran in _post_clean, so the write trusts it.
+        """
+        self._raise_if_invalid("changed")
+        self.instance.update(clean_and_validate=False, fields=fields)
+        self._save_m2m()
         return self.instance
 
 
@@ -770,7 +771,7 @@ def modelfield_to_formfield(
             **defaults,
         )
 
-    # TODO related (OneToOne, m2m)
+    # TODO related (m2m)
 
     # If there's a form field of the exact same name, use it
     # (models.URLField -> forms.URLField)

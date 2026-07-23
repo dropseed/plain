@@ -1,5 +1,31 @@
 # plain-code changelog
 
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-code@0.22.0) (2026-07-22)
+
+### What's changed
+
+- Oxc binaries (`oxlint`, `oxfmt`) are now downloaded to the machine-level cache at `~/.cache/plain/oxc/<version>/` instead of the per-checkout `.plain/` directory, so every checkout and worktree on the machine shares one download. Because the path is version-addressed, projects pinned to different Oxc versions coexist without re-downloading on every switch. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The `.plain/oxc.version` sidecar lockfile is gone — the version in the cache path is the state, and `OxcTool.needs_update()` was removed along with it. `plain code install`, `check`, and `fix` now simply install when a binary for the configured version isn't present. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- `plain code install` now also verifies `oxfmt` is present, not just `oxlint` — previously a missing or partially installed `oxfmt` could go unnoticed. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- Downloads extract to a temporary file and are atomically moved into place, so two checkouts installing at the same time can't leave a truncated or corrupted binary behind. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- Running Oxc with no version configured in `pyproject.toml` now raises a clear error pointing at `plain code install` instead of failing on a missing binary path. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+
+### Upgrade instructions
+
+- No changes required — the new binaries download on the next `plain code check`/`fix`/`install`. If you want the disk back, the stale `oxlint`, `oxfmt`, and `oxc.version` files left in each checkout's `.plain/` can be deleted.
+- If you called `OxcTool.needs_update()` or `OxcTool.standalone_path` directly, use `is_installed()` and `binary_path(version)` instead.
+
+## [0.21.8](https://github.com/dropseed/plain/releases/plain-code@0.21.8) (2026-07-15)
+
+### What's changed
+
+- Migrated the oxc downloader from `requests` to `httpx`, keeping behavioral parity (redirects followed, streamed download with progress bar). `requests` is no longer a dependency. ([17570d71cf](https://github.com/dropseed/plain/commit/17570d71cf))
+- Updated the shipped `plain-code` style rules: prefer keyword-only parameters for functions taking more than one argument, and spell out real parameters instead of passing `**kwargs` through blindly (so type checking works at call sites). ([249769ece3](https://github.com/dropseed/plain/commit/249769ece3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.7](https://github.com/dropseed/plain/releases/plain-code@0.21.7) (2026-05-05)
 
 ### What's changed

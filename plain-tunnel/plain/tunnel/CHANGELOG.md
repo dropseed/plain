@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.12.7](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.7) (2026-06-26)
+
+### What's changed
+
+- Bumped the tunnel server's npm dependencies (undici, Cloudflare workerd/wrangler) to resolve security advisories. ([cea9cd30b2](https://github.com/dropseed/plain/commit/cea9cd30b2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.6](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.6) (2026-05-05)
 
 ### What's changed

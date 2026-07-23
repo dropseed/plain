@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from plain.http import Response
-from plain.templates.views import CreateView, UpdateView
+from plain.templates.views import CreateView, DeleteView, UpdateView
 
 from .forms import (
     ChildCascadeForm,
@@ -46,6 +46,13 @@ class FormsExampleCreateView(_NoTemplateFormView, CreateView):
 
 class FormsExampleUpdateView(_NoTemplateFormView, UpdateView):
     form_class = FormsExampleForm
+    success_url = "/ok/"
+
+    def get_object(self) -> Any:
+        return FormsExample.query.filter(id=self.url_kwargs["pk"]).first()
+
+
+class FormsExampleDeleteView(_NoTemplateFormView, DeleteView):
     success_url = "/ok/"
 
     def get_object(self) -> Any:

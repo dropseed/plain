@@ -2,22 +2,8 @@ from __future__ import annotations
 
 from app.examples.models.iteration import IterationExample
 
-from plain.postgres.db import get_connection
 
-
-def _capture_queries(callable_):
-    conn = get_connection()
-    prev_force = conn.force_debug_cursor
-    conn.force_debug_cursor = True
-    conn.queries_log.clear()
-    try:
-        callable_()
-        return list(conn.queries_log)
-    finally:
-        conn.force_debug_cursor = prev_force
-
-
-def test_repr_does_not_execute_sql_when_unevaluated(db):
+def test_repr_does_not_execute_sql_when_unevaluated(db, capture_queries):
     """repr() of an unevaluated queryset must not issue a SQL query.
 
     Error reporters (Sentry, pdb, exception templates) call repr() on
@@ -26,13 +12,14 @@ def test_repr_does_not_execute_sql_when_unevaluated(db):
     """
     qs = IterationExample.query.all()
 
-    queries = _capture_queries(lambda: repr(qs))
+    with capture_queries() as queries:
+        repr(qs)
 
     assert queries == []
     assert repr(qs) == "<QuerySet [unevaluated]>"
 
 
-def test_repr_uses_cache_when_evaluated(db):
+def test_repr_uses_cache_when_evaluated(db, capture_queries):
     """Once a queryset is evaluated, repr() reflects its rows without re-querying."""
     IterationExample.query.create(name="alpha", tag="a")
     IterationExample.query.create(name="beta", tag="b")
@@ -40,7 +27,8 @@ def test_repr_uses_cache_when_evaluated(db):
     qs = IterationExample.query.all()
     list(qs)  # force evaluation, populates _result_cache
 
-    queries = _capture_queries(lambda: repr(qs))
+    with capture_queries() as queries:
+        repr(qs)
 
     assert queries == []
     rendered = repr(qs)

@@ -22,8 +22,10 @@ import logging
 import os
 import random
 import signal
+import ssl
 import sys
 import time
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from types import FrameType
 from typing import TYPE_CHECKING, Any
@@ -49,6 +51,11 @@ SIGNALS = [
     signal.SIGWINCH,
 ]
 
+# Slice of SERVER_GRACEFUL_TIMEOUT reserved for cancelling leftover
+# connection tasks and tearing down after the drain wait, so a
+# SIGTERM-initiated shutdown finishes before the arbiter's SIGKILL lands.
+DRAIN_TEARDOWN_MARGIN = 2.0
+
 
 def check_worker_config(threads: int, connections: int, log: logging.Logger) -> None:
     max_keepalived = connections - threads
@@ -65,7 +72,7 @@ class Worker:
         self,
         age: int,
         ppid: int,
-        sockets: list[sock.BaseSocket],
+        sockets: Sequence[sock.BaseSocket],
         app: ServerApplication,
         timeout: int | float,
         heartbeat: WorkerHeartbeat,
@@ -96,6 +103,11 @@ class Worker:
         )
         self.nr_conns: int = 0
         self._connection_tasks: set[asyncio.Task] = set()
+        self._servers: list[asyncio.Server] = []
+        self._notify_during_drain = True
+        # Set (on the event loop) when shutdown starts — H2 connections
+        # watch this to refuse new streams and drain (h1 gates on alive).
+        self._shutdown_event: asyncio.Event = asyncio.Event()
         # Worker-level H2 stream budget — limits total in-flight H2 streams
         # across all connections to avoid overwhelming the thread pool.
         self._h2_stream_budget: asyncio.Semaphore = asyncio.Semaphore(
@@ -164,9 +176,12 @@ class Worker:
 
             def changed(fname: str) -> None:
                 self.log.debug("Server worker reloading", extra={"modified": fname})
+                # Runs on the Reloader thread — flag the heartbeat loop,
+                # which notices within about a second (longer if the
+                # thread pool is backed up) and shuts down gracefully.
+                # (sys.exit() here would only end the watcher thread,
+                # not the process.)
                 self.alive = False
-                time.sleep(0.1)
-                sys.exit(0)
 
             self.reloader = Reloader(callback=changed, watch_html=True)
 
@@ -188,13 +203,39 @@ class Worker:
             loop.set_debug(True)
             loop.slow_callback_duration = 0.1
 
+        # Port scans and TCP health checks (load balancers, `nc -z`) abort
+        # mid-TLS-handshake constantly — asyncio logs each one as an error
+        # with a traceback. Routine connection noise, not application errors.
+        def _accept_error_handler(
+            loop: asyncio.AbstractEventLoop, context: dict[str, Any]
+        ) -> None:
+            if context.get(
+                "message"
+            ) == "Error on transport creation for incoming connection" and isinstance(
+                context.get("exception"),
+                ConnectionResetError
+                | ConnectionAbortedError  # handshake timeout on 3.13+
+                | BrokenPipeError
+                | ssl.SSLError
+                | TimeoutError,
+            ):
+                self.log.debug(
+                    "Connection aborted during accept/TLS handshake",
+                    extra={"error": repr(context.get("exception"))},
+                )
+                return
+            loop.default_exception_handler(context)
+
+        loop.set_exception_handler(_accept_error_handler)
+
         # Signal handlers
         loop.add_signal_handler(signal.SIGTERM, self._signal_exit)
         loop.add_signal_handler(signal.SIGINT, self._signal_quit)
         loop.add_signal_handler(signal.SIGQUIT, self._signal_quit)
         loop.add_signal_handler(signal.SIGUSR1, self._handle_memory_signal)
-        # SIGABRT/SIGWINCH use signal.signal() because they need the
-        # (sig, frame) signature and call sys.exit() directly
+        # SIGABRT/SIGWINCH use signal.signal() because they take the
+        # (sig, frame) signature; handle_abort also exits the process
+        # directly (handle_winch just ignores the signal)
         signal.signal(signal.SIGABRT, self.handle_abort)
         signal.signal(signal.SIGWINCH, self.handle_winch)
         signal.siginterrupt(signal.SIGTERM, False)
@@ -211,8 +252,6 @@ class Worker:
         )
 
         # Start servers (one per listener socket)
-        self._servers: list[asyncio.Server] = []
-        servers = self._servers
         for listener in self.sockets:
             assert listener.sock is not None, "Listener socket is closed"
             listener.sock.setblocking(False)
@@ -222,9 +261,11 @@ class Worker:
                 ssl=ssl_ctx,
                 ssl_handshake_timeout=10 if ssl_ctx else None,
             )
-            servers.append(server)
+            self._servers.append(server)
 
-        # Heartbeat loop
+        # Heartbeat loop. _signal_exit can close self._servers between any
+        # two awaits in this body (see its comment) — per-tick checks on
+        # server state would false-positive during shutdown.
         while self.alive:
             self.notify()
             if not self.is_parent_alive():
@@ -245,21 +286,25 @@ class Worker:
                     "Thread pool stalled, stopping heartbeat to trigger restart",
                     extra={"timeout": self.timeout},
                 )
+                self._notify_during_drain = False
                 break
 
-            # Surface server crashes
-            for server in servers:
-                if not server.is_serving():
-                    self.log.error("Server stopped serving unexpectedly")
-                    self.alive = False
-                    break
-
             await asyncio.sleep(1.0)
+
+        # Any loop exit means shutdown — the break paths (parent death,
+        # stalled thread pool) leave alive True, but connection handling
+        # gates on this state: h1 stops taking keep-alive requests once
+        # alive is False (requests parsed from here on respond with
+        # Connection: close; responses already dispatched still go out
+        # keep-alive), and h2 connections watch _shutdown_event to refuse
+        # new streams and drain.
+        self.alive = False
+        self._shutdown_event.set()
 
         # Stop accepting new connections (don't await wait_closed() —
         # it blocks until all connection tasks finish, bypassing
         # _graceful_shutdown's timeout enforcement)
-        for server in servers:
+        for server in self._servers:
             server.close()
 
         await self._graceful_shutdown()
@@ -316,6 +361,7 @@ class Worker:
                     self.tpool,
                     stream_budget=self._h2_stream_budget,
                     on_stream_complete=self._count_request,
+                    shutdown_event=self._shutdown_event,
                 )
                 return
 
@@ -328,7 +374,34 @@ class Worker:
             from plain.runtime import settings
 
             timeout = settings.SERVER_GRACEFUL_TIMEOUT
-            _, pending = await asyncio.wait(self._connection_tasks, timeout=timeout)
+            # The margin is capped at half the window so deliberately
+            # short graceful timeouts still get a real drain.
+            margin = min(DRAIN_TEARDOWN_MARGIN, timeout / 2)
+
+            deadline = time.monotonic() + timeout
+            pending = set(self._connection_tasks)
+            while pending:
+                # When this shutdown ends in SIGKILL, the arbiter
+                # publishes its kill time on the heartbeat — cap the
+                # drain so the cancellation and teardown below still run
+                # before it lands. Re-read every slice: a deploy can
+                # catch a worker that is already draining (e.g.
+                # retiring). Retirement SIGTERMs have no SIGKILL
+                # follower, publish nothing, and keep the full window.
+                kill_deadline = self.heartbeat.kill_deadline()
+                if kill_deadline:
+                    deadline = min(deadline, kill_deadline - margin)
+
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                # Keep the heartbeat fresh while draining so the arbiter
+                # doesn't murder a worker that's shutting down normally.
+                # (The stalled-pool exit skips this — it stopped
+                # heartbeating on purpose to get killed and replaced.)
+                if self._notify_during_drain:
+                    self.notify()
+                _, pending = await asyncio.wait(pending, timeout=min(1.0, remaining))
             for task in pending:
                 task.cancel()
             if pending:
@@ -338,9 +411,13 @@ class Worker:
 
     def _signal_exit(self) -> None:
         self.alive = False
+        self._shutdown_event.set()
         # Immediately stop accepting new connections so requests
         # don't land on a worker that's about to exit (H13 prevention).
-        for server in getattr(self, "_servers", ()):
+        # This runs as an event-loop callback, so the heartbeat loop in
+        # run() can resume mid-iteration and observe these servers already
+        # closed — per-tick checks on server state would false-positive here.
+        for server in self._servers:
             server.close()
 
     def _signal_quit(self) -> None:

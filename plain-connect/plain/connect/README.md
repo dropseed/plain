@@ -6,10 +6,10 @@
 - [Settings](#settings)
 - [Sampling](#sampling)
 - [What gets exported](#what-gets-exported)
+- [Reading your data back](#reading-your-data-back)
 - [Pageview tracking](#pageview-tracking)
 - [Support forms](#support-forms)
 - [Toolbar](#toolbar)
-- [Observer coexistence](#observer-coexistence)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -58,6 +58,10 @@ Metrics are not affected by sampling — histograms aggregate in-process and exp
 **Metrics** — OTel histograms like `db.client.query.duration`, aggregated and pushed every 60 seconds.
 
 **Logs** — Records from the `plain` and `app` loggers, plus anything propagating to the root logger, are bridged into OTLP log records and exported with `trace_id` / `span_id` set from the active span. The minimum severity is controlled by `CONNECT_LOG_LEVEL` (default `INFO`); the root logger's level is widened to that floor when needed so libraries using `getLogger(__name__)` reach the exporter. To prevent feedback loops, two sources are skipped on the export path: the `opentelemetry` namespace, and any record emitted from inside the OTLP exporter's background thread (e.g. urllib3 connection errors raised by the exporter's own HTTP call). Your application's urllib3 logs are exported normally.
+
+## Reading your data back
+
+plain.connect only sends data _to_ Plain Cloud. To read it back — production exceptions, slow endpoints, slow queries, recent deploys — use the separate [`plain-cloud`](https://pypi.org/project/plain-cloud/) CLI (or `uvx plain-cloud` to run it without installing).
 
 ## Pageview tracking
 
@@ -146,15 +150,7 @@ The button only appears when export is active (`CONNECT_EXPORT_TOKEN` is set), s
 
 If a request wasn't sampled for export (see [Sampling](#sampling)), the button shows "Not sampled" instead. Because traces export in a background batch, a freshly-clicked link may briefly land on a "locating trace" page that retries until the trace arrives.
 
-## Observer coexistence
-
-If [plain.observer](../../plain-observer/plain/observer/README.md) is also installed, both work simultaneously. plain.connect handles production export while observer provides the local dev toolbar and admin trace viewer. Observer detects the existing TracerProvider and layers its sampler and span processor on top.
-
 ## FAQs
-
-#### Do I need plain.observer to use plain.connect?
-
-No. plain.connect works independently. Observer is for local dev tooling; plain.connect is for production export.
 
 #### What happens if the export endpoint is unreachable?
 
@@ -173,5 +169,3 @@ INSTALLED_PACKAGES = [
     # ...
 ]
 ```
-
-Place `plain.connect` **before** `plain.observer` in `INSTALLED_PACKAGES` so it sets up the TracerProvider first.

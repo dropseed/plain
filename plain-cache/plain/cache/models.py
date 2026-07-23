@@ -11,6 +11,18 @@ __all__ = ["CachedItem", "CachedItemQuerySet"]
 
 
 class CachedItemQuerySet(postgres.QuerySet["CachedItem"]):
+    def live(self) -> Self:
+        """Rows readable right now: never-expiring *or* not-yet-expired.
+
+        This is the filter cache reads use -- an entry past its `expires_at`
+        reads as absent. (Contrast `unexpired()`, which matches only rows with a
+        *future* expiry.)
+        """
+        return self.filter(
+            postgres.Q(expires_at__isnull=True)
+            | postgres.Q(expires_at__gte=timezone.now())
+        )
+
     def expired(self) -> Self:
         return self.filter(expires_at__lt=timezone.now())
 

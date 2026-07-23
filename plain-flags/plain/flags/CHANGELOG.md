@@ -1,5 +1,25 @@
 # plain-flags changelog
 
+## [0.37.0](https://github.com/dropseed/plain/releases/plain-flags@0.37.0) (2026-06-22)
+
+### What's changed
+
+- Collapsed the migration history into a single fresh `0001_initial`. The database schema is unchanged — only the migration files were squashed. ([802f2d87](https://github.com/dropseed/plain/commit/802f2d87))
+
+### Upgrade instructions
+
+- Run `plain migrations prune` after upgrading to clear the now-orphaned history records for this package's old migrations. No SQL runs — it only cleans up migration-history records and is safe and idempotent. If `migrations prune` is already part of your deploy steps, no action is needed.
+
+## [0.36.7](https://github.com/dropseed/plain/releases/plain-flags@0.36.7) (2026-05-25)
+
+### What's changed
+
+- Internal: model field declarations updated for plain.postgres's new parameterized-descriptor field typing. ([229ecdbbfa](https://github.com/dropseed/plain/commit/229ecdbbfa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.36.6](https://github.com/dropseed/plain/releases/plain-flags@0.36.6) (2026-05-05)
 
 ### What's changed

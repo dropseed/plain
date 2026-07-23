@@ -1,8 +1,11 @@
 /*
- * `panel.style.{top,left}` mutations in initHovercard are a known CSP
- * carve-out — fluid positioning relative to a trigger's bounding rect
- * has no static-CSS equivalent until anchor-positioning ships in
- * Firefox. Tracked separately.
+ * Popover / dropdown / hovercard panels open in the top layer (native
+ * Popover API) and are tethered to their trigger with CSS anchor
+ * positioning. The only positioning JS left is linkAnchor(), which assigns
+ * a unique anchor-name / position-anchor pair via CSSOM property setters —
+ * CSP-safe (only `style="..."` attributes / `cssText` are blocked), and a
+ * no-op in browsers that predate anchor positioning (those fall back to the
+ * UA's centered top-layer placement).
  */
 (() => {
   const POPOVER_OPEN_EVENT = "plain-admin:popover-open";
@@ -31,9 +34,30 @@
   document.addEventListener("htmx:afterSwap", (evt) => initAll(evt.detail.target));
 
   // ---------- Shared popover lifecycle ----------
-  // Open popovers are tracked in a Set so global outside-click and
-  // cross-popover-close don't have to scan the whole document.
+  // Open click-popovers are tracked in a Set so global outside-click and
+  // cross-popover-close don't have to scan the whole document. Opening one
+  // closes the others, so there's only ever 0 or 1 in here.
   const openComponents = new Set();
+
+  // Tether a panel to its trigger for CSS anchor positioning: give the trigger
+  // a unique anchor-name and point the panel's position-anchor at it. The rest
+  // of placement — side, alignment, the gap, edge-flipping, staying tethered
+  // through scroll — is declarative in popover.css / hovercard.css. Assigning
+  // via CSSOM property setters is CSP-safe; in browsers without anchor
+  // positioning these are ignored and the panel falls back to the UA's
+  // centered top-layer placement.
+  let anchorSeq = 0;
+  const linkAnchor = (trigger, panel) => {
+    // `popover="manual"` is what lifts the panel into the top layer; without it
+    // the panel never opens and just sits hidden. Catch a forgotten attribute
+    // loudly instead of failing silently.
+    if (!panel.hasAttribute("popover")) {
+      console.error('Overlay panel is missing popover="manual" — it will not open', panel);
+    }
+    const name = `--admin-popover-anchor-${anchorSeq++}`;
+    trigger.style.anchorName = name;
+    panel.style.positionAnchor = name;
+  };
 
   const closePopover = (component, focusTrigger = true) => {
     const trigger = component.querySelector(":scope > button");
@@ -41,7 +65,9 @@
     const content = component.querySelector(":scope > [data-popover]");
     trigger.setAttribute("aria-expanded", "false");
     trigger.removeAttribute("aria-activedescendant");
-    if (content) content.setAttribute("aria-hidden", "true");
+    // Visibility (and a11y) is owned by the CSS: a closed panel is
+    // `visibility: hidden`, so there's no panel-level aria-hidden to maintain.
+    if (content && content.popover && content.matches(":popover-open")) content.hidePopover();
     openComponents.delete(component);
     if (focusTrigger) trigger.focus();
     return true;
@@ -53,7 +79,7 @@
     if (!trigger || !content) return null;
     document.dispatchEvent(new CustomEvent(POPOVER_OPEN_EVENT, { detail: { source: component } }));
     trigger.setAttribute("aria-expanded", "true");
-    content.setAttribute("aria-hidden", "false");
+    if (content.popover && !content.matches(":popover-open")) content.showPopover();
     openComponents.add(component);
     return { trigger, content };
   };
@@ -81,6 +107,7 @@
       console.error("Popover init failed: missing trigger or [data-popover]", component);
       return;
     }
+    linkAnchor(trigger, content);
 
     trigger.addEventListener("click", () => {
       if (trigger.getAttribute("aria-expanded") === "true") {
@@ -113,6 +140,7 @@
       );
       return;
     }
+    linkAnchor(trigger, popover);
 
     let menuItems = [];
     let activeIndex = -1;
@@ -338,17 +366,23 @@
       return;
     }
 
+    // Hovercards are often created dynamically (datetime-hovercard.js), so the
+    // `popover` attribute is set here rather than in markup; a closed
+    // `[data-hovercard]` is `visibility: hidden` in CSS until then, so there's
+    // no flash and nothing in the a11y tree.
+    panel.setAttribute("popover", "manual");
+    linkAnchor(trigger, panel);
+
     let hideTimeout;
     const show = () => {
       clearTimeout(hideTimeout);
       hovercard.dispatchEvent(new CustomEvent("hovercard:show"));
-      const rect = trigger.getBoundingClientRect();
-      panel.style.top = `${rect.bottom + 4}px`;
-      panel.style.left = `${rect.left}px`;
-      panel.setAttribute("aria-hidden", "false");
+      if (panel.popover && !panel.matches(":popover-open")) panel.showPopover();
     };
     const hide = () => {
-      hideTimeout = setTimeout(() => panel.setAttribute("aria-hidden", "true"), 100);
+      hideTimeout = setTimeout(() => {
+        if (panel.popover && panel.matches(":popover-open")) panel.hidePopover();
+      }, 100);
     };
 
     trigger.addEventListener("mouseenter", show);

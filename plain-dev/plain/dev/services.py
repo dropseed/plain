@@ -10,7 +10,7 @@ import click
 
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
-from .process import ProcessManager
+from .process import Supervisor
 from .utils import has_pyproject_toml
 
 
@@ -47,10 +47,12 @@ def auto_start_services() -> None:
         if "logs" in sys.argv or "services" in sys.argv or "--stop" in sys.argv:
             return
 
-    if not ServicesProcess.get_services(APP_PATH.parent):
+    if not ServicesSupervisor.get_services(APP_PATH.parent):
         return
 
-    if ServicesProcess.running_pid():
+    # Cheap pre-check to avoid a needless spawn; the spawned supervisor's
+    # acquire() is the real guarantee against double-starting.
+    if ServicesSupervisor.running_pid():
         return
 
     click.secho(
@@ -58,22 +60,17 @@ def auto_start_services() -> None:
         dim=True,
     )
 
-    subprocess.Popen(
-        [sys.executable, "-m", "plain", "dev", "services", "--start"],
-        start_new_session=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    ServicesSupervisor.spawn_background()
 
     # Give services time to start and retry the check
     wait_times = [0.5, 1, 1]  # First check at 0.5s, then 1s intervals
     for wait_time in wait_times:
         time.sleep(wait_time)
-        if ServicesProcess.running_pid():
+        if ServicesSupervisor.running_pid():
             return  # Services started successfully
 
     # Only show error after multiple attempts
-    if not ServicesProcess.running_pid():
+    if not ServicesSupervisor.running_pid():
         click.secho(
             "Failed to start dev services. Here are the logs:",
             fg="red",
@@ -85,9 +82,11 @@ def auto_start_services() -> None:
         sys.exit(1)
 
 
-class ServicesProcess(ProcessManager):
-    pidfile = PLAIN_TEMP_PATH / "dev" / "services.pid"
+class ServicesSupervisor(Supervisor):
+    state_filename = "services.pid"
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "services"
+    background_command = ["dev", "services"]
+    display_name = "Services"
 
     @staticmethod
     def get_services(root: str | Path) -> dict[str, Any]:
@@ -105,7 +104,10 @@ class ServicesProcess(ProcessManager):
         )
 
     def run(self) -> None:
-        self.write_pidfile()
+        if not self.acquire():
+            click.secho(self.already_running_message(self.read_pidfile()), fg="yellow")
+            return
+
         self.prepare_log()
         self.init_poncho(print)
 
@@ -124,5 +126,5 @@ class ServicesProcess(ProcessManager):
 
             self.poncho.loop()
         finally:
-            self.rm_pidfile()
+            self.release()
             self.close()

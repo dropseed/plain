@@ -4,7 +4,7 @@
 Covers:
 - DDL: column DEFAULT persists after CREATE TABLE
 - Raw SQL: INSERT omitting the column triggers the DB default
-- ORM: Model().save() + bulk_create() populate via RETURNING
+- ORM: Model().create() + bulk_create() populate via RETURNING
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ def test_unsaved_instance_holds_sentinel(db):
 
 def test_save_populates_value_via_returning(db):
     inst = DBDefaultsExample(name="saved")
-    inst.save()
+    inst.create()
 
     assert isinstance(inst.db_uuid, uuid.UUID)
     assert isinstance(inst.created_at, datetime.datetime)
@@ -98,7 +98,7 @@ def test_save_populates_value_via_returning(db):
 
 def test_save_persists_to_database(db):
     inst = DBDefaultsExample(name="saved")
-    inst.save()
+    inst.create()
 
     reloaded = DBDefaultsExample.query.get(id=inst.id)
     assert reloaded.db_uuid == inst.db_uuid
@@ -122,7 +122,7 @@ def test_explicit_value_overrides_db_default(db):
     explicit_dt = datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC)
 
     inst = DBDefaultsExample(name="explicit", db_uuid=explicit, created_at=explicit_dt)
-    inst.save()
+    inst.create()
 
     assert inst.db_uuid == explicit
     assert inst.created_at == explicit_dt
@@ -135,7 +135,7 @@ def test_update_does_not_re_apply_db_default(db):
     """After the row exists, updating an unrelated field must not cause
     Postgres (or the ORM) to re-evaluate the DEFAULT expression."""
     inst = DBDefaultsExample(name="row")
-    inst.save()
+    inst.create()
     original_uuid = inst.db_uuid
 
     DBDefaultsExample.query.filter(id=inst.id).update(name="renamed")
@@ -147,7 +147,7 @@ def test_update_does_not_re_apply_db_default(db):
 
 def test_refresh_from_db_returns_persisted_value(db):
     inst = DBDefaultsExample(name="row")
-    inst.save()
+    inst.create()
     original_uuid = inst.db_uuid
 
     inst.db_uuid = uuid.uuid4()
@@ -156,15 +156,17 @@ def test_refresh_from_db_returns_persisted_value(db):
     assert inst.db_uuid == original_uuid
 
 
-def test_full_clean_skips_constraints_on_sentinel_fields(db):
-    """A UniqueConstraint over an expression-default field shouldn't trigger
-    a SELECT lookup using the sentinel during save's full_clean — the value
-    doesn't exist in Python yet."""
+def test_validation_skips_sentinel_fields(db):
+    """A field still holding the DATABASE_DEFAULT sentinel has no Python value
+    yet, so neither shape validation (full_clean) nor the constraint pre-check
+    (validate_constraints) may touch it — the UniqueConstraint over db_uuid
+    must not run a SELECT lookup with the sentinel."""
     inst = DBDefaultsExample(name="constrained")
-    # If validate_constraints didn't exclude the sentinel field, this would
-    # raise (UUIDField rejects non-UUID values) before the INSERT could run.
+    # If either step didn't exclude the sentinel field, this would raise
+    # (UUIDField rejects the non-UUID sentinel) before the INSERT could run.
     inst.full_clean()
-    inst.save()
+    inst.validate_constraints()
+    inst.create()
     assert isinstance(inst.db_uuid, uuid.UUID)
 
 
@@ -211,7 +213,7 @@ def test_alter_field_nullable_to_not_null_with_expression_default_is_migration_n
 ):
     """A nullable→NOT NULL transition on a column that already carries an
     expression DEFAULT is a schema-editor no-op. Convergence owns the
-    NullabilityDrift (SetNotNullFix blocks if NULL rows exist)."""
+    NullabilityDrift (SetNotNullCorrection blocks if NULL rows exist)."""
     from plain.postgres import fields as plain_fields
 
     connection = get_connection()
@@ -380,7 +382,7 @@ def test_construct_instance_preserves_db_default_on_blank_submission(db):
 
 
 def test_database_default_singleton_survives_pickling(db):
-    """`Model().save()` after `pickle.dumps`/`loads` round-trip must still
+    """`Model().create()` after `pickle.dumps`/`loads` round-trip must still
     work — the sentinel identity check (`is DATABASE_DEFAULT`) drives both
     the descriptor and the INSERT compiler."""
     import pickle
@@ -391,39 +393,17 @@ def test_database_default_singleton_survives_pickling(db):
     restored = pickle.loads(pickle.dumps(inst))
     assert restored.db_uuid is DATABASE_DEFAULT
 
-    restored.save()
+    restored.create()
     assert isinstance(restored.db_uuid, uuid.UUID)
 
 
-def test_save_with_explicit_pk_refreshes_db_default_fields_after_update(db):
-    """When save() takes the UPDATE path against an existing row, fields
-    that hold the DATABASE_DEFAULT sentinel must be refreshed from the DB
-    so the in-memory instance doesn't keep the sentinel."""
-    # First, create a row so the explicit-PK save below hits an UPDATE.
-    original = DBDefaultsExample(name="original")
-    original.save()
-
-    # New unsaved instance with the SAME id and no value for db_uuid.
-    # Skip clean_and_validate so the UPDATE-then-INSERT fallback path runs;
-    # validate_unique would otherwise reject the colliding id.
-    same_id = DBDefaultsExample(id=original.id, name="updated")
-    assert same_id.db_uuid is DATABASE_DEFAULT
-
-    same_id.save(clean_and_validate=False)
-
-    # The UPDATE succeeded; db_uuid should now hold the DB's value, not
-    # the sentinel.
-    assert same_id.db_uuid is not DATABASE_DEFAULT
-    assert same_id.db_uuid == original.db_uuid
-    assert isinstance(same_id.db_uuid, uuid.UUID)
-
-
-def test_save_with_explicit_pk_falls_back_to_insert(db):
-    """When id is set but the row doesn't exist, save() tries UPDATE first
-    then INSERT. The DATABASE_DEFAULT sentinel must not leak into the UPDATE
-    path — only the INSERT can meaningfully evaluate a DB default."""
-    inst = DBDefaultsExample(id=999_999, name="explicit-pk")
-    inst.save()
+def test_explicit_pk_inserts_and_fills_db_defaults(db):
+    """A new instance with a hand-set id create()s -- INSERTing that id -- and
+    the DB-expression defaults (db_uuid, created_at) are filled by the INSERT's
+    RETURNING, not left as the DATABASE_DEFAULT sentinel."""
+    inst = DBDefaultsExample(name="explicit-pk")
+    inst.id = 999_999
+    inst.create()
 
     assert inst.id == 999_999
     assert isinstance(inst.db_uuid, uuid.UUID)

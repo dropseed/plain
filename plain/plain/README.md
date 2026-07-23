@@ -47,7 +47,6 @@ The `plain` package includes everything you need to start handling web requests 
 - [plain.admin](/plain-admin/plain/admin/README.md) - An admin interface for back-office tasks.
 - [plain.flags](/plain-flags/plain/flags/README.md) - Feature flags.
 - [plain.redirection](/plain-redirection/plain/redirection/README.md) - Redirects managed in the database.
-- [plain.observer](/plain-observer/plain/observer/README.md) - On-page telemetry reporting.
 - [plain.connect](/plain-connect/plain/connect/README.md) - Export traces, metrics, and logs to Plain Cloud via OTLP.
 
 ## Dev Packages
@@ -64,5 +63,4 @@ The `plain` package includes everything you need to start handling web requests 
 - [plain.htmx](/plain-htmx/plain/htmx/README.md) - HTMX integrated into views and templates.
 - [plain.elements](/plain-elements/plain/elements/README.md) - Server-side HTML components.
 - [plain.pages](/plain-pages/plain/pages/README.md) - Static pages with Markdown and Jinja2.
-- [plain.esbuild](/plain-esbuild/plain/esbuild/README.md) - Simple JavaScript bundling and minification.
 - [plain.vendor](/plain-vendor/plain/vendor/README.md) - Vendor JavaScript and CSS libraries.

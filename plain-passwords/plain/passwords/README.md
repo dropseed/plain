@@ -62,7 +62,7 @@ from plain.passwords.hashers import check_password
 def setter(new_hash):
     # Called when the hash needs to be upgraded
     user.password = new_hash
-    user.save()
+    user.update()
 
 is_valid = check_password("user-password", stored_hash, setter=setter)
 ```
@@ -133,7 +133,7 @@ When you assign a raw password, it gets hashed automatically on save:
 
 ```python
 user = User(email="user@example.com", password="my-password")
-user.save()
+user.create()
 # user.password is now a hash like: pbkdf2_sha256$720000$...
 ```
 

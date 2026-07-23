@@ -3,7 +3,6 @@ from app.examples.models.delete import (
     ChildCascade,
     ChildSetNull,
     DeleteParent,
-    UnconstrainedChild,
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 
@@ -28,7 +27,7 @@ class TestForwardForeignKeyDescriptor:
 
         # Test setting the forward relationship
         child.parent = parent2
-        child.save()
+        child.update()
         child.refresh_from_db()
         assert child.parent == parent2
 
@@ -41,7 +40,7 @@ class TestForwardForeignKeyDescriptor:
         with pytest.raises(
             Exception, match="constraint|null|NOT NULL"
         ):  # Database constraint error
-            child.save()
+            child.update()
 
     def test_set_to_none_nullable(self, db):
         parent = DeleteParent.query.create(name="Test Parent")
@@ -50,13 +49,13 @@ class TestForwardForeignKeyDescriptor:
         # Test setting nullable FK to None
         child.parent = None
         try:
-            child.save()
+            child.update()
             child.refresh_from_db()
             assert child.parent is None
         except Exception as e:
             # For now, accept that nullable FK behavior might need adjustment
             # The core relationship functionality works
-            pytest.skip(f"Nullable FK handling needs refinement: {e}")  # ty: ignore[too-many-positional-arguments]
+            pytest.skip(f"Nullable FK handling needs refinement: {e}")
 
 
 class TestReverseForeignKey:
@@ -519,52 +518,44 @@ class TestForeignKeyPartialInstance:
     available with no query, other fields load on first access. There is no
     separate ``<name>_id`` attribute -- ``child.parent.id`` is the key."""
 
-    def _count_queries(self, fn):
-        from plain.postgres.db import get_connection
-
-        conn = get_connection()
-        previous = conn.force_debug_cursor
-        conn.force_debug_cursor = True
-        conn.queries_log.clear()
-        try:
-            result = fn()
-            return result, len(conn.queries_log)
-        finally:
-            conn.force_debug_cursor = previous
-
-    def test_primary_key_access_is_free(self, db):
+    def test_primary_key_access_is_free(self, db, capture_queries):
         parent = DeleteParent.query.create(name="Parent")
         created = ChildCascade.query.create(parent=parent)
         child = ChildCascade.query.get(id=created.id)  # fresh, nothing cached
 
-        related, queries = self._count_queries(lambda: child.parent)
-        assert queries == 0
+        with capture_queries() as queries:
+            related = child.parent
+        assert len(queries) == 0
         assert isinstance(related, DeleteParent)
 
-        pk, queries = self._count_queries(lambda: child.parent.id)
-        assert queries == 0
+        with capture_queries() as queries:
+            pk = child.parent.id
+        assert len(queries) == 0
         assert pk == parent.id
 
-    def test_other_fields_load_on_demand(self, db):
+    def test_other_fields_load_on_demand(self, db, capture_queries):
         parent = DeleteParent.query.create(name="Parent")
         created = ChildCascade.query.create(parent=parent)
         child = ChildCascade.query.get(id=created.id)
 
-        name, queries = self._count_queries(lambda: child.parent.name)
-        assert queries == 1
+        with capture_queries() as queries:
+            name = child.parent.name
+        assert len(queries) == 1
         assert name == "Parent"
 
-    def test_one_query_hydrates_the_whole_row(self, db):
+    def test_one_query_hydrates_the_whole_row(self, db, capture_queries):
         tag = Tag.query.create(name="t")
         widget = Widget.query.create(name="W", size="L")
         created = WidgetTag.query.create(widget=widget, tag=tag)
         widget_tag = WidgetTag.query.get(id=created.id)
 
-        _, first = self._count_queries(lambda: widget_tag.widget.name)
-        assert first == 1
+        with capture_queries() as first:
+            _ = widget_tag.widget.name
+        assert len(first) == 1
         # The whole row was hydrated -- a second field needs no further query.
-        _, second = self._count_queries(lambda: widget_tag.widget.size)
-        assert second == 0
+        with capture_queries() as second:
+            _ = widget_tag.widget.size
+        assert len(second) == 0
 
     def test_no_id_suffixed_attribute(self, db):
         parent = DeleteParent.query.create(name="Parent")
@@ -575,19 +566,20 @@ class TestForeignKeyPartialInstance:
     def test_assign_by_primary_key(self, db):
         parent = DeleteParent.query.create(name="Parent")
         child = ChildCascade(parent=parent.id)
-        child.save()
+        child.create()
 
         reloaded = ChildCascade.query.get(id=child.id)
         assert reloaded.parent.id == parent.id
 
-    def test_select_related_returns_fully_loaded_instance(self, db):
+    def test_select_related_returns_fully_loaded_instance(self, db, capture_queries):
         parent = DeleteParent.query.create(name="Parent")
         created = ChildCascade.query.create(parent=parent)
         child = ChildCascade.query.select_related("parent").get(id=created.id)
 
         # The JOIN already loaded every column -- no query for any field.
-        _, queries = self._count_queries(lambda: child.parent.name)
-        assert queries == 0
+        with capture_queries() as queries:
+            _ = child.parent.name
+        assert len(queries) == 0
 
     def test_non_nullable_fk_with_no_value_raises_consistently(self, db):
         # A non-nullable foreign key with no value must raise on every access,
@@ -598,7 +590,7 @@ class TestForeignKeyPartialInstance:
         with pytest.raises(AttributeError, match="has no parent"):
             _ = child.parent
 
-    def test_reverse_iteration_prepopulates_forward_fk(self, db):
+    def test_reverse_iteration_prepopulates_forward_fk(self, db, capture_queries):
         parent = DeleteParent.query.create(name="Parent")
         ChildCascade.query.create(parent=parent)
         ChildCascade.query.create(parent=parent)
@@ -606,20 +598,20 @@ class TestForeignKeyPartialInstance:
         children = list(parent.childcascade_set.query.all())
         # Each child's .parent is pre-populated from the known parent, so
         # reading parent fields in the loop issues no further queries.
-        _, queries = self._count_queries(
-            lambda: [child.parent.name for child in children]
-        )
-        assert queries == 0
+        with capture_queries() as queries:
+            _ = [child.parent.name for child in children]
+        assert len(queries) == 0
 
-    def test_save_keeps_foreign_key_cache(self, db):
+    def test_save_keeps_foreign_key_cache(self, db, capture_queries):
         parent = DeleteParent.query.create(name="Parent")
         child = ChildCascade.query.create(parent=parent)
 
-        child.save()
+        child.update()
 
-        # save() must not evict the cached related object.
-        _, queries = self._count_queries(lambda: child.parent.name)
-        assert queries == 0
+        # update() must not evict the cached related object.
+        with capture_queries() as queries:
+            _ = child.parent.name
+        assert len(queries) == 0
 
     def test_save_with_deferred_fk_preserves_value(self, db):
         parent = DeleteParent.query.create(name="Parent")
@@ -627,7 +619,7 @@ class TestForeignKeyPartialInstance:
 
         # Load with the foreign key column deferred, then save.
         deferred = ChildCascade.query.only("id").get(id=created.id)
-        deferred.save()
+        deferred.update()
 
         reloaded = ChildCascade.query.get(id=created.id)
         assert reloaded.parent.id == parent.id
@@ -675,29 +667,3 @@ class TestForeignKeyPartialInstance:
         with pytest.raises(AttributeError):
             del child.parent
         assert fk_field.is_cached(child)  # ty: ignore[unresolved-attribute]
-
-    def test_unconstrained_fk_is_queried_on_access(self, db):
-        # A db_constraint=False foreign key has no database guarantee that the
-        # row exists, so it is queried on access rather than synthesized.
-        parent = DeleteParent.query.create(name="Parent")
-        created = UnconstrainedChild.query.create(parent=parent)
-        child = UnconstrainedChild.query.get(id=created.id)
-
-        related, queries = self._count_queries(lambda: child.parent)
-        assert queries == 1
-        assert related == parent
-
-    def test_unconstrained_fk_raises_on_missing_target(self, db):
-        # Without a database FK constraint the target row can disappear. The
-        # stale key must raise on access -- not return a phantom partial
-        # instance that looks valid until a non-key field is read.
-        parent = DeleteParent.query.create(name="Parent")
-        created = UnconstrainedChild.query.create(parent=parent)
-        parent.delete()  # NO_ACTION + no DB constraint: the child now dangles
-
-        child = UnconstrainedChild.query.get(id=created.id)
-        with pytest.raises(DeleteParent.DoesNotExist):
-            _ = child.parent
-        # Same exception family as an empty foreign key -- also an
-        # AttributeError -- so hasattr() reports False rather than propagating.
-        assert not hasattr(child, "parent")

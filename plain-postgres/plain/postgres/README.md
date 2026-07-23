@@ -18,6 +18,7 @@
 - [Forms](#forms)
 - [Architecture](#architecture)
 - [Diagnostics](#diagnostics)
+- [Tracing](#tracing)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -61,7 +62,7 @@ user = User.query.create(
 
 # Update a user
 user.email = "new@example.com"
-user.save()
+user.update()
 
 # Delete a user
 user.delete()
@@ -375,12 +376,12 @@ total = User.query.count()
 
 #### Use `bulk_create` / `bulk_update` for batch operations
 
-Avoid calling `.save()` in a loop — each call is a separate query.
+Avoid calling `.create()` in a loop — each call is a separate query.
 
 ```python
 # Bad — N INSERT statements
 for name in names:
-    Tag(name=name).save()
+    Tag(name=name).create()
 
 # Good — single INSERT
 Tag.query.bulk_create([Tag(name=name) for name in names])
@@ -392,7 +393,7 @@ Tag.query.bulk_create([Tag(name=name) for name in names])
 # Bad — N UPDATE statements
 for user in User.query.filter(is_active=False):
     user.is_archived = True
-    user.save()
+    user.update()
 
 # Good — single UPDATE statement
 User.query.filter(is_active=False).update(is_archived=True)
@@ -439,16 +440,16 @@ from plain.postgres import transaction
 
 with transaction.atomic():
     user = User(email="test@example.com")
-    user.save()
-    Profile(user=user).save()
-    # Both saves commit together, or both roll back on error
+    user.create()
+    Profile(user=user).create()
+    # Both writes commit together, or both roll back on error
 ```
 
 Nesting `atomic()` creates savepoints:
 
 ```python
 with transaction.atomic():
-    user.save()
+    user.create()
     try:
         with transaction.atomic():
             risky_operation()  # If this fails...
@@ -774,6 +775,26 @@ Environment overrides: every setting accepts `PLAIN_POSTGRES_*` env vars, so you
 PLAIN_POSTGRES_MIGRATION_STATEMENT_TIMEOUT=30s plain migrations apply
 ```
 
+### Schema lock
+
+Schema-changing commands — `plain postgres sync`, `plain migrations apply`, `plain postgres converge`, and `plain postgres drop-unknown-tables` — serialize on a single session-level advisory lock, so two deploy processes running at once (a retried migrate job, overlapping release phases) can't interleave schema changes. You don't have to do anything to get this.
+
+A second process warns and waits, retrying until the holder finishes:
+
+```python
+# app/settings.py — defaults shown (waits up to an hour total)
+POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL = 5.0
+POSTGRES_SCHEMA_LOCK_MAX_RETRIES = 720
+```
+
+The wait is generous by default because a legitimate holder can be mid index build. If the budget runs out, the command fails with the holder's `pid` so you can see what's blocking. A crashed holder is not a problem — the lock releases automatically when its database session closes.
+
+The lock is held on its own connection, separate from the one running DDL, so non-transactional operations (`CREATE INDEX CONCURRENTLY`, `VALIDATE CONSTRAINT`) work normally while it's held. Session-level locks don't survive transaction-mode poolers like pgbouncer — if your `POSTGRES_URL` points at one, set [`POSTGRES_MANAGEMENT_URL`](#bypassing-a-connection-pooler-for-management-operations) to a direct connection.
+
+The lock connection sits idle while your DDL runs, so it enables TCP keepalives to survive NAT and load-balancer idle timeouts. A server-side `idle_session_timeout` would still kill it (releasing the lock mid-run) — don't set one for the role that runs migrations. `sync` re-verifies the lock between its migrate and converge phases and stops with a clear error if the session died.
+
+To see the lock live: `SELECT * FROM pg_locks WHERE locktype = 'advisory' AND objid = 1047265496`.
+
 ## Fields
 
 You can use many field types for different data:
@@ -944,7 +965,7 @@ book.author.name   # one query — loads the rest of the row
 
 The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `select_related()` to load related rows up front and avoid a query per row.
 
-The partial-instance shortcut relies on the database guaranteeing the row exists. A foreign key declared with `db_constraint=False` has no such guarantee, so it is queried on access instead — a stale key raises `DoesNotExist` right away rather than yielding a placeholder.
+The partial-instance shortcut is safe because Plain always creates a database foreign-key constraint, so the referenced row is guaranteed to exist.
 
 ### Reverse relationships
 
@@ -1020,7 +1041,7 @@ author.books.query.published()
 
 ### Validation
 
-`save()` runs `full_clean()` by default — field validators, model `clean()`, and any constraints with a `validate()` method are all checked, raising `ValidationError` on violation. Pass `clean_and_validate=False` to skip it (e.g. for trusted bulk loads).
+`create()` and `update()` run `full_clean()` by default — field validators and the model's `clean()` method — raising `ValidationError` on violation. Pass `clean_and_validate=False` to skip it (e.g. for trusted bulk loads). Constraints are _not_ pre-checked here; the database enforces them (see below).
 
 ```python
 @postgres.register_model
@@ -1040,6 +1061,33 @@ class User(postgres.Model):
 ```
 
 Field-level validation happens automatically based on field types and constraints.
+
+**The database is authoritative for constraints.** `create()`/`update()` don't pre-check your declared unique/check constraints — they attempt the write, and if Postgres rejects it, translate the `IntegrityError` into a `ValidationError` (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). You get the same field-level error you'd expect, the write costs no per-constraint `SELECT`, and a raced concurrent insert can't slip through as a 500. (FK violations, `NOT NULL`, and a hand-set primary-key collision have no declared constraint to map to and re-raise as the original `IntegrityError`. `create()` always inserts, so passing a stray `id` that already exists is rejected by Postgres as the original `IntegrityError`.)
+
+Because the rejected write reaches the database, it aborts the surrounding transaction. If you catch the `ValidationError` and want to keep using the transaction, wrap the write in `transaction.atomic()` so it rolls back to a savepoint:
+
+```python
+try:
+    with transaction.atomic():
+        User.query.create(email=taken_email)
+except ValidationError:
+    ...  # report it — the transaction is still usable
+```
+
+Forms are the exception: a `ModelForm` pre-checks constraints explicitly (a `validate_constraints()` call in its `_post_clean`) so it can surface every violation at once, then writes via `form.create()`/`form.update()` with validation already done. A direct `create()`/`update()` reports the first violation Postgres hits.
+
+This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to. If you retry on a unique conflict, catch both:
+
+```python
+try:
+    obj.create()
+except (psycopg.IntegrityError, ValidationError):
+    ...  # lost a race — reload and retry, or report it
+```
+
+For a plain insert-or-update with no per-row logic, `bulk_create(..., update_conflicts=True, unique_fields=[...])` is an atomic upsert with no race to catch.
+
+Two caveats. The mapping covers **immediate** constraints — the default. An explicitly deferred constraint (`UniqueConstraint(deferrable=Deferrable.DEFERRED)`) is checked at commit, _after_ the write returns, so its violation still surfaces as a raw `psycopg.IntegrityError`. And when a row violates several constraints at once, a form's pre-check (or an explicit `validate_constraints()`) reports them all, while a direct `create()`/`update()` gets only the first one the database hits.
 
 ### Indexes and constraints
 
@@ -1063,7 +1111,7 @@ class User(postgres.Model):
     )
 ```
 
-Constraints are also checked during `full_clean()` (which `save()` runs by default — see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
+Constraints are checked by `validate_constraints()` — run by a `ModelForm` (and any explicit `validate_constraints()` call), but **not** by `full_clean()` (which validates shape only) or a direct `create()`/`update()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
 
 ```python
 # Simple message — lands on NON_FIELD_ERRORS
@@ -1142,10 +1190,11 @@ class Order(postgres.Model):
 Enforce uniqueness and data integrity at the database level.
 
 ```python
-# Bad — only validated in Python
-def save(self):
+# Bad — only validated in Python (racy: two requests can both pass the check)
+def create(self):
     if MyModel.query.filter(email=self.email).exists():
         raise ValueError("duplicate")
+    return super().create()
 
 # Good — database-enforced
 model_options = postgres.Options(
@@ -1193,7 +1242,7 @@ class UserForm(forms.ModelForm):
 # Usage
 form = UserForm(request=request)
 if form.is_valid():
-    user = form.save()
+    user = form.create()
 ```
 
 ## Architecture
@@ -1389,6 +1438,21 @@ These are static, code-level checks that catch issues before you deploy. The `di
 - **LLM-powered column recommendations for missing indexes** — `missing_index_candidates` shows the culprit queries and lets you decide. For precise column-level suggestions, use a platform tool (PlanetScale Insights, Dexter, pg_qualstats + hypopg).
 - **Historical trending** — `diagnose` is stateless; it reports on the current state of cumulative stats. Continuous monitoring is out of scope.
 - **Niche server checks** (WAL bloat, replication slot age, etc.) — better covered by your Postgres provider's monitoring or a dedicated tool; users on self-hosted setups that need them typically have their own tooling.
+
+## Tracing
+
+Every query runs inside an OpenTelemetry `CLIENT` span with standard `db.*` attributes, so queries show up as children of whatever request, job, or chore triggered them. You don't configure anything for this — it's on by default and only exports if your app exports traces (e.g. with [plain.connect](../../../plain-connect/plain/connect/README.md)).
+
+If code runs a query with _no_ active span — a background thread, a polling loop — that query's span becomes its own single-span trace. For framework-internal housekeeping queries where that's pure noise, you can suppress query tracing entirely:
+
+```python
+from plain.postgres.otel import suppress_db_tracing
+
+with suppress_db_tracing():
+    MyModel.query.count()  # No span, no query metrics
+```
+
+This is meant for infrastructure code (pollers, metric gauge callbacks, test fixtures) — not for hiding application queries, which you almost always want visible in traces.
 
 ## Settings
 

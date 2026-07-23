@@ -1,5 +1,35 @@
 # plain-passwords changelog
 
+## [0.26.5](https://github.com/dropseed/plain/releases/plain-passwords@0.26.5) (2026-07-21)
+
+### What's changed
+
+- Removed dead code in `identify_hasher` that detected ancient unsalted MD5/SHA1 password formats — no `unsalted_md5` or `unsalted_sha1` hashers exist to handle them, so those branches could only raise. ([76afc81605](https://github.com/dropseed/plain/commit/76afc81605))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.26.4](https://github.com/dropseed/plain/releases/plain-passwords@0.26.4) (2026-06-08)
+
+### What's changed
+
+- Internal: a commented-out example in `PasswordSignupView.form_valid` updated from `form.save()` to `form.create()` to track the `plain.postgres` `ModelForm` API change. No functional change. ([66634f5af9](https://github.com/dropseed/plain/commit/66634f5af9))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.26.3](https://github.com/dropseed/plain/releases/plain-passwords@0.26.3) (2026-06-03)
+
+### What's changed
+
+- Internal: the password-rehash setter in `check_user_password` and `PasswordSetForm.save` now write via `user.update(...)` instead of `user.save(...)`. ([f75deb3ba2](https://github.com/dropseed/plain/commit/f75deb3ba2))
+
+### Upgrade instructions
+
+- No changes required. Your `User` model must be on `plain.postgres>=0.106.0` (which provides `update()`).
+
 ## [0.26.2](https://github.com/dropseed/plain/releases/plain-passwords@0.26.2) (2026-05-22)
 
 ### What's changed

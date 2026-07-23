@@ -130,6 +130,22 @@ class ExampleDetailView(DetailView):
 
 The single object is exposed in templates as `object`; list views expose `objects`. Set `context_object_name` for a more descriptive name.
 
+`ListView` paginates when you set `page_size`. The page number comes from the `?page` query param (invalid values fall back to the first or last page), `objects` becomes the current `Page` — iterate it exactly like the full list — and `page_obj` is available for rendering pagination controls (`None` when pagination is off):
+
+```python
+from plain.templates.views import ListView
+
+
+class ExampleListView(ListView):
+    template_name = "list.html"
+    page_size = 30
+
+    def get_objects(self):
+        return MyObjectClass.query.order_by("-created_at")
+```
+
+Override `get_page_size()` to compute the page size per request. A paginated queryset needs a deterministic order (an `order_by()` or a model default) — unordered results can shift between pages. An empty `Page` is falsy, so check `{% if page_obj is not none %}` to test whether pagination is on.
+
 ## Error views
 
 `TemplateView` overrides `handle_exception` to render `{status}.html` for any exception that escapes the handler — `404.html` for `NotFoundError404`, `500.html` for unhandled errors, etc. The context is `{request, status_code, exception, DEBUG}`. On `TemplateFileMissing` the view returns a plain-text status response (`404 Not Found`, `500 Internal Server Error`); on any other render failure it logs and returns a bare-status `Response` so `_respond_to_exception` can still attach `response.exception` for observability.

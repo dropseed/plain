@@ -421,6 +421,36 @@ def test_run_loop_returns_connection_each_tick(
     assert ticks == 2
 
 
+def test_run_loop_claims_job_and_submits(db, worker: Worker, monkeypatch) -> None:
+    """A full claim through _run_loop: poll finds the JobRequest, converts it
+    to a JobProcess, and submits it to the executor. Submission is stubbed —
+    spawned worker processes can't see the test transaction's data anyway."""
+    name = jobs_registry.get_job_class_name(_RecordingJob)
+    request = JobRequest.query.create(
+        job_class=name,
+        parameters={"args": [], "kwargs": {}},
+    )
+    worker.register_heartbeat()
+
+    submitted: list[str] = []
+
+    def fake_submit(fn, job_process_uuid: str) -> Future:
+        submitted.append(job_process_uuid)
+        return Future()
+
+    monkeypatch.setattr(worker.executor, "submit", fake_submit)
+    # After the claim, the next tick's empty poll sleeps — use it to exit.
+    monkeypatch.setattr(
+        "plain.jobs.workers.time.sleep", lambda seconds: worker.shutdown()
+    )
+
+    worker._run_loop()
+
+    process = JobProcess.query.get(job_request_uuid=request.uuid)
+    assert submitted == [str(process.uuid)]
+    assert not JobRequest.query.filter(uuid=request.uuid).exists()
+
+
 def test_future_finished_callback_rescues_orphan_jobprocess(db) -> None:
     """If a future completes "successfully" but the JobProcess row survives
     (because process_job's outer except-Exception swallowed a framework error
@@ -451,7 +481,7 @@ def test_future_finished_callback_marks_killed_mid_run_as_lost(db) -> None:
     job_process = _make_job_process(_RecordingJob, worker_id=uuid.uuid4())
     # Simulate the child having entered run() before being killed.
     job_process.started_at = timezone.now()
-    job_process.save(update_fields=["started_at"])
+    job_process.update(fields=["started_at"])
 
     fake_future: Future = Future()
     fake_future.set_exception(RuntimeError("BrokenProcessPool"))
@@ -530,7 +560,7 @@ def test_rescue_own_orphans_converts_stranded_row_to_lost(
     job_process = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
     # Backdate so it's past the cutoff.
     job_process.created_at = timezone.now() - datetime.timedelta(seconds=120)
-    job_process.save(update_fields=["created_at"])
+    job_process.update(fields=["created_at"])
 
     worker._rescue_own_orphans()
 
@@ -548,7 +578,7 @@ def test_rescue_own_orphans_leaves_inflight_rows_alone(
 
     job_process = _make_job_process(_RecordingJob, worker_id=worker.worker_id)
     job_process.created_at = timezone.now() - datetime.timedelta(seconds=120)
-    job_process.save(update_fields=["created_at"])
+    job_process.update(fields=["created_at"])
 
     fake_future: Future = Future()
     worker._inflight_futures[fake_future] = str(job_process.uuid)
@@ -587,7 +617,7 @@ def test_rescue_own_orphans_ignores_other_workers_rows(
     other_worker_id = uuid.uuid4()
     other_job = _make_job_process(_RecordingJob, worker_id=other_worker_id)
     other_job.created_at = timezone.now() - datetime.timedelta(seconds=120)
-    other_job.save(update_fields=["created_at"])
+    other_job.update(fields=["created_at"])
 
     worker._rescue_own_orphans()
 

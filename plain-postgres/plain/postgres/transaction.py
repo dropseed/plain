@@ -20,8 +20,8 @@ def mark_for_rollback_on_error() -> Generator[None]:
     """
     Internal low-level utility to mark a transaction as "needs rollback" when
     an exception is raised while not enforcing the enclosed block to be in a
-    transaction. This is needed by Model.save() and friends to avoid starting a
-    transaction when in autocommit mode and a single query is executed.
+    transaction. This is needed by Model.create()/update() and friends to avoid
+    starting a transaction when in autocommit mode and a single query is executed.
 
     It's equivalent to:
 
@@ -106,8 +106,12 @@ class Atomic(ContextDecorator):
                 "A durable atomic block cannot be nested within another atomic block."
             )
         if not conn.in_atomic_block:
-            # Reset state when entering an outermost atomic block.
+            # Reset state when entering an outermost atomic block. Clearing
+            # rollback_exc keeps a stale value from the reused connection wrapper
+            # from being misattributed as the cause of a later block's
+            # broken-transaction error.
             conn.needs_rollback = False
+            conn.rollback_exc = None
         if conn.in_atomic_block:
             # We're already in a transaction; create a savepoint, unless we
             # were told not to or we're already waiting for a rollback. The
@@ -181,6 +185,13 @@ class Atomic(ContextDecorator):
                     # otherwise.
                     if sid is None:
                         conn.needs_rollback = True
+                        # Record what broke the transaction (when we can see it)
+                        # so validate_no_broken_transaction() chains from the
+                        # real cause rather than a stale or absent one. Mirror
+                        # mark_for_rollback_on_error() and only capture Exception
+                        # (not BaseException like KeyboardInterrupt/SystemExit).
+                        if isinstance(exc_value, Exception):
+                            conn.rollback_exc = exc_value
                     else:
                         try:
                             conn.savepoint_rollback(sid)
