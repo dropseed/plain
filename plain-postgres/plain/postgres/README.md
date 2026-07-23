@@ -403,11 +403,13 @@ with its DB-generated fields (primary key, DB defaults) populated.
 # Insert new items, refresh `value`/`expires_at` on any existing key.
 CacheItem.query.bulk_upsert(
     [CacheItem(key=k, value=v, expires_at=exp) for k, v in items],
-    update_fields=["value", "expires_at"],
-    unique_fields=["key"],
+    update_fields=[CacheItem.value, CacheItem.expires_at],
+    unique_fields=[CacheItem.key],
 )
 ```
 
+- `update_fields` and `unique_fields` take field references (`Model.field`), not
+  strings.
 - `unique_fields` must name the **primary key** or a `UniqueConstraint` declared
   on the model (no condition, no expressions) — this is the conflict target.
 - `update_fields` must be concrete, non-primary-key, and must not overlap
