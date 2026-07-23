@@ -281,7 +281,7 @@ class TokenView(View):
         # Lock the code row so two concurrent exchanges can't both spend it.
         with transaction.atomic():
             try:
-                auth_code = AuthorizationCode.query.select_for_update().get(
+                auth_code = AuthorizationCode.query.for_update().get(
                     code=code_value, application=application
                 )
             except AuthorizationCode.DoesNotExist:
@@ -317,7 +317,7 @@ class TokenView(View):
         with transaction.atomic():
             try:
                 refresh = (
-                    RefreshToken.query.select_for_update()
+                    RefreshToken.query.for_update()
                     .select_related("access_token")
                     .get(token_hash=_hash_token(token_value), application=application)
                 )

@@ -312,15 +312,15 @@ def distinct_sql(
         return ["DISTINCT"], []
 
 
-def for_update_sql(
+def lock_sql(
+    mode: str,
     nowait: bool = False,
     skip_locked: bool = False,
     of: tuple[str, ...] = (),
-    no_key: bool = False,
 ) -> str:
-    """Return the FOR UPDATE SQL clause to lock rows for an update operation."""
-    return "FOR{} UPDATE{}{}{}".format(
-        " NO KEY" if no_key else "",
+    """Return a row-level locking clause (FOR UPDATE, FOR SHARE, etc.)."""
+    return "{}{}{}{}".format(
+        mode,
         " OF {}".format(", ".join(of)) if of else "",
         " NOWAIT" if nowait else "",
         " SKIP LOCKED" if skip_locked else "",

@@ -857,9 +857,7 @@ class QuerySet[T: "Model"]:
         with transaction.atomic():
             # Lock the row so that a concurrent update is blocked until
             # update_or_create() has performed its save.
-            obj, created = self.select_for_update().get_or_create(
-                create_defaults, **kwargs
-            )
+            obj, created = self.for_update().get_or_create(create_defaults, **kwargs)
             if created:
                 return obj, created
             for k, v in resolve_callables(update_defaults):
@@ -939,7 +937,7 @@ class QuerySet[T: "Model"]:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
         del_query = self._chain()
-        del_query.sql_query.select_for_update = False
+        del_query.sql_query.lock_mode = None
         del_query.sql_query.select_related = False
         del_query.sql_query.clear_ordering(force=True)
 
@@ -1159,25 +1157,60 @@ class QuerySet[T: "Model"]:
         else:
             self._query.add_q(Q(*args, **kwargs))
 
-    def select_for_update(
+    def for_update(
         self,
         nowait: bool = False,
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
-        no_key: bool = False,
+    ) -> QuerySet[T]:
+        """Return a new QuerySet that locks selected rows with FOR UPDATE."""
+        return self._lock_rows("FOR UPDATE", nowait, skip_locked, of)
+
+    def for_no_key_update(
+        self,
+        nowait: bool = False,
+        skip_locked: bool = False,
+        of: tuple[str, ...] = (),
+    ) -> QuerySet[T]:
+        """Return a new QuerySet that locks selected rows with FOR NO KEY UPDATE."""
+        return self._lock_rows("FOR NO KEY UPDATE", nowait, skip_locked, of)
+
+    def for_share(
+        self,
+        nowait: bool = False,
+        skip_locked: bool = False,
+        of: tuple[str, ...] = (),
+    ) -> QuerySet[T]:
+        """Return a new QuerySet that locks selected rows with FOR SHARE."""
+        return self._lock_rows("FOR SHARE", nowait, skip_locked, of)
+
+    def for_key_share(
+        self,
+        nowait: bool = False,
+        skip_locked: bool = False,
+        of: tuple[str, ...] = (),
+    ) -> QuerySet[T]:
+        """Return a new QuerySet that locks selected rows with FOR KEY SHARE."""
+        return self._lock_rows("FOR KEY SHARE", nowait, skip_locked, of)
+
+    def _lock_rows(
+        self,
+        mode: str,
+        nowait: bool,
+        skip_locked: bool,
+        of: tuple[str, ...],
     ) -> QuerySet[T]:
         """
-        Return a new QuerySet instance that will select objects with a
-        FOR UPDATE lock.
+        Build a new QuerySet carrying a row-level locking clause. Calling more
+        than one lock method on a chain keeps only the last mode.
         """
         if nowait and skip_locked:
             raise ValueError("The nowait option cannot be used with skip_locked.")
         obj = self._chain()
-        obj.sql_query.select_for_update = True
-        obj.sql_query.select_for_update_nowait = nowait
-        obj.sql_query.select_for_update_skip_locked = skip_locked
-        obj.sql_query.select_for_update_of = of
-        obj.sql_query.select_for_no_key_update = no_key
+        obj.sql_query.lock_mode = mode
+        obj.sql_query.lock_nowait = nowait
+        obj.sql_query.lock_skip_locked = skip_locked
+        obj.sql_query.lock_of = of
         return obj
 
     def select_related(self, *fields: str | None) -> Self:

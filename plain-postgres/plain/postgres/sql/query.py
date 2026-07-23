@@ -226,11 +226,10 @@ class Query(BaseExpression):
     high_mark = None  # Used for offset/limit.
     distinct = False
     distinct_fields: tuple[str, ...] = ()
-    select_for_update = False
-    select_for_update_nowait = False
-    select_for_update_skip_locked = False
-    select_for_update_of: tuple[str, ...] = ()
-    select_for_no_key_update = False
+    lock_mode: str | None = None  # The row-level locking clause, e.g. "FOR UPDATE".
+    lock_nowait = False
+    lock_skip_locked = False
+    lock_of: tuple[str, ...] = ()
     select_related: bool | dict[str, Any] = False
     has_select_fields = False
     # Arbitrary limit for select_related to prevents infinite recursion.
@@ -428,7 +427,7 @@ class Query(BaseExpression):
             inner_query = self.clone()
             inner_query.subquery = True
             outer_query = AggregateQuery(self.model, inner_query)
-            inner_query.select_for_update = False
+            inner_query.lock_mode = None
             inner_query.select_related = False
             inner_query.set_annotation_mask(self.annotation_select)
             # Queries with distinct_fields need ordering and when a limit is
@@ -520,7 +519,7 @@ class Query(BaseExpression):
         elide_empty = not any(result is NotImplemented for result in empty_set_result)
         outer_query.clear_ordering(force=True)
         outer_query.clear_limits()
-        outer_query.select_for_update = False
+        outer_query.lock_mode = None
         outer_query.select_related = False
         compiler = outer_query.get_compiler(elide_empty=elide_empty)
         result = compiler.execute_sql(SINGLE)
@@ -2077,9 +2076,7 @@ class Query(BaseExpression):
         If 'clear_default' is True, there will be no ordering in the resulting
         query (not even the model's default).
         """
-        if not force and (
-            self.is_sliced or self.distinct_fields or self.select_for_update
-        ):
+        if not force and (self.is_sliced or self.distinct_fields or self.lock_mode):
             return
         self.order_by = ()
         if clear_default:
