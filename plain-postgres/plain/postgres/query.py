@@ -7,7 +7,7 @@ from __future__ import annotations
 import copy
 import operator
 import warnings
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from functools import cached_property
 from itertools import islice
 from typing import TYPE_CHECKING, Any, Never, Self, cast, overload
@@ -687,24 +687,48 @@ class QuerySet[T: "Model"]:
 
         return objs
 
+    def _validate_upsert_unique_fields(
+        self, unique_field_names: Sequence[str | None], *, operation_name: str
+    ) -> None:
+        """Require unique_fields, and that they match a usable model constraint.
+
+        Shared by upsert() and bulk_upsert(); operation_name names the caller in
+        the error messages.
+        """
+        if not unique_field_names:
+            raise ValueError(f"{operation_name}() requires unique_fields.")
+        if not self.model.model_options.unique_fields_match_constraint(
+            set(unique_field_names)
+        ):
+            raise ValueError(
+                f"{operation_name}() unique_fields {unique_field_names} on "
+                f"{self.model.__name__} must name the primary key or a "
+                "UniqueConstraint declared on the model without a condition or "
+                "expressions."
+            )
+
+    def _reject_null_upsert_key(
+        self, field: Field, value: Any, *, operation_name: str
+    ) -> None:
+        """Reject a null value for a conflict key field.
+
+        Shared by upsert() and bulk_upsert(); NULL never conflicts in Postgres,
+        so a null unique-field value can't be upserted.
+        """
+        if value is None:
+            raise ValueError(
+                f"{operation_name}() requires a non-null {field.name}; NULL never "
+                "conflicts in Postgres, so it cannot be upserted."
+            )
+
     def _check_bulk_upsert_options(
         self,
         update_fields: list[Field],
         unique_fields: list[Field],
     ) -> None:
-        model_name = self.model.__name__
-
-        if not unique_fields:
-            raise ValueError("bulk_upsert() requires unique_fields.")
-        if not self.model.model_options.unique_fields_match_constraint(
-            {f.name for f in unique_fields}
-        ):
-            names = [f.name for f in unique_fields]
-            raise ValueError(
-                f"bulk_upsert() unique_fields {names} on {model_name} must name "
-                "the primary key or a UniqueConstraint declared on the model "
-                "without a condition or expressions."
-            )
+        self._validate_upsert_unique_fields(
+            [f.name for f in unique_fields], operation_name="bulk_upsert"
+        )
 
         if not update_fields:
             raise ValueError("bulk_upsert() requires update_fields.")
@@ -758,12 +782,7 @@ class QuerySet[T: "Model"]:
             key = []
             for field in unique_fields_objs:
                 value = field.value_from_object(obj)
-                if value is None:
-                    raise ValueError(
-                        f"bulk_upsert() requires a non-null {field.name} on every "
-                        "object; NULL never conflicts in Postgres, so it cannot "
-                        "be upserted."
-                    )
+                self._reject_null_upsert_key(field, value, operation_name="bulk_upsert")
                 key.append(value)
             keyed.append((tuple(key), obj))
 
@@ -943,16 +962,7 @@ class QuerySet[T: "Model"]:
         """
         meta = self.model._model_meta
 
-        if not unique_fields:
-            raise ValueError("upsert() requires unique_fields.")
-        if not self.model.model_options.unique_fields_match_constraint(
-            set(unique_fields)
-        ):
-            raise ValueError(
-                f"upsert() unique_fields {unique_fields} on {self.model.__name__} "
-                "must name the primary key or a UniqueConstraint declared on the "
-                "model without a condition or expressions."
-            )
+        self._validate_upsert_unique_fields(unique_fields, operation_name="upsert")
 
         defaults = defaults or {}
         create_defaults = create_defaults or {}
@@ -965,14 +975,16 @@ class QuerySet[T: "Model"]:
         for source in (create_defaults, defaults, kwargs):
             insert_values.update(resolve_callables(source))
 
+        # Reject typo'd keys with a clean FieldError before they fail later and
+        # more confusingly, matching get_or_create()'s validation.
+        self._validate_model_field_names(insert_values)
+
         unique_field_objs = [meta.get_forward_field(name) for name in unique_fields]
         for field in unique_field_objs:
             assert field.name is not None
-            if insert_values.get(field.name) is None:
-                raise ValueError(
-                    f"upsert() requires a non-null {field.name}; NULL never "
-                    "conflicts in Postgres, so it cannot be upserted."
-                )
+            self._reject_null_upsert_key(
+                field, insert_values.get(field.name), operation_name="upsert"
+            )
 
         # The conflict-update columns: everything from kwargs and defaults that
         # isn't a unique field or the PK. create_defaults are insert-only, so
@@ -1031,9 +1043,14 @@ class QuerySet[T: "Model"]:
         defaults = defaults or {}
         params = {k: v for k, v in kwargs.items() if LOOKUP_SEP not in k}
         params.update(defaults)
+        self._validate_model_field_names(params)
+        return params
+
+    def _validate_model_field_names(self, names: Iterable[str]) -> None:
+        """Raise FieldError if any name isn't a model field or settable property."""
         property_names = self.model._model_meta._property_names
         invalid_params = []
-        for param in params:
+        for param in names:
             try:
                 self.model._model_meta.get_field(param)
             except FieldDoesNotExist:
@@ -1047,7 +1064,6 @@ class QuerySet[T: "Model"]:
                     "', '".join(sorted(invalid_params)),
                 )
             )
-        return params
 
     def first(self) -> T | None:
         """Return the first object of a query or None if no match is found."""

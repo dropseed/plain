@@ -380,21 +380,14 @@ def lookup_cast(lookup_type: str, field: Field | None = None) -> str:
     return lookup
 
 
-def returning_columns(fields: list[Field], extra: str = "") -> str:
-    """Return the RETURNING clause SQL for the given fields, or "" when empty.
-
-    `extra` is a raw SQL expression appended as a trailing RETURNING column.
-    upsert() uses it to return the "(xmax = 0)" created flag alongside the
-    field columns.
-    """
+def returning_columns(fields: list[Field]) -> str:
+    """Return the RETURNING clause SQL for the given fields, or "" when empty."""
+    if not fields:
+        return ""
     columns = [
         f"{quote_name(field.model.model_options.db_table)}.{quote_name(field.column)}"
         for field in fields
     ]
-    if extra:
-        columns.append(extra)
-    if not columns:
-        return ""
     return "RETURNING {}".format(", ".join(columns))
 
 

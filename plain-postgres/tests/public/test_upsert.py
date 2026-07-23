@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import pytest
 from app.examples.models.relationships import Widget
-from app.examples.models.upsert import UpsertItem
+from app.examples.models.upsert import UpsertItem, UpsertOwner
 
+from plain.postgres.exceptions import FieldError
 from plain.postgres.expressions import F
 
 
@@ -128,3 +129,47 @@ def test_upsert_unique_fields_must_match_a_constraint(db):
 def test_upsert_rejects_null_unique_value(db):
     with pytest.raises(ValueError, match="non-null"):
         UpsertItem.query.upsert(key=None, unique_fields=["key"])
+
+
+def test_upsert_conflict_defaults_accepts_related_instance(db):
+    # A model instance as a conflict_defaults value exercises the related-field
+    # branch of assignment-value compilation (prepare_database_save).
+    owner = UpsertOwner(name="owner").create()
+    UpsertItem(key="a", value=1).create()
+
+    obj, created = UpsertItem.query.upsert(
+        key="a",
+        value=2,
+        conflict_defaults={"owner": owner},
+        unique_fields=["key"],
+    )
+
+    assert created is False
+    assert obj.owner is not None
+    assert obj.owner.id == owner.id
+    reloaded = UpsertItem.query.get(key="a")
+    assert reloaded.owner is not None
+    assert reloaded.owner.id == owner.id
+
+
+def test_upsert_rejects_unknown_field_name(db):
+    with pytest.raises(FieldError, match="typo_field"):
+        UpsertItem.query.upsert(
+            key="a", defaults={"typo_field": 1}, unique_fields=["key"]
+        )
+
+
+def test_upsert_insert_is_one_statement(db, capture_queries):
+    with capture_queries() as queries:
+        UpsertItem.query.upsert(key="a", value=1, unique_fields=["key"])
+
+    assert len(queries) == 1
+
+
+def test_upsert_conflict_is_one_statement(db, capture_queries):
+    UpsertItem(key="a", value=1).create()
+
+    with capture_queries() as queries:
+        UpsertItem.query.upsert(key="a", value=2, unique_fields=["key"])
+
+    assert len(queries) == 1
