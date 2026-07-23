@@ -290,6 +290,9 @@ class QuerySet[T: "Model"]:
     # () => RETURNING every concrete column, hydrated into model instances.
     # (name, ...) => RETURNING those columns, returned as dicts.
     _returning: tuple[str, ...] | None
+    # The concrete fields resolved from _returning, or None for a plain write.
+    # Set once by returning() so update()/delete() don't re-resolve at execute.
+    _returning_fields: list[Field] | None
 
     def __init__(self):
         """Minimal init for descriptor mode. Use from_model() to create instances."""
@@ -311,6 +314,7 @@ class QuerySet[T: "Model"]:
         instance._defer_next_filter = False
         instance._deferred_filter = None
         instance._returning = None
+        instance._returning_fields = None
         return instance
 
     @overload
@@ -949,7 +953,7 @@ class QuerySet[T: "Model"]:
         clone = self._chain()
         clone.__class__ = ReturningQuerySet
         clone._returning = fields
-        clone._resolve_returning_fields()
+        clone._returning_fields = clone._resolve_returning_fields()
         return cast("ReturningQuerySet[T, Any]", clone)
 
     def _resolve_returning_fields(self) -> list[Field]:
@@ -990,9 +994,6 @@ class QuerySet[T: "Model"]:
         handled by Postgres via the declared `on_delete` clauses and are not
         included in the count.
         """
-        return self._execute_delete()
-
-    def _execute_delete(self) -> Any:
         if self.sql_query.is_sliced:
             raise TypeError("Cannot use 'limit' or 'offset' with delete().")
         if self.sql_query.distinct or self.sql_query.distinct_fields:
@@ -1000,9 +1001,7 @@ class QuerySet[T: "Model"]:
         if self._fields is not None:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
-        returning_fields = (
-            self._resolve_returning_fields() if self._returning is not None else None
-        )
+        returning_fields = self._returning_fields
 
         del_query = self._chain()
         del_query.sql_query.select_for_update = False
@@ -1019,7 +1018,8 @@ class QuerySet[T: "Model"]:
         self._result_cache = None
         if returning_fields is None:
             return result
-        return self._hydrate_returning(returning_fields, result)
+        # Reachable only via ReturningQuerySet.delete(), which returns R.
+        return self._hydrate_returning(returning_fields, result)  # ty: ignore[invalid-return-type]
 
     def _raw_delete(self, returning_fields: list[Field] | None = None) -> Any:
         """
@@ -1030,34 +1030,22 @@ class QuerySet[T: "Model"]:
         returning_fields is given (only the target table's rows — cascade
         deletes never appear in a RETURNING clause).
         """
-        from plain.postgres.sql.compiler import convert_returning_rows
-
         query = cast(DeleteQuery, self.sql_query.clone())
         query.__class__ = DeleteQuery
         query.returning_fields = returning_fields
-        cursor = query.get_compiler().execute_sql(CURSOR)
-        if not cursor:
-            return [] if returning_fields is not None else 0
-        with cursor:
-            if returning_fields is None:
-                return cursor.rowcount
-            rows = cursor.fetchall()
-        return convert_returning_rows(rows, returning_fields, get_connection())
+        return query.get_compiler().execute_sql(CURSOR)
 
     def update(self, **kwargs: Any) -> int:
         """
         Update all elements in the current QuerySet, setting all the given
         fields to the appropriate values.
         """
-        return self._execute_update(kwargs)
-
-    def _execute_update(self, values: dict[str, Any]) -> Any:
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
         if self._fields is not None:
             raise TypeError("Cannot call update() after .values() or .values_list()")
         query = self.sql_query.chain(UpdateQuery)
-        query.add_update_values(values)
+        query.add_update_values(kwargs)
 
         # Inline annotations in order_by(), if possible.
         new_order_by = []
@@ -1082,9 +1070,7 @@ class QuerySet[T: "Model"]:
         # Clear any annotations so that they won't be present in subqueries.
         query.annotations = {}
 
-        returning_fields = (
-            self._resolve_returning_fields() if self._returning is not None else None
-        )
+        returning_fields = self._returning_fields
         if returning_fields is not None:
             query.returning_fields = returning_fields
 
@@ -1093,7 +1079,8 @@ class QuerySet[T: "Model"]:
         self._result_cache = None
         if returning_fields is None:
             return result
-        return self._hydrate_returning(returning_fields, result)
+        # Reachable only via ReturningQuerySet.update(), which returns R.
+        return self._hydrate_returning(returning_fields, result)  # ty: ignore[invalid-return-type]
 
     def _update(self, values: list[tuple[Field, Any]]) -> int:
         """
@@ -1528,6 +1515,7 @@ class QuerySet[T: "Model"]:
         c._iterable_class = self._iterable_class
         c._fields = self._fields
         c._returning = self._returning
+        c._returning_fields = self._returning_fields
         return c
 
     def _attach_result_cache(self, obj: Self, cache: list[T]) -> None:
@@ -1622,10 +1610,10 @@ class ReturningQuerySet[T: "Model", R](QuerySet[T]):
     """
 
     def update(self, **kwargs: Any) -> R:  # ty: ignore[invalid-method-override]
-        return self._execute_update(kwargs)
+        return cast("R", super().update(**kwargs))
 
     def delete(self) -> R:  # ty: ignore[invalid-method-override]
-        return self._execute_delete()
+        return cast("R", super().delete())
 
 
 class InstanceCheckMeta(type):

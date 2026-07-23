@@ -8,11 +8,8 @@ returns a list of dicts holding just those columns.
 from __future__ import annotations
 
 import pytest
-from app.examples.models.returning import (
-    ReturningChild,
-    ReturningEvent,
-    ReturningParent,
-)
+from app.examples.models.delete import ChildCascade, DeleteParent
+from app.examples.models.returning import ReturningEvent
 
 from plain.postgres.exceptions import FieldError
 from plain.postgres.query import ReturningQuerySet
@@ -139,13 +136,13 @@ def test_returning_then_values_update_errors(db):
 
 
 def test_delete_returning_excludes_cascade_deleted_children(db):
-    parent = ReturningParent(name="p").create()
-    ReturningChild(parent=parent).create()
-    ReturningChild(parent=parent).create()
+    parent = DeleteParent(name="p").create()
+    ChildCascade(parent=parent).create()
+    ChildCascade(parent=parent).create()
 
-    rows = ReturningParent.query.filter(id=parent.id).returning("id", "name").delete()
+    rows = DeleteParent.query.filter(id=parent.id).returning("id", "name").delete()
 
     # Only the parent row comes back, even though two children were cascaded.
     assert len(rows) == 1
     assert rows[0] == {"id": parent.id, "name": "p"}
-    assert ReturningChild.query.count() == 0
+    assert ChildCascade.query.count() == 0

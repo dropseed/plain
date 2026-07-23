@@ -18,7 +18,7 @@ from plain.postgres.dialect import (
     limit_offset_sql,
     on_conflict_suffix_sql,
     quote_name,
-    return_insert_columns,
+    returning_columns,
 )
 from plain.postgres.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.postgres.expressions import (
@@ -527,6 +527,14 @@ class SQLCompiler:
     def compile(self, node: SQLCompilable) -> SqlWithParams:
         sql, params = node.as_sql(self, self.connection)
         return sql, tuple(params)
+
+    def _returning_sql(self) -> str:
+        """Return the RETURNING clause for this query's returning_fields, or "".
+
+        Shared by the UPDATE and DELETE compilers, whose queries carry
+        returning_fields; the RETURNING clause never takes params.
+        """
+        return returning_columns(self.query.returning_fields or [])  # ty: ignore[unresolved-attribute]
 
     def get_qualify_sql(self) -> tuple[list[str], list[Any]]:
         where_parts = []
@@ -1336,7 +1344,6 @@ class SQLCompiler:
 class SQLInsertCompiler(SQLCompiler):
     query: InsertQuery
     returning_fields: list | None = None
-    returning_params: tuple = ()
 
     def field_as_sql(self, field: Any, val: Any) -> tuple[str, list]:
         """
@@ -1487,17 +1494,11 @@ class SQLInsertCompiler(SQLCompiler):
             result.append(
                 bulk_insert_sql(fields, placeholder_rows)  # ty: ignore[invalid-argument-type]
             )
-            params = param_rows
             if conflict_suffix_sql:
                 result.append(conflict_suffix_sql)
-            # Skip empty r_sql in case returning_cols returns an empty string.
-            returning_cols = return_insert_columns(self.returning_fields)
-            if returning_cols:
-                r_sql, self.returning_params = returning_cols
-                if r_sql:
-                    result.append(r_sql)
-                    params += [list(self.returning_params)]
-            return [(" ".join(result), tuple(chain.from_iterable(params)))]
+            if returning := returning_columns(self.returning_fields):
+                result.append(returning)
+            return [(" ".join(result), tuple(chain.from_iterable(param_rows)))]
 
         # Bulk insert without returning fields
         result.append(bulk_insert_sql(fields, placeholder_rows))  # ty: ignore[invalid-argument-type]
@@ -1509,7 +1510,6 @@ class SQLInsertCompiler(SQLCompiler):
         self, returning_fields: list | None = None
     ) -> list:
         assert self.query.model is not None, "INSERT execution requires a model"
-        options = self.query.model.model_options
         self.returning_fields = returning_fields
         with self.connection.cursor() as cursor:
             for sql, params in self.as_sql():
@@ -1521,11 +1521,7 @@ class SQLInsertCompiler(SQLCompiler):
                 rows = cursor.fetchall()
             else:
                 rows = [cursor.fetchone()]
-        cols = [field.get_col(options.db_table) for field in self.returning_fields]
-        converters = get_converters(cols, self.connection)
-        if converters:
-            rows = list(apply_converters(rows, converters, self.connection))
-        return rows
+        return convert_returning_rows(rows, self.returning_fields, self.connection)
 
 
 class SQLDeleteCompiler(SQLCompiler):
@@ -1559,11 +1555,9 @@ class SQLDeleteCompiler(SQLCompiler):
 
     def _as_sql(self, query: Query) -> SqlWithParams:
         delete = f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"  # ty: ignore[invalid-argument-type]
-        returning = ""
-        if self.query.returning_fields:
-            r_sql, _ = return_insert_columns(self.query.returning_fields)
-            if r_sql:
-                returning = f" {r_sql}"
+        returning = self._returning_sql()
+        if returning:
+            returning = f" {returning}"
         try:
             where, params = self.compile(query.where)
         except FullResultSet:
@@ -1588,6 +1582,24 @@ class SQLDeleteCompiler(SQLCompiler):
         outerq = Query(self.query.model)
         outerq.add_filter("id__in", innerq)
         return self._as_sql(outerq)
+
+    def execute_sql(self, result_type: str) -> Any:  # ty: ignore[invalid-method-override]
+        """Execute the delete.
+
+        Return the number of rows deleted, or — when the query carries
+        returning_fields — the converted RETURNING rows.
+        """
+        cursor = super().execute_sql(result_type)
+        if not cursor:
+            return [] if self.query.returning_fields else 0
+        try:
+            if self.query.returning_fields:
+                return convert_returning_rows(
+                    cursor.fetchall(), self.query.returning_fields, self.connection
+                )
+            return cursor.rowcount
+        finally:
+            cursor.close()
 
 
 class SQLUpdateCompiler(SQLCompiler):
@@ -1657,10 +1669,8 @@ class SQLUpdateCompiler(SQLCompiler):
             params = []
         else:
             result.append(f"WHERE {where}")
-        if self.query.returning_fields:
-            r_sql, _ = return_insert_columns(self.query.returning_fields)
-            if r_sql:
-                result.append(r_sql)
+        if returning := self._returning_sql():
+            result.append(returning)
         return " ".join(result), tuple(update_params + list(params))
 
     def execute_sql(self, result_type: str) -> Any:  # ty: ignore[invalid-method-override]

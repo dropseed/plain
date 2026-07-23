@@ -2485,11 +2485,9 @@ class DeleteQuery(Query):
 
         self.alias_map = {table: self.alias_map[table]}
         self.where = where
-        cursor = self.get_compiler().execute_sql(CURSOR)
-        if cursor:
-            with cursor:
-                return cursor.rowcount
-        return 0
+        # The compiler returns the deleted row count directly (this query never
+        # carries returning_fields).
+        return self.get_compiler().execute_sql(CURSOR)
 
     def delete_batch(self, id_list: list[Any]) -> int:
         """
