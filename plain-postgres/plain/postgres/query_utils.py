@@ -22,13 +22,11 @@ from plain.utils import tree
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
-    from plain.postgres.connection import DatabaseConnection
     from plain.postgres.fields import Field
     from plain.postgres.fields.related import ForeignKeyField
     from plain.postgres.fields.reverse_related import ForeignObjectRel
     from plain.postgres.lookups import Lookup, Transform
     from plain.postgres.meta import Meta
-    from plain.postgres.sql.compiler import SQLCompiler
     from plain.postgres.sql.where import WhereNode
 
 logger = get_framework_logger()
@@ -47,7 +45,6 @@ class PathInfo(NamedTuple):
     join_field: ForeignKeyField | ForeignObjectRel
     m2m: bool
     direct: bool
-    filtered_relation: FilteredRelation | None
 
 
 def subclasses(cls: type) -> Generator[type]:
@@ -65,7 +62,6 @@ class Q(tree.Node):
     # Connection types
     AND = "AND"
     OR = "OR"
-    XOR = "XOR"
     default = AND
     conditional = True
 
@@ -100,9 +96,6 @@ class Q(tree.Node):
 
     def __and__(self, other: Any) -> Q:
         return self._combine(other, self.AND)
-
-    def __xor__(self, other: Any) -> Q:
-        return self._combine(other, self.XOR)
 
     def __invert__(self) -> Q:
         obj = self.copy()
@@ -417,38 +410,3 @@ def check_rel_lookup_compatibility(
     return check(target_meta) or (
         getattr(field, "primary_key", False) and check(field.model._model_meta)
     )
-
-
-class FilteredRelation:
-    """Specify custom filtering in the ON clause of SQL joins."""
-
-    def __init__(self, relation_name: str, *, condition: Q = Q()) -> None:
-        if not relation_name:
-            raise ValueError("relation_name cannot be empty.")
-        self.relation_name = relation_name
-        self.alias: str | None = None
-        if not isinstance(condition, Q):
-            raise ValueError("condition argument must be a Q() instance.")
-        self.condition = condition
-        self.path: list[str] = []
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, self.__class__):
-            return NotImplemented
-        return (
-            self.relation_name == other.relation_name
-            and self.alias == other.alias
-            and self.condition == other.condition
-        )
-
-    def clone(self) -> FilteredRelation:
-        clone = FilteredRelation(self.relation_name, condition=self.condition)
-        clone.alias = self.alias
-        clone.path = self.path[:]
-        return clone
-
-    def as_sql(self, compiler: SQLCompiler, connection: DatabaseConnection) -> Any:
-        # Resolve the condition in Join.filtered_relation.
-        query = compiler.query
-        where = query.build_filtered_relation_q(self.condition, reuse=set(self.path))
-        return compiler.compile(where)

@@ -6,41 +6,12 @@ from pathlib import Path
 
 import click
 
+from plain.utils.version import compare_versions, parse_version
+
 from .output import style_markdown
 from .runtime import without_runtime_setup
 
-
-def parse_version(version_str: str) -> tuple[int, ...]:
-    """Parse a version string into a tuple of integers for comparison."""
-    # Remove 'v' prefix if present and split by dots
-    clean_version = version_str.lstrip("v")
-    parts = []
-    for part in clean_version.split("."):
-        # Extract numeric part from each segment
-        numeric_part = re.match(r"\d+", part)
-        if numeric_part:
-            parts.append(int(numeric_part.group()))
-        else:
-            parts.append(0)
-    return tuple(parts)
-
-
-def compare_versions(v1: str, v2: str) -> int:
-    """Compare two version strings. Returns -1 if v1 < v2, 0 if equal, 1 if v1 > v2."""
-    parsed_v1 = parse_version(v1)
-    parsed_v2 = parse_version(v2)
-
-    # Pad shorter version with zeros
-    max_len = max(len(parsed_v1), len(parsed_v2))
-    parsed_v1 += (0,) * (max_len - len(parsed_v1))
-    parsed_v2 += (0,) * (max_len - len(parsed_v2))
-
-    if parsed_v1 < parsed_v2:
-        return -1
-    elif parsed_v1 > parsed_v2:
-        return 1
-    else:
-        return 0
+__all__ = ["compare_versions", "parse_version"]
 
 
 @without_runtime_setup

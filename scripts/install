@@ -12,7 +12,7 @@ done
 echo ""
 echo "${BOLD}Installing dependencies for example${NORMAL}"
 cd "example"
-DATABASE_URL=sqlite://:memory: ./scripts/install
+PLAIN_POSTGRES_URL=none ./scripts/install
 cd ..
 
 uv sync

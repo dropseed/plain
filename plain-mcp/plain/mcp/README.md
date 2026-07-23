@@ -448,6 +448,8 @@ class AppRouter(Router):
 
 `authorization_servers` defaults to this app's origin, so the same-app case (above) needs nothing set. Override it only when an external IdP issues the tokens.
 
+If your app sets `URLS_TRAILING_SLASH = True`, mount both paths — including the catch-all variant below — with `force_trailing_slash=False`. MCP clients won't reliably follow a 308 trailing-slash redirect: they request the metadata URL exactly as the `WWW-Authenticate` challenge gives it (or construct the `.well-known` path from the resource identifier). Keep the two mounts on the same slash form either way, since the challenge URL is derived from the MCP path.
+
 The metadata view derives `resource` from the request path, so an app with several MCP endpoints can mount one catch-all instead of a metadata view per endpoint: `path(".well-known/oauth-protected-resource/<path:resource_path>", AppMCPMetadata)`.
 
 `plain.mcp` only validates tokens and emits the challenge — it never issues them. The authorization server is yours to run; [`plain.oauthserver`](../../plain-oauthserver/plain/oauthserver/README.md) is a drop-in one. `authenticate_token` is the seam, so any issuer (a third-party IdP, a custom JWT service) works the same way.

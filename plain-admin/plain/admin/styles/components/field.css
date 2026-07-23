@@ -16,7 +16,7 @@
     }
     [role="alert"] {
       @apply text-sm text-admin-danger font-normal;
-      
+
       ul {
         @apply ml-4 flex list-disc flex-col gap-1;
       }
@@ -25,7 +25,7 @@
       @apply flex flex-1 flex-col gap-1.5 leading-snug;
     }
 
-    &[data-orientation='horizontal'] {
+    &[data-orientation="horizontal"] {
       @apply flex-row items-center [&>label]:flex-auto has-[>section]:items-start has-[>section]:[&>[type=checkbox],[type=radio]]:mt-px [&_p]:text-balance;
     }
   }

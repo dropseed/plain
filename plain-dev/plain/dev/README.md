@@ -11,8 +11,15 @@
         - [Custom processes](#custom-processes)
     - [`plain dev services`](#plain-dev-services)
     - [`plain dev logs`](#plain-dev-logs)
-    - [`plain dev backups`](#plain-dev-backups)
     - [`plain pre-commit`](#plain-pre-commit)
+- [Databases](#databases)
+    - [A database per checkout](#a-database-per-checkout)
+    - [New checkouts start with your data](#new-checkouts-start-with-your-data)
+    - [Managing databases](#managing-databases)
+    - [Sharing one database between checkouts](#sharing-one-database-between-checkouts)
+    - [Switching branches](#switching-branches)
+    - [Where the server comes from](#where-the-server-comes-from)
+    - [Server lifecycle](#server-lifecycle)
 - [`.env` files](#env-files)
 - [Settings](#settings)
 - [FAQs](#faqs)
@@ -52,15 +59,17 @@ The [`plain dev`](./cli.py#cli) command does several things:
 
 #### Services
 
-Use services to define databases or other processes that your app _needs_ to be functional. The services will be started automatically in `plain dev`, but also in `plain pre-commit` (so preflight and tests have a database).
-
-Ultimately, how you run your development database is up to you. But a recommended starting point is to use Docker:
+Use services to define processes that your app _needs_ to be functional — a
+queue, a mail catcher, a search index. They start automatically in `plain dev`,
+and also in `plain pre-commit` so preflight and tests have what they need.
 
 ```toml
 # pyproject.toml
 [tool.plain.dev.services]
-postgres = {cmd = "docker run --name app-postgres --rm -p 54321:5432 -v $(pwd)/.plain/dev/pgdata:/var/lib/postgresql/data -e POSTGRES_PASSWORD=postgres postgres:15 postgres"}
+redis = {cmd = "redis-server --port 6399"}
 ```
+
+You don't need a service for Postgres — see [Databases](#databases) below.
 
 #### Custom processes
 
@@ -90,25 +99,6 @@ plain dev logs --pid 1234
 plain dev logs --path
 ```
 
-### `plain dev backups`
-
-Manage local database backups. Requires [`plain.postgres`](../../plain-postgres/plain/postgres/README.md).
-
-A backup is automatically created when `plain dev` detects pending migrations, so you can easily restore your database if a migration changes something unexpectedly.
-
-```bash
-plain dev backups list              # List all backups
-plain dev backups list --branch     # Filter to current branch
-plain dev backups create            # Create a manual backup
-plain dev backups create my-backup  # Create with a specific name
-plain dev backups restore --latest  # Restore the most recent backup
-plain dev backups restore my-backup # Restore a specific backup
-plain dev backups delete my-backup  # Delete a specific backup
-plain dev backups clear             # Delete all backups
-```
-
-Backups are stored in `.plain/backups/` and automatically pruned to the 20 most recent per branch.
-
 ### `plain pre-commit`
 
 A built-in pre-commit hook that you can install with `plain pre-commit --install`.
@@ -125,6 +115,140 @@ Custom commands can be defined in `pyproject.toml` at `tool.plain.check.run` and
 [tool.plain.check.run]
 my-check = {cmd = "echo 'running my check'"}
 ```
+
+## Databases
+
+You don't need to configure a database to start working. If [`plain.postgres`](../../plain-postgres/plain/postgres/README.md) is installed and no database URL is set, `plain.dev` provides one — a Postgres server for the project, and a database for this checkout.
+
+```bash
+plain dev          # server started, database created and migrated
+plain db status    # see what you got
+```
+
+**Configuring a URL means "use this, don't manage Postgres for me."** Set `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in `settings.py`, or `DATABASE_URL`) and `plain.dev` stays out of the way entirely — no server is started and nothing is injected. Nothing here is required, and nothing here overrides you.
+
+### A database per checkout
+
+Every checkout gets its own database, derived from its directory name. Two worktrees of the same project never share data:
+
+| Checkout             | Database        |
+| -------------------- | --------------- |
+| `myapp/`             | `myapp`         |
+| `myapp-feature/`     | `myapp_feature` |
+| `worktrees/fix-bug/` | `myapp_fix_bug` |
+
+Test databases are derived from that name too (`test_myapp_feature`), so parallel test runs in different checkouts don't collide either.
+
+All of a project's databases live in one Postgres server, shared by every worktree. That's what makes copying between them instant.
+
+### New checkouts start with your data
+
+A new worktree's database is a **copy of your main database, data included** — because re-seeding a fresh database every time is the actual cost of working in parallel.
+
+```bash
+git worktree add ../myapp-feature
+cd ../myapp-feature
+plain dev          # database forked from `myapp`, with its rows
+```
+
+Copying uses `CREATE DATABASE ... TEMPLATE` when the source is idle, which is a file-level copy and effectively instant at any size. If the source is busy — you're running `plain dev` against it in another window — it falls back to a streaming dump/restore, which doesn't interrupt anything. You don't choose; it picks.
+
+Use `plain db create` if you'd rather start empty.
+
+### Managing databases
+
+```bash
+plain db status              # this checkout's database, server, size, branch, pending migrations
+plain db list                # every database in the project, and who owns it
+plain db fork <name>         # copy a database, data and all
+plain db use <name>          # point this checkout somewhere else (no name: back to derived)
+plain db create [name]       # a new empty database
+plain db reset               # drop and recreate this one, empty
+plain db drop <name>         # delete a database
+plain db clean               # delete databases whose checkout is gone
+plain db url                 # print the URL and nothing else, for scripts
+```
+
+`plain db status` and `plain db list` take `--json` for scripts and agents.
+
+`plain db url` ensures the server and database exist before printing, and writes
+nothing but the URL to stdout, so `export PLAIN_POSTGRES_URL="$(plain db url)"`
+is safe to build on.
+
+For a psql prompt on this checkout's database, use [`plain postgres shell`](../../plain-postgres/plain/postgres/README.md) — it connects to whatever database is active, managed or not.
+
+Forks are real copies, so deleted worktrees leave real disk behind. `plain db clean` finds databases whose checkout directory no longer exists and offers to drop them — it never touches a database that doesn't record where it came from, and never the project's main database, which is the fork source for every checkout.
+
+`plain db` changes **which** database you're on; [`plain postgres sync`](../../plain-postgres/plain/postgres/README.md) changes the **schema** of the one you're on. `plain db` exists only when `plain.dev` is installed — it's a development tool with no production counterpart.
+
+### Sharing one database between checkouts
+
+`plain db use` points several checkouts at a single database, which is what you want when you'd rather have no drift than isolation.
+
+The risk is schema, not data: applying a branch-only migration to a shared database changes it for everyone using it. So when `plain dev` sees that combination — a shared database, plus migrations this branch has that it doesn't — it forks you a private copy instead and tells you so. Applying to the shared database is deliberate: `plain db use <name>` to point at it, then `plain postgres sync`.
+
+### Switching branches
+
+Databases remember the branch they were last used on. When you switch branches and the database turns out to be _ahead_ of your code — carrying tables from migrations this branch doesn't have — `plain dev` says so, because nothing else will. Your app keeps working and the schema quietly doesn't match.
+
+It reports and leaves the database alone. `plain db fork` or `plain db reset` are there when you want a clean one.
+
+### Where the server comes from
+
+Docker if it's available, otherwise a Postgres already listening on `127.0.0.1:5432` that accepts the `postgres` role. The second is what makes cloud sandboxes and remote agent environments work, where a Docker daemon usually isn't available but a system Postgres often is.
+
+An open port isn't enough — we check that we can actually log in. Homebrew and
+Postgres.app both create a superuser named after your macOS account and no
+`postgres` role, so a server like that is reported as unusable rather than
+picked and then failed on. Point us at it yourself if you want to use it:
+
+```bash
+export PLAIN_POSTGRES_URL="postgres://$USER@127.0.0.1:5432/myapp"
+```
+
+```toml
+# pyproject.toml
+[tool.plain.dev.postgres]
+backend = "auto"          # auto | docker | local | off
+image = "postgres:16"     # any image, for the docker backend
+```
+
+`image` is a full image reference rather than a version number, so you can use a
+build that ships the extensions you need:
+
+```toml
+[tool.plain.dev.postgres]
+image = "pgvector/pgvector:pg16"
+```
+
+Changing `image` doesn't rebuild an existing container — the image is fixed when
+it's created — so `plain dev` tells you when the two have drifted apart and how
+to recreate it. Your data is on a separate volume and survives that.
+
+Data lives in a Docker named volume, never inside your checkout, so deleting a worktree never deletes a database.
+
+Set `backend = "off"` to turn all of this off.
+
+### Server lifecycle
+
+There's one container per project, created the first time something needs a
+database. Nothing removes one automatically — a container might hold the only
+copy of something — so they accumulate as you work on more projects. Each idle
+Postgres holds around 76 MB, which is worth knowing if you have a lot of them.
+
+They deliberately have **no restart policy**, so a reboot leaves them all
+stopped and only the projects you actually touch start back up. Starting on
+demand costs about two seconds, and the port is re-read each time, so a
+reassigned port is handled for you.
+
+```bash
+plain db server list      # every project's container on this machine
+plain db server stop      # stop it; data is untouched, next command restarts it
+plain db server remove    # remove it and its data (--keep-data keeps the volume)
+```
+
+`plain db server list` is the one to reach for when Docker feels crowded — it
+marks the current project and tells you how many are running.
 
 ## `.env` files
 
@@ -171,6 +295,14 @@ Use `plain dev --start` to run the server in the background. You can then use `p
 #### What's the difference between services and custom processes?
 
 Services are processes that your app needs to function (like a database). They run during `plain dev` and also during `plain pre-commit`. Custom processes only run during `plain dev` and are typically for development conveniences like ngrok or a job worker.
+
+#### How do I back up a development database?
+
+Forks are the everyday safety copy — `plain db fork` makes an instant, switchable duplicate before you try something risky. For a file that outlives the server itself, plain psql tooling works directly against the database URL:
+
+```bash
+pg_dump -Fc "$(plain db url)" > myapp.backup
+```
 
 #### Why am I seeing deprecation warnings?
 

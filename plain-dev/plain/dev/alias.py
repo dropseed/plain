@@ -6,11 +6,13 @@ from pathlib import Path
 
 import click
 
+from plain.runtime import PLAIN_CACHE_PATH
+
 
 class AliasManager:
     """Manages the 'p' alias for 'uv run plain'."""
 
-    MARKER_FILE = Path.home() / ".plain" / "dev" / ".alias_prompted"
+    MARKER_FILE = PLAIN_CACHE_PATH / ".alias_prompted"
     ALIAS_COMMAND = "uv run plain"
     ALIAS_NAME = "p"
 

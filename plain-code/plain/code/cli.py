@@ -40,8 +40,9 @@ def install(ctx: click.Context, force: bool) -> None:
         return
 
     oxlint = OxcTool("oxlint")
+    oxfmt = OxcTool("oxfmt")
 
-    if force or not oxlint.is_installed() or oxlint.needs_update():
+    if force or not (oxlint.is_installed() and oxfmt.is_installed()):
         version_to_install = config.get("oxc", {}).get("version", "")
         if version_to_install:
             click.secho(
@@ -149,7 +150,7 @@ def check(
         oxlint = OxcTool("oxlint")
         oxfmt = OxcTool("oxfmt")
 
-        if oxlint.needs_update():
+        if not (oxlint.is_installed() and oxfmt.is_installed()):
             ctx.invoke(install)
 
         print_event("oxlint...", newline=False)
@@ -327,7 +328,7 @@ def fix(
         oxlint = OxcTool("oxlint")
         oxfmt = OxcTool("oxfmt")
 
-        if oxlint.needs_update():
+        if not (oxlint.is_installed() and oxfmt.is_installed()):
             ctx.invoke(install)
 
         if unsafe_fixes:

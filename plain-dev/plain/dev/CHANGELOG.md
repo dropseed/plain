@@ -1,5 +1,37 @@
 # plain-dev changelog
 
+## [0.65.0](https://github.com/dropseed/plain/releases/plain-dev@0.65.0) (2026-07-22)
+
+### What's changed
+
+- The downloaded `mkcert` binary now lives in the machine-level cache at `~/.cache/plain/mkcert/` instead of `~/.plain/dev/`, alongside the other cached tool binaries. (This only applies when `mkcert` isn't already installed system-wide.) ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The mkcert download now writes to a temporary file and atomically moves it into place, so an interrupted download can't leave a partial binary that later fails to execute. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The `p` alias prompt marker moved from `~/.plain/dev/.alias_prompted` to the cache directory as well. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- `MkcertManager.setup_mkcert()` no longer takes an `install_path` argument — the cache location is now fixed. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The shipped `plain-dev` agent rule now documents that `.plain/` is disposable per-checkout state and must never be symlinked or shared between checkouts — shared pid files block `plain dev`, and shared assets or db pointers cross-contaminate. With binaries cached machine-wide and worktree databases forked automatically, there's nothing left in `.plain/` worth sharing. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+
+### Upgrade instructions
+
+- No changes required. `mkcert` re-downloads to the new location on the next `plain dev`; `~/.plain/dev/mkcert` can be deleted. You will be prompted about the `p` alias once more, since the marker file moved.
+
+## [0.64.0](https://github.com/dropseed/plain/releases/plain-dev@0.64.0) (2026-07-21)
+
+### What's changed
+
+- **Managed development databases.** When [`plain.postgres`](https://plainframework.com/docs/plain-postgres/plain/postgres/README.md) is installed and no database URL is configured, `plain.dev` now provides Postgres automatically — one server per project (Docker if available, otherwise a compatible local Postgres on `127.0.0.1:5432`) and one database per checkout, created and migrated on `plain dev`. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means "use this" and turns all of it off. ([94f30fc73e](https://github.com/dropseed/plain/commit/94f30fc73e), [977fed7576](https://github.com/dropseed/plain/commit/977fed7576), [6328f19902](https://github.com/dropseed/plain/commit/6328f19902))
+- **A database per checkout, forked with data.** Each checkout's database is derived from its directory name, so worktrees never share data, and a new worktree's database starts as a copy of the project's main database — data included — using `CREATE DATABASE ... TEMPLATE` when the source is idle, or a streaming dump/restore when it's busy. Test databases derive from the checkout's name too, so parallel test runs don't collide. ([977fed7576](https://github.com/dropseed/plain/commit/977fed7576))
+- **New `plain db` command group** for managing the databases: `status`, `list`, `fork`, `use`, `create`, `reset`, `drop`, `clean` (drop databases whose checkout is gone), and `url` (script-safe, prints only the URL). `status` and `list` take `--json`. Server lifecycle is handled by `plain db server list|stop|remove`. ([977fed7576](https://github.com/dropseed/plain/commit/977fed7576), [6328f19902](https://github.com/dropseed/plain/commit/6328f19902))
+- **Branch-awareness guards.** Sharing one database across checkouts via `plain db use` is supported — if `plain dev` sees branch-only migrations about to hit a shared database, it forks a private copy instead and says so. After a branch switch, a database carrying tables from migrations the branch doesn't have is reported rather than silently mismatched. ([6328f19902](https://github.com/dropseed/plain/commit/6328f19902))
+- The managed server is configurable via `[tool.plain.dev.postgres]` in `pyproject.toml`: `backend = "auto" | "docker" | "local" | "off"` and `image` for any Postgres image (e.g. `pgvector/pgvector:pg16`). Data lives in a Docker named volume, never inside the checkout. ([6328f19902](https://github.com/dropseed/plain/commit/6328f19902))
+- **`plain dev backups` has been removed.** Forks are the everyday safety copy (`plain db fork`), and for a file backup, `pg_dump -Fc "$(plain db url)"` works directly. The automatic pre-migration backup is gone with it. ([6328f19902](https://github.com/dropseed/plain/commit/6328f19902))
+- The shipped agents rule now covers dev databases and tells agents to prefer the tunnel URL (when one is running) for browser navigation and screenshots. ([8f6dd0d67e](https://github.com/dropseed/plain/commit/8f6dd0d67e), [74a9daf75d](https://github.com/dropseed/plain/commit/74a9daf75d))
+
+### Upgrade instructions
+
+- If you ran Postgres as a `[tool.plain.dev.services]` entry (e.g. the previously recommended Docker command), you can delete that service and let `plain.dev` manage Postgres instead — or keep your setup by leaving `PLAIN_POSTGRES_URL`/`POSTGRES_URL` configured, which disables the managed database entirely.
+- If you used `plain dev backups`, switch to `plain db fork` for quick safety copies or `pg_dump -Fc "$(plain db url)" > myapp.backup` for file backups. Existing `.plain/backups/` files are untouched but no longer managed.
+- The managed database features require plain-postgres 0.112.0+ (they use its new cluster-level database helpers) — upgrade both packages together.
+
 ## [0.63.2](https://github.com/dropseed/plain/releases/plain-dev@0.63.2) (2026-07-15)
 
 ### What's changed

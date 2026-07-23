@@ -8,7 +8,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.dialect import quote_name
-from plain.postgres.exceptions import FullResultSet
 from plain.postgres.sql.constants import INNER, LOUTER
 
 if TYPE_CHECKING:
@@ -64,7 +63,6 @@ class Join:
         join_type: str,
         join_field: ForeignKeyField | ForeignObjectRel,
         nullable: bool,
-        filtered_relation: Any = None,
     ) -> None:
         # Join table
         self.table_name = table_name
@@ -80,7 +78,6 @@ class Join:
         self.join_field = join_field
         # Is this join nullabled?
         self.nullable = nullable
-        self.filtered_relation = filtered_relation
 
     def as_sql(
         self, compiler: SQLCompiler, connection: DatabaseConnection
@@ -101,21 +98,6 @@ class Join:
             f"{qn(self.parent_alias)}.{qn2(lhs_col)} = {qn(self.table_alias)}.{qn2(rhs_col)}"
         )
 
-        if self.filtered_relation:
-            try:
-                extra_sql, extra_params = compiler.compile(self.filtered_relation)
-            except FullResultSet:
-                pass
-            else:
-                join_conditions.append(f"({extra_sql})")
-                params.extend(extra_params)
-        if not join_conditions:
-            # This might be a rel on the other end of an actual declared field.
-            declared_field = getattr(self.join_field, "field", self.join_field)
-            raise ValueError(
-                f"Join generated an empty ON clause. {declared_field.__class__} did not yield either "
-                "joining columns or extra restrictions."
-            )
         on_clause_sql = " AND ".join(join_conditions)
         alias_str = (
             "" if self.table_alias == self.table_name else (f" {self.table_alias}")
@@ -126,13 +108,6 @@ class Join:
     def relabeled_clone(self, change_map: dict[str, str]) -> Join:
         new_parent_alias = change_map.get(self.parent_alias, self.parent_alias)
         new_table_alias = change_map.get(self.table_alias, self.table_alias)
-        if self.filtered_relation is not None:
-            filtered_relation = self.filtered_relation.clone()
-            filtered_relation.path = [
-                change_map.get(p, p) for p in self.filtered_relation.path
-            ]
-        else:
-            filtered_relation = None
         return self.__class__(
             self.table_name,
             new_parent_alias,
@@ -140,17 +115,15 @@ class Join:
             self.join_type,
             self.join_field,
             self.nullable,
-            filtered_relation=filtered_relation,
         )
 
     @property
-    def identity(self) -> tuple[type[Join], str, str, Any, Any]:
+    def identity(self) -> tuple[type[Join], str, str, Any]:
         return (
             self.__class__,
             self.table_name,
             self.parent_alias,
             self.join_field,
-            self.filtered_relation,
         )
 
     def __eq__(self, other: object) -> bool:
@@ -160,10 +133,6 @@ class Join:
 
     def __hash__(self) -> int:
         return hash(self.identity)
-
-    def equals(self, other: Join) -> bool:
-        # Ignore filtered_relation in equality check.
-        return self.identity[:-1] == other.identity[:-1]
 
     def demote(self) -> Join:
         new = self.relabeled_clone({})
@@ -186,7 +155,6 @@ class BaseTable:
 
     join_type = None
     parent_alias = None
-    filtered_relation = None
 
     def __init__(self, table_name: str, alias: str) -> None:
         self.table_name = table_name
@@ -217,6 +185,3 @@ class BaseTable:
 
     def __hash__(self) -> int:
         return hash(self.identity)
-
-    def equals(self, other: BaseTable) -> bool:
-        return self.identity == other.identity

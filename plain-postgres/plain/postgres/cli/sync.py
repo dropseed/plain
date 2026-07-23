@@ -7,6 +7,7 @@ import click
 from plain.runtime import settings
 
 from ..convergence import execute_plan, plan_convergence
+from ..db import get_connection
 from .decorators import cli_schema_lock, database_management_command
 
 
@@ -112,7 +113,6 @@ def _create_migrations() -> None:
 
 
 def _migrate() -> None:
-    from ..db import get_connection
     from ..migrations.executor import MigrationExecutor
 
     click.secho("Applying migrations...", bold=True)

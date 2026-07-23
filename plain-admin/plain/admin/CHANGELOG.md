@@ -1,5 +1,19 @@
 # plain-admin changelog
 
+## [0.85.0](https://github.com/dropseed/plain/releases/plain-admin@0.85.0) (2026-07-21)
+
+### What's changed
+
+- **`AdminListView` is now built on `ListView` from `plain.templates`** (requires `plain-templates>=0.5.0`), so it uses the framework's pagination instead of its own. The list objects come from a `get_objects()` method, and `page_size` is resolved through `get_page_size()`. ([497df7c2cf](https://github.com/dropseed/plain/commit/497df7c2cf))
+- **The list template context renamed `page` to `page_obj` and dropped `paginator`.** Reach the paginator through `page_obj.paginator`. `objects` still holds the current page, unchanged. ([497df7c2cf](https://github.com/dropseed/plain/commit/497df7c2cf))
+- **An invalid `?page_size=` no longer 500s.** A non-integer or non-positive value now falls back to the view's `page_size` instead of raising. ([497df7c2cf](https://github.com/dropseed/plain/commit/497df7c2cf))
+- An empty global-search preview fragment returns its `204` before rendering the template rather than after, so no wasted render. ([497df7c2cf](https://github.com/dropseed/plain/commit/497df7c2cf))
+
+### Upgrade instructions
+
+- If you override an admin list template (or `admin/list.html` itself), rename `page` to `page_obj` and replace `paginator` with `page_obj.paginator`.
+- If you set `self.objects` inside a `get_template_context()` override, move that logic into `get_objects()` — `objects` is now a cached property computed from it.
+
 ## [0.84.0](https://github.com/dropseed/plain/releases/plain-admin@0.84.0) (2026-07-15)
 
 ### What's changed

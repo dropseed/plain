@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import back_link %}
+{% from "_macros.html" import back_link, pagination %}
 
 {% block title %}Notes{% endblock %}
 
@@ -25,6 +25,8 @@
         </li>
         {% endfor %}
     </ul>
+
+    {{ pagination(page_obj) }}
     {% else %}
     <p class="mt-6 text-sm text-muted">No notes yet. Create your first one.</p>
     {% endif %}

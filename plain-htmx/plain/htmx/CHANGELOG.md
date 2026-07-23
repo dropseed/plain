@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.20.2](https://github.com/dropseed/plain/releases/plain-htmx@0.20.2) (2026-07-21)
+
+### What's changed
+
+- Fixed the docs claiming `plain.htmx` automatically discovers `{template_name}_htmx.html` templates for HTMX requests — no such behavior exists. The naming scheme is now described as a convention to use with `{% include %}`. ([9eb08a5380](https://github.com/dropseed/plain/commit/9eb08a5380))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.20.1](https://github.com/dropseed/plain/releases/plain-htmx@0.20.1) (2026-06-03)
 
 ### What's changed

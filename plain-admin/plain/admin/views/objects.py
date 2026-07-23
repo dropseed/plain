@@ -4,12 +4,12 @@ from urllib.parse import urlparse
 
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
-from plain.paginator import Paginator
 from plain.postgres import QuerySet
 from plain.templates.views import (
     CreateView,
     DeleteView,
     DetailView,
+    ListView,
     UpdateView,
 )
 from plain.urls import reverse
@@ -54,13 +54,13 @@ def get_field_label(field: str) -> str:
     return " ".join(_LABEL_ACRONYMS.get(w, w) for w in words)
 
 
-class AdminListView(HTMXView, AdminView):
+class AdminListView(HTMXView, AdminView, ListView):
     template_name = "admin/list.html"
     fields: list[str] = []
     search_fields: list[str] = []
     actions: list[str] = []
     filters: list[str] = []
-    page_size = 20
+    page_size: int = 20
     allow_global_search = False
 
     @cached_property
@@ -68,19 +68,21 @@ class AdminListView(HTMXView, AdminView):
         """Get the current filter parameter from the request."""
         return self.request.query_params.get("filter", "")
 
+    def get_objects(self) -> list[Any] | QuerySet[Any]:
+        return self.process_objects()
+
+    def get_page_size(self) -> int:
+        try:
+            page_size = int(self.request.query_params.get("page_size", self.page_size))
+        except ValueError:
+            return self.page_size
+        if page_size < 1:
+            return self.page_size
+        return page_size
+
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
 
-        # Make this available to get_filter_names and stuff
-        self.objects = self.process_objects()
-
-        page_size = self.request.query_params.get("page_size", self.page_size)
-        paginator = Paginator(self.objects, int(page_size))
-        self._page = paginator.get_page(self.request.query_params.get("page", 1))
-
-        context["paginator"] = paginator
-        context["page"] = self._page
-        context["objects"] = self._page  # alias
         context["fields"] = self.get_fields()
         context["actions"] = self.get_actions()
         context["filter_names"] = self.get_filter_names()
@@ -117,19 +119,13 @@ class AdminListView(HTMXView, AdminView):
             # Detect a list rendered as a preview fragment inside the global
             # search page (its hx-get sends HX-Current-Url = the search URL).
             current_path = urlparse(self.request.headers.get("HX-Current-Url", "")).path
-            htmx_search = current_path == reverse("admin:search")
-            if htmx_search:
+            if current_path == reverse("admin:search"):
+                if not self.page_obj:
+                    # No results — skip the render entirely
+                    return Response(status_code=204)
                 self._table_style = "preview"
-        else:
-            htmx_search = False
 
-        response = super().get()
-
-        if self.is_htmx_request() and htmx_search and not self._page:
-            # Don't render anything
-            return Response(status_code=204)
-
-        return response
+        return super().get()
 
     def post(self) -> Response:
         action_name = self.request.form_data.get("action_name")

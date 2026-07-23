@@ -72,12 +72,11 @@ bold() { printf '\033[1m%s\033[0m\n' "$1"; }
 # ---------------------------------------------------------------------------
 # Database URL (PostgreSQL required)
 # ---------------------------------------------------------------------------
-# Use a unique DB name per checkout so parallel worktrees don't collide.
-_repo_dir=$(basename "$(git rev-parse --show-toplevel)")
-_db_suffix=$(echo "$_repo_dir" | tr '-' '_')
-source scripts/start-postgres "plain_tests_${_db_suffix}"
+# plain.dev already gives each checkout its own database, so parallel worktrees
+# don't collide without us naming anything here.
+source scripts/start-postgres
 
-echo "Using DATABASE_URL: $DATABASE_URL"
+echo "Using PLAIN_POSTGRES_URL: $PLAIN_POSTGRES_URL"
 
 # PostgreSQL driver
 WITH="--with psycopg[binary]"

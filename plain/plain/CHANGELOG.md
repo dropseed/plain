@@ -1,5 +1,32 @@
 # plain changelog
 
+## [0.154.0](https://github.com/dropseed/plain/releases/plain@0.154.0) (2026-07-22)
+
+### What's changed
+
+- New `PLAIN_CACHE_PATH` export from `plain.runtime` — a machine-level cache directory shared across projects and checkouts, intended for downloaded binaries and other reusable artifacts. Like `APP_PATH` and `PLAIN_TEMP_PATH`, it's available without calling `setup()`. It defaults to `$XDG_CACHE_HOME/plain` (or `~/.cache/plain`) and can be overridden with the `PLAIN_CACHE_PATH` environment variable. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The runtime docs now spell out the split between the two paths: `PLAIN_TEMP_PATH` (`.plain`) is disposable per-checkout state and should never be shared or symlinked between checkouts, while `PLAIN_CACHE_PATH` is shared machine-wide. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.153.0](https://github.com/dropseed/plain/releases/plain@0.153.0) (2026-07-21)
+
+### What's changed
+
+- `plain request` trace output has been reworked to report rather than diagnose. The automatic N+1/issue detection is gone — every distinct statement is now listed with its execution count, total duration (slowest first), and the call sites that issued it, leaving the judgment about what's a problem to the reader. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- A followed redirect chain now produces one trace block per request hop (labeled with method, path, and query string) instead of a single merged summary that could double-count once-per-request queries. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- New `--trace` flag for `plain request` shows the full detail in text output: the complete uncapped query list plus an indented span tree. Without it, the summary caps the query list but always keeps repeated statements visible. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- Transaction-control statements (savepoint bookkeeping, etc.) are now counted separately from queries instead of cluttering the query list. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- A request that raises now still reports its captured trace — in text output the Trace section renders before exiting, and in `--json` the command emits `{"error": ..., "traces": [...]}` on stdout with exit code 1, with `analysis.exceptions` carrying the stacktrace. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- The `--json` shape changed: the `trace` object is now `traces`, a list with one entry per request, each carrying `name`, `request_id` (matching `response.request_id` for the hop that rendered), `analysis`, and `spans`. `analysis.issues` and `analysis.duplicate_query_count` were replaced by `analysis.exceptions` and `analysis.transaction_count`, and a `trace_note` key explains a missing or empty `traces`. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- `plain request` is now documented in the CLI README, and piping its output (`| head`) no longer produces a BrokenPipeError traceback. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+
+### Upgrade instructions
+
+- If you have scripts or agents parsing `plain request --json` output: read `traces` (a list, one entry per request) instead of `trace`, use `analysis.exceptions` instead of filtering `analysis.issues`, and detect repeats yourself via each query's `count` instead of `analysis.duplicate_query_count`. Check `trace_note` before indexing into `traces`, and note that a failed request now exits 1 with `{"error", "traces"}` and no `response` key.
+
 ## [0.152.0](https://github.com/dropseed/plain/releases/plain@0.152.0) (2026-07-15)
 
 ### What's changed

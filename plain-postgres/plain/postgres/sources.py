@@ -198,8 +198,8 @@ def _parse_runtime_url() -> DatabaseConfig:
     url = str(plain_settings.POSTGRES_URL)
     if not url:
         raise ImproperlyConfigured(
-            "PostgreSQL database is not configured. "
-            "Set POSTGRES_URL (or DATABASE_URL) to a postgres://... connection string."
+            "PostgreSQL database is not configured. Set PLAIN_POSTGRES_URL, or "
+            "POSTGRES_URL in settings, to a postgres://... connection string."
         )
     if url.lower() == "none":
         raise ImproperlyConfigured(

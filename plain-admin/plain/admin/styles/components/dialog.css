@@ -8,7 +8,7 @@
     @apply inset-y-0 opacity-0 transition-all transition-discrete;
     transition-duration: var(--admin-overlay-fade);
 
-    &:is([open],:popover-open) {
+    &:is([open], :popover-open) {
       @apply opacity-100;
 
       &::backdrop {
@@ -56,11 +56,11 @@
         @apply flex flex-col-reverse gap-2 sm:flex-row sm:justify-end;
       }
       > button,
-      > form[method='dialog'] {
+      > form[method="dialog"] {
         @apply absolute top-4 right-4;
       }
       > button,
-      > form[method='dialog'] > button {
+      > form[method="dialog"] > button {
         @apply ring-offset-admin-background focus:ring-admin-ring data-[state=open]:bg-admin-accent data-[state=open]:text-admin-muted-foreground  rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4;
       }
     }

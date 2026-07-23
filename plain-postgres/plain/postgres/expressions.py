@@ -163,9 +163,7 @@ class Combinable:
     def bitrightshift(self, other: Any) -> CombinedExpression:
         return self._combine(other, self.BITRIGHTSHIFT, False)
 
-    def __xor__(self, other: Any) -> Q:
-        if getattr(self, "conditional", False) and getattr(other, "conditional", False):
-            return Q(self) ^ Q(other)
+    def __xor__(self, other: Any) -> None:
         raise NotImplementedError(
             "Use .bitand(), .bitor(), and .bitxor() for bitwise logical operations."
         )

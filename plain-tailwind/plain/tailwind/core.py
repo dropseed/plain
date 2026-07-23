@@ -4,6 +4,7 @@ import os
 import platform
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,7 @@ import httpx
 import tomlkit
 
 from plain.packages import packages_registry
-from plain.runtime import APP_PATH, PLAIN_TEMP_PATH, settings
+from plain.runtime import APP_PATH, PLAIN_CACHE_PATH, PLAIN_TEMP_PATH, settings
 
 
 class Tailwind:
@@ -20,13 +21,10 @@ class Tailwind:
     def target_directory(self) -> str:
         return str(PLAIN_TEMP_PATH)
 
-    @property
-    def standalone_path(self) -> str:
-        return os.path.join(self.target_directory, "tailwind")
-
-    @property
-    def version_lockfile_path(self) -> str:
-        return os.path.join(self.target_directory, "tailwind.version")
+    def binary_path(self, version: str) -> Path:
+        """Machine-level cache path for a specific Tailwind version."""
+        filename = "tailwind.exe" if platform.system() == "Windows" else "tailwind"
+        return PLAIN_CACHE_PATH / "tailwind" / version / filename
 
     @property
     def src_css_path(self) -> Path:
@@ -59,6 +57,7 @@ class Tailwind:
             if tailwind_css.is_file():
                 import_paths.append(rel_to_target(tailwind_css))
 
+        os.makedirs(self.target_directory, exist_ok=True)
         plain_sources_path = os.path.join(self.target_directory, "tailwind.css")
         with open(plain_sources_path, "w") as f:
             # @import rules must come before any other rules per the CSS spec.
@@ -68,37 +67,23 @@ class Tailwind:
                 f.write(f'@source "{path}";\n')
 
     def invoke(self, *args: Any, cwd: str | None = None) -> None:
-        result = subprocess.run([self.standalone_path] + list(args), cwd=cwd)
+        version = self.get_version_from_config()
+        if not version:
+            raise RuntimeError(
+                "No Tailwind version configured in pyproject.toml — run `plain tailwind install`"
+            )
+        result = subprocess.run([self.binary_path(version)] + list(args), cwd=cwd)
         if result.returncode != 0:
             sys.exit(result.returncode)
 
     def is_installed(self) -> bool:
-        if not os.path.exists(self.target_directory):
-            os.mkdir(self.target_directory)
-        return os.path.exists(os.path.join(self.target_directory, "tailwind"))
+        version = self.get_version_from_config()
+        return bool(version) and self.binary_path(version).exists()
 
     def create_src_css(self) -> None:
         os.makedirs(os.path.dirname(self.src_css_path), exist_ok=True)
         with open(self.src_css_path, "w") as f:
             f.write("""@import "tailwindcss";\n@import "./.plain/tailwind.css";\n""")
-
-    def needs_update(self) -> bool:
-        locked_version = self.get_installed_version()
-        if not locked_version:
-            return True
-
-        if locked_version != self.get_version_from_config():
-            return True
-
-        return False
-
-    def get_installed_version(self) -> str:
-        """Get the currently installed Tailwind version"""
-        if not os.path.exists(self.version_lockfile_path):
-            return ""
-
-        with open(self.version_lockfile_path) as f:
-            return f.read().strip()
 
     def get_version_from_config(self) -> str:
         pyproject_path = os.path.join(
@@ -108,8 +93,8 @@ class Tailwind:
         if not os.path.exists(pyproject_path):
             return ""
 
-        with open(pyproject_path) as f:
-            config = tomlkit.load(f)
+        with open(pyproject_path, "rb") as f:
+            config = tomllib.load(f)
             return (
                 config.get("tool", {})
                 .get("plain", {})
@@ -145,38 +130,48 @@ class Tailwind:
             "User-Agent": "plain-tailwind/1.0",
         }
 
-        with (
-            httpx.Client(
-                transport=httpx.HTTPTransport(retries=3),
-                follow_redirects=True,
-                timeout=300,
-            ) as client,
-            client.stream("GET", url, headers=headers) as response,
-        ):
-            response.raise_for_status()
-            total = int(response.headers.get("Content-Length", 0))
+        # Download to a temp file first, then atomically move it into the
+        # versioned cache path (parallel checkouts can download concurrently).
+        download_dir = PLAIN_CACHE_PATH / "tailwind"
+        download_dir.mkdir(parents=True, exist_ok=True)
+        tmp_path = download_dir / f".download-{os.getpid()}"
 
-            with open(self.standalone_path, "wb") as f:
-                with click.progressbar(
-                    length=total,
-                    label="Downloading Tailwind",
-                    width=0,
-                ) as bar:
-                    for chunk in response.iter_bytes(chunk_size=1024 * 1024):
-                        if chunk:
-                            f.write(chunk)
-                            bar.update(len(chunk))
+        try:
+            with (
+                httpx.Client(
+                    transport=httpx.HTTPTransport(retries=3),
+                    follow_redirects=True,
+                    timeout=300,
+                ) as client,
+                client.stream("GET", url, headers=headers) as response,
+            ):
+                response.raise_for_status()
+                total = int(response.headers.get("Content-Length", 0))
 
-        os.chmod(self.standalone_path, 0o755)
+                with open(tmp_path, "wb") as f:
+                    with click.progressbar(
+                        length=total,
+                        label="Downloading Tailwind",
+                        width=0,
+                    ) as bar:
+                        for chunk in response.iter_bytes(chunk_size=1024 * 1024):
+                            if chunk:
+                                f.write(chunk)
+                                bar.update(len(chunk))
 
-        if not version:
-            # Get the version from the redirect chain (latest -> vX.Y.Z)
-            version = str(response.history[1].url).split("/")[-2]
+            os.chmod(tmp_path, 0o755)
 
-        version = version.lstrip("v")
+            if not version:
+                # Get the version from the redirect chain (latest -> vX.Y.Z)
+                version = str(response.history[1].url).split("/")[-2]
 
-        with open(self.version_lockfile_path, "w") as f:
-            f.write(version)
+            version = version.lstrip("v")
+
+            binary_path = self.binary_path(version)
+            binary_path.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(tmp_path, binary_path)
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
         return version
 
