@@ -57,7 +57,7 @@ from plain.postgres.query_utils import (
 )
 from plain.postgres.sql.constants import INNER, LOUTER, ORDER_DIR, SINGLE
 from plain.postgres.sql.datastructures import BaseTable, Empty, Join, MultiJoin
-from plain.postgres.sql.where import AND, OR, ExtraWhere, NothingNode, WhereNode
+from plain.postgres.sql.where import AND, OR, NothingNode, WhereNode
 from plain.utils.regex_helper import _lazy_re_compile
 from plain.utils.tree import Node
 
@@ -131,7 +131,6 @@ class RawQuery:
         # Mirror some properties of a normal query so that
         # the compiler can be used to process results.
         self.low_mark, self.high_mark = 0, None  # Used for offset/limit
-        self.extra_select = {}
         self.annotation_select = {}
 
     def chain(self) -> RawQuery:
@@ -246,20 +245,12 @@ class Query(BaseExpression):
     # Arbitrary limit for select_related to prevents infinite recursion.
     max_depth = 5
     # Holds the selects defined by a call to values() or values_list()
-    # excluding annotation_select and extra_select.
+    # excluding annotation_select.
     values_select: tuple[str, ...] = ()
 
     # SQL annotation-related attributes.
     annotation_select_mask = None
     _annotation_select_cache = None
-
-    # These are for extensions. The contents are more or less appended verbatim
-    # to the appropriate clause.
-    extra_select_mask = None
-    _extra_select_cache = None
-
-    extra_tables: tuple[str, ...] = ()
-    extra_order_by: tuple[str, ...] = ()
 
     # A tuple that is a set of model field names and either True, if these are
     # the fields to defer, or False if these are the only fields to load.
@@ -289,9 +280,6 @@ class Query(BaseExpression):
         self.where = WhereNode()
         # Maps alias -> Annotation Expression.
         self.annotations = {}
-        # These are for extensions. The contents are more or less appended
-        # verbatim to the appropriate clause.
-        self.extra = {}  # Maps col_alias -> (col_sql, params).
 
         self._filtered_relations = {}
 
@@ -364,11 +352,6 @@ class Query(BaseExpression):
         # It will get re-populated in the cloned queryset the next time it's
         # used.
         obj._annotation_select_cache = None
-        obj.extra = self.extra.copy()
-        if self.extra_select_mask is not None:
-            obj.extra_select_mask = self.extra_select_mask.copy()
-        if self._extra_select_cache is not None:
-            obj._extra_select_cache = self._extra_select_cache.copy()
         if self.select_related is not False:
             # Use deepcopy because select_related stores fields in nested
             # dicts.
@@ -526,7 +509,6 @@ class Query(BaseExpression):
             outer_query = self
             self.select = ()
             self.default_cols = False
-            self.extra = {}
             if self.annotations:
                 # Inline reference to existing annotations and mask them as
                 # they are unnecessary given only the summarized aggregations
@@ -697,35 +679,15 @@ class Query(BaseExpression):
         w.relabel_aliases(change_map)
         self.where.add(w, connector)
 
-        # Selection columns and extra extensions are those provided by 'rhs'.
+        # Selection columns are those provided by 'rhs'.
         if rhs.select:
             self.set_select([col.relabeled_clone(change_map) for col in rhs.select])
         else:
             self.select = ()
 
-        if connector == OR:
-            # It would be nice to be able to handle this, but the queries don't
-            # really make sense (or return consistent value sets). Not worth
-            # the extra complexity when you can write a real query instead.
-            if self.extra and rhs.extra:
-                raise ValueError(
-                    "When merging querysets using 'or', you cannot have "
-                    "extra(select=...) on both sides."
-                )
-        self.extra.update(rhs.extra)
-        extra_select_mask = set()
-        if self.extra_select_mask is not None:
-            extra_select_mask.update(self.extra_select_mask)
-        if rhs.extra_select_mask is not None:
-            extra_select_mask.update(rhs.extra_select_mask)
-        if extra_select_mask:
-            self.set_extra_mask(extra_select_mask)
-        self.extra_tables += rhs.extra_tables
-
         # Ordering uses the 'rhs' ordering, unless it has none, in which case
         # the current ordering is used.
         self.order_by = rhs.order_by or self.order_by
-        self.extra_order_by = rhs.extra_order_by or self.extra_order_by
 
     def _get_defer_select_mask(
         self,
@@ -2132,14 +2094,12 @@ class Query(BaseExpression):
         self.select = ()
         self.default_cols = False
         self.select_related = False
-        self.set_extra_mask(())
         self.set_annotation_mask(())
 
     def clear_select_fields(self) -> None:
         """
-        Clear the list of fields to select (but not extra_select columns).
-        Some queryset types completely replace any existing list of select
-        columns.
+        Clear the list of fields to select. Some queryset types completely
+        replace any existing list of select columns.
         """
         self.select = ()
         self.values_select = ()
@@ -2205,7 +2165,6 @@ class Query(BaseExpression):
                 names = sorted(
                     [
                         *get_field_names_from_opts(meta),
-                        *self.extra,
                         *self.annotation_select,
                         *self._filtered_relations,
                     ]
@@ -2232,8 +2191,6 @@ class Query(BaseExpression):
                     continue
                 item = item.removeprefix("-")
                 if item in self.annotations:
-                    continue
-                if self.extra and item in self.extra:
                     continue
                 # names_to_path() validates the lookup. A descriptive
                 # FieldError will be raise if it's not.
@@ -2265,7 +2222,6 @@ class Query(BaseExpression):
         ):
             return
         self.order_by = ()
-        self.extra_order_by = ()
         if clear_default:
             self.default_ordering = False
 
@@ -2317,47 +2273,6 @@ class Query(BaseExpression):
             for part in field.split(LOOKUP_SEP):
                 d = d.setdefault(part, {})
         self.select_related = field_dict
-
-    def add_extra(
-        self,
-        select: dict[str, str],
-        select_params: list[Any] | None,
-        where: list[str],
-        params: list[Any],
-        tables: list[str],
-        order_by: tuple[str, ...],
-    ) -> None:
-        """
-        Add data to the various extra_* attributes for user-created additions
-        to the query.
-        """
-        if select:
-            # We need to pair any placeholder markers in the 'select'
-            # dictionary with their parameters in 'select_params' so that
-            # subsequent updates to the select dictionary also adjust the
-            # parameters appropriately.
-            select_pairs = {}
-            if select_params:
-                param_iter = iter(select_params)
-            else:
-                param_iter = iter([])
-            for name, entry in select.items():
-                self.check_alias(name)
-                entry = str(entry)
-                entry_params = []
-                pos = entry.find("%s")
-                while pos != -1:
-                    if pos == 0 or entry[pos - 1] != "%":
-                        entry_params.append(next(param_iter))
-                    pos = entry.find("%s", pos + 2)
-                select_pairs[name] = (entry, entry_params)
-            self.extra.update(select_pairs)
-        if where or params:
-            self.where.add(ExtraWhere(where, params), AND)
-        if tables:
-            self.extra_tables += tuple(tables)
-        if order_by:
-            self.extra_order_by = order_by
 
     def clear_deferred_loading(self) -> None:
         """Remove any fields from the deferred loading set."""
@@ -2433,19 +2348,6 @@ class Query(BaseExpression):
         if self.annotation_select_mask is not None:
             self.set_annotation_mask(self.annotation_select_mask.union(names))
 
-    def set_extra_mask(
-        self, names: set[str] | list[str] | tuple[str, ...] | None
-    ) -> None:
-        """
-        Set the mask of extra select items that will be returned by SELECT.
-        Don't remove them from the Query since they might be used later.
-        """
-        if names is None:
-            self.extra_select_mask = None
-        else:
-            self.extra_select_mask = set(names)
-        self._extra_select_cache = None
-
     def set_values(self, fields: list[str]) -> None:
         self.select_related = False
         self.clear_deferred_loading()
@@ -2454,24 +2356,20 @@ class Query(BaseExpression):
 
         if fields:
             field_names = []
-            extra_names = []
             annotation_names = []
-            if not self.extra and not self.annotations:
-                # Shortcut - if there are no extra or annotations, then
-                # the values() clause must be just field names.
+            if not self.annotations:
+                # Shortcut - if there are no annotations, then the values()
+                # clause must be just field names.
                 field_names = list(fields)
             else:
                 self.default_cols = False
                 for f in fields:
-                    if f in self.extra_select:
-                        extra_names.append(f)
-                    elif f in self.annotation_select:
+                    if f in self.annotation_select:
                         annotation_names.append(f)
                     else:
                         field_names.append(f)
-            self.set_extra_mask(extra_names)
             self.set_annotation_mask(annotation_names)
-            selected = frozenset(field_names + extra_names + annotation_names)
+            selected = frozenset(field_names + annotation_names)
         else:
             assert self.model is not None, "Default values query requires a model"
             field_names = [f.name for f in self.model._model_meta.concrete_fields]
@@ -2519,20 +2417,6 @@ class Query(BaseExpression):
             return self._annotation_select_cache
         else:
             return self.annotations
-
-    @property
-    def extra_select(self) -> dict[str, tuple[str, list[Any]]]:
-        if self._extra_select_cache is not None:
-            return self._extra_select_cache
-        if not self.extra:
-            return {}
-        elif self.extra_select_mask is not None:
-            self._extra_select_cache = {
-                k: v for k, v in self.extra.items() if k in self.extra_select_mask
-            }
-            return self._extra_select_cache
-        else:
-            return self.extra
 
     def trim_start(
         self, names_with_path: list[tuple[str, list[Any]]]

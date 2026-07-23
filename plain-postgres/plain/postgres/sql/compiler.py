@@ -24,7 +24,6 @@ from plain.postgres.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.postgres.expressions import (
     F,
     OrderBy,
-    RawSQL,
     Ref,
     ResolvableExpression,
     Value,
@@ -314,10 +313,6 @@ class SQLCompiler:
         klass_info = None
         annotations = {}
         select_idx = 0
-        for alias, (sql, params) in self.query.extra_select.items():
-            annotations[alias] = select_idx
-            select.append((RawSQL(sql, params), alias))
-            select_idx += 1
         assert not (self.query.select and self.query.default_cols)
         select_mask = self.query.get_select_mask()
         if self.query.default_cols:
@@ -371,11 +366,7 @@ class SQLCompiler:
         return ret, klass_info, annotations  # ty: ignore[invalid-return-type] (heterogeneous klass_info dict)
 
     def _order_by_pairs(self) -> Generator[tuple[OrderBy, bool]]:
-        if self.query.extra_order_by:
-            ordering = self.query.extra_order_by
-        elif not self.query.default_ordering:
-            ordering = self.query.order_by
-        elif self.query.order_by:
+        if not self.query.default_ordering or self.query.order_by:
             ordering = self.query.order_by
         elif (
             self.query.model
@@ -448,45 +439,15 @@ class SQLCompiler:
                 yield OrderBy(expr, descending=descending), False
                 continue
 
-            if "." in field:
-                # This came in through an extra(order_by=...) addition. Pass it
-                # on verbatim.
-                table, col = col.split(".", 1)
-                yield (
-                    OrderBy(
-                        RawSQL(f"{self.quote_name_unless_alias(table)}.{col}", []),
-                        descending=descending,
-                    ),
-                    False,
-                )
-                continue
-
-            if self.query.extra and col in self.query.extra:
-                if col in self.query.extra_select:
-                    yield (
-                        OrderBy(
-                            Ref(col, RawSQL(*self.query.extra[col])),
-                            descending=descending,
-                        ),
-                        True,
-                    )
-                else:
-                    yield (
-                        OrderBy(RawSQL(*self.query.extra[col]), descending=descending),
-                        False,
-                    )
-            else:
-                # 'col' is of the form 'field' or 'field1__field2' or
-                # '-field1__field2__field', etc.
-                assert self.query.model is not None, (
-                    "Ordering by fields requires a model"
-                )
-                meta = self.query.model._model_meta
-                yield from self.find_ordering_name(
-                    field,
-                    meta,
-                    default_order=default_order,
-                )
+            # 'col' is of the form 'field' or 'field1__field2' or
+            # '-field1__field2__field', etc.
+            assert self.query.model is not None, "Ordering by fields requires a model"
+            meta = self.query.model._model_meta
+            yield from self.find_ordering_name(
+                field,
+                meta,
+                default_order=default_order,
+            )
 
     def get_order_by(self) -> list[tuple[Any, tuple[str, tuple, bool]]]:
         """
@@ -534,13 +495,8 @@ class SQLCompiler:
         """
         if name in self.quote_cache:
             return self.quote_cache[name]
-        if (
-            (name in self.query.alias_map and name not in self.query.table_map)
-            or name in self.query.extra_select
-            or (
-                self.query.external_aliases.get(name)
-                and name not in self.query.table_map
-            )
+        if (name in self.query.alias_map and name not in self.query.table_map) or (
+            self.query.external_aliases.get(name) and name not in self.query.table_map
         ):
             self.quote_cache[name] = name
             return name
@@ -976,25 +932,10 @@ class SQLCompiler:
         for alias in tuple(self.query.alias_map):
             if not self.query.alias_refcount[alias]:
                 continue
-            try:
-                from_clause = self.query.alias_map[alias]
-            except KeyError:
-                # Extra tables can end up in self.tables, but not in the
-                # alias_map if they aren't in a join. That's OK. We skip them.
-                continue
+            from_clause = self.query.alias_map[alias]
             clause_sql, clause_params = self.compile(from_clause)
             result.append(clause_sql)
             params.extend(clause_params)
-        for t in self.query.extra_tables:
-            alias, _ = self.query.table_alias(t)
-            # Only add the alias if it's not already present (the table_alias()
-            # call increments the refcount, so an alias refcount of one means
-            # this is the only reference).
-            if (
-                alias not in self.query.alias_map
-                or self.query.alias_refcount[alias] == 1
-            ):
-                result.append(f", {self.quote_name_unless_alias(alias)}")
         return result, params
 
     def get_related_selections(
@@ -1772,7 +1713,6 @@ class SQLUpdateCompiler(SQLCompiler):
         query = self.query.chain(klass=Query)
         query.select_related = False
         query.clear_ordering(force=True)
-        query.extra = {}
         query.select = ()
         query.add_fields(["id"])
         super().pre_sql_setup()

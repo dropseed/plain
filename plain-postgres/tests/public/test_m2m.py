@@ -144,3 +144,40 @@ def test_many_to_many_through_model(db):
     through_instance = through_instances.first()
     assert through_instance is not None
     assert through_instance.tag == gps
+
+
+def test_many_to_many_prefetch_related(db, capture_queries):
+    """prefetch_related on a forward M2M batches the related rows into one
+    query and assigns each set to the right instance.
+
+    Correct per-instance assignment depends on the prefetch query exposing the
+    through-table FK column so the loader can match secondary rows back to the
+    primary that owns them. That value is added by an annotation on the
+    prefetch queryset, so this test guards that mechanism.
+    """
+    tesla = Widget.query.create(name="Tesla", size="Model 3")
+    toyota = Widget.query.create(name="Toyota", size="Camry")
+    Widget.query.create(name="Honda", size="Civic")  # no tags
+
+    gps = Tag.query.create(name="GPS")
+    sunroof = Tag.query.create(name="Sunroof")
+    leather = Tag.query.create(name="Leather Seats")
+
+    tesla.tags.add(gps, sunroof)
+    toyota.tags.add(leather)
+
+    with capture_queries() as queries:
+        widgets = {
+            w.name: w for w in Widget.query.prefetch_related("tags").order_by("id")
+        }
+        prefetched = {
+            name: {t.name for t in w.tags.query.all()} for name, w in widgets.items()
+        }
+
+    # One query for widgets, one for the batched tags — no per-widget query.
+    assert len(queries) == 2
+
+    # Each widget gets its own tags, not another widget's.
+    assert prefetched["Tesla"] == {"GPS", "Sunroof"}
+    assert prefetched["Toyota"] == {"Leather Seats"}
+    assert prefetched["Honda"] == set()

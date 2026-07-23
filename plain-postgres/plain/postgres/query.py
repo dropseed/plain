@@ -194,9 +194,7 @@ class ValuesIterable(BaseIterable):
         query = queryset.sql_query
         compiler = query.get_compiler()
 
-        # extra(select=...) cols are always at the start of the row.
         names = [
-            *query.extra_select,
             *query.values_select,
             *query.annotation_select,
         ]
@@ -217,9 +215,7 @@ class ValuesListIterable(BaseIterable):
         compiler = query.get_compiler()
 
         if queryset._fields:
-            # extra(select=...) cols are always at the start of the row.
             names = [
-                *query.extra_select,
                 *query.values_select,
                 *query.annotation_select,
             ]
@@ -1338,29 +1334,6 @@ class QuerySet[T: "Model"]:
         obj.sql_query.add_distinct_fields(*field_names)
         return obj
 
-    def extra(
-        self,
-        select: dict[str, str] | None = None,
-        where: list[str] | None = None,
-        params: list[Any] | None = None,
-        tables: list[str] | None = None,
-        order_by: list[str] | None = None,
-        select_params: list[Any] | None = None,
-    ) -> QuerySet[T]:
-        """Add extra SQL fragments to the query."""
-        if self.sql_query.is_sliced:
-            raise TypeError("Cannot change a query once a slice has been taken.")
-        clone = self._chain()
-        clone.sql_query.add_extra(
-            select or {},
-            select_params,
-            where or [],
-            params or [],
-            tables or [],
-            tuple(order_by) if order_by else (),
-        )
-        return clone
-
     def reverse(self) -> QuerySet[T]:
         """Reverse the ordering of the QuerySet."""
         if self.sql_query.is_sliced:
@@ -1417,7 +1390,7 @@ class QuerySet[T: "Model"]:
         """
         if isinstance(self, EmptyQuerySet):
             return True
-        if self.sql_query.extra_order_by or self.sql_query.order_by:
+        if self.sql_query.order_by:
             return True
         elif (
             self.sql_query.default_ordering
@@ -1554,7 +1527,6 @@ class QuerySet[T: "Model"]:
         """Check that two QuerySet classes may be merged."""
         if self._fields is not None and (
             set(self.sql_query.values_select) != set(other.sql_query.values_select)
-            or set(self.sql_query.extra_select) != set(other.sql_query.extra_select)
             or set(self.sql_query.annotation_select)
             != set(other.sql_query.annotation_select)
         ):

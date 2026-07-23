@@ -330,21 +330,3 @@ class NothingNode:
         connection: DatabaseConnection | None = None,
     ) -> tuple[str, list[Any]]:
         raise EmptyResultSet
-
-
-class ExtraWhere:
-    # The contents are a black box - assume no aggregates or windows are used.
-    contains_aggregate = False
-    contains_over_clause = False
-
-    def __init__(self, sqls: list[str], params: list[Any] | None):
-        self.sqls = sqls
-        self.params = params
-
-    def as_sql(
-        self,
-        compiler: SQLCompiler | None = None,
-        connection: DatabaseConnection | None = None,
-    ) -> tuple[str, list[Any]]:
-        sqls = [f"({sql})" for sql in self.sqls]
-        return " AND ".join(sqls), list(self.params or ())

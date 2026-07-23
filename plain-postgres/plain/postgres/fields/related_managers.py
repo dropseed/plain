@@ -20,7 +20,7 @@ import builtins
 from plain.postgres import transaction
 from plain.postgres.db import get_connection
 from plain.postgres.dialect import quote_name
-from plain.postgres.expressions import Window
+from plain.postgres.expressions import RawSQL, Window
 from plain.postgres.functions import RowNumber
 from plain.postgres.lookups import GreaterThan, LessThanOrEqual
 from plain.postgres.query import QuerySet
@@ -414,9 +414,13 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         )  # M2M through model fields are always ForeignKey
         join_table = fk.model.model_options.db_table
         qn = quote_name
-        queryset = queryset.extra(
-            select={
-                f"_prefetch_related_val_{fk.name}": f"{qn(join_table)}.{qn(fk.column)}"
+        # Expose the through-table FK column so the prefetch loader can match
+        # each secondary row back to the primary instance that owns it.
+        queryset = queryset.annotate(
+            **{
+                f"_prefetch_related_val_{fk.name}": RawSQL(
+                    f"{qn(join_table)}.{qn(fk.column)}", []
+                )
             }
         )
         conn = get_connection()
