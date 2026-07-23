@@ -2604,6 +2604,8 @@ class InsertQuery(Query):
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
+        conflict_defaults: dict[Field, Any] | None = None,
+        returning_created: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
@@ -2612,6 +2614,10 @@ class InsertQuery(Query):
         self.on_conflict = on_conflict
         self.update_fields: list[Field] = update_fields or []
         self.unique_fields: list[Field] = unique_fields or []
+        # Per-column DO UPDATE SET overrides (upsert conflict_defaults) and the
+        # flag for the trailing "(xmax = 0)" created column in RETURNING.
+        self.conflict_defaults: dict[Field, Any] = conflict_defaults or {}
+        self.returning_created: bool = returning_created
 
     def insert_values(self, fields: list[Any], objs: list[Any]) -> None:
         self.fields = fields

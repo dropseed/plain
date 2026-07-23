@@ -14,6 +14,12 @@ class Tag(postgres.Model):
         to="Widget", field="tags"
     )
 
+    model_options = postgres.Options(
+        constraints=[
+            postgres.UniqueConstraint(fields=["name"], name="unique_tag_name"),
+        ]
+    )
+
 
 @postgres.register_model
 class WidgetTag(postgres.Model):

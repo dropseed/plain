@@ -31,11 +31,40 @@ def test_create_unique_constraint(db):
     assert Widget.query.count() == 1
 
 
-def test_update_or_create_unique_constraint(db):
-    Widget.query.update_or_create(name="Toyota", size="Tundra")
-    Widget.query.update_or_create(name="Toyota", size="Tundra")
+def test_upsert_unique_constraint(db):
+    Widget.query.upsert(
+        name="Toyota", size="Tundra", unique_fields=[Widget.name, Widget.size]
+    )
+    Widget.query.upsert(
+        name="Toyota", size="Tundra", unique_fields=[Widget.name, Widget.size]
+    )
 
     assert Widget.query.count() == 1
+
+
+def test_m2m_manager_upsert_adds_relationship_on_insert(db):
+    """The M2M manager's upsert() adds the through-row only when it inserts a
+    new target row -- if the target already existed the relationship does too.
+    """
+    widget = Widget.query.create(name="Tesla", size="Model 3")
+
+    tag, created = widget.tags.upsert(name="GPS", unique_fields=[Tag.name])
+    assert created is True
+    assert widget.tags.query.count() == 1
+    assert widget.tags.query.first() == tag
+
+
+def test_m2m_manager_upsert_does_not_readd_on_conflict(db):
+    widget = Widget.query.create(name="Tesla", size="Model 3")
+    gps = Tag.query.create(name="GPS")
+    widget.tags.add(gps)
+
+    # The tag already exists and is already related; upsert must not create a
+    # duplicate through-row.
+    tag, created = widget.tags.upsert(name="GPS", unique_fields=[Tag.name])
+    assert created is False
+    assert tag.id == gps.id
+    assert widget.tags.query.count() == 1
 
 
 def test_many_to_many_forward_accessor(db):
