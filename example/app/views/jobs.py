@@ -9,4 +9,6 @@ from plain.views import View
 class RunExampleJobView(View):
     def post(self) -> Response:
         ExampleJob().run_in_worker()
-        return RedirectResponse(reverse("index") + "?queued=ExampleJob")
+        return RedirectResponse(
+            reverse("index") + "?queued=ExampleJob", status_code=302
+        )

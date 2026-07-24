@@ -120,4 +120,4 @@ class TaskSeedView(AuthView, View):
         if not Tag.query.filter(owner=self.user).exists():
             for n in ("urgent", "later", "fun"):
                 Tag.query.create(owner=self.user, name=n)
-        return RedirectResponse(reverse("tasks:list"))
+        return RedirectResponse(reverse("tasks:list"), status_code=302)

@@ -592,15 +592,13 @@ def _is_external_url(url: str) -> bool:
 class RedirectResponse(Response):
     """HTTP redirect response"""
 
-    status_code = 302
-
     def __init__(
         self,
         redirect_to: str,
         *,
+        status_code: int,
         allow_external: bool = False,
         content_type: str | None = None,
-        status_code: int | None = None,
         reason: str | None = None,
         charset: str | None = None,
         headers: dict[str, Any] | None = None,
@@ -619,6 +617,11 @@ class RedirectResponse(Response):
             charset=charset,
             headers=headers,
         )
+        if not 300 <= self.status_code <= 399:
+            raise ValueError(
+                "RedirectResponse status_code must be a 3xx redirect status, "
+                f"got {self.status_code}."
+            )
         self.headers["Location"] = iri_to_uri(redirect_to) or ""
 
     @property
