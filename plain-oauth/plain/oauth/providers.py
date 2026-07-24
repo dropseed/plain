@@ -220,7 +220,9 @@ class OAuthProvider(ABC):
         Returns a redirect response to the given URL.
         This is a utility method to ensure consistent redirect handling.
         """
-        response = RedirectResponse(redirect_url, allow_external=allow_external)
+        response = RedirectResponse(
+            redirect_url, status_code=302, allow_external=allow_external
+        )
         add_never_cache_headers(response)
         return response
 

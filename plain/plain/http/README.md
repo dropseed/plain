@@ -165,7 +165,7 @@ return JsonResponse({"name": "Plain", "version": "1.0"})
 ```python
 from plain.http import RedirectResponse
 
-return RedirectResponse("/new-location")
+return RedirectResponse("/new-location", status_code=302)
 ```
 
 **File downloads:**

@@ -19,7 +19,7 @@ class OAuthLoginView(View):
         request = self.request
         provider = self.url_kwargs["provider"]
         if get_request_user(request):
-            return RedirectResponse("/")
+            return RedirectResponse("/", status_code=302)
 
         provider_instance = get_oauth_provider_instance(provider_key=provider)
         return provider_instance.handle_login_request(request=request)

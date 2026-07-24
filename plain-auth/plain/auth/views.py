@@ -135,7 +135,7 @@ class AuthView(SessionView):
 class LogoutView(View):
     def post(self) -> RedirectResponse:
         logout(self.request)
-        return RedirectResponse("/")
+        return RedirectResponse("/", status_code=302)
 
 
 def redirect_to_login(
@@ -152,4 +152,6 @@ def redirect_to_login(
         querystring[redirect_field_name] = next
         login_url_parts[4] = querystring.urlencode(safe="/")
 
-    return RedirectResponse(str(urlunparse(login_url_parts)), allow_external=True)
+    return RedirectResponse(
+        str(urlunparse(login_url_parts)), status_code=302, allow_external=True
+    )

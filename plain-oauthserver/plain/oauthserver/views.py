@@ -429,7 +429,9 @@ def _redirect(redirect_uri: str, params: dict[str, str]) -> RedirectResponse:
     separator = "&" if parsed.query else ""
     new_query = parsed.query + separator + urlencode(params)
     return RedirectResponse(
-        urlunparse(parsed._replace(query=new_query)), allow_external=True
+        urlunparse(parsed._replace(query=new_query)),
+        status_code=302,
+        allow_external=True,
     )
 
 
