@@ -619,7 +619,7 @@ class RedirectResponse(Response):
         )
         if not 300 <= self.status_code <= 399:
             raise ValueError(
-                f"RedirectResponse status_code must be a 3xx redirect status, "
+                "RedirectResponse status_code must be a 3xx redirect status, "
                 f"got {self.status_code}."
             )
         self.headers["Location"] = iri_to_uri(redirect_to) or ""
