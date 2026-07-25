@@ -9,7 +9,7 @@ typed *descriptor* (`XField[T]`), not the primitive `T`. Combined with
         email = types.EmailField()
         age = types.IntegerField(allow_null=True)
 
-    User.email   # EmailField[str]        — typed reference
+    User.email   # EmailField[str]        — typed reference, has .equals(), .contains(), ...
     user.email   # str                    — the loaded value
     User.age     # IntegerField[int | None]
     user.age     # int | None
@@ -440,16 +440,19 @@ def EncryptedJSONField(
 # Two overload families:
 #
 # 1. Class-argument FK (`to=SomeModel`) — T is inferred from the class.
-#    Returns `_ForeignKeyDescriptor[T, V]` whose `__get__` overloads keep
-#    class-access typed as the descriptor itself (matching runtime
-#    `ForwardForeignKeyDescriptor.__get__` which returns `self` when
-#    `instance is None`) and instance-access as the related instance
-#    (or `T | None` for nullable FKs).
+#    Returns `_ForeignKeyDescriptor[T, V]` whose `__get__` overloads do
+#    double duty: class-access (`Child.parent`) yields `type[T]` so the
+#    related model's typed field surface (e.g. `Child.parent.name.equals(...)`)
+#    is visible for typed where() chaining; instance-access (`child.parent`)
+#    yields V (T or T | None for nullable FKs).
 #
 # 2. String-argument FK (`to="SomeModel"`, `to="self"`) — T can't be
 #    inferred from the string, so the return type falls back to bare `T`.
 #    This requires an explicit LHS annotation (`parent: TreeNode | None = …`)
-#    but preserves typing for forward references and self-references.
+#    but preserves instance-access typing for forward references and
+#    self-references. Type-level FK traversal isn't available through
+#    string-arg FKs — the runtime `RelatedFieldRef` still resolves
+#    `Child.parent.name` regardless.
 #
 # `__set__` accepts the related instance, None (via V), or a bare PK
 # value (int) — matching what `ForwardForeignKeyDescriptor` already
@@ -461,7 +464,7 @@ def EncryptedJSONField(
 # caught at runtime rather than silently coerced to PK 0/1.
 class _ForeignKeyDescriptor[T: Model, V]:
     @overload
-    def __get__(self, instance: None, owner: type) -> _ForeignKeyDescriptor[T, V]: ...
+    def __get__(self, instance: None, owner: type) -> type[T]: ...
     @overload
     def __get__(self, instance: Model, owner: type) -> V: ...
     def __set__(self, instance: Model, value: V | int) -> None: ...

@@ -144,6 +144,70 @@ class TestLookupBlocking:
         assert field.get_transform("lower") is None  # ty: ignore[unresolved-attribute]
 
 
+class TestTypedQueryMethodsBlocked:
+    """Encrypted fields must not expose typed-query comparison methods.
+
+    The class-level overrides accept `Never`, so type checkers reject any
+    call site. The runtime also raises TypeError as a safety net for callers
+    that bypass type checking (e.g. dynamic code).
+    """
+
+    def test_equals_raises(self):
+        with pytest.raises(TypeError, match=r"api_key.*does not support \.equals\("):
+            SecretStore.api_key.equals("anything")  # ty: ignore[invalid-argument-type]
+
+    def test_not_equal_raises(self):
+        with pytest.raises(TypeError, match=r"does not support \.not_equal\("):
+            SecretStore.api_key.not_equal("x")  # ty: ignore[invalid-argument-type]
+
+    @pytest.mark.parametrize("method", ["gt", "gte", "lt", "lte"])
+    def test_ordering_comparison_raises(self, method):
+        with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
+            getattr(SecretStore.api_key, method)("x")
+
+    def test_is_in_raises(self):
+        with pytest.raises(TypeError, match=r"does not support \.is_in\("):
+            SecretStore.api_key.is_in(["x", "y"])  # ty: ignore[invalid-argument-type]
+
+    def test_is_null_returns_correct_lookup(self):
+        """is_null is the one comparison that makes sense on ciphertext."""
+        from plain.postgres.query_utils import Q
+
+        q = SecretStore.api_key.is_null()
+        assert isinstance(q, Q)
+        assert q.children == [("api_key__isnull", True)]
+
+        q_false = SecretStore.api_key.is_null(False)
+        assert q_false.children == [("api_key__isnull", False)]
+
+
+class TestKwargFilterBlocked:
+    """Block the legacy kwarg/Q path the same way the typed methods are
+    blocked: `filter(api_key='x')` on an encrypted field would silently
+    return zero rows because ciphertext is non-deterministic.
+    `filter(api_key=None)` is preserved so it still rewrites to IS NULL.
+    """
+
+    def test_filter_non_none_raises(self, db):
+        with pytest.raises(
+            TypeError,
+            match=r"api_key.*cannot be filtered by equality against a non-None value",
+        ):
+            SecretStore.query.filter(api_key="sk-test").count()
+
+    def test_exclude_non_none_raises(self, db):
+        with pytest.raises(
+            TypeError,
+            match=r"api_key.*cannot be filtered by equality against a non-None value",
+        ):
+            SecretStore.query.exclude(api_key="sk-test").count()
+
+    def test_filter_none_still_rewrites_to_isnull(self, db):
+        """filter(field=None) must continue to work — ORM rewrites to isnull."""
+        SecretStore.query.create(name="test", api_key="sk-test", config=None)
+        assert SecretStore.query.filter(config=None).count() == 1
+
+
 class TestKeyRotation:
     def test_decrypt_with_fallback_key(self):
         """Data encrypted with an old key should decrypt when that key is in fallbacks."""

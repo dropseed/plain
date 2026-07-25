@@ -5,6 +5,7 @@ The main QuerySet implementation. This provides the public API for the ORM.
 from __future__ import annotations
 
 import copy
+import inspect
 import operator
 import warnings
 from collections.abc import Callable, Iterator, Sequence
@@ -1138,6 +1139,18 @@ class QuerySet[T: "Model"]:
         """
         return self._filter_or_exclude(True, args, kwargs)
 
+    def where(self, *conditions: Q) -> Self:
+        """
+        Return a new QuerySet narrowed by typed field conditions.
+
+        Conditions are produced by field methods like `Model.field.equals(...)`
+        and combine with `|` and `&`. Unlike `filter()`, this accepts no
+        keyword arguments — every condition is a typed expression, so a
+        type checker can reject typos and value-type mismatches at the call
+        site.
+        """
+        return self._filter_or_exclude(False, conditions, {})
+
     def _filter_or_exclude(
         self, negate: bool, args: tuple[Any, ...], kwargs: dict[str, Any]
     ) -> Self:
@@ -1915,8 +1928,10 @@ def get_prefetcher(
 
     # For singly related objects, we have to avoid getting the attribute
     # from the object, as this will trigger the query. So we first try
-    # on the class, in order to get the descriptor object.
-    rel_obj_descriptor = getattr(instance.__class__, through_attr, None)
+    # on the class, in order to get the descriptor object. Use
+    # getattr_static so a forward FK yields its descriptor rather than the
+    # RelatedFieldRef traversal proxy its __get__ returns for class access.
+    rel_obj_descriptor = inspect.getattr_static(instance.__class__, through_attr, None)
     if rel_obj_descriptor is None:
         attr_found = hasattr(instance, through_attr)
     else:
