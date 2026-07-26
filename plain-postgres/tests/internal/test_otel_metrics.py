@@ -16,14 +16,13 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 from opentelemetry.trace import NoOpTracer
-from psycopg_pool import PoolTimeout
-
 from plain.postgres import otel as postgres_otel
 from plain.postgres.db import get_connection
 from plain.postgres.otel import register_pool_observables
 from plain.postgres.sources import runtime_pool_source
 from plain.runtime import settings
 from plain.test.otel import install_test_meter
+from psycopg_pool import PoolTimeout
 
 # Pool observables were registered against the proxy meter at package
 # `ready()`; ensure the real MeterProvider is installed and rebind so

@@ -8,7 +8,6 @@ can't be impersonated, and stopping restores the original user.
 from __future__ import annotations
 
 from app.users.models import User
-
 from plain.test import Client
 
 

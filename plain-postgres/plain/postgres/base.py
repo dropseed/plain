@@ -11,9 +11,8 @@ if TYPE_CHECKING:
     from plain.postgres.meta import Meta
     from plain.postgres.options import Options
 
-import psycopg
-
 import plain.runtime
+import psycopg
 from plain.exceptions import ValidationError
 from plain.postgres import models_registry, transaction, types
 from plain.postgres.constants import LOOKUP_SEP

@@ -9,7 +9,6 @@ get rendered into HTML.
 from __future__ import annotations
 
 import pytest
-
 from plain.http import Response
 from plain.runtime import settings
 from plain.urls import Router, get_resolver, include, path, reverse

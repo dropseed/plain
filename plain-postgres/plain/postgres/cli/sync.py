@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 
 import click
-
 from plain.runtime import settings
 
 from ..convergence import execute_plan, plan_convergence

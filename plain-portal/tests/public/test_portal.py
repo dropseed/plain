@@ -10,7 +10,6 @@ import nacl.exceptions
 import nacl.secret
 import pytest
 import spake2
-
 from plain.portal.codegen import WORDLIST, generate_code, validate_code
 from plain.portal.crypto import PortalEncryptor, channel_id
 from plain.portal.local import _MAX_FRAME_SIZE, _recv_framed, _send_framed

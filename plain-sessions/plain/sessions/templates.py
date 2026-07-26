@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from jinja2 import pass_context
-
 from plain.templates import register_template_global
 
 from .core import SessionStore

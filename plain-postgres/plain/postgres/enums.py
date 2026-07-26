@@ -69,7 +69,9 @@ class ChoicesMeta(enum.EnumMeta):
         return [value for value, _ in cls.choices]
 
 
-class TextChoices(str, enum.Enum, metaclass=ChoicesMeta):
+# Not `enum.StrEnum`: that would bring its own `__str__` and
+# `_generate_next_value_`, both of which are deliberately overridden below.
+class TextChoices(str, enum.Enum, metaclass=ChoicesMeta):  # noqa: UP042
     """Class for creating enumerated string choices."""
 
     # Dynamically set by metaclass

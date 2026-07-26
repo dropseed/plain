@@ -233,8 +233,10 @@ def test_thread_pool_exhaustion(
             return True
         return (
             False,
-            f"Normal request blocked (status={status}) "
-            f"— all {threads} threads exhausted by slow clients",
+            (
+                f"Normal request blocked (status={status}) "
+                f"— all {threads} threads exhausted by slow clients"
+            ),
         )
     finally:
         for s in slow_conns:

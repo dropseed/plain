@@ -7,7 +7,6 @@ import traceback
 import types
 
 import click
-
 from plain.cli.runtime import common_command
 
 _STARTUP = os.path.join(os.path.dirname(__file__), "startup.py")

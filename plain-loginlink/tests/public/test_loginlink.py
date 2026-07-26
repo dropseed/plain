@@ -12,7 +12,6 @@ import re
 from urllib.parse import urlsplit
 
 from app.users.models import User
-
 from plain.loginlink.links import generate_link_url
 from plain.test import Client, RequestFactory
 

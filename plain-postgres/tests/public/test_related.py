@@ -5,7 +5,6 @@ from app.examples.models.delete import (
     DeleteParent,
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
-
 from plain.postgres import QuerySet
 
 

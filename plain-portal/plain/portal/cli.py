@@ -7,7 +7,6 @@ import os
 import sys
 
 import click
-
 from plain.cli import register_cli
 
 from .protocol import (

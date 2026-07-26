@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 from app.examples.models.defaults import DBDefaultsExample
-
 from plain.postgres import RandomStringField, get_connection
 from plain.postgres.functions.random import RandomString
 

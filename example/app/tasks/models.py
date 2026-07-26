@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from app.users.models import User
 from plain import postgres
 from plain.postgres import types
 from plain.urls import reverse
+
+from app.users.models import User
 
 PRIORITY_CHOICES = [
     ("low", "Low"),

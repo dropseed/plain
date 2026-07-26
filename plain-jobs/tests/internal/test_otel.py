@@ -19,7 +19,6 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 from opentelemetry.trace import SpanKind
-
 from plain.jobs import Job, otel
 from plain.jobs.registry import register_job
 from plain.jobs.workers import Worker
@@ -179,7 +178,6 @@ def test_process_job_emits_consumer_span_when_lookup_fails(
     CONSUMER span at the top of process_job ensures lookup failures still
     surface."""
     from opentelemetry.trace import StatusCode
-
     from plain.jobs.workers import process_job
 
     # A random UUID won't match any row — JobProcess.query.get raises
@@ -317,7 +315,6 @@ def test_worker_loop_claim_failure_emits_error_span_and_continues(
     (the claim's own CLIENT spans are suppressed, so there is no other entry
     span to carry the failure), and keeps running."""
     from opentelemetry.trace import StatusCode
-
     from plain.jobs.models import JobRequestQuerySet
 
     worker = _build_worker_for_loop_test()

@@ -8,7 +8,6 @@ from opentelemetry.semconv._incubating.attributes import user_attributes
 
 if TYPE_CHECKING:
     from app.users.models import User
-
     from plain.http import Request
 
 _request_users: WeakKeyDictionary[Request, User | None] = WeakKeyDictionary()

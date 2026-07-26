@@ -18,9 +18,8 @@ import concurrent.futures
 from contextlib import contextmanager
 from unittest.mock import patch
 
-import pytest
-
 import plain.postgres.middleware
+import pytest
 from plain.http import Response, StreamingResponse
 from plain.internal.handlers.base import BaseHandler
 from plain.postgres.connection import DatabaseConnection

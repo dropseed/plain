@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from plain.postgres.db import _db_conn, use_management_connection
 from plain.runtime import settings
 

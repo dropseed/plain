@@ -11,7 +11,6 @@ import json as json_lib
 from pathlib import Path
 
 import click
-
 from plain.cli import register_cli
 from plain.runtime import APP_PATH
 

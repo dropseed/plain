@@ -3,7 +3,6 @@ from __future__ import annotations
 from contextlib import contextmanager
 
 import pytest
-
 from plain.postgres.connection import DatabaseConnection
 from plain.postgres.db import _db_conn, get_connection
 

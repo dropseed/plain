@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import psycopg
 import pytest
-
 from plain.postgres import get_connection
 from plain.postgres.migrations.executor import MigrationExecutor
 from plain.postgres.migrations.migration import Migration

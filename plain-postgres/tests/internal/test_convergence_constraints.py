@@ -9,7 +9,6 @@ from conftest_convergence import (
     execute,
     index_exists,
 )
-
 from plain.postgres import CheckConstraint, Q, UniqueConstraint, get_connection
 from plain.postgres.constraints import Deferrable
 from plain.postgres.convergence import (
@@ -536,7 +535,6 @@ class TestApplyConstraintFixes:
         from unittest.mock import patch
 
         import psycopg
-
         from plain.postgres.convergence.analysis import (
             _normalize_constraint_def,
             _normalize_default_expr,

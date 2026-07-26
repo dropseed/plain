@@ -5,7 +5,6 @@ import random
 import string
 
 import click
-
 from plain.cli import register_cli
 
 from .client import TunnelClient

@@ -1,12 +1,28 @@
 target-version = "py313"
 
+# Ruff 0.16 started linting and formatting Python code blocks inside Markdown.
+# Opt back out: it rewrites historical files like CHANGELOGs, and prose examples
+# are often deliberately partial.
+extend-exclude = ["*.md"]
+
 [lint]
 ignore = [
   "E501", # Never enforce `E501` (line length violations)
   "S101", # pytest use of assert
   "ISC001", # Implicit string concatenation
 ]
-extend-select = [
+# An explicit `select` — not `extend-select`. Ruff 0.16 grew its built-in default
+# from 59 rules to 413, and `extend-select` layers on top of that default, so the
+# set we ship would move whenever ruff's does. Listing the base explicitly keeps
+# `plain code check` reporting the same rules across ruff versions.
+#
+# The category selectors below stay whole (all of `UP`, not ruff's subset), so a
+# ruff upgrade still picks up new rules within a category we've opted into.
+select = [
+  "E4", # pycodestyle imports
+  "E7", # pycodestyle statements
+  "E9", # pycodestyle runtime errors
+  "F", # pyflakes
   "I", # isort
   # # "C90",  # mccabe
   # # "N",  # pep8-naming
@@ -21,3 +37,10 @@ extend-select = [
   "PT", # pytest
   "B006", # mutable-argument-default
 ]
+
+[lint.isort]
+# `plain` is a namespace package split across many distributions. Checkouts that
+# have some of it on disk (the Plain monorepo itself) would otherwise see `plain`
+# sorted as first-party while `plain.postgres` stays third-party, splitting one
+# namespace across two blocks. Pin it so imports group the same way everywhere.
+known-third-party = ["plain"]

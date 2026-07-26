@@ -23,7 +23,6 @@ from opentelemetry.semconv.attributes.code_attributes import (
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
-
 from plain import postgres
 from plain.postgres import transaction
 from plain.utils import timezone

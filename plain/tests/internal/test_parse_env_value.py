@@ -1,7 +1,6 @@
 from typing import Union
 
 import pytest
-
 from plain.exceptions import ImproperlyConfigured
 from plain.runtime import Secret
 from plain.runtime.user_settings import _parse_env_value

@@ -8,7 +8,6 @@ from conftest_convergence import (
     index_exists,
     index_is_valid,
 )
-
 from plain.postgres import Index, Q, get_connection
 from plain.postgres.convergence import (
     ReadOnlyConnectionError,

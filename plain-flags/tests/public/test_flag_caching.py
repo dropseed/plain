@@ -8,7 +8,6 @@ flags recompute every time. Disabled flags short-circuit.
 from __future__ import annotations
 
 import pytest
-
 from plain.flags import Flag
 from plain.flags.exceptions import FlagDisabled
 from plain.flags.models import Flag as FlagModel

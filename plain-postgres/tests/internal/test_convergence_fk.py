@@ -11,7 +11,6 @@ from conftest_convergence import (
     fk_on_delete_action,
     get_fk_constraint_names,
 )
-
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
     analyze_model,

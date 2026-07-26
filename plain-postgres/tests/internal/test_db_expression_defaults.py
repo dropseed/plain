@@ -14,7 +14,6 @@ import uuid
 
 import pytest
 from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
-
 from plain.postgres import get_connection
 from plain.postgres.fields import DATABASE_DEFAULT
 from plain.postgres.functions import GenRandomUUID, Now

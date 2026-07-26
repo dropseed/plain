@@ -10,7 +10,6 @@ from __future__ import annotations
 import os
 
 import pytest
-
 from plain.dev.postgres.identity import (
     read_pointer,
     resolve_database_name,
@@ -234,11 +233,10 @@ def test_losing_a_creation_race_is_not_an_error(tmp_path, monkeypatch):
     Both see it missing, both create it, one loses. Losing means the database
     now exists, which is the whole point — so it must not crash the command.
     """
-    from psycopg import errors
-
     from plain.dev.postgres.backends import Server
     from plain.dev.postgres.cluster import Cluster
     from plain.dev.postgres.resolve import ensure_database
+    from psycopg import errors
 
     def lost_the_race(*args, **kwargs):
         raise errors.DuplicateDatabase("someone else got there first")

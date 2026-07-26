@@ -13,7 +13,6 @@ from app.examples.models.constraints import ConstraintExample
 from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.querysets import DefaultQuerySetModel
 from app.examples.models.relationships import Tag, Widget, WidgetTag
-
 from plain.exceptions import ValidationError
 from plain.postgres import transaction
 from plain.postgres.exceptions import FieldError

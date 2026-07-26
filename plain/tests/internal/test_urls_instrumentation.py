@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import pytest
 from opentelemetry.semconv.attributes import url_attributes
-
 from plain.runtime import settings
 from plain.test import Client
 from plain.test.otel import install_test_tracer

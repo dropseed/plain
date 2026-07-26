@@ -4,7 +4,6 @@ from collections.abc import Callable, Generator
 from typing import Any
 
 from app.users.models import User
-
 from plain import forms
 from plain.exceptions import ValidationError
 from plain.postgres.forms import ModelForm

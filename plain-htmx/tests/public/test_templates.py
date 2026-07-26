@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import jinja2
 import pytest
-
 from plain.htmx.templates import HTMXFragmentExtension, render_template_fragment
 
 

@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, Protocol, Self, cast, runtime_checkable
 from uuid import UUID
 
 import psycopg
-
 from plain.postgres import fields
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import (
@@ -407,22 +406,16 @@ class BaseExpression:
         """
         field = self.output_field
         if isinstance(field, fields.FloatField):
-            return (
-                lambda value, expression, connection: None
-                if value is None
-                else float(value)
+            return lambda value, expression, connection: (
+                None if value is None else float(value)
             )
         elif isinstance(field, fields.IntegerField | fields.PrimaryKeyField):
-            return (
-                lambda value, expression, connection: None
-                if value is None
-                else int(value)
+            return lambda value, expression, connection: (
+                None if value is None else int(value)
             )
         elif isinstance(field, fields.DecimalField):
-            return (
-                lambda value, expression, connection: None
-                if value is None
-                else Decimal(value)
+            return lambda value, expression, connection: (
+                None if value is None else Decimal(value)
             )
         return self._convert_value_noop
 

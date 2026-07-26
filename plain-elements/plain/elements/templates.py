@@ -9,7 +9,6 @@ from jinja2.environment import Environment
 from jinja2.ext import Extension
 from jinja2.parser import Parser
 from jinja2.runtime import Context
-
 from plain.templates import register_template_extension
 from plain.utils.safestring import SafeString, mark_safe
 

@@ -4,7 +4,6 @@ import json
 import sys
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.runtime import without_runtime_setup
 

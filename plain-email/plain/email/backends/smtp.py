@@ -15,7 +15,6 @@ from opentelemetry.semconv.attributes.server_attributes import (
     SERVER_PORT,
 )
 from opentelemetry.trace import SpanKind
-
 from plain.runtime import settings
 from plain.utils.otel import format_exception_type
 

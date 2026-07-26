@@ -15,7 +15,6 @@ from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
-
 from plain.logs import get_framework_logger
 from plain.postgres import transaction
 from plain.postgres.db import return_database_connection

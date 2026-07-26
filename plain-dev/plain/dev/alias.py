@@ -5,7 +5,6 @@ from functools import cached_property
 from pathlib import Path
 
 import click
-
 from plain.runtime import PLAIN_CACHE_PATH
 
 

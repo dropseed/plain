@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from jinja2.runtime import Context
-
 from plain.assets.finders import _APP_ASSETS_DIR
 from plain.runtime import settings
 from plain.templates import register_template_extension

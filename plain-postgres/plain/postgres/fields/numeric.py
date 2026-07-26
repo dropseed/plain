@@ -5,10 +5,9 @@ from collections.abc import Callable, Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from psycopg.types import numeric
-
 from plain import exceptions, validators
 from plain.preflight import PreflightResult
+from psycopg.types import numeric
 
 from .base import NOT_PROVIDED, DefaultableField
 

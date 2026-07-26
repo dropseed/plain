@@ -6,7 +6,6 @@ from collections.abc import Callable
 import httpx
 import pytest
 from click.testing import CliRunner
-
 from plain.cloud import cli as cli_module
 from plain.cloud.cli import cli
 from plain.cloud.client import Client

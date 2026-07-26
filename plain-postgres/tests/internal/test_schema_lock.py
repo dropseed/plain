@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import psycopg
 import pytest
-
 from plain.postgres.db import get_connection
 from plain.postgres.schema_lock import (
     SCHEMA_LOCK_KEY,

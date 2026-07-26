@@ -2,7 +2,6 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-
 from plain.csrf.middleware import CsrfViewMiddleware
 from plain.test import RequestFactory
 
