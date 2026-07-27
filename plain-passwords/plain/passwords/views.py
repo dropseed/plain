@@ -98,7 +98,9 @@ class PasswordResetView(AuthView, FormView[PasswordSetForm]):
     def get(self) -> Response:
         if self.user:
             # Redirect if the user is already logged in
-            return RedirectResponse(str(self.success_url) if self.success_url else "/")
+            return RedirectResponse(
+                str(self.success_url) if self.success_url else "/", status_code=302
+            )
 
         # Tokens are initially passed as GET parameters and we
         # immediately store them in the session and remove it from the URL.
@@ -109,7 +111,7 @@ class PasswordResetView(AuthView, FormView[PasswordSetForm]):
             # HTTP Referer header.
             self.session[self._reset_token_session_key] = token
             # Redirect to the path itself, without the GET parameters
-            response = RedirectResponse(self.request.path)
+            response = RedirectResponse(self.request.path, status_code=302)
             add_never_cache_headers(response)
             return response
 
@@ -167,7 +169,7 @@ class PasswordLoginView(AuthView, FormView[PasswordLoginForm]):
     def get(self) -> Response:
         # Redirect if the user is already logged in
         if self.user:
-            return RedirectResponse(self.success_url)
+            return RedirectResponse(self.success_url, status_code=302)
 
         return super().get()
 

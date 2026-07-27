@@ -1,0 +1,99 @@
+name: claude-code-review
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  # Lets the action exchange an OIDC token for a Claude GitHub App token,
+  # so reviews post as the branded app instead of github-actions[bot].
+  id-token: write
+
+jobs:
+  review:
+    # Job-level so that skipped runs (e.g. unrelated PR comments) never enter
+    # the group and cancel a review in progress.
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}
+      cancel-in-progress: true
+    # Automatic on non-draft PRs from this repo (fork PRs can't read the token
+    # secret), or manually via an "@claude review" PR comment from a
+    # collaborator, or via workflow_dispatch with a PR number.
+    if: >-
+      (github.event_name == 'pull_request' &&
+       !github.event.pull_request.draft &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       startsWith(github.event.comment.body, '@claude review') &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)) ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The pull_request trigger already excludes fork PRs, but comment and
+      # dispatch triggers only know a PR number — look up whether it's a fork.
+      - name: Check for fork PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          fork=$(gh pr view "${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}" \
+            -R "${{ github.repository }}" --json isCrossRepository -q .isCrossRepository)
+          echo "fork=$fork" >> "$GITHUB_OUTPUT"
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.pr.outputs.fork == 'false'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+          prompt: "/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}"
+          # Always end with a submitted PR review, even when clean — it's the
+          # visible "this ran" record, and tools that wait on bot reviews
+          # (e.g. PullApprove agents) treat a submitted review as the answer.
+          # Approve vs. comment is also the signal the Codex handoff below reads,
+          # so the reason Codex did or didn't run is visible on the PR itself.
+          claude_args: |
+            --model opus
+            --append-system-prompt "After completing the review, always submit a GitHub review on the pull request, even when the review is clean. If you found no issues, approve it: 'gh pr review <number> --approve --body <summary>'. If you reported one or more findings, comment instead: 'gh pr review <number> --comment --body <summary>'. Never approve a pull request you reported findings on."
+            --allowedTools "Bash(gh pr review:*)"
+
+      # Hand the PR off to Codex for a second opinion, but only once Claude has
+      # approved — the two reviewers run in sequence rather than commenting over
+      # each other, and a PR with open findings should get fixed before Codex
+      # spends a review on it. Anything other than an approval (findings, a
+      # failed run, no review at all) skips the handoff.
+      #
+      # Must post with a personal access token, not github.token: Codex ignores
+      # comments authored by GitHub bots, and it bills the review to the Codex
+      # workspace of the commenting account. A github-actions[bot] comment is
+      # silently dropped.
+      - name: Trigger Codex review
+        if: success() && steps.pr.outputs.fork == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.CODEX_TRIGGER_TOKEN }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "CODEX_TRIGGER_TOKEN is not set — skipping Codex handoff."
+            exit 0
+          fi
+          # Latest review from a bot account is Claude's, since it just ran.
+          state=$(gh api --paginate --slurp "repos/$REPO/pulls/$PR/reviews" \
+            | jq -r 'add | map(select(.user.type == "Bot")) | last | .state // ""')
+          if [ "$state" != "APPROVED" ]; then
+            echo "Claude review state: ${state:-<none>} — not handing off to Codex."
+            exit 0
+          fi
+          gh pr comment "$PR" -R "$REPO" --body "@codex review"

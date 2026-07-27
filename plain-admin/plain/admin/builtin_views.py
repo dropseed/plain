@@ -28,7 +28,7 @@ class AdminIndexView(AdminView):
 
     def get(self) -> Response:
         if views := registry.get_list_views(user=self.user):
-            return RedirectResponse(list(views)[0].get_view_url())
+            return RedirectResponse(list(views)[0].get_view_url(), status_code=302)
 
         return super().get()
 
@@ -81,7 +81,7 @@ class PinNavView(AdminView):
         )
 
         referer = self.request.headers.get("Referer", "/admin/")
-        return RedirectResponse(referer, allow_external=True)
+        return RedirectResponse(referer, status_code=302, allow_external=True)
 
 
 class UnpinNavView(AdminView):
@@ -101,7 +101,7 @@ class UnpinNavView(AdminView):
         ).delete()
 
         referer = self.request.headers.get("Referer", "/admin/")
-        return RedirectResponse(referer, allow_external=True)
+        return RedirectResponse(referer, status_code=302, allow_external=True)
 
 
 class ReorderPinnedView(AdminView):

@@ -148,7 +148,7 @@ class AdminListView(HTMXView, AdminView, ListView):
             else:
                 # Redirect back to the list, keeping the current query params
                 # (page, search, filter).
-                return RedirectResponse(self.request.get_full_path())
+                return RedirectResponse(self.request.get_full_path(), status_code=302)
 
         raise ValueError("Invalid action")
 

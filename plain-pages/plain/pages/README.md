@@ -86,7 +86,7 @@ Files with `.redirect` extension create redirects:
 # app/templates/pages/old-url.redirect
 ---
 url: /new-url/
-temporary: false
+status_code: 301
 ---
 ```
 
@@ -177,7 +177,7 @@ Available frontmatter options:
 - `template_name`: Custom template to use
 - `render_plain`: Skip template rendering (for markdown)
 - `url`: Redirect URL (for .redirect files)
-- `temporary`: Redirect type (for .redirect files)
+- `status_code`: Redirect status code (for .redirect files, defaults to 302)
 - Any custom variables accessible via `page.vars`
 
 ## Custom views

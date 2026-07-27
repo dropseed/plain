@@ -165,8 +165,10 @@ return JsonResponse({"name": "Plain", "version": "1.0"})
 ```python
 from plain.http import RedirectResponse
 
-return RedirectResponse("/new-location")
+return RedirectResponse("/new-location", status_code=302)
 ```
+
+The `status_code` is required and must be a 3xx status — pick the kind of redirect explicitly: `301` (moved permanently), `302` (found — the typical temporary redirect), `303` (see other), `307` (temporary, preserves the request method), or `308` (permanent, preserves the request method). External URLs are refused unless you pass `allow_external=True`.
 
 **File downloads:**
 

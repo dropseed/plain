@@ -27,9 +27,9 @@ def redirect_to_next_url(request: Request, default: str = "/") -> RedirectRespon
     empty, or an external URL (which RedirectResponse refuses)."""
     next_url = request.query_params.get("next") or default
     try:
-        return RedirectResponse(next_url)
+        return RedirectResponse(next_url, status_code=302)
     except ValueError:
-        return RedirectResponse(default)
+        return RedirectResponse(default, status_code=302)
 
 
 class LoginLinkFormView(AuthView, FormView[LoginLinkForm]):
@@ -91,11 +91,17 @@ class LoginLinkLoginView(AuthView, View):
         try:
             user = get_link_token_user(token)
         except LoginLinkExpired:
-            return RedirectResponse(reverse("loginlink:failed") + "?error=expired")
+            return RedirectResponse(
+                reverse("loginlink:failed") + "?error=expired", status_code=302
+            )
         except LoginLinkInvalid:
-            return RedirectResponse(reverse("loginlink:failed") + "?error=invalid")
+            return RedirectResponse(
+                reverse("loginlink:failed") + "?error=invalid", status_code=302
+            )
         except LoginLinkChanged:
-            return RedirectResponse(reverse("loginlink:failed") + "?error=changed")
+            return RedirectResponse(
+                reverse("loginlink:failed") + "?error=changed", status_code=302
+            )
 
         login(self.request, user)
 

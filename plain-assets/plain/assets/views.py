@@ -239,6 +239,7 @@ class AssetView(View):
             redirect_to=reverse(
                 f"{AssetsRouter.namespace}:asset", path=compiled_url_path
             ),
+            status_code=302,
             headers={
                 "Cache-Control": "max-age=60",  # Can cache this for a short time, but the fingerprinted path can change
             },

@@ -158,7 +158,7 @@ class FormView[F: "BaseForm"](TemplateView):
 
     def form_valid(self, form: F) -> Response:
         """If the form is valid, redirect to the supplied URL."""
-        return RedirectResponse(self.get_success_url(form))
+        return RedirectResponse(self.get_success_url(form), status_code=302)
 
     def get_template_context(self) -> dict[str, Any]:
         """Insert the form into the context dict."""
