@@ -220,28 +220,26 @@ class RegisterLookupMixin:
         get_class_lookups
     )
 
-    def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
+    def get_lookup(self, lookup: str) -> type[Lookup] | None:
         from plain.postgres.lookups import Lookup
 
-        found = self._get_lookup(lookup_name)
+        found = self._get_lookup(lookup)
         if found is None:
             # output_field is a Field which inherits from RegisterLookupMixin
             if output_field := getattr(self, "output_field", None):
-                return output_field.get_lookup(lookup_name)
+                return output_field.get_lookup(lookup)
         if found is not None and not issubclass(found, Lookup):
             return None
         return found
 
-    def get_transform(
-        self, lookup_name: str
-    ) -> type[Transform] | Callable[..., Any] | None:
+    def get_transform(self, name: str) -> Callable[..., Transform] | None:
         from plain.postgres.lookups import Transform
 
-        found = self._get_lookup(lookup_name)
+        found = self._get_lookup(name)
         if found is None:
             # output_field is a Field which inherits from RegisterLookupMixin
             if output_field := getattr(self, "output_field", None):
-                return output_field.get_transform(lookup_name)
+                return output_field.get_transform(name)
         if found is not None and not issubclass(found, Transform):
             return None
         return found

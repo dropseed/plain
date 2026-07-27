@@ -5,7 +5,7 @@ import itertools
 import math
 from collections.abc import Sequence
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 from plain.postgres.dialect import (
     OPERATORS,
@@ -187,7 +187,7 @@ class Lookup(Expression):
         reuse: Any = None,
         summarize: bool = False,
         for_save: bool = False,
-    ) -> Lookup:
+    ) -> Self:
         c = self.copy()
         c.is_summary = summarize
         c.lhs = self.lhs.resolve_expression(

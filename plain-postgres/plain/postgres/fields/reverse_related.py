@@ -100,8 +100,8 @@ class ForeignObjectRel(FieldCacheMixin):
             )
         return self.field.model
 
-    def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
-        return self.field.get_lookup(lookup_name)
+    def get_lookup(self, lookup: str) -> type[Lookup] | None:
+        return self.field.get_lookup(lookup)
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__}: {self.related_model.model_options.package_label}.{self.related_model.model_options.model_name}>"
