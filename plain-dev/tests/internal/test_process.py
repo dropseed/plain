@@ -9,7 +9,6 @@ automatically because the kernel has already dropped its lock.
 import os
 
 import pytest
-
 from plain.dev.process import Supervisor
 
 

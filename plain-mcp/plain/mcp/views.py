@@ -7,7 +7,6 @@ from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
-
 from plain.http import (
     HTTPException,
     JsonResponse,

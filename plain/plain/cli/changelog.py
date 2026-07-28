@@ -5,7 +5,6 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
-
 from plain.utils.version import compare_versions, parse_version
 
 from .output import style_markdown

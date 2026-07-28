@@ -8,7 +8,6 @@ import urllib.request
 from pathlib import Path
 
 import click
-
 from plain.runtime import PLAIN_CACHE_PATH
 
 

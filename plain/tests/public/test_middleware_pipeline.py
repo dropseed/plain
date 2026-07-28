@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import pytest
 from middleware_helpers import call_log
-
 from plain.runtime import settings
 from plain.test import Client
 

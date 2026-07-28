@@ -4,7 +4,6 @@ import sys
 from importlib.metadata import entry_points
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.runtime import common_command
 from plain.runtime import PLAIN_TEMP_PATH

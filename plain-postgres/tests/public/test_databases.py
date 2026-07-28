@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import psycopg
 import pytest
-
 from plain.postgres.database_url import parse_database_url
 from plain.postgres.databases import (
     connection_count,

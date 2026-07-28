@@ -5,7 +5,6 @@ attachments, HTML alternatives, and header-injection protection.
 from __future__ import annotations
 
 import pytest
-
 from plain.email import send_mail
 from plain.email.message import (
     BadHeaderError,

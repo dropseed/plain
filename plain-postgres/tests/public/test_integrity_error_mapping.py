@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import pytest
 from app.examples.models.constraints import ConstraintExample
-
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import transaction
 

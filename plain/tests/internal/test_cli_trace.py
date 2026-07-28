@@ -14,7 +14,6 @@ from opentelemetry.semconv.attributes.db_attributes import (
 )
 from opentelemetry.semconv.attributes.http_attributes import HTTP_REQUEST_METHOD
 from opentelemetry.semconv.attributes.url_attributes import URL_PATH
-
 from plain.cli._trace import (
     CapturedTrace,
     RawSpan,

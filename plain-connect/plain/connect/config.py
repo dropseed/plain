@@ -20,7 +20,6 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider, sampling
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.attributes import service_attributes
-
 from plain.packages import PackageConfig, register_config
 from plain.runtime import settings
 

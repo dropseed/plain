@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 
 import pytest
-
 from plain.dev import dotenv as dotenv_module
 from plain.dev.dotenv import load_dotenv_files
 

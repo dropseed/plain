@@ -3,7 +3,6 @@ import logging
 from io import StringIO
 
 import pytest
-
 from plain.logs import app_logger, get_framework_logger
 from plain.logs.configure import configure_logging
 from plain.logs.formatters import JSONFormatter, KeyValueFormatter

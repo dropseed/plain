@@ -8,7 +8,6 @@ import uuid
 from concurrent.futures import Future
 
 import pytest
-
 from plain.exceptions import ValidationError
 from plain.jobs import Job
 from plain.jobs.models import (

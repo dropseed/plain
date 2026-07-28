@@ -13,7 +13,6 @@ from opentelemetry.semconv.attributes.db_attributes import (
     DB_OPERATION_NAME,
     DB_QUERY_TEXT,
 )
-
 from plain.http import Response, StreamingResponse
 from plain.urls import Router, path
 from plain.views import View

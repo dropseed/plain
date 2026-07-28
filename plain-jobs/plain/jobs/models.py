@@ -13,7 +13,6 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import Link, SpanContext, SpanKind, TraceFlags
-
 from plain import postgres
 from plain.logs import get_framework_logger
 from plain.postgres import transaction, types

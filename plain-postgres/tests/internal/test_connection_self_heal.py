@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import psycopg
 import pytest
-
 from plain.postgres import transaction
 from plain.postgres.db import get_connection
 from plain.postgres.sources import runtime_pool_source

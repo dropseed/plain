@@ -135,6 +135,10 @@ plain code install --force
 plain code update
 ```
 
+#### Does Ruff format Python code blocks in my Markdown files?
+
+No. Ruff 0.16 added Markdown support and turns it on by default, but `plain.code` excludes `*.md` — it rewrites files you rarely want touched (changelogs, docs whose examples are deliberately partial). Markdown is left to your own formatter.
+
 #### Why are test files excluded from annotation coverage?
 
 Test files (`test_*.py`, `*_test.py`, and files in `tests/` or `test/` directories) are excluded by default because they typically contain many small helper functions where type annotations add noise without providing significant value. You can customize this behavior via the `exclude` option in the annotations configuration.

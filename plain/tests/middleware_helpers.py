@@ -6,7 +6,6 @@ import asyncio
 from contextvars import ContextVar
 
 from opentelemetry import trace
-
 from plain.http import HttpMiddleware, Response
 from plain.urls import Router, path
 from plain.views import ServerSentEvent, ServerSentEventsView, View

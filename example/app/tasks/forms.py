@@ -3,9 +3,10 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
-from app.users.models import User
 from plain import forms
 from plain.postgres.forms import ModelForm, ModelMultipleChoiceField
+
+from app.users.models import User
 
 from .models import Project, Tag, Task
 

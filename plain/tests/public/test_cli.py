@@ -4,7 +4,6 @@ import json
 from unittest import mock
 
 from click.testing import CliRunner
-
 from plain.cli.core import cli
 from plain.runtime import settings
 from plain.urls.resolvers import _get_cached_resolver

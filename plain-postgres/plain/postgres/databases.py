@@ -23,10 +23,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 import psycopg
-from psycopg import sql
-
 from plain.postgres.database_url import DatabaseConfig
 from plain.postgres.sources import build_connection_params
+from psycopg import sql
 
 __all__ = [
     "DatabaseInfo",

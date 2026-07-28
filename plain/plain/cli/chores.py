@@ -3,7 +3,6 @@ import sys
 import click
 from opentelemetry import trace
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
-
 from plain.logs import get_framework_logger
 from plain.utils.otel import format_exception_type
 

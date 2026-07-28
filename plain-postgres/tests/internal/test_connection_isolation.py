@@ -18,7 +18,6 @@ import contextvars
 import threading
 
 import pytest
-
 from plain.postgres.db import _db_conn, has_connection
 
 

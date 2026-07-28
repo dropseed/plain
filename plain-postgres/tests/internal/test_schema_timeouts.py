@@ -10,7 +10,6 @@ from typing import cast
 
 import pytest
 from app.examples.models.defaults import DefaultsExample
-
 from plain.postgres import get_connection
 from plain.postgres.migrations.operations.special import RunSQL
 from plain.runtime import settings as plain_settings

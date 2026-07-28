@@ -38,7 +38,6 @@ from app.examples.models.delete import (
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.trees import TreeNode
-
 from plain.postgres import transaction
 
 

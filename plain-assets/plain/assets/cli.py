@@ -6,7 +6,6 @@ from importlib.metadata import entry_points
 from pathlib import Path
 
 import click
-
 import plain.runtime
 from plain.cli import register_cli
 from plain.cli.print import print_event

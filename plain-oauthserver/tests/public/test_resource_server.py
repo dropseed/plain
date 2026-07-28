@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import timedelta
 
 from oauth_helpers import generate_pkce_pair, issue_token_pair
-
 from plain.oauthserver import validate_access_token
 from plain.oauthserver.models import AuthorizationCode
 from plain.test import Client

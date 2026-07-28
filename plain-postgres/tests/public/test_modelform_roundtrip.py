@@ -18,7 +18,6 @@ from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.encrypted import SecretStore
 from app.examples.models.forms import FormsExample
-
 from plain.test import Client
 
 

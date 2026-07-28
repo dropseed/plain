@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from app.users.models import User
-
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthView

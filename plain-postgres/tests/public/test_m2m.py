@@ -9,7 +9,6 @@ from typing import cast
 
 import pytest
 from app.examples.models.relationships import Tag, Widget, WidgetTag
-
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import transaction
 from plain.postgres.fields.related import ManyToManyField

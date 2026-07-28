@@ -1,5 +1,4 @@
 from app.users.models import User
-
 from plain.auth import login, logout
 from plain.auth.views import AuthView
 from plain.http import Response

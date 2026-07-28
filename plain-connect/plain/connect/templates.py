@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 from jinja2.runtime import Context
-
 from plain.runtime import settings
 from plain.templates import register_template_extension, register_template_global
 from plain.templates.jinja.extensions import InclusionTagExtension

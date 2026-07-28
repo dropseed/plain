@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import psycopg
 import pytest
-
 from plain.cache import cache
 from plain.postgres import get_connection
 

@@ -9,7 +9,6 @@ only the user-observable resolution behavior is.
 from __future__ import annotations
 
 import pytest
-
 from plain.exceptions import ImproperlyConfigured
 from plain.urls.converters import INT, PATH, STR, UUID
 from plain.urls.segments import (

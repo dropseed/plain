@@ -10,7 +10,6 @@ namespaced router.
 from __future__ import annotations
 
 import pytest
-
 from plain.runtime import settings
 from plain.urls import get_resolver
 from plain.urls.resolvers import _get_cached_resolver

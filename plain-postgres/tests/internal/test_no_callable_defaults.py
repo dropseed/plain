@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-
 from plain.postgres import fields as plain_fields
 from plain.postgres.fields.json import JSONField
 

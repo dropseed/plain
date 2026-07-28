@@ -1,5 +1,4 @@
 from app.examples.urls import ExamplesRouter
-
 from plain.urls import Router, include, path
 from plain.views import View
 

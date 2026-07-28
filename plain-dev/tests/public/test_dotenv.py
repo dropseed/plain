@@ -1,7 +1,6 @@
 import os
 
 import pytest
-
 from plain.dev.dotenv import load_dotenv, parse_dotenv
 
 

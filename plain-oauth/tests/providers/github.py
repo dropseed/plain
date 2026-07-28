@@ -1,7 +1,6 @@
 import datetime
 
 import httpx
-
 from plain.oauth.exceptions import OAuthError
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 from plain.utils import timezone

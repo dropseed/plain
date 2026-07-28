@@ -8,7 +8,6 @@ is required.
 from __future__ import annotations
 
 import httpx
-
 from plain.scan.audits import (
     ContentTypeOptionsAudit,
     FrameOptionsAudit,

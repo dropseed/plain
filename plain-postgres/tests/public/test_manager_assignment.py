@@ -4,7 +4,6 @@ from app.examples.models.querysets import (
     CustomSpecialQuerySetModel,
     DefaultQuerySetModel,
 )
-
 from plain.postgres.query import QuerySet
 
 

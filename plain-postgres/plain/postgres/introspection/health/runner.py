@@ -101,38 +101,48 @@ def _apply_cross_check_caveats(results: list[CheckResult]) -> None:
         "unused_indexes": [
             (
                 "stats_freshness",
-                "planner statistics on this table are absent or stale — the "
-                "planner may be picking sub-optimal plans that bypass this "
-                "index; re-check after ANALYZE",
+                (
+                    "planner statistics on this table are absent or stale — the "
+                    "planner may be picking sub-optimal plans that bypass this "
+                    "index; re-check after ANALYZE"
+                ),
             ),
             (
                 "vacuum_health",
-                "heavy dead-tuple bloat on this table may be skewing scan "
-                "counts — clear the bloat before deciding to drop",
+                (
+                    "heavy dead-tuple bloat on this table may be skewing scan "
+                    "counts — clear the bloat before deciding to drop"
+                ),
             ),
         ],
         "missing_index_candidates": [
             (
                 "stats_freshness",
-                "this table's planner stats are absent or stale — the "
-                "sequential-scan evidence is still valid, but query plans "
-                "may shift after ANALYZE",
+                (
+                    "this table's planner stats are absent or stale — the "
+                    "sequential-scan evidence is still valid, but query plans "
+                    "may shift after ANALYZE"
+                ),
             ),
         ],
         "vacuum_health": [
             (
                 "table_bloat",
-                "this table also shows page-level bloat — VACUUM (ANALYZE) "
-                "reclaims dead tuples for reuse but does not shrink the "
-                "relation; see table_bloat for rewrite options",
+                (
+                    "this table also shows page-level bloat — VACUUM (ANALYZE) "
+                    "reclaims dead tuples for reuse but does not shrink the "
+                    "relation; see table_bloat for rewrite options"
+                ),
             ),
         ],
         "table_bloat": [
             (
                 "vacuum_health",
-                "this table also has significant dead tuples — run "
-                "VACUUM (ANALYZE) first, then re-measure before deciding "
-                "whether a rewrite is still needed",
+                (
+                    "this table also has significant dead tuples — run "
+                    "VACUUM (ANALYZE) first, then re-measure before deciding "
+                    "whether a rewrite is still needed"
+                ),
             ),
         ],
     }

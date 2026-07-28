@@ -6,7 +6,6 @@ import sys
 from typing import Any
 
 import click
-
 from plain.preflight import set_check_counts
 from plain.runtime import settings
 from plain.test import Client

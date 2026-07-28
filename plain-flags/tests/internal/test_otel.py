@@ -11,7 +11,6 @@ import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
-
 from plain.flags import Flag
 
 

@@ -4,7 +4,6 @@ import time
 
 from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.session_attributes import SESSION_ID
-
 from plain.http import HttpMiddleware, Request, Response
 from plain.runtime import settings
 from plain.utils.cache import patch_vary_headers

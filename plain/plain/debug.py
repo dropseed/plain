@@ -4,7 +4,6 @@ from pprint import pformat
 from typing import Any, NoReturn
 
 from markupsafe import Markup, escape
-
 from plain.http import Response
 from plain.views.exceptions import ResponseException
 
