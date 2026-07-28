@@ -16,6 +16,9 @@ permissions:
   # Lets the action exchange an OIDC token for a Claude GitHub App token,
   # so reviews post as the branded app instead of github-actions[bot].
   id-token: write
+  # For the skipped-handoff check run below. Claude itself can't reach this --
+  # it is limited to `gh pr review` by --allowedTools.
+  checks: write
 
 jobs:
   review:
@@ -110,6 +113,11 @@ jobs:
       # would stay silent on this pull request. A declared agent that sometimes
       # stays silent holds human review requests forever -- so say so here
       # instead, immediately and without waiting on anything.
+      #
+      # Same check name codex-outcome.yml writes: this is the same signal --
+      # "what happened with Codex" -- and neither workflow can cover both paths
+      # alone. `skipped` is the conclusion for both no-answer cases, quota there
+      # and no-handoff here.
       - name: Report a skipped Codex handoff
         if: ${{ !cancelled() && steps.codex.outputs.skipped != '' }}
         env:
@@ -118,6 +126,22 @@ jobs:
           REPO: ${{ github.repository }}
           REASON: ${{ steps.codex.outputs.skipped }}
         run: |
-          gh pr review "$PR" -R "$REPO" --comment \
-            --body "Codex second opinion — not run: $REASON."
+          set -euo pipefail
+
+          sha="$(gh pr view "$PR" -R "$REPO" --json headRefOid -q .headRefOid)"
+
+          jq -n \
+            --arg sha "$sha" \
+            --arg reason "$REASON" \
+            '{
+              name: "codex-review",
+              head_sha: $sha,
+              status: "completed",
+              conclusion: "skipped",
+              output: {
+                title: ("Not run: " + $reason),
+                summary: ("Codex second opinion — not run: " + $reason + ".")
+              }
+            }' \
+            | gh api --method POST "repos/$REPO/check-runs" --input -
 

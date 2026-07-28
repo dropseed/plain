@@ -23,15 +23,22 @@ account = "claude[bot]"
 # The Codex adapter, not Codex. Codex itself cannot be declared: it emits no
 # check run, and its clean result is a reaction rather than a review, so there
 # is nothing for PullApprove to read. codex-outcome.yml watches what Codex does
-# leave behind — a review, or a comment — and submits a review of its own under
-# this account, and claude-code-review.yml reports here too when the handoff is
-# skipped. Between them every path reports, which is what makes it safe to wait
-# on.
+# leave behind — a review, or a comment — and reports under this account, and
+# claude-code-review.yml reports here too when the handoff is skipped. Between
+# them every path reports, which is what makes it safe to wait on.
 #
-# Note this counts ANY review from github-actions[bot], so nothing else in this
-# repo should post one; Claude posts as claude[bot] via its own app.
+# Both write the `codex-review` check run rather than a review, because only a
+# check run can conclude `skipped` — "no answer is coming". As reviews, the two
+# no-answer paths (Codex out of quota, handoff never made) read as "Codex
+# looked at it". The check name is matched together with the producing App, so
+# an unrelated workflow can't answer for this agent by picking the name.
+#
+# Reviews are still read as a fallback channel, so this does still count ANY
+# review from github-actions[bot] — nothing else in this repo should post one.
+# Claude posts as claude[bot] via its own app.
 [[agents]]
 account = "github-actions[bot]"
+check = "codex-review"
 
 [[scopes]]
 name = "all"

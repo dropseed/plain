@@ -1,12 +1,12 @@
 name: codex-outcome
 
-# ADAPTER: turn whatever Codex did into a submitted review.
+# ADAPTER: turn whatever Codex did into a check run PullApprove can read.
 #
 # Codex cannot be named as a PullApprove agent directly. It emits no check run
 # at all, and its clean result is a 👍 reaction rather than a review, so there
 # is nothing for PullApprove to read. This watches what it *does* leave behind
-# and submits a review under this workflow's own identity — so the account to
-# declare in CODEREVIEW.toml is github-actions[bot], not Codex's.
+# and reports under this workflow's own identity — so the account to declare in
+# CODEREVIEW.toml is github-actions[bot], with `check = "codex-review"`.
 #
 # Every outcome Codex has been observed to produce leaves either a review or a
 # pull request comment, and both are workflow triggers — so this is entirely
@@ -14,9 +14,20 @@ name: codex-outcome
 # runner for up to fifteen minutes per pull request; the reaction turned out to
 # be redundant, because the clean path leaves a comment too.
 #
-#   found issues   review          -> reviewed it and left findings
-#   clean          comment         -> reviewed it and found nothing
-#   never ran      comment (quota) -> could not run
+#   found issues   review          -> failure  reviewed it and left findings
+#   clean          comment         -> success  reviewed it and found nothing
+#   never ran      comment (quota) -> skipped  could not run
+#
+# A check run rather than a review, for one reason above all: `skipped` is the
+# only way to say "no answer is coming", and nothing but a check run can say
+# it. As a review, the quota case read as "Codex looked" — PullApprove was told
+# a review happened on a run that never started. That was a third of measured
+# runs. The verdict riding along in the conclusion is the smaller win.
+#
+# The job's own check run is NOT this signal: its conclusion says whether this
+# script exited 0, which is always true. `codex-review` is created explicitly
+# so the two questions — "did the adapter run" and "what did Codex conclude" —
+# keep separate answers.
 #
 # Only the quota notice is matched on its text. Anything else Codex says is
 # treated as "it responded", which errs toward releasing the hold: waiting too
@@ -35,12 +46,15 @@ on:
     types: [submitted]
 
 permissions:
-  pull-requests: write
+  # Read to resolve the pull request's head SHA; write to create the check run
+  # against it. No longer posts a review, so `pull-requests: write` is gone.
+  pull-requests: read
+  checks: write
 
 jobs:
   report:
     # Only Codex's own activity, and only on pull requests. `issue_comment`
-    # fires for plain issues too, which have no review to submit.
+    # fires for plain issues too, which have no head commit to report on.
     if: >-
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request &&
@@ -57,14 +71,38 @@ jobs:
           EVENT: ${{ github.event_name }}
           BODY: ${{ github.event.comment.body }}
         run: |
+          set -euo pipefail
+
           if [ "$EVENT" = "pull_request_review" ]; then
-            outcome="reviewed it and left findings."
+            conclusion="failure"
+            title="Reviewed it and left findings"
           elif printf '%s' "$BODY" | grep -qi "usage limits"; then
-            outcome="could not run (Codex usage limits reached)."
+            conclusion="skipped"
+            title="Could not run (Codex usage limits reached)"
           else
-            outcome="reviewed it and found nothing."
+            conclusion="success"
+            title="Reviewed it and found nothing"
           fi
 
-          echo "Reporting: $outcome"
-          gh pr review "$PR" -R "$REPO" --comment \
-            --body "Codex second opinion — $outcome"
+          # The current head, not the commit Codex happened to look at. This is
+          # the commit PullApprove reads check runs for, and a later push
+          # re-runs the whole chain against its own head anyway.
+          sha="$(gh pr view "$PR" -R "$REPO" --json headRefOid -q .headRefOid)"
+
+          echo "Reporting $conclusion on $sha: $title"
+
+          jq -n \
+            --arg sha "$sha" \
+            --arg conclusion "$conclusion" \
+            --arg title "$title" \
+            '{
+              name: "codex-review",
+              head_sha: $sha,
+              status: "completed",
+              conclusion: $conclusion,
+              output: {
+                title: $title,
+                summary: ("Codex second opinion — " + $title + ".")
+              }
+            }' \
+            | gh api --method POST "repos/$REPO/check-runs" --input -
