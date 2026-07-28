@@ -6,6 +6,26 @@
 # instructions, but does not hard-block. Once agents open PRs under a separate
 # bot identity, raise this to `require = 1`.
 
+# claude-code-review.yml reviews every non-draft PR from this repo and always
+# ends by submitting a review, clean or not — so the review request below waits
+# until Claude has looked. The maintainer opens the PR and comes back to a
+# review already on it, instead of racing the bot to the same findings.
+#
+# Only claude[bot] is declared. The Codex handoff in that workflow is
+# conditional (it only fires on an approval, and only when CODEX_TRIGGER_TOKEN
+# is set) and Copilot is opt-in per PR — an agent that may never answer would
+# hold the request forever. Fork PRs skip the workflow entirely and will sit
+# held; there have been none here, and the fix if that changes is to drop the
+# declaration rather than work around it.
+#
+# Codex could not be declared here whatever the handoff did: it emits no check
+# run at all, and signals a clean result with a reaction rather than a review,
+# so there is nothing for PullApprove to read. Declaring it would need an
+# adapter step in that workflow that submits a review of its own — and then the
+# account to declare is the adapter's, not Codex's.
+[[agents]]
+account = "claude[bot]"
+
 [[scopes]]
 name = "all"
 description = "Everything in the monorepo — framework core, packages, tooling, and docs."
