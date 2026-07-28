@@ -59,6 +59,15 @@ class MCPTool(ABC):
     description: str = ""
     input_schema: dict[str, Any] | None = None
 
+    # Client capabilities this tool can't run without, in ClientCapabilities
+    # shape — e.g. `{"sampling": {}}` for a tool that calls back to the
+    # client's model. A client that didn't declare them gets a JSON-RPC error
+    # naming what's missing instead of a tool failure. Only the presence of
+    # each top-level key is checked; the values are never inspected, just
+    # echoed back in `error.data.requiredCapabilities`, which the spec requires
+    # to be a ClientCapabilities object — hence a dict here and not a set.
+    required_client_capabilities: dict[str, Any] = {}
+
     # Optional MCP tool annotations — hints the client may use (e.g. Claude
     # groups `readOnlyHint` tools and gates approval on the rest). A raw wire-
     # format dict, e.g. `annotations = {"readOnlyHint": True}`; emitted as-is, so

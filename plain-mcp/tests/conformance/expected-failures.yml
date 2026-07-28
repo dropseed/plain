@@ -1,10 +1,19 @@
-# Baseline of MCP conformance scenarios that plain-mcp does not yet pass.
-# Most of these require features we haven't implemented (prompts, resources,
-# logging, subscriptions, completions, URI templates, binary/image/audio
-# content, elicitation, JSON Schema 2020-12, SSE).
+# Baseline of MCP conformance checks that plain-mcp does not pass.
 #
-# When we ship one of these features, remove its entry from this file —
-# the conformance CLI will exit 1 on "stale baseline" to force the update.
+# Two entry forms, and the difference matters:
+#
+#   - `scenario`          — a wildcard. Exempts every check in the scenario,
+#                           and only goes stale once the whole scenario passes.
+#                           Right for a feature we haven't built: naming its
+#                           checks one by one just restates the scenario in
+#                           more words.
+#   - `scenario:check-id` — exempts that check alone, so a *different* check in
+#                           the same scenario failing still counts as a
+#                           regression. Right for a scenario that partly
+#                           passes. None currently do.
+#
+# The CLI rejects mixing the two forms for one scenario, so a scenario is
+# either wholly exempt or listed check by check.
 #
 # Exit-code semantics (--expected-failures):
 #   fail + expected  -> exit 0
@@ -13,15 +22,12 @@
 #   pass + unexpected -> exit 0  (normal pass)
 
 server:
-  # Resources: text, binary, and URI template reads supported.
-  # Subscriptions require a long-lived SSE stream + cross-worker pub/sub
-  # for change fan-out — not implemented. Clients re-read for freshness.
-  - resources-subscribe
-  - resources-unsubscribe
-
-  # Logging capability — not implemented.
-  - logging-set-level
-  - tools-call-with-logging
+  # SEP-2243 `x-mcp-header` / `Mcp-Param-*`: a schema can mark an input as
+  # travelling in its own HTTP header, and the server validates it there.
+  # Deferred, and inert until there's a tool-side API to declare it — the
+  # server half alone would be a validator with nothing to validate. Optional
+  # for servers, so this is a feature gap, not a violation.
+  - http-custom-header-server-validation
 
   # Completions — not implemented.
   - completion-complete
@@ -29,20 +35,19 @@ server:
   # Progress notifications on tools/call — not implemented.
   - tools-call-with-progress
 
-  # Sampling (server-initiated LLM calls) — not implemented.
-  - tools-call-sampling
-
-  # Elicitation — not implemented.
-  - tools-call-elicitation
-  - elicitation-sep1034-defaults
-  - elicitation-sep1330-enums
-
-  # SEP-1699 SSE session management — we don't emit session IDs or SSE
-  # streams on POST yet.
-  - server-sse-polling
-  - server-sse-multiple-streams
-
-  # NOTE: dns-rebinding-protection PASSES — Plain's builtin CsrfViewMiddleware
-  # rejects a forged non-localhost Origin with a 400 (the MCP MUST), and valid
-  # localhost requests are accepted now that the runner targets `/mcp` (no
-  # trailing slash — `/mcp/` 308-redirected, which the raw probe didn't follow).
+  # SEP-2322 mid-request input (MRTR): a tool pauses, asks the client for
+  # elicitation / sampling / roots, and resumes from carried state. Not
+  # implemented — it's the stateless protocol's replacement for the old
+  # server-to-client stream, and a sizable feature in its own right.
+  - input-required-result-basic-elicitation
+  - input-required-result-basic-sampling
+  - input-required-result-basic-list-roots
+  - input-required-result-request-state
+  - input-required-result-multiple-input-requests
+  - input-required-result-multi-round
+  - input-required-result-missing-input-response
+  - input-required-result-non-tool-request
+  - input-required-result-result-type
+  - input-required-result-tampered-state
+  - input-required-result-capability-check
+  - input-required-result-validate-input

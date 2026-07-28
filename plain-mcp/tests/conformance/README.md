@@ -7,19 +7,26 @@ Runs the [MCP Conformance Test Framework](https://github.com/modelcontextprotoco
 - `app/settings.py`, `app/urls.py` — a minimal Plain server that mounts an `MCP` view on `/mcp`
 - `app/mcp.py` — the `ConformanceMCP` subclass and the tools the conformance suite expects (`test_simple_text`, `test_error_handling`)
 - `run` — starts the Plain server on `127.0.0.1:18765`, runs the conformance CLI against it, then shuts the server down
-- `expected-failures.yml` — baseline of scenarios that plain-mcp does not yet pass
+- `expected-failures.yml` — baseline of checks that plain-mcp does not yet pass
 
 ## How it runs
 
 `scripts/test --server` invokes `tests/conformance/run` as part of the server-flag-gated suite (the conformance run spins up a live server and depends on Node, so it's not included in the default `scripts/test` pass). The runner:
 
 1. Starts `plain server` with `app.settings` in a background process
-2. Waits for `ping` to succeed
-3. Invokes `npx --yes @modelcontextprotocol/conformance server --url … --expected-failures …`
+2. Waits for the endpoint to respond at all (any status — the CLI negotiates the protocol itself)
+3. Invokes `npx --yes @modelcontextprotocol/conformance@<pinned> server --url … --spec-version 2026-07-28 --expected-failures …`
 4. Kills the server regardless of the outcome
 5. Exits with the conformance CLI's exit code
 
 If `npx` isn't on `PATH` the runner errors out — install Node.js before running this suite.
+
+## Pinned CLI version
+
+`2026-07-28` scenarios only exist in the CLI's `0.2` alphas — its `latest`
+release still tops out at `2025-11-25`. The runner pins an exact alpha rather
+than tracking the moving `alpha` tag, so a run is reproducible; bump
+`CONFORMANCE_PACKAGE` in `run` when `0.2.0` ships stable.
 
 ## Running it directly
 
@@ -34,7 +41,11 @@ Override the port with `MCP_CONFORMANCE_PORT=<port>`.
 The conformance suite proves plain-mcp obeys the spec. To drive a real server's
 _tools_ — with no Claude/Cursor account — use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector)
 via `./scripts/inspect-mcp`, which boots the **example app**'s `NotesMCP` server
-on a local HTTP port and points the Inspector at it:
+on a local HTTP port and points the Inspector at it.
+
+> MCP Inspector v0.22.0 is still a legacy-era client: it opens with an
+> `initialize` handshake, which `2026-07-28` removed, so it can't connect yet.
+> The script is otherwise ready and needs a `2026-07-28`-aware Inspector release.
 
 ```bash
 ./scripts/inspect-mcp                            # interactive web UI
@@ -62,4 +73,13 @@ The conformance CLI has four exit-code outcomes when `--expected-failures` is se
 | Passes     | Yes         | 1 — stale baseline, remove the entry |
 | Passes     | No          | 0 — normal pass                      |
 
-So when you ship a new MCP feature (e.g. prompts or resources), the runner will fail with "stale baseline" until you remove the now-passing scenarios from `expected-failures.yml`. That forces the baseline to track reality.
+So when you ship a new MCP feature (e.g. completions or SEP-2322 mid-request input), the runner will fail with "stale baseline" until you remove the now-passing entries from `expected-failures.yml`. That forces the baseline to track reality.
+
+There are two entry forms, and picking the right one decides how much a listed scenario can hide:
+
+| Form                | Exempts                     | Goes stale when           | Use for                               |
+| ------------------- | --------------------------- | ------------------------- | ------------------------------------- |
+| `scenario`          | every check in the scenario | the whole scenario passes | a feature that isn't built at all     |
+| `scenario:check-id` | that one check              | that check passes         | a scenario that already partly passes |
+
+The CLI rejects mixing both forms for the same scenario. Today every baselined scenario is a feature we haven't built, so all entries are the bare wildcard form; reach for `scenario:check-id` the moment a scenario starts passing some of its checks, so the rest can't regress unnoticed.

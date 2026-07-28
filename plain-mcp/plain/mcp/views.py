@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Callable
 from http import HTTPStatus
 from typing import Any
 
@@ -18,37 +19,78 @@ from plain.runtime import settings
 from plain.utils.otel import format_exception_type
 from plain.views.base import View
 
-from .exceptions import MCPInvalidParams, MCPToolError, MCPUnauthorized
+from .exceptions import (
+    HEADER_MISMATCH,
+    INTERNAL_ERROR,
+    INVALID_PARAMS,
+    INVALID_REQUEST,
+    METHOD_NOT_FOUND,
+    MISSING_REQUIRED_CLIENT_CAPABILITY,
+    PARSE_ERROR,
+    UNSUPPORTED_PROTOCOL_VERSION,
+    MCPInvalidParams,
+    MCPToolError,
+    MCPUnauthorized,
+    _error_response,
+    _ProtocolError,
+)
 from .resources import MCPResource
 from .schema import validate_arguments
 from .tools import MCPTool
 
 tracer = trace.get_tracer("plain.mcp")
 
-PROTOCOL_VERSION = "2025-11-25"
+# This server speaks one revision. 2026-07-28 is stateless — no sessions, no
+# `initialize` handshake, no server-to-client stream — so there is nothing to
+# negotiate down to and no legacy branch to keep alive.
+PROTOCOL_VERSION = "2026-07-28"
 
-# Streamable HTTP transport revisions this server speaks. initialize echoes the
-# client's requested version when it's one of these (MCP version negotiation),
-# the MCP-Protocol-Version header is validated against the same set, and an
-# absent header means the legacy 2025-03-26 default.
-SUPPORTED_PROTOCOL_VERSIONS = frozenset({"2025-03-26", "2025-06-18", PROTOCOL_VERSION})
+# Keys inside `params._meta`. protocolVersion and clientCapabilities are
+# required on every request (they replace what the handshake used to
+# establish once); clientInfo is optional.
+META_PROTOCOL_VERSION = "io.modelcontextprotocol/protocolVersion"
+META_CLIENT_CAPABILITIES = "io.modelcontextprotocol/clientCapabilities"
+META_CLIENT_INFO = "io.modelcontextprotocol/clientInfo"
 
-PARSE_ERROR = -32700
-INVALID_REQUEST = -32600
-METHOD_NOT_FOUND = -32601
-INVALID_PARAMS = -32602
-INTERNAL_ERROR = -32603
-UNAUTHORIZED = -32001
-FORBIDDEN = -32003
-NOT_FOUND = -32004
+# Key inside a result's `_meta`, naming the server that produced it.
+META_SERVER_INFO = "io.modelcontextprotocol/serverInfo"
 
+# The HTTP status an in-band JSON-RPC reply travels at, keyed by its error
+# code. One table decides it wherever the error came from — the validation
+# ladder or a handler — so a code never rides two different statuses. Every
+# code plain.mcp raises is listed, INTERNAL_ERROR included: a server-side
+# failure isn't a malformed request, so it rides a 200 like a success. A code
+# missing from here silently falls back to 200, so add new ones as you define
+# them.
+#
+# Framework exceptions (LoginRequired, an HTTPException from a view) don't come
+# through here at all — `handle_exception` is a separate funnel where the HTTP
+# status leads and the JSON-RPC code follows from it.
+ERROR_CODE_HTTP_STATUS: dict[int, int] = {
+    PARSE_ERROR: 400,
+    INVALID_REQUEST: 400,
+    INVALID_PARAMS: 400,
+    HEADER_MISMATCH: 400,
+    MISSING_REQUIRED_CLIENT_CAPABILITY: 400,
+    UNSUPPORTED_PROTOCOL_VERSION: 400,
+    METHOD_NOT_FOUND: 404,
+    INTERNAL_ERROR: 200,
+}
+
+# The other direction, for `handle_exception`: 400 and 500 have standard
+# JSON-RPC codes, and for every other status the status itself is the code. The
+# reserved -320xx range belongs to the protocol — -32001 is a request timeout
+# there — so borrowing it for auth would have clients read a 401 as a timeout.
+# The real auth signal is the HTTP status plus `WWW-Authenticate`.
 _STATUS_TO_JSON_RPC_CODE: dict[int, int] = {
     400: INVALID_PARAMS,
-    401: UNAUTHORIZED,
-    403: FORBIDDEN,
-    404: NOT_FOUND,
     500: INTERNAL_ERROR,
 }
+
+
+def _header_mismatch(detail: str) -> _ProtocolError:
+    """The transport's one failure mode: a header that's missing or disagrees."""
+    return _ProtocolError(HEADER_MISMATCH, f"Header mismatch: {detail}")
 
 
 class MCPView(View):
@@ -91,14 +133,47 @@ class MCPView(View):
 
             def get_capabilities(self):
                 caps = super().get_capabilities()
-                caps["prompts"] = {"listChanged": False}
+                caps["prompts"] = {}
                 return caps
     """
 
     name: str = ""
     version: str = ""
+
+    # Natural-language guidance for the LLM driving this server — how to use
+    # these tools, what the app is for. Returned by `server/discover` when set.
+    instructions: str = ""
+
     tools: list[type[MCPTool]] = []
     resources: list[type[MCPResource]] = []
+
+    # Methods whose results are `CacheableResult`s — the spec requires a
+    # freshness hint (`ttlMs`) and a `cacheScope` on every one of them. Add
+    # your own `rpc_` list methods here to have them stamped too.
+    cacheable_result_methods: frozenset[str] = frozenset(
+        {
+            "server/discover",
+            "tools/list",
+            "prompts/list",
+            "resources/list",
+            "resources/templates/list",
+            "resources/read",
+        }
+    )
+
+    # Methods where the `Mcp-Name` header mirrors a body param, and which
+    # param it mirrors. Everything else sends no `Mcp-Name`. Add your own
+    # target-naming methods here to have the header checked for them too.
+    name_header_params: dict[str, str] = {
+        "tools/call": "name",
+        "prompts/get": "name",
+        "resources/read": "uri",
+    }
+
+    # Who is calling, read from the current request's `_meta`. Tools reach
+    # these through `self.mcp`.
+    client_info: dict[str, Any] | None = None
+    client_capabilities: dict[str, Any] = {}
 
     @classmethod
     def register_tool(cls, tool_cls: type[MCPTool]) -> type[MCPTool]:
@@ -154,124 +229,280 @@ class MCPView(View):
         we catch the standard auth/routing exceptions here and emit
         JSON-RPC error objects at appropriate status codes.
         """
-        if isinstance(exc, MCPUnauthorized):
-            headers = (
-                {"WWW-Authenticate": exc.www_authenticate}
-                if exc.www_authenticate
-                else None
-            )
-            return JsonResponse(
-                _error_response(None, UNAUTHORIZED, str(exc)),
-                status_code=401,
-                headers=headers,
-            )
+        headers = None
 
-        status = exc.status_code if isinstance(exc, HTTPException) else 500
-        if status >= 500:
-            message = "Internal error"
+        if isinstance(exc, MCPUnauthorized):
+            status = 401
+            message = str(exc) or "Unauthorized"
+            if exc.www_authenticate:
+                headers = {"WWW-Authenticate": exc.www_authenticate}
         else:
-            message = str(exc) or HTTPStatus(status).phrase
+            status = exc.status_code if isinstance(exc, HTTPException) else 500
+            if status >= 500:
+                message = "Internal error"
+            else:
+                message = str(exc) or HTTPStatus(status).phrase
+
         return JsonResponse(
             _error_response(
-                None, _STATUS_TO_JSON_RPC_CODE.get(status, INTERNAL_ERROR), message
+                None, _STATUS_TO_JSON_RPC_CODE.get(status, status), message
             ),
             status_code=status,
+            headers=headers,
         )
 
     def post(self) -> Response:
-        # Spec MUST: reject a request that declares a protocol version we don't
-        # speak. An absent header is the legacy 2025-03-26 default, so allowed.
-        version = self.request.headers.get("MCP-Protocol-Version")
-        if version is not None and version not in SUPPORTED_PROTOCOL_VERSIONS:
-            return JsonResponse(
-                _error_response(
-                    None,
-                    INVALID_REQUEST,
-                    f"Unsupported MCP-Protocol-Version: {version}",
-                ),
-                status_code=400,
-            )
-        response = self.handle_message(self.request.body)
-        if response is None:
-            # Spec MUST: a notification (no `id`) is acknowledged with 202, no body.
-            return Response(status_code=202)
-        return JsonResponse(response)
+        """One POST carries exactly one JSON-RPC request or notification.
 
-    def handle_message(self, raw: bytes | str) -> dict[str, Any] | None:
-        """Process a single JSON-RPC message and return the reply dict.
+        Whether the method exists is settled first — a method nobody
+        implements can't be judged by an envelope, and the ones earlier
+        revisions had (`initialize`, `ping`, `logging/setLevel`) arrive with no
+        modern envelope at all. Then comes the validation ladder, in order: the
+        request must say what it is (`_meta`), then agree with itself
+        (headers), then speak a version we have. A client that contradicts
+        itself is told that before it's told its version is unsupported —
+        the two answers call for different fixes.
 
-        Returns None for notifications (no `id` field).
+        There is no GET stream and no session — GET and DELETE fall through
+        to the base view's 405.
         """
+        msg_id: Any = None
         try:
-            message = json.loads(raw)
-        except (json.JSONDecodeError, ValueError) as e:
-            return _error_response(None, PARSE_ERROR, f"Parse error: {e}")
+            message = _decode_request(self.request.body)
 
-        if not isinstance(message, dict):
-            return _error_response(
-                None, INVALID_REQUEST, "Request must be a JSON object"
+            # Read out before anything that can fail below, so every error from
+            # here down carries the id the client correlates its reply by.
+            msg_id = message.get("id")
+
+            method = _read_method(message)
+
+            if msg_id is None:
+                # Spec MUST: a notification (no `id`) is acknowledged with 202
+                # and no body — never a reply, not even an error one, so its
+                # params go unchecked. The spec leaves header requirements for
+                # notifications undefined, so nothing further is checked either.
+                return Response(status_code=202)
+
+            params = _read_params(message)
+
+            # Resolved here, at the rung that decides it, and carried down to
+            # dispatch — `get_rpc_handler` is an overridable seam, so it runs
+            # exactly once per request.
+            handler = self.get_rpc_handler(method)
+
+            protocol_version = self.load_client_identity(params)
+            self.check_request_headers(
+                method=method, params=params, protocol_version=protocol_version
             )
 
-        if message.get("jsonrpc") != "2.0":
-            return _error_response(
-                message.get("id"),
-                INVALID_REQUEST,
-                "Missing or invalid 'jsonrpc' version; must be '2.0'",
+            if protocol_version != PROTOCOL_VERSION:
+                # Last rung. `protocol_version` is a string by now, and
+                # `requested` has to stay one — this is the one code an
+                # auto-negotiating client can't fall back from, so a null
+                # there breaks its whole recovery path.
+                raise _ProtocolError(
+                    UNSUPPORTED_PROTOCOL_VERSION,
+                    f"Unsupported protocol version: {protocol_version}",
+                    data={
+                        "supported": [PROTOCOL_VERSION],
+                        "requested": protocol_version,
+                    },
+                )
+
+            reply = self.handle_message(
+                msg_id=msg_id, method=method, params=params, handler=handler
+            )
+        except _ProtocolError as e:
+            reply = e.as_response(msg_id)
+
+        error = reply.get("error")
+        status_code = ERROR_CODE_HTTP_STATUS.get(error["code"], 200) if error else 200
+        return JsonResponse(reply, status_code=status_code)
+
+    def load_client_identity(self, params: dict[str, Any]) -> str:
+        """Read the required per-request `_meta`, and return its protocol version.
+
+        Every request restates its protocol version and the client's
+        capabilities — there is no handshake to establish them once. This is
+        the presence-and-shape rung only: whether we *speak* the version it
+        names is decided later, after the headers have been checked against it.
+        """
+        meta = params.get("_meta")
+        if not isinstance(meta, dict):
+            meta = {}
+
+        version = meta.get(META_PROTOCOL_VERSION)
+        if not isinstance(version, str):
+            raise _ProtocolError(
+                INVALID_PARAMS,
+                f"Missing required params._meta['{META_PROTOCOL_VERSION}']",
             )
 
-        msg_id = message.get("id")
-        method = message.get("method")
-
-        if not method or not isinstance(method, str):
-            return _error_response(msg_id, INVALID_REQUEST, "Missing or invalid method")
-
-        if msg_id is None:
-            return None
-
-        # MCP uses by-name params (objects) only. By-position (arrays) is
-        # valid JSON-RPC 2.0 in general but not how MCP methods are spec'd.
-        # Explicit null is accepted as "no params".
-        params = message.get("params")
-        if params is None:
-            params = {}
-        elif not isinstance(params, dict):
-            return _error_response(msg_id, INVALID_PARAMS, "'params' must be an object")
-
-        # Reject `_` so the `/` → `_` rewrite below can't be spoofed by
-        # a client sending `tools_list` instead of `tools/list`.
-        if "_" in method:
-            return _error_response(
-                msg_id, METHOD_NOT_FOUND, f"Unknown method: {method}"
+        capabilities = meta.get(META_CLIENT_CAPABILITIES)
+        if not isinstance(capabilities, dict):
+            raise _ProtocolError(
+                INVALID_PARAMS,
+                f"Missing required params._meta['{META_CLIENT_CAPABILITIES}']",
             )
 
-        handler = getattr(self, f"rpc_{method.replace('/', '_')}", None)
-        if handler is None:
-            return _error_response(
-                msg_id, METHOD_NOT_FOUND, f"Unknown method: {method}"
+        client_info = meta.get(META_CLIENT_INFO)
+        self.client_capabilities = capabilities
+        self.client_info = client_info if isinstance(client_info, dict) else None
+        return version
+
+    def check_request_headers(
+        self, *, method: str, params: dict[str, Any], protocol_version: str
+    ) -> None:
+        """Verify the transport headers mirror the JSON-RPC body.
+
+        The transport requires `MCP-Protocol-Version` and `Mcp-Method` on
+        every request, plus `Mcp-Name` on the methods that name a target, so
+        infrastructure in front of the server can route and authorize without
+        parsing the body. A missing or disagreeing header is a transport
+        failure — `HeaderMismatch` at HTTP 400.
+        """
+        for header, body_value in (
+            ("MCP-Protocol-Version", protocol_version),
+            ("Mcp-Method", method),
+        ):
+            header_value = self.request.headers.get(header)
+            if not header_value:
+                raise _header_mismatch(f"{header} header is required")
+            if header_value != body_value:
+                raise _header_mismatch(
+                    f"{header} header value '{header_value}' "
+                    f"does not match body value '{body_value}'"
+                )
+
+        name_param = self.name_header_params.get(method)
+        if name_param is None:
+            return
+
+        body_name = params.get(name_param)
+        if not body_name:
+            # Nothing in the body for the header to mirror. That's a missing
+            # parameter, not a header problem — let dispatch say so, using the
+            # same "falsy means absent" test the handlers use.
+            return
+
+        header_name = self.request.headers.get("Mcp-Name")
+        if header_name is None:
+            raise _header_mismatch(f"Mcp-Name header is required for {method}")
+
+        decoded_name = _decode_header_value(header_name)
+        if decoded_name != body_name:
+            raise _header_mismatch(
+                f"Mcp-Name header value '{decoded_name}' "
+                f"does not match body value '{body_name}'"
             )
 
+    def get_rpc_handler(
+        self, method: str
+    ) -> Callable[[dict[str, Any]], dict[str, Any]]:
+        """Find the `rpc_<method>` handler, with `/` in the method written as `_`."""
+        # Reject `_` in the method name so the `/` → `_` rewrite can't be
+        # spoofed by a client sending `tools_list` instead of `tools/list`.
+        if "_" not in method:
+            handler = getattr(self, f"rpc_{method.replace('/', '_')}", None)
+            if handler is not None:
+                return handler
+
+        # Spec MUST: an unknown method answers 404 carrying the JSON-RPC error.
+        # That pairing is what tells a client it reached a modern MCP server
+        # rather than a URL that doesn't exist. The methods earlier revisions
+        # had and this one removed — `initialize`, `ping`, `logging/setLevel` —
+        # land here too (SEP-2575), so the answer names the version we speak:
+        # that's all a client from one of those revisions can learn from us.
+        raise _ProtocolError(
+            METHOD_NOT_FOUND,
+            f"Unknown method: {method}. This server speaks MCP {PROTOCOL_VERSION}.",
+            data={"supportedVersions": [PROTOCOL_VERSION]},
+        )
+
+    def handle_message(
+        self,
+        *,
+        msg_id: Any,
+        method: str,
+        params: dict[str, Any],
+        handler: Callable[[dict[str, Any]], dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Dispatch one validated request to its `rpc_<method>` handler.
+
+        `post()` resolves the handler before the validation ladder runs and
+        passes it in — `method` still comes along, for the span name and for
+        `stamp_result`. Returns the JSON-RPC reply, success or error alike;
+        `post()` maps the reply's error code through `ERROR_CODE_HTTP_STATUS`
+        to decide what status it travels at.
+        """
         with tracer.start_as_current_span(
             f"rpc {method}", kind=trace.SpanKind.SERVER
         ) as span:
             try:
                 result = handler(params)
-                return _success_response(msg_id, result)
-            except MCPInvalidParams as e:
-                # Client-side validation failure — analogous to a 4xx,
-                # don't stamp the span with status=ERROR.
-                return _error_response(msg_id, INVALID_PARAMS, str(e))
+                return _success_response(
+                    msg_id, self.stamp_result(method=method, result=result)
+                )
+            except _ProtocolError as e:
+                # The caller's problem, not ours — a missing client capability,
+                # or `MCPInvalidParams` from the handler. Returned rather than
+                # re-raised: letting it leave the `with` block would have the
+                # OTel SDK auto-record it as a server failure.
+                return e.as_response(msg_id)
             except Exception as e:
-                # Real handler failure. handle_message swallows this into
-                # a JSON-RPC error with HTTP 200, so without the span the
-                # failure is invisible to OTel-based exception tooling.
+                # Real handler failure. It's swallowed into a JSON-RPC error
+                # with HTTP 200, so without the span the failure is invisible
+                # to OTel-based exception tooling.
                 span.record_exception(e)
                 span.set_status(trace.StatusCode.ERROR)
                 span.set_attribute(ERROR_TYPE, format_exception_type(e))
                 log_exception(self.request, e)
                 return _error_response(msg_id, INTERNAL_ERROR, "Internal error")
 
+    def stamp_result(self, *, method: str, result: dict[str, Any]) -> dict[str, Any]:
+        """Add the fields the spec requires on every result.
+
+        `resultType` marks the result complete, `_meta` names this server, and
+        list/read results carry the freshness hints clients cache by. A
+        handler that sets any of them keeps its own value.
+        """
+        # Say what a handler got wrong. Without these, a handler returning None
+        # or a list fails on `dict(...)` below and `handle_message` logs an
+        # opaque "argument must be a mapping" under an Internal error reply.
+        if not isinstance(result, dict):
+            raise TypeError(
+                f"The rpc_ handler for {method} must return a dict, "
+                f"not {type(result).__name__}"
+            )
+
+        meta = result.get("_meta", {})
+        if not isinstance(meta, dict):
+            raise TypeError(
+                f"The rpc_ handler for {method} returned a '_meta' that is "
+                f"{type(meta).__name__}, not a dict"
+            )
+
+        stamped = dict(result)
+        stamped.setdefault("resultType", "complete")
+
+        meta = dict(meta)
+        meta.setdefault(
+            META_SERVER_INFO,
+            {"name": self.name, "version": self.version or settings.VERSION},
+        )
+        stamped["_meta"] = meta
+
+        if method in self.cacheable_result_methods:
+            # Tool and resource listings are filtered per authenticated user
+            # by `allowed_for`, so "don't reuse this, and not across users" is
+            # the only safe default. Handlers with a stable, public surface
+            # can return their own ttlMs/cacheScope.
+            stamped.setdefault("ttlMs", 0)
+            stamped.setdefault("cacheScope", "private")
+        return stamped
+
     def get_capabilities(self) -> dict[str, Any]:
-        """Return the capabilities dict advertised to clients at `initialize`.
+        """Return the capabilities dict advertised by `server/discover`.
 
         Override to advertise additional capabilities beyond `tools` /
         `resources`. Call `super().get_capabilities()` to keep the
@@ -279,33 +510,19 @@ class MCPView(View):
         """
         capabilities: dict[str, Any] = {}
         if self.get_tools():
-            capabilities["tools"] = {"listChanged": False}
+            capabilities["tools"] = {}
         if self.get_resources():
-            capabilities["resources"] = {
-                "subscribe": False,
-                "listChanged": False,
-            }
+            capabilities["resources"] = {}
         return capabilities
 
-    def rpc_initialize(self, params: dict[str, Any]) -> dict[str, Any]:
-        # MCP version negotiation: echo the client's requested version when we
-        # speak it, otherwise offer our preferred one (the client then decides).
-        requested = params.get("protocolVersion")
-        if requested in SUPPORTED_PROTOCOL_VERSIONS:
-            version = requested
-        else:
-            version = PROTOCOL_VERSION
-        return {
-            "protocolVersion": version,
+    def rpc_server_discover(self, params: dict[str, Any]) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "supportedVersions": [PROTOCOL_VERSION],
             "capabilities": self.get_capabilities(),
-            "serverInfo": {
-                "name": self.name,
-                "version": self.version or settings.VERSION,
-            },
         }
-
-    def rpc_ping(self, params: dict[str, Any]) -> dict[str, Any]:
-        return {}
+        if self.instructions:
+            result["instructions"] = self.instructions
+        return result
 
     def rpc_tools_list(self, params: dict[str, Any]) -> dict[str, Any]:
         tools = []
@@ -333,6 +550,23 @@ class MCPView(View):
         tool_cls = next((t for t in self.get_tools() if t.name == tool_name), None)
         if tool_cls is None:
             return _tool_error(f"Unknown tool: {tool_name}")
+
+        # A tool that needs something back from the client (sampling,
+        # elicitation) can't run for a client that doesn't offer it. That's a
+        # protocol mismatch, not a tool failure, so it goes back as a JSON-RPC
+        # error naming what's missing rather than as an `isError` result.
+        missing = {
+            capability: requirement
+            for capability, requirement in tool_cls.required_client_capabilities.items()
+            if capability not in self.client_capabilities
+        }
+        if missing:
+            raise _ProtocolError(
+                MISSING_REQUIRED_CLIENT_CAPABILITY,
+                f"Tool {tool_cls.name} requires client capabilities the client "
+                f"did not declare: {', '.join(sorted(missing))}",
+                data={"requiredCapabilities": missing},
+            )
 
         # Validate against the advertised input schema before instantiating, so a
         # bad-typed argument returns a clear, model-fixable tool error instead of
@@ -414,7 +648,9 @@ class MCPView(View):
                 break
 
         if resource_cls is None:
-            raise MCPInvalidParams(f"Unknown resource: {uri}")
+            # `data.uri` echoes what wasn't found, so a client doesn't have to
+            # parse it back out of the message (SEP-2164).
+            raise MCPInvalidParams(f"Unknown resource: {uri}", data={"uri": uri})
 
         try:
             resource = resource_cls(**matched_params)
@@ -435,6 +671,69 @@ class MCPView(View):
 
 
 _CONTENT_BLOCK_TYPES = {"text", "image", "audio", "resource", "resource_link"}
+
+
+def _decode_request(raw: bytes | str) -> dict[str, Any]:
+    """Decode the body and confirm it's a JSON-RPC 2.0 message at all.
+
+    Split from the checks below because these are the failures with no `id` to
+    correlate against — the body didn't parse, or what it parsed to isn't a
+    request. JSON-RPC says the reply's `id` is null exactly then.
+    """
+    try:
+        message = json.loads(raw)
+    except (json.JSONDecodeError, ValueError) as e:
+        raise _ProtocolError(PARSE_ERROR, f"Parse error: {e}") from e
+
+    if not isinstance(message, dict):
+        raise _ProtocolError(INVALID_REQUEST, "Request must be a JSON object")
+
+    if message.get("jsonrpc") != "2.0":
+        raise _ProtocolError(
+            INVALID_REQUEST,
+            "Missing or invalid 'jsonrpc' version; must be '2.0'",
+        )
+
+    return message
+
+
+def _read_method(message: dict[str, Any]) -> str:
+    """Return the message's `method`, which every message must name."""
+    method = message.get("method")
+    if not method or not isinstance(method, str):
+        raise _ProtocolError(INVALID_REQUEST, "Missing or invalid method")
+    return method
+
+
+def _read_params(message: dict[str, Any]) -> dict[str, Any]:
+    """Return the message's `params` as a dict, absent or explicit null as `{}`.
+
+    Checked only after the caller knows this is a request and not a
+    notification: by-position params (an array) are legal JSON-RPC that MCP
+    methods don't take, and rejecting them is still a reply — which a
+    notification may never receive.
+    """
+    params = message.get("params")
+    if params is None:
+        return {}
+    if not isinstance(params, dict):
+        raise _ProtocolError(INVALID_PARAMS, "'params' must be an object")
+    return params
+
+
+def _decode_header_value(value: str) -> str:
+    """Decode the `=?base64?...?=` sentinel a client uses for non-ASCII values.
+
+    The markers are case-sensitive, and a value the client didn't wrap comes
+    back untouched.
+    """
+    if not (value.startswith("=?base64?") and value.endswith("?=")):
+        return value
+    encoded = value.removeprefix("=?base64?").removesuffix("?=")
+    try:
+        return base64.b64decode(encoded, validate=True).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return value
 
 
 def _tool_error(text: str) -> dict[str, Any]:
@@ -495,11 +794,3 @@ def _encode_binary(block: dict[str, Any]) -> dict[str, Any]:
 
 def _success_response(msg_id: Any, result: Any) -> dict[str, Any]:
     return {"jsonrpc": "2.0", "id": msg_id, "result": result}
-
-
-def _error_response(msg_id: Any, code: int, message: str) -> dict[str, Any]:
-    return {
-        "jsonrpc": "2.0",
-        "id": msg_id,
-        "error": {"code": code, "message": message},
-    }

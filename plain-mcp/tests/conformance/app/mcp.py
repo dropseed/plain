@@ -106,12 +106,18 @@ class TestMultipleContentTypes(MCPTool):
 class JsonSchema202012Tool(MCPTool):
     """Tool with JSON Schema 2020-12 features"""
 
+    # SEP-2106 checks that a server hands back a hand-written schema
+    # untouched, so this exercises every construct it looks for:
+    # `$defs` + `$ref`, an `$anchor`, composition (`allOf` / `anyOf`), and a
+    # conditional (`if` / `then` / `else`). plain-mcp emits `input_schema`
+    # verbatim, so passing is a matter of having the constructs present.
     name = "json_schema_2020_12_tool"
     input_schema = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "$defs": {
             "address": {
+                "$anchor": "addressDef",
                 "type": "object",
                 "properties": {
                     "street": {"type": "string"},
@@ -122,12 +128,34 @@ class JsonSchema202012Tool(MCPTool):
         "properties": {
             "name": {"type": "string"},
             "address": {"$ref": "#/$defs/address"},
+            "contactMethod": {"type": "string", "enum": ["phone", "email"]},
+            "phone": {"type": "string"},
+            "email": {"type": "string"},
         },
+        "allOf": [
+            {"anyOf": [{"required": ["phone"]}, {"required": ["email"]}]},
+        ],
+        "if": {
+            "properties": {"contactMethod": {"const": "phone"}},
+            "required": ["contactMethod"],
+        },
+        "then": {"required": ["phone"]},
+        "else": {"required": ["email"]},
         "additionalProperties": False,
     }
 
     def run(self) -> str:
         return ""
+
+
+class MissingCapabilityTool(MCPTool):
+    """Tool that requires the sampling client capability."""
+
+    name = "test_missing_capability"
+    required_client_capabilities = {"sampling": {}}
+
+    def run(self) -> str:
+        return "This tool should never run without the sampling capability."
 
 
 class StaticText(MCPResource):
@@ -206,12 +234,13 @@ class ConformanceMCP(MCPView):
         TestEmbeddedResource,
         TestMultipleContentTypes,
         JsonSchema202012Tool,
+        MissingCapabilityTool,
     ]
     resources = [StaticText, StaticBinary, TemplateData]
 
     def get_capabilities(self) -> dict:
         caps = super().get_capabilities()
-        caps["prompts"] = {"listChanged": False}
+        caps["prompts"] = {}
         return caps
 
     def rpc_prompts_list(self, params: dict) -> dict:

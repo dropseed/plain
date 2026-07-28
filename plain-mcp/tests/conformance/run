@@ -5,7 +5,7 @@
 # Usage: plain-mcp/tests/conformance/run
 #
 # Starts `plain server` on a local port, waits for it to become ready, runs
-# `npx @modelcontextprotocol/conformance server`, then stops the server.
+# the pinned `@modelcontextprotocol/conformance` CLI, then stops the server.
 # Exits with the conformance CLI's exit code.
 #
 # Errors out (exit 1) if `npx` is not available on PATH.
@@ -14,6 +14,10 @@ set -e
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PORT="${MCP_CONFORMANCE_PORT:-18765}"
+# 2026-07-28 scenarios only exist in the 0.2 alphas — the `latest` release
+# still tops out at 2025-11-25. Pinned rather than tracking the `alpha` tag so
+# a run is reproducible; bump it when 0.2.0 ships stable.
+CONFORMANCE_PACKAGE="@modelcontextprotocol/conformance@0.2.0-alpha.10"
 # No trailing slash — Plain canonicalizes to the slashless path, so `/mcp/` would
 # 308-redirect. Normal MCP clients follow the redirect, but the conformance
 # dns-rebinding probe makes a raw request that doesn't, so it must hit `/mcp`.
@@ -24,6 +28,14 @@ bold() { printf '\033[1m%s\033[0m\n' "$1"; }
 
 if ! command -v npx >/dev/null 2>&1; then
     bold "Error: npx not available — install Node.js to run the MCP conformance suite."
+    exit 1
+fi
+
+# Refuse to start onto an occupied port. Otherwise the readiness probe below
+# is answered by whatever is already listening — a stale server from a killed
+# run, most likely — and the suite silently grades that process instead.
+if curl -s -o /dev/null --max-time 2 "${URL}"; then
+    bold "Error: something is already serving ${URL}. Stop it, or set MCP_CONFORMANCE_PORT."
     exit 1
 fi
 
@@ -47,19 +59,20 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Wait for the server to respond to an MCP initialize request.
+# Wait for the endpoint to respond at all. Any status counts — a bare GET gets
+# a 405, which still proves the server is up and routing. The conformance CLI
+# negotiates the protocol itself, so duplicating a valid MCP request here would
+# only mean maintaining the envelope and protocol version in two places.
 for i in $(seq 1 40); do
-    if curl -sf -X POST "${URL}" \
-        -H 'Content-Type: application/json' \
-        -H 'Accept: application/json, text/event-stream' \
-        -d '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}' \
-        >/dev/null 2>&1; then
-        break
-    fi
+    # Liveness first: a server that died on startup must be reported as that,
+    # not probed for.
     if ! kill -0 "${SERVER_PID}" 2>/dev/null; then
         bold "Server died before becoming ready. Last 40 log lines:"
         tail -n 40 /tmp/plain-mcp-conformance.log || true
         exit 1
+    fi
+    if curl -s -o /dev/null "${URL}"; then
+        break
     fi
     sleep 0.25
 done
@@ -67,9 +80,10 @@ done
 bold "Running MCP conformance suite"
 
 set +e
-npx --yes @modelcontextprotocol/conformance server \
+npx --yes "${CONFORMANCE_PACKAGE}" server \
     --url "${URL}" \
     --suite all \
+    --spec-version 2026-07-28 \
     --expected-failures "${BASELINE}"
 STATUS=$?
 set -e

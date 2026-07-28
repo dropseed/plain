@@ -12,6 +12,11 @@
 # (no TLS, so Node connects without cert friction) and tears it down on exit —
 # nothing needs to be running first.
 #
+# NOTE: Inspector v0.22.0 is a legacy-era client — it opens with an
+# `initialize` handshake, which MCP 2026-07-28 removed, so it can't currently
+# connect. This script is otherwise ready; it needs a 2026-07-28-aware
+# Inspector release.
+#
 # Usage:
 #   ./scripts/inspect-mcp                                          # UI mode (opens the Inspector web UI)
 #   ./scripts/inspect-mcp --cli --method tools/list               # scripted: print the tool list
@@ -43,6 +48,14 @@ if ! command -v npx >/dev/null 2>&1; then
     exit 1
 fi
 
+# Refuse to start onto an occupied port. Otherwise the readiness probe below
+# is answered by whatever is already listening — a stale server from a killed
+# run, most likely — and the Inspector connects to that instead.
+if curl -s -o /dev/null --max-time 2 "${URL}"; then
+    bold "Error: something is already serving ${URL}. Stop it, or set INSPECT_MCP_PORT."
+    exit 1
+fi
+
 bold "Starting example MCP server on ${URL}"
 
 cd "${EXAMPLE_DIR}"
@@ -63,20 +76,20 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Wait for the MCP endpoint to answer an authenticated ping.
+# Wait for the endpoint to respond at all. Any status counts — a bare GET gets
+# a 405, which still proves the server is up and routing. The Inspector does
+# its own protocol negotiation, so duplicating a valid MCP request here would
+# only mean maintaining the envelope and protocol version in two places.
 for i in $(seq 1 40); do
-    if curl -sf -X POST "${URL}" \
-        -H "Authorization: Bearer ${TOKEN}" \
-        -H 'Content-Type: application/json' \
-        -H 'Accept: application/json, text/event-stream' \
-        -d '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}' \
-        >/dev/null 2>&1; then
-        break
-    fi
+    # Liveness first: a server that died on startup must be reported as that,
+    # not probed for.
     if ! kill -0 "${SERVER_PID}" 2>/dev/null; then
         bold "Server died before becoming ready. Last 40 log lines:"
         tail -n 40 /tmp/inspect-mcp-server.log || true
         exit 1
+    fi
+    if curl -s -o /dev/null "${URL}"; then
+        break
     fi
     sleep 0.25
 done

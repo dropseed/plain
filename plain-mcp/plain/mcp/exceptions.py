@@ -1,6 +1,43 @@
-"""Exception types used by `plain.mcp`."""
+"""JSON-RPC error codes, the error envelope, and the exceptions `plain.mcp` raises."""
 
 from __future__ import annotations
+
+from typing import Any
+
+PARSE_ERROR = -32700
+INVALID_REQUEST = -32600
+METHOD_NOT_FOUND = -32601
+INVALID_PARAMS = -32602
+INTERNAL_ERROR = -32603
+HEADER_MISMATCH = -32020
+MISSING_REQUIRED_CLIENT_CAPABILITY = -32021
+UNSUPPORTED_PROTOCOL_VERSION = -32022
+
+
+def _error_response(
+    msg_id: Any, code: int, message: str, *, data: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    error: dict[str, Any] = {"code": code, "message": message}
+    if data is not None:
+        error["data"] = data
+    return {"jsonrpc": "2.0", "id": msg_id, "error": error}
+
+
+class _ProtocolError(Exception):
+    """A protocol-level failure that ends the request where it's raised.
+
+    Carries the JSON-RPC code and payload and nothing else —
+    `ERROR_CODE_HTTP_STATUS` in `views` maps the code to a status, so a code
+    can't pick up a different one depending on which raise site produced it.
+    """
+
+    def __init__(self, code: int, message: str, *, data: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.code = code
+        self.data = data
+
+    def as_response(self, msg_id: Any) -> dict[str, Any]:
+        return _error_response(msg_id, self.code, str(self), data=self.data)
 
 
 class MCPUnauthorized(Exception):
@@ -17,15 +54,24 @@ class MCPUnauthorized(Exception):
         self.www_authenticate = www_authenticate
 
 
-class MCPInvalidParams(Exception):
+class MCPInvalidParams(_ProtocolError):
     """Raised from a JSON-RPC handler to signal bad caller params.
 
-    The dispatcher translates this to a JSON-RPC `INVALID_PARAMS`
-    (-32602) error rather than the blanket `INTERNAL_ERROR`.
+    Answers with a JSON-RPC `INVALID_PARAMS` (-32602) at HTTP 400 rather than
+    the blanket `INTERNAL_ERROR`, and — being a protocol error — is never
+    logged or recorded as a server failure.
+
+    Pass `data` to attach a structured payload, so the client doesn't have to
+    parse the message to learn what was wrong:
+
+        raise MCPInvalidParams(f"Unknown resource: {uri}", data={"uri": uri})
 
     For a tool's `run()`, raise `MCPToolError` instead — tool execution
     errors travel in the result via `isError`, not as JSON-RPC errors.
     """
+
+    def __init__(self, message: str = "", *, data: dict[str, Any] | None = None):
+        super().__init__(INVALID_PARAMS, message, data=data)
 
 
 class MCPToolError(Exception):
