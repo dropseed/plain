@@ -99,82 +99,21 @@ jobs:
             echo "Claude review state: ${state:-<none>} — not handing off to Codex."
             exit 0
           fi
-          # Recorded before the trigger so the watcher below only counts what
-          # Codex does in RESPONSE to it -- a review or a quota notice left on
-          # an earlier commit must not be read as this run's outcome.
-          echo "since=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-          comment_id=$(gh api "repos/$REPO/issues/$PR/comments" \
-            -f body="@codex review" --jq .id)
-          echo "comment_id=$comment_id" >> "$GITHUB_OUTPUT"
-          echo "Triggered Codex (comment $comment_id)"
+          gh pr comment "$PR" -R "$REPO" --body "@codex review"
 
-      # ADAPTER: turn whatever Codex did into a submitted review.
-      #
-      # Codex cannot be named as a PullApprove agent directly. It emits no check
-      # run at all, and signals a clean result with a 👍 reaction rather than a
-      # review, so there is nothing for PullApprove to read. This step watches
-      # those native signals and submits a review under this workflow's own
-      # identity -- so the account to declare in CODEREVIEW.toml is
-      # github-actions[bot], not Codex's.
-      #
-      # It reports on EVERY path, including "Codex never ran". That is the whole
-      # point: a declared agent that sometimes stays silent holds human review
-      # requests forever, which is worse than not declaring it. Roughly a third
-      # of Codex runs never execute at all (quota), and the handoff above is
-      # itself conditional -- so silence is the common case, not the edge case.
-      #
-      # `!cancelled()` rather than `always()`: a run superseded by a new push
-      # should leave the reporting to its replacement.
-      - name: Report the Codex outcome
-        if: ${{ !cancelled() && steps.pr.outputs.fork == 'false' }}
+      # When the handoff doesn't happen, Codex leaves nothing behind, so
+      # codex-outcome.yml never fires and the account that workflow reports as
+      # would stay silent on this pull request. A declared agent that sometimes
+      # stays silent holds human review requests forever -- so say so here
+      # instead, immediately and without waiting on anything.
+      - name: Report a skipped Codex handoff
+        if: ${{ !cancelled() && steps.codex.outputs.skipped != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}
           REPO: ${{ github.repository }}
-          CODEX: "chatgpt-codex-connector[bot]"
-          COMMENT_ID: ${{ steps.codex.outputs.comment_id }}
-          SINCE: ${{ steps.codex.outputs.since }}
-          SKIPPED: ${{ steps.codex.outputs.skipped }}
-          TIMEOUT_SECONDS: "900"
+          REASON: ${{ steps.codex.outputs.skipped }}
         run: |
-          report() {
-            echo "Reporting: $1"
-            gh pr review "$PR" -R "$REPO" --comment --body "Codex second opinion — $1"
-            exit 0
-          }
+          gh pr review "$PR" -R "$REPO" --comment \
+            --body "Codex second opinion — not run: $REASON."
 
-          [ -n "$SKIPPED" ] && report "not run: $SKIPPED."
-          [ -z "$COMMENT_ID" ] && report "not run: the review step did not finish."
-
-          deadline=$(( $(date +%s) + TIMEOUT_SECONDS ))
-          while [ "$(date +%s)" -lt "$deadline" ]; do
-            # Findings: Codex submits a review (always COMMENTED, never a
-            # verdict), with its findings as inline comments.
-            if gh api --paginate --slurp "repos/$REPO/pulls/$PR/reviews" \
-              | jq -e --arg u "$CODEX" --arg t "$SINCE" \
-                  'add | map(select(.user.login == $u and .submitted_at > $t)) | length > 0' \
-              >/dev/null 2>&1; then
-              report "reviewed it and left findings."
-            fi
-
-            # Clean: a 👍 on the trigger comment, and no review at all. This is
-            # the outcome that makes Codex undeclarable on its own.
-            if gh api "repos/$REPO/issues/comments/$COMMENT_ID/reactions" \
-              | jq -e 'map(select(.content == "+1")) | length > 0' >/dev/null 2>&1; then
-              report "reviewed it and found nothing."
-            fi
-
-            # Never ran: it says so in a PR comment. Same channel as the clean
-            # notice, so the reaction above has to be checked first.
-            if gh api --paginate --slurp "repos/$REPO/issues/$PR/comments" \
-              | jq -e --arg u "$CODEX" --arg t "$SINCE" \
-                  'add | map(select(.user.login == $u and .created_at > $t
-                                    and (.body | test("usage limits"; "i")))) | length > 0' \
-              >/dev/null 2>&1; then
-              report "could not run (Codex usage limits reached)."
-            fi
-
-            sleep 30
-          done
-
-          report "did not respond within $((TIMEOUT_SECONDS / 60)) minutes."
