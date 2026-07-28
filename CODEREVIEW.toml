@@ -11,20 +11,27 @@
 # until Claude has looked. The maintainer opens the PR and comes back to a
 # review already on it, instead of racing the bot to the same findings.
 #
-# Only claude[bot] is declared. The Codex handoff in that workflow is
-# conditional (it only fires on an approval, and only when CODEX_TRIGGER_TOKEN
-# is set) and Copilot is opt-in per PR — an agent that may never answer would
-# hold the request forever. Fork PRs skip the workflow entirely and will sit
-# held; there have been none here, and the fix if that changes is to drop the
-# declaration rather than work around it.
+# Copilot stays undeclared — it is opt-in per pull request, so it may never
+# answer, and an agent that never answers holds the request forever.
 #
-# Codex could not be declared here whatever the handoff did: it emits no check
-# run at all, and signals a clean result with a reaction rather than a review,
-# so there is nothing for PullApprove to read. Declaring it would need an
-# adapter step in that workflow that submits a review of its own — and then the
-# account to declare is the adapter's, not Codex's.
+# Fork PRs skip both workflows entirely and will sit held; there have been none
+# here, and the fix if that changes is to drop the declarations rather than work
+# around it.
 [[agents]]
 account = "claude[bot]"
+
+# The Codex adapter, not Codex. Codex itself cannot be declared: it emits no
+# check run, and its clean result is a reaction rather than a review, so there
+# is nothing for PullApprove to read. codex-outcome.yml watches what Codex does
+# leave behind — a review, or a comment — and submits a review of its own under
+# this account, and claude-code-review.yml reports here too when the handoff is
+# skipped. Between them every path reports, which is what makes it safe to wait
+# on.
+#
+# Note this counts ANY review from github-actions[bot], so nothing else in this
+# repo should post one; Claude posts as claude[bot] via its own app.
+[[agents]]
+account = "github-actions[bot]"
 
 [[scopes]]
 name = "all"

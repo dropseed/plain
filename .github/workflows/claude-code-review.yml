@@ -91,9 +91,13 @@ jobs:
             echo "CODEX_TRIGGER_TOKEN is not set — skipping Codex handoff."
             exit 0
           fi
-          # Latest review from a bot account is Claude's, since it just ran.
+          # Claude by login, not "the latest bot review". The Codex adapter
+          # posts its own reviews as github-actions[bot], which is also a Bot —
+          # so once it has reported, "latest bot review" is the adapter's
+          # comment-only review and never an approval, and Codex would never be
+          # triggered on this pull request again.
           state=$(gh api --paginate --slurp "repos/$REPO/pulls/$PR/reviews" \
-            | jq -r 'add | map(select(.user.type == "Bot")) | last | .state // ""')
+            | jq -r 'add | map(select(.user.login == "claude[bot]")) | last | .state // ""')
           if [ "$state" != "APPROVED" ]; then
             echo "skipped=Claude did not approve (review state: ${state:-none})" >> "$GITHUB_OUTPUT"
             echo "Claude review state: ${state:-<none>} — not handing off to Codex."
