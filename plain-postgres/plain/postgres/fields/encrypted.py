@@ -125,15 +125,13 @@ class EncryptedFieldMixin:
     name: str
     model: Any
 
-    def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
-        if lookup_name not in _ALLOWED_LOOKUPS:
+    def get_lookup(self, lookup: str) -> type[Lookup] | None:
+        if lookup not in _ALLOWED_LOOKUPS:
             return None
         get_lookup = getattr(super(), "get_lookup")
-        return get_lookup(lookup_name)
+        return get_lookup(lookup)
 
-    def get_transform(
-        self, lookup_name: str
-    ) -> type[Transform] | Callable[..., Any] | None:
+    def get_transform(self, name: str) -> Callable[..., Transform] | None:
         return None
 
     def _check_encrypted_constraints(self) -> list[PreflightResult]:

@@ -429,8 +429,8 @@ class BaseExpression:
     def get_lookup(self, lookup: str) -> type[Lookup] | None:
         return self.output_field.get_lookup(lookup)
 
-    def get_transform(self, name: str) -> type[Transform] | None:
-        return self.output_field.get_transform(name)  # ty: ignore[invalid-return-type]
+    def get_transform(self, name: str) -> Callable[..., Transform] | None:
+        return self.output_field.get_transform(name)
 
     def relabeled_clone(self, change_map: dict[str, str]) -> Self:
         clone = self.copy()

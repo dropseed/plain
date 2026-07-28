@@ -90,14 +90,12 @@ class JSONField(DefaultableField):
             return value
         return self.get_db_prep_value(value, connection)
 
-    def get_transform(
-        self, lookup_name: str
-    ) -> type[Transform] | Callable[..., Any] | None:
+    def get_transform(self, name: str) -> Callable[..., Transform] | None:
         # Always returns a transform (never None in practice)
-        transform = super().get_transform(lookup_name)
+        transform = super().get_transform(name)
         if transform:
             return transform
-        return KeyTransformFactory(lookup_name)
+        return KeyTransformFactory(name)
 
     def validate(self, value: Any, model_instance: Any) -> None:
         super().validate(value, model_instance)
