@@ -16,9 +16,6 @@ permissions:
   # Lets the action exchange an OIDC token for a Claude GitHub App token,
   # so reviews post as the branded app instead of github-actions[bot].
   id-token: write
-  # For the skipped-handoff check run below. Claude itself can't reach this --
-  # it is limited to `gh pr review` by --allowedTools.
-  checks: write
 
 jobs:
   review:
@@ -62,10 +59,9 @@ jobs:
           plugins: "code-review@claude-code-plugins"
           prompt: "/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}"
           # Always end with a submitted PR review, even when clean — it's the
-          # visible "this ran" record, and tools that wait on bot reviews
-          # (e.g. PullApprove agents) treat a submitted review as the answer.
-          # Approve vs. comment is also the signal the Codex handoff below reads,
-          # so the reason Codex did or didn't run is visible on the PR itself.
+          # visible "this ran" record. Approve vs. comment is also the signal
+          # the Codex handoff below reads, so the reason Codex did or didn't
+          # run is visible on the PR itself.
           claude_args: |
             --model opus
             --append-system-prompt "After completing the review, always submit a GitHub review on the pull request, even when the review is clean. If you found no issues, approve it: 'gh pr review <number> --approve --body <summary>'. If you reported one or more findings, comment instead: 'gh pr review <number> --comment --body <summary>'. Never approve a pull request you reported findings on."
@@ -82,7 +78,6 @@ jobs:
       # workspace of the commenting account. A github-actions[bot] comment is
       # silently dropped.
       - name: Trigger Codex review
-        id: codex
         if: success() && steps.pr.outputs.fork == 'false'
         env:
           GH_TOKEN: ${{ secrets.CODEX_TRIGGER_TOKEN }}
@@ -90,58 +85,16 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "skipped=CODEX_TRIGGER_TOKEN is not set" >> "$GITHUB_OUTPUT"
             echo "CODEX_TRIGGER_TOKEN is not set — skipping Codex handoff."
             exit 0
           fi
-          # Claude by login, not "the latest bot review". The Codex adapter
-          # posts its own reviews as github-actions[bot], which is also a Bot —
-          # so once it has reported, "latest bot review" is the adapter's
-          # comment-only review and never an approval, and Codex would never be
-          # triggered on this pull request again.
+          # Claude's own latest review, matched by login rather than "the
+          # latest bot review" — other bots post reviews here too.
           state=$(gh api --paginate --slurp "repos/$REPO/pulls/$PR/reviews" \
             | jq -r 'add | map(select(.user.login == "claude[bot]")) | last | .state // ""')
           if [ "$state" != "APPROVED" ]; then
-            echo "skipped=Claude did not approve (review state: ${state:-none})" >> "$GITHUB_OUTPUT"
             echo "Claude review state: ${state:-<none>} — not handing off to Codex."
             exit 0
           fi
           gh pr comment "$PR" -R "$REPO" --body "@codex review"
-
-      # When the handoff doesn't happen, Codex leaves nothing behind, so
-      # codex-outcome.yml never fires and the account that workflow reports as
-      # would stay silent on this pull request. A declared agent that sometimes
-      # stays silent holds human review requests forever -- so say so here
-      # instead, immediately and without waiting on anything.
-      #
-      # Same check name codex-outcome.yml writes: this is the same signal --
-      # "what happened with Codex" -- and neither workflow can cover both paths
-      # alone. `skipped` is the conclusion for both no-answer cases, quota there
-      # and no-handoff here.
-      - name: Report a skipped Codex handoff
-        if: ${{ !cancelled() && steps.codex.outputs.skipped != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}
-          REPO: ${{ github.repository }}
-          REASON: ${{ steps.codex.outputs.skipped }}
-        run: |
-          set -euo pipefail
-
-          sha="$(gh pr view "$PR" -R "$REPO" --json headRefOid -q .headRefOid)"
-
-          jq -n \
-            --arg sha "$sha" \
-            --arg reason "$REASON" \
-            '{
-              name: "codex-review",
-              head_sha: $sha,
-              status: "completed",
-              conclusion: "skipped",
-              output: {
-                title: ("Not run: " + $reason),
-                summary: ("Codex second opinion — not run: " + $reason + ".")
-              }
-            }' \
-            | gh api --method POST "repos/$REPO/check-runs" --input -
 
