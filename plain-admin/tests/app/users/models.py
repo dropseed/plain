@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
 class User(postgres.Model):
-    username = types.TextField(max_length=255)
-    is_admin = types.BooleanField(default=False)
-
-    query: postgres.QuerySet[User] = postgres.QuerySet()
+    username: Field[str] = types.TextField(max_length=255)
+    is_admin: Field[bool] = types.BooleanField(default=False)
 
     @property
     def username_upper(self) -> str:

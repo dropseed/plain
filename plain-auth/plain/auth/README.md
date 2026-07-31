@@ -75,16 +75,16 @@ You can create one with `plain create users` or manually:
 from datetime import datetime
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 from plain.passwords.models import PasswordField
 
 
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    password = PasswordField()
-    is_admin: bool = types.BooleanField(default=False)
-    created_at: datetime = types.DateTimeField(create_now=True)
+    email: Field[str] = types.EmailField()
+    password: Field[str] = PasswordField()
+    is_admin: Field[bool] = types.BooleanField(default=False)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
 
     def __str__(self):
         return self.email

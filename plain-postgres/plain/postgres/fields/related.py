@@ -14,7 +14,7 @@ from plain.preflight import PreflightResult
 
 from ..registry import models_registry
 from . import Field
-from .base import ColumnField
+from .base import NOT_PROVIDED, ColumnField
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
     ForwardForeignKeyDescriptor,
@@ -331,13 +331,17 @@ class ForeignKeyField(ColumnField, RelatedField):
         on_delete: OnDelete,
         related_query_name: str | None = None,
         *,
+        default: Any = NOT_PROVIDED,
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # `default` and `choices` are intentionally not accepted: a hardcoded
-        # FK id default is a portability/existence footgun, and the related
-        # model itself already defines the valid set.
+        # `default` accepts ONLY `None` -- the "no relation" marker for a
+        # nullable FK, which lets typed construction treat the field as optional.
+        # A hardcoded FK id default stays rejected (portability/existence
+        # footgun; the related model itself defines the valid set). `choices` is
+        # likewise not accepted. The default=None / allow_null validation is
+        # enforced by ColumnField.
         if not isinstance(to, str):
             try:
                 to.model_options.model_name
@@ -353,6 +357,7 @@ class ForeignKeyField(ColumnField, RelatedField):
             )
 
         super().__init__(
+            default=default,
             required=required,
             allow_null=allow_null,
             validators=validators,

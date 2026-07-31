@@ -1,7 +1,7 @@
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
 class User(postgres.Model):
-    username = types.TextField(max_length=255)
+    username: Field[str] = types.TextField(max_length=255)

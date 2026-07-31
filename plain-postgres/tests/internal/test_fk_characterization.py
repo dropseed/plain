@@ -96,8 +96,8 @@ def test_construct_with_id_kwarg(db):
     # NOW: TypeError -- pass the field name, which also accepts a bare key.
     parent = DeleteParent.query.create(name="P")
     with pytest.raises(TypeError, match="unexpected keyword"):
-        ChildCascade(parent_id=parent.id)
-    child = ChildCascade(parent=parent.id)
+        ChildCascade(parent_id=parent.id)  # ty: ignore[unknown-argument, missing-argument]
+    child = ChildCascade(parent=parent.id)  # ty: ignore[invalid-argument-type]
     child.create()
     assert ChildCascade.query.get(id=child.id).parent == parent
 
@@ -120,7 +120,7 @@ def test_assign_bare_int(db):
     # NOW: a bare primary key value is accepted.
     parent = DeleteParent.query.create(name="P")
     child = ChildCascade.query.create(parent=parent)
-    child.parent = parent.id
+    child.parent = parent.id  # ty: ignore[invalid-assignment]
     assert child.parent.id == parent.id
 
 

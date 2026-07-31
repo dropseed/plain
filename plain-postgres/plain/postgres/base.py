@@ -5,7 +5,7 @@ import warnings
 from collections.abc import Collection, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Self, dataclass_transform
 
 if TYPE_CHECKING:
     from plain.postgres.meta import Meta
@@ -50,8 +50,45 @@ class Deferred:
 DEFERRED = Deferred()
 
 
+@dataclass_transform(
+    kw_only_default=True,
+    field_specifiers=(
+        types.BigIntegerField,
+        types.BinaryField,
+        types.BooleanField,
+        types.DateField,
+        types.DateTimeField,
+        types.DecimalField,
+        types.DurationField,
+        types.EmailField,
+        types.EncryptedJSONField,
+        types.EncryptedTextField,
+        types.FloatField,
+        types.ForeignKeyField,
+        types.GenericIPAddressField,
+        types.IntegerField,
+        types.JSONField,
+        types.ManyToManyField,
+        types.PrimaryKeyField,
+        types.RandomStringField,
+        types.SmallIntegerField,
+        types.TextField,
+        types.TimeField,
+        types.TimeZoneField,
+        types.URLField,
+        types.UUIDField,
+    ),
+)
 class ModelBase(type):
-    """Metaclass for all models."""
+    """Metaclass for all models.
+
+    Carries ``@dataclass_transform`` so every model gets a type-checked
+    constructor synthesized from its ``Field[T]``-annotated fields:
+    ``Model(field=value)`` flags wrong value types, unknown field names, and
+    missing required fields, and excludes DB-owned fields (the id,
+    ``create_now``, generated values). This is a type-checker-only affordance;
+    the runtime ``__init__`` is unchanged.
+    """
 
     def __new__(
         cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any], **kwargs: Any
@@ -88,10 +125,14 @@ class Model(metaclass=ModelBase):
     # Every model gets an automatic id field
     id = types.PrimaryKeyField()
 
-    # Descriptors for other model behavior
-    query: QuerySet[Self] = QuerySet()
-    model_options: Options = Options()
-    _model_meta: Meta = Meta()
+    # Descriptors and framework metadata. These are ClassVars so the metaclass's
+    # @dataclass_transform doesn't treat them as constructor fields -- otherwise
+    # `Model(query=...)` / `Model(model_options=...)` would type-check and then
+    # raise an unexpected-keyword TypeError at runtime. A model with a custom
+    # QuerySet overrides query via `query: ClassVar[MyQuerySet]`.
+    query: ClassVar[QuerySet[Self]] = QuerySet()
+    model_options: ClassVar[Options] = Options()
+    _model_meta: ClassVar[Meta] = Meta()
     DoesNotExist = DoesNotExistDescriptor()
     MultipleObjectsReturned = MultipleObjectsReturnedDescriptor()
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
@@ -14,7 +14,5 @@ class IterationExample(postgres.Model):
     class plumbing).
     """
 
-    name = types.TextField(max_length=100)
-    tag = types.TextField(max_length=100)
-
-    query: postgres.QuerySet[IterationExample] = postgres.QuerySet()
+    name: Field[str] = types.TextField(max_length=100)
+    tag: Field[str] = types.TextField(max_length=100)

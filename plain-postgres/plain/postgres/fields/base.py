@@ -563,10 +563,30 @@ class ColumnField[T](Field[T]):
     def __init__(
         self,
         *,
+        default: Any = NOT_PROVIDED,
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
+        # A plain ColumnField can't express a persistent literal column
+        # DEFAULT (that's DefaultableField's job), but it still accepts
+        # `default=None` so a nullable variant reads as optional in the typed
+        # constructor -- a stock type checker only treats a field as omittable
+        # when the call site passes `default=`. None is the only allowed value
+        # and it requires allow_null; nothing is stored, because a nullable
+        # column already yields None when constructed without a value (see
+        # get_default). So `default=None` here is purely a typing affordance.
+        if default is not NOT_PROVIDED:
+            if default is not None:
+                raise TypeError(
+                    f"{type(self).__name__} does not accept a persistent default. "
+                    "Only default=None is allowed (with allow_null=True), which "
+                    "makes the field optional in the constructor."
+                )
+            if not allow_null:
+                raise TypeError(
+                    f"{type(self).__name__}(default=None) requires allow_null=True."
+                )
         self.required = required
         self.allow_null = allow_null
         self._validators = list(validators)

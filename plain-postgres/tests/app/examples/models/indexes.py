@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
@@ -13,7 +13,5 @@ class IndexExample(postgres.Model):
     never leak into other test files' schemas.
     """
 
-    name = types.TextField(max_length=100)
-    description = types.TextField(max_length=100)
-
-    query: postgres.QuerySet[IndexExample] = postgres.QuerySet()
+    name: Field[str] = types.TextField(max_length=100)
+    description: Field[str] = types.TextField(max_length=100)

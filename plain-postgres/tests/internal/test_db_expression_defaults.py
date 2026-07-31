@@ -121,7 +121,7 @@ def test_explicit_value_overrides_db_default(db):
     explicit = uuid.UUID("11111111-2222-3333-4444-555555555555")
     explicit_dt = datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC)
 
-    inst = DBDefaultsExample(name="explicit", db_uuid=explicit, created_at=explicit_dt)
+    inst = DBDefaultsExample(name="explicit", db_uuid=explicit, created_at=explicit_dt)  # ty: ignore[unknown-argument]
     inst.create()
 
     assert inst.db_uuid == explicit
@@ -370,7 +370,7 @@ def test_construct_instance_preserves_db_default_on_blank_submission(db):
         def __getitem__(self, name: str) -> _Bound:
             return _Bound()
 
-    instance = DBDefaultsExample()
+    instance = DBDefaultsExample()  # ty: ignore[missing-argument]
     assert instance.db_uuid is DATABASE_DEFAULT
 
     construct_instance(_Form(), instance)  # ty: ignore[invalid-argument-type]
@@ -433,22 +433,45 @@ def test_datetime_update_now_requires_backfill_companion():
     assert with_null.preflight() == []
 
 
-def test_uuid_default_kwarg_rejected_at_signature():
-    """UUIDField no longer accepts `default=` — Python-side UUID generation
-    isn't supported; use `generate=True` or set the value explicitly."""
+def test_uuid_accepts_default_none_only():
+    """UUIDField accepts `default=None` -- the nullable-optional marker so typed
+    construction treats the field as omittable. Any literal/callable default is
+    rejected (no Python-side UUID generation; use `generate=True`), and
+    `default=None` without allow_null is rejected too."""
     from plain.postgres import fields as plain_fields
 
-    with pytest.raises(TypeError, match="unexpected keyword argument 'default'"):
-        plain_fields.UUIDField(default=uuid.uuid4)  # ty: ignore[unknown-argument]
+    # default=None is accepted with allow_null and yields None at construction.
+    field = plain_fields.UUIDField(allow_null=True, default=None)
+    assert field.get_default() is None
+
+    # default=None without allow_null is rejected.
+    with pytest.raises(TypeError, match="requires allow_null=True"):
+        plain_fields.UUIDField(default=None)
+
+    # A literal/callable default is rejected -- no Python-side generation.
+    with pytest.raises(TypeError, match="does not accept a persistent default"):
+        plain_fields.UUIDField(default=uuid.uuid4)
 
 
-def test_datetime_default_kwarg_rejected_at_signature():
-    """DateTimeField no longer accepts `default=` — use `create_now=True` or
-    `update_now=True`, or set the value explicitly."""
+def test_datetime_accepts_default_none_and_flags_create_now_conflict():
+    """DateTimeField accepts `default` -- chiefly `default=None`, which marks a
+    nullable field omittable (so typed construction sees it as optional). A
+    *literal* default conflicts with create_now/update_now's DB-side default
+    and is flagged at preflight."""
     from plain.postgres import fields as plain_fields
 
-    with pytest.raises(TypeError, match="unexpected keyword argument 'default'"):
-        plain_fields.DateTimeField(default=datetime.datetime(2020, 1, 1))  # ty: ignore[unknown-argument]
+    # default=None is accepted: the nullable-optional marker, no DB default.
+    field = plain_fields.DateTimeField(allow_null=True, default=None)
+    assert field.has_default()
+    assert field.get_default() is None
+    assert not field.has_persistent_literal_default()
+
+    # A literal default alongside create_now is a conflict caught at preflight.
+    conflicted = plain_fields.DateTimeField(
+        create_now=True, default=datetime.datetime(2020, 1, 1)
+    )
+    results = conflicted._check_create_now_default_conflict()
+    assert any(r.id == "fields.datetime_create_now_default_conflict" for r in results)
 
 
 def test_get_db_default_expression_returns_now_when_create_now():

@@ -3,11 +3,17 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse, urlunparse
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 from plain.utils import timezone
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from app.users.models import User
 
 __all__ = [
     "OAuthApplication",
@@ -45,12 +51,10 @@ class OAuthApplication(postgres.Model):
     refresh token on refresh, never a client secret.
     """
 
-    client_id = types.RandomStringField(length=32)
-    name = types.TextField(max_length=255, default="", required=False)
-    redirect_uris = types.TextField(max_length=2000)
-    created_at = types.DateTimeField(create_now=True)
-
-    query: postgres.QuerySet[OAuthApplication] = postgres.QuerySet()
+    client_id: Field[str] = types.RandomStringField(length=32)
+    name: Field[str] = types.TextField(max_length=255, default="", required=False)
+    redirect_uris: Field[str] = types.TextField(max_length=2000)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
 
     model_options = postgres.Options(
         constraints=[
@@ -82,18 +86,18 @@ class AuthorizationCode(postgres.Model):
     Stored in plaintext: it's ephemeral, single-use, and bound by PKCE.
     """
 
-    code = types.RandomStringField(length=48)
-    application = types.ForeignKeyField(OAuthApplication, on_delete=postgres.CASCADE)
-    user = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
-    redirect_uri = types.TextField(max_length=2000)
-    scope = types.TextField(max_length=500, default="", required=False)
-    resource = types.TextField(max_length=2000, default="", required=False)
-    code_challenge = types.TextField(max_length=128)
-    created_at = types.DateTimeField(create_now=True)
-    expires_at = types.DateTimeField()
-    used = types.BooleanField(default=False)
-
-    query: postgres.QuerySet[AuthorizationCode] = postgres.QuerySet()
+    code: Field[str] = types.RandomStringField(length=48)
+    application: Field[OAuthApplication] = types.ForeignKeyField(
+        OAuthApplication, on_delete=postgres.CASCADE
+    )
+    user: User = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
+    redirect_uri: Field[str] = types.TextField(max_length=2000)
+    scope: Field[str] = types.TextField(max_length=500, default="", required=False)
+    resource: Field[str] = types.TextField(max_length=2000, default="", required=False)
+    code_challenge: Field[str] = types.TextField(max_length=128)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    expires_at: Field[datetime] = types.DateTimeField()
+    used: Field[bool] = types.BooleanField(default=False)
 
     model_options = postgres.Options(
         constraints=[
@@ -130,16 +134,16 @@ class AuthorizationCode(postgres.Model):
 class AccessToken(postgres.Model):
     """A bearer access token. Only its hash is stored."""
 
-    token_hash = types.TextField(max_length=64)
-    application = types.ForeignKeyField(OAuthApplication, on_delete=postgres.CASCADE)
-    user = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
-    scope = types.TextField(max_length=500, default="", required=False)
-    resource = types.TextField(max_length=2000, default="", required=False)
-    created_at = types.DateTimeField(create_now=True)
-    expires_at = types.DateTimeField()
-    revoked = types.BooleanField(default=False)
-
-    query: postgres.QuerySet[AccessToken] = postgres.QuerySet()
+    token_hash: Field[str] = types.TextField(max_length=64)
+    application: Field[OAuthApplication] = types.ForeignKeyField(
+        OAuthApplication, on_delete=postgres.CASCADE
+    )
+    user: User = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
+    scope: Field[str] = types.TextField(max_length=500, default="", required=False)
+    resource: Field[str] = types.TextField(max_length=2000, default="", required=False)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    expires_at: Field[datetime] = types.DateTimeField()
+    revoked: Field[bool] = types.BooleanField(default=False)
 
     model_options = postgres.Options(
         constraints=[
@@ -176,17 +180,19 @@ class RefreshToken(postgres.Model):
     has one (non-null CASCADE FK), so there's nothing to duplicate here.
     """
 
-    token_hash = types.TextField(max_length=64)
-    application = types.ForeignKeyField(OAuthApplication, on_delete=postgres.CASCADE)
-    user = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
+    token_hash: Field[str] = types.TextField(max_length=64)
+    application: Field[OAuthApplication] = types.ForeignKeyField(
+        OAuthApplication, on_delete=postgres.CASCADE
+    )
+    user: User = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
     # CASCADE is load-bearing for the cleanup chore: it deletes access tokens
     # only when no live refresh token still points at them (see chores.py).
-    access_token = types.ForeignKeyField(AccessToken, on_delete=postgres.CASCADE)
-    created_at = types.DateTimeField(create_now=True)
-    expires_at = types.DateTimeField()
-    revoked = types.BooleanField(default=False)
-
-    query: postgres.QuerySet[RefreshToken] = postgres.QuerySet()
+    access_token: Field[AccessToken] = types.ForeignKeyField(
+        AccessToken, on_delete=postgres.CASCADE
+    )
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    expires_at: Field[datetime] = types.DateTimeField()
+    revoked: Field[bool] = types.BooleanField(default=False)
 
     model_options = postgres.Options(
         constraints=[

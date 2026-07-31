@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Self
+from datetime import datetime
+from typing import Any, ClassVar, Self
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -35,13 +36,17 @@ class CachedItemQuerySet(postgres.QuerySet["CachedItem"]):
 
 @postgres.register_model
 class CachedItem(postgres.Model):
-    key = types.TextField(max_length=255)
-    value: Any = types.JSONField(required=False, allow_null=True)
-    expires_at = types.DateTimeField(required=False, allow_null=True)
-    created_at = types.DateTimeField(create_now=True)
-    updated_at = types.DateTimeField(create_now=True, update_now=True)
+    key: Field[str] = types.TextField(max_length=255)
+    value: Field[Any] = types.JSONField(required=False, allow_null=True, default=None)
+    expires_at: Field[datetime | None] = types.DateTimeField(
+        required=False, allow_null=True, default=None
+    )
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
 
-    query: CachedItemQuerySet = CachedItemQuerySet()
+    # ClassVar override so @typed doesn't treat it as a constructor field;
+    # base Model.query is also a ClassVar, so this override is clean.
+    query: ClassVar[CachedItemQuerySet] = CachedItemQuerySet()
 
     model_options = postgres.Options(
         indexes=[

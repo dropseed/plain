@@ -728,12 +728,12 @@ The admin header shows a user avatar next to the account dropdown. If your User 
 # app/users/models.py
 import hashlib
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
+    email: Field[str] = types.EmailField()
 
     def get_avatar_url(self) -> str:
         # Use Gravatar
@@ -904,12 +904,12 @@ Your User model is expected to have an `is_admin` field (or attribute) for check
 ```python
 # app/users/models.py
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
 class User(postgres.Model):
-    is_admin: bool = types.BooleanField(default=False)
+    is_admin: Field[bool] = types.BooleanField(default=False)
     # other fields...
 ```
 

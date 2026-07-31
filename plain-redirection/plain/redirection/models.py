@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 if TYPE_CHECKING:
     from plain.http import Request
@@ -14,22 +15,20 @@ __all__ = ["NotFoundLog", "Redirect", "RedirectLog"]
 
 @postgres.register_model
 class Redirect(postgres.Model):
-    from_pattern = types.TextField(max_length=255)
-    to_pattern = types.TextField(max_length=255)
-    http_status = types.SmallIntegerField(
+    from_pattern: Field[str] = types.TextField(max_length=255)
+    to_pattern: Field[str] = types.TextField(max_length=255)
+    http_status: Field[int] = types.SmallIntegerField(
         default=301
     )  # Default to permanent - could be choices?
-    created_at = types.DateTimeField(create_now=True)
-    updated_at = types.DateTimeField(create_now=True, update_now=True)
-    order = types.SmallIntegerField(default=0)
-    enabled = types.BooleanField(default=True)
-    is_regex = types.BooleanField(default=False)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
+    order: Field[int] = types.SmallIntegerField(default=0)
+    enabled: Field[bool] = types.BooleanField(default=True)
+    is_regex: Field[bool] = types.BooleanField(default=False)
 
     # query params?
     # logged in or not? auth not required necessarily...
     # headers?
-
-    query: postgres.QuerySet[Redirect] = postgres.QuerySet()
 
     model_options = postgres.Options(
         ordering=["order", "-created_at"],
@@ -93,21 +92,21 @@ class Redirect(postgres.Model):
 
 @postgres.register_model
 class RedirectLog(postgres.Model):
-    redirect = types.ForeignKeyField(Redirect, on_delete=postgres.CASCADE)
+    redirect: Field[Redirect] = types.ForeignKeyField(
+        Redirect, on_delete=postgres.CASCADE
+    )
 
     # The actuals that were used to redirect
-    from_url = types.URLField(max_length=512)
-    to_url = types.URLField(max_length=512)
-    http_status = types.SmallIntegerField(default=301)
+    from_url: Field[str] = types.URLField(max_length=512)
+    to_url: Field[str] = types.URLField(max_length=512)
+    http_status: Field[int] = types.SmallIntegerField(default=301)
 
     # Request metadata
-    ip_address = types.GenericIPAddressField()
-    user_agent = types.TextField(required=False, max_length=512)
-    referrer = types.TextField(required=False, max_length=512)
+    ip_address: Field[str] = types.GenericIPAddressField()
+    user_agent: Field[str] = types.TextField(required=False, max_length=512)
+    referrer: Field[str] = types.TextField(required=False, max_length=512)
 
-    created_at = types.DateTimeField(create_now=True)
-
-    query: postgres.QuerySet[RedirectLog] = postgres.QuerySet()
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
 
     model_options = postgres.Options(
         ordering=["-created_at"],
@@ -153,16 +152,14 @@ class RedirectLog(postgres.Model):
 
 @postgres.register_model
 class NotFoundLog(postgres.Model):
-    url = types.URLField(max_length=512)
+    url: Field[str] = types.URLField(max_length=512)
 
     # Request metadata
-    ip_address = types.GenericIPAddressField()
-    user_agent = types.TextField(required=False, max_length=512)
-    referrer = types.TextField(required=False, max_length=512)
+    ip_address: Field[str] = types.GenericIPAddressField()
+    user_agent: Field[str] = types.TextField(required=False, max_length=512)
+    referrer: Field[str] = types.TextField(required=False, max_length=512)
 
-    created_at = types.DateTimeField(create_now=True)
-
-    query: postgres.QuerySet[NotFoundLog] = postgres.QuerySet()
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
 
     model_options = postgres.Options(
         ordering=["-created_at"],

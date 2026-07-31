@@ -30,20 +30,31 @@
 from datetime import datetime
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 from plain.passwords.models import PasswordField
 
 
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    password = PasswordField()
-    is_admin: bool = types.BooleanField(default=False)
-    created_at: datetime = types.DateTimeField(create_now=True)
+    email: Field[str] = types.EmailField()
+    password: Field[str] = PasswordField()
+    is_admin: Field[bool] = types.BooleanField(default=False)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
 
     def __str__(self) -> str:
         return self.email
 ```
+
+Annotate each field with `Field[T]` (the value type) — that's what gives the
+model a type-checked constructor: `User(email="a@b.com")` flags wrong value
+types, unknown field names, and missing required fields. A field is optional in
+that constructor only when its definition passes `default=` (this is general,
+not nullable-specific — a `required=False` field with no `default=` is still a
+required constructor arg), so nullable fields use `Field[T | None]` with
+`default=None`. DB-owned fields (`id`, `create_now`, generated values) are
+auto-excluded from the constructor. A custom field type works the same as long
+as it ships a `Field`-returning stub (like `PasswordField`); one without a typed
+stub falls back to a value-type annotation (`name: str = MyField()`).
 
 Every model automatically includes an `id` field which serves as the primary
 key. The name `id` is reserved and can't be used for other fields.
@@ -181,11 +192,11 @@ For more advanced querying options, see the [`QuerySet`](./query.py#QuerySet) cl
 
 ### Custom QuerySets
 
-You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods. Define a custom QuerySet and assign it to your model's `query` attribute:
+You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods. Define a custom QuerySet and assign it to your model's `query` attribute as a `ClassVar` (so it isn't treated as a constructor field):
 
 ```python
-from typing import Self
-from plain.postgres import types
+from typing import ClassVar, Self
+from plain.postgres import Field, types
 
 class PublishedQuerySet(postgres.QuerySet["Article"]):
     def published_only(self) -> Self:
@@ -196,10 +207,10 @@ class PublishedQuerySet(postgres.QuerySet["Article"]):
 
 @postgres.register_model
 class Article(postgres.Model):
-    title: str = types.TextField(max_length=200)
-    status: str = types.TextField(max_length=20)
+    title: Field[str] = types.TextField(max_length=200)
+    status: Field[str] = types.TextField(max_length=20)
 
-    query = PublishedQuerySet()
+    query: ClassVar[PublishedQuerySet] = PublishedQuerySet()
 
 # Usage - all methods available on Article.query
 all_articles = Article.query.all()
@@ -218,23 +229,11 @@ special_qs = SpecialQuerySet.from_model(Article)
 
 ### Typing QuerySets
 
-For better type checking of query results, you can explicitly type the `query` attribute:
-
-```python
-from __future__ import annotations
-
-from plain import postgres
-from plain.postgres import types
-
-@postgres.register_model
-class User(postgres.Model):
-    email: str = types.EmailField()
-    is_admin: bool = types.BooleanField(default=False)
-
-    query: postgres.QuerySet[User] = postgres.QuerySet()
-```
-
-With this annotation, type checkers will know that `User.query.get()` returns a `User` instance and `User.query.filter()` returns `QuerySet[User]`. This is optional but improves IDE autocomplete and type checking.
+`Model.query` is typed automatically — `User.query.get()` returns a `User` and
+`User.query.filter()` returns `QuerySet[User]` with no extra annotation. Don't
+redeclare `query` just to type it; the base provides `QuerySet[Self]`. Declare
+`query` only when attaching a **custom** QuerySet, and then as a `ClassVar`
+(see [Custom QuerySets](#custom-querysets) above).
 
 ### Raw SQL
 
@@ -695,9 +694,9 @@ Convergence compares the indexes, constraints, foreign keys, nullability, and [s
 ```python
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    username: str = types.TextField(max_length=150)
-    age: int = types.IntegerField()
+    email: Field[str] = types.EmailField()
+    username: Field[str] = types.TextField(max_length=150)
+    age: Field[int] = types.IntegerField()
 
     model_options = postgres.Options(
         indexes=[
@@ -804,23 +803,23 @@ from decimal import Decimal
 from datetime import datetime
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 class Product(postgres.Model):
     # Text fields
-    name: str = types.TextField(max_length=200)
-    description: str = types.TextField()
+    name: Field[str] = types.TextField(max_length=200)
+    description: Field[str] = types.TextField()
 
     # Numeric fields
-    price: Decimal = types.DecimalField(max_digits=10, decimal_places=2)
-    quantity: int = types.IntegerField(default=0)
+    price: Field[Decimal] = types.DecimalField(max_digits=10, decimal_places=2)
+    quantity: Field[int] = types.IntegerField(default=0)
 
     # Boolean fields
-    is_active: bool = types.BooleanField(default=True)
+    is_active: Field[bool] = types.BooleanField(default=True)
 
     # Date and time fields
-    created_at: datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime = types.DateTimeField(update_now=True)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(update_now=True)
 ```
 
 **Text fields:**
@@ -877,27 +876,27 @@ To share common fields across multiple models, use Python classes as mixins. The
 from datetime import datetime
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 # Regular Python class for shared fields
 class TimestampedMixin:
-    created_at: datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime = types.DateTimeField(update_now=True)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(update_now=True)
 
 
 # Models inherit from the mixin AND postgres.Model
 @postgres.register_model
 class User(TimestampedMixin, postgres.Model):
-    email: str = types.EmailField()
-    password = PasswordField()
-    is_admin: bool = types.BooleanField(default=False)
+    email: Field[str] = types.EmailField()
+    password: Field[str] = PasswordField()
+    is_admin: Field[bool] = types.BooleanField(default=False)
 
 
 @postgres.register_model
 class Note(TimestampedMixin, postgres.Model):
-    content: str = types.TextField(max_length=1024)
-    liked: bool = types.BooleanField(default=False)
+    content: Field[str] = types.TextField(max_length=1024)
+    liked: Field[bool] = types.BooleanField(default=False)
 ```
 
 ### Encrypted fields
@@ -908,13 +907,13 @@ This is **not** for passwords or tokens you issue — those should be hashed (on
 
 ```python
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 @postgres.register_model
 class Integration(postgres.Model):
-    name: str = types.TextField(max_length=100)
-    api_key: str = types.EncryptedTextField(max_length=200)
-    credentials: dict = types.EncryptedJSONField(required=False, allow_null=True)
+    name: Field[str] = types.TextField(max_length=100)
+    api_key: Field[str] = types.EncryptedTextField(max_length=200)
+    credentials: Field[dict | None] = types.EncryptedJSONField(required=False, allow_null=True, default=None)
 ```
 
 Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived from `SECRET_KEY`. The `cryptography` package is required — install it with `pip install cryptography`.
@@ -943,11 +942,11 @@ Use [`ForeignKeyField`](./fields/related.py#ForeignKeyField) for many-to-one and
 
 ```python
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 @postgres.register_model
 class Book(postgres.Model):
-    title: str = types.TextField(max_length=200)
+    title: Field[str] = types.TextField(max_length=200)
     author: Author = types.ForeignKeyField("Author", on_delete=postgres.CASCADE)
     tags = types.ManyToManyField("Tag")
 ```
@@ -972,19 +971,24 @@ The partial-instance shortcut is safe because Plain always creates a database fo
 When you define a `ForeignKey` or `ManyToManyField`, Plain automatically creates a reverse accessor on the related model (like `author.book_set`). You can explicitly declare these reverse relationships using [`ReverseForeignKey`](./fields/reverse_descriptors.py#ReverseForeignKey) and [`ReverseManyToMany`](./fields/reverse_descriptors.py#ReverseManyToMany):
 
 ```python
+from typing import ClassVar
+
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 @postgres.register_model
 class Author(postgres.Model):
-    name: str = types.TextField(max_length=200)
-    # Explicit reverse accessor for all books by this author
-    books = types.ReverseForeignKey(to="Book", field="author")
+    name: Field[str] = types.TextField(max_length=200)
+    # Explicit reverse accessor for all books by this author.
+    # ClassVar keeps it out of the typed constructor (it's an accessor, not a field).
+    books: ClassVar[types.ReverseForeignKey[Book]] = types.ReverseForeignKey(
+        to="Book", field="author"
+    )
 
 @postgres.register_model
 class Book(postgres.Model):
-    title: str = types.TextField(max_length=200)
-    author: Author = types.ForeignKeyField(Author, on_delete=postgres.CASCADE)
+    title: Field[str] = types.TextField(max_length=200)
+    author: Field[Author] = types.ForeignKeyField(Author, on_delete=postgres.CASCADE)
 
 # Usage
 author = Author.query.get(name="Jane Doe")
@@ -1000,13 +1004,15 @@ For many-to-many relationships:
 ```python
 @postgres.register_model
 class Feature(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name: Field[str] = types.TextField(max_length=100)
     # Explicit reverse accessor for all cars with this feature
-    cars = types.ReverseManyToMany(to="Car", field="features")
+    cars: ClassVar[types.ReverseManyToMany[Car]] = types.ReverseManyToMany(
+        to="Car", field="features"
+    )
 
 @postgres.register_model
 class Car(postgres.Model):
-    model: str = types.TextField(max_length=100)
+    model: Field[str] = types.TextField(max_length=100)
     features = types.ManyToManyField(Feature)
 
 # Usage
@@ -1024,14 +1030,14 @@ for car in feature.cars.all():
 
 Reverse relations are optional — if you don't declare them, the automatic `{model}_set` accessor still works.
 
-To get type checking for custom QuerySet methods on reverse relations, specify the QuerySet type as a second parameter:
+Annotate reverse relations with `ClassVar` — they're class-level accessors, not constructor fields, so `ClassVar` keeps them out of the typed `Model(...)` constructor (same as `query`). To get type checking for custom QuerySet methods, specify the QuerySet type as a second parameter:
 
 ```python
 # Basic usage
-books: types.ReverseForeignKey[Book] = types.ReverseForeignKey(to="Book", field="author")
+books: ClassVar[types.ReverseForeignKey[Book]] = types.ReverseForeignKey(to="Book", field="author")
 
 # With custom QuerySet for proper method recognition
-books: types.ReverseForeignKey[Book, BookQuerySet] = types.ReverseForeignKey(to="Book", field="author")
+books: ClassVar[types.ReverseForeignKey[Book, BookQuerySet]] = types.ReverseForeignKey(to="Book", field="author")
 
 # Now type checkers recognize custom methods like .published()
 author.books.query.published()
@@ -1046,8 +1052,8 @@ author.books.query.published()
 ```python
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    age: int = types.IntegerField()
+    email: Field[str] = types.EmailField()
+    age: Field[int] = types.IntegerField()
 
     model_options = postgres.Options(
         constraints=[
@@ -1095,9 +1101,9 @@ You can optimize queries and ensure data integrity with indexes and constraints.
 
 ```python
 class User(postgres.Model):
-    email: str = types.EmailField()
-    username: str = types.TextField(max_length=150)
-    age: int = types.IntegerField()
+    email: Field[str] = types.EmailField()
+    username: Field[str] = types.TextField(max_length=150)
+    age: Field[int] = types.IntegerField()
 
     model_options = postgres.Options(
         indexes=[
@@ -1172,13 +1178,13 @@ Add indexes for columns that appear in `.filter()`, `.order_by()`, or `.exclude(
 ```python
 # Bad — full table scan on every filtered query
 class Order(postgres.Model):
-    status: str = types.TextField(max_length=20)
-    created_at: datetime = types.DateTimeField()
+    status: Field[str] = types.TextField(max_length=20)
+    created_at: Field[datetime] = types.DateTimeField()
 
 # Good — indexed for common queries
 class Order(postgres.Model):
-    status: str = types.TextField(max_length=20)
-    created_at: datetime = types.DateTimeField()
+    status: Field[str] = types.TextField(max_length=20)
+    created_at: Field[datetime] = types.DateTimeField()
 
     model_options = postgres.Options(
         indexes=[postgres.Index(fields=["status", "-created_at"])],
