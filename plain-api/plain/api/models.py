@@ -15,11 +15,11 @@ class APIKey(postgres.Model):
     expires_at = types.DateTimeField(required=False, allow_null=True)
     last_used_at = types.DateTimeField(required=False, allow_null=True)
 
-    name = types.TextField(max_length=255, required=False)
+    name = types.TextField(max_length=255, required=False, default="")
 
     token = types.RandomStringField(length=40)
 
-    api_version = types.TextField(max_length=255, required=False)
+    api_version = types.TextField(max_length=255, required=False, default="")
 
     query: postgres.QuerySet[APIKey] = postgres.QuerySet()
 

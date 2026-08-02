@@ -516,8 +516,8 @@ class Field[T](RegisterLookupMixin):
         return self.get_db_prep_value(value, connection=connection, prepared=False)
 
     # Empty-value fallback used by ColumnField.get_default for the
-    # not-null + not-required + empty_strings_allowed case (Python-side
-    # Model() construction). BinaryField overrides with b"".
+    # not-null + empty_strings_allowed case (Python-side Model()
+    # construction). BinaryField overrides with b"".
     _default_empty_value: Any = ""
 
     def has_default(self) -> bool:
@@ -666,6 +666,10 @@ class DefaultableField[T](ColumnField[T]):
 
     non_migration_attrs = (*ColumnField.non_migration_attrs, "default")
 
+    # Subclasses set this when their only expressible column DEFAULT is the
+    # class's `_default_empty_value` ("" / b"").
+    only_empty_default = False
+
     def __init__(
         self,
         *,
@@ -674,22 +678,48 @@ class DefaultableField[T](ColumnField[T]):
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        if default is not NOT_PROVIDED and callable(default):
-            raise TypeError(
-                f"{type(self).__name__}(default=...) must be a static literal. "
-                f"For empty collections pass default={{}} or default=[]; for "
-                f"per-row generation use a DB-side expression "
-                f"(create_now=True, generate=True, RandomStringField)."
-            )
-        if default is not NOT_PROVIDED and isinstance(default, str) and "\\" in default:
-            # psycopg quotes backslash-bearing strings with `E'...'` escape
-            # syntax, but pg_get_expr returns the stored DEFAULT as a standard
-            # `'...'` literal — the two forms don't compare lexically, so
-            # convergence would flag spurious drift on every sync. Reject at
-            # declaration time rather than ship a sync that never converges.
-            raise ValueError(
-                f"{type(self).__name__}(default=...) must not contain a backslash."
-            )
+        if default is not NOT_PROVIDED:
+            if callable(default):
+                raise TypeError(
+                    f"{type(self).__name__}(default=...) must be a static literal. "
+                    f"For empty collections pass default={{}} or default=[]; for "
+                    f"per-row generation use a DB-side expression "
+                    f"(create_now=True, generate=True, RandomStringField)."
+                )
+            if isinstance(default, str) and "\\" in default:
+                # psycopg quotes backslash-bearing strings with `E'...'` escape
+                # syntax, but pg_get_expr returns the stored DEFAULT as a standard
+                # `'...'` literal — the two forms don't compare lexically, so
+                # convergence would flag spurious drift on every sync. Reject at
+                # declaration time rather than ship a sync that never converges.
+                raise ValueError(
+                    f"{type(self).__name__}(default=...) must not contain a backslash."
+                )
+            if self.only_empty_default:
+                empty = self._default_empty_value
+                if default is None:
+                    if not allow_null or required:
+                        raise ValueError(
+                            f"{type(self).__name__} with default=None must also "
+                            f"set allow_null=True and required=False — the "
+                            f"column must accept NULL, and required=True would "
+                            f"reject the defaulted None on every save."
+                        )
+                # `type()` (not isinstance/==) so bytearray()/memoryview(b"")
+                # can't slip through — they compare equal to b"" but don't
+                # deepcopy or serialize like it.
+                elif type(default) is not type(empty) or default != empty:
+                    raise ValueError(
+                        f"{type(self).__name__} only supports default={empty!r} — "
+                        f"the empty value, used to backfill existing rows when "
+                        f"the field is added to a populated table."
+                    )
+                elif required:
+                    raise ValueError(
+                        f"{type(self).__name__} with default={empty!r} must also "
+                        f"set required=False — the default fills the field with "
+                        f"an empty value that required=True then rejects."
+                    )
         self.default = default
         super().__init__(
             required=required,

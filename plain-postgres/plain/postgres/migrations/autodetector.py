@@ -6,7 +6,7 @@ from graphlib import TopologicalSorter
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.fields import Field
-from plain.postgres.fields.base import ColumnField
+from plain.postgres.fields.base import ColumnField, DefaultableField
 from plain.postgres.fields.related import ManyToManyField, RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.migrations import operations
@@ -810,26 +810,36 @@ class MigrationAutodetector:
         can_add_without_backfill = (
             isinstance(field, ManyToManyField)
             or field.has_persistent_column_default()
-            or (
-                isinstance(field, ColumnField)
-                and (
-                    field.allow_null
-                    or (not field.required and field.empty_strings_allowed)
-                )
-            )
+            or (isinstance(field, ColumnField) and field.allow_null)
         )
         if not can_add_without_backfill:
-            raise MigrationSchemaError(
-                f"Cannot add non-nullable field '{model_name}.{field_name}' "
-                f"without a default. Existing rows have no value for this "
-                f"column.\n\n"
-                f"Choose one:\n"
-                f"  1. Declare a default on the field in models.py, e.g.\n"
-                f'       {field_name}: str = types.TextField(default="...")\n'
-                f"  2. Add the field with allow_null=True, scaffold a data "
+            backfill_remedy = (
+                f"Add the field with allow_null=True, scaffold a data "
                 f"migration to populate existing rows, then remove allow_null=True "
                 f"— convergence applies NOT NULL on the next sync:\n"
                 f"       uv run plain migrations create --empty --name backfill_{field_name}"
+            )
+            if isinstance(field, DefaultableField):
+                if field.only_empty_default:
+                    # get_default() returns the field's empty value here — the
+                    # one default these fields accept.
+                    example_kwargs = f"required=False, default={field.get_default()!r}"
+                else:
+                    # `<value>` can't be copied verbatim — `default=...` could
+                    # be, and Ellipsis is a real (wrong) Python value.
+                    example_kwargs = "default=<value>"
+                remedy_text = (
+                    f"Choose one:\n"
+                    f"  1. Declare a default on the field in models.py, e.g.\n"
+                    f"       {field_name} = types.{type(field).__name__}({example_kwargs})\n"
+                    f"  2. {backfill_remedy}"
+                )
+            else:
+                remedy_text = f"Fix: {backfill_remedy}"
+            raise MigrationSchemaError(
+                f"Cannot add non-nullable field '{model_name}.{field_name}' "
+                f"without a default. Existing rows have no value for this "
+                f"column.\n\n{remedy_text}"
             )
         self.add_operation(
             package_label,

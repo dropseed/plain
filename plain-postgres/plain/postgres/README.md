@@ -928,6 +928,7 @@ Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived
 
 - **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported.
 - **No indexes or constraints** — encrypted fields cannot be used in indexes or unique constraints. Preflight checks will catch this.
+- **Only `default=""`** — on `EncryptedTextField` (paired with `required=False`), the empty string is stored as plaintext `''`, so it's the one value expressible as a column `DEFAULT` (declare it to add the field to a populated table). Any other default would need ciphertext, which is non-deterministic. `EncryptedJSONField` accepts no default at all — even `{}` serializes to text that would need ciphertext; use `allow_null=True`.
 
 **Key rotation:**
 
@@ -1479,9 +1480,9 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 Add the field to your model class, then run `plain migrations create` to create a migration.
 
-If the field is required (no `default=` and not `allow_null=True`), the autodetector refuses to generate the migration, since there's no value to seed existing rows with. You have two options:
+If the field has no `default=` and isn't `allow_null=True`, the autodetector refuses to generate the migration, since there's no value to seed existing rows with — `required=False` alone is not enough (it only affects Python-side validation, not the column). You have two options:
 
-1. Declare a `default=` on the field so the new column has a value for existing rows.
+1. Declare a `default=` on the field so the new column has a value for existing rows. For an optional string field the idiom is `required=False, default=""` (for `BinaryField`, `default=b""`).
 2. Add the field with `allow_null=True`, scaffold a data migration with `plain migrations create --empty --name backfill_<field>` to populate existing rows, then remove `allow_null=True` from the field — convergence applies `NOT NULL` on the next `postgres sync`.
 
 #### How do I make an existing column `NOT NULL`?

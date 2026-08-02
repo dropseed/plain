@@ -20,6 +20,7 @@ from plain.forms.forms import BaseForm, DeclarativeFieldsMetaclass
 from plain.postgres.exceptions import FieldError
 from plain.postgres.fields import ChoicesField
 from plain.postgres.fields.base import ColumnField, DefaultableField
+from plain.postgres.fields.binary import BinaryField
 
 if TYPE_CHECKING:
     from plain.postgres.fields import Field as ModelField
@@ -683,6 +684,9 @@ def modelfield_to_formfield(
         isinstance(modelfield, DefaultableField)
         and modelfield.has_default()
         and not auto_filled
+        # BinaryField's bytes default doesn't round-trip through a text
+        # input — rendering it would show the literal "b''".
+        and not isinstance(modelfield, BinaryField)
     ):
         defaults["initial"] = modelfield.get_default()
 
@@ -719,7 +723,7 @@ def modelfield_to_formfield(
 
     # Avoid a circular import
     from plain import postgres
-    from plain.postgres.fields.encrypted import EncryptedJSONField, EncryptedTextField
+    from plain.postgres.fields.encrypted import EncryptedJSONField
 
     # Primary key fields aren't rendered by default
     if isinstance(modelfield, postgres.PrimaryKeyField):
@@ -746,11 +750,6 @@ def modelfield_to_formfield(
         return fields.JSONField(
             encoder=modelfield.encoder, decoder=modelfield.decoder, **defaults
         )
-
-    if isinstance(modelfield, EncryptedTextField):
-        if modelfield.allow_null:
-            defaults["empty_value"] = None
-        return fields.TextField(max_length=modelfield.max_length, **defaults)
 
     if isinstance(modelfield, postgres.TextField):
         # Passing max_length to fields.TextField means that the value's length

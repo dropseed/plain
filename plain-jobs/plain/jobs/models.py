@@ -70,13 +70,13 @@ class JobRequest(postgres.Model):
     job_class = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
     priority = types.SmallIntegerField(default=0)
-    source = types.TextField(required=False)
+    source = types.TextField(required=False, default="")
     queue = types.TextField(default="default", max_length=255)
 
     retries = types.SmallIntegerField(default=0)
     retry_attempt = types.SmallIntegerField(default=0)
 
-    concurrency_key = types.TextField(max_length=255, required=False)
+    concurrency_key = types.TextField(max_length=255, required=False, default="")
 
     start_at = types.DateTimeField(required=False, allow_null=True)
 
@@ -179,11 +179,11 @@ class JobProcess(postgres.Model):
     job_class = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
     priority = types.SmallIntegerField(default=0)
-    source = types.TextField(required=False)
+    source = types.TextField(required=False, default="")
     queue = types.TextField(default="default", max_length=255)
     retries = types.SmallIntegerField(default=0)
     retry_attempt = types.SmallIntegerField(default=0)
-    concurrency_key = types.TextField(max_length=255, required=False)
+    concurrency_key = types.TextField(max_length=255, required=False, default="")
 
     # OpenTelemetry trace context
     trace_id = types.TextField(max_length=34, required=False, allow_null=True)
@@ -587,7 +587,7 @@ class JobResult(postgres.Model):
     job_process_uuid = types.UUIDField()
     started_at = types.DateTimeField(required=False, allow_null=True)
     ended_at = types.DateTimeField(required=False, allow_null=True)
-    error = types.TextField(required=False)
+    error = types.TextField(required=False, default="")
     status = types.TextField(
         max_length=20,
         choices=JobResultStatuses.choices,
@@ -599,11 +599,11 @@ class JobResult(postgres.Model):
     job_class = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
     priority = types.SmallIntegerField(default=0)
-    source = types.TextField(required=False)
+    source = types.TextField(required=False, default="")
     queue = types.TextField(default="default", max_length=255)
     retries = types.SmallIntegerField(default=0)
     retry_attempt = types.SmallIntegerField(default=0)
-    concurrency_key = types.TextField(max_length=255, required=False)
+    concurrency_key = types.TextField(max_length=255, required=False, default="")
 
     # Retries
     retry_job_request_uuid = types.UUIDField(required=False, allow_null=True)

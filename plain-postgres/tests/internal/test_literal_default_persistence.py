@@ -1,19 +1,20 @@
 """Pin the schema-editor behavior for persistent literal `default=` values.
 
 Literal (non-callable, non-None) defaults are inlined into CREATE TABLE and
-kept on ADD COLUMN. Callable defaults, `update_now` auto-fills, and the
-synthesized empty-string default for `required=False` text fields must
-continue to use the transient ADD+DROP path. Nullability and column DEFAULT
+kept on ADD COLUMN. There is no implicit DDL synthesis: a field without a
+declared default gets no DEFAULT clause at all (backfill intent must be
+explicit via `default=` or `allow_null=True`). Nullability and column DEFAULT
 changes on existing columns are convergence-managed — the schema editor
 short-circuits on allow_null and default differences.
 """
 
 from __future__ import annotations
 
+import pytest
 from app.examples.models.defaults import DefaultsExample
 
 from plain.postgres import fields as plain_fields
-from plain.postgres import get_connection
+from plain.postgres import get_connection, types
 
 
 def test_create_table_inlines_literal_default(db):
@@ -61,6 +62,43 @@ def test_add_field_without_default_emits_no_default_clause(db):
     joined = " ".join(editor.executed_sql).lower()
     assert " default " not in joined
     assert "drop default" not in joined
+
+
+@pytest.mark.parametrize(
+    ("field", "expected"),
+    [
+        (types.EncryptedTextField(required=False, default=""), ""),
+        (types.BinaryField(required=False, default=b""), b""),
+    ],
+    ids=["encrypted-text", "binary"],
+)
+def test_add_only_empty_default_field_backfills_populated_table(db, field, expected):
+    """The whole point of the empty default: ADD COLUMN succeeds on a table
+    that already has rows (the empty value is expressible as a literal —
+    encrypted stores '' as plaintext), existing rows read back empty, and the
+    DEFAULT persists."""
+    DefaultsExample.query.create(name="existing")
+
+    field.set_attributes_from_name("added_column")
+
+    connection = get_connection()
+    with connection.schema_editor(atomic=False) as editor:
+        editor.add_field(DefaultsExample, field)
+
+    joined = " ".join(editor.executed_sql).lower()
+    # Spaces matter: bare "default" would match the table name
+    # ("examples_defaultsexample") and never fail.
+    assert " default " in joined
+    assert "drop default" not in joined
+
+    table = DefaultsExample.model_options.db_table
+    with connection.cursor() as cursor:
+        cursor.execute(f'SELECT "added_column" FROM "{table}"')  # noqa: S608
+        rows = cursor.fetchall()
+    value = rows[0][0]
+    if isinstance(value, memoryview):
+        value = bytes(value)
+    assert value == expected
 
 
 def test_alter_field_nullable_to_not_null_is_migration_no_op(db):

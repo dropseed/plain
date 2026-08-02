@@ -20,7 +20,8 @@ from plain import exceptions, preflight
 from plain.runtime import settings
 from plain.utils.encoding import force_bytes
 
-from .base import ColumnField
+from .base import NOT_PROVIDED, ColumnField
+from .text import TextField
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -176,20 +177,21 @@ class EncryptedFieldMixin:
         return errors
 
 
-class EncryptedTextField[T: (str, str | None) = str](
-    EncryptedFieldMixin, ColumnField[T]
-):
-    """A text field that encrypts its value before storing in the database.
+class EncryptedTextField[T: (str, str | None) = str](EncryptedFieldMixin, TextField[T]):
+    """A TextField that encrypts its value before storing in the database.
 
     Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key
     derived from SECRET_KEY. The database column is always ``text`` regardless
     of max_length, since ciphertext length is unpredictable.
 
     max_length is enforced on the plaintext value (validation), not on the
-    ciphertext stored in the database.
+    ciphertext stored in the database. Only ``default=""`` (with
+    ``required=False``) is accepted — empty strings are stored as plaintext
+    ``''``, so the empty value is the one default expressible as a column
+    DEFAULT; anything else would need ciphertext, which is non-deterministic.
     """
 
-    db_type_sql = "text"
+    only_empty_default = True
 
     def __init__(
         self,
@@ -197,39 +199,19 @@ class EncryptedTextField[T: (str, str | None) = str](
         max_length: int | None = None,
         required: bool = True,
         allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # `default` is intentionally not accepted: Fernet encryption is
-        # non-deterministic, so a literal column DEFAULT cannot be expressed.
-        self.max_length = max_length
+        # Deliberately narrower than TextField: no `choices` — exact lookups
+        # on ciphertext are non-deterministic, so choice-based filtering would
+        # silently match nothing.
         super().__init__(
+            max_length=max_length,
             required=required,
             allow_null=allow_null,
+            default=default,
             validators=validators,
         )
-
-    def to_python(self, value: Any) -> str | None:
-        if isinstance(value, str) or value is None:
-            return value
-        return str(value)
-
-    def validate(self, value: Any, model_instance: Any) -> None:
-        super().validate(value, model_instance)
-        if (
-            self.max_length is not None
-            and value is not None
-            and len(value) > self.max_length
-        ):
-            raise exceptions.ValidationError(
-                f"Ensure this value has at most {self.max_length} characters (it has {len(value)}).",
-                code="max_length",
-            )
-
-    def get_prep_value(self, value: Any) -> Any:
-        value = super().get_prep_value(value)
-        if value is None:
-            return value
-        return self.to_python(value)
 
     def get_db_prep_value(
         self, value: Any, connection: DatabaseConnection, prepared: bool = False
@@ -245,12 +227,6 @@ class EncryptedTextField[T: (str, str | None) = str](
         if value is None:
             return value
         return _decrypt(value)
-
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()
-        if self.max_length is not None:
-            kwargs["max_length"] = self.max_length
-        return name, path, args, kwargs
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         errors = super().preflight(**kwargs)
@@ -277,8 +253,10 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # `default` is intentionally not accepted: Fernet encryption is
-        # non-deterministic, so a literal column DEFAULT cannot be expressed.
+        # `default` is intentionally not accepted: unlike EncryptedTextField,
+        # there is no empty plaintext value — every JSON value (even {})
+        # serializes to text that would need ciphertext, which is
+        # non-deterministic, so no literal column DEFAULT can be expressed.
         if encoder and not callable(encoder):
             raise ValueError("The encoder parameter must be a callable object.")
         if decoder and not callable(decoder):

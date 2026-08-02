@@ -102,8 +102,8 @@ class RedirectLog(postgres.Model):
 
     # Request metadata
     ip_address = types.GenericIPAddressField()
-    user_agent = types.TextField(required=False, max_length=512)
-    referrer = types.TextField(required=False, max_length=512)
+    user_agent = types.TextField(required=False, max_length=512, default="")
+    referrer = types.TextField(required=False, max_length=512, default="")
 
     created_at = types.DateTimeField(create_now=True)
 
@@ -157,8 +157,8 @@ class NotFoundLog(postgres.Model):
 
     # Request metadata
     ip_address = types.GenericIPAddressField()
-    user_agent = types.TextField(required=False, max_length=512)
-    referrer = types.TextField(required=False, max_length=512)
+    user_agent = types.TextField(required=False, max_length=512, default="")
+    referrer = types.TextField(required=False, max_length=512, default="")
 
     created_at = types.DateTimeField(create_now=True)
 

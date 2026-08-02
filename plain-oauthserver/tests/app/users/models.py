@@ -7,7 +7,7 @@ from plain.postgres import types
 @postgres.register_model
 class User(postgres.Model):
     email = types.EmailField()
-    password = types.TextField(max_length=128, required=False)
+    password = types.TextField(max_length=128, required=False, default="")
 
     query: postgres.QuerySet[User] = postgres.QuerySet()
 

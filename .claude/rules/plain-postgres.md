@@ -79,7 +79,7 @@ Run `uv run plain docs postgres` for full patterns with code examples.
 - Indexes: `{table}_{column(s)}_idx`
 - Constraints: `{table}_{column(s)}_{type}` (e.g., `_unique`, `_check`)
 - Choose `on_delete` deliberately: CASCADE for owned children, RESTRICT for referenced data, SET_NULL for optional references
-- No `allow_null` on string fields — use `default=""`
+- No `allow_null` on string fields — use `default=""`. Optional string fields are `required=False, default=""` — the declared default is what lets the column be added to a populated table (`required=False` alone only affects Python-side validation)
 
 Run `uv run plain docs postgres` for full patterns with code examples.
 

@@ -36,7 +36,9 @@ class OAuthConnection(postgres.Model):
 
     # Token data
     access_token = types.EncryptedTextField(max_length=2000)
-    refresh_token = types.EncryptedTextField(max_length=2000, required=False)
+    refresh_token = types.EncryptedTextField(
+        max_length=2000, required=False, default=""
+    )
     access_token_expires_at = types.DateTimeField(required=False, allow_null=True)
     refresh_token_expires_at = types.DateTimeField(required=False, allow_null=True)
 
