@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from plain.postgres import fields
-from plain.postgres.fields.encrypted import EncryptedTextField
+from plain.postgres.fields.encrypted import EncryptedJSONField, EncryptedTextField
 from plain.postgres.fields.json import JSONField
 
 # Postgres short-form type aliases that should NOT appear in db_type() output.
@@ -87,6 +87,9 @@ def test_db_type_uses_canonical_form(field_class: type, expected_sql: str) -> No
         # Always text regardless of max_length — ciphertext outgrows the
         # plaintext limit.
         (EncryptedTextField, "text"),
+        # text, NOT the jsonb it would inherit from JSONField — the column
+        # holds ciphertext.
+        (EncryptedJSONField, "text"),
     ],
     ids=lambda x: x.__name__ if isinstance(x, type) else x,
 )

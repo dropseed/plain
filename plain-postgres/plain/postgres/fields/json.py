@@ -83,6 +83,15 @@ class JSONField(DefaultableField):
             value = value.value
         elif hasattr(value, "as_sql"):
             return value
+        return self.adapt_json_db_value(value)
+
+    def adapt_json_db_value(self, value: Any) -> Any:
+        """Adapt a plain JSON value for this field's column — the one step
+        subclasses with a different column type (EncryptedJSONField) replace.
+
+        May receive None (get_db_prep_save short-circuits it, but other
+        get_db_prep_value callers don't): here it adapts to jsonb null;
+        EncryptedJSONField maps it to SQL NULL."""
         return adapt_json_value(value, self.encoder)
 
     def get_db_prep_save(self, value: Any, connection: DatabaseConnection) -> Any:

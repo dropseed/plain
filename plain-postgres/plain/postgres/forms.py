@@ -723,7 +723,6 @@ def modelfield_to_formfield(
 
     # Avoid a circular import
     from plain import postgres
-    from plain.postgres.fields.encrypted import EncryptedJSONField
 
     # Primary key fields aren't rendered by default
     if isinstance(modelfield, postgres.PrimaryKeyField):
@@ -744,11 +743,6 @@ def modelfield_to_formfield(
             max_digits=modelfield.max_digits,
             decimal_places=modelfield.decimal_places,
             **defaults,
-        )
-
-    if isinstance(modelfield, EncryptedJSONField):
-        return fields.JSONField(
-            encoder=modelfield.encoder, decoder=modelfield.decoder, **defaults
         )
 
     if isinstance(modelfield, postgres.TextField):

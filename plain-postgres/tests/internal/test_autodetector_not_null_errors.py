@@ -105,11 +105,24 @@ def test_backfill_error_placeholder_is_not_executable() -> None:
     assert "types.IntegerField(default=<value>)" in str(exc.value)
 
 
-def test_backfill_error_omits_default_remedy_for_non_defaultable_fields() -> None:
-    """Fields with no default= kwarg (e.g. DateTimeField) get only the
-    allow_null remedy — suggesting a default would be advice that raises."""
+@pytest.mark.parametrize(
+    "field",
+    [
+        # Not a DefaultableField at all.
+        types.DateTimeField(),
+        # A DefaultableField whose __init__ deliberately takes no default=
+        # (accepts_default=False).
+        types.EncryptedJSONField(),
+    ],
+    ids=["datetime", "encrypted-json"],
+)
+def test_backfill_error_omits_default_remedy_for_non_defaultable_fields(
+    field: Any,
+) -> None:
+    """Fields with no default= kwarg get only the allow_null remedy —
+    suggesting a default would be advice that raises."""
     with pytest.raises(MigrationSchemaError) as exc:
-        _added_field_changes(types.DateTimeField())
+        _added_field_changes(field)
     msg = str(exc.value)
     assert "Fix:" in msg
     assert "Declare a default" not in msg

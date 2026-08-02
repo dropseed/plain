@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from app.examples.models.encrypted import SecretStore
 
+from plain.postgres.exceptions import FieldError
 from plain.postgres.fields.encrypted import (
     _ENCRYPTED_PREFIX,
     _decrypt,
@@ -125,7 +126,7 @@ class TestLookupBlocking:
         SecretStore.query.create(name="test", api_key="sk-test", config=None)
         assert SecretStore.query.filter(config__isnull=True).count() == 1
 
-    def test_exact_lookup_allowed(self, db):
+    def test_exact_lookup_allowed(self):
         """Exact is allowed so filter(field=None) works (ORM rewrites to isnull)."""
         field = SecretStore._model_meta.get_field("api_key")
         assert field.get_lookup("exact") is not None
@@ -135,13 +136,22 @@ class TestLookupBlocking:
         SecretStore.query.create(name="test", api_key="sk-test", config=None)
         assert SecretStore.query.filter(config=None).count() == 1
 
-    def test_contains_lookup_blocked(self, db):
+    def test_contains_lookup_blocked(self):
         field = SecretStore._model_meta.get_field("api_key")
         assert field.get_lookup("contains") is None
 
-    def test_transform_blocked(self, db):
+    def test_transform_blocked(self):
         field = SecretStore._model_meta.get_field("api_key")
         assert field.get_transform("lower") is None  # ty: ignore[unresolved-attribute]
+
+    def test_unsupported_lookup_raises_field_error(self):
+        """An unsupported lookup on an encrypted field must fail as a normal
+        FieldError at query-build time — not leak into transform resolution
+        (which once raised a bare TypeError via class-level get_lookups)."""
+        with pytest.raises(FieldError):
+            SecretStore.query.filter(api_key__contains="x")
+        with pytest.raises(FieldError):
+            SecretStore.query.filter(config__has_key="token")
 
 
 class TestKeyRotation:
