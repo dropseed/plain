@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.66.0](https://github.com/dropseed/plain/releases/plain-dev@0.66.0) (2026-08-02)
+
+### What's changed
+
+- **Per-checkout state now lives outside the working tree**, keyed by the checkout's resolved path under `~/.cache/plain/checkouts/<name>-<hash>/`. The database pointer (`plain db use`), the cached Postgres URL, and the dev/services pidfiles all moved there from `.plain/dev/`. A working tree is exactly what gets symlinked, copied, or mounted into containers — state keyed by location was eventually read by the wrong reader, so two checkouts sharing a `.plain/` could silently share a database or block each other's dev server. `.plain/` now holds only rebuildable artifacts: logs, compiled assets, certificates. ([737707b6f7](https://github.com/dropseed/plain/commit/737707b6f7))
+- New `plain.dev.state` module centralizes the definitions of "this checkout" (`checkout_id`), where its facts live (`checkout_state_path`), and `find_project_root` (moved from `postgres.identity`), so the CLI, `setup()`, and the supervisors can't disagree about which checkout they're in. ([737707b6f7](https://github.com/dropseed/plain/commit/737707b6f7))
+
+### Upgrade instructions
+
+- No changes required. Existing `.plain/dev/` pointer and cache files are simply ignored in their old location — if you had repointed a checkout with `plain db use`, run it once more to re-record the pointer in the new location.
+
 ## [0.65.0](https://github.com/dropseed/plain/releases/plain-dev@0.65.0) (2026-07-22)
 
 ### What's changed
