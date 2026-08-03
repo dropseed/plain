@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.21.8](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.8) (2026-08-02)
+
+### What's changed
+
+- Login-link redirects now pass an explicit `status_code=302` to `RedirectResponse`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.7](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.7) (2026-07-15)
 
 ### What's changed
