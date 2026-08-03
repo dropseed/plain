@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.29.6](https://github.com/dropseed/plain/releases/plain-auth@0.29.6) (2026-08-02)
+
+### What's changed
+
+- `LogoutView` and `redirect_to_login()` now pass an explicit `status_code=302` to `RedirectResponse`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.29.5](https://github.com/dropseed/plain/releases/plain-auth@0.29.5) (2026-05-05)
 
 ### What's changed
