@@ -1,5 +1,15 @@
 # plain-oauthserver changelog
 
+## [0.1.3](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.3) (2026-08-02)
+
+### What's changed
+
+- Authorization redirects now pass an explicit `status_code=302` to `RedirectResponse`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.2](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.2) (2026-07-21)
 
 ### What's changed
