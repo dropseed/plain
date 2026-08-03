@@ -1,5 +1,15 @@
 # plain-assets changelog
 
+## [0.4.2](https://github.com/dropseed/plain/releases/plain-assets@0.4.2) (2026-08-02)
+
+### What's changed
+
+- The compiled-asset redirect now passes an explicit `status_code=302`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.4.1](https://github.com/dropseed/plain/releases/plain-assets@0.4.1) (2026-06-26)
 
 ### What's changed
