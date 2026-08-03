@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.12.8](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.8) (2026-08-02)
+
+### What's changed
+
+- The server's npm lockfile now resolves wrangler 4.114.0, picking up sharp 0.35.2 to clear Dependabot-flagged libvips CVEs (GHSA-f88m-g3jw-g9cj). sharp is only part of the local dev/deploy toolchain — the deployed worker never touches it. ([e7fda362d5](https://github.com/dropseed/plain/commit/e7fda362d5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.7](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.7) (2026-06-26)
 
 ### What's changed
