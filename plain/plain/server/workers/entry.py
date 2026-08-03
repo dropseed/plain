@@ -43,6 +43,9 @@ def worker_main(
     log.addHandler(_handler)
 
     worker = None
+    # Captured before anything can fail: after the arbiter dies, getppid()
+    # returns the reparented pid, so a late capture could never detect it.
+    arbiter_pid = os.getppid()
 
     try:
         sock_class_map = {
@@ -91,6 +94,14 @@ def worker_main(
 
             # Load the request handler
             handler = app.load()
+
+            from .worker import Worker
+
+            # Worker construction reads settings (SERVER_CONNECTIONS,
+            # HEALTHCHECK_PATH, ...) — app-code edits can break it too.
+            worker = Worker(
+                age, arbiter_pid, listeners, app, timeout, heartbeat, handler
+            )
         except Exception:
             if not app.reload:
                 raise
@@ -109,6 +120,7 @@ def worker_main(
                     listeners=listeners,
                     app=app,
                     heartbeat=heartbeat,
+                    arbiter_pid=arbiter_pid,
                     traceback_text=boot_failure_traceback,
                 )
             except Exception:
@@ -119,9 +131,7 @@ def worker_main(
                 time.sleep(5)
             sys.exit(0)
 
-        from .worker import Worker
-
-        worker = Worker(age, os.getppid(), listeners, app, timeout, heartbeat, handler)
+        assert worker is not None  # the boot-failure path always exits above
         worker.pid = os.getpid()
 
         log.info("Server worker started (pid: %s)", worker.pid)

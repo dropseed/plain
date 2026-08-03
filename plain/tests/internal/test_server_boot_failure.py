@@ -10,6 +10,7 @@ reports a file change so the process can recycle with fresh code.
 
 from __future__ import annotations
 
+import os
 import signal
 import socket
 import threading
@@ -50,16 +51,27 @@ def test_serves_traceback_then_returns_on_file_change(monkeypatch) -> None:
 
     results: dict = {}
 
-    def client() -> None:
+    def request(raw: bytes) -> bytes:
         # The kernel queues the connection until the loop accepts it,
         # so no startup synchronization is needed.
+        with socket.create_connection(("127.0.0.1", port), timeout=5) as conn:
+            conn.settimeout(5)
+            conn.sendall(raw)
+            return conn.makefile("rb").read()
+
+    def client() -> None:
         try:
-            with socket.create_connection(("127.0.0.1", port), timeout=5) as conn:
-                conn.settimeout(5)
-                conn.sendall(b"GET / HTTP/1.1\r\nHost: test\r\n\r\n")
-                results["response"] = conn.makefile("rb").read()
+            results["text"] = request(b"GET / HTTP/1.1\r\nHost: test\r\n\r\n")
+            results["html"] = request(
+                b"GET / HTTP/1.1\r\nHost: test\r\nAccept: text/html\r\n\r\n"
+            )
+            # text/html anywhere else in the request must not count.
+            results["not_accept"] = request(
+                b"POST / HTTP/1.1\r\nHost: test\r\n"
+                b"Content-Type: text/html\r\nContent-Length: 0\r\n\r\n"
+            )
         finally:
-            # Fire the reloader callback even if the read failed, so a
+            # Fire the reloader callback even if the reads failed, so a
             # broken serve loop fails the assertions instead of hanging
             # the suite on a loop that never returns.
             captured["callback"]("app/broken.py")  # the fix gets saved
@@ -68,14 +80,21 @@ def test_serves_traceback_then_returns_on_file_change(monkeypatch) -> None:
     client_thread.start()
 
     heartbeat = _StubHeartbeat()
-    # serve_boot_failure installs shutdown signal handlers; restore pytest's.
-    handled_signals = (signal.SIGTERM, signal.SIGINT, signal.SIGQUIT)
+    # serve_boot_failure installs signal handlers; restore pytest's.
+    handled_signals = (
+        signal.SIGTERM,
+        signal.SIGINT,
+        signal.SIGQUIT,
+        signal.SIGABRT,
+        signal.SIGUSR1,
+    )
     saved_handlers = {sig: signal.getsignal(sig) for sig in handled_signals}
     try:
         boot_failure.serve_boot_failure(
             listeners=[listener],  # ty: ignore[invalid-argument-type]
             app=_StubApp(),  # ty: ignore[invalid-argument-type]
             heartbeat=heartbeat,  # ty: ignore[invalid-argument-type]
+            arbiter_pid=os.getppid(),
             traceback_text="ImportError: cannot import name 'X'",
         )
     finally:
@@ -84,7 +103,21 @@ def test_serves_traceback_then_returns_on_file_change(monkeypatch) -> None:
         client_thread.join(timeout=5)
         listener.close()
 
-    response = results["response"]
-    assert response.startswith(b"HTTP/1.1 500 ")
-    assert b"ImportError: cannot import name 'X'" in response
+    text = results["text"]
+    assert text.startswith(b"HTTP/1.1 500 ")
+    assert b"Content-Type: text/plain" in text
+    assert b"ImportError: cannot import name 'X'" in text
+
+    # Browsers get an HTML page that refreshes itself, so the tab
+    # recovers on its own once the fix lands and the worker recycles.
+    html = results["html"]
+    assert html.startswith(b"HTTP/1.1 500 ")
+    assert b"Content-Type: text/html" in html
+    assert b'<meta http-equiv="refresh"' in html
+    assert b"ImportError: cannot import name &#x27;X&#x27;" in html
+
+    # Only the Accept header selects HTML — a text/html Content-Type
+    # elsewhere in the request still gets the plain-text variant.
+    assert b"Content-Type: text/plain" in results["not_accept"]
+
     assert heartbeat.notifies >= 1
