@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.85.1](https://github.com/dropseed/plain/releases/plain-admin@0.85.1) (2026-08-02)
+
+### What's changed
+
+- Internal `RedirectResponse` calls now pass an explicit `status_code=302`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+- Shipped admin stylesheets were reformatted by the oxc 1.75.0 upgrade (oxfmt now formats CSS) — no visual changes. ([1415312278](https://github.com/dropseed/plain/commit/1415312278))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.85.0](https://github.com/dropseed/plain/releases/plain-admin@0.85.0) (2026-07-21)
 
 ### What's changed
