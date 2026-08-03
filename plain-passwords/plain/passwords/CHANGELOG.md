@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.26.6](https://github.com/dropseed/plain/releases/plain-passwords@0.26.6) (2026-08-02)
+
+### What's changed
+
+- Login and reset redirects now pass an explicit `status_code=302` to `RedirectResponse`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.26.5](https://github.com/dropseed/plain/releases/plain-passwords@0.26.5) (2026-07-21)
 
 ### What's changed
