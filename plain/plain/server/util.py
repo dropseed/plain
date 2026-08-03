@@ -15,7 +15,6 @@ import re
 import socket
 import time
 import urllib.parse
-from typing import Any
 
 # Server and Date aren't technically hop-by-hop
 # headers, but they are in the purview of the
@@ -122,19 +121,6 @@ def to_bytestring(value: str | bytes, encoding: str = "utf8") -> bytes:
         raise TypeError(f"{value!r} is not a string")
 
     return value.encode(encoding)
-
-
-def make_fail_handler(msg: str | bytes) -> Any:
-    """Create a handler that returns a 500 error for all requests."""
-    msg = to_bytestring(msg)
-
-    class FailHandler:
-        async def handle(self, request: Any, executor: Any) -> Any:
-            from plain.http import Response
-
-            return Response(msg, status_code=500, content_type="text/plain")
-
-    return FailHandler()
 
 
 def split_request_uri(uri: str) -> urllib.parse.SplitResult:

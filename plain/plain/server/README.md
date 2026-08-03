@@ -28,6 +28,8 @@ For local development, you can enable auto-reload to restart workers when code c
 plain server --reload
 ```
 
+In reload mode, a worker that fails to boot (an import error mid-edit, for example) doesn't shut the server down. It serves the traceback as a 500 response until the code changes again, then restarts with the new code. Without `--reload`, a boot failure stops the server immediately.
+
 ## Workers and threads
 
 The server uses two levels of concurrency:
