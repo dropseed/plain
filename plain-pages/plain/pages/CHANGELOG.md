@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.19.7](https://github.com/dropseed/plain/releases/plain-pages@0.19.7) (2026-08-02)
+
+### What's changed
+
+- The README now documents the `status_code` frontmatter option for `.redirect` pages (defaults to 302), replacing the stale docs for the old `temporary` option. Docs only — the code already worked this way. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.19.6](https://github.com/dropseed/plain/releases/plain-pages@0.19.6) (2026-05-12)
 
 ### What's changed
