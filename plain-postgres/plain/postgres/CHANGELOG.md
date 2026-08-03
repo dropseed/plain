@@ -1,6 +1,24 @@
 # plain-postgres changelog
 
-## [0.112.0](https://github.com/dropseed/plain/releases/plain-postgres@0.112.0) (2026-07-21)
+## [0.113.0](https://github.com/dropseed/plain/releases/plain-postgres@0.113.0) (2026-08-02)
+
+### What's changed
+
+- **`QuerySet.extra()` has been removed**, along with all of its supporting machinery (`extra_select`, `extra_tables`, `extra_order_by`, `ExtraWhere`). Use `annotate()` with `RawSQL` or other expressions instead. ([3fed0b32f1](https://github.com/dropseed/plain/commit/3fed0b32f1))
+- **`FilteredRelation` has been removed** — it's no longer importable from `plain.postgres` or usable in `annotate()`. Express conditional joins with `Q` filters or subqueries instead. ([434f57852f](https://github.com/dropseed/plain/commit/434f57852f))
+- **`QuerySet.alias()` and logical XOR have been removed** — `Q(...) ^ Q(...)` and `queryset ^ queryset` are no longer supported. Use `annotate()` in place of `alias()`, and compose AND/OR/NOT in place of XOR. ([c12cf81af4](https://github.com/dropseed/plain/commit/c12cf81af4))
+- **Encrypted and binary fields now accept their empty value as a declared `default=`.** `EncryptedTextField` (now a `TextField` subclass) accepts exactly `default=""` and `BinaryField` accepts exactly `default=b""`, each paired with `required=False` — the empty value is stored as plaintext so it's the one default expressible as a column `DEFAULT`, which is what lets the field be added to a populated table. `default=None` requires `allow_null=True` + `required=False`. The `types.pyi` stub overloads encode the same coupling. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+- **The migration autodetector no longer waves through `required=False` fields with no declared default.** Adding a non-nullable field without a `default=` now refuses at `plain migrations create` time with a field-accurate remedy (previously these could generate an `AddField` that failed at apply time on any populated table). The optional-string idiom is `required=False, default=""`. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+- **`EncryptedJSONField` is now a `JSONField` subclass** and `EncryptedTextField` a `TextField` subclass, instead of parallel `ColumnField` implementations — behavior like max_length validation and JSON encoding now comes from the real base classes. The encrypted lookup surface is still just `exact`/`isnull`, and JSON key transforms are blocked (they'd operate on ciphertext). `EncryptedJSONField` accepts no `default=` at all — even `{}` would need ciphertext; use `allow_null=True`. ([5153ceb106](https://github.com/dropseed/plain/commit/5153ceb106), [2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+- Model forms no longer prefill a `BinaryField`'s `b""` default as a text input's initial value (it rendered as the literal `b''`), and encrypted fields now map to form fields through the regular `TextField`/`JSONField` branches. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+- M2M prefetches now expose the through-table join column via `annotate(RawSQL(...))` instead of the removed `extra()`, and internal path-info plumbing lost its `filtered_relation` threading. ([3fed0b32f1](https://github.com/dropseed/plain/commit/3fed0b32f1), [434f57852f](https://github.com/dropseed/plain/commit/434f57852f))
+
+### Upgrade instructions
+
+- Replace `QuerySet.extra()` calls: `extra(select=...)` becomes `annotate(name=RawSQL("...", []))`, `extra(where=...)` becomes `filter()` with expressions or `RawSQL`, and `extra(order_by=...)` becomes `order_by()` on an annotation.
+- Replace `FilteredRelation` annotations with filtered subqueries or `Q` conditions, and `QuerySet.alias()` with `annotate()`.
+- Replace `Q(a) ^ Q(b)` / `qs1 ^ qs2` with explicit AND/OR logic: `(Q(a) | Q(b)) & ~(Q(a) & Q(b))`.
+- If `plain migrations create` now refuses a field it previously accepted, follow the error's remedy: declare `required=False, default=""` (or `default=b""` / an appropriate literal) so existing rows get a value, or add it with `allow_null=True` plus a backfill data migration.(https://github.com/dropseed/plain/releases/plain-postgres@0.112.0) (2026-07-21)
 
 ### What's changed
 
