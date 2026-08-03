@@ -1052,7 +1052,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-flags"
-version = "0.37.0"
+version = "0.37.1"
 source = { editable = "plain-flags" }
 dependencies = [
     { name = "plain" },
