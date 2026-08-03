@@ -1,5 +1,17 @@
 # plain-code changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-code@0.23.0) (2026-08-02)
+
+### What's changed
+
+- **Oxc 1.75.0 is now the minimum supported version**, enforced before install and before every invocation. A `pyproject.toml` pinned below the minimum is rejected with a clear error (`run \`plain code update\``) instead of installing successfully and then dying with an unhandled error on the first lint. ([92792ca396](https://github.com/dropseed/plain/commit/92792ca396), [3796cf6854](https://github.com/dropseed/plain/commit/3796cf6854))
+- Ignore patterns are now passed on the command line instead of via shipped config files (`oxlint_defaults.json` / `oxfmt_defaults.json`, both removed — config-file `ignorePatterns` only match files under the config's own directory, which never matched the project's). The list is also trimmed to committed third-party code (`**/vendor/**`, `**/*.min.*`) — `node_modules`, `.venv`, `htmlcov`, and `.pytest_cache` are already gitignored and both tools honor `.gitignore` on their own. ([3796cf6854](https://github.com/dropseed/plain/commit/3796cf6854), [f9a6fe43f9](https://github.com/dropseed/plain/commit/f9a6fe43f9))
+- oxfmt's "No config found, using defaults" nudge is suppressed — no config file is passed on purpose, and projects can still add their own `.oxfmtrc.json`. ([b40819d36f](https://github.com/dropseed/plain/commit/b40819d36f))
+
+### Upgrade instructions
+
+- If your project pins an Oxc version below 1.75.0 in `pyproject.toml`, run `uv run plain code update` to move to the latest version.
+
 ## [0.22.0](https://github.com/dropseed/plain/releases/plain-code@0.22.0) (2026-07-22)
 
 ### What's changed
