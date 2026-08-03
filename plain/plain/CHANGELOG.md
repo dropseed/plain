@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.155.0](https://github.com/dropseed/plain/releases/plain@0.155.0) (2026-08-02)
+
+### What's changed
+
+- `RedirectResponse` now requires an explicit `status_code` keyword argument — the implicit `302` default is gone, and the value must be a 3xx status (a `ValueError` is raised otherwise). The http README documents when to pick `301`, `302`, `303`, `307`, or `308`. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+- New `plain.utils.version` module with `parse_version()` and `compare_versions()` — the lenient version parser that previously lived inside `plain.cli.changelog` is now a shared utility (also used by `plain.code` to enforce tool minimum versions). ([92792ca396](https://github.com/dropseed/plain/commit/92792ca396))
+- The agents README now shows what a package rule body should look like (one-line reminders ending in a docs pointer) and advises keeping each piece of guidance in exactly one scoped rule. ([5db071a6e9](https://github.com/dropseed/plain/commit/5db071a6e9))
+
+### Upgrade instructions
+
+- Add an explicit `status_code` to every `RedirectResponse(...)` call. Use `status_code=302` to keep the previous default behavior, or pick a more specific redirect status: `301` (moved permanently), `303` (see other), `307` (temporary, preserves method), `308` (permanent, preserves method).
+
 ## [0.154.0](https://github.com/dropseed/plain/releases/plain@0.154.0) (2026-07-22)
 
 ### What's changed
