@@ -1,5 +1,25 @@
 # plain-mcp changelog
 
+## [0.4.0](https://github.com/dropseed/plain/releases/plain-mcp@0.4.0) (2026-08-02)
+
+### What's changed
+
+- **The server now speaks MCP `2026-07-28`, the stateless revision — and only that version.** There is no `initialize` handshake, no sessions, and no server-to-client stream; every POST is one self-describing JSON-RPC request. `rpc_initialize` and `rpc_ping` are gone — a client that opens with `initialize` (or any pre-`2026-07-28` method) gets a `-32601` at HTTP 404 naming the version this server speaks. ([4c36e05626](https://github.com/dropseed/plain/commit/4c36e05626))
+- Each request restates the client's identity in `params._meta` — `io.modelcontextprotocol/protocolVersion` and `clientCapabilities` are required, `clientInfo` optional — and mirrors the routing-relevant parts into headers (`MCP-Protocol-Version`, `Mcp-Method`, and `Mcp-Name` on target-naming methods), which the server validates against the body. Failures answer with the new spec error codes: `-32602` for missing `_meta`, `-32020` for a header mismatch, `-32022` for an unsupported protocol version. What the client sent is available as `self.client_info` / `self.client_capabilities`. ([4c36e05626](https://github.com/dropseed/plain/commit/4c36e05626))
+- JSON-RPC errors now ride spec-mandated HTTP statuses via one `ERROR_CODE_HTTP_STATUS` table — unknown method is 404, protocol/validation errors are 400, and an internal error (`-32603`) stays at 200. The private `-32001`/`-32003`/`-32004` auth codes are gone: for framework exceptions the HTTP status leads and the JSON-RPC code follows from it (401 with `WWW-Authenticate` is the real auth signal). ([4c36e05626](https://github.com/dropseed/plain/commit/4c36e05626))
+- **New `server/discover` built-in** replaces `initialize` for discovery — it reports `supportedVersions`, capabilities, and the new `MCPView.instructions` attribute (free-form guidance for the model driving the server). Capability values are now bare `{}` (no more `listChanged`/`subscribe` flags). ([4c36e05626](https://github.com/dropseed/plain/commit/4c36e05626))
+- **Results are stamped automatically**, including from your own `rpc_` methods: `resultType: "complete"`, `_meta` with `io.modelcontextprotocol/serverInfo`, and `ttlMs: 0` / `cacheScope: "private"` on list and read results. Handler-set values win. Two extensible class attributes control the stamping and header checks for custom methods: `cacheable_result_methods` and `name_header_params`. An `rpc_` handler must now return a dict — anything else raises a clear `TypeError` instead of an opaque internal error. ([4c36e05626](https://github.com/dropseed/plain/commit/4c36e05626))
+- **New `MCPTool.required_client_capabilities`** — a tool that calls back to the client (sampling, elicitation) declares what it needs, and a client that didn't announce it gets a `-32021` naming exactly what's missing instead of a confusing tool failure. ([4c36e05626](https://github.com/dropseed/plain/commit/4c36e05626))
+- `MCPInvalidParams` now accepts a structured `data=` payload (e.g. `raise MCPInvalidParams(f"Unknown resource: {uri}", data={"uri": uri})`), and unknown-resource errors echo the URI in `data.uri`. ([4c36e05626](https://github.com/dropseed/plain/commit/4c36e05626))
+- The README documents the full request/validation flow and adds a spec-coverage table, backed by a machine-checked conformance baseline that fails the build if reality drifts from the table. ([4c36e05626](https://github.com/dropseed/plain/commit/4c36e05626))
+
+### Upgrade instructions
+
+- Clients must speak MCP `2026-07-28` — recent MCP client libraries handle the new `_meta`/header envelope for you. Older clients that open with `initialize` can no longer connect.
+- If you overrode `rpc_initialize` or `rpc_ping`, remove those overrides — discovery customization now goes through `rpc_server_discover`, `get_capabilities()`, and the `instructions` attribute.
+- If you referenced the removed error constants (`UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`), switch to reading the HTTP status instead — non-400/500 statuses now use the status itself as the JSON-RPC code.
+- Custom `rpc_` methods must return a dict; their results are now stamped with `resultType`/`serverInfo` automatically, and list-shaped methods should be added to `cacheable_result_methods` (and target-naming ones to `name_header_params`).
+
 ## [0.3.1](https://github.com/dropseed/plain/releases/plain-mcp@0.3.1) (2026-07-21)
 
 ### What's changed
