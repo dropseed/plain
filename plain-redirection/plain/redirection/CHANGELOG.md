@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.36.1](https://github.com/dropseed/plain/releases/plain-redirection@0.36.1) (2026-08-02)
+
+### What's changed
+
+- `RedirectLog` and `NotFoundLog`'s `user_agent` and `referrer` fields now declare `default=""` explicitly, matching the plain-postgres 0.113.0 optional-string idiom (`required=False, default=""`). The column `DEFAULT`s are applied by convergence on the next `plain postgres sync` — no migration needed. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.36.0](https://github.com/dropseed/plain/releases/plain-redirection@0.36.0) (2026-06-22)
 
 ### What's changed
