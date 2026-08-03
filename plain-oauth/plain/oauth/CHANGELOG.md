@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.50.2](https://github.com/dropseed/plain/releases/plain-oauth@0.50.2) (2026-08-02)
+
+### What's changed
+
+- `OAuthConnection.refresh_token` now declares `default=""` explicitly — plain-postgres 0.113.0 lets `EncryptedTextField` accept exactly the empty string as a default (stored as plaintext `''`). The column `DEFAULT` is applied by convergence on the next `plain postgres sync` — no migration needed. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+- Login and provider redirects now pass an explicit `status_code=302` to `RedirectResponse`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.50.1](https://github.com/dropseed/plain/releases/plain-oauth@0.50.1) (2026-07-15)
 
 ### What's changed
