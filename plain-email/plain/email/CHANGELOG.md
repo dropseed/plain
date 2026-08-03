@@ -1,5 +1,15 @@
 # plain-email changelog
 
+## [0.20.1](https://github.com/dropseed/plain/releases/plain-email@0.20.1) (2026-08-02)
+
+### What's changed
+
+- Internal type-checker annotations for the ty 0.0.63 upgrade (new MRO-based method-override diagnostics on the `SafeMIME*` classes). No behavior changes. ([9e75740b5f](https://github.com/dropseed/plain/commit/9e75740b5f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-email@0.20.0) (2026-05-19)
 
 ### What's changed
