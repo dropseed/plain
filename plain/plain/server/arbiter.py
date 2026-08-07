@@ -21,7 +21,7 @@ from plain.logs import get_framework_logger
 from plain.runtime import settings
 
 from . import sock
-from .errors import APP_LOAD_ERROR, WORKER_BOOT_ERROR, HaltServer
+from .errors import WORKER_BOOT_ERROR, HaltServer
 from .workers.entry import worker_main
 from .workers.worker import check_worker_config
 from .workers.workertmp import WorkerHeartbeat
@@ -222,8 +222,6 @@ class Arbiter:
                 self._halt_error = HaltServer(
                     "Worker failed to boot.", WORKER_BOOT_ERROR
                 )
-            elif exitcode == APP_LOAD_ERROR and self._halt_error is None:
-                self._halt_error = HaltServer("App failed to load.", APP_LOAD_ERROR)
             elif exitcode < 0:
                 # Negative exit codes mean the worker was killed by a signal
                 try:

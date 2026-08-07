@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.156.0](https://github.com/dropseed/plain/releases/plain@0.156.0) (2026-08-03)
+
+### What's changed
+
+- In reload mode (`plain server --reload`), a worker that fails to boot no longer takes the server down with it. Any failure across the boot sequence — `plain.runtime.setup()`, access log configuration, loading the request handler, or constructing the worker — is now caught, and the process stays alive serving that traceback as a `500` on the same listener sockets. It recycles for a fresh boot attempt when the reloader sees a file change, after 60 seconds, or if the arbiter goes away. Previously only a `SyntaxError` raised while loading the handler was tolerated; everything else exited with a boot-error code that halted the arbiter and the whole dev stack. Without `--reload`, a boot failure still stops the server immediately. ([79bbcbd428](https://github.com/dropseed/plain/commit/79bbcbd428))
+- The boot failure response is now content-negotiated. Browsers (any request whose `Accept` header includes `text/html`) get an HTML page with a two-second meta refresh, so the tab reloads itself into the working app once the fix lands; curl and other non-browser clients still get the plain-text traceback. ([42b86cf78d](https://github.com/dropseed/plain/commit/42b86cf78d))
+- Removed `AppImportError` and the `APP_LOAD_ERROR` exit code from `plain.server.errors`, and `make_fail_handler()` from `plain.server.util` — all superseded by the new boot failure server. ([79bbcbd428](https://github.com/dropseed/plain/commit/79bbcbd428))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.155.0](https://github.com/dropseed/plain/releases/plain@0.155.0) (2026-08-02)
 
 ### What's changed
