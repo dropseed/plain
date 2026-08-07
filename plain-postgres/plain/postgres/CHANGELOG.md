@@ -1,5 +1,15 @@
 # plain-postgres changelog
 
+## [0.113.1](https://github.com/dropseed/plain/releases/plain-postgres@0.113.1) (2026-08-07)
+
+### What's changed
+
+- Internal: `Meta` field sorting tolerates a field whose `name` hasn't been set yet, keeping the sort key type-correct under ty 0.0.65. No behavior change. ([a798c13c92](https://github.com/dropseed/plain/commit/a798c13c92))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.113.0](https://github.com/dropseed/plain/releases/plain-postgres@0.113.0) (2026-08-02)
 
 ### What's changed
@@ -18,7 +28,9 @@
 - Replace `QuerySet.extra()` calls: `extra(select=...)` becomes `annotate(name=RawSQL("...", []))`, `extra(where=...)` becomes `filter()` with expressions or `RawSQL`, and `extra(order_by=...)` becomes `order_by()` on an annotation.
 - Replace `FilteredRelation` annotations with filtered subqueries or `Q` conditions, and `QuerySet.alias()` with `annotate()`.
 - Replace `Q(a) ^ Q(b)` / `qs1 ^ qs2` with explicit AND/OR logic: `(Q(a) | Q(b)) & ~(Q(a) & Q(b))`.
-- If `plain migrations create` now refuses a field it previously accepted, follow the error's remedy: declare `required=False, default=""` (or `default=b""` / an appropriate literal) so existing rows get a value, or add it with `allow_null=True` plus a backfill data migration.(https://github.com/dropseed/plain/releases/plain-postgres@0.112.0) (2026-07-21)
+- If `plain migrations create` now refuses a field it previously accepted, follow the error's remedy: declare `required=False, default=""` (or `default=b""` / an appropriate literal) so existing rows get a value, or add it with `allow_null=True` plus a backfill data migration.
+
+## [0.112.0](https://github.com/dropseed/plain/releases/plain-postgres@0.112.0) (2026-07-21)
 
 ### What's changed
 
