@@ -41,6 +41,7 @@ __all__ = [
     "JobResult",
     "JobResultStatuses",
     "WorkerHeartbeat",
+    "ScheduleState",
 ]
 
 logger = get_framework_logger()
@@ -621,6 +622,12 @@ class JobResult(postgres.Model):
                 name="plainjobs_jobresult_created_at_idx", fields=["created_at"]
             ),
             postgres.Index(name="plainjobs_jobresult_status_idx", fields=["status"]),
+            # Used by the scheduler's completed-slot dedupe, and matches the
+            # equivalent index on JobRequest/JobProcess.
+            postgres.Index(
+                name="job_result_concurrency_key",
+                fields=["job_class", "concurrency_key"],
+            ),
         ],
         constraints=[
             postgres.UniqueConstraint(
@@ -724,6 +731,47 @@ class WorkerHeartbeat(postgres.Model):
 
     def __str__(self) -> str:
         return f"WorkerHeartbeat({self.worker_id} on {self.hostname}:{self.pid})"
+
+
+@postgres.register_model
+class ScheduleState(postgres.Model):
+    """
+    The scheduler's ledger: one row per JOBS_SCHEDULE entry, recording the
+    last slot handled for it. A slot is handled when its job is enqueued —
+    or when it's settled without firing: seen for the first time at deploy,
+    skipped by should_enqueue() or the completed-run dedupe, or older than
+    the catch-up window.
+
+    Workers evaluate schedules at tick time — nothing is enqueued ahead of
+    its start time — so removing an entry (or its job class) from
+    JOBS_SCHEDULE just stops it from being evaluated. A row whose entry no
+    longer exists is inert bookkeeping, not pending work.
+
+    Advancing `last_enqueued_slot` uses an optimistic
+    `UPDATE ... WHERE last_enqueued_slot = <old>` so an entry fires at most
+    once per slot across any number of workers.
+    """
+
+    # No max_length: the key embeds the schedule and, for ScheduledCommand,
+    # the full shell command — a length limit here would make one long entry
+    # fail validation on every scheduling pass.
+    schedule_key = types.TextField()
+    last_enqueued_slot = types.DateTimeField()
+    created_at = types.DateTimeField(create_now=True)
+
+    model_options = postgres.Options(
+        ordering=["schedule_key"],
+        constraints=[
+            # The unique constraint provides the schedule_key lookup index.
+            postgres.UniqueConstraint(
+                fields=["schedule_key"],
+                name="plainjobs_schedulestate_unique_schedule_key",
+            ),
+        ],
+    )
+
+    def __str__(self) -> str:
+        return f"ScheduleState({self.schedule_key} @ {self.last_enqueued_slot})"
 
 
 def heartbeat_cutoff() -> datetime.datetime:

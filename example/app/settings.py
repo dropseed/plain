@@ -32,6 +32,10 @@ INSTALLED_PACKAGES = [
     "app.tasks",
 ]
 
+JOBS_SCHEDULE = [
+    ("app.jobs.ExampleJob", "*/5 * * * *"),
+]
+
 
 DEFAULT_RESPONSE_HEADERS = {
     # Strict CSP policy for testing CSP nonce support

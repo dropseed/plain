@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any
 
 from plain import postgres
 from plain.admin.cards import Card, TrendCard
 from plain.admin.views import (
+    AdminListView,
     AdminModelDetailView,
     AdminModelListView,
     AdminViewset,
+    register_view,
     register_viewset,
 )
 from plain.http import RedirectResponse
@@ -19,8 +22,14 @@ from .models import (
     JobRequest,
     JobResult,
     JobResultQuerySet,
+    ScheduleState,
     WorkerHeartbeat,
     heartbeat_cutoff,
+)
+from .scheduling import (
+    load_schedule_entry,
+    schedule_entry_display,
+    schedule_entry_key,
 )
 
 
@@ -167,6 +176,53 @@ class StaleWorkersCard(Card):
 
     def get_link(self) -> str:
         return WorkerHeartbeatViewset.ListView.get_view_url() + "?display=Stale"
+
+
+@register_view
+class ScheduleView(AdminListView):
+    nav_section = "Jobs"
+    nav_icon = "calendar-week"
+    title = "Schedule"
+    description = "JOBS_SCHEDULE entries with their next slot and the last one handled."
+    path = "jobschedule/"
+    fields = ["job", "schedule", "queue", "next_slot", "last_enqueued_slot"]
+
+    def get_initial_objects(self) -> list[dict[str, Any]]:
+        ledger = dict(
+            ScheduleState.query.values_list("schedule_key", "last_enqueued_slot")
+        )
+
+        rows = []
+        for entry in settings.JOBS_SCHEDULE:
+            try:
+                job, schedule = load_schedule_entry(entry)
+                rows.append(
+                    {
+                        "job": schedule_entry_display(job),
+                        "schedule": str(schedule),
+                        "queue": job.default_queue(),
+                        # next() raises for a schedule that can never match
+                        "next_slot": schedule.next(),
+                        "last_enqueued_slot": ledger.get(
+                            schedule_entry_key(job, schedule)
+                        ),
+                    }
+                )
+            except Exception as e:
+                # Render the broken entry instead of failing the whole page —
+                # this is exactly the state an operator is here to diagnose.
+                # repr(entry) is safe for any malformed shape.
+                rows.append(
+                    {
+                        "job": f"{entry!r} ({type(e).__name__})",
+                        "schedule": "",
+                        "queue": "",
+                        "next_slot": None,
+                        "last_enqueued_slot": None,
+                    }
+                )
+
+        return rows
 
 
 @register_viewset
