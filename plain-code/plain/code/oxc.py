@@ -215,20 +215,21 @@ class OxcTool:
             # oxfmt has no --ignore-pattern; it excludes via `!`-prefixed paths.
             ignore_args = [f"!{pattern}" for pattern in IGNORE_PATTERNS]
         result = subprocess.run(
-            [self.binary_path(version), *args, *ignore_args],
+            [
+                self.binary_path(version),
+                *args,
+                # Both tools exit non-zero when the paths match no files, which
+                # is the normal state for a project with no JS/TS in it.
+                "--no-error-on-unmatched-pattern",
+                *ignore_args,
+            ],
             cwd=cwd,
             capture_output=True,
             text=True,
         )
         if result.stdout:
             print(result.stdout, end="")
-        # oxfmt errors when no matching files are found — treat as success
-        if (
-            result.returncode != 0
-            and "Expected at least one target file" in result.stderr
-        ):
-            result.returncode = 0
-        elif result.stderr:
+        if result.stderr:
             # We deliberately don't pass a config file, so drop oxfmt's nudge to
             # add one — projects can still add their own `.oxfmtrc.json`.
             stderr = "".join(
