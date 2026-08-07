@@ -22,6 +22,7 @@ from plain.postgres.dialect import (
 )
 from plain.postgres.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.postgres.expressions import (
+    BaseExpression,
     F,
     OrderBy,
     Ref,
@@ -49,7 +50,6 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
-    from plain.postgres.expressions import BaseExpression
     from plain.postgres.sql.query import AggregateQuery, InsertQuery
 
 # Type aliases for SQL compilation results

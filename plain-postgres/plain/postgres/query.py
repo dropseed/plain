@@ -1262,7 +1262,7 @@ class QuerySet[T: "Model"]:
 
         return clone
 
-    def order_by(self, *field_names: str) -> Self:
+    def order_by(self, *field_names: str | ResolvableExpression) -> Self:
         """Return a new QuerySet instance with the ordering changed."""
         if self.sql_query.is_sliced:
             raise TypeError("Cannot reorder a query once a slice has been taken.")

@@ -2035,7 +2035,7 @@ class Query(BaseExpression):
                     )
                 )
 
-    def add_ordering(self, *ordering: str | BaseExpression) -> None:
+    def add_ordering(self, *ordering: str | ResolvableExpression) -> None:
         """
         Add items from the 'ordering' sequence to the query's "order by"
         clause. These items are either field names (not column names) --
