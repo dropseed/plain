@@ -2472,6 +2472,9 @@ class JoinPromoter:
 class DeleteQuery(Query):
     """A DELETE SQL query."""
 
+    # Concrete fields to emit in a RETURNING clause, or None for a plain DELETE.
+    returning_fields: list[Field] | None = None
+
     def get_compiler(self, *, elide_empty: bool = True) -> SQLDeleteCompiler:
         from plain.postgres.sql.compiler import SQLDeleteCompiler
 
@@ -2482,11 +2485,9 @@ class DeleteQuery(Query):
 
         self.alias_map = {table: self.alias_map[table]}
         self.where = where
-        cursor = self.get_compiler().execute_sql(CURSOR)
-        if cursor:
-            with cursor:
-                return cursor.rowcount
-        return 0
+        # The compiler returns the deleted row count directly (this query never
+        # carries returning_fields).
+        return self.get_compiler().execute_sql(CURSOR)
 
     def delete_batch(self, id_list: list[Any]) -> int:
         """
@@ -2514,6 +2515,9 @@ class DeleteQuery(Query):
 
 class UpdateQuery(Query):
     """An UPDATE SQL query."""
+
+    # Concrete fields to emit in a RETURNING clause, or None for a plain UPDATE.
+    returning_fields: list[Field] | None = None
 
     def get_compiler(self, *, elide_empty: bool = True) -> SQLUpdateCompiler:
         from plain.postgres.sql.compiler import SQLUpdateCompiler

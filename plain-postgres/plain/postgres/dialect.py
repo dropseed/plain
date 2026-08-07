@@ -380,15 +380,15 @@ def lookup_cast(lookup_type: str, field: Field | None = None) -> str:
     return lookup
 
 
-def return_insert_columns(fields: list[Field]) -> tuple[str, tuple[Any, ...]]:
-    """Return the RETURNING clause SQL and params to append to an INSERT query."""
+def returning_columns(fields: list[Field]) -> str:
+    """Return the RETURNING clause SQL for the given fields, or "" when empty."""
     if not fields:
-        return "", ()
+        return ""
     columns = [
         f"{quote_name(field.model.model_options.db_table)}.{quote_name(field.column)}"
         for field in fields
     ]
-    return "RETURNING {}".format(", ".join(columns)), ()
+    return "RETURNING {}".format(", ".join(columns))
 
 
 def bulk_insert_sql(fields: list[Field], placeholder_rows: list[list[str]]) -> str:
