@@ -77,7 +77,7 @@ for i in $(seq 1 40); do
     sleep 0.25
 done
 
-bold "Running MCP conformance suite"
+bold "Running MCP conformance suite (2026-07-28)"
 
 set +e
 npx --yes "${CONFORMANCE_PACKAGE}" server \
@@ -88,4 +88,24 @@ npx --yes "${CONFORMANCE_PACKAGE}" server \
 STATUS=$?
 set -e
 
-exit "${STATUS}"
+# Second pass at a classic revision, grading the compatibility branch
+# (`MCPView.handle_classic_message`) against the handshake-era protocol it
+# serves. 2025-11-25 is the newest classic version the branch offers, and
+# date filtering is cumulative, so this covers the older revisions'
+# scenarios too. Its own baseline lists the optional features plain-mcp
+# doesn't implement on either path.
+bold "Running MCP conformance suite (classic, 2025-11-25)"
+
+set +e
+npx --yes "${CONFORMANCE_PACKAGE}" server \
+    --url "${URL}" \
+    --suite all \
+    --spec-version 2025-11-25 \
+    --expected-failures "${HERE}/expected-failures-classic.yml"
+CLASSIC_STATUS=$?
+set -e
+
+if [ "${STATUS}" -ne 0 ] || [ "${CLASSIC_STATUS}" -ne 0 ]; then
+    exit 1
+fi
+exit 0

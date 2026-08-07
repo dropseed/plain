@@ -13,9 +13,10 @@
 # nothing needs to be running first.
 #
 # NOTE: Inspector v0.22.0 is a legacy-era client — it opens with an
-# `initialize` handshake, which MCP 2026-07-28 removed, so it can't currently
-# connect. This script is otherwise ready; it needs a 2026-07-28-aware
-# Inspector release.
+# `initialize` handshake, which MCP 2026-07-28 removed. It connects through
+# plain-mcp's classic compatibility branch, so what it exercises is that
+# branch (which is also what real legacy clients like claude.ai's connector
+# proxy hit), not the modern `_meta`/header envelope.
 #
 # Usage:
 #   ./scripts/inspect-mcp                                          # UI mode (opens the Inspector web UI)

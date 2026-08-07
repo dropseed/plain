@@ -40,10 +40,16 @@ from .tools import MCPTool
 
 tracer = trace.get_tracer("plain.mcp")
 
-# This server speaks one revision. 2026-07-28 is stateless — no sessions, no
-# `initialize` handshake, no server-to-client stream — so there is nothing to
-# negotiate down to and no legacy branch to keep alive.
+# The revision this server speaks natively. 2026-07-28 is stateless — no
+# sessions, no `initialize` handshake, no server-to-client stream.
 PROTOCOL_VERSION = "2026-07-28"
+
+# Earlier revisions, still served for clients that open with `initialize` —
+# claude.ai's connector proxy among them, as of mid-2026. They reach the same
+# handlers through a compatibility branch in `post()`; see
+# `handle_classic_message`. Newest first: that's the counter-offer to a client
+# whose requested version isn't listed, per the classic negotiation rule.
+CLASSIC_PROTOCOL_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26")
 
 # Keys inside `params._meta`. protocolVersion and clientCapabilities are
 # required on every request (they replace what the handshake used to
@@ -254,17 +260,25 @@ class MCPView(View):
     def post(self) -> Response:
         """One POST carries exactly one JSON-RPC request or notification.
 
-        Whether the method exists is settled first — a method nobody
-        implements can't be judged by an envelope, and the ones earlier
-        revisions had (`initialize`, `ping`, `logging/setLevel`) arrive with no
-        modern envelope at all. Then comes the validation ladder, in order: the
-        request must say what it is (`_meta`), then agree with itself
-        (headers), then speak a version we have. A client that contradicts
-        itself is told that before it's told its version is unsupported —
-        the two answers call for different fixes.
+        Which revision family the request belongs to is settled right after
+        it's read: a 2026-07-28 request declares its protocol version in the
+        `MCP-Protocol-Version` header and inside `params._meta`, and a request
+        declaring it in neither place is from the classic, handshake-era
+        protocol and takes the compatibility branch instead
+        (`handle_classic_message`).
+
+        On the modern path, whether the method exists is settled first — a
+        method nobody implements can't be judged by an envelope. Then comes
+        the validation ladder, in order: the request must say what it is
+        (`_meta`), then agree with itself (headers), then speak a version we
+        have. A client that contradicts itself is told that before it's told
+        its version is unsupported — the two answers call for different
+        fixes.
 
         There is no GET stream and no session — GET and DELETE fall through
-        to the base view's 405.
+        to the base view's 405. That answer is legal in every revision served
+        here: the classic Streamable HTTP transport lets a server decline the
+        GET stream with a 405 and issue no session id.
         """
         msg_id: Any = None
         try:
@@ -284,6 +298,33 @@ class MCPView(View):
                 return Response(status_code=202)
 
             params = _read_params(message)
+
+            # Which family is this request from? Modern requests carry the
+            # protocol version in `params._meta` — that settles it outright.
+            # Without it, `initialize` is always classic: the modern revision
+            # removed the method, so nothing but a classic handshake opens
+            # with it (and a client mid-handshake has no negotiated version
+            # for its headers yet). For everything else, the transport
+            # headers decide: `Mcp-Method` exists only in the modern
+            # revision, and a version header naming anything we don't serve
+            # classically marks a modern client with a broken envelope — it
+            # belongs on the modern ladder so it's told exactly what's
+            # missing, not silently served an unstamped classic reply.
+            meta = params.get("_meta")
+            if isinstance(meta, dict) and META_PROTOCOL_VERSION in meta:
+                is_classic = False
+            elif method == "initialize":
+                is_classic = True
+            else:
+                version_header = self.request.headers.get("MCP-Protocol-Version")
+                is_classic = (
+                    version_header is None
+                    or version_header in CLASSIC_PROTOCOL_VERSIONS
+                ) and "Mcp-Method" not in self.request.headers
+            if is_classic:
+                return self.handle_classic_message(
+                    msg_id=msg_id, method=method, params=params
+                )
 
             # Resolved here, at the rung that decides it, and carried down to
             # dispatch — `get_rpc_handler` is an overridable seam, so it runs
@@ -318,6 +359,102 @@ class MCPView(View):
         error = reply.get("error")
         status_code = ERROR_CODE_HTTP_STATUS.get(error["code"], 200) if error else 200
         return JsonResponse(reply, status_code=status_code)
+
+    def handle_classic_message(
+        self, *, msg_id: Any, method: str, params: dict[str, Any]
+    ) -> Response:
+        """Serve one request from a pre-2026-07-28 client.
+
+        The classic revisions establish identity once, in an `initialize`
+        handshake, and mirror nothing into headers — so none of the modern
+        validation ladder applies. Dispatch lands on the same `rpc_` handlers;
+        `initialize` and `ping` — the methods the modern revision removed —
+        are answered here directly.
+
+        Two deliberate departures from a full classic server, both
+        spec-permitted, keep this branch stateless:
+
+        - No `Mcp-Session-Id` is ever issued, so there is no session to
+          resume, stream, or delete.
+        - Nothing from `initialize` is remembered. Capabilities a classic
+          client declares there are gone by its next request, so tools with
+          `required_client_capabilities` refuse classic clients.
+
+        Every reply — errors included — travels at HTTP 200: the spec-mandated
+        error statuses in `ERROR_CODE_HTTP_STATUS` are 2026-07-28 vocabulary,
+        and a classic client reads the JSON-RPC error from the body. (A 404 on
+        `initialize` is exactly what sends one chasing the deprecated SSE
+        transport.)
+
+        Delete this branch once the clients that matter speak 2026-07-28.
+        """
+        try:
+            if method == "initialize":
+                handler = self.classic_initialize_result
+            elif method == "ping":
+                handler = self.classic_ping_result
+            else:
+                try:
+                    handler = self.get_rpc_handler(method)
+                except _ProtocolError as e:
+                    if e.code != METHOD_NOT_FOUND:
+                        raise
+                    # The modern resolver's unknown-method error names
+                    # 2026-07-28 — to a client that just negotiated a classic
+                    # version, that reads as a version mismatch and can tear
+                    # down a session that's actually fine. Same code, no
+                    # version claim.
+                    raise _ProtocolError(
+                        METHOD_NOT_FOUND, f"Unknown method: {method}"
+                    ) from None
+            # Through `handle_message` even for initialize/ping, so every
+            # classic dispatch gets the same `rpc <method>` span and
+            # handler-failure funnel (-32603 in the body, logged) as a modern
+            # one. `stamp=False`: `resultType`, `serverInfo`, and the
+            # freshness hints are 2026-07-28 vocabulary a classic client
+            # never asked for.
+            reply = self.handle_message(
+                msg_id=msg_id,
+                method=method,
+                params=params,
+                handler=handler,
+                stamp=False,
+            )
+        except _ProtocolError as e:
+            reply = e.as_response(msg_id)
+        return JsonResponse(reply, status_code=200)
+
+    def classic_initialize_result(self, params: dict[str, Any]) -> dict[str, Any]:
+        """The `initialize` result, built by the classic negotiation rule.
+
+        A requested version we serve is echoed back; anything else — older,
+        newer, or absent — is answered with our newest classic revision, and
+        the client decides whether it can work with that.
+        """
+        requested = params.get("protocolVersion")
+        version = (
+            requested
+            if requested in CLASSIC_PROTOCOL_VERSIONS
+            else CLASSIC_PROTOCOL_VERSIONS[0]
+        )
+
+        result: dict[str, Any] = {
+            "protocolVersion": version,
+            "capabilities": self.get_capabilities(),
+            "serverInfo": {
+                "name": self.name,
+                "version": self.version or settings.VERSION,
+            },
+        }
+        if self.instructions:
+            result["instructions"] = self.instructions
+        return result
+
+    def classic_ping_result(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Classic `ping` answers an empty result. Not named `rpc_ping` on
+        purpose — that would resurrect `ping` on the modern path, where the
+        spec removed it."""
+        return {}
 
     def load_client_identity(self, params: dict[str, Any]) -> str:
         """Read the required per-request `_meta`, and return its protocol version.
@@ -409,10 +546,13 @@ class MCPView(View):
 
         # Spec MUST: an unknown method answers 404 carrying the JSON-RPC error.
         # That pairing is what tells a client it reached a modern MCP server
-        # rather than a URL that doesn't exist. The methods earlier revisions
-        # had and this one removed — `initialize`, `ping`, `logging/setLevel` —
-        # land here too (SEP-2575), so the answer names the version we speak:
-        # that's all a client from one of those revisions can learn from us.
+        # rather than a URL that doesn't exist. On the modern path, the methods
+        # this revision removed — `initialize`, `ping`, `logging/setLevel` —
+        # land here too (SEP-2575), so the answer names the version we speak.
+        # A *classic* client's `initialize` never gets here: it carries no
+        # modern envelope, so `post()` routes it to the compatibility branch.
+        # (The classic branch reuses this resolver for its other methods and
+        # returns this same error at HTTP 200.)
         raise _ProtocolError(
             METHOD_NOT_FOUND,
             f"Unknown method: {method}. This server speaks MCP {PROTOCOL_VERSION}.",
@@ -426,6 +566,7 @@ class MCPView(View):
         method: str,
         params: dict[str, Any],
         handler: Callable[[dict[str, Any]], dict[str, Any]],
+        stamp: bool = True,
     ) -> dict[str, Any]:
         """Dispatch one validated request to its `rpc_<method>` handler.
 
@@ -433,16 +574,32 @@ class MCPView(View):
         passes it in — `method` still comes along, for the span name and for
         `stamp_result`. Returns the JSON-RPC reply, success or error alike;
         `post()` maps the reply's error code through `ERROR_CODE_HTTP_STATUS`
-        to decide what status it travels at.
+        to decide what status it travels at. The classic branch passes
+        `stamp=False` — the stamped fields are 2026-07-28 vocabulary.
         """
         with tracer.start_as_current_span(
             f"rpc {method}", kind=trace.SpanKind.SERVER
         ) as span:
             try:
                 result = handler(params)
-                return _success_response(
-                    msg_id, self.stamp_result(method=method, result=result)
-                )
+                # Say what a handler got wrong, on both revision paths.
+                # Without these, a handler returning None or a list either
+                # fails on `dict(...)` in `stamp_result` under an opaque
+                # "argument must be a mapping", or — unstamped — ships the
+                # malformed result to a classic client with nothing logged.
+                if not isinstance(result, dict):
+                    raise TypeError(
+                        f"The rpc_ handler for {method} must return a dict, "
+                        f"not {type(result).__name__}"
+                    )
+                if not isinstance(result.get("_meta", {}), dict):
+                    raise TypeError(
+                        f"The rpc_ handler for {method} returned a '_meta' that is "
+                        f"{type(result['_meta']).__name__}, not a dict"
+                    )
+                if stamp:
+                    result = self.stamp_result(method=method, result=result)
+                return _success_response(msg_id, result)
             except _ProtocolError as e:
                 # The caller's problem, not ours — a missing client capability,
                 # or `MCPInvalidParams` from the handler. Returned rather than
@@ -464,24 +621,11 @@ class MCPView(View):
 
         `resultType` marks the result complete, `_meta` names this server, and
         list/read results carry the freshness hints clients cache by. A
-        handler that sets any of them keeps its own value.
+        handler that sets any of them keeps its own value. The result's shape
+        was already checked in `handle_message` — that guard runs whether or
+        not stamping does.
         """
-        # Say what a handler got wrong. Without these, a handler returning None
-        # or a list fails on `dict(...)` below and `handle_message` logs an
-        # opaque "argument must be a mapping" under an Internal error reply.
-        if not isinstance(result, dict):
-            raise TypeError(
-                f"The rpc_ handler for {method} must return a dict, "
-                f"not {type(result).__name__}"
-            )
-
         meta = result.get("_meta", {})
-        if not isinstance(meta, dict):
-            raise TypeError(
-                f"The rpc_ handler for {method} returned a '_meta' that is "
-                f"{type(meta).__name__}, not a dict"
-            )
-
         stamped = dict(result)
         stamped.setdefault("resultType", "complete")
 
@@ -564,7 +708,7 @@ class MCPView(View):
             raise _ProtocolError(
                 MISSING_REQUIRED_CLIENT_CAPABILITY,
                 f"Tool {tool_cls.name} requires client capabilities the client "
-                f"did not declare: {', '.join(sorted(missing))}",
+                f"did not declare in this request: {', '.join(sorted(missing))}",
                 data={"requiredCapabilities": missing},
             )
 

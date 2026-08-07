@@ -1,0 +1,42 @@
+# Baseline for the classic-revision pass (--spec-version 2025-11-25,
+# cumulative over the older classic revisions), which grades the
+# compatibility branch in `MCPView.handle_classic_message`. Same
+# exit-code semantics as expected-failures.yml — a scenario leaving this list
+# (or joining it) fails the build, so this file is the machine-checked
+# statement of exactly which classic subset the branch serves.
+#
+# Every entry is an optional-per-spec feature that plain-mcp doesn't
+# implement on the modern path either — the classic branch adds no gap of its
+# own. The core protocol (initialize, ping, tools, resources, prompts via
+# `rpc_` methods, error shapes) passes.
+
+server:
+  # `logging/setLevel` and log notifications — not implemented.
+  - logging-set-level
+  - tools-call-with-logging
+
+  # Completions — not implemented.
+  - completion-complete
+
+  # Progress notifications on tools/call — not implemented (no
+  # server-to-client stream).
+  - tools-call-with-progress
+
+  # Server-initiated callbacks (sampling, elicitation) — not implemented;
+  # the modern equivalent (MRTR) is baselined in expected-failures.yml.
+  - tools-call-sampling
+  - tools-call-elicitation
+  - elicitation-sep1034-defaults
+  - elicitation-sep1330-enums
+
+  # Resource subscriptions — not implemented; clients re-read instead.
+  - resources-subscribe
+  - resources-unsubscribe
+
+  # SSE server-to-client streams — not offered (GET answers 405, which the
+  # classic spec permits). Against a streamless server these scenarios have
+  # no applicable checks ("0 passed, 0 failed"), and the CLI's baseline
+  # evaluator counts a zero-check scenario as a failure — so they live here
+  # until a stream exists for them to grade.
+  - server-sse-polling
+  - server-sse-multiple-streams

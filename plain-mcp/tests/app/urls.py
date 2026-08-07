@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hmac
-from typing import cast
+from typing import Any, cast
 
 from plain.mcp import (
     MCPProtectedResourceView,
@@ -72,6 +72,11 @@ class RPCBoomMCP(MCPView):
 
     def rpc_boom(self, params: dict) -> dict:
         raise RuntimeError("rpc handler boom")
+
+    def rpc_bad(self, params: dict) -> Any:
+        # Returns the wrong shape on purpose — the handler-contract guard
+        # must catch this on both revision paths.
+        return ["not", "a", "dict"]
 
 
 class WhoAmI(MCPTool):

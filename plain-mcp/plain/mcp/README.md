@@ -76,7 +76,7 @@ MCP `2026-07-28` is **stateless** — no handshake, no sessions, no server-to-cl
 | `io.modelcontextprotocol/clientCapabilities` | yes      | object                          |
 | `io.modelcontextprotocol/clientInfo`         | no       | `{"name": ..., "version": ...}` |
 
-The routing-relevant parts are mirrored into headers, so infrastructure in front of your app can route and authorize a call without parsing the body:
+The routing-relevant parts are mirrored into headers, so infrastructure in front of your app can route and authorize a call without parsing the body. This guarantee holds on the modern path only — classic requests (see [FAQs](#faqs)) send none of these headers, so infrastructure keying on them must treat their absence as "inspect the body" rather than "allow":
 
 | Header                 | Required                                      | Must equal          |
 | ---------------------- | --------------------------------------------- | ------------------- |
@@ -84,7 +84,7 @@ The routing-relevant parts are mirrored into headers, so infrastructure in front
 | `Mcp-Method`           | every request                                 | the body's `method` |
 | `Mcp-Name`             | `tools/call`, `prompts/get`, `resources/read` | the body's target   |
 
-Whether the method exists is settled first: an unknown one is a `-32601` at HTTP **404**, which is how a client tells a real MCP endpoint apart from a URL that isn't there. A method the spec has since removed (`initialize`, `ping`, `logging/setLevel`) answers the same way, naming the version this server speaks — a client from one of those revisions sends no `_meta` to validate, so that error is all it can learn from. A notification (no `id`) gets a bare `202` and skips everything below.
+Whether the method exists is settled first: an unknown one is a `-32601` at HTTP **404**, which is how a client tells a real MCP endpoint apart from a URL that isn't there. A method the spec has since removed (`initialize`, `ping`, `logging/setLevel`) answers the same way, naming the version this server speaks. A request declaring `2026-07-28` in neither the `MCP-Protocol-Version` header nor `_meta` never enters this ladder — that's a classic client, served by the compatibility branch (see [FAQs](#faqs)). A notification (no `id`) gets a bare `202` and skips everything below.
 
 A request for a method that does exist is then validated in this order — say what you are, then agree with yourself, then name a version we have:
 
@@ -708,25 +708,25 @@ The shipped handlers (`rpc_server_discover`, `rpc_tools_list`, `rpc_tools_call`,
 
 Where `plain.mcp` stands on each feature of the [MCP `2026-07-28` spec](https://modelcontextprotocol.io/specification/2026-07-28). **Built in** means the framework handles it; **build it yourself** means the spec method is yours to implement on the documented [`rpc_` extension point](#custom-json-rpc-methods); **not supported** means there's no way to do it today.
 
-| Spec feature                                                       | Support           | How                                                                                             |
-| ------------------------------------------------------------------ | ----------------- | ----------------------------------------------------------------------------------------------- |
-| Stateless Streamable HTTP (`_meta`, headers, validation ladder)    | built in          | [Requests and results](#requests-and-results)                                                   |
-| `server/discover`                                                  | built in          | [Discovery](#discovery) — `instructions`, `get_capabilities()`                                  |
-| Tools (`tools/list`, `tools/call`)                                 | built in          | [`MCPTool`](#tools) — schema derivation, validation, `isError`, `annotations`                   |
-| Required client capabilities (`-32021`)                            | built in          | `MCPTool.required_client_capabilities`                                                          |
-| Resources (`resources/list`, `templates/list`, `read`)             | built in          | [`MCPResource`](#resources) — static URIs and templates                                         |
-| Result stamping (`resultType`, `serverInfo`, `ttlMs`/`cacheScope`) | built in          | [Requests and results](#requests-and-results) — handler-set values win                          |
-| OAuth resource server (RFC 9728)                                   | built in          | [`OAuthResourceServer`](#oauth-for-mcp-clients), `MCPProtectedResourceView`                     |
-| Per-request authorization                                          | built in          | `allowed_for()`, [`get_tools()`/`get_resources()`](#filtering-tools-per-request)                |
-| Prompts (`prompts/list`, `prompts/get`)                            | build it yourself | [`rpc_` methods](#custom-json-rpc-methods) — complete example there                             |
-| Completions (`completion/complete`)                                | build it yourself | same `rpc_` pattern                                                                             |
-| Any other spec or custom method                                    | build it yourself | `rpc_<method>` + `get_capabilities()` + the two [class-attribute tables](#requests-and-results) |
-| MRTR (`input_required` — sampling, elicitation, roots)             | not supported     | tools always return complete results                                                            |
-| Subscriptions (`subscriptions/listen`, change notifications)       | not supported     | see [FAQs](#faqs) — clients re-read instead                                                     |
-| Progress notifications / SSE response streams                      | not supported     | every response is a single JSON object (spec-permitted)                                         |
-| Tasks extension                                                    | not supported     | not in the official SDK yet either                                                              |
-| `Mcp-Param-*` headers (`x-mcp-header`)                             | not supported     | no tool API to declare them, so clients never send them                                         |
-| Legacy protocol versions (pre-`2026-07-28`)                        | not supported     | see [FAQs](#faqs)                                                                               |
+| Spec feature                                                       | Support           | How                                                                                               |
+| ------------------------------------------------------------------ | ----------------- | ------------------------------------------------------------------------------------------------- |
+| Stateless Streamable HTTP (`_meta`, headers, validation ladder)    | built in          | [Requests and results](#requests-and-results)                                                     |
+| `server/discover`                                                  | built in          | [Discovery](#discovery) — `instructions`, `get_capabilities()`                                    |
+| Tools (`tools/list`, `tools/call`)                                 | built in          | [`MCPTool`](#tools) — schema derivation, validation, `isError`, `annotations`                     |
+| Required client capabilities (`-32021`)                            | built in          | `MCPTool.required_client_capabilities`                                                            |
+| Resources (`resources/list`, `templates/list`, `read`)             | built in          | [`MCPResource`](#resources) — static URIs and templates                                           |
+| Result stamping (`resultType`, `serverInfo`, `ttlMs`/`cacheScope`) | built in          | [Requests and results](#requests-and-results) — handler-set values win                            |
+| OAuth resource server (RFC 9728)                                   | built in          | [`OAuthResourceServer`](#oauth-for-mcp-clients), `MCPProtectedResourceView`                       |
+| Per-request authorization                                          | built in          | `allowed_for()`, [`get_tools()`/`get_resources()`](#filtering-tools-per-request)                  |
+| Prompts (`prompts/list`, `prompts/get`)                            | build it yourself | [`rpc_` methods](#custom-json-rpc-methods) — complete example there                               |
+| Completions (`completion/complete`)                                | build it yourself | same `rpc_` pattern                                                                               |
+| Any other spec or custom method                                    | build it yourself | `rpc_<method>` + `get_capabilities()` + the two [class-attribute tables](#requests-and-results)   |
+| MRTR (`input_required` — sampling, elicitation, roots)             | not supported     | tools always return complete results                                                              |
+| Subscriptions (`subscriptions/listen`, change notifications)       | not supported     | see [FAQs](#faqs) — clients re-read instead                                                       |
+| Progress notifications / SSE response streams                      | not supported     | every response is a single JSON object (spec-permitted)                                           |
+| Tasks extension                                                    | not supported     | not in the official SDK yet either                                                                |
+| `Mcp-Param-*` headers (`x-mcp-header`)                             | not supported     | no tool API to declare them, so clients never send them                                           |
+| Classic protocol versions (`2025-03-26` … `2025-11-25`)            | built in          | sessionless compatibility branch — `initialize`/`ping` answered, same handlers; see [FAQs](#faqs) |
 
 The conformance suite baseline at [`tests/conformance/expected-failures.yml`](../../tests/conformance/expected-failures.yml) is the machine-checked version of the "not supported" rows — it fails the build if reality drifts from this table in either direction.
 
@@ -734,7 +734,9 @@ The conformance suite baseline at [`tests/conformance/expected-failures.yml`](..
 
 #### What MCP protocol version is supported?
 
-The `2026-07-28` version of the MCP specification, using the Streamable HTTP transport — and only that version. It's the revision that made MCP stateless, so there's no `initialize` handshake to negotiate an older one down to, and no session or SSE machinery to keep alive. A client that opens with `initialize` gets the same `404` / `-32601` as any other unknown method, with a message naming the version this server does speak — that's all a pre-`2026-07-28` client can learn from us.
+Natively, the `2026-07-28` version of the MCP specification, using the Streamable HTTP transport — the revision that made MCP stateless, so there's no session or SSE machinery to keep alive.
+
+The classic revisions (`2025-03-26`, `2025-06-18`, `2025-11-25`) are also served, through a compatibility branch for clients that still open with `initialize` — claude.ai's connector proxy among them. A request that declares `2026-07-28` in neither the `MCP-Protocol-Version` header nor `params._meta` is a classic request; it gets `initialize`/`ping` answered, the same tool and resource handlers, and its JSON-RPC errors in the body at HTTP 200. The branch stays stateless the whole way — both allowances are in the classic spec itself: no `Mcp-Session-Id` is issued (the client proceeds sessionless) and the GET stream is declined with a `405`. Two consequences: capabilities a classic client declares at `initialize` aren't retained, so tools with `required_client_capabilities` refuse classic clients; and JSON-RPC batch arrays (part of the transport in `2025-03-26` only, removed in `2025-06-18`) are rejected with `-32600` — the SDKs never sent them by default. The branch goes away once the clients that matter speak `2026-07-28`.
 
 #### Are resource subscriptions supported?
 
@@ -746,7 +748,7 @@ On startup, `plain.mcp` imports `mcp` modules from installed packages (similar t
 
 #### Do I need to handle CSRF?
 
-No. Non-browser clients (like AI assistants) don't send `Origin` or `Sec-Fetch-Site` headers, so Plain's CSRF protection skips them automatically.
+No. Non-browser clients (like AI assistants) don't send `Origin` or `Sec-Fetch-Site` headers, so Plain's CSRF protection skips them automatically. Don't add your MCP path to `CSRF_EXEMPT_PATHS`, though — for a session-authenticated MCP view, that CSRF check is what blocks cross-site tool invocation from a browser, and classic requests carry no custom headers that would otherwise force a CORS preflight.
 
 #### Why are arguments on `__init__` instead of `run()`?
 

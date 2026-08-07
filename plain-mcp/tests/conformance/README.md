@@ -6,8 +6,9 @@ Runs the [MCP Conformance Test Framework](https://github.com/modelcontextprotoco
 
 - `app/settings.py`, `app/urls.py` — a minimal Plain server that mounts an `MCP` view on `/mcp`
 - `app/mcp.py` — the `ConformanceMCP` subclass and the tools the conformance suite expects (`test_simple_text`, `test_error_handling`)
-- `run` — starts the Plain server on `127.0.0.1:18765`, runs the conformance CLI against it, then shuts the server down
-- `expected-failures.yml` — baseline of checks that plain-mcp does not yet pass
+- `run` — starts the Plain server on `127.0.0.1:18765`, runs the conformance CLI against it (two passes, see below), then shuts the server down
+- `expected-failures.yml` — baseline of `2026-07-28` checks that plain-mcp does not yet pass
+- `expected-failures-classic.yml` — baseline for the classic pass (`--spec-version 2025-11-25`), which grades the compatibility branch (`handle_classic_message`) against the handshake-era protocol; its entries are the optional features unimplemented on either path
 
 ## How it runs
 
@@ -16,8 +17,9 @@ Runs the [MCP Conformance Test Framework](https://github.com/modelcontextprotoco
 1. Starts `plain server` with `app.settings` in a background process
 2. Waits for the endpoint to respond at all (any status — the CLI negotiates the protocol itself)
 3. Invokes `npx --yes @modelcontextprotocol/conformance@<pinned> server --url … --spec-version 2026-07-28 --expected-failures …`
-4. Kills the server regardless of the outcome
-5. Exits with the conformance CLI's exit code
+4. Repeats at `--spec-version 2025-11-25` with `expected-failures-classic.yml`, so the classic compatibility branch has its own machine-checked contract
+5. Kills the server regardless of the outcome
+6. Exits non-zero if either pass regresses (or a baseline goes stale)
 
 If `npx` isn't on `PATH` the runner errors out — install Node.js before running this suite.
 
@@ -43,9 +45,10 @@ _tools_ — with no Claude/Cursor account — use the [MCP Inspector](https://gi
 via `./scripts/inspect-mcp`, which boots the **example app**'s `NotesMCP` server
 on a local HTTP port and points the Inspector at it.
 
-> MCP Inspector v0.22.0 is still a legacy-era client: it opens with an
-> `initialize` handshake, which `2026-07-28` removed, so it can't connect yet.
-> The script is otherwise ready and needs a `2026-07-28`-aware Inspector release.
+> MCP Inspector v0.22.0 is a legacy-era client: it opens with an `initialize`
+> handshake, which `2026-07-28` removed — it connects through the classic
+> compatibility branch, so what it exercises is that branch, not the modern
+> `_meta`/header envelope the conformance suite covers.
 
 ```bash
 ./scripts/inspect-mcp                            # interactive web UI

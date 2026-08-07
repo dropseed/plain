@@ -136,6 +136,10 @@ class TestRequestMeta:
         )
 
     def test_missing_meta_is_invalid_params(self, mcp_post_raw) -> None:
+        # The MCP-Protocol-Version header still declares 2026-07-28, so this
+        # is a modern request with a broken envelope — not a classic one.
+        # (Declaring the version in neither the header nor `_meta` routes to
+        # the compatibility branch instead — test_classic.py.)
         response = self._post_with_meta(mcp_post_raw, {})
         assert response.status_code == 400
         body = response.json()
@@ -166,6 +170,31 @@ class TestRequestMeta:
             "supported": [PROTOCOL_VERSION],
             "requested": "2025-06-18",
         }
+
+    def test_mcp_method_header_alone_is_modern(self, mcp_post_raw) -> None:
+        # `Mcp-Method` exists only in the modern revision — its presence
+        # routes a version-less, envelope-less request onto the modern ladder
+        # (where the missing `_meta` is diagnosed) instead of silently serving
+        # it an unstamped classic reply.
+        response = mcp_post_raw(
+            "/mcp",
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+            headers={"MCP-Protocol-Version": None},
+        )
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == -32602
+
+    def test_unknown_version_header_is_modern(self, mcp_post_raw) -> None:
+        # A version header naming something we don't serve classically marks
+        # a modern client with a stale or broken envelope — diagnosed on the
+        # modern ladder, not downgraded to the classic branch.
+        response = mcp_post_raw(
+            "/mcp",
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+            headers={"MCP-Protocol-Version": "2026-01-01", "Mcp-Method": None},
+        )
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == -32602
 
     def test_meta_is_checked_before_headers(self, mcp_post_raw) -> None:
         # Both wrong at once: no `_meta` and no Mcp-Method header. `_meta` is
@@ -309,18 +338,14 @@ class TestMalformedRequests:
         assert response.status_code == 400
         assert response.json()["error"]["code"] == -32602
 
-    def test_removed_methods_are_unknown_methods(self, mcp_post_raw) -> None:
-        # SEP-2575: a method this revision removed answers like any other
-        # unknown method — 404 / -32601. A client from an earlier revision
-        # sends none of the modern headers and no `_meta`, so method existence
-        # is settled before those checks, and the answer names the version we
-        # speak since that's all such a client can learn from us.
+    def test_removed_methods_are_unknown_methods(self, mcp_post) -> None:
+        # SEP-2575: on the modern path, a method this revision removed answers
+        # like any other unknown method — 404 / -32601 — naming the version we
+        # speak. Only the *modern* path: a classic client sends these without
+        # the modern envelope and is served by the compatibility branch
+        # instead (test_classic.py).
         for method in ("initialize", "ping", "logging/setLevel"):
-            response = mcp_post_raw(
-                "/mcp",
-                {"jsonrpc": "2.0", "id": 1, "method": method, "params": {}},
-                headers={"MCP-Protocol-Version": None, "Mcp-Method": None},
-            )
+            response = mcp_post("/mcp", method)
             assert response.status_code == 404, method
             body = response.json()
             assert body["error"]["code"] == -32601, method
