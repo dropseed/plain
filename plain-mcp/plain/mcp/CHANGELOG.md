@@ -1,5 +1,24 @@
 # plain-mcp changelog
 
+## [0.5.0](https://github.com/dropseed/plain/releases/plain-mcp@0.5.0) (2026-08-07)
+
+### What's changed
+
+- **Classic MCP revisions (`2025-03-26`, `2025-06-18`, `2025-11-25`) are served again**, through a compatibility branch for clients that still open with `initialize` — claude.ai's connector proxy among them. A request that declares `2026-07-28` in neither the `MCP-Protocol-Version` header nor `params._meta` is routed to the new `handle_classic_message`, which answers `initialize` and `ping` directly and sends every other method to the same `rpc_` handlers. New `CLASSIC_PROTOCOL_VERSIONS` constant; `handle_classic_message`, `classic_initialize_result`, and `classic_ping_result` are all overridable. ([7a57d06229](https://github.com/dropseed/plain/commit/7a57d06229))
+- The classic branch stays stateless — no `Mcp-Session-Id` is issued (the client proceeds sessionless) and the GET stream is still declined with a `405`, both allowances the classic spec grants. Nothing from `initialize` is remembered, so tools with `required_client_capabilities` refuse classic clients, and JSON-RPC batch arrays (transport-level in `2025-03-26` only) are rejected with `-32600`. ([7a57d06229](https://github.com/dropseed/plain/commit/7a57d06229))
+- Every classic reply, errors included, travels at HTTP 200 — the statuses in `ERROR_CODE_HTTP_STATUS` are `2026-07-28` vocabulary, and a classic client reads the JSON-RPC error from the body (a 404 on `initialize` is what sends one chasing the deprecated SSE transport). A classic unknown-method error also drops the "This server speaks MCP 2026-07-28" claim, which a client that just negotiated a classic version would read as a version mismatch. ([7a57d06229](https://github.com/dropseed/plain/commit/7a57d06229))
+- Classic dispatch goes through `handle_message` like any modern request, so `initialize`/`ping` get the same `rpc <method>` SERVER span and the same `-32603`-in-the-body handler-failure funnel. Results aren't stamped on that path — `resultType`, `serverInfo`, and the `ttlMs`/`cacheScope` freshness hints are vocabulary a classic client never asked for. ([7a57d06229](https://github.com/dropseed/plain/commit/7a57d06229))
+- **`rpc_` handler result-shape validation moved from `stamp_result` into `handle_message`**, so the clear `TypeError` for a non-dict result (or a non-dict `_meta`) is raised on both revision paths. Without the move, an unstamped classic reply would have shipped a malformed result with nothing logged. ([7a57d06229](https://github.com/dropseed/plain/commit/7a57d06229))
+- The `-32021` missing-capability message now reads "did not declare in this request", since capabilities are restated per-request on the modern path and unavailable on the classic one. ([7a57d06229](https://github.com/dropseed/plain/commit/7a57d06229))
+- README: the spec-coverage table's "Legacy protocol versions — not supported" row is now "Classic protocol versions (`2025-03-26` … `2025-11-25`) — built in", and the header guarantee, validation ladder, and protocol-version FAQ all document the branch and its limits. A new CSRF note warns against adding your MCP path to `CSRF_EXEMPT_PATHS` — for a session-authenticated MCP view, that check is what blocks cross-site tool invocation from a browser, and classic requests carry no custom headers that would force a CORS preflight. ([7a57d06229](https://github.com/dropseed/plain/commit/7a57d06229))
+
+### Upgrade instructions
+
+- No changes required — existing `rpc_` methods, tools, and resources serve both revision families unchanged.
+- If infrastructure in front of your app routes or authorizes on `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name`, treat their absence as "inspect the body" rather than "allow" — classic requests send none of them.
+- Tools declaring `required_client_capabilities` will refuse classic clients, since capabilities announced at `initialize` aren't retained. Nothing to change, but expect a `-32021` from older clients.
+- If you added your MCP path to `CSRF_EXEMPT_PATHS`, remove it — a session-authenticated MCP view needs that check, and non-browser clients skip it automatically.
+
 ## [0.4.0](https://github.com/dropseed/plain/releases/plain-mcp@0.4.0) (2026-08-02)
 
 ### What's changed
