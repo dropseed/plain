@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.23.1](https://github.com/dropseed/plain/releases/plain-code@0.23.1) (2026-08-07)
+
+### What's changed
+
+- `oxlint` and `oxfmt` are now invoked with `--no-error-on-unmatched-pattern`, so `plain code check` and `plain code fix` no longer fail in a project with no JS/TS files — the normal state for a Python-only app. Previously only oxfmt's exact "Expected at least one target file" stderr text was special-cased into a success, which left oxlint failing the same empty-project case. ([31180b789a](https://github.com/dropseed/plain/commit/31180b789a))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.23.0](https://github.com/dropseed/plain/releases/plain-code@0.23.0) (2026-08-02)
 
 ### What's changed
