@@ -41,6 +41,14 @@ class StreamView(View):
         return StreamingResponse(BytesIO(b"streamed-bytes"), content_type="text/plain")
 
 
+class UploadView(View):
+    """Echoes back the handler class and byte count of an uploaded file."""
+
+    def post(self):
+        uploaded = self.request.files["upload"]
+        return Response(f"{type(uploaded).__name__}:{len(uploaded.read())}")
+
+
 def _query_span(sql: str, *, file_path: str, function: str, line: int) -> None:
     """Emit a span shaped like the one a db instrumentation would record."""
     with _tracer.start_as_current_span(
@@ -106,6 +114,7 @@ class AppRouter(Router):
     urls = [
         path("", TestView, name="index"),
         path("stream", StreamView, name="stream"),
+        path("upload", UploadView, name="upload"),
         path("queries", QueriesView, name="queries"),
         path("boom", BoomView, name="boom"),
     ]
