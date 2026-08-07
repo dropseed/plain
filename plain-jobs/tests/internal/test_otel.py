@@ -227,10 +227,10 @@ def _build_worker_for_loop_test(
     worker._job_results_checked_at = now
     worker._jobs_schedule_checked_at = now
     if stub_maintenance:
-        worker.maybe_heartbeat = lambda: None
-        worker.maybe_log_stats = lambda: None
-        worker.maybe_check_job_results = lambda: None
-        worker.maybe_schedule_jobs = lambda: None
+        worker.maybe_heartbeat = lambda: None  # ty: ignore[invalid-assignment]
+        worker.maybe_log_stats = lambda: None  # ty: ignore[invalid-assignment]
+        worker.maybe_check_job_results = lambda: None  # ty: ignore[invalid-assignment]
+        worker.maybe_schedule_jobs = lambda: None  # ty: ignore[invalid-assignment]
     return worker
 
 
