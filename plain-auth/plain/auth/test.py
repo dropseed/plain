@@ -3,6 +3,7 @@ from __future__ import annotations
 from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
 
+from plain.http import Response
 from plain.http.request import Request
 from plain.runtime import settings
 from plain.sessions import SessionStore
@@ -26,16 +27,21 @@ def login_client(client: Client, user: Any) -> None:
     login(request, user)
     session = get_request_session(request)
     session.save()
-    session_cookie = settings.SESSION_COOKIE_NAME
-    client.cookies[session_cookie] = session.session_key
-    cookie_data = {
-        "max-age": None,
-        "path": "/",
-        "domain": settings.SESSION_COOKIE_DOMAIN,
-        "secure": settings.SESSION_COOKIE_SECURE or None,
-        "expires": None,
-    }
-    client.cookies[session_cookie].update(cookie_data)
+    assert session.session_key is not None, "Session key should exist after save()"
+
+    # Build the same Set-Cookie a real response would send, matching
+    # plain.sessions' SessionMiddleware, then copy it onto the test client.
+    response = Response()
+    response.set_cookie(
+        settings.SESSION_COOKIE_NAME,
+        session.session_key,
+        domain=settings.SESSION_COOKIE_DOMAIN,
+        path=settings.SESSION_COOKIE_PATH,
+        secure=bool(settings.SESSION_COOKIE_SECURE),
+        httponly=bool(settings.SESSION_COOKIE_HTTPONLY),
+        samesite=settings.SESSION_COOKIE_SAMESITE,
+    )
+    client.cookies.update(response.cookies)
 
 
 def logout_client(client: Client) -> None:

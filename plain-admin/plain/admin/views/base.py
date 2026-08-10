@@ -162,6 +162,23 @@ class AdminView(AuthView, TemplateView):
         else:
             return reverse(f"{_URL_NAMESPACE}:" + cls.view_name())
 
+    # Wired up by AdminViewset.get_views() to cross-link the List/Create/Detail/
+    # Update/Delete views registered together on a viewset.
+    def get_list_url(self) -> str:
+        return ""
+
+    def get_create_url(self) -> str:
+        return ""
+
+    def get_detail_url(self, obj: Any) -> str:
+        return ""
+
+    def get_update_url(self, obj: Any) -> str:
+        return ""
+
+    def get_delete_url(self, obj: Any) -> str:
+        return ""
+
     def get_links(self) -> dict[str, str]:
         return self.links.copy()
 
