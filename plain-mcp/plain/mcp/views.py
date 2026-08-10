@@ -14,7 +14,7 @@ from plain.http import (
     JsonResponse,
     Response,
 )
-from plain.logs import log_exception
+from plain.logs import get_framework_logger, log_exception
 from plain.runtime import settings
 from plain.utils.otel import format_exception_type
 from plain.views.base import View
@@ -39,6 +39,8 @@ from .schema import validate_arguments
 from .tools import MCPTool
 
 tracer = trace.get_tracer("plain.mcp")
+
+logger = get_framework_logger()
 
 # The revision this server speaks natively. 2026-07-28 is stateless — no
 # sessions, no `initialize` handshake, no server-to-client stream.
@@ -181,6 +183,14 @@ class MCPView(View):
     client_info: dict[str, Any] | None = None
     client_capabilities: dict[str, Any] = {}
 
+    # The routing facts `post()` has learned about the current request —
+    # each one is stamped onto the request span as an `mcp.<key>` attribute
+    # the moment it's known, and repeated in the reject log's context. A
+    # request that dies on the validation ladder carries whatever was known
+    # by then, which is exactly what a "why was this client rejected?"
+    # investigation needs.
+    _routing_facts: dict[str, Any] = {}
+
     @classmethod
     def register_tool(cls, tool_cls: type[MCPTool]) -> type[MCPTool]:
         """Attach a tool to this MCPView subclass.
@@ -261,11 +271,13 @@ class MCPView(View):
         """One POST carries exactly one JSON-RPC request or notification.
 
         Which revision family the request belongs to is settled right after
-        it's read: a 2026-07-28 request declares its protocol version in the
-        `MCP-Protocol-Version` header and inside `params._meta`, and a request
-        declaring it in neither place is from the classic, handshake-era
-        protocol and takes the compatibility branch instead
-        (`handle_classic_message`).
+        it's read: a 2026-07-28 request declares its protocol version inside
+        `params._meta` on every message, and a request without that
+        declaration is from the classic, handshake-era protocol and takes
+        the compatibility branch instead (`handle_classic_message`) — unless
+        its `MCP-Protocol-Version` header explicitly names `2026-07-28`,
+        which is a modern client whose envelope needs diagnosing. Other
+        header facts don't participate in the decision.
 
         On the modern path, whether the method exists is settled first — a
         method nobody implements can't be judged by an envelope. Then comes
@@ -280,6 +292,15 @@ class MCPView(View):
         here: the classic Streamable HTTP transport lets a server decline the
         GET stream with a 405 and issue no session id.
         """
+        # Fresh per request — the class attribute is only the fallback for
+        # code paths that never went through here.
+        self._routing_facts = {}
+        if version_header := self.request.headers.get("MCP-Protocol-Version"):
+            self._stamp_routing_fact("protocol_version_header", version_header)
+        self._stamp_routing_fact(
+            "method_header_present", "Mcp-Method" in self.request.headers
+        )
+
         msg_id: Any = None
         try:
             message = _decode_request(self.request.body)
@@ -289,6 +310,7 @@ class MCPView(View):
             msg_id = message.get("id")
 
             method = _read_method(message)
+            self._stamp_routing_fact("method", method)
 
             if msg_id is None:
                 # Spec MUST: a notification (no `id`) is acknowledged with 202
@@ -299,28 +321,39 @@ class MCPView(View):
 
             params = _read_params(message)
 
-            # Which family is this request from? Modern requests carry the
-            # protocol version in `params._meta` — that settles it outright.
-            # Without it, `initialize` is always classic: the modern revision
-            # removed the method, so nothing but a classic handshake opens
-            # with it (and a client mid-handshake has no negotiated version
-            # for its headers yet). For everything else, the transport
-            # headers decide: `Mcp-Method` exists only in the modern
-            # revision, and a version header naming anything we don't serve
-            # classically marks a modern client with a broken envelope — it
-            # belongs on the modern ladder so it's told exactly what's
-            # missing, not silently served an unstamped classic reply.
+            # Which family is this request from? The modern envelope's own
+            # structural marker decides: a 2026-07-28 request restates its
+            # protocol version in `params._meta` on every message, so a
+            # request carrying that key is modern outright. Without it,
+            # `initialize` is always classic — the modern revision removed
+            # the method, so nothing but a classic handshake opens with it —
+            # and for everything else only an `MCP-Protocol-Version` header
+            # naming `2026-07-28` exactly, the client's own declaration that
+            # it speaks the modern revision, selects the modern ladder: that
+            # keeps a conformant modern client with a broken envelope told
+            # precisely which field is missing (the spec's conformance suite
+            # requires that diagnosis). No other header fact gets a vote.
+            # HTTP semantics make unrecognized headers fair game for any
+            # client, SDK, or middlebox, so a header's presence is not
+            # evidence of a revision — a conformant 2025-11-25 client that
+            # also sent `Mcp-Method` was once misrouted here and rejected
+            # mid-session for a `_meta` envelope its revision never defined.
             meta = params.get("_meta")
-            if isinstance(meta, dict) and META_PROTOCOL_VERSION in meta:
+            meta_declares_modern = (
+                isinstance(meta, dict) and META_PROTOCOL_VERSION in meta
+            )
+            if meta_declares_modern:
                 is_classic = False
             elif method == "initialize":
                 is_classic = True
             else:
-                version_header = self.request.headers.get("MCP-Protocol-Version")
                 is_classic = (
-                    version_header is None
-                    or version_header in CLASSIC_PROTOCOL_VERSIONS
-                ) and "Mcp-Method" not in self.request.headers
+                    self.request.headers.get("MCP-Protocol-Version") != PROTOCOL_VERSION
+                )
+            self._stamp_routing_fact(
+                "meta_protocol_version_present", meta_declares_modern
+            )
+            self._stamp_routing_fact("revision", "classic" if is_classic else "modern")
             if is_classic:
                 return self.handle_classic_message(
                     msg_id=msg_id, method=method, params=params
@@ -356,6 +389,7 @@ class MCPView(View):
         except _ProtocolError as e:
             reply = e.as_response(msg_id)
 
+        self._observe_reply_error(reply)
         error = reply.get("error")
         status_code = ERROR_CODE_HTTP_STATUS.get(error["code"], 200) if error else 200
         return JsonResponse(reply, status_code=status_code)
@@ -422,6 +456,7 @@ class MCPView(View):
             )
         except _ProtocolError as e:
             reply = e.as_response(msg_id)
+        self._observe_reply_error(reply)
         return JsonResponse(reply, status_code=200)
 
     def classic_initialize_result(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -455,6 +490,38 @@ class MCPView(View):
         purpose — that would resurrect `ping` on the modern path, where the
         spec removed it."""
         return {}
+
+    def _stamp_routing_fact(self, key: str, value: str | bool) -> None:
+        """Record one routing fact: on the request span, and for the reject log."""
+        self._routing_facts[key] = value
+        trace.get_current_span().set_attribute(f"mcp.{key}", value)
+
+    def _observe_reply_error(self, reply: dict[str, Any]) -> None:
+        """Make a JSON-RPC error reply visible server-side before it ships.
+
+        The body tells the client exactly what's wrong, but a client that
+        swallows it surfaces nothing better than "connection failed" — so the
+        code and message also land on the request span, and everything except
+        an internal error logs a warning carrying the routing facts. Internal
+        errors are excluded because `handle_message` already logged them with
+        a traceback.
+        """
+        error = reply.get("error")
+        if not error:
+            return
+        span = trace.get_current_span()
+        span.set_attribute("mcp.error.code", error["code"])
+        span.set_attribute("mcp.error.message", error["message"])
+        if error["code"] == INTERNAL_ERROR:
+            return
+        logger.warning(
+            "MCP request rejected",
+            extra={
+                "error_code": error["code"],
+                "error_message": error["message"],
+                **self._routing_facts,
+            },
+        )
 
     def load_client_identity(self, params: dict[str, Any]) -> str:
         """Read the required per-request `_meta`, and return its protocol version.

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from plain.mcp.views import CLASSIC_PROTOCOL_VERSIONS
 from plain.test import Client
 
@@ -116,8 +118,8 @@ class TestClassicDispatch:
 
     def test_classic_version_header_still_routes_classic(self) -> None:
         # 2025-06-18 clients send their negotiated version in the header on
-        # requests after `initialize` — only `2026-07-28` there (or in
-        # `_meta`) selects the modern path.
+        # requests after `initialize` — only the `_meta` declaration selects
+        # the modern path.
         response = Client().post(
             "/mcp",
             data={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
@@ -151,6 +153,82 @@ class TestClassicDispatch:
         response = classic_post("/rpc-boom", "bad")
         assert response.status_code == 200
         assert response.json()["error"]["code"] == -32603
+
+
+class TestExtraTransportHeaders:
+    """Headers a classic revision is silent about must not change the family.
+
+    HTTP semantics make unrecognized headers fair game for any client, SDK,
+    or middlebox, so their presence is not evidence of a revision. The live
+    example is claude.ai's connector proxy: fully conformant 2025-11-25
+    traffic (correct handshake, correct negotiated version header) that also
+    sends `Mcp-Method` on every request. A classification that read that
+    header as "modern" rejected it mid-session with a `_meta` error its
+    revision never defined. Only the modern `_meta` declaration — or an
+    `MCP-Protocol-Version` header naming `2026-07-28` itself — selects the
+    modern ladder.
+    """
+
+    def test_claude_connector_shape_end_to_end(self) -> None:
+        # The observed sequence: classic initialize (with the extra
+        # Mcp-Method header), then tools/list under the negotiated version
+        # header plus Mcp-Method, no `_meta` anywhere.
+        response = Client().post(
+            "/mcp",
+            data={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "claude-proxy", "version": "0"},
+                },
+            },
+            content_type="application/json",
+            headers={"Mcp-Method": "initialize"},
+        )
+        assert response.status_code == 200
+        negotiated = response.json()["result"]["protocolVersion"]
+        assert negotiated == "2025-11-25"
+
+        response = Client().post(
+            "/mcp",
+            data={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+            content_type="application/json",
+            headers={
+                "MCP-Protocol-Version": negotiated,
+                "Mcp-Method": "tools/list",
+            },
+        )
+        assert response.status_code == 200
+        result = response.json()["result"]
+        assert result["tools"][0]["name"] == "Echo"
+
+    @pytest.mark.parametrize(
+        "headers",
+        [
+            {"Mcp-Method": "tools/list"},
+            {"MCP-Protocol-Version": "2026-01-01"},
+            {"MCP-Protocol-Version": "2026-01-01", "Mcp-Method": "tools/list"},
+        ],
+        ids=["mcp-method-alone", "unknown-version", "both"],
+    )
+    def test_never_a_modern_error_without_meta(self, headers: dict[str, str]) -> None:
+        # The invariant behind the class: a request that doesn't declare the
+        # modern `_meta` (and doesn't name `2026-07-28` in its version
+        # header) is never answered in modern vocabulary — no missing-_meta
+        # -32602, no -32020 header mismatch, no -32022 unsupported version —
+        # whatever extra headers it carries. It's a classic request, served
+        # as one.
+        response = Client().post(
+            "/mcp",
+            data={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+            content_type="application/json",
+            headers=headers,
+        )
+        assert response.status_code == 200
+        assert "tools" in response.json()["result"]
 
 
 class TestClassicAuth:
