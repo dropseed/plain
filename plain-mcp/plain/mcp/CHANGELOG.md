@@ -1,5 +1,20 @@
 # plain-mcp changelog
 
+## [0.6.0](https://github.com/dropseed/plain/releases/plain-mcp@0.6.0) (2026-08-10)
+
+### What's changed
+
+- **Which revision a request belongs to is now decided by its envelope alone.** A request is modern if it restates the protocol version in `params._meta`, or if its `MCP-Protocol-Version` header names `2026-07-28` exactly; everything else is classic. Previously the presence of an `Mcp-Method` header (or a version header naming anything outside `CLASSIC_PROTOCOL_VERSIONS`) also selected the modern path — which misrouted a fully conformant classic client that happened to send `Mcp-Method` too, rejecting it mid-session with a `-32602` for a `params._meta` envelope its revision never defined. claude.ai's connector proxy sends exactly that shape. Unrecognized headers are spec-legal for any client, SDK, or middlebox, so their presence is no longer treated as evidence of a revision. ([2ad52d8b26](https://github.com/dropseed/plain/commit/2ad52d8b26))
+- **Routing facts are stamped on the request span as they're learned** — `mcp.method`, `mcp.revision` (`classic` / `modern`), `mcp.protocol_version_header`, `mcp.method_header_present`, and `mcp.meta_protocol_version_present`. A request that dies partway up the validation ladder carries whatever was known by then, which is what a "why was this client rejected?" investigation reads first. ([2ad52d8b26](https://github.com/dropseed/plain/commit/2ad52d8b26))
+- **Every JSON-RPC error reply is now visible server-side before it ships.** The code and message land on the request span as `mcp.error.code` / `mcp.error.message`, and everything except an internal error (`-32603`, already logged with a traceback) logs a `MCP request rejected` warning on the `plain.mcp` logger carrying the routing facts. Classic replies ride HTTP 200, so this is otherwise the only server-side trace of a rejected classic request — and a client that swallows the response body surfaces nothing better than "connection failed". ([2ad52d8b26](https://github.com/dropseed/plain/commit/2ad52d8b26))
+
+### Upgrade instructions
+
+- No changes required.
+- This supersedes the 0.5.0 note that classic requests send none of the `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name` headers. Any of them may appear on any request, from any revision — infrastructure keying on them should treat them as advisory and fall back to inspecting the body.
+- A modern client that relied on `Mcp-Method` alone to be routed onto the modern ladder must now declare `io.modelcontextprotocol/protocolVersion` in `params._meta`, or send `MCP-Protocol-Version: 2026-07-28`. Without either, it's served as a classic client.
+- Expect new `WARNING`-level `MCP request rejected` records on the `plain.mcp` logger — one per rejected request. Adjust that logger's level if you don't want them.
+
 ## [0.5.0](https://github.com/dropseed/plain/releases/plain-mcp@0.5.0) (2026-08-07)
 
 ### What's changed
