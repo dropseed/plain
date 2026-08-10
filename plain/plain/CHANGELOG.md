@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.156.1](https://github.com/dropseed/plain/releases/plain@0.156.1) (2026-08-10)
+
+### What's changed
+
+- Fixed a `NameError` on every multipart upload large enough to spill to disk. `TemporaryUploadedFile.__init__` wrapped its temp file in `cast(IO[Any], ...)`, but `IO` and `Any` are imported only under `TYPE_CHECKING` — and `from __future__ import annotations` defers annotations, not ordinary expressions, so `cast()`'s first argument was evaluated at runtime and raised. Uploads under `FILE_UPLOAD_MAX_MEMORY_SIZE` (2.5 MB) are served by the in-memory handler and never reached this path. The `cast` is gone rather than moved to a runtime import. ([46b01da294](https://github.com/dropseed/plain/commit/46b01da294))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.156.0](https://github.com/dropseed/plain/releases/plain@0.156.0) (2026-08-03)
 
 ### What's changed
