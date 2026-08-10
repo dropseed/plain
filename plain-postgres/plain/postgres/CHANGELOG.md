@@ -1,5 +1,16 @@
 # plain-postgres changelog
 
+## [0.113.2](https://github.com/dropseed/plain/releases/plain-postgres@0.113.2) (2026-08-10)
+
+### What's changed
+
+- Fixed a `NameError` on any expression-based ordering — `Model.query.order_by(F("name"))`, `order_by(Lower("name"))`, or `Options(ordering=[Lower("name")])`. `SQLCompiler` cast ordering items to `BaseExpression`, which was imported only under `TYPE_CHECKING`; `cast()`'s first argument is an ordinary expression and is evaluated at runtime, so the branch raised instead of compiling. `BaseExpression` moves into the existing runtime import from `plain.postgres.expressions`. ([3429735be0](https://github.com/dropseed/plain/commit/3429735be0))
+- `QuerySet.order_by()` and `Query.add_ordering()` now accept `str | ResolvableExpression` instead of `str` / `str | BaseExpression`. That's the protocol both layers actually test with `isinstance()`, and the one `F()` satisfies (`F` extends `Combinable`, not `BaseExpression`) — so no type-checked caller could reach the expression branch at all before. ([3429735be0](https://github.com/dropseed/plain/commit/3429735be0))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.113.1](https://github.com/dropseed/plain/releases/plain-postgres@0.113.1) (2026-08-07)
 
 ### What's changed
