@@ -703,7 +703,7 @@ class QuerySet[T: "Model"]:
             update_fields_objs,
             unique_fields_objs,
         )
-        fields = meta.concrete_fields
+        fields = list(meta.concrete_fields)
         self._prepare_for_bulk_create(objs)
         with transaction.atomic(savepoint=False):
             objs_with_id, objs_without_id = partition(lambda o: o.id is None, objs)

@@ -234,7 +234,7 @@ class MultiValueDict(dict[str, list[Any]]):
         return {key: self[key] for key in self}
 
 
-class ImmutableList(tuple):
+class ImmutableList[T](tuple[T, ...]):
     """
     A tuple-like object that raises useful errors when it is asked to mutate.
 
@@ -254,7 +254,7 @@ class ImmutableList(tuple):
         *args: Any,
         warning: str = "ImmutableList object is immutable.",
         **kwargs: Any,
-    ) -> ImmutableList:
+    ) -> ImmutableList[T]:
         self = tuple.__new__(cls, *args, **kwargs)
         self.warning = warning
         return self

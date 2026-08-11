@@ -5,7 +5,7 @@ import inspect
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any
 
 from plain.postgres.exceptions import FieldDoesNotExist
 from plain.postgres.query import QuerySet
@@ -175,7 +175,7 @@ class Meta:
             self._expire_cache(reverse=False)
 
     @cached_property
-    def fields(self) -> ImmutableList[Field]:
+    def fields(self) -> ImmutableList:
         from plain.postgres.fields.related import RelatedField
 
         """
@@ -213,7 +213,7 @@ class Meta:
         )
 
     @cached_property
-    def concrete_fields(self) -> ImmutableList[Field]:
+    def concrete_fields(self) -> ImmutableList:
         """
         Return a list of all concrete fields on the model and its parents.
 
@@ -226,7 +226,7 @@ class Meta:
         )
 
     @cached_property
-    def local_concrete_fields(self) -> ImmutableList[Field]:
+    def local_concrete_fields(self) -> ImmutableList:
         """
         Return a list of all concrete fields on the model.
 
@@ -239,7 +239,7 @@ class Meta:
         )
 
     @cached_property
-    def many_to_many(self) -> ImmutableList[Field]:
+    def many_to_many(self) -> ImmutableList:
         """
         Return a list of all many to many fields on the model and its parents.
 
@@ -407,19 +407,7 @@ class Meta:
                     delattr(self, cache_key)
         self._get_fields_cache = {}
 
-    @overload
-    def get_fields(
-        self, include_reverse: Literal[False] = False
-    ) -> ImmutableList[Field]: ...
-
-    @overload
-    def get_fields(
-        self, include_reverse: Literal[True]
-    ) -> ImmutableList[Field | ForeignObjectRel]: ...
-
-    def get_fields(
-        self, include_reverse: bool = False
-    ) -> ImmutableList[Field | ForeignObjectRel]:
+    def get_fields(self, include_reverse: bool = False) -> ImmutableList:
         """
         Return a list of fields associated to the model.
 
@@ -434,40 +422,13 @@ class Meta:
         """
         return self._get_fields(reverse=include_reverse)
 
-    @overload
-    def _get_fields(
-        self,
-        *,
-        forward: Literal[True] = True,
-        reverse: Literal[False],
-        seen_models: set[type[Any]] | None = None,
-    ) -> ImmutableList[Field]: ...
-
-    @overload
-    def _get_fields(
-        self,
-        *,
-        forward: Literal[False],
-        reverse: Literal[True] = True,
-        seen_models: set[type[Any]] | None = None,
-    ) -> ImmutableList[ForeignObjectRel]: ...
-
-    @overload
     def _get_fields(
         self,
         *,
         forward: bool = True,
         reverse: bool = True,
         seen_models: set[type[Any]] | None = None,
-    ) -> ImmutableList[Field | ForeignObjectRel]: ...
-
-    def _get_fields(
-        self,
-        *,
-        forward: bool = True,
-        reverse: bool = True,
-        seen_models: set[type[Any]] | None = None,
-    ) -> ImmutableList[Field | ForeignObjectRel]:
+    ) -> ImmutableList:
         """
         Internal helper function to return fields of the model.
 

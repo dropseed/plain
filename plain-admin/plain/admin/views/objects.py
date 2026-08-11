@@ -248,21 +248,6 @@ class AdminListView(HTMXView, AdminView, ListView):
     def get_object_id(self, obj: Any) -> Any:
         return self.get_field_value(obj, "id")
 
-    def get_list_url(self) -> str:
-        return ""
-
-    def get_create_url(self) -> str:
-        return ""
-
-    def get_detail_url(self, obj: Any) -> str:
-        return ""
-
-    def get_update_url(self, obj: Any) -> str:
-        return ""
-
-    def get_delete_url(self, obj: Any) -> str:
-        return ""
-
     def get_object_url(self, obj: Any) -> str:
         if url := self.get_detail_url(obj):
             return url
@@ -296,21 +281,6 @@ class AdminCreateView(AdminView, CreateView):
     template_name = None
     nav_section = None
 
-    def get_list_url(self) -> str:
-        return ""
-
-    def get_create_url(self) -> str:
-        return ""
-
-    def get_detail_url(self, obj: Any) -> str:
-        return ""
-
-    def get_update_url(self, obj: Any) -> str:
-        return ""
-
-    def get_delete_url(self, obj: Any) -> str:
-        return ""
-
     def get_success_url(self, form: "BaseForm") -> str:
         if list_url := self.get_list_url():
             return list_url
@@ -337,21 +307,6 @@ class AdminDetailView(AdminView, DetailView):
             "admin/detail.html",  # A generic detail view for rendering any object
         ]
 
-    def get_list_url(self) -> str:
-        return ""
-
-    def get_create_url(self) -> str:
-        return ""
-
-    def get_detail_url(self, obj: Any) -> str:
-        return ""
-
-    def get_update_url(self, obj: Any) -> str:
-        return ""
-
-    def get_delete_url(self, obj: Any) -> str:
-        return ""
-
     def get_fields(self) -> list[str]:
         return self.fields.copy()  # Avoid mutating the class attribute itself
 
@@ -373,21 +328,6 @@ class AdminDetailView(AdminView, DetailView):
 class AdminUpdateView(AdminView, UpdateView):
     template_name = None
     nav_section = None
-
-    def get_list_url(self) -> str:
-        return ""
-
-    def get_create_url(self) -> str:
-        return ""
-
-    def get_detail_url(self, obj: Any) -> str:
-        return ""
-
-    def get_update_url(self, obj: Any) -> str:
-        return ""
-
-    def get_delete_url(self, obj: Any) -> str:
-        return ""
 
     def get_links(self) -> dict[str, str]:
         links = super().get_links()
@@ -419,21 +359,6 @@ class AdminUpdateView(AdminView, UpdateView):
 class AdminDeleteView(AdminView, DeleteView):
     template_name = "admin/delete.html"
     nav_section = None
-
-    def get_list_url(self) -> str:
-        return ""
-
-    def get_create_url(self) -> str:
-        return ""
-
-    def get_detail_url(self, obj: Any) -> str:
-        return ""
-
-    def get_update_url(self, obj: Any) -> str:
-        return ""
-
-    def get_delete_url(self, obj: Any) -> str:
-        return ""
 
     def get_links(self) -> dict[str, str]:
         links = super().get_links()
