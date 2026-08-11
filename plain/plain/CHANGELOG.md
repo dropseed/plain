@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.156.2](https://github.com/dropseed/plain/releases/plain@0.156.2) (2026-08-11)
+
+### What's changed
+
+- The HTTP/1.1 server no longer drops a request that arrives on an established keep-alive connection just as a worker begins shutting down. The keep-alive loop gated on the worker's `alive` flag at the top of each iteration, so when a worker was recycled (on `max_requests`, or a deploy's `SIGTERM`) a request already in flight on a pooled connection — such as one Heroku's router holds open to the dyno — was left unread and the socket was closed on it. Behind a router that surfaces as an H13 "Connection closed without response", one per worker recycle under sustained traffic (e.g. webhook deliveries). Such a request is now read and served with `Connection: close`, and the loop exits based on how the response was actually framed rather than on the `alive` flag, so the socket is never closed on a client that was just told the connection would stay open. ([2236aaff23](https://github.com/dropseed/plain/commit/2236aaff23))
+- Reads on a draining worker are now time-bounded. Once shutdown starts, each connection gets a deadline (derived from `SERVER_GRACEFUL_TIMEOUT` and the arbiter's kill deadline) to finish reading its final request, so a slow or trickling client can't pin a draining worker open, and a read can't outlive the graceful window and be cancelled mid-flight — which the client would see as a connection reset — instead of getting a clean `Connection: close`. ([2236aaff23](https://github.com/dropseed/plain/commit/2236aaff23))
+- Request-body framing is hardened: a request pipelined behind another is answered with `Connection: close` for the client to retry on a fresh connection rather than being silently dropped or mis-framed, `Transfer-Encoding` validation is deferred to the single authoritative parser (so `identity`/compressed codings are handled and unsupported ones return `501 Not Implemented`), and a malformed (e.g. negative) chunk size can no longer spin a worker's event loop. ([2236aaff23](https://github.com/dropseed/plain/commit/2236aaff23))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.156.1](https://github.com/dropseed/plain/releases/plain@0.156.1) (2026-08-10)
 
 ### What's changed
