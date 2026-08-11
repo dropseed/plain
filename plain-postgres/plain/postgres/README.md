@@ -486,6 +486,39 @@ with read_only():
     User.query.count()   # still works — outer txn is healthy
 ```
 
+### Row-level locking
+
+Lock the rows a query selects so concurrent transactions can't change them until yours commits. Postgres offers four lock strengths, from strongest to weakest, each with its own QuerySet method:
+
+```python
+with transaction.atomic():
+    account = Account.query.for_update().get(id=1)  # FOR UPDATE
+    account.balance -= 100
+    account.update(fields=["balance"])
+```
+
+| Method                | SQL clause          | Use it when                                                                |
+| --------------------- | ------------------- | -------------------------------------------------------------------------- |
+| `for_update()`        | `FOR UPDATE`        | You intend to update or delete the row.                                    |
+| `for_no_key_update()` | `FOR NO KEY UPDATE` | Same, but you won't touch the primary key — lets key-share locks proceed.  |
+| `for_share()`         | `FOR SHARE`         | You need the row to stay put while you read it, but others may also share. |
+| `for_key_share()`     | `FOR KEY SHARE`     | Weakest — only blocks changes to the row's key.                            |
+
+Locking requires an open transaction; calling any of these outside `transaction.atomic()` raises `TransactionManagementError`.
+
+All four accept the same options:
+
+- `nowait=True` — raise instead of waiting if a row is already locked.
+- `skip_locked=True` — skip already-locked rows instead of waiting (can't be combined with `nowait`).
+- `of=("self", "related")` — lock only the named tables in a join rather than every selected row.
+
+```python
+# Claim the next available job without blocking on rows another worker holds
+job = Job.query.for_update(skip_locked=True).filter(status="pending").first()
+```
+
+Chaining more than one lock method keeps only the last one.
+
 ## Schema management
 
 Schema changes fall into three categories, each with a different author and apply model:

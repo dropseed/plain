@@ -12,6 +12,7 @@ from plain.postgres.sql.query import (
     AggregateQuery,
     DeleteQuery,
     InsertQuery,
+    LockMode,
     Query,
     RawQuery,
     UpdateQuery,
@@ -25,6 +26,7 @@ __all__ = [
     "DeleteQuery",
     "InsertQuery",
     "UpdateQuery",
+    "LockMode",
     "AND",
     "OR",
     # Constants
