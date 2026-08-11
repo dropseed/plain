@@ -107,12 +107,18 @@ class _Client:
     async def assert_closed(self) -> None:
         """The keepalive loop exited and wrote nothing further.
 
-        (The socket close itself is _on_connection's job, so mimic it
-        here — the EOF read also proves no extra response was sent.)
+        The socket close itself is _on_connection's job, so mimic it here.
+        "Closed" reads as a clean EOF, or as a reset when the server closed
+        with an unread request still in the socket (Linux RSTs there where
+        macOS sends FIN) — both mean the connection is gone. An extra
+        *response* would instead surface as non-empty read bytes.
         """
         await asyncio.wait_for(self.server_task, timeout=5)
         self.conn.close()
-        assert await asyncio.wait_for(self.reader.read(1), timeout=5) == b""
+        try:
+            assert await asyncio.wait_for(self.reader.read(1), timeout=5) == b""
+        except ConnectionResetError:
+            pass
 
     def teardown(self) -> None:
         self.server_task.cancel()
