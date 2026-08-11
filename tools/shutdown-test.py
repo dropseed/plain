@@ -161,6 +161,14 @@ def test_inflight_drains(addr: tuple[str, int], pid: int) -> bool | tuple[bool, 
         if parse_status(interim) != 100:
             return False, f"Expected 100 Continue, got {interim[:100]!r}"
 
+        # Prime the probe right before the signal so its keep-alive idle
+        # clock (~2s server-side) is fresh — otherwise a slow run can have
+        # the server close the idle probe before SIGTERM, and that close
+        # would be misread below as a shutdown-dropped request.
+        probe.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
+        if not recv_response(probe):
+            return False, "Probe connection failed before shutdown"
+
         os.kill(pid, signal.SIGTERM)
 
         # Wait until the worker has observed the SIGTERM rather than
@@ -168,6 +176,8 @@ def test_inflight_drains(addr: tuple[str, int], pid: int) -> bool | tuple[bool, 
         # down, dispatched keep-alive responses switch to Connection: close.
         # (Probe / rather than /up/ — the healthcheck is answered at the
         # server layer, outside the dispatch path that adds the header.)
+        # A dropped probe here is the H13: a request on an established
+        # keep-alive connection must be answered, not left unread.
         deadline = time.monotonic() + 10
         while True:
             if time.monotonic() > deadline:
@@ -175,12 +185,12 @@ def test_inflight_drains(addr: tuple[str, int], pid: int) -> bool | tuple[bool, 
             try:
                 probe.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
                 resp = recv_response(probe)
+            except TimeoutError:
+                return False, "Probe read timed out during shutdown"
             except OSError:
-                # The keep-alive loop exits once the worker stops, so a
-                # torn-down probe also means shutdown was observed.
-                break
+                resp = b""
             if not resp:
-                break
+                return False, "Probe request dropped during shutdown (would be an H13)"
             if b"connection: close" in resp.split(b"\r\n\r\n", 1)[0].lower():
                 break
             time.sleep(0.1)

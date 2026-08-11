@@ -9,7 +9,10 @@ from __future__ import annotations
 import asyncio
 import io
 import os
+import time
 from typing import Any
+
+from ..connection import DRAIN_MIN_RECV
 
 # Classes that can undo reading data from
 # a given type of data source.
@@ -96,28 +99,42 @@ class AsyncBridgeUnreader(Unreader):
         conn: Any,
         loop: asyncio.AbstractEventLoop,
         timeout: float = 30,
+        worker: Any = None,
     ) -> None:
         super().__init__()
         self.buf.write(data)
         self._conn = conn
         self._loop = loop
         self._timeout = timeout
+        # Worker whose drain_read_deadline caps reads during shutdown.
+        # Read live on each chunk so a SIGTERM mid-body applies too.
+        self._worker = worker
         self._eof = False
         self.socket_bytes_read = 0
 
     async def _async_read(self) -> bytes:
-        """Read from the connection using asyncio streams."""
+        """Read the next bytes from the connection's stream."""
         return await self._conn.reader.read(8192)
 
     def chunk(self) -> bytes:
         if self._eof:
             return b""
+        timeout = self._timeout
+        deadline = self._worker.drain_read_deadline if self._worker else None
+        if deadline is not None:
+            # Floor at DRAIN_MIN_RECV (like the pre-buffer paths) so a
+            # large body already buffered in the StreamReader isn't dropped
+            # by a zero-length wait right at the deadline.
+            timeout = min(timeout, max(DRAIN_MIN_RECV, deadline - time.monotonic()))
         future = asyncio.run_coroutine_threadsafe(self._async_read(), self._loop)
         try:
             # On Python 3.11+, concurrent.futures.TimeoutError is
             # builtins.TimeoutError so this except clause catches it.
-            data = future.result(timeout=self._timeout)
+            data = future.result(timeout=timeout)
         except TimeoutError:
+            # The read outlived its budget. Cancel it (if it hasn't
+            # started) and give up — the connection is about to close, so
+            # any bytes a running recv still collects are discarded with it.
             future.cancel()
             self._eof = True
             raise

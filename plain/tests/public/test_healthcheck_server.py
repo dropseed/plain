@@ -30,6 +30,7 @@ class _StubWorker:
             healthcheck_path.encode("ascii") if healthcheck_path else b""
         )
         self.alive = True
+        self.drain_read_deadline: float | None = None
         self.max_body = 10 * 1024 * 1024
         self.nr_conns = 0
         self.max_keepalived = 10

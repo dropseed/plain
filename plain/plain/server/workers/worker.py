@@ -56,6 +56,12 @@ SIGNALS = [
 # SIGTERM-initiated shutdown finishes before the arbiter's SIGKILL lands.
 DRAIN_TEARDOWN_MARGIN = 2.0
 
+# Ceiling on how long a connection may spend reading its final request
+# once shutdown starts (see drain_read_deadline). Without a bound, a
+# client trickling bytes (each recv resets the per-recv timeout) could
+# pin its connection task for the whole graceful window.
+DRAIN_READ_TIMEOUT = 5.0
+
 
 def check_worker_config(threads: int, connections: int, log: logging.Logger) -> None:
     max_keepalived = connections - threads
@@ -102,6 +108,11 @@ class Worker:
             healthcheck_path.encode("ascii") if healthcheck_path else b""
         )
         self.nr_conns: int = 0
+        # Absolute time.monotonic() deadline for post-shutdown reads,
+        # published when shutdown starts (None while alive). Connection
+        # loops read it live via h1._recv_timeout, so it also bounds
+        # requests that were already mid-read when the signal landed.
+        self.drain_read_deadline: float | None = None
         self._connection_tasks: set[asyncio.Task] = set()
         self._servers: list[asyncio.Server] = []
         self._notify_during_drain = True
@@ -298,8 +309,7 @@ class Worker:
         # Connection: close; responses already dispatched still go out
         # keep-alive), and h2 connections watch _shutdown_event to refuse
         # new streams and drain.
-        self.alive = False
-        self._shutdown_event.set()
+        self._begin_drain()
 
         # Stop accepting new connections (don't await wait_closed() —
         # it blocks until all connection tasks finish, bypassing
@@ -391,6 +401,14 @@ class Worker:
                 kill_deadline = self.heartbeat.kill_deadline()
                 if kill_deadline:
                     deadline = min(deadline, kill_deadline - margin)
+                    # Tighten in-flight reads to match: a read latched a
+                    # longer drain deadline at shutdown start would else
+                    # outlive this nearer kill time and die by cancellation
+                    # (an RST) instead of finishing with Connection: close.
+                    if self.drain_read_deadline is not None:
+                        self.drain_read_deadline = min(
+                            self.drain_read_deadline, deadline
+                        )
 
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -409,9 +427,39 @@ class Worker:
 
         self.tpool.shutdown(wait=False)
 
-    def _signal_exit(self) -> None:
+    def _begin_drain(self) -> None:
+        """Enter graceful shutdown: flip alive, publish the drain state.
+
+        Publishing drain_read_deadline here (not later in run()) means
+        in-flight reads are bounded from the instant shutdown starts —
+        otherwise a SIGTERM landing while the heartbeat loop is parked
+        leaves alive False but the deadline None, and a final-request read
+        runs unbounded until _graceful_shutdown cancels it (an RST to the
+        client). Idempotent: the first call wins the deadline.
+        """
+        if self.drain_read_deadline is not None:
+            self.alive = False
+            self._shutdown_event.set()
+            return
         self.alive = False
         self._shutdown_event.set()
+
+        # Derive the read budget from the graceful window (and the
+        # arbiter's SIGKILL time when one is published) so a final-request
+        # read never outlives the drain and dies by cancellation.
+        from plain.runtime import settings
+
+        read_budget = min(DRAIN_READ_TIMEOUT, settings.SERVER_GRACEFUL_TIMEOUT / 4)
+        kill_deadline = self.heartbeat.kill_deadline()
+        if kill_deadline:
+            read_budget = min(
+                read_budget,
+                max(0.0, kill_deadline - DRAIN_TEARDOWN_MARGIN - time.monotonic()),
+            )
+        self.drain_read_deadline = time.monotonic() + read_budget
+
+    def _signal_exit(self) -> None:
+        self._begin_drain()
         # Immediately stop accepting new connections so requests
         # don't land on a worker that's about to exit (H13 prevention).
         # This runs as an event-loop callback, so the heartbeat loop in

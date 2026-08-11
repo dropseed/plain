@@ -11,6 +11,13 @@ if TYPE_CHECKING:
 # Keep-alive connection timeout in seconds
 KEEPALIVE = 2
 
+# Per-recv timeout floor during shutdown drain. The drain deadline caps
+# total read time, but each individual recv still gets at least this long
+# so a request whose bytes are already buffered (or arrive in one segment,
+# as a router's pooled connection does) is always drained rather than
+# dropped by a zero-length timeout.
+DRAIN_MIN_RECV = 0.5
+
 
 class Connection:
     def __init__(
@@ -33,7 +40,8 @@ class Connection:
         self.is_ssl: bool = is_ssl
         self.req_count: int = 0
 
-        # Byte read during keepalive wait, prepended to next header read
+        # Byte read during the keepalive wait, prepended to the next header
+        # read so wait_readable()'s peek isn't lost.
         self._keepalive_byte: bytes = b""
 
     def close(self) -> None:
@@ -54,7 +62,8 @@ class Connection:
         await self.sendall(util._error_response_bytes(status_int, reason, mesg))
 
     async def wait_readable(self) -> None:
+        """Return when the next request's bytes are available to recv."""
         data = await self.reader.read(1)
         if data:
-            # Prepend the peeked byte back into the buffer
+            # Prepend the peeked byte back into the next read.
             self._keepalive_byte = data

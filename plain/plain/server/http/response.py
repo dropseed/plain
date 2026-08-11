@@ -56,6 +56,9 @@ class Response:
         self.status: str | None = None
         self.chunked = False
         self.must_close = False
+        # Latched when headers are framed: what the Connection header
+        # actually said. Set in default_headers().
+        self.framed_close: bool | None = None
         self.headers: list[tuple[str, str]] = []
         self.headers_sent = False
         self.response_length: int | None = None
@@ -67,6 +70,12 @@ class Response:
         self.must_close = True
 
     def should_close(self) -> bool:
+        # Once headers are framed, the wire is the answer — the keepalive
+        # decision after the response is written must match what the
+        # client was told, or the socket closes on a client that was just
+        # promised keep-alive (a dropped request when it pipelines/reuses).
+        if self.framed_close is not None:
+            return self.framed_close
         if self.must_close or self.req.should_close():
             return True
         if self.response_length is not None or self.chunked:
@@ -147,13 +156,20 @@ class Response:
         return True
 
     def default_headers(self) -> list[str]:
-        # set the connection header
+        # Set the connection header and latch the close decision. The
+        # latch records the decision, not the header text: an upgrade
+        # response frames "Connection: upgrade" but the keepalive loop
+        # still follows should_close() — otherwise force_close() (e.g.
+        # shutdown) would be silently ignored on upgrade responses.
+        close = self.should_close()
         if self.upgrade:
             connection = "upgrade"
-        elif self.should_close():
+        elif close:
             connection = "close"
         else:
             connection = "keep-alive"
+
+        self.framed_close = close
 
         headers = [
             f"HTTP/{self.req.version[0]}.{self.req.version[1]} {self.status}\r\n",

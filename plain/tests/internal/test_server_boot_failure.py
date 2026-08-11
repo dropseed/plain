@@ -15,13 +15,9 @@ import signal
 import socket
 import threading
 
+from server_stubs import StubApp
+
 from plain.server.workers import boot_failure
-
-
-class _StubApp:
-    is_ssl = False
-    certfile = None
-    keyfile = None
 
 
 class _StubHeartbeat:
@@ -92,7 +88,7 @@ def test_serves_traceback_then_returns_on_file_change(monkeypatch) -> None:
     try:
         boot_failure.serve_boot_failure(
             listeners=[listener],  # ty: ignore[invalid-argument-type]
-            app=_StubApp(),  # ty: ignore[invalid-argument-type]
+            app=StubApp(),  # ty: ignore[invalid-argument-type]
             heartbeat=heartbeat,  # ty: ignore[invalid-argument-type]
             arbiter_pid=os.getppid(),
             traceback_text="ImportError: cannot import name 'X'",

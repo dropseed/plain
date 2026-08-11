@@ -18,11 +18,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import signal
 import socket
 import time
-from concurrent.futures import ThreadPoolExecutor
+
+from server_stubs import StubHeartbeat, make_worker
 
 from plain.server.workers.worker import Worker
 
@@ -34,32 +34,6 @@ class _Listener:
         self.sock: socket.socket | None = socket.create_server(("127.0.0.1", 0))
 
 
-class _StubApp:
-    """Minimal stand-in for ServerApplication."""
-
-    is_ssl = False
-    certfile = None
-    keyfile = None
-    threads = 1
-    reload = False
-
-
-class _StubHeartbeat:
-    """Minimal stand-in for WorkerHeartbeat."""
-
-    def __init__(self, *, deadline: float = 0.0) -> None:
-        self.deadline = deadline
-
-    def notify(self) -> None:
-        pass
-
-    def is_retiring(self) -> bool:
-        return False
-
-    def kill_deadline(self) -> float:
-        return self.deadline
-
-
 class _CaptureHandler(logging.Handler):
     def __init__(self) -> None:
         super().__init__()
@@ -69,26 +43,9 @@ class _CaptureHandler(logging.Handler):
         self.records.append(record)
 
 
-def _make_worker(
-    listener: _Listener | None = None, *, heartbeat: _StubHeartbeat | None = None
-) -> Worker:
-    worker = Worker(
-        age=0,
-        ppid=os.getppid(),
-        sockets=[listener] if listener else [],  # ty: ignore[invalid-argument-type]
-        app=_StubApp(),  # ty: ignore[invalid-argument-type]
-        timeout=5,
-        heartbeat=heartbeat or _StubHeartbeat(),  # ty: ignore[invalid-argument-type]
-        handler=None,
-    )
-    # Normally created in init_process(), which these tests bypass.
-    worker.tpool = ThreadPoolExecutor(max_workers=1)
-    return worker
-
-
 def test_signal_exit_mid_iteration_shuts_down_cleanly() -> None:
     listener = _Listener()
-    worker = _make_worker(listener)
+    worker = make_worker(sockets=[listener])
 
     capture = _CaptureHandler()
     logger = logging.getLogger("test.server.worker.shutdown")
@@ -141,7 +98,7 @@ def _drain(worker: Worker, *, task_seconds: float) -> tuple[bool, float]:
 
 
 def test_drain_notifies_heartbeat_and_completes_requests() -> None:
-    worker = _make_worker()
+    worker = make_worker()
     notifies = 0
 
     def notify() -> None:
@@ -159,7 +116,7 @@ def test_drain_notifies_heartbeat_and_completes_requests() -> None:
 
 
 def test_stalled_pool_drain_skips_heartbeat() -> None:
-    worker = _make_worker()
+    worker = make_worker()
     notifies = 0
 
     def notify() -> None:
@@ -181,7 +138,7 @@ def test_no_kill_deadline_keeps_full_graceful_window() -> None:
     # A retirement SIGTERM comes from our own arbiter with no SIGKILL
     # follower (only _stop publishes a kill deadline), so the drain keeps
     # the full graceful window.
-    worker = _make_worker()
+    worker = make_worker()
     worker.notify = lambda: None  # ty: ignore[invalid-assignment]
 
     completed, _ = _drain(worker, task_seconds=0.3)
@@ -194,7 +151,7 @@ def test_short_graceful_timeout_still_drains() -> None:
     # SERVER_GRACEFUL_TIMEOUT keeps a usable drain window on SIGTERM.
     from plain.runtime import settings
 
-    worker = _make_worker(heartbeat=_StubHeartbeat(deadline=time.monotonic() + 2))
+    worker = make_worker(heartbeat=StubHeartbeat(deadline=time.monotonic() + 2))
     worker.notify = lambda: None  # ty: ignore[invalid-assignment]
 
     original = settings.SERVER_GRACEFUL_TIMEOUT
@@ -210,7 +167,7 @@ def test_short_graceful_timeout_still_drains() -> None:
 def test_imminent_kill_deadline_cancels_drain() -> None:
     # The arbiter's published SIGKILL time is already due: the drain must
     # cancel immediately rather than waiting a fresh full window.
-    worker = _make_worker(heartbeat=_StubHeartbeat(deadline=time.monotonic()))
+    worker = make_worker(heartbeat=StubHeartbeat(deadline=time.monotonic()))
     worker.notify = lambda: None  # ty: ignore[invalid-assignment]
 
     completed, elapsed = _drain(worker, task_seconds=30)
@@ -224,8 +181,8 @@ def test_kill_deadline_published_mid_drain_caps_it() -> None:
     # The published deadline must take effect mid-drain, not only at
     # drain start.
     async def scenario() -> float:
-        heartbeat = _StubHeartbeat()
-        worker = _make_worker(heartbeat=heartbeat)
+        heartbeat = StubHeartbeat()
+        worker = make_worker(heartbeat=heartbeat)
         worker.notify = lambda: None  # ty: ignore[invalid-assignment]
 
         task = asyncio.create_task(asyncio.sleep(30))
