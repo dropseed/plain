@@ -1,5 +1,15 @@
 # plain-connect changelog
 
+## [0.7.3](https://github.com/dropseed/plain/releases/plain-connect@0.7.3) (2026-08-12)
+
+### What's changed
+
+- `CONNECT_LOG_LEVEL` validation checks against the logging level-name mapping directly — same `ValueError` on an invalid name, cleaner internals ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.7.2](https://github.com/dropseed/plain/releases/plain-connect@0.7.2) (2026-06-26)
 
 ### What's changed
