@@ -1,5 +1,15 @@
 # plain-scan changelog
 
+## [0.6.6](https://github.com/dropseed/plain/releases/plain-scan@0.6.6) (2026-08-12)
+
+### What's changed
+
+- Internal simplification of the TLS, CSP, and cookie audits — no behavior changes ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.6.5](https://github.com/dropseed/plain/releases/plain-scan@0.6.5) (2026-07-15)
 
 ### What's changed
