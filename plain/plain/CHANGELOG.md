@@ -1,5 +1,23 @@
 # plain changelog
 
+## [0.157.0](https://github.com/dropseed/plain/releases/plain@0.157.0) (2026-08-12)
+
+### What's changed
+
+- `Router.urls` is now typed as a tuple (`tuple[URLPattern | URLResolver, ...]`), and `include()` takes a tuple of url patterns or a `Router` class. Lists still work at runtime — the resolver normalizes them — but they now fail type checking ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Added `plain.utils.timezone.naive_datetime_from_date()` for converting a `date` to a naive midnight `datetime` ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Form field `default_validators` is now a tuple and `default_error_messages` is annotated `ClassVar`; `URLValidator.schemes` and `EmailValidator.domain_allowlist` are tuples ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `timezone.activate()` raises `TypeError` (was `ValueError`) when given something other than a `tzinfo` or string ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Fixed a `ValidationError` bug where nested errors in a list could read `error_list` off the wrong object due to a shadowed loop variable ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- The HTTP server measures request timing with timezone-aware UTC datetimes (also faster than naive `now()`) ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `plain create` scaffolds new packages with a tuple `urls` declaration ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Lint-driven cleanups across the CLI, forms, http, and server internals from adopting ruff 0.16's default rules — no behavior changes ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- Change `urls = [...]` to `urls = (...)` in your `Router` classes (including nested `include("...", [...])` lists). Runtime behavior is unchanged, but `plain check` will fail type checking until converted. Remember the trailing comma for a single entry: `urls = (path("", HomeView),)`
+- If you catch `ValueError` from `timezone.activate()` for invalid timezone types, catch `TypeError` instead
+
 ## [0.156.2](https://github.com/dropseed/plain/releases/plain@0.156.2) (2026-08-11)
 
 ### What's changed
