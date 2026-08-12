@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.26.7](https://github.com/dropseed/plain/releases/plain-passwords@0.26.7) (2026-08-12)
+
+### What's changed
+
+- Password-reset token timestamps use aware UTC time (the timestamp only provides uniqueness — no behavior change) ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.26.6](https://github.com/dropseed/plain/releases/plain-passwords@0.26.6) (2026-08-02)
 
 ### What's changed
