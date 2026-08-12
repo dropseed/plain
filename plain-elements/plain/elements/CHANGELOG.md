@@ -1,5 +1,15 @@
 # plain-elements changelog
 
+## [0.11.7](https://github.com/dropseed/plain/releases/plain-elements@0.11.7) (2026-08-12)
+
+### What's changed
+
+- Internal lint annotation on the template extension — no behavior changes ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.11.6](https://github.com/dropseed/plain/releases/plain-elements@0.11.6) (2026-06-22)
 
 ### What's changed
