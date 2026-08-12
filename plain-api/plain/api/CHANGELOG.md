@@ -1,5 +1,17 @@
 # plain-api changelog
 
+## [0.34.2](https://github.com/dropseed/plain/releases/plain-api@0.34.2) (2026-08-12)
+
+### What's changed
+
+- The OpenAPI generator raises `TypeError` (was `ValueError`) when it encounters an object that isn't a url pattern, and accepts any sequence of url patterns ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `VersionedAPIView.api_versions` is annotated `ClassVar` ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Internal lint-driven cleanups; removed stale type-checker suppressions in OpenAPI validation ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.34.1](https://github.com/dropseed/plain/releases/plain-api@0.34.1) (2026-08-02)
 
 ### What's changed
