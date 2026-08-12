@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.21.9](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.9) (2026-08-12)
+
+### What's changed
+
+- `urls` declared as a tuple; internal lint cleanups ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.8](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.8) (2026-08-02)
 
 ### What's changed
