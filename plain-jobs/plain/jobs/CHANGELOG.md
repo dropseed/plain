@@ -1,5 +1,17 @@
 # plain-jobs changelog
 
+## [0.57.2](https://github.com/dropseed/plain/releases/plain-jobs@0.57.2) (2026-08-12)
+
+### What's changed
+
+- Worker and job error logs use descriptive messages ("Job failed", "Worker heartbeat failed", "Failed to claim job", …) instead of the bare exception as the message — tracebacks are unchanged ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `Schedule` components raise `TypeError` (was `ValueError`) when given something other than an int or str, and comparing a schedule component against an unrelated object returns `False` instead of raising ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Admin viewset attributes declared as tuples ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- If log-based alerting matches on worker error message text, update patterns for the new messages
+
 ## [0.57.1](https://github.com/dropseed/plain/releases/plain-jobs@0.57.1) (2026-08-02)
 
 ### What's changed
