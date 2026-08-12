@@ -1,5 +1,22 @@
 # plain-postgres changelog
 
+## [0.114.0](https://github.com/dropseed/plain/releases/plain-postgres@0.114.0) (2026-08-12)
+
+### What's changed
+
+- Wrong-type arguments now raise `TypeError` instead of `ValueError` across the schema and query APIs: `UniqueConstraint`/`Index` options (`condition`, `deferrable`, `include`, `opclasses`, `fields`), `Extract`/`Trunc` field types, non-bool `isnull` lookups, `RunPython` without a callable, serializer registration, assigning a wrong-model instance (or bool) to a foreign key, and reverse descriptors on non-FK/M2M fields ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `Migration.operations`/`dependencies`/`replaces` are typed as `Sequence`, and `plain migrations create` now writes them as tuples in generated files. Existing list-based migration files keep working ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Migration filename timestamps use the app's `TIME_ZONE` (via `timezone.localtime()`) instead of the machine's local clock, so a team generates consistently named migrations ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Model field `default_validators` is now a tuple and `empty_values` a tuple; `ignored_tables` on the connection is a tuple ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `ModelsRegistry.get_models()` caching was reworked to a per-instance memo (still cleared by `clear_cache()`), replacing a `functools.cache` keyed on the registry instance ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `on_commit()` handler errors are logged with `logger.exception()` — same message and traceback, standard idiom ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- If you catch `ValueError` around any of the argument-validation cases above, catch `TypeError` instead
+- Newly generated migrations use tuples for `dependencies`/`operations`; existing migration files don't need to change
+- Requires `plain>=0.157.0`
+
 ## [0.113.2](https://github.com/dropseed/plain/releases/plain-postgres@0.113.2) (2026-08-10)
 
 ### What's changed
