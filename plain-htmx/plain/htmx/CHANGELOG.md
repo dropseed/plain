@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.20.3](https://github.com/dropseed/plain/releases/plain-htmx@0.20.3) (2026-08-12)
+
+### What's changed
+
+- Documentation examples updated to the tuple `urls` convention; internal lint annotation ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.20.2](https://github.com/dropseed/plain/releases/plain-htmx@0.20.2) (2026-07-21)
 
 ### What's changed
