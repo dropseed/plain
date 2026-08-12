@@ -1349,7 +1349,7 @@ dev = [
 
 [[package]]
 name = "plain-pytest"
-version = "0.19.0"
+version = "0.19.1"
 source = { editable = "plain-pytest" }
 dependencies = [
     { name = "click" },
@@ -1393,7 +1393,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-scan"
-version = "0.6.5"
+version = "0.6.6"
 source = { editable = "plain-scan" }
 dependencies = [
     { name = "httpx" },
@@ -1416,7 +1416,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-sessions"
-version = "0.46.0"
+version = "0.46.1"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
@@ -1496,7 +1496,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-toolbar"
-version = "0.13.0"
+version = "0.13.1"
 source = { editable = "plain-toolbar" }
 dependencies = [
     { name = "plain" },
