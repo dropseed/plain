@@ -1,5 +1,16 @@
 # plain-tunnel changelog
 
+## [0.12.9](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.9) (2026-08-12)
+
+### What's changed
+
+- Tunnel server lockfile security updates ([99caf7fd9e](https://github.com/dropseed/plain/commit/99caf7fd9e))
+- Internal lint cleanup ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.8](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.8) (2026-08-02)
 
 ### What's changed

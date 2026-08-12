@@ -1513,7 +1513,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-tunnel"
-version = "0.12.8"
+version = "0.12.9"
 source = { editable = "plain-tunnel" }
 dependencies = [
     { name = "httpx" },
