@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.50.3](https://github.com/dropseed/plain/releases/plain-oauth@0.50.3) (2026-08-12)
+
+### What's changed
+
+- Provider examples raise `OAuthError` with a clear message when no verified/confirmed primary email is available, instead of leaking an `IndexError`/`StopIteration` ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `urls` and admin viewset attributes declared as tuples; internal cleanups ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- If you based a provider on the GitHub/Bitbucket examples, consider adopting the explicit missing-email `OAuthError` handling
+
 ## [0.50.2](https://github.com/dropseed/plain/releases/plain-oauth@0.50.2) (2026-08-02)
 
 ### What's changed
