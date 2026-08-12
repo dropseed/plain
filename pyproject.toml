@@ -5,6 +5,9 @@ requires-python = ">=3.13"
 
 [dependency-groups]
 dev = [
+  # Optional runtime dep of plain-api's --validate; hoisted so ty resolves its
+  # imports in every dev/CI environment.
+  "openapi-spec-validator>=0.7.1",
   "plain",
   "plain-admin",
   "plain-api",

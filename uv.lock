@@ -1562,6 +1562,7 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "openapi-spec-validator" },
     { name = "plain" },
     { name = "plain-admin" },
     { name = "plain-api" },
@@ -1602,6 +1603,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "openapi-spec-validator", specifier = ">=0.7.1" },
     { name = "plain", editable = "plain" },
     { name = "plain-admin", editable = "plain-admin" },
     { name = "plain-api", editable = "plain-api" },
