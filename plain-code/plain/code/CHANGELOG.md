@@ -1,5 +1,17 @@
 # plain-code changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-code@0.24.0) (2026-08-12)
+
+### What's changed
+
+- Ruff is now a bounded dependency (`ruff>=0.16.2,<0.17`), so every checkout and app on the same plain.code release lints with the same ruff version and rule set ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- The bundled config now deliberately tracks ruff's default rules (which expanded significantly in ruff 0.16) instead of pinning a small explicit list. A short, documented ignore list remains: `ISC001` (formatter conflict), `B009`/`B010` (getattr/setattr with literal names is how dynamic-attribute code stays visible to the type checker), and `BLE001`/`S110`/`S112` (broad catches at error boundaries are design, not accidents) ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- Upgrading will move you to ruff 0.16 and its expanded default rule set, so `plain fix` / `plain code check` will likely surface new findings in your code without you changing anything. Run `plain fix` first — many are auto-fixable (import grouping, `__all__` sorting, simplifications) — then address the rest: prefer tuples for declarative class attributes and `ClassVar[...]` for mutable dict class attributes (`RUF012`), and timezone-aware datetimes (`DTZ*`)
+- Ruff may also flag now-unused `# noqa` comments (`RUF100`) — safe to delete
+
 ## [0.23.1](https://github.com/dropseed/plain/releases/plain-code@0.23.1) (2026-08-07)
 
 ### What's changed

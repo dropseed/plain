@@ -921,7 +921,7 @@ dev = [{ name = "pytest" }]
 
 [[package]]
 name = "plain-code"
-version = "0.23.1"
+version = "0.24.0"
 source = { editable = "plain-code" }
 dependencies = [
     { name = "httpx" },
