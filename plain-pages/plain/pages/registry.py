@@ -21,7 +21,7 @@ class PagesRegistry:
         self._path_mappings = {}  # relative_path -> absolute_path
         self._companions = {}  # html_relative_path -> md_relative_path
 
-    def get_page_urls(self) -> list[URLPattern]:
+    def get_page_urls(self) -> tuple[URLPattern, ...]:
         """
         Generate a list of real urls based on the files that exist.
         This way, you get a concrete url reversingerror if you try
@@ -55,7 +55,7 @@ class PagesRegistry:
                         )
                     )
 
-        return paths
+        return tuple(paths)
 
     def discover_pages(self, pages_dir: str) -> None:
         # Collect all files first so we can detect .md/.html pairs

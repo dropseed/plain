@@ -9,12 +9,11 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
+from plain.cli.print import print_event
+from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 from rich.columns import Columns
 from rich.console import Console
 from rich.text import Text
-
-from plain.cli.print import print_event
-from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .mkcert import MkcertManager
 from .process import Supervisor
@@ -27,7 +26,7 @@ ENTRYPOINT_GROUP = "plain.dev"
 class DevSupervisor(Supervisor):
     state_filename = "dev.pid"
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "run"
-    background_command = ["dev"]
+    background_command = ("dev",)
     display_name = "`plain dev`"
 
     def setup(
@@ -227,7 +226,7 @@ class DevSupervisor(Supervisor):
         """Symlink the plain package into .plain so we can look at it easily"""
         spec = find_spec("plain.runtime")
         if spec is None or spec.origin is None:
-            return None
+            return
         plain_path = Path(spec.origin).parent.parent
         if not PLAIN_TEMP_PATH.exists():
             PLAIN_TEMP_PATH.mkdir()
@@ -337,7 +336,7 @@ class DevSupervisor(Supervisor):
 
     def run_preflight(self) -> None:
         if subprocess.run(
-            ["plain", "preflight", "--quiet"], env=self.plain_env
+            ["plain", "preflight", "--quiet"], env=self.plain_env, check=False
         ).returncode:
             click.secho("Preflight check failed!", fg="red")
             sys.exit(1)

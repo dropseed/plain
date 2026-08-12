@@ -179,6 +179,7 @@ plain.runtime.setup()
 
 # Now you can use Plain normally
 from plain.runtime import settings
+
 print(settings.DEBUG)
 ```
 

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import functools
 import mimetypes
 import os
-from email.utils import formatdate, parsedate
+from email.utils import parsedate
 from io import BytesIO
 
 from plain.http import (
@@ -17,6 +16,7 @@ from plain.http import (
 from plain.http.response import ResponseHeaders
 from plain.runtime import settings
 from plain.urls import reverse
+from plain.utils.http import http_date
 from plain.views import View
 
 from .compile import get_compiled_path
@@ -48,18 +48,20 @@ class AssetView(View):
         url_path = url_path.rstrip("/")
 
         # If a CDN is configured, redirect compiled assets there
-        if settings.ASSETS_CDN_URL:
-            if cdn_response := self.get_cdn_redirect_response(url_path):
-                return cdn_response
+        if settings.ASSETS_CDN_URL and (
+            cdn_response := self.get_cdn_redirect_response(url_path)
+        ):
+            return cdn_response
 
         if settings.DEBUG:
             absolute_path = self.get_debug_asset_path(url_path)
         else:
             absolute_path = self.get_asset_path(url_path)
 
-            if settings.ASSETS_REDIRECT_ORIGINAL:
-                if redirect_response := self.get_redirect_response(url_path):
-                    return redirect_response
+            if settings.ASSETS_REDIRECT_ORIGINAL and (
+                redirect_response := self.get_redirect_response(url_path)
+            ):
+                return redirect_response
 
         # check_asset_path validates and raises if path is invalid
         # After this point, absolute_path is guaranteed to be a valid str
@@ -79,7 +81,7 @@ class AssetView(View):
         content_type, _ = mimetypes.guess_type(absolute_path)
 
         response = FileResponse(
-            open(absolute_path, "rb"),
+            open(absolute_path, "rb"),  # noqa: SIM115 — FileResponse takes ownership and closes it
             filename=os.path.basename(absolute_path),
             content_type=content_type,
         )
@@ -114,31 +116,14 @@ class AssetView(View):
         if os.path.isdir(path):
             raise NotFoundError404("Asset is a directory")
 
-    @functools.cache
     def get_last_modified(self, path: str) -> str | None:
-        try:
-            mtime = os.path.getmtime(path)
-        except OSError:
-            mtime = None
+        return _get_last_modified(path)
 
-        if mtime:
-            return formatdate(mtime, usegmt=True)
-        return None
-
-    @functools.cache
     def get_etag(self, path: str) -> str:
-        try:
-            mtime = os.path.getmtime(path)
-        except OSError:
-            mtime = 0.0
+        return _get_etag(path)
 
-        timestamp = int(mtime)
-        size = self.get_size(path)
-        return f'"{timestamp:x}-{size:x}"'
-
-    @functools.cache
     def get_size(self, path: str) -> int:
-        return os.path.getsize(path)
+        return _get_size(path)
 
     def update_headers(self, headers: ResponseHeaders, path: str) -> ResponseHeaders:
         headers.setdefault("Access-Control-Allow-Origin", "*")
@@ -334,3 +319,27 @@ class AssetView(View):
         response.headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
         response.headers["Content-Length"] = str(end - start + 1)
         return response
+
+
+# Deliberately uncached: these validators are only consulted for
+# non-fingerprinted assets, which can change on disk while the process runs.
+def _get_last_modified(path: str) -> str | None:
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return None
+    if not mtime:
+        return None
+    return http_date(mtime)
+
+
+def _get_etag(path: str) -> str:
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        mtime = 0.0
+    return f'"{int(mtime):x}-{_get_size(path):x}"'
+
+
+def _get_size(path: str) -> int:
+    return os.path.getsize(path)

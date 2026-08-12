@@ -45,6 +45,7 @@ def _measure_package(pkg: str) -> tuple[str, float] | None:
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
         if out.returncode == 0:
             pkg_mb = float(out.stdout.strip())

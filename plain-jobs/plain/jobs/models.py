@@ -13,13 +13,13 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import Link, SpanContext, SpanKind, TraceFlags
-
-from plain import postgres
 from plain.logs import get_framework_logger
 from plain.postgres import transaction, types
 from plain.postgres.expressions import F
 from plain.runtime import settings
 from plain.utils import timezone
+
+from plain import postgres
 
 from .exceptions import DeferJob
 from .otel import (
@@ -36,8 +36,8 @@ if TYPE_CHECKING:
     from .jobs import Job
 
 __all__ = [
-    "JobRequest",
     "JobProcess",
+    "JobRequest",
     "JobResult",
     "JobResultStatuses",
     "WorkerHeartbeat",
@@ -331,7 +331,7 @@ class JobProcess(postgres.Model):
                     # unique constraint on job_process_uuid and produces a
                     # second log line. Rare; correct outcome; not worth
                     # pre-checking on every successful job.
-                    logger.exception(e)
+                    logger.exception("Job failed")
                     error_type = record_span_error(span, e)
                     metric_attributes[ERROR_TYPE] = error_type
                     return self.convert_to_result(

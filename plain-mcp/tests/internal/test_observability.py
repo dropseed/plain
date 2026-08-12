@@ -20,7 +20,6 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
-
 from plain.mcp.exceptions import INVALID_PARAMS, METHOD_NOT_FOUND
 from plain.mcp.views import META_PROTOCOL_VERSION, PROTOCOL_VERSION
 from plain.test import Client

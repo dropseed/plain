@@ -1,13 +1,12 @@
-from plain import postgres
 from plain.postgres import migrations
+
+from plain import postgres
 
 
 class Migration(migrations.Migration):
-    dependencies = [
-        ("examples", "0017_random_string_token"),
-    ]
+    dependencies = (("examples", "0017_random_string_token"),)
 
-    operations = [
+    operations = (
         migrations.CreateModel(
             name="StorageParametersExample",
             fields=[
@@ -15,4 +14,4 @@ class Migration(migrations.Migration):
                 ("name", postgres.TextField(max_length=100)),
             ],
         ),
-    ]
+    )

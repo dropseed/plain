@@ -55,7 +55,7 @@ class DocsView(View):
 
 class SlashRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("with-slash", WithSlashView, name="with-slash"),
         path(
             "without-slash",
@@ -87,4 +87,4 @@ class SlashRouter(Router):
             name="docs-noslash",
             force_trailing_slash=False,
         ),
-    ]
+    )

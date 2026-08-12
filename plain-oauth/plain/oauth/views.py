@@ -47,9 +47,10 @@ class OAuthCallbackView(TemplateView):
 
     def get_template_names(self) -> list[str]:
         names = []
-        if oauth_error := getattr(self, "oauth_error", None):
-            if oauth_error.template_name:
-                names.append(oauth_error.template_name)
+        if (
+            oauth_error := getattr(self, "oauth_error", None)
+        ) and oauth_error.template_name:
+            names.append(oauth_error.template_name)
         names.append(self.template_name)
         return names
 

@@ -1,7 +1,6 @@
 import datetime
 
 import httpx
-
 from plain.oauth.exceptions import OAuthError
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 from plain.utils import timezone
@@ -87,11 +86,11 @@ class GitHubOAuthProvider(OAuthProvider):
         )
         response.raise_for_status()
 
-        try:
-            verified_primary_email = [
-                x["email"] for x in response.json() if x["primary"] and x["verified"]
-            ][0]
-        except IndexError:
+        verified_primary_email = next(
+            (x["email"] for x in response.json() if x["primary"] and x["verified"]),
+            None,
+        )
+        if verified_primary_email is None:
             raise OAuthError("A verified primary email address is required on GitHub")
 
         return OAuthUser(

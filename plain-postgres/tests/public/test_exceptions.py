@@ -3,7 +3,6 @@
 import pytest
 from app.examples.models.delete import DeleteParent
 from app.examples.models.iteration import IterationExample
-
 from plain.postgres.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 
 

@@ -121,6 +121,7 @@ This pairs nicely with passing a callable function or method as a context variab
 ```python
 def fetch_items():
     import time
+
     time.sleep(2)
     return ["foo", "bar", "baz"]
 
@@ -316,13 +317,14 @@ _If_ you need a URL to render an individual item, you can simply include the sam
 default_namespace = "pullrequests"
 
 urlpatterns = [
-  path("<uuid:uuid>/", views.PullRequestDetailView, name="detail"),
+    path("<uuid:uuid>/", views.PullRequestDetailView, name="detail"),
 ]
+
 
 # views.py
 class PullRequestDetailView(HTMXView, DetailView):
-  def htmx_post_update(self):
-      self.object.update()
+    def htmx_post_update(self):
+        self.object.update()
 ```
 
 ## FAQs

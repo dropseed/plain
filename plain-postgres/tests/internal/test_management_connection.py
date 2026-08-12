@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from plain.postgres.db import _db_conn, use_management_connection
 from plain.runtime import settings
 
@@ -55,9 +54,8 @@ def test_context_manager_uses_management_url_when_set(isolated_db):
 
     import psycopg
 
-    with pytest.raises(psycopg.OperationalError):
-        with use_management_connection() as conn:
-            conn.ensure_connection()
+    with pytest.raises(psycopg.OperationalError), use_management_connection() as conn:
+        conn.ensure_connection()
 
 
 def test_context_manager_reuses_active_connection_when_management_url_unset(

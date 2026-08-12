@@ -38,7 +38,6 @@ from app.examples.models.delete import (
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.trees import TreeNode
-
 from plain.postgres import transaction
 
 
@@ -81,9 +80,8 @@ def test_restrict_instance(db):
     ChildRestrict.query.create(parent=parent)
     # Inner atomic so the failed DELETE rolls back to a savepoint, leaving the
     # outer pytest fixture transaction usable for follow-up assertions.
-    with pytest.raises(psycopg.errors.IntegrityError):  # noqa: PT012
-        with transaction.atomic():
-            parent.delete()
+    with pytest.raises(psycopg.errors.IntegrityError), transaction.atomic():
+        parent.delete()
     assert DeleteParent.query.filter(id=parent.id).exists()
 
 
@@ -92,9 +90,8 @@ def test_restrict_queryset(db):
     parent = DeleteParent.query.get(name="parent")
     ChildRestrict.query.create(parent=parent)
 
-    with pytest.raises(psycopg.errors.IntegrityError):  # noqa: PT012
-        with transaction.atomic():
-            DeleteParent.query.filter(id=parent.id).delete()
+    with pytest.raises(psycopg.errors.IntegrityError), transaction.atomic():
+        DeleteParent.query.filter(id=parent.id).delete()
 
     assert DeleteParent.query.filter(id=parent.id).exists()
 
@@ -143,16 +140,15 @@ def test_no_action_raises_at_commit(db):
     parent = DeleteParent.query.get(name="parent")
     ChildNoAction.query.create(parent=parent)
 
-    with pytest.raises(psycopg.IntegrityError):  # noqa: PT012
-        with transaction.atomic():
-            parent.delete()
-            with get_connection().cursor() as cur:
-                cur.execute("SET CONSTRAINTS ALL IMMEDIATE")
+    with pytest.raises(psycopg.IntegrityError), transaction.atomic():  # noqa: PT012
+        parent.delete()
+        with get_connection().cursor() as cur:
+            cur.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
 def test_filtered_delete_only_cascades_filtered(db):
     """`.filter(...).delete()` must not touch rows outside the filter."""
-    default_parent, parent = _create_parents()
+    _default_parent, parent = _create_parents()
     other = DeleteParent.query.create(name="other")
 
     keeper = ChildCascade.query.create(parent=other)
@@ -238,9 +234,8 @@ def test_mixed_on_delete_restrict_blocks_cascade(db):
     cascade_child = ChildCascade.query.create(parent=parent)
     restrict_child = ChildRestrict.query.create(parent=parent)
 
-    with pytest.raises(psycopg.errors.IntegrityError):  # noqa: PT012
-        with transaction.atomic():
-            parent.delete()
+    with pytest.raises(psycopg.errors.IntegrityError), transaction.atomic():
+        parent.delete()
 
     assert DeleteParent.query.filter(id=parent.id).exists()
     assert ChildCascade.query.filter(id=cascade_child.id).exists()

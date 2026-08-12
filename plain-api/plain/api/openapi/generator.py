@@ -1,6 +1,7 @@
 import inspect
 import json
 import re
+from collections.abc import Sequence
 from typing import Any, get_type_hints
 
 from plain.urls import Router, URLPattern, URLResolver
@@ -105,7 +106,7 @@ class OpenAPISchemaGenerator:
 
     def get_paths(
         self,
-        urls: list[URLPattern | URLResolver],
+        urls: Sequence[URLPattern | URLResolver],
     ) -> dict[str, dict[str, Any]]:
         paths = {}
 
@@ -118,7 +119,7 @@ class OpenAPISchemaGenerator:
                     # TODO could have class level summary/description?
                     paths[path] = operations
             else:
-                raise ValueError(f"Unknown url pattern: {url_pattern}")
+                raise TypeError(f"Unknown url pattern: {url_pattern}")
 
         return paths
 
@@ -247,8 +248,8 @@ class OpenAPISchemaGenerator:
                 # Most likely the developer didn't define any actual responses for their endpoint,
                 # and all we did was inherit the base error responses.
                 keep_operation = False
-                for status_code in operation.get("responses", {}).keys():
-                    if status_code.startswith("2") or status_code.startswith("3"):
+                for status_code in operation.get("responses", {}):
+                    if status_code.startswith(("2", "3")):
                         keep_operation = True
                         break
 

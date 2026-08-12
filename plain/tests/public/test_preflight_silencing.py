@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from click.testing import CliRunner
-
-from plain import preflight
 from plain.cli.core import cli
 from plain.preflight import PreflightCheck, PreflightResult, unused_silenced_results
 from plain.preflight.registry import CheckRegistry
 from plain.runtime import settings
+
+from plain import preflight
 
 
 def test_silence_by_result_id(monkeypatch):

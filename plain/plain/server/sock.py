@@ -89,7 +89,7 @@ class BaseSocket:
 
     def close(self) -> None:
         if self.sock is None:
-            return None
+            return
 
         try:
             self.sock.close()
@@ -97,7 +97,7 @@ class BaseSocket:
             log.info("Error while closing socket", extra={"error": str(e)})
 
         self.sock = None
-        return None
+        return
 
 
 class TCPSocket(BaseSocket):

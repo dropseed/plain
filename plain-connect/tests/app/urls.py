@@ -9,7 +9,7 @@ class PageView(TemplateView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("assets", AssetsRouter),
         path("", PageView, name="page"),
-    ]
+    )

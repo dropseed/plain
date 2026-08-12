@@ -58,12 +58,12 @@ class ChunkedReader:
             done = buf.getvalue()[:2] == b"\r\n"
         if done:
             unreader.unread(buf.getvalue()[2:])
-            return None
+            return
         self.req.trailers = self.req.parse_headers(
             buf.getvalue()[:idx], from_trailer=True
         )
         unreader.unread(buf.getvalue()[idx + 4 :])
-        return None
+        return
 
     def parse_chunked(self, unreader: Unreader) -> Generator[bytes]:
         (size, rest) = self.parse_chunk_size(unreader)
@@ -124,7 +124,6 @@ class ChunkedReader:
         if not data:
             raise NoMoreData()
         buf.write(data)
-        return None
 
 
 class LengthReader:

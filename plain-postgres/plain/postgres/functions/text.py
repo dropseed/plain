@@ -113,9 +113,8 @@ class Left(Func):
         expression: the name of a field, or an expression returning a string
         length: the number of characters to return from the start of the string
         """
-        if not isinstance(length, ResolvableExpression):
-            if length < 1:
-                raise ValueError("'length' must be greater than 0.")
+        if not isinstance(length, ResolvableExpression) and length < 1:
+            raise ValueError("'length' must be greater than 0.")
         super().__init__(expression, length, **extra)
 
     def get_substr(self) -> Substr:
@@ -135,12 +134,17 @@ class Lower(Transform):
     lookup_name = "lower"
 
 
+# Shared expression defaults — expressions are copied on resolve, so sharing is safe.
+_SPACE_VALUE = Value(" ")
+_EMPTY_VALUE = Value("")
+
+
 class LPad(Func):
     function = "LPAD"
     output_field = TextField()
 
     def __init__(
-        self, expression: Any, length: Any, fill_text: Any = Value(" "), **extra: Any
+        self, expression: Any, length: Any, fill_text: Any = _SPACE_VALUE, **extra: Any
     ) -> None:
         if (
             not isinstance(length, ResolvableExpression)
@@ -185,7 +189,7 @@ class Replace(Func):
     function = "REPLACE"
 
     def __init__(
-        self, expression: Any, text: Any, replacement: Any = Value(""), **extra: Any
+        self, expression: Any, text: Any, replacement: Any = _EMPTY_VALUE, **extra: Any
     ) -> None:
         super().__init__(expression, text, replacement, **extra)
 
@@ -263,9 +267,8 @@ class Substr(Func):
         pos: an integer > 0, or an expression returning an integer
         length: an optional number of characters to return
         """
-        if not isinstance(pos, ResolvableExpression):
-            if pos < 1:
-                raise ValueError("'pos' must be greater than 0")
+        if not isinstance(pos, ResolvableExpression) and pos < 1:
+            raise ValueError("'pos' must be greater than 0")
         expressions = [expression, pos]
         if length is not None:
             expressions.append(length)

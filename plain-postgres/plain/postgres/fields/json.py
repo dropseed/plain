@@ -4,7 +4,6 @@ import json
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
-from plain import exceptions
 from plain.postgres import expressions, lookups
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import adapt_json_value
@@ -16,6 +15,8 @@ from plain.postgres.lookups import (
     OperatorLookup,
     Transform,
 )
+
+from plain import exceptions
 
 from .base import DefaultableField
 

@@ -9,7 +9,6 @@ from typing import cast
 
 import pytest
 from app.examples.models.relationships import Tag, Widget, WidgetTag
-
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import transaction
 from plain.postgres.fields.related import ManyToManyField
@@ -21,9 +20,8 @@ def test_create_unique_constraint(db):
     # No pre-check: the duplicate is rejected by the database and mapped to a
     # ValidationError. Wrap in atomic() so the savepoint rolls back and the
     # transaction stays usable for the count() below.
-    with pytest.raises(ValidationError) as e:
-        with transaction.atomic():
-            Widget.query.create(name="Toyota", size="Tundra")
+    with pytest.raises(ValidationError) as e, transaction.atomic():
+        Widget.query.create(name="Toyota", size="Tundra")
 
     assert e.value.messages == ["A widget with this name and size already exists."]
     assert NON_FIELD_ERRORS in e.value.error_dict

@@ -13,13 +13,12 @@ class Router:
     except for the root router in app.urls where it is typically "".
 
     `urls` is read once at `URLResolver.__init__` time, when the reverse
-    and namespace lookup tables are built. Mutating `urls` afterward will
-    not refresh those tables — treat the list as immutable once the app
-    is running.
+    and namespace lookup tables are built — it is declarative config, not
+    a runtime collection, which is why it is typed as a tuple.
     """
 
     namespace: str
-    urls: list[URLPattern | URLResolver]
+    urls: tuple[URLPattern | URLResolver, ...]
 
 
 def _strip_slashes(route: str) -> str:
@@ -37,14 +36,10 @@ def _strip_slashes(route: str) -> str:
 
 def include(
     route: str,
-    router_or_urls: (
-        list[URLPattern | URLResolver]
-        | tuple[URLPattern | URLResolver, ...]
-        | type[Router]
-    ),
+    router_or_urls: tuple[URLPattern | URLResolver, ...] | type[Router],
 ) -> URLResolver:
     """
-    Include URLs from another module or a nested list of URL patterns.
+    Include URLs from another module or a nested tuple of URL patterns.
     """
     if not isinstance(route, str):
         raise TypeError(f"include() route must be a string, not {type(route).__name__}")
@@ -56,7 +51,7 @@ def include(
 
         class _IncludeRouter(Router):
             namespace = ""
-            urls = list(router_or_urls)
+            urls = tuple(router_or_urls)
 
         return URLResolver(
             segments=segments, raw_route=raw_route, router=_IncludeRouter()
@@ -67,7 +62,7 @@ def include(
         )
     else:
         raise TypeError(
-            f"include() urls must be a list, tuple, or Router class (not a Router() instance): {router_or_urls}"
+            f"include() urls must be a tuple or Router class (not a Router() instance): {router_or_urls}"
         )
 
 

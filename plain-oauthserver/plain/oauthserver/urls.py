@@ -13,19 +13,19 @@ from .views import (
 
 class OAuthServerRouter(Router):
     namespace = "oauthserver"
-    urls = [
+    urls = (
         path("authorize", AuthorizeView, name="authorize"),
         path("token", TokenView, name="token"),
         path("register", RegisterView, name="register"),
         path("revoke", RevocationView, name="revoke"),
-    ]
+    )
 
 
 class OAuthWellKnownRouter(Router):
     """Mount at .well-known/ in your root router."""
 
     namespace = ""
-    urls = [
+    urls = (
         path(
             "oauth-authorization-server",
             AuthorizationServerMetadataView,
@@ -35,4 +35,4 @@ class OAuthWellKnownRouter(Router):
             # app canonicalizes URLs with URLS_TRAILING_SLASH=True.
             force_trailing_slash=False,
         ),
-    ]
+    )

@@ -1,12 +1,13 @@
-from plain import postgres
 from plain.postgres import migrations
+
+from plain import postgres
 
 
 class Migration(migrations.Migration):
     initial = True
-    dependencies = []
+    dependencies = ()
 
-    operations = [
+    operations = (
         migrations.CreateModel(
             name="User",
             fields=[
@@ -14,4 +15,4 @@ class Migration(migrations.Migration):
                 ("email", postgres.EmailField(max_length=254)),
             ],
         ),
-    ]
+    )

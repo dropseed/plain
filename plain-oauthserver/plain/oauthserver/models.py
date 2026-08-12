@@ -5,14 +5,15 @@ import hashlib
 import secrets
 from urllib.parse import urlparse, urlunparse
 
-from plain import postgres
 from plain.postgres import types
 from plain.utils import timezone
 
+from plain import postgres
+
 __all__ = [
-    "OAuthApplication",
-    "AuthorizationCode",
     "AccessToken",
+    "AuthorizationCode",
+    "OAuthApplication",
     "RefreshToken",
 ]
 

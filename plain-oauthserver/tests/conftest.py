@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from plain.test import Client
 
 

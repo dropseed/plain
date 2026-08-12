@@ -15,7 +15,6 @@ from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
-
 from plain.logs import get_framework_logger
 from plain.postgres import transaction
 from plain.postgres.db import return_database_connection
@@ -193,8 +192,8 @@ class Worker:
                 # a single-span root trace.
                 with suppress_db_tracing():
                     self.maybe_heartbeat()
-            except Exception as e:
-                logger.exception(e)
+            except Exception:
+                logger.exception("Worker heartbeat failed during drain")
         logger.info("Job worker shutdown complete")
 
     def _run_loop(self) -> None:
@@ -226,7 +225,7 @@ class Worker:
                         # failure signal explicitly. Log and continue: these
                         # tasks are ancillary to the main job processing.
                         record_span_error(span, e)
-                        logger.exception(e)
+                        logger.exception("Worker maintenance task failed")
 
             # Re-check shutdown after maintenance — a signal may have arrived
             # between the loop condition and now. Don't pick up new work.
@@ -254,7 +253,7 @@ class Worker:
                 # worker. With the claim's CLIENT spans suppressed there is
                 # no entry span to carry the failure, so emit one.
                 emit_error_consumer_span("claim job", e)
-                logger.exception(e)
+                logger.exception("Failed to claim job")
                 consecutive_claim_failures += 1
                 if consecutive_claim_failures >= 30:
                     # This isn't a blip (e.g. schema drift or lost table
@@ -436,7 +435,7 @@ class Worker:
             # loop won't claim work. That's serious enough to deserve error
             # attribution, and there's no entry span here to carry it.
             emit_error_consumer_span("worker heartbeat", e)
-            logger.exception(e)
+            logger.exception("Worker registration failed")
             logger.warning(
                 "Worker heartbeat registration failed; worker will not claim "
                 "jobs until a heartbeat row is created",
@@ -469,7 +468,7 @@ class Worker:
             # healthy-looking spans (or, during drain, nothing at all).
             self._heartbeat_registered = False
             emit_error_consumer_span("worker heartbeat", e)
-            logger.exception(e)
+            logger.exception("Worker heartbeat failed")
 
     def deregister_heartbeat(self) -> None:
         # Lazy import - see _worker_process_initializer() comment for why
@@ -489,10 +488,10 @@ class Worker:
                 return
 
             WorkerHeartbeat.query.filter(worker_id=self.worker_id).delete()
-        except Exception as e:
+        except Exception:
             # Best effort. A leftover row will be reclaimed by rescue when its
             # heartbeat goes stale.
-            logger.exception(e)
+            logger.exception("Failed to remove worker heartbeat")
 
     def _schedule_due(self, now: float) -> bool:
         if not self.jobs_schedule:
@@ -796,12 +795,12 @@ def process_job(job_process_uuid: str) -> None:
                 "job_queue_time": queue_time,
             },
         )
-    except Exception as e:
+    except Exception:
         # Raising exceptions inside the worker process doesn't
         # seem to be caught/shown anywhere as configured.
         # So we at least log it out here.
         # (A job should catch it's own user-code errors, so this is for library errors)
-        logger.exception(e)
+        logger.exception("Job process errored")
     finally:
         return_database_connection()
         gc.collect()

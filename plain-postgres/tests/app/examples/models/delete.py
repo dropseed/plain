@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from plain import postgres
 from plain.postgres import types
 from plain.postgres.query_utils import Q
+
+from plain import postgres
 
 # ---------------------------------------------------------------------------
 # Single-level: one parent, one child per on_delete option

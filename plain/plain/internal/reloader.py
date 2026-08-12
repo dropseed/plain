@@ -52,26 +52,31 @@ class Reloader(threading.Thread):
                 filename = os.path.basename(file_path)
 
                 # Python files: reload on modify/add
-                if change_type in (watchfiles.Change.modified, watchfiles.Change.added):
-                    if file_path.endswith(".py"):
-                        should_reload = True
+                if change_type in (
+                    watchfiles.Change.modified,
+                    watchfiles.Change.added,
+                ) and file_path.endswith(".py"):
+                    should_reload = True
 
                 # .env files: reload on modify/add/delete
                 if change_type in (
                     watchfiles.Change.modified,
                     watchfiles.Change.added,
                     watchfiles.Change.deleted,
-                ):
-                    if filename.startswith(".env"):
-                        should_reload = True
+                ) and filename.startswith(".env"):
+                    should_reload = True
 
                 # HTML files: only reload on add/delete (Jinja auto-reloads modifications)
-                if self._watch_html and change_type in (
-                    watchfiles.Change.added,
-                    watchfiles.Change.deleted,
+                if (
+                    self._watch_html
+                    and change_type
+                    in (
+                        watchfiles.Change.added,
+                        watchfiles.Change.deleted,
+                    )
+                    and file_path.endswith(".html")
                 ):
-                    if file_path.endswith(".html"):
-                        should_reload = True
+                    should_reload = True
 
                 if should_reload:
                     self._callback(file_path)

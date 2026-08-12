@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import subprocess
-from typing import Any
+from itertools import chain
 
 from plain.utils import timezone
 
@@ -46,8 +46,8 @@ class _ScheduleComponent:
             return str(self._raw)
         return ",".join(str(v) for v in self.values)
 
-    def __eq__(self, other: Any) -> bool:
-        return self.values == other.values
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, _ScheduleComponent) and self.values == other.values
 
     @property
     def is_wildcard(self) -> bool:
@@ -78,19 +78,18 @@ class _ScheduleComponent:
             return cls([value], raw=value)
 
         if not isinstance(value, str):
-            raise ValueError("Schedule component should be an int or str")
+            raise TypeError("Schedule component should be an int or str")
 
         # First split any subcomponents and re-parse them
         if "," in value:
             return cls(
-                sum(
-                    (
+                list(
+                    chain.from_iterable(
                         cls.parse(
                             sub_value, min_allowed, max_allowed, str_conversions
                         ).values
                         for sub_value in value.split(",")
-                    ),
-                    [],
+                    )
                 ),
                 raw=value,
             )

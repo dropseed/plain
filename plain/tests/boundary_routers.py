@@ -35,47 +35,41 @@ class UserDetailView(View):
 
 class NestedRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("users/", UsersListView, name="users-list"),
         path("users/<int:user_id>/", UserDetailView, name="user-detail"),
-    ]
+    )
 
 
 class AdminCanonicalRouter(Router):
     namespace = "admin-canonical"
-    urls = [
+    urls = (
         path("home/", HelloView, name="home"),
         include("nested/", NestedRouter),
-    ]
+    )
 
 
 class AdminBoundaryRouter(Router):
     namespace = "admin-boundary"
-    urls = [
-        path("home/", HelloView, name="home"),
-    ]
+    urls = (path("home/", HelloView, name="home"),)
 
 
 class AdminLeadingSlashRouter(Router):
     namespace = "admin-leading"
-    urls = [
-        path("home/", HelloView, name="home"),
-    ]
+    urls = (path("home/", HelloView, name="home"),)
 
 
 class RootIncludeRouter(Router):
     namespace = "root-include"
-    urls = [
-        path("root-hello/", HelloView, name="hello"),
-    ]
+    urls = (path("root-hello/", HelloView, name="hello"),)
 
 
 class BoundaryRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("admin-canonical/", AdminCanonicalRouter),
         include("admin-boundary", AdminBoundaryRouter),
         include("/admin-leading/", AdminLeadingSlashRouter),
         include("", RootIncludeRouter),
         path("/leading-slash/", HelloView, name="leading-slash"),
-    ]
+    )

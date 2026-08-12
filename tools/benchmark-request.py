@@ -22,11 +22,11 @@ else:
     print(f"Error: Could not find example at {example_dir}", file=sys.stderr)
     sys.exit(1)
 
-import plain.runtime  # noqa: E402
+import plain.runtime
 
 plain.runtime.setup()
 
-from plain.test import Client  # noqa: E402
+from plain.test import Client
 
 
 def main() -> None:

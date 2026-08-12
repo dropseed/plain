@@ -163,7 +163,9 @@ LOG_STREAM: str = "split"  # "split", "stdout", or "stderr"
 
 # MARK: Server
 
-SERVER_WORKERS: int = int(os.environ.get("WEB_CONCURRENCY", 0))  # 0 = auto (CPU count)
+SERVER_WORKERS: int = int(
+    os.environ.get("WEB_CONCURRENCY", "0")
+)  # 0 = auto (CPU count)
 SERVER_THREADS: int = 4
 SERVER_TIMEOUT: int = 30
 SERVER_ACCESS_LOG: bool = True

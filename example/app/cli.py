@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 
 import click
-
 from plain.cli import register_cli
 
 from .users.models import User
@@ -13,7 +12,6 @@ from .users.models import User
 @click.group()
 def cli() -> None:
     """App related commands"""
-    pass
 
 
 @cli.command()

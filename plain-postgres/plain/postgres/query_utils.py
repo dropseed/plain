@@ -14,7 +14,6 @@ from collections.abc import Callable, Generator
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self
 
 import psycopg
-
 from plain.logs import get_framework_logger
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.exceptions import FieldError
@@ -202,7 +201,7 @@ class RegisterLookupMixin:
     def _get_lookup(self, lookup_name: str) -> type[Lookup | Transform] | None:
         return self.get_lookups().get(lookup_name, None)
 
-    @functools.cache
+    @functools.cache  # noqa: B019 — keyed by class; classes live for the process
     def get_class_lookups(cls: type[Self]) -> dict[str, type[Lookup | Transform]]:
         class_lookups = [
             parent.__dict__.get("class_lookups", {}) for parent in inspect.getmro(cls)
@@ -224,10 +223,9 @@ class RegisterLookupMixin:
         from plain.postgres.lookups import Lookup
 
         found = self._get_lookup(lookup)
-        if found is None:
-            # output_field is a Field which inherits from RegisterLookupMixin
-            if output_field := getattr(self, "output_field", None):
-                return output_field.get_lookup(lookup)
+        # output_field is a Field which inherits from RegisterLookupMixin
+        if found is None and (output_field := getattr(self, "output_field", None)):
+            return output_field.get_lookup(lookup)
         if found is not None and not issubclass(found, Lookup):
             return None
         return found
@@ -236,10 +234,9 @@ class RegisterLookupMixin:
         from plain.postgres.lookups import Transform
 
         found = self._get_lookup(name)
-        if found is None:
-            # output_field is a Field which inherits from RegisterLookupMixin
-            if output_field := getattr(self, "output_field", None):
-                return output_field.get_transform(name)
+        # output_field is a Field which inherits from RegisterLookupMixin
+        if found is None and (output_field := getattr(self, "output_field", None)):
+            return output_field.get_transform(name)
         if found is not None and not issubclass(found, Transform):
             return None
         return found

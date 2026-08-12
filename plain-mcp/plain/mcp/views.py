@@ -4,11 +4,10 @@ import base64
 import json
 from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any
+from typing import Any, ClassVar
 
 from opentelemetry import trace
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
-
 from plain.http import (
     HTTPException,
     JsonResponse,
@@ -152,8 +151,8 @@ class MCPView(View):
     # these tools, what the app is for. Returned by `server/discover` when set.
     instructions: str = ""
 
-    tools: list[type[MCPTool]] = []
-    resources: list[type[MCPResource]] = []
+    tools: tuple[type[MCPTool], ...] = ()
+    resources: tuple[type[MCPResource], ...] = ()
 
     # Methods whose results are `CacheableResult`s — the spec requires a
     # freshness hint (`ttlMs`) and a `cacheScope` on every one of them. Add
@@ -172,7 +171,7 @@ class MCPView(View):
     # Methods where the `Mcp-Name` header mirrors a body param, and which
     # param it mirrors. Everything else sends no `Mcp-Name`. Add your own
     # target-naming methods here to have the header checked for them too.
-    name_header_params: dict[str, str] = {
+    name_header_params: ClassVar[dict[str, str]] = {
         "tools/call": "name",
         "prompts/get": "name",
         "resources/read": "uri",
@@ -181,7 +180,7 @@ class MCPView(View):
     # Who is calling, read from the current request's `_meta`. Tools reach
     # these through `self.mcp`.
     client_info: dict[str, Any] | None = None
-    client_capabilities: dict[str, Any] = {}
+    client_capabilities: dict[str, Any] = {}  # noqa: RUF012 — replaced per-instance, never mutated
 
     # The routing facts `post()` has learned about the current request —
     # each one is stamped onto the request span as an `mcp.<key>` attribute
@@ -189,7 +188,7 @@ class MCPView(View):
     # request that dies on the validation ladder carries whatever was known
     # by then, which is exactly what a "why was this client rejected?"
     # investigation needs.
-    _routing_facts: dict[str, Any] = {}
+    _routing_facts: dict[str, Any] = {}  # noqa: RUF012 — replaced per-instance, never mutated
 
     @classmethod
     def register_tool(cls, tool_cls: type[MCPTool]) -> type[MCPTool]:
@@ -211,13 +210,11 @@ class MCPView(View):
 
     @classmethod
     def _append_unique(cls, attr: str, item: type) -> None:
-        # Give this class its own list on first mutation so registrations
-        # don't bleed into the base class or sibling subclasses.
-        if attr not in cls.__dict__:
-            setattr(cls, attr, list(getattr(cls, attr)))
-        existing = getattr(cls, attr)
+        # Rebuild the tuple on this class so registrations don't bleed into
+        # the base class or sibling subclasses.
+        existing = tuple(getattr(cls, attr))
         if item not in existing:
-            existing.append(item)
+            setattr(cls, attr, (*existing, item))
 
     def get_tools(self) -> list[type[MCPTool]]:
         """Return the tools available for this request.

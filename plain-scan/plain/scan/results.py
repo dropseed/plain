@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .metadata import ScanMetadata
 
-__all__ = ["CheckResult", "AuditResult", "ScanResult"]
+__all__ = ["AuditResult", "CheckResult", "ScanResult"]
 
 
 @dataclass

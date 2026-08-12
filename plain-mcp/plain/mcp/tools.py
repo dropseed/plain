@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from .schema import build_input_schema
 
@@ -57,7 +57,7 @@ class MCPTool(ABC):
 
     name: str = ""
     description: str = ""
-    input_schema: dict[str, Any] | None = None
+    input_schema: ClassVar[dict[str, Any] | None] = None
 
     # Client capabilities this tool can't run without, in ClientCapabilities
     # shape — e.g. `{"sampling": {}}` for a tool that calls back to the
@@ -66,14 +66,14 @@ class MCPTool(ABC):
     # each top-level key is checked; the values are never inspected, just
     # echoed back in `error.data.requiredCapabilities`, which the spec requires
     # to be a ClientCapabilities object — hence a dict here and not a set.
-    required_client_capabilities: dict[str, Any] = {}
+    required_client_capabilities: ClassVar[dict[str, Any]] = {}
 
     # Optional MCP tool annotations — hints the client may use (e.g. Claude
     # groups `readOnlyHint` tools and gates approval on the rest). A raw wire-
     # format dict, e.g. `annotations = {"readOnlyHint": True}`; emitted as-is, so
     # any hint the spec defines (current or future) works without a plain-mcp
     # change. See the README. Inherited by subclasses like any class attribute.
-    annotations: dict[str, Any] | None = None
+    annotations: ClassVar[dict[str, Any] | None] = None
 
     # Set by the MCPView dispatcher before `run()` is called. Re-annotate on a
     # per-app base tool (`mcp: AppMCP`) for typed access to your view's attrs.

@@ -8,7 +8,9 @@ license = "BSD-3-Clause"
 requires-python = ">=3.13"
 dependencies = [
   "plain>=0.155.0,<1.0.0",
-  "ruff>=0.1.0",
+  # Bounded so every checkout and every app lints with the same rule set —
+  # ruff adds rules (and import-sort tweaks) in minor releases.
+  "ruff>=0.16.2,<0.17",
   "ty<1.0.0",
   "httpx>=0.27",
   "tomlkit>=0.11.0",

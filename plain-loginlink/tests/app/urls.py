@@ -37,9 +37,9 @@ class WhoamiView(AuthView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("login", LoginView, name="login"),
         include("loginlink", LoginlinkRouter),
         path("whoami", WhoamiView, name="whoami"),
         path("", IndexView, name="index"),
-    ]
+    )

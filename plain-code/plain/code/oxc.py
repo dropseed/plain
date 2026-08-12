@@ -20,7 +20,6 @@ from pathlib import Path
 import click
 import httpx
 import tomlkit
-
 from plain.runtime import PLAIN_CACHE_PATH, PLAIN_TEMP_PATH
 from plain.utils.version import compare_versions
 
@@ -226,6 +225,7 @@ class OxcTool:
             cwd=cwd,
             capture_output=True,
             text=True,
+            check=False,
         )
         if result.stdout:
             print(result.stdout, end="")

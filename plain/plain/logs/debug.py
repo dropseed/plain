@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -17,7 +17,7 @@ class DebugMode:
         self._ref_count = 0
         self._lock = threading.Lock()
 
-    def __enter__(self) -> DebugMode:
+    def __enter__(self) -> Self:
         """Store original level and set to DEBUG."""
         self.start()
         return self

@@ -5,7 +5,6 @@ from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 import psycopg
-
 from plain.validators import MaxLengthValidator
 
 from .base import NOT_PROVIDED, DefaultableField
@@ -19,7 +18,7 @@ class BinaryField[
     T: (bytes | memoryview, bytes | memoryview | None) = bytes | memoryview
 ](DefaultableField[T]):
     db_type_sql = "bytea"
-    empty_values = [None, b""]
+    empty_values = (None, b"")
     _default_empty_value = b""
     only_empty_default = True
 

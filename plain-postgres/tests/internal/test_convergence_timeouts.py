@@ -21,7 +21,6 @@ import psycopg.errors
 import pytest
 from app.examples.models.indexes import IndexExample
 from app.examples.models.relationships import Widget
-
 from plain.postgres import Index, Q, get_connection
 from plain.postgres.constraints import CheckConstraint, UniqueConstraint
 from plain.postgres.convergence import corrections

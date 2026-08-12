@@ -84,9 +84,10 @@ class Node:
         """Return True if 'other' is a direct child of this instance."""
         return other in self.children
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return (
-            self.__class__ == other.__class__
+            isinstance(other, Node)
+            and self.__class__ == other.__class__
             and self.connector == other.connector
             and self.negated == other.negated
             and self.children == other.children

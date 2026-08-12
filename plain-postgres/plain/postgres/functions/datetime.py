@@ -117,12 +117,12 @@ class Extract(TimezoneMixin, Transform):
         if field is None:
             return copy
         if not isinstance(field, DateField | DateTimeField | TimeField | DurationField):
-            raise ValueError(
+            raise TypeError(
                 "Extract input expression must be DateField, DateTimeField, "
                 "TimeField, or DurationField."
             )
         # Passing dates to functions expecting datetimes is most likely a mistake.
-        if type(field) == DateField and copy.lookup_name in (  # noqa: E721
+        if type(field) == DateField and copy.lookup_name in (
             "hour",
             "minute",
             "second",
@@ -287,7 +287,7 @@ class TruncBase(TimezoneMixin, Transform):
         elif isinstance(self.output_field, TimeField):
             sql, params = time_trunc_sql(self.kind, sql, tuple(params), tzname)
         else:
-            raise ValueError(
+            raise TypeError(
                 "Trunc only valid on DateField, TimeField, or DateTimeField."
             )
         return sql, list(params)
@@ -311,7 +311,7 @@ class TruncBase(TimezoneMixin, Transform):
         # If self.output_field was None, then accessing the field will trigger
         # the resolver to assign it to self.lhs.output_field.
         if not isinstance(copy.output_field, DateField | DateTimeField | TimeField):
-            raise ValueError(
+            raise TypeError(
                 "output_field must be either DateField, TimeField, or DateTimeField"
             )
         # Passing dates or times to functions expecting datetimes is most
@@ -325,7 +325,7 @@ class TruncBase(TimezoneMixin, Transform):
         has_explicit_output_field = (
             class_output_field or field.__class__ is not copy.output_field.__class__
         )
-        if type(field) == DateField and (  # noqa: E721
+        if type(field) == DateField and (
             isinstance(output_field, DateTimeField)
             or copy.kind in ("hour", "minute", "second", "time")
         ):

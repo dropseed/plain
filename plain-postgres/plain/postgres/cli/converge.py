@@ -42,9 +42,8 @@ def converge(yes: bool) -> None:
 
         click.echo()
 
-        if not yes:
-            if not click.confirm("Apply these changes?"):
-                return
+        if not yes and not click.confirm("Apply these changes?"):
+            return
 
         click.echo()
 

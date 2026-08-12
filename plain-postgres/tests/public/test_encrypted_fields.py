@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 from app.examples.models.encrypted import SecretStore
-
 from plain.postgres.exceptions import FieldError
 from plain.postgres.fields.encrypted import (
     _ENCRYPTED_PREFIX,

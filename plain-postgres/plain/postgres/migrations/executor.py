@@ -128,7 +128,7 @@ class MigrationExecutor:
                         break
                     if migration in migrations_to_run:
                         if "models_registry" not in state.__dict__:
-                            state.models_registry  # Render all -- performance critical
+                            state.models_registry  # noqa: B018 — cached-property render; performance critical
                         state = self.apply_migration(state, migration, fake=fake)
                         migrations_to_run.remove(migration)
 

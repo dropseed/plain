@@ -16,7 +16,6 @@ from typing import Any
 
 import pytest
 from click.testing import CliRunner
-
 from plain.postgres import get_connection
 from plain.postgres.cli.diagnose import diagnose as diagnose_cli
 from plain.postgres.introspection import (

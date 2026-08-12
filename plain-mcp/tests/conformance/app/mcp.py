@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+from typing import ClassVar
 
 from plain.mcp import MCPInvalidParams, MCPResource, MCPTool, MCPView
 
@@ -112,7 +113,7 @@ class JsonSchema202012Tool(MCPTool):
     # conditional (`if` / `then` / `else`). plain-mcp emits `input_schema`
     # verbatim, so passing is a matter of having the constructs present.
     name = "json_schema_2020_12_tool"
-    input_schema = {
+    input_schema: ClassVar = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "$defs": {
@@ -152,7 +153,7 @@ class MissingCapabilityTool(MCPTool):
     """Tool that requires the sampling client capability."""
 
     name = "test_missing_capability"
-    required_client_capabilities = {"sampling": {}}
+    required_client_capabilities: ClassVar = {"sampling": {}}
 
     def run(self) -> str:
         return "This tool should never run without the sampling capability."
@@ -226,7 +227,7 @@ _PROMPTS = [
 
 class ConformanceMCP(MCPView):
     name = "plain-mcp-conformance"
-    tools = [
+    tools = (
         TestSimpleText,
         TestErrorHandling,
         TestImageContent,
@@ -235,8 +236,8 @@ class ConformanceMCP(MCPView):
         TestMultipleContentTypes,
         JsonSchema202012Tool,
         MissingCapabilityTool,
-    ]
-    resources = [StaticText, StaticBinary, TemplateData]
+    )
+    resources = (StaticText, StaticBinary, TemplateData)
 
     def get_capabilities(self) -> dict:
         caps = super().get_capabilities()

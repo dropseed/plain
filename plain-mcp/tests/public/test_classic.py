@@ -11,7 +11,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from plain.mcp.views import CLASSIC_PROTOCOL_VERSIONS
 from plain.test import Client
 

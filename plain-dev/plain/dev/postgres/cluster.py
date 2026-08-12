@@ -248,6 +248,7 @@ class Cluster:
             capture_output=True,
             text=True,
             env=restore_env,
+            check=False,
         )
         dump.stdout.close()  # let pg_dump see EOF/SIGPIPE if restore exited early
         dump_stderr = dump.stderr.read().decode(errors="replace")

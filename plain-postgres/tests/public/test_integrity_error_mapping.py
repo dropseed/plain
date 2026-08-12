@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import pytest
 from app.examples.models.constraints import ConstraintExample
-
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import transaction
 
@@ -32,11 +31,10 @@ def test_caught_violation_matches_pre_check_and_recovers_in_atomic(db: None) -> 
     # ...and the database catch raises the same thing when the pre-check is
     # bypassed. Wrapping in atomic() rolls back to a savepoint, so the caller
     # can keep using the transaction after handling the error.
-    with pytest.raises(ValidationError) as caught:
-        with transaction.atomic():
-            ConstraintExample(name="dup", description="same").create(
-                clean_and_validate=False
-            )
+    with pytest.raises(ValidationError) as caught, transaction.atomic():
+        ConstraintExample(name="dup", description="same").create(
+            clean_and_validate=False
+        )
 
     # Same messages AND same routing: the database catch normalizes to the
     # dict shape validate_constraints() produces, so a composite unique lands
@@ -57,8 +55,7 @@ def test_default_save_maps_duplicate_to_validation_error(db: None) -> None:
     pins the user-facing contract on the common path.)"""
     ConstraintExample(name="dup", description="same").create()
 
-    with pytest.raises(ValidationError):
-        with transaction.atomic():
-            ConstraintExample(name="dup", description="same").create()
+    with pytest.raises(ValidationError), transaction.atomic():
+        ConstraintExample(name="dup", description="same").create()
 
     assert ConstraintExample.query.filter(name="dup").count() == 1

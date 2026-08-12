@@ -11,7 +11,6 @@ from opentelemetry.semconv._incubating.attributes.feature_flag_attributes import
     FEATURE_FLAG_RESULT_VALUE,
     FeatureFlagResultReasonValues,
 )
-
 from plain.runtime import settings
 from plain.utils import timezone
 

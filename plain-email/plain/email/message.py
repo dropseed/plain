@@ -353,16 +353,15 @@ class EmailMessage:
                 mimetype = mimetypes.guess_type(filename)[0]
             if mimetype is None:
                 mimetype = _DEFAULT_ATTACHMENT_MIME_TYPE
-            basetype, subtype = mimetype.split("/", 1)
+            basetype, _subtype = mimetype.split("/", 1)
 
-            if basetype == "text":
-                if isinstance(content, bytes):
-                    try:
-                        content = content.decode()
-                    except UnicodeDecodeError:
-                        # If mimetype suggests the file is text but it's
-                        # actually binary, read() raises a UnicodeDecodeError.
-                        mimetype = _DEFAULT_ATTACHMENT_MIME_TYPE
+            if basetype == "text" and isinstance(content, bytes):
+                try:
+                    content = content.decode()
+                except UnicodeDecodeError:
+                    # If mimetype suggests the file is text but it's
+                    # actually binary, read() raises a UnicodeDecodeError.
+                    mimetype = _DEFAULT_ATTACHMENT_MIME_TYPE
 
             self.attachments.append((filename, content, mimetype))
 

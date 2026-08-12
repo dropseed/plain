@@ -3,9 +3,10 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
-from plain import validators
 from plain.preflight import PreflightResult
 from plain.validators import MaxLengthValidator
+
+from plain import validators
 
 from .base import NOT_PROVIDED, ChoicesField, ColumnField
 
@@ -88,11 +89,11 @@ class TextField[T: (str, str | None) = str](ChoicesField[T]):
 
 
 class EmailField[T: (str, str | None) = str](TextField[T]):
-    default_validators = [validators.validate_email]
+    default_validators = (validators.validate_email,)
 
 
 class URLField[T: (str, str | None) = str](TextField[T]):
-    default_validators = [validators.URLValidator()]
+    default_validators = (validators.URLValidator(),)
 
 
 class RandomStringField[T: (str, str | None) = str](ColumnField[T]):

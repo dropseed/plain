@@ -57,9 +57,7 @@ from plain.urls import Router, path
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
-        path("mcp/", AppMCP, name="mcp"),
-    ]
+    urls = (path("mcp/", AppMCP, name="mcp"),)
 ```
 
 AI clients connect to `https://yourapp.com/mcp` using the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports#streamable-http).
@@ -183,17 +181,14 @@ class ListMyNotes(AppTool):
     """List notes owned by the caller."""
 
     def run(self) -> list[dict]:
-        return list(
-            Note.query.filter(author=self.mcp.user).values("id", "title")
-        )
+        return list(Note.query.filter(author=self.mcp.user).values("id", "title"))
 
 
 class AppMCP(OAuthResourceServer, MCPView):
     name = "myapp"
     tools = [ListMyNotes]
 
-    def authenticate_token(self, token: str) -> TokenInfo | None:
-        ...
+    def authenticate_token(self, token: str) -> TokenInfo | None: ...
 ```
 
 The `mcp: AppMCP` annotation is a forward reference (resolved lazily), so this natural order just works — base tool and tools first, then the view with `tools = [...]`. A tool that needs nothing view-specific stays bare — `class Greet(MCPTool)` — and `self.mcp` is the base `MCPView` (request, no user).
@@ -391,10 +386,10 @@ class StaffMCP(MCPView, AuthView):
 
 ```python
 # app/urls.py
-urls = [
+urls = (
     path("api/mcp", AppMCP, name="app_mcp"),
     path("staff/mcp", StaffMCP, name="staff_mcp"),
-]
+)
 ```
 
 ## Attaching tools to a shared MCP
@@ -413,8 +408,7 @@ class FlagStatus(MCPTool):
     def __init__(self, name: str):
         self.name = name
 
-    def run(self) -> dict:
-        ...
+    def run(self) -> dict: ...
 
 
 AdminMCP.register_tool(FlagStatus)
@@ -529,14 +523,14 @@ class AppMCPMetadata(MCPProtectedResourceView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("mcp", AppMCP, name="mcp"),
         path(
             ".well-known/oauth-protected-resource/mcp",
             AppMCPMetadata,
             name="mcp_prm",
         ),
-    ]
+    )
 ```
 
 `authorization_servers` defaults to this app's origin, so the same-app case (above) needs nothing set. Override it only when an external IdP issues the tokens.
@@ -582,8 +576,7 @@ class DeleteUser(AdminTool):
     def __init__(self, user_id: int):
         self.user_id = user_id
 
-    def run(self) -> str:
-        ...
+    def run(self) -> str: ...
 ```
 
 Tools that return `False` from `allowed_for()` are hidden from `tools/list` and rejected from `tools/call` as "unknown tool" — existence isn't leaked. Same for resources and `resources/read`.

@@ -22,7 +22,6 @@ from opentelemetry.semconv._incubating.metrics.messaging_metrics import (
     create_messaging_client_sent_messages,
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
-
 from plain.postgres import Q
 from plain.postgres.aggregates import Count, Min
 from plain.postgres.db import return_database_connection

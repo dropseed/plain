@@ -32,3 +32,7 @@ Runs ruff, ty (type checking), oxlint/oxfmt, and annotation coverage checks with
 - Don't accept or pass through `**kwargs` blindly — spell out real parameters so type checking works at call sites
 - Keep imports at the top of the file unless avoiding circular imports
 - Don't include args/returns in docstrings if already type annotated
+
+## Linting is Plain's config, not yours
+
+`plain fix` and `plain code check` run ruff with Plain's bundled config — a `[tool.ruff]` section in pyproject.toml is not read.

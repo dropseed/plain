@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 import click
-
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .process import Supervisor
@@ -43,9 +42,10 @@ def auto_start_services() -> None:
         return
 
     # Don't do anything if it looks like a "services" command is being run explicitly
-    if "dev" in sys.argv:
-        if "logs" in sys.argv or "services" in sys.argv or "--stop" in sys.argv:
-            return
+    if "dev" in sys.argv and (
+        "logs" in sys.argv or "services" in sys.argv or "--stop" in sys.argv
+    ):
+        return
 
     if not ServicesSupervisor.get_services(APP_PATH.parent):
         return
@@ -85,7 +85,7 @@ def auto_start_services() -> None:
 class ServicesSupervisor(Supervisor):
     state_filename = "services.pid"
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "services"
-    background_command = ["dev", "services"]
+    background_command = ("dev", "services")
     display_name = "Services"
 
     @staticmethod

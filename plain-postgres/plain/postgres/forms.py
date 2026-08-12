@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from itertools import chain
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from plain.exceptions import (
     NON_FIELD_ERRORS,
@@ -26,12 +26,12 @@ if TYPE_CHECKING:
     from plain.postgres.fields import Field as ModelField
 
 __all__ = [
-    "ModelForm",
     "BaseModelForm",
-    "model_to_dict",
-    "fields_for_model",
     "ModelChoiceField",
+    "ModelForm",
     "ModelMultipleChoiceField",
+    "fields_for_model",
+    "model_to_dict",
 ]
 
 
@@ -285,18 +285,13 @@ class BaseModelForm(BaseForm):
             field = f.name
             # Exclude fields that aren't on the form. The developer may be
             # adding these values to the model after form validation.
-            if field not in self.fields:
-                exclude.add(f.name)
-
-            # Don't perform model validation on fields that were defined
-            # manually on the form and excluded via the ModelForm's Meta
-            # class. See #12901.
-            elif self._meta.fields and field not in self._meta.fields:
-                exclude.add(f.name)
-
-            # Exclude fields that failed form validation. There's no need for
-            # the model fields to validate them as well.
-            elif self._errors and field in self._errors:
+            if (
+                field not in self.fields
+                or self._meta.fields
+                and field not in self._meta.fields
+                or self._errors
+                and field in self._errors
+            ):
                 exclude.add(f.name)
 
             # Exclude empty fields that are not required by the form, if the
@@ -475,7 +470,7 @@ class ModelChoiceField(ChoiceField):
 
     # This class is a subclass of ChoiceField for purity, but it doesn't
     # actually use any of ChoiceField's implementation.
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid_choice": "Select a valid choice. That choice is not one of the available choices.",
     }
     iterator = ModelChoiceIterator
@@ -569,7 +564,7 @@ class ModelChoiceField(ChoiceField):
 class ModelMultipleChoiceField(ModelChoiceField):
     """A MultipleChoiceField whose choices are a model QuerySet."""
 
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid_list": "Enter a list of values.",
         "invalid_choice": "Select a valid choice. %(value)s is not one of the available choices.",
         "invalid_id_value": "'%(id)s' is not a valid value.",

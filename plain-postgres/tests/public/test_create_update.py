@@ -13,7 +13,6 @@ from app.examples.models.constraints import ConstraintExample
 from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.querysets import DefaultQuerySetModel
 from app.examples.models.relationships import Tag, Widget, WidgetTag
-
 from plain.exceptions import ValidationError
 from plain.postgres import transaction
 from plain.postgres.exceptions import FieldError
@@ -62,9 +61,8 @@ def test_create_with_colliding_hand_set_id_raises(db):
     clash = DefaultQuerySetModel(name="clash")
     clash.id = existing.id
 
-    with pytest.raises(psycopg.IntegrityError):
-        with transaction.atomic():
-            clash.create()
+    with pytest.raises(psycopg.IntegrityError), transaction.atomic():
+        clash.create()
 
     assert DefaultQuerySetModel.query.get(id=existing.id).name == "existing"
 
@@ -74,9 +72,8 @@ def test_create_maps_constraint_violation_to_validation_error(db):
     # pre-check would raise.
     ConstraintExample(name="dup", description="same").create()
 
-    with pytest.raises(ValidationError):
-        with transaction.atomic():
-            ConstraintExample(name="dup", description="same").create()
+    with pytest.raises(ValidationError), transaction.atomic():
+        ConstraintExample(name="dup", description="same").create()
 
 
 def test_create_skips_validation_when_asked(db):
@@ -155,9 +152,11 @@ def test_update_no_matching_row_raises(db):
     ConstraintExample.query.filter(id=obj.id).delete()
     obj.name = "changed"
 
-    with pytest.raises(psycopg.DatabaseError, match="affected no rows"):
-        with transaction.atomic():
-            obj.update()
+    with (
+        pytest.raises(psycopg.DatabaseError, match="affected no rows"),
+        transaction.atomic(),
+    ):
+        obj.update()
 
 
 # ===========================================================================

@@ -18,14 +18,11 @@ import contextvars
 import threading
 
 import pytest
-
 from plain.postgres.db import _db_conn, has_connection
 
 
 class FakeConn:
     """Lightweight stand-in for DatabaseConnection to test storage isolation."""
-
-    pass
 
 
 @pytest.fixture(autouse=True)

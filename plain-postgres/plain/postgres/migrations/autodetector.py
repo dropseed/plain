@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import itertools
 import re
 from graphlib import TopologicalSorter
 from typing import TYPE_CHECKING, Any
@@ -172,11 +173,11 @@ class MigrationAutodetector:
         # Prepare some old/new state and model lists, ignoring unmigrated packages.
         self.old_model_keys = set()
         self.new_model_keys = set()
-        for (package_label, model_name), model_state in self.from_state.models.items():
+        for package_label, model_name in self.from_state.models:
             if package_label not in self.from_state.real_packages:
                 self.old_model_keys.add((package_label, model_name))
 
-        for (package_label, model_name), model_state in self.to_state.models.items():
+        for package_label, model_name in self.to_state.models:
             if package_label not in self.from_state.real_packages or (
                 convert_packages and package_label in convert_packages
             ):
@@ -379,8 +380,8 @@ class MigrationAutodetector:
     def _optimize_migrations(self) -> None:
         # Add in internal dependencies among the migrations
         for package_label, migrations in self.migrations.items():
-            for m1, m2 in zip(migrations, migrations[1:]):
-                m2.dependencies.append((package_label, m1.name))
+            for m1, m2 in itertools.pairwise(migrations):
+                m2.dependencies = [*m2.dependencies, (package_label, m1.name)]
 
         # De-dupe dependencies
         for migrations in self.migrations.values():
@@ -479,49 +480,44 @@ class MigrationAutodetector:
                     rem_model_fields_def = self.only_relation_agnostic_fields(
                         rem_model_state.fields
                     )
-                    if model_fields_def == rem_model_fields_def:
-                        if self.questioner.ask_rename_model(
-                            rem_model_state, model_state
-                        ):
-                            dependencies = []
-                            fields = list(model_state.fields.values()) + [
-                                field.remote_field
-                                for relations in self.to_state.relations[
-                                    package_label, model_name
-                                ].values()
-                                for field in relations.values()
-                                if isinstance(field, RelatedField)
-                            ]
-                            for field in fields:
-                                if isinstance(field, RelatedField):
-                                    dependencies.extend(
-                                        self._get_dependencies_for_foreign_key(
-                                            package_label,
-                                            model_name,
-                                            field,
-                                            self.to_state,
-                                        )
+                    if model_fields_def == rem_model_fields_def and (
+                        self.questioner.ask_rename_model(rem_model_state, model_state)
+                    ):
+                        dependencies = []
+                        fields = list(model_state.fields.values()) + [
+                            field.remote_field
+                            for relations in self.to_state.relations[
+                                package_label, model_name
+                            ].values()
+                            for field in relations.values()
+                            if isinstance(field, RelatedField)
+                        ]
+                        for field in fields:
+                            if isinstance(field, RelatedField):
+                                dependencies.extend(
+                                    self._get_dependencies_for_foreign_key(
+                                        package_label,
+                                        model_name,
+                                        field,
+                                        self.to_state,
                                     )
-                            self.add_operation(
-                                package_label,
-                                operations.RenameModel(
-                                    old_name=rem_model_state.name,
-                                    new_name=model_state.name,
-                                ),
-                                dependencies=dependencies,
-                            )
-                            self.renamed_models[package_label, model_name] = (
-                                rem_model_name
-                            )
-                            renamed_models_rel_key = f"{rem_model_state.package_label}.{rem_model_state.name_lower}"
-                            self.renamed_models_rel[renamed_models_rel_key] = (
-                                f"{model_state.package_label}.{model_state.name_lower}"
-                            )
-                            self.old_model_keys.remove(
-                                (rem_package_label, rem_model_name)
-                            )
-                            self.old_model_keys.add((package_label, model_name))
-                            break
+                                )
+                        self.add_operation(
+                            package_label,
+                            operations.RenameModel(
+                                old_name=rem_model_state.name,
+                                new_name=model_state.name,
+                            ),
+                            dependencies=dependencies,
+                        )
+                        self.renamed_models[package_label, model_name] = rem_model_name
+                        renamed_models_rel_key = f"{rem_model_state.package_label}.{rem_model_state.name_lower}"
+                        self.renamed_models_rel[renamed_models_rel_key] = (
+                            f"{model_state.package_label}.{model_state.name_lower}"
+                        )
+                        self.old_model_keys.remove((rem_package_label, rem_model_name))
+                        self.old_model_keys.add((package_label, model_name))
+                        break
 
     def generate_created_models(self) -> None:
         """
@@ -731,29 +727,28 @@ class MigrationAutodetector:
                         if old_rel_to in self.renamed_models_rel:
                             old_field_dec[2]["to"] = self.renamed_models_rel[old_rel_to]
                     old_field.set_attributes_from_name(rem_field_name)
-                    if old_field_dec == field_dec:
-                        if self.questioner.ask_rename(
-                            model_name, rem_field_name, field_name, field
-                        ):
-                            self.renamed_operations.append(
-                                (
-                                    rem_package_label,
-                                    rem_model_name,
-                                    rem_field_name,
-                                    package_label,
-                                    model_name,
-                                    field,
-                                    field_name,
-                                )
+                    if old_field_dec == field_dec and self.questioner.ask_rename(
+                        model_name, rem_field_name, field_name, field
+                    ):
+                        self.renamed_operations.append(
+                            (
+                                rem_package_label,
+                                rem_model_name,
+                                rem_field_name,
+                                package_label,
+                                model_name,
+                                field,
+                                field_name,
                             )
-                            old_field_keys.remove(
-                                (rem_package_label, rem_model_name, rem_field_name)
-                            )
-                            old_field_keys.add((package_label, model_name, field_name))
-                            self.renamed_fields[
-                                package_label, model_name, field_name
-                            ] = rem_field_name
-                            break
+                        )
+                        old_field_keys.remove(
+                            (rem_package_label, rem_model_name, rem_field_name)
+                        )
+                        old_field_keys.add((package_label, model_name, field_name))
+                        self.renamed_fields[package_label, model_name, field_name] = (
+                            rem_field_name
+                        )
+                        break
 
     def generate_renamed_fields(self) -> None:
         """Generate RenameField operations."""
@@ -976,8 +971,8 @@ class MigrationAutodetector:
         try:
             old_udt = old_field.unqualified_db_type()
             new_udt = new_field.unqualified_db_type()
-        except ValueError:
-            # ForeignKeyField.target_field raises ValueError when the target
+        except TypeError:
+            # ForeignKeyField.target_field raises TypeError when the target
             # model is a string ref that hasn't been resolved on the state
             # instance. Let the AlterField through — the schema editor will
             # surface any mismatch at apply time.
@@ -1130,7 +1125,7 @@ class MigrationAutodetector:
             # Name each migration
             for i, migration in enumerate(migrations):
                 if i == 0 and app_leaf:
-                    migration.dependencies.append(app_leaf)
+                    migration.dependencies = [*migration.dependencies, app_leaf]
                 new_name_parts = ["%04i" % next_number]  # noqa: UP031
                 if migration_name:
                     new_name_parts.append(migration_name)

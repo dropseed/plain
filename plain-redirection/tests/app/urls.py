@@ -10,6 +10,4 @@ class HomeView(View):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
-        path("", HomeView, name="home"),
-    ]
+    urls = (path("", HomeView, name="home"),)

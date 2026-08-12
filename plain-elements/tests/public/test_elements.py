@@ -1,5 +1,4 @@
 from jinja2 import DictLoader, Environment
-
 from plain.elements.templates import ElementsExtension  # adjust import
 
 

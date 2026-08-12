@@ -23,7 +23,9 @@ can't infer the target type from the string — annotate explicitly so
 instance access keeps its type:
 
 ```python
-parent: TreeNode | None = types.ForeignKeyField("self", on_delete=postgres.CASCADE, allow_null=True)
+parent: TreeNode | None = types.ForeignKeyField(
+    "self", on_delete=postgres.CASCADE, allow_null=True
+)
 ```
 
 For `JSONField` and `EncryptedJSONField`, the stub returns `Any` (the

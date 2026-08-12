@@ -1590,6 +1590,7 @@
             "Content-Security-Policy": f"script-src 'self' 'nonce-{nonce}'",
         }
 
+
     # After:
     DEFAULT_RESPONSE_HEADERS = {
         "Content-Security-Policy": "script-src 'self' 'nonce-{request.csp_nonce}'",
@@ -1670,8 +1671,10 @@
             response = self.get_response(request)
             return response
 
+
     # After:
     from plain.http import HttpMiddleware
+
 
     class MyMiddleware(HttpMiddleware):
         def process_request(self, request):
@@ -1723,8 +1726,10 @@
         """Description"""
         return "Done!"
 
+
     # After:
     from plain.chores import Chore, register_chore
+
 
     @register_chore
     class ChoreName(Chore):

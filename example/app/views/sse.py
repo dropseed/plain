@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import random
 from collections.abc import AsyncIterator
-from datetime import datetime
 
+from plain.utils import timezone
 from plain.views import ServerSentEvent, ServerSentEventsView
 
 
@@ -13,7 +13,9 @@ class ClockView(ServerSentEventsView):
 
     async def stream(self) -> AsyncIterator[ServerSentEvent]:
         while True:
-            yield ServerSentEvent(data={"time": datetime.now().strftime("%H:%M:%S")})
+            yield ServerSentEvent(
+                data={"time": timezone.localtime().strftime("%H:%M:%S")}
+            )
             await asyncio.sleep(1)
 
 

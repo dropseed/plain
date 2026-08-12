@@ -13,7 +13,6 @@ from opentelemetry.semconv.attributes.db_attributes import (
     DB_OPERATION_NAME,
     DB_QUERY_TEXT,
 )
-
 from plain.http import Response, StreamingResponse
 from plain.urls import Router, path
 from plain.views import View
@@ -111,10 +110,10 @@ class BoomView(View):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("", TestView, name="index"),
         path("stream", StreamView, name="stream"),
         path("upload", UploadView, name="upload"),
         path("queries", QueriesView, name="queries"),
         path("boom", BoomView, name="boom"),
-    ]
+    )

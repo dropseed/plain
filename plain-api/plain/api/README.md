@@ -109,10 +109,10 @@ from . import views
 
 class APIRouter(Router):
     namespace = "api"
-    urls = [
+    urls = (
         path("user/", views.UserView),
         path("pullrequests/<uuid:uuid>/", views.PullRequestView),
-    ]
+    )
 ```
 
 ## Authentication and authorization
@@ -165,10 +165,11 @@ One way to handle PUT, POST, and PATCH endpoints is to use standard [forms](/pla
 class UserForm(ModelForm):
     class Meta:
         model = User
-        fields = [
+        fields = (
             "username",
             "time_zone",
-        ]
+        )
+
 
 class UserView(BaseAPIView):
     def patch(self):
@@ -244,7 +245,7 @@ class User(postgres.Model):
     model_options = postgres.Options(
         constraints=[
             postgres.UniqueConstraint(
-                fields=["api_key"],
+                fields=("api_key",),
                 condition=postgres.Q(api_key__isnull=False),
                 name="unique_user_api_key",
             ),
@@ -299,33 +300,37 @@ from plain.assets.views import AssetView
 from . import views
 
 
-@openapi.schema({
-    "openapi": "3.0.0",
-    "info": {
-        "title": "PullApprove API",
-        "version": "4.0.0",
-    },
-    "servers": [
-        {
-            "url": "https://4.pullapprove.com/api/",
-            "description": "PullApprove API",
-        }
-    ],
-})
+@openapi.schema(
+    {
+        "openapi": "3.0.0",
+        "info": {
+            "title": "PullApprove API",
+            "version": "4.0.0",
+        },
+        "servers": [
+            {
+                "url": "https://4.pullapprove.com/api/",
+                "description": "PullApprove API",
+            }
+        ],
+    }
+)
 class APIRouter(Router):
     namespace = "api"
-    urls = [
+    urls = (
         # ...your API routes
-    ]
+    )
 ```
 
 You can then define additional schema on a view class, or a specific view method.
 
 ```python
 class CurrentUserAPIView(BaseAPIView):
-    @openapi.schema({
-        "summary": "Get current user",
-    })
+    @openapi.schema(
+        {
+            "summary": "Get current user",
+        }
+    )
     def get(self):
         from plain.auth import get_request_user
 
@@ -345,22 +350,23 @@ Most of an OpenAPI dict is the same envelope repeated. `plain.api.openapi` ships
 - `openapi.link_to(view_class, *, parameters, method="get")` → builds an OpenAPI `link` to another view's operation, using the framework-default operationId
 
 ```python
-@openapi.schema({
-    "requestBody": openapi.json_body({"$ref": "#/components/schemas/NoteInput"}),
-    "responses": {
-        "201": {
-            "description": "The created note.",
-            "content": openapi.json_content({"$ref": "#/components/schemas/Note"}),
-            "links": {
-                "GetById": openapi.link_to(
-                    NoteDetailAPIView, parameters={"id": "$response.body#/id"}
-                ),
+@openapi.schema(
+    {
+        "requestBody": openapi.json_body({"$ref": "#/components/schemas/NoteInput"}),
+        "responses": {
+            "201": {
+                "description": "The created note.",
+                "content": openapi.json_content({"$ref": "#/components/schemas/Note"}),
+                "links": {
+                    "GetById": openapi.link_to(
+                        NoteDetailAPIView, parameters={"id": "$response.body#/id"}
+                    ),
+                },
             },
         },
-    },
-})
-def post(self):
-    ...
+    }
+)
+def post(self): ...
 ```
 
 ### What the generator emits for you
@@ -385,9 +391,7 @@ class TeamAccountAPIView(BaseAPIView):
 
         if form.is_valid():
             team_account = form.update()
-            return TeamAccountSchema.from_team_account(
-                team_account, self.request
-            )
+            return TeamAccountSchema.from_team_account(team_account, self.request)
         else:
             return {"errors": form.errors}
 
@@ -412,7 +416,7 @@ class TeamAccountAPIView(BaseAPIView):
 class TeamAccountForm(ModelForm):
     class Meta:
         model = TeamAccount
-        fields = ["is_reviewer", "is_admin"]
+        fields = ("is_reviewer", "is_admin")
 
 
 class TeamAccountSchema(TypedDict):
@@ -465,12 +469,13 @@ from plain.urls import Router, path
 from plain.assets.views import AssetView
 from . import views
 
+
 class APIRouter(Router):
     namespace = "api"
-    urls = [
+    urls = (
         # ...your API routes
         path("openapi.json", AssetView.as_view(asset_path="openapi.json")),
-    ]
+    )
 ```
 
 ## Settings
@@ -495,10 +500,10 @@ from plain.urls import Router, path
 
 class APIRouter(Router):
     namespace = "api"
-    urls = [
+    urls = (
         # ...your API routes
         path(re.compile(r"^[\s\S]+$"), JsonNotFoundView, name="not_found"),
-    ]
+    )
 ```
 
 #### How do I make an API key optional?
@@ -583,9 +588,7 @@ class ExampleAPIView(APIView):
 
 class APIRouter(Router):
     namespace = "api"
-    urls = [
-        path("example/", ExampleAPIView),
-    ]
+    urls = (path("example/", ExampleAPIView),)
 ```
 
 The `APIRouter` can then be included in your app's URLs.
@@ -599,8 +602,8 @@ from .api.urls import APIRouter
 
 class AppRouter(Router):
     namespace = "app"
-    urls = [
+    urls = (
         # ...other routes
         include("api/", APIRouter),
-    ]
+    )
 ```

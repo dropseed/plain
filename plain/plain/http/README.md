@@ -28,6 +28,7 @@ You interact with [`Request`](./request.py#Request) and [`Response`](./response.
 from plain.views import View
 from plain.http import Response
 
+
 class ExampleView(View):
     def get(self):
         # Access a request header
@@ -191,9 +192,11 @@ return FileResponse(
 ```python
 from plain.http import StreamingResponse
 
+
 def generate_data():
     for i in range(1000):
         yield f"Line {i}\n"
+
 
 return StreamingResponse(generate_data(), content_type="text/plain")
 ```
@@ -203,9 +206,11 @@ return StreamingResponse(generate_data(), content_type="text/plain")
 ```python
 from plain.http import AsyncStreamingResponse
 
+
 async def generate_data():
     for i in range(1000):
         yield f"Line {i}\n"
+
 
 return AsyncStreamingResponse(generate_data(), content_type="text/plain")
 ```
@@ -267,7 +272,9 @@ from plain.runtime import settings
 
 if csp := settings.DEFAULT_RESPONSE_HEADERS.get("Content-Security-Policy"):
     csp = csp.format(request=self.request)
-    response.headers["Content-Security-Policy"] = f"{csp}; script-src https://cdn.example.com"
+    response.headers["Content-Security-Policy"] = (
+        f"{csp}; script-src https://cdn.example.com"
+    )
 ```
 
 ## Content Security Policy (CSP)
@@ -327,14 +334,17 @@ Create custom middleware by subclassing [`HttpMiddleware`](./middleware.py#HttpM
 ```python
 from plain.http import HttpMiddleware, Request, Response
 
+
 class TimingMiddleware(HttpMiddleware):
     def before_request(self, request: Request) -> Response | None:
         import time
+
         request.timing_start = time.time()
         return None
 
     def after_response(self, request: Request, response: Response) -> Response:
         import time
+
         duration = time.time() - request.timing_start
         response.headers["X-Request-Duration"] = f"{duration:.3f}s"
         return response

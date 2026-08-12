@@ -15,12 +15,11 @@ from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any
 
 import psycopg
-from psycopg.types.json import Jsonb
-
 from plain.postgres.constants import OnConflict
 from plain.postgres.utils import split_tzname_delta
 from plain.utils import timezone
 from plain.utils.regex_helper import _lazy_re_compile
+from psycopg.types.json import Jsonb
 
 if TYPE_CHECKING:
     from plain.postgres.fields import Field
@@ -467,8 +466,8 @@ def year_lookup_bounds_for_datetime_field(
             value + 1, 1, 1
         ) - datetime.timedelta(microseconds=1)
     else:
-        first = datetime.datetime(value, 1, 1)
-        second = datetime.datetime(value, 12, 31, 23, 59, 59, 999999)
+        first = datetime.datetime(value, 1, 1)  # noqa: DTZ001 — made aware just below
+        second = datetime.datetime(value, 12, 31, 23, 59, 59, 999999)  # noqa: DTZ001 — made aware just below
 
     # Make sure that datetimes are aware in the current timezone
     tz = timezone.get_current_timezone()

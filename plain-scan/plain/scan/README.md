@@ -101,6 +101,7 @@ The scan result can be serialized to JSON:
 
 ```python
 import json
+
 result_dict = result.to_dict()
 print(json.dumps(result_dict, indent=2))
 ```

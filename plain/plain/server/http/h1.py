@@ -4,7 +4,7 @@ import asyncio
 import errno
 import ssl
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from plain.logs import get_framework_logger
@@ -199,9 +199,8 @@ def _parse_body_headers(header_data: bytes) -> tuple[int, bool, bool]:
         elif name_upper == "TRANSFER-ENCODING":
             if "chunked" in value.lower():
                 is_chunked = True
-        elif name_upper == "EXPECT":
-            if "100-continue" in value.lower():
-                expect_continue = True
+        elif name_upper == "EXPECT" and "100-continue" in value.lower():
+            expect_continue = True
 
     # RFC 9112 §6.1: If both Content-Length and Transfer-Encoding are
     # present, Transfer-Encoding takes precedence. Ignore Content-Length
@@ -391,7 +390,7 @@ def parse_request(
         if not req:
             return None
 
-        request_start = datetime.now()
+        request_start = datetime.now(UTC)
 
         # create_request sets _stream = req.body, which is the parser's
         # body reader — it properly decodes chunked/length-delimited data.
@@ -431,7 +430,7 @@ async def async_handle_error(
     exc: BaseException,
 ) -> None:
     """Handle request errors, sending an appropriate HTTP error response."""
-    request_start = datetime.now()
+    request_start = datetime.now(UTC)
     addr = conn.client or ("", -1)  # unix socket case
     if isinstance(
         exc,
@@ -464,9 +463,7 @@ async def async_handle_error(
         elif isinstance(exc, ConfigurationProblem):
             mesg = str(exc)
             status_int = 500
-        elif isinstance(exc, ObsoleteFolding):
-            mesg = str(exc)
-        elif isinstance(exc, InvalidHostHeader):
+        elif isinstance(exc, (ObsoleteFolding, InvalidHostHeader)):
             mesg = str(exc)
         elif isinstance(exc, InvalidHeaderName | InvalidHeader):
             mesg = str(exc)
@@ -494,7 +491,7 @@ async def async_handle_error(
         mesg = ""
 
     if req is not None:
-        request_time = datetime.now() - request_start
+        request_time = datetime.now(UTC) - request_start
         resp = Response(req, conn.writer, is_ssl=conn.is_ssl)
         resp.status = f"{status_int} {reason}"
         resp.response_length = len(mesg)
@@ -516,7 +513,7 @@ async def async_finish_request(
     try:
         await resp.async_write_response(http_response)
     finally:
-        request_time = datetime.now() - request_start
+        request_time = datetime.now(UTC) - request_start
         if http_response.log_access:
             log_access(resp, req, request_time)
         if hasattr(http_response, "close"):
@@ -637,15 +634,13 @@ async def stream_async_response(
         except OSError:
             pass
         finally:
-            request_time = datetime.now() - request_start
+            request_time = datetime.now(UTC) - request_start
             if http_response.log_access:
                 log_access(resp, req, request_time)
             if hasattr(http_response, "close"):
                 http_response.close()
 
-    if client_disconnected or resp.should_close():
-        return False
-    return True
+    return not (client_disconnected or resp.should_close())
 
 
 async def handle_connection(worker: Worker, conn: Connection) -> None:

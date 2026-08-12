@@ -8,31 +8,21 @@ import psycopg
 class AmbiguityError(Exception):
     """More than one migration matches a name prefix."""
 
-    pass
-
 
 class BadMigrationError(Exception):
     """There's a bad migration (unreadable/bad format/etc.)."""
-
-    pass
 
 
 class CircularDependencyError(Exception):
     """There's an impossible-to-resolve circular dependency."""
 
-    pass
-
 
 class InconsistentMigrationHistory(Exception):
     """An applied migration has some of its dependencies not applied."""
 
-    pass
-
 
 class InvalidBasesError(ValueError):
     """A model's base classes can't be resolved."""
-
-    pass
 
 
 class NodeNotFoundError(LookupError):
@@ -59,5 +49,3 @@ class MigrationSchemaError(Exception):
     translated to a single migration — e.g. adding a NOT NULL field to
     an existing table without a default, which would leave existing rows
     with no value."""
-
-    pass

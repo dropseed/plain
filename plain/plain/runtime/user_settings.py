@@ -306,9 +306,10 @@ def _parse_env_value(
         )
 
     # Unwrap Secret[T] to get the inner type
-    if typing.get_origin(annotation) is Secret:
-        if args := typing.get_args(annotation):
-            annotation = args[0]
+    if typing.get_origin(annotation) is Secret and (
+        args := typing.get_args(annotation)
+    ):
+        annotation = args[0]
 
     # Unwrap `T | None` — empty env string maps to None, otherwise parse as T.
     # Only the single-arm union case is unwrapped; richer unions fall through.

@@ -13,7 +13,6 @@ from typing import (
     overload,
 )
 
-from plain import exceptions, validators
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import quote_name
 from plain.postgres.enums import ChoicesMeta
@@ -22,6 +21,8 @@ from plain.preflight import PreflightResult
 from plain.utils.datastructures import DictWrapper
 from plain.utils.functional import Promise
 from plain.utils.itercompat import is_iterable
+
+from plain import exceptions, validators
 
 from ..registry import models_registry
 
@@ -120,9 +121,11 @@ class Field[T](RegisterLookupMixin):
     # Designates whether empty strings fundamentally are allowed at the
     # database level.
     empty_strings_allowed = True
-    empty_values = list(validators.EMPTY_VALUES)
+    empty_values = tuple(validators.EMPTY_VALUES)
 
-    default_validators = []  # Default set of validators
+    default_validators: tuple[
+        Callable[[Any], None], ...
+    ] = ()  # Default set of validators
     unique_error_message = "A %(model_name)s with this %(field_label)s already exists."
 
     # Kwargs that don't affect the column definition; the schema editor
@@ -264,7 +267,7 @@ class Field[T](RegisterLookupMixin):
         Uses deconstruct() to clone a new copy of this Field.
         Will not preserve any class attachments/attribute names.
         """
-        name, path, args, kwargs = self.deconstruct()
+        _name, _path, args, kwargs = self.deconstruct()
         return self.__class__(*args, **kwargs)
 
     def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
@@ -600,7 +603,7 @@ class ColumnField[T](Field[T]):
                     PreflightResult(
                         fix=(
                             "All 'validators' must be callable. "
-                            f"validators[{i}] ({repr(validator)}) isn't a function or "
+                            f"validators[{i}] ({validator!r}) isn't a function or "
                             "instance of a validator class."
                         ),
                         obj=self,

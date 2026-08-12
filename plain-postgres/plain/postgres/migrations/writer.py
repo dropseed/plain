@@ -177,7 +177,7 @@ class MigrationWriter:
         # If there's a replaces, make a string for it
         if self.migration.replaces:
             items["replaces_str"] = (
-                f"\n    replaces = {self.serialize(self.migration.replaces)[0]}\n"
+                f"\n    replaces = {self.serialize(tuple(self.migration.replaces))[0]}\n"
             )
         # Hinting that goes into comment
         if self.include_header:
@@ -285,11 +285,11 @@ MIGRATION_TEMPLATE = """\
 
 class Migration(migrations.Migration):
 %(replaces_str)s%(initial_str)s
-    dependencies = [
+    dependencies = (
 %(dependencies)s\
-    ]
+    )
 
-    operations = [
+    operations = (
 %(operations)s\
-    ]
+    )
 """

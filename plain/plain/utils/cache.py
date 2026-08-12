@@ -30,15 +30,14 @@ if TYPE_CHECKING:
 _cc_delim_re = _lazy_re_compile(r"\s*,\s*")
 
 
-def patch_response_headers(response: Response, cache_timeout: int | float) -> None:
+def patch_response_headers(response: Response, cache_timeout: float) -> None:
     """
     Add HTTP caching headers to the given HttpResponse: Expires and
     Cache-Control.
 
     Each header is only added if it isn't already set.
     """
-    if cache_timeout < 0:
-        cache_timeout = 0  # Can't have max-age negative
+    cache_timeout = max(cache_timeout, 0)  # Can't have max-age negative
     if "Expires" not in response.headers:
         response.headers["Expires"] = http_date(time.time() + cache_timeout)
     patch_cache_control(response, max_age=int(cache_timeout))

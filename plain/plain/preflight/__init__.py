@@ -1,3 +1,8 @@
+# Import these to force registration of checks
+import plain.preflight.files
+import plain.preflight.security
+import plain.preflight.settings
+
 from .checks import PreflightCheck
 from .registry import (
     get_check_counts,
@@ -7,10 +12,6 @@ from .registry import (
 )
 from .results import PreflightResult, unused_silenced_results
 
-# Import these to force registration of checks
-import plain.preflight.files  # NOQA isort:skip
-import plain.preflight.security  # NOQA isort:skip
-import plain.preflight.settings  # NOQA isort:skip
 import plain.preflight.urls  # NOQA isort:skip
 
 

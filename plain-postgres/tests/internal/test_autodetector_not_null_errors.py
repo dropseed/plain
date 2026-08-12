@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from plain.postgres import types
 from plain.postgres.migrations.autodetector import MigrationAutodetector
 from plain.postgres.migrations.exceptions import MigrationSchemaError

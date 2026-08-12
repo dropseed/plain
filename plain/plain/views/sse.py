@@ -37,7 +37,7 @@ class ServerSentEventsView(View):
     async def stream(self) -> AsyncIterator[ServerSentEvent]:
         """Override this to yield ServerSentEvent instances."""
         raise NotImplementedError(f"{self.__class__.__name__} must implement stream()")
-        yield  # noqa: RET503 — unreachable, marks this as an async generator
+        yield
 
     async def _format_events(self) -> AsyncIterator[str]:
         async for event in self.stream():

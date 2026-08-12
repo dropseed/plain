@@ -59,9 +59,8 @@ def resolve_relation(
         relation = scope_model
 
     # Look for an "app.Model" relation
-    if isinstance(relation, str):
-        if "." not in relation:
-            relation = f"{scope_model.model_options.package_label}.{relation}"
+    if isinstance(relation, str) and "." not in relation:
+        relation = f"{scope_model.model_options.package_label}.{relation}"
 
     return relation
 
@@ -340,7 +339,7 @@ class ForeignKeyField(ColumnField, RelatedField):
         # model itself already defines the valid set.
         if not isinstance(to, str):
             try:
-                to.model_options.model_name
+                to.model_options.model_name  # noqa: B018 — duck-type probe
             except AttributeError:
                 raise TypeError(
                     f"{self.__class__.__name__}({to!r}) is invalid. First parameter to ForeignKeyField must be "
@@ -471,7 +470,7 @@ class ForeignKeyField(ColumnField, RelatedField):
     def target_field(self) -> Field:
         """A foreign key points at exactly one column: the remote model's id."""
         if isinstance(self.remote_field.model, str):
-            raise ValueError(
+            raise TypeError(
                 f"Related model {self.remote_field.model!r} cannot be resolved"
             )
         return self.remote_field.model._model_meta.get_forward_field("id")
@@ -571,7 +570,7 @@ class ManyToManyField(RelatedField):
         # is managed through the related manager.
         if not isinstance(to, str):
             try:
-                to._model_meta
+                to._model_meta  # noqa: B018 — duck-type probe
             except AttributeError:
                 raise TypeError(
                     f"{self.__class__.__name__}({to!r}) is invalid. First parameter to ManyToManyField "

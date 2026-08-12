@@ -22,7 +22,6 @@ import h2.config
 import h2.connection
 import h2.errors
 import h2.events
-
 from plain.http import Response
 from plain.server.http.h2 import async_handle_h2_connection
 

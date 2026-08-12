@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
+from plain.postgres.exceptions import FieldDoesNotExist
+
 if TYPE_CHECKING:
     from plain.postgres import Model
     from plain.postgres.fields.related_managers import BaseRelatedManager
@@ -61,7 +63,7 @@ class BaseReverseDescriptor(Generic[T, QS]):
                 self._resolved_field = related_model._model_meta.get_field(
                     self.field_name
                 )
-            except Exception as e:
+            except FieldDoesNotExist as e:
                 raise ValueError(
                     f"Field '{self.field_name}' not found on model "
                     f"'{related_model.__name__}' for {self._get_descriptor_type()} '{self.name}' "
@@ -158,7 +160,7 @@ class ReverseForeignKey(BaseReverseDescriptor[T, QS]):
         from plain.postgres.fields.related import ForeignKeyField
 
         if not isinstance(self._resolved_field, ForeignKeyField):
-            raise ValueError(
+            raise TypeError(
                 f"Field '{self.field_name}' on '{related_model.__name__}' is not a "
                 f"ForeignKey. ReverseForeignKey requires a ForeignKeyField field."
             )
@@ -209,7 +211,7 @@ class ReverseManyToMany(BaseReverseDescriptor[T, QS]):
         from plain.postgres.fields.related import ManyToManyField
 
         if not isinstance(self._resolved_field, ManyToManyField):
-            raise ValueError(
+            raise TypeError(
                 f"Field '{self.field_name}' on '{related_model.__name__}' is not a "
                 f"ManyToManyField. ReverseManyToMany requires a ManyToManyField."
             )

@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 from functools import cached_property
 from io import UnsupportedOperation
-from typing import TYPE_CHECKING
+from types import TracebackType
+from typing import TYPE_CHECKING, Self
 
 from plain.internal.files.utils import FileProxyMixin
 
@@ -106,14 +107,14 @@ class File(FileProxyMixin):
         if buffer_ is not None:
             yield buffer_
 
-    def __enter__(self) -> File:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        tb: Any,
+        tb: TracebackType | None,
     ) -> None:
         self.close()
 
@@ -121,7 +122,7 @@ class File(FileProxyMixin):
         if not self.closed:
             self.seek(0)
         elif self.name and os.path.exists(self.name):
-            self.file = open(self.name, mode or self.mode)
+            self.file = open(self.name, mode or self.mode)  # noqa: SIM115 — File owns and closes it
         else:
             raise ValueError("The file cannot be reopened.")
         return self

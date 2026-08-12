@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import ClassVar
 
-from plain import postgres
 from plain.admin.cards import Card, TrendCard
 from plain.admin.views import (
     AdminModelDetailView,
@@ -13,6 +13,8 @@ from plain.admin.views import (
 from plain.http import RedirectResponse
 from plain.postgres.expressions import Case, When
 from plain.runtime import settings
+
+from plain import postgres
 
 from .models import (
     JobProcess,
@@ -51,14 +53,14 @@ class JobResultsTrendCard(TrendCard):
     datetime_field = "created_at"
     size = TrendCard.Sizes.FULL
     group_field = "status"
-    group_labels = {
+    group_labels: ClassVar = {
         "SUCCESSFUL": "Successful",
         "ERRORED": "Errored",
         "CANCELLED": "Cancelled",
         "DEFERRED": "Deferred",
         "LOST": "Lost",
     }
-    group_colors = {
+    group_colors: ClassVar = {
         "SUCCESSFUL": "var(--success)",
         "ERRORED": "var(--danger)",
         "CANCELLED": "var(--muted-foreground)",
@@ -177,16 +179,16 @@ class JobRequestViewset(AdminViewset):
         model = JobRequest
         title = "Requests"
         description = "Jobs waiting to be picked up by a worker."
-        fields = [
+        fields = (
             "id",
             "job_class",
             "priority",
             "created_at",
             "start_at",
             "concurrency_key",
-        ]
-        actions = ["Delete"]
-        queryset_order = ["-priority", "-start_at", "-created_at"]
+        )
+        actions = ("Delete",)
+        queryset_order = ("-priority", "-start_at", "-created_at")
 
         def perform_action(self, action: str, objects: postgres.QuerySet) -> None:
             if action == "Delete":
@@ -205,21 +207,21 @@ class JobProcessViewset(AdminViewset):
         model = JobProcess
         title = "Processes"
         description = "Jobs currently being processed by a worker."
-        fields = [
+        fields = (
             "id",
             "job_class",
             "priority",
             "created_at",
             "started_at",
             "concurrency_key",
-        ]
-        actions = ["Delete"]
-        cards = [
+        )
+        actions = ("Delete",)
+        cards = (
             WaitingJobsCard,
             RunningJobsCard,
             ActiveWorkersCard,
             StaleWorkersCard,
-        ]
+        )
 
         def perform_action(self, action: str, objects: postgres.QuerySet) -> None:
             if action == "Delete":
@@ -238,7 +240,7 @@ class JobResultViewset(AdminViewset):
         model = JobResult
         title = "Results"
         description = "Completed jobs with their success/failure status."
-        fields = [
+        fields = (
             "id",
             "job_class",
             "priority",
@@ -246,33 +248,31 @@ class JobResultViewset(AdminViewset):
             "status",
             "retried",
             "is_retry",
-        ]
-        field_templates = {
+        )
+        field_templates: ClassVar = {
             "status": "jobs/values/job_status.html",
         }
-        search_fields = [
+        search_fields = (
             "uuid",
             "job_process_uuid",
             "job_request_uuid",
             "job_class",
-        ]
-        cards = [
+        )
+        cards = (
             JobResultsTrendCard,
             SuccessfulJobsCard,
             ErroredJobsCard,
             LostJobsCard,
             RetriedJobsCard,
-        ]
-        filters = [
+        )
+        filters = (
             "Successful",
             "Errored",
             "Cancelled",
             "Lost",
             "Retried",
-        ]
-        actions = [
-            "Retry",
-        ]
+        )
+        actions = ("Retry",)
 
         def get_initial_queryset(self) -> JobResultQuerySet:
             queryset: JobResultQuerySet = super().get_initial_queryset()  # ty: ignore[invalid-assignment]
@@ -302,11 +302,10 @@ class JobResultViewset(AdminViewset):
                 return queryset.retried()
             return queryset
 
-        def get_fields(self) -> list[str]:
+        def get_fields(self) -> tuple[str, ...]:
             fields = super().get_fields()
             if self.filter == "Retried":
-                fields.append("retries")
-                fields.append("retry_attempt")
+                fields = (*fields, "retries", "retry_attempt")
             return fields
 
         def perform_action(self, action: str, objects: postgres.QuerySet) -> None:
@@ -336,7 +335,7 @@ class WorkerHeartbeatViewset(AdminViewset):
             "Live worker processes. Each row is refreshed while its worker is "
             "running and deleted on clean shutdown."
         )
-        fields = [
+        fields = (
             "worker_id",
             "hostname",
             "pid",
@@ -344,16 +343,16 @@ class WorkerHeartbeatViewset(AdminViewset):
             "started_at",
             "last_heartbeat_at",
             "stale",
-        ]
-        search_fields = [
+        )
+        search_fields = (
             "worker_id",
             "hostname",
-        ]
-        filters = [
+        )
+        filters = (
             "Active",
             "Stale",
-        ]
-        queryset_order = ["-last_heartbeat_at"]
+        )
+        queryset_order = ("-last_heartbeat_at",)
 
         def get_initial_queryset(self) -> postgres.QuerySet[WorkerHeartbeat]:
             queryset = super().get_initial_queryset()

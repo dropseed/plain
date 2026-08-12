@@ -245,7 +245,7 @@ class BaseForm:
         """
         self._errors = {}
         if not self.is_bound:  # Stop further processing.
-            return None
+            return
         self.cleaned_data = {}
 
         self._clean_fields()
@@ -294,7 +294,6 @@ class BaseForm:
         An internal hook for performing additional cleaning after form cleaning
         is complete. Used for model validation in model forms.
         """
-        pass
 
     def clean(self) -> dict[str, Any]:
         """

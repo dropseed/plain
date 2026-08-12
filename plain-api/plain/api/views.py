@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from functools import cached_property
 from http.client import responses as http_status_phrases
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from plain.exceptions import ValidationError
 from plain.forms.exceptions import FormFieldMissingError
@@ -91,7 +91,7 @@ class APIKeyView(View[APIResult]):
     # Picked up by the OpenAPI generator: each entry is added to
     # `components.securitySchemes` and required on every operation served by
     # this view. Subclasses can override to declare a different scheme.
-    openapi_security_schemes: dict[str, dict[str, Any]] = {
+    openapi_security_schemes: ClassVar[dict[str, dict[str, Any]]] = {
         "BearerAuth": {
             "type": "http",
             "scheme": "bearer",

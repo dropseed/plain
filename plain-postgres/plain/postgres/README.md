@@ -166,9 +166,8 @@ user = User.query.get(email="test@example.com")
 
 # Complex queries with Q objects
 from plain.postgres import Q
-users = User.query.filter(
-    Q(is_admin=True) | Q(email__endswith="@example.com")
-)
+
+users = User.query.filter(Q(is_admin=True) | Q(email__endswith="@example.com"))
 
 # Ordering
 users = User.query.order_by("-created_at")
@@ -187,6 +186,7 @@ You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specializ
 from typing import Self
 from plain.postgres import types
 
+
 class PublishedQuerySet(postgres.QuerySet["Article"]):
     def published_only(self) -> Self:
         return self.filter(status="published")
@@ -194,12 +194,14 @@ class PublishedQuerySet(postgres.QuerySet["Article"]):
     def draft_only(self) -> Self:
         return self.filter(status="draft")
 
+
 @postgres.register_model
 class Article(postgres.Model):
     title: str = types.TextField(max_length=200)
     status: str = types.TextField(max_length=20)
 
     query = PublishedQuerySet()
+
 
 # Usage - all methods available on Article.query
 all_articles = Article.query.all()
@@ -226,6 +228,7 @@ from __future__ import annotations
 from plain import postgres
 from plain.postgres import types
 
+
 @postgres.register_model
 class User(postgres.Model):
     email: str = types.EmailField()
@@ -243,11 +246,14 @@ For complex queries that can't be expressed with the ORM, you can use raw SQL.
 Use `Model.query.raw()` to execute raw SQL and get model instances back:
 
 ```python
-users = User.query.raw("""
+users = User.query.raw(
+    """
     SELECT * FROM users
     WHERE created_at > %s
     ORDER BY created_at DESC
-""", [some_date])
+""",
+    [some_date],
+)
 
 for user in users:
     print(user.email)  # Full model instance with all fields
@@ -320,6 +326,7 @@ for category in Category.query.all():
 
 # Good — single query with annotation
 from plain.postgres.aggregates import Count
+
 for category in Category.query.annotate(num_products=Count("products")).all():
     print(category.num_products)
 ```
@@ -332,6 +339,7 @@ Templates should only render data, never trigger queries. Prepare everything in 
 # Bad — template triggers lazy queries
 def get_template_context(self):
     return {"posts": Post.query.all()}  # related lookups happen in template
+
 
 # Good — eagerly load everything
 def get_template_context(self):
@@ -356,10 +364,12 @@ emails = list(User.query.values_list("email", flat=True))
 
 ```python
 # Bad
-if User.query.filter(is_active=True).count() > 0: ...
+if User.query.filter(is_active=True).count() > 0:
+    ...
 
 # Good
-if User.query.filter(is_active=True).exists(): ...
+if User.query.filter(is_active=True).exists():
+    ...
 ```
 
 #### Use `.count()` instead of `len(queryset)`
@@ -466,8 +476,8 @@ Run a block of code in a read-only transaction using `read_only()`. Any write (I
 from plain.postgres.db import read_only
 
 with read_only():
-    users = User.query.all()       # reads work
-    User.query.create(name="x")   # raises psycopg.errors.ReadOnlySqlTransaction
+    users = User.query.all()  # reads work
+    User.query.create(name="x")  # raises psycopg.errors.ReadOnlySqlTransaction
 ```
 
 `read_only()` opens a single `BEGIN READ ONLY` transaction for the block. Nested `atomic()` blocks inside become savepoints of the outer read-only transaction and inherit read-only.
@@ -480,10 +490,10 @@ Because the whole block is one transaction, catching a database error inside `re
 with read_only():
     try:
         with atomic():
-            User.query.create(name="x")   # raises, savepoint rolls back
+            User.query.create(name="x")  # raises, savepoint rolls back
     except psycopg.errors.ReadOnlySqlTransaction:
         pass
-    User.query.count()   # still works — outer txn is healthy
+    User.query.count()  # still works — outer txn is healthy
 ```
 
 ## Schema management
@@ -705,7 +715,9 @@ class User(postgres.Model):
         ],
         constraints=[
             postgres.UniqueConstraint(fields=["email"], name="users_email_uniq"),
-            postgres.CheckConstraint(check=postgres.Q(age__gte=0), name="users_age_positive"),
+            postgres.CheckConstraint(
+                check=postgres.Q(age__gte=0), name="users_age_positive"
+            ),
         ],
     )
 ```
@@ -805,6 +817,7 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
+
 
 class Product(postgres.Model):
     # Text fields
@@ -910,6 +923,7 @@ This is **not** for passwords or tokens you issue — those should be hashed (on
 from plain import postgres
 from plain.postgres import types
 
+
 @postgres.register_model
 class Integration(postgres.Model):
     name: str = types.TextField(max_length=100)
@@ -946,6 +960,7 @@ Use [`ForeignKeyField`](./fields/related.py#ForeignKeyField) for many-to-one and
 from plain import postgres
 from plain.postgres import types
 
+
 @postgres.register_model
 class Book(postgres.Model):
     title: str = types.TextField(max_length=200)
@@ -959,9 +974,9 @@ Accessing a foreign key gives you the related object without a query — only it
 
 ```python
 book = Book.query.get(id=1)
-book.author        # no query — a partial Author instance
-book.author.id     # no query — the foreign key value
-book.author.name   # one query — loads the rest of the row
+book.author  # no query — a partial Author instance
+book.author.id  # no query — the foreign key value
+book.author.name  # one query — loads the rest of the row
 ```
 
 The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `select_related()` to load related rows up front and avoid a query per row.
@@ -976,16 +991,19 @@ When you define a `ForeignKey` or `ManyToManyField`, Plain automatically creates
 from plain import postgres
 from plain.postgres import types
 
+
 @postgres.register_model
 class Author(postgres.Model):
     name: str = types.TextField(max_length=200)
     # Explicit reverse accessor for all books by this author
     books = types.ReverseForeignKey(to="Book", field="author")
 
+
 @postgres.register_model
 class Book(postgres.Model):
     title: str = types.TextField(max_length=200)
     author: Author = types.ForeignKeyField(Author, on_delete=postgres.CASCADE)
+
 
 # Usage
 author = Author.query.get(name="Jane Doe")
@@ -1005,10 +1023,12 @@ class Feature(postgres.Model):
     # Explicit reverse accessor for all cars with this feature
     cars = types.ReverseManyToMany(to="Car", field="features")
 
+
 @postgres.register_model
 class Car(postgres.Model):
     model: str = types.TextField(max_length=100)
     features = types.ManyToManyField(Feature)
+
 
 # Usage
 feature = Feature.query.get(name="Sunroof")
@@ -1029,10 +1049,14 @@ To get type checking for custom QuerySet methods on reverse relations, specify t
 
 ```python
 # Basic usage
-books: types.ReverseForeignKey[Book] = types.ReverseForeignKey(to="Book", field="author")
+books: types.ReverseForeignKey[Book] = types.ReverseForeignKey(
+    to="Book", field="author"
+)
 
 # With custom QuerySet for proper method recognition
-books: types.ReverseForeignKey[Book, BookQuerySet] = types.ReverseForeignKey(to="Book", field="author")
+books: types.ReverseForeignKey[Book, BookQuerySet] = types.ReverseForeignKey(
+    to="Book", field="author"
+)
 
 # Now type checkers recognize custom methods like .published()
 author.books.query.published()
@@ -1176,6 +1200,7 @@ class Order(postgres.Model):
     status: str = types.TextField(max_length=20)
     created_at: datetime = types.DateTimeField()
 
+
 # Good — indexed for common queries
 class Order(postgres.Model):
     status: str = types.TextField(max_length=20)
@@ -1197,6 +1222,7 @@ def create(self):
         raise ValueError("duplicate")
     return super().create()
 
+
 # Good — database-enforced
 model_options = postgres.Options(
     constraints=[postgres.UniqueConstraint(fields=["email"])],
@@ -1209,7 +1235,9 @@ CASCADE for owned children, RESTRICT for referenced data, SET_NULL for optional 
 
 ```python
 # Bad — blindly using CASCADE everywhere
-company: Company = types.ForeignKeyField("Company", on_delete=postgres.CASCADE)  # deleting company deletes invoices!
+company: Company = types.ForeignKeyField(
+    "Company", on_delete=postgres.CASCADE
+)  # deleting company deletes invoices!
 
 # Good — block the delete while invoices reference the company
 company: Company = types.ForeignKeyField("Company", on_delete=postgres.RESTRICT)
@@ -1235,10 +1263,12 @@ Models integrate with [plain.forms](../../../plain-forms/plain/forms/README.md):
 from plain import forms
 from .models import User
 
+
 class UserForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ["email", "is_admin"]
+        fields = ("email", "is_admin")
+
 
 # Usage
 form = UserForm(request=request)
@@ -1499,7 +1529,9 @@ Use `UniqueConstraint` in your model's `model_options`:
 ```python
 model_options = postgres.Options(
     constraints=[
-        postgres.UniqueConstraint(fields=["email", "organization"], name="unique_email_per_org"),
+        postgres.UniqueConstraint(
+            fields=["email", "organization"], name="unique_email_per_org"
+        ),
     ],
 )
 ```

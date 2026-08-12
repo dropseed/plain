@@ -6,7 +6,6 @@ import asyncio
 from contextvars import ContextVar
 
 from opentelemetry import trace
-
 from plain.http import HttpMiddleware, Response
 from plain.urls import Router, path
 from plain.views import ServerSentEvent, ServerSentEventsView, View
@@ -25,7 +24,6 @@ class CtxVarRoundTripMiddleware(HttpMiddleware):
 
     def before_request(self, request):
         request_ctxvar.set("set-by-before-request")
-        return None
 
     def after_response(self, request, response):
         ctxvar_seen.append(request_ctxvar.get())
@@ -42,9 +40,7 @@ class AsyncAwaitView(View):
 
 class AsyncCtxVarRouter(Router):
     namespace = ""
-    urls = [
-        path("", AsyncAwaitView, name="index"),
-    ]
+    urls = (path("", AsyncAwaitView, name="index"),)
 
 
 class SyncSpanEmittingView(View):
@@ -58,9 +54,7 @@ class SyncSpanEmittingView(View):
 
 class SyncSpanRouter(Router):
     namespace = ""
-    urls = [
-        path("", SyncSpanEmittingView, name="index"),
-    ]
+    urls = (path("", SyncSpanEmittingView, name="index"),)
 
 
 class AsyncSpanEmittingView(View):
@@ -75,15 +69,12 @@ class AsyncSpanEmittingView(View):
 
 class AsyncSpanRouter(Router):
     namespace = ""
-    urls = [
-        path("", AsyncSpanEmittingView, name="index"),
-    ]
+    urls = (path("", AsyncSpanEmittingView, name="index"),)
 
 
 class TrackingMiddleware(HttpMiddleware):
     def before_request(self, request):
         call_log.append("before")
-        return None
 
     def after_response(self, request, response):
         call_log.append("after")
@@ -93,7 +84,6 @@ class TrackingMiddleware(HttpMiddleware):
 class FirstMiddleware(HttpMiddleware):
     def before_request(self, request):
         call_log.append("first_before")
-        return None
 
     def after_response(self, request, response):
         call_log.append("first_after")
@@ -103,7 +93,6 @@ class FirstMiddleware(HttpMiddleware):
 class SecondMiddleware(HttpMiddleware):
     def before_request(self, request):
         call_log.append("second_before")
-        return None
 
     def after_response(self, request, response):
         call_log.append("second_after")
@@ -119,13 +108,11 @@ class BlockingMiddleware(HttpMiddleware):
 class InnerMiddleware(HttpMiddleware):
     def before_request(self, request):
         call_log.append("inner")
-        return None
 
 
 class LoggingMiddleware(HttpMiddleware):
     def before_request(self, request):
         call_log.append("user_middleware")
-        return None
 
 
 class ExplodingMiddleware(HttpMiddleware):
@@ -138,7 +125,6 @@ class OuterWrappingMiddleware(HttpMiddleware):
 
     def before_request(self, request):
         call_log.append("outer_before")
-        return None
 
     def after_response(self, request, response):
         call_log.append(f"outer_after:{response.status_code}")
@@ -182,9 +168,7 @@ class ErrorView(View):
 
 class ErrorRouter(Router):
     namespace = ""
-    urls = [
-        path("", ErrorView, name="index"),
-    ]
+    urls = (path("", ErrorView, name="index"),)
 
 
 class FiniteServerSentEventsView(ServerSentEventsView):
@@ -198,6 +182,4 @@ class FiniteServerSentEventsView(ServerSentEventsView):
 
 class SSERouter(Router):
     namespace = ""
-    urls = [
-        path("", FiniteServerSentEventsView, name="index"),
-    ]
+    urls = (path("", FiniteServerSentEventsView, name="index"),)

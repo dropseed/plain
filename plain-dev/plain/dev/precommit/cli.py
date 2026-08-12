@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.check import check_short, run_core_checks
 from plain.cli.runtime import without_runtime_setup

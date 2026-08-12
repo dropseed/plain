@@ -7,8 +7,8 @@ from . import views
 
 class ContactsRouter(Router):
     namespace = "contacts"
-    urls = [
+    urls = (
         path("", views.ContactView, name="form"),
         path("success", views.ContactSuccessView, name="success"),
         path("archive", views.ContactArchiveView, name="archive"),
-    ]
+    )

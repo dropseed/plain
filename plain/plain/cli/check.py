@@ -8,7 +8,6 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
-
 from plain.cli.print import print_event
 from plain.cli.runtime import common_command
 
@@ -18,6 +17,7 @@ def plain_db_connected() -> bool:
         ["plain", "migrations", "list"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        check=False,
     )
     return result.returncode == 0
 
@@ -26,7 +26,7 @@ def check_short(message: str, *args: str) -> None:
     print_event(message, newline=False)
     env = {**os.environ, "FORCE_COLOR": "1"}
     result = subprocess.run(
-        args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env
+        args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, check=False
     )
     if result.returncode != 0:
         click.secho("✘", fg="red")
@@ -50,13 +50,14 @@ def check_preflight() -> None:
         ["plain", "preflight", "--format", "json"],
         capture_output=True,
         env=env,
+        check=False,
     )
 
     if result.returncode != 0:
         # Errors fail the check. Re-run preflight so its full, human-readable
         # report streams out, rather than reconstructing a partial one here.
         click.secho("✘", fg="red")
-        subprocess.run(["plain", "preflight"], env=env)
+        subprocess.run(["plain", "preflight"], env=env, check=False)
         raise SystemExit(1)
 
     # Success — count warnings from the JSON to surface them; any parse hiccup
@@ -93,12 +94,12 @@ def run_custom_checks() -> None:
     with open(pyproject_path, "rb") as f:
         pyproject = tomllib.load(f)
 
-    for name, data in (
+    for data in (
         pyproject.get("tool", {}).get("plain", {}).get("check", {}).get("run", {})
-    ).items():
+    ).values():
         cmd = data["cmd"]
         print_event(f"Custom: {cmd}")
-        result = subprocess.run(cmd, shell=True)
+        result = subprocess.run(cmd, shell=True, check=False)
         if result.returncode != 0:
             raise SystemExit(result.returncode)
 
@@ -122,7 +123,7 @@ def run_core_checks(*, skip_test: bool = False) -> None:
 
     if not skip_test and find_spec("plain.pytest"):
         print_event("plain test")
-        result = subprocess.run(["plain", "test"])
+        result = subprocess.run(["plain", "test"], check=False)
         if result.returncode != 0:
             raise SystemExit(result.returncode)
 

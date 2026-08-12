@@ -9,7 +9,6 @@ from jinja2.environment import Environment
 from jinja2.ext import Extension
 from jinja2.parser import Parser
 from jinja2.runtime import Context
-
 from plain.templates import register_template_extension
 from plain.utils.safestring import SafeString, mark_safe
 
@@ -36,7 +35,7 @@ def Element(ctx: Context, _element_name: str, **kwargs: Any) -> SafeString:
 
 @register_template_extension
 class ElementsExtension(Extension):
-    tags = {"use_elements"}
+    tags = {"use_elements"}  # noqa: RUF012 — jinja2 types `tags` as an instance attribute; ClassVar here fails ty's LSP check
 
     def __init__(self, env: Environment):
         super().__init__(env)

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import psycopg
 import pytest
-
 from plain.postgres import transaction
 from plain.postgres.db import get_connection
 from plain.postgres.sources import runtime_pool_source
@@ -69,9 +68,8 @@ class TestDeadConnectionSelfHeal:
 
         # psycopg only detects the dead socket on I/O — the first use fails
         # and marks the connection closed.
-        with pytest.raises(psycopg.OperationalError):
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
+        with pytest.raises(psycopg.OperationalError), conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
         assert conn.connection is not None
         assert conn.connection.closed
 
@@ -113,12 +111,11 @@ class TestDeadConnectionSelfHeal:
         conn = get_connection()
 
         def killed_in_nested_atomic() -> None:
-            with transaction.atomic():
-                with transaction.atomic():
-                    pid = _backend_pid(conn)
-                    _terminate_backend(pid)
-                    with conn.cursor() as cursor:
-                        cursor.execute("SELECT 1")
+            with transaction.atomic(), transaction.atomic():
+                pid = _backend_pid(conn)
+                _terminate_backend(pid)
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1")
 
         with pytest.raises(psycopg.OperationalError):
             killed_in_nested_atomic()

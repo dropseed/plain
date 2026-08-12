@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING, Any
 
 import psycopg
 from app.users.models import User
-
-from plain import postgres
 from plain.exceptions import ValidationError
 from plain.postgres import transaction, types
 from plain.utils import timezone
+
+from plain import postgres
 
 from .exceptions import OAuthUserAlreadyExistsError
 

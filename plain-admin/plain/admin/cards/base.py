@@ -37,6 +37,15 @@ class Card:
     view: AdminView
     request: Request
 
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        # Declarative sequence attributes are tuples; converge legacy list
+        # declarations so accessors can return them as-is.
+        for attr in ("headers", "rows", "footers"):
+            value = cls.__dict__.get(attr)
+            if isinstance(value, list):
+                setattr(cls, attr, tuple(value))
+
     def render(self, view: AdminView, request: Request) -> str:
         self.view = view
         self.request = request

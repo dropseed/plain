@@ -9,7 +9,6 @@ from conftest_convergence import (
     execute,
     index_exists,
 )
-
 from plain.postgres import CheckConstraint, Q, UniqueConstraint, get_connection
 from plain.postgres.constraints import Deferrable
 from plain.postgres.convergence import (
@@ -536,7 +535,6 @@ class TestApplyConstraintFixes:
         from unittest.mock import patch
 
         import psycopg
-
         from plain.postgres.convergence.analysis import (
             _normalize_constraint_def,
             _normalize_default_expr,
@@ -554,23 +552,25 @@ class TestApplyConstraintFixes:
 
         # Patch every helper's `_probe_table` and verify the privilege
         # error propagates instead of returning the empty sentinel.
-        with patch(
-            "plain.postgres.convergence.analysis._probe_table",
-            _raising_probe_table,
+        with (
+            patch(
+                "plain.postgres.convergence.analysis._probe_table",
+                _raising_probe_table,
+            ),
+            conn.cursor() as cursor,
         ):
-            with conn.cursor() as cursor:
-                with pytest.raises(psycopg.errors.InsufficientPrivilege):
-                    _normalize_constraint_def(
-                        cursor, ConstraintExample, "CHECK (length(name) > 0)"
-                    )
-                with pytest.raises(psycopg.errors.InsufficientPrivilege):
-                    _normalize_default_expr(cursor, ConstraintExample, "name", "'x'")
-                with pytest.raises(psycopg.errors.InsufficientPrivilege):
-                    _normalize_index_def(
-                        cursor,
-                        ConstraintExample,
-                        fields_orders=[("name", "")],
-                    )
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                _normalize_constraint_def(
+                    cursor, ConstraintExample, "CHECK (length(name) > 0)"
+                )
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                _normalize_default_expr(cursor, ConstraintExample, "name", "'x'")
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                _normalize_index_def(
+                    cursor,
+                    ConstraintExample,
+                    fields_orders=[("name", "")],
+                )
 
     def test_normalization_does_not_drop_real_user_table(self, isolated_db):
         """The round-trip helper uses a fixed temp-table name
@@ -1408,9 +1408,8 @@ class TestProbeTableReuse:
 
         conn = get_connection()
         try:
-            with capture_queries() as queries:
-                with conn.cursor() as cursor:
-                    analyze_model(conn, cursor, ConstraintExample)
+            with capture_queries() as queries, conn.cursor() as cursor:
+                analyze_model(conn, cursor, ConstraintExample)
             sqls = [q["sql"] for q in queries]
         finally:
             ConstraintExample.model_options.constraints = original

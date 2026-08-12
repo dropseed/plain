@@ -12,7 +12,7 @@ import pathlib
 import re
 import types
 import uuid
-from typing import Any
+from typing import Any, ClassVar
 
 from plain.postgres.base import Model
 from plain.postgres.deletion import OnDelete
@@ -223,7 +223,7 @@ class IterableSerializer(BaseSerializer):
 
 class ModelFieldSerializer(DeconstructableSerializer):
     def serialize(self) -> tuple[str, set[str]]:
-        attr_name, path, args, kwargs = self.value.deconstruct()
+        _attr_name, path, args, kwargs = self.value.deconstruct()
         return self.serialize_deconstructed(path, args, kwargs)
 
 
@@ -304,7 +304,7 @@ class TypeSerializer(BaseSerializer):
 
 class UUIDSerializer(BaseSerializer):
     def serialize(self) -> tuple[str, set[str]]:
-        return f"uuid.{repr(self.value)}", {"import uuid"}
+        return f"uuid.{self.value!r}", {"import uuid"}
 
 
 class OnDeleteSerializer(BaseSerializer):
@@ -317,7 +317,7 @@ class OnDeleteSerializer(BaseSerializer):
 
 
 class Serializer:
-    _registry = {
+    _registry: ClassVar = {
         # Some of these are order-dependent.
         frozenset: FrozensetSerializer,
         list: SequenceSerializer,
@@ -348,7 +348,7 @@ class Serializer:
     @classmethod
     def register(cls, type_: type[Any], serializer: type[BaseSerializer]) -> None:
         if not issubclass(serializer, BaseSerializer):
-            raise ValueError(
+            raise TypeError(
                 f"'{serializer.__name__}' must inherit from 'BaseSerializer'."
             )
         cls._registry[type_] = serializer  # ty: ignore[invalid-assignment]

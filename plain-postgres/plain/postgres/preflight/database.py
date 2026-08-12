@@ -117,7 +117,7 @@ class CheckPrunableMigrations(PreflightCheck):
         prunable_orphaned: list[tuple[str, str]] = []
 
         for migration in all_prunable:
-            package, name = migration
+            package, _name = migration
             if package in existing_packages:
                 prunable_existing.append(migration)
             else:

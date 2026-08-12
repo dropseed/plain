@@ -15,7 +15,6 @@ behavior is exercised by dedicated tests below.
 from __future__ import annotations
 
 import pytest
-
 from plain.http import Response
 from plain.runtime import settings
 from plain.test import Client
@@ -225,7 +224,7 @@ def test_global_setting_false_serves_no_slash(setting_client):
 
     class _R(Router):
         namespace = ""
-        urls = [path("home", _OkView, name="home")]
+        urls = (path("home", _OkView, name="home"),)
 
     client = setting_client(_R, urls_trailing_slash=False)
     assert client.get("/home").status_code == 200
@@ -239,7 +238,7 @@ def test_global_setting_true_serves_slash(setting_client):
 
     class _R(Router):
         namespace = ""
-        urls = [path("home", _OkView, name="home")]
+        urls = (path("home", _OkView, name="home"),)
 
     client = setting_client(_R, urls_trailing_slash=True)
     assert client.get("/home/").status_code == 200
@@ -254,7 +253,7 @@ def test_route_string_slash_is_irrelevant(setting_client):
 
     class _R(Router):
         namespace = ""
-        urls = [path("home/", _OkView, name="home")]
+        urls = (path("home/", _OkView, name="home"),)
 
     client = setting_client(_R, urls_trailing_slash=False)
     assert client.get("/home").status_code == 200
@@ -267,9 +266,7 @@ def test_force_trailing_slash_true_overrides_global_false(setting_client):
 
     class _R(Router):
         namespace = ""
-        urls = [
-            path("home", _OkView, name="home", force_trailing_slash=True),
-        ]
+        urls = (path("home", _OkView, name="home", force_trailing_slash=True),)
 
     client = setting_client(_R, urls_trailing_slash=False)
     assert client.get("/home/").status_code == 200
@@ -286,14 +283,14 @@ def test_force_trailing_slash_false_overrides_global_true(setting_client):
 
     class _R(Router):
         namespace = ""
-        urls = [
+        urls = (
             path(
                 "sitemap.xml",
                 _OkView,
                 name="sitemap",
                 force_trailing_slash=False,
             ),
-        ]
+        )
 
     client = setting_client(_R, urls_trailing_slash=True)
     assert client.get("/sitemap.xml").status_code == 200
@@ -310,7 +307,7 @@ def test_root_route_is_slash_neutral_under_global_true(setting_client):
 
     class _R(Router):
         namespace = ""
-        urls = [path("", _OkView, name="home")]
+        urls = (path("", _OkView, name="home"),)
 
     client = setting_client(_R, urls_trailing_slash=True)
     response = client.get("/")
@@ -323,7 +320,7 @@ def test_root_route_is_slash_neutral_under_global_false(setting_client):
 
     class _R(Router):
         namespace = ""
-        urls = [path("", _OkView, name="home")]
+        urls = (path("", _OkView, name="home"),)
 
     client = setting_client(_R, urls_trailing_slash=False)
     response = client.get("/")

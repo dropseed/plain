@@ -5,7 +5,6 @@ from app.examples.models.delete import (
     DeleteParent,
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
-
 from plain.postgres import QuerySet
 
 
@@ -626,7 +625,7 @@ class TestForeignKeyPartialInstance:
 
     def test_assign_bool_is_rejected(self, db):
         child = ChildCascade()
-        with pytest.raises(ValueError, match="Cannot assign"):
+        with pytest.raises(TypeError, match="Cannot assign"):
             child.parent = True
 
     def test_reassign_by_bare_pk_evicts_cached_object(self, db):

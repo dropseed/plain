@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from plain import exceptions
 from plain.preflight import PreflightResult
+
+from plain import exceptions
 
 from .base import ColumnField
 

@@ -78,15 +78,25 @@ Most options can also be configured via settings (see below). CLI arguments take
 Server behavior can be configured in your `settings.py` file. These are the defaults:
 
 ```python
-SERVER_WORKERS = 0           # 0 = auto (one per CPU core)
+SERVER_WORKERS = 0  # 0 = auto (one per CPU core)
 SERVER_THREADS = 4
 SERVER_TIMEOUT = 30
 SERVER_ACCESS_LOG = True
-SERVER_ACCESS_LOG_FIELDS = ["method", "path", "query", "status", "duration_ms", "size", "ip", "user_agent", "referer"]
+SERVER_ACCESS_LOG_FIELDS = [
+    "method",
+    "path",
+    "query",
+    "status",
+    "duration_ms",
+    "size",
+    "ip",
+    "user_agent",
+    "referer",
+]
 SERVER_GRACEFUL_TIMEOUT = 30
 SERVER_SENDFILE = True
 SERVER_CONNECTIONS = 1000
-SERVER_MAX_REQUESTS = 1000   # 0 = disabled, restart worker after N requests
+SERVER_MAX_REQUESTS = 1000  # 0 = disabled, restart worker after N requests
 SERVER_MAX_REQUESTS_JITTER = 100  # random +/- variance to stagger restarts
 ```
 
@@ -111,8 +121,15 @@ See the [logs docs](../logs/README.md) for details on output formats.
 ```python
 # settings.py (default)
 SERVER_ACCESS_LOG_FIELDS = [
-    "method", "path", "query", "status", "duration_ms", "size",
-    "ip", "user_agent", "referer",
+    "method",
+    "path",
+    "query",
+    "status",
+    "duration_ms",
+    "size",
+    "ip",
+    "user_agent",
+    "referer",
 ]
 ```
 

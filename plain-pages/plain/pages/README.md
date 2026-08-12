@@ -187,6 +187,7 @@ You can extend the view classes to customize page rendering:
 ```python
 from plain.pages.views import PageView
 
+
 class CustomPageView(PageView):
     def get_template_context(self):
         context = super().get_template_context()

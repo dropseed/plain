@@ -11,7 +11,6 @@ import json as json_lib
 from pathlib import Path
 
 import click
-
 from plain.cli import register_cli
 from plain.runtime import APP_PATH
 
@@ -196,7 +195,7 @@ def url() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
 def list_(as_json: bool) -> None:
     """List this project's databases."""
-    project_root, cluster, project_name, current = _open()
+    _project_root, cluster, project_name, current = _open()
     databases = cluster.list_databases(project_name)
 
     if as_json:
@@ -397,7 +396,7 @@ def clean(yes: bool) -> None:
     is a reason to correct the metadata, not to reclaim the disk. A test
     database can never be the project main — the `test_` prefix rules it out.
     """
-    project_root, cluster, project_name, current = _open()
+    _project_root, cluster, project_name, current = _open()
 
     databases = cluster.list_databases(project_name)
     orphans: list[DevDatabase] = [

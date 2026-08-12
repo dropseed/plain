@@ -1,12 +1,10 @@
 import click
-
 import plain.runtime
 
 
 @click.group()
 def settings() -> None:
     """View and inspect settings"""
-    pass
 
 
 @settings.command()

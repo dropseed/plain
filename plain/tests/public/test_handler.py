@@ -8,7 +8,6 @@ from middleware_helpers import (
     ctxvar_seen,
     request_ctxvar,
 )
-
 from plain.http import Response
 from plain.internal.handlers.base import BaseHandler
 from plain.runtime import settings

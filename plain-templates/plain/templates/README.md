@@ -156,11 +156,12 @@ Plain core's exception handler — the one that catches pre-view failures like U
 from plain.templates.views import NotFoundView
 from plain.urls import Router, path
 
+
 class AppRouter(Router):
-    urls = [
+    urls = (
         # ... your routes ...
         path("<path:_>", NotFoundView),
-    ]
+    )
 ```
 
 `NotFoundView.before_request` raises `NotFoundError404` before method dispatch, so every HTTP method produces a 404 instead of a 405.
@@ -183,7 +184,9 @@ class ProductView(TemplateView):
     def get_template_context(self):
         context = super().get_template_context()
         context["product"] = Product.objects.get(id=self.url_kwargs["id"])
-        context["related_products"] = Product.objects.filter(category=context["product"].category)[:5]
+        context["related_products"] = Product.objects.filter(
+            category=context["product"].category
+        )[:5]
         return context
 ```
 
@@ -329,10 +332,12 @@ You can render templates outside of views using the [`Template`](./core.py#Templ
 ```python
 from plain.templates import Template
 
-html = Template("email/welcome.html").render({
-    "user_name": "Alice",
-    "activation_url": "https://example.com/activate/abc123",
-})
+html = Template("email/welcome.html").render(
+    {
+        "user_name": "Alice",
+        "activation_url": "https://example.com/activate/abc123",
+    }
+)
 ```
 
 If the template file doesn't exist, a [`TemplateFileMissing`](./core.py#TemplateFileMissing) exception is raised.

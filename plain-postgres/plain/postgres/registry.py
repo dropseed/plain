@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import warnings
 from collections import defaultdict
 from collections.abc import Callable
@@ -14,11 +13,13 @@ if TYPE_CHECKING:
 class ModelsRegistryNotReady(Exception):
     """The plain.postgres registry is not populated yet"""
 
-    pass
-
 
 class ModelsRegistry:
     def __init__(self) -> None:
+        # Memo for get_models(), keyed by package_label ("" = all). Cleared by
+        # clear_cache() whenever the registry changes.
+        self._get_models_cache: dict[str, list[type[Model]]] = {}
+
         # Mapping of app labels => model names => model classes. Every time a
         # model is imported, ModelBase.__new__ calls packages.register_model which
         # creates an entry in all_models. All imported models are registered,
@@ -43,7 +44,6 @@ class ModelsRegistry:
             raise ModelsRegistryNotReady("Models aren't loaded yet.")
 
     # This method is performance-critical at least for Plain's test suite.
-    @functools.cache
     def get_models(self, *, package_label: str = "") -> list[type[Model]]:
         """
         Return a list of all installed models.
@@ -58,20 +58,20 @@ class ModelsRegistry:
 
         self.check_ready()
 
+        if (cached := self._get_models_cache.get(package_label)) is not None:
+            return cached
+
         models = []
 
         # Get models for a single package
         if package_label:
-            package_models = self.all_models[package_label]
-            for model in package_models.values():
-                models.append(model)
-            return models
+            models.extend(self.all_models[package_label].values())
+        else:
+            # Get models for all packages
+            for package_models in self.all_models.values():
+                models.extend(package_models.values())
 
-        # Get models for all packages
-        for package_models in self.all_models.values():
-            for model in package_models.values():
-                models.append(model)
-
+        self._get_models_cache[package_label] = models
         return models
 
     def get_model(
@@ -148,7 +148,7 @@ class ModelsRegistry:
         """
         # Call expire cache on each model. This will purge
         # the relation tree and the fields cache.
-        self.get_models.cache_clear()
+        self._get_models_cache.clear()
         if self.ready:
             # Circumvent self.get_models() to prevent that the cache is refilled.
             # This particularly prevents that an empty value is cached while cloning.

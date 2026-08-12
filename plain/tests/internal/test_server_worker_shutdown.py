@@ -22,9 +22,8 @@ import signal
 import socket
 import time
 
-from server_stubs import StubHeartbeat, make_worker
-
 from plain.server.workers.worker import Worker
+from server_stubs import StubHeartbeat, make_worker
 
 
 class _Listener:

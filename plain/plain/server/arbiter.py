@@ -85,7 +85,7 @@ class Arbiter:
         except SystemExit:
             raise
         except Exception:
-            self.log.error("Unhandled exception in main loop", exc_info=True)
+            self.log.exception("Unhandled exception in main loop")
             self._stop(graceful=False)
             sys.exit(-1)
 

@@ -21,9 +21,9 @@ class LoginView(TemplateView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("oauth", OAuthRouter),
         path("login", LoginView, name="login"),
         path("logout", LogoutView, name="logout"),
         path("", LoggedInView),
-    ]
+    )

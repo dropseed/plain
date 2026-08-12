@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.print import print_event
 from plain.cli.runtime import common_command, without_runtime_setup
@@ -24,7 +23,6 @@ DEFAULT_RUFF_CONFIG = Path(__file__).parent / "ruff_defaults.toml"
 @click.group()
 def cli() -> None:
     """Code formatting and linting"""
-    pass
 
 
 @without_runtime_setup
@@ -129,12 +127,14 @@ def check(
 
     if not skip_ruff and python_paths:
         print_event("ruff check...", newline=False)
-        result = subprocess.run(["ruff", "check", *python_paths, *ruff_args])
+        result = subprocess.run(
+            ["ruff", "check", *python_paths, *ruff_args], check=False
+        )
         maybe_exit(result.returncode)
 
         print_event("ruff format --check...", newline=False)
         result = subprocess.run(
-            ["ruff", "format", *python_paths, "--check", *ruff_args]
+            ["ruff", "format", *python_paths, "--check", *ruff_args], check=False
         )
         maybe_exit(result.returncode)
 
@@ -143,7 +143,7 @@ def check(
         ty_args = ["ty", "check", *python_paths, "--no-progress"]
         for e in config.get("exclude", []):
             ty_args.extend(["--exclude", e])
-        result = subprocess.run(ty_args)
+        result = subprocess.run(ty_args, check=False)
         maybe_exit(result.returncode)
 
     if not skip_oxc and other_paths and config.get("oxc", {}).get("enabled", True):
@@ -303,24 +303,27 @@ def fix(
         if unsafe_fixes:
             print_event("ruff check --fix --unsafe-fixes...", newline=False)
             result = subprocess.run(
-                ["ruff", "check", *python_paths, "--fix", "--unsafe-fixes", *ruff_args]
+                ["ruff", "check", *python_paths, "--fix", "--unsafe-fixes", *ruff_args],
+                check=False,
             )
         elif add_noqa:
             print_event("ruff check --add-noqa...", newline=False)
             result = subprocess.run(
-                ["ruff", "check", *python_paths, "--add-noqa", *ruff_args]
+                ["ruff", "check", *python_paths, "--add-noqa", *ruff_args], check=False
             )
         else:
             print_event("ruff check --fix...", newline=False)
             result = subprocess.run(
-                ["ruff", "check", *python_paths, "--fix", *ruff_args]
+                ["ruff", "check", *python_paths, "--fix", *ruff_args], check=False
             )
 
         if result.returncode != 0:
             sys.exit(result.returncode)
 
         print_event("ruff format...", newline=False)
-        result = subprocess.run(["ruff", "format", *python_paths, *ruff_args])
+        result = subprocess.run(
+            ["ruff", "format", *python_paths, *ruff_args], check=False
+        )
         if result.returncode != 0:
             sys.exit(result.returncode)
 

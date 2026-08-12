@@ -3,11 +3,11 @@ import sys
 from typing import Any
 
 import click
-
-from plain import preflight
 from plain.cli.runtime import common_command
 from plain.packages import packages_registry
 from plain.preflight.registry import count_results_by_severity
+
+from plain import preflight
 
 
 @common_command
@@ -41,7 +41,6 @@ def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
             "Running preflight checks...", dim=True, italic=True, err=use_stderr
         )
 
-    total_checks = 0
     passed_checks = 0
     check_results = []
 
@@ -49,8 +48,6 @@ def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
     for check_class, check_name, issues in preflight.run_checks(
         include_deploy_checks=deploy,
     ):
-        total_checks += 1
-
         # Filter out silenced issues
         visible_issues = [issue for issue in issues if not issue.is_silenced()]
 

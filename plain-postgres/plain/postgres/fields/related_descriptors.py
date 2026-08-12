@@ -183,7 +183,7 @@ class ForwardForeignKeyDescriptor:
         if isinstance(value, Model | bool):
             # A wrong-model instance, or a bool (which would silently coerce to
             # the key 0/1 via int) -- reject rather than store a bogus key.
-            raise ValueError(
+            raise TypeError(
                 f'Cannot assign "{value!r}": '
                 f'"{instance.model_options.object_name}.{self.field.name}" must be a '
                 f'"{remote_field.model.model_options.object_name}" instance or a '
@@ -192,11 +192,10 @@ class ForwardForeignKeyDescriptor:
 
         # A bare related key value (e.g. child.parent = 5).
         new_value = self.field.to_python(value)
-        if instance.__dict__.get(name) != new_value:
-            # The key actually changed -- drop the now-stale forward cache.
-            # Re-storing the same key (e.g. by clean_fields) keeps the cache.
-            if self.field.is_cached(instance):
-                self.field.delete_cached_value(instance)
+        # On an actual key change, drop the now-stale forward cache.
+        # Re-storing the same key (e.g. by clean_fields) keeps the cache.
+        if instance.__dict__.get(name) != new_value and self.field.is_cached(instance):
+            self.field.delete_cached_value(instance)
         instance.__dict__[name] = new_value
 
     def __delete__(self, instance: Any) -> None:

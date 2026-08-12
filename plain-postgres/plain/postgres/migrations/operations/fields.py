@@ -53,9 +53,8 @@ class FieldOperation(Operation):
     def references_field(self, model_name: str, name: str, package_label: str) -> bool:
         model_name_lower = model_name.lower()
         # Check if this operation locally references the field.
-        if model_name_lower == self.model_name_lower:
-            if name == self.name:
-                return True
+        if model_name_lower == self.model_name_lower and name == self.name:
+            return True
         # Check if this operation remotely references the field.
         if self.field is None:
             return False

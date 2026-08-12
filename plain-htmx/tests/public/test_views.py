@@ -1,5 +1,4 @@
 import pytest
-
 from plain.htmx.views import HTMXView
 from plain.http import Response
 from plain.test import RequestFactory

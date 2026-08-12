@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 
 from .base import Card
 
@@ -6,7 +6,7 @@ from .base import Card
 class KeyValueCard(Card):
     template_name = "admin/cards/key_value.html"
 
-    items: dict[str, Any] = {}
+    items: ClassVar[dict[str, Any]] = {}
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()

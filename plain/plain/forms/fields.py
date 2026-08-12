@@ -14,16 +14,17 @@ import uuid
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from decimal import Decimal, DecimalException
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 from urllib.parse import urlsplit, urlunsplit
 
-from plain import validators as validators_
 from plain.exceptions import ValidationError
 from plain.utils import timezone
 from plain.utils.dateparse import parse_datetime, parse_duration
 from plain.utils.duration import duration_string
 from plain.utils.regex_helper import _lazy_re_compile
 from plain.utils.text import pluralize_lazy
+
+from plain import validators as validators_
 
 from .boundfield import BoundField
 from .exceptions import FormFieldMissingError
@@ -32,26 +33,26 @@ if TYPE_CHECKING:
     from .forms import BaseForm
 
 __all__ = [
-    "Field",
-    "TextField",
-    "IntegerField",
-    "DateField",
-    "TimeField",
-    "DateTimeField",
-    "DurationField",
-    "RegexField",
-    "EmailField",
-    "FileField",
-    "ImageField",
-    "URLField",
     "BooleanField",
-    "NullBooleanField",
     "ChoiceField",
-    "MultipleChoiceField",
-    "FloatField",
+    "DateField",
+    "DateTimeField",
     "DecimalField",
+    "DurationField",
+    "EmailField",
+    "Field",
+    "FileField",
+    "FloatField",
+    "ImageField",
+    "IntegerField",
     "JSONField",
+    "MultipleChoiceField",
+    "NullBooleanField",
+    "RegexField",
+    "TextField",
+    "TimeField",
     "TypedChoiceField",
+    "URLField",
     "UUIDField",
 ]
 
@@ -60,13 +61,15 @@ _FILE_INPUT_CONTRADICTION = object()
 
 
 class Field:
-    default_validators: list[Callable[[Any], None]] = []  # Default set of validators
+    default_validators: tuple[
+        Callable[[Any], None], ...
+    ] = ()  # Default set of validators
     # Add an 'invalid' entry to default_error_message if you want a specific
     # field error message not raised by the field validators.
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "required": "This field is required.",
     }
-    empty_values = list(validators_.EMPTY_VALUES)
+    empty_values = tuple(validators_.EMPTY_VALUES)
 
     def __init__(
         self,
@@ -106,7 +109,7 @@ class Field:
 
     def run_validators(self, value: Any) -> None:
         if value in self.empty_values:
-            return None
+            return
         errors = []
         for v in self.validators:
             try:
@@ -228,9 +231,9 @@ class NumericField(Field):
     def __init__(
         self,
         *,
-        max_value: int | float | Decimal | None = None,
-        min_value: int | float | Decimal | None = None,
-        step_size: int | float | Decimal | None = None,
+        max_value: float | Decimal | None = None,
+        min_value: float | Decimal | None = None,
+        step_size: float | Decimal | None = None,
         required: bool = True,
         initial: Any = None,
         error_messages: dict[str, str] | None = None,
@@ -253,7 +256,7 @@ class NumericField(Field):
 
 
 class IntegerField(NumericField):
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid": "Enter a whole number.",
     }
     re_decimal = _lazy_re_compile(r"\.0*\s*$")
@@ -275,7 +278,7 @@ class IntegerField(NumericField):
 
 
 class FloatField(NumericField):
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid": "Enter a number.",
     }
 
@@ -296,13 +299,13 @@ class FloatField(NumericField):
     def validate(self, value: Any) -> None:
         super().validate(value)
         if value in self.empty_values:
-            return None
+            return
         if not math.isfinite(value):
             raise ValidationError(self.error_messages["invalid"], code="invalid")
 
 
 class DecimalField(NumericField):
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid": "Enter a number.",
     }
 
@@ -347,7 +350,7 @@ class DecimalField(NumericField):
     def validate(self, value: Any) -> None:
         super().validate(value)
         if value in self.empty_values:
-            return None
+            return
         if not value.is_finite():
             raise ValidationError(
                 self.error_messages["invalid"],
@@ -361,7 +364,7 @@ class BaseTemporalField(Field):
     # See all available format string here:
     # https://docs.python.org/library/datetime.html#strftime-behavior
     # * Note that these format strings are different from the ones to display dates
-    DATE_INPUT_FORMATS = [
+    DATE_INPUT_FORMATS = (
         "%Y-%m-%d",  # '2006-10-25'
         "%m/%d/%Y",  # '10/25/2006'
         "%m/%d/%y",  # '10/25/06'
@@ -373,24 +376,24 @@ class BaseTemporalField(Field):
         "%B %d, %Y",  # 'October 25, 2006'
         "%d %B %Y",  # '25 October 2006'
         "%d %B, %Y",  # '25 October, 2006'
-    ]
+    )
 
     # Default formats to be used when parsing times from input boxes, in order
     # See all available format string here:
     # https://docs.python.org/library/datetime.html#strftime-behavior
     # * Note that these format strings are different from the ones to display dates
-    TIME_INPUT_FORMATS = [
+    TIME_INPUT_FORMATS = (
         "%H:%M:%S",  # '14:30:59'
         "%H:%M:%S.%f",  # '14:30:59.000200'
         "%H:%M",  # '14:30'
-    ]
+    )
 
     # Default formats to be used when parsing dates and times from input boxes,
     # in order
     # See all available format string here:
     # https://docs.python.org/library/datetime.html#strftime-behavior
     # * Note that these format strings are different from the ones to display dates
-    DATETIME_INPUT_FORMATS = [
+    DATETIME_INPUT_FORMATS = (
         "%Y-%m-%d %H:%M:%S",  # '2006-10-25 14:30:59'
         "%Y-%m-%d %H:%M:%S.%f",  # '2006-10-25 14:30:59.000200'
         "%Y-%m-%d %H:%M",  # '2006-10-25 14:30'
@@ -400,7 +403,7 @@ class BaseTemporalField(Field):
         "%m/%d/%y %H:%M:%S",  # '10/25/06 14:30:59'
         "%m/%d/%y %H:%M:%S.%f",  # '10/25/06 14:30:59.000200'
         "%m/%d/%y %H:%M",  # '10/25/06 14:30'
-    ]
+    )
 
     def __init__(
         self,
@@ -436,7 +439,7 @@ class BaseTemporalField(Field):
 
 class DateField(BaseTemporalField):
     input_formats = BaseTemporalField.DATE_INPUT_FORMATS
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid": "Enter a valid date.",
     }
 
@@ -454,12 +457,13 @@ class DateField(BaseTemporalField):
         return super().to_python(value)
 
     def strptime(self, value: str, format: str) -> datetime.date:
-        return datetime.datetime.strptime(value, format).date()
+        # Only the date survives; the intermediate datetime's tz is irrelevant.
+        return datetime.datetime.strptime(value, format).date()  # noqa: DTZ007
 
 
 class TimeField(BaseTemporalField):
     input_formats = BaseTemporalField.TIME_INPUT_FORMATS
-    default_error_messages = {"invalid": "Enter a valid time."}
+    default_error_messages: ClassVar = {"invalid": "Enter a valid time."}
 
     def to_python(self, value: Any) -> datetime.time | None:
         """
@@ -473,7 +477,8 @@ class TimeField(BaseTemporalField):
         return super().to_python(value)
 
     def strptime(self, value: str, format: str) -> datetime.time:
-        return datetime.datetime.strptime(value, format).time()
+        # Only the time survives; the intermediate datetime's tz is irrelevant.
+        return datetime.datetime.strptime(value, format).time()  # noqa: DTZ007
 
 
 class DateTimeFormatsIterator:
@@ -484,7 +489,7 @@ class DateTimeFormatsIterator:
 
 class DateTimeField(BaseTemporalField):
     input_formats = DateTimeFormatsIterator()
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid": "Enter a valid date/time.",
     }
 
@@ -503,8 +508,7 @@ class DateTimeField(BaseTemporalField):
         if isinstance(value, datetime.datetime):
             return from_current_timezone(value)
         if isinstance(value, datetime.date):
-            result = datetime.datetime(value.year, value.month, value.day)
-            return from_current_timezone(result)
+            return from_current_timezone(timezone.naive_datetime_from_date(value))
         try:
             result = parse_datetime(value.strip())
         except ValueError:
@@ -514,11 +518,12 @@ class DateTimeField(BaseTemporalField):
         return from_current_timezone(result)
 
     def strptime(self, value: str, format: str) -> datetime.datetime:
-        return datetime.datetime.strptime(value, format)
+        # Parsed naive by design; to_python localizes via from_current_timezone.
+        return datetime.datetime.strptime(value, format)  # noqa: DTZ007
 
 
 class DurationField(Field):
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid": "Enter a valid duration.",
         "overflow": "The number of days must be between {min_days} and {max_days}.",
     }
@@ -596,7 +601,7 @@ class RegexField(TextField):
 
 
 class EmailField(TextField):
-    default_validators = [validators_.validate_email]
+    default_validators = (validators_.validate_email,)
 
     def __init__(
         self,
@@ -623,7 +628,7 @@ class EmailField(TextField):
 
 
 class FileField(Field):
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid": "No file was submitted. Check the encoding type on the form.",
         "missing": "No file was submitted.",
         "empty": "The submitted file is empty.",
@@ -712,8 +717,8 @@ class FileField(Field):
 
 
 class ImageField(FileField):
-    default_validators = [validators_.validate_image_file_extension]
-    default_error_messages = {
+    default_validators = (validators_.validate_image_file_extension,)
+    default_error_messages: ClassVar = {
         "invalid_image": "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
     }
 
@@ -762,10 +767,10 @@ class ImageField(FileField):
 
 
 class URLField(TextField):
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid": "Enter a valid URL.",
     }
-    default_validators = [validators_.URLValidator()]
+    default_validators = (validators_.URLValidator(),)
 
     def __init__(
         self,
@@ -911,7 +916,7 @@ class CallableChoiceIterator:
 
 
 class ChoiceField(Field):
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid_choice": "Select a valid choice. %(value)s is not one of the available choices.",
     }
 
@@ -1034,7 +1039,7 @@ class TypedChoiceField(ChoiceField):
 
 
 class MultipleChoiceField(ChoiceField):
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid_choice": "Select a valid choice. %(value)s is not one of the available choices.",
         "invalid_list": "Enter a list of values.",
     }
@@ -1077,7 +1082,7 @@ class MultipleChoiceField(ChoiceField):
 
 
 class UUIDField(TextField):
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid": "Enter a valid UUID.",
     }
 
@@ -1107,7 +1112,7 @@ class JSONString(str):
 
 
 class JSONField(TextField):
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid": "Enter a valid JSON.",
     }
 

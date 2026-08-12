@@ -2,7 +2,7 @@ import datetime
 
 from plain.utils.html import avoid_wrapping
 from plain.utils.text import pluralize_lazy
-from plain.utils.timezone import is_aware
+from plain.utils.timezone import is_aware, naive_datetime_from_date
 
 
 def timesince(
@@ -93,9 +93,9 @@ def timesince(
 
     # Convert datetime.date to datetime.datetime for comparison.
     if not isinstance(d, datetime.datetime):
-        d = datetime.datetime(d.year, d.month, d.day)
+        d = naive_datetime_from_date(d)
     if now and not isinstance(now, datetime.datetime):
-        now = datetime.datetime(now.year, now.month, now.day)
+        now = naive_datetime_from_date(now)
 
     now = now or datetime.datetime.now(datetime.UTC if is_aware(d) else None)
 

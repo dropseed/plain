@@ -225,7 +225,7 @@ class UniqueConstraint(BaseConstraint):
                 "UniqueConstraint.fields and expressions are mutually exclusive."
             )
         if not isinstance(condition, NoneType | Q):
-            raise ValueError("UniqueConstraint.condition must be a Q instance.")
+            raise TypeError("UniqueConstraint.condition must be a Q instance.")
         if condition and deferrable:
             raise ValueError("UniqueConstraint with conditions cannot be deferred.")
         if include and deferrable:
@@ -240,13 +240,13 @@ class UniqueConstraint(BaseConstraint):
                 "Use a custom OpClass() instead."
             )
         if not isinstance(deferrable, NoneType | Deferrable):
-            raise ValueError(
+            raise TypeError(
                 "UniqueConstraint.deferrable must be a Deferrable instance."
             )
         if not isinstance(include, NoneType | list | tuple):
-            raise ValueError("UniqueConstraint.include must be a list or tuple.")
+            raise TypeError("UniqueConstraint.include must be a list or tuple.")
         if not isinstance(opclasses, list | tuple):
-            raise ValueError("UniqueConstraint.opclasses must be a list or tuple.")
+            raise TypeError("UniqueConstraint.opclasses must be a list or tuple.")
         if opclasses and len(fields) != len(opclasses):
             raise ValueError(
                 "UniqueConstraint.fields and UniqueConstraint.opclasses must "
@@ -328,13 +328,13 @@ class UniqueConstraint(BaseConstraint):
     def __repr__(self) -> str:
         return "<{}:{}{}{}{}{}{}{}{}>".format(
             self.__class__.__qualname__,
-            "" if not self.fields else f" fields={repr(self.fields)}",
-            "" if not self.expressions else f" expressions={repr(self.expressions)}",
-            f" name={repr(self.name)}",
+            "" if not self.fields else f" fields={self.fields!r}",
+            "" if not self.expressions else f" expressions={self.expressions!r}",
+            f" name={self.name!r}",
             "" if self.condition is None else f" condition={self.condition}",
             "" if self.deferrable is None else f" deferrable={self.deferrable!r}",
-            "" if not self.include else f" include={repr(self.include)}",
-            "" if not self.opclasses else f" opclasses={repr(self.opclasses)}",
+            "" if not self.include else f" include={self.include!r}",
+            "" if not self.opclasses else f" opclasses={self.opclasses!r}",
             (
                 ""
                 if self.violation_error is None
@@ -357,7 +357,7 @@ class UniqueConstraint(BaseConstraint):
         return super().__eq__(other)
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
-        path, args, kwargs = super().deconstruct()
+        path, _args, kwargs = super().deconstruct()
         if self.fields:
             kwargs["fields"] = self.fields
         if self.condition:

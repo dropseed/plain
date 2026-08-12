@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, Protocol, Self, cast, runtime_checkable
 from uuid import UUID
 
 import psycopg
-
 from plain.postgres import fields
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import (
@@ -43,25 +42,22 @@ if TYPE_CHECKING:
     from plain.postgres.sql.query import Query
 
 __all__ = [
-    # Core expression classes
-    "F",
-    "Value",
     "Case",
-    "When",
-    "Subquery",
-    "Exists",
-    "OuterRef",
-    "Window",
-    "ExpressionWrapper",
-    "RawSQL",
-    "OrderBy",
-    # Base classes (for extension)
-    "Func",
-    "Expression",
     "Combinable",
-    # Window frame specs
+    "Exists",
+    "Expression",
+    "ExpressionWrapper",
+    "F",
+    "Func",
+    "OrderBy",
+    "OuterRef",
+    "RawSQL",
     "RowRange",
+    "Subquery",
+    "Value",
     "ValueRange",
+    "When",
+    "Window",
 ]
 
 
@@ -407,22 +403,16 @@ class BaseExpression:
         """
         field = self.output_field
         if isinstance(field, fields.FloatField):
-            return (
-                lambda value, expression, connection: None
-                if value is None
-                else float(value)
+            return lambda value, expression, connection: (
+                None if value is None else float(value)
             )
         elif isinstance(field, fields.IntegerField | fields.PrimaryKeyField):
-            return (
-                lambda value, expression, connection: None
-                if value is None
-                else int(value)
+            return lambda value, expression, connection: (
+                None if value is None else int(value)
             )
         elif isinstance(field, fields.DecimalField):
-            return (
-                lambda value, expression, connection: None
-                if value is None
-                else Decimal(value)
+            return lambda value, expression, connection: (
+                None if value is None else Decimal(value)
             )
         return self._convert_value_noop
 
@@ -514,9 +504,10 @@ class BaseExpression:
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
     ) -> tuple[str, Sequence[Any]]:
         """Custom format for select clauses."""
-        if output_field := getattr(self, "output_field", None):
-            if select_format := getattr(output_field, "select_format", None):
-                return select_format(compiler, sql, params)
+        if (output_field := getattr(self, "output_field", None)) and (
+            select_format := getattr(output_field, "select_format", None)
+        ):
+            return select_format(compiler, sql, params)
         return sql, params
 
 
@@ -661,9 +652,9 @@ _connector_combinators = defaultdict(list)
 
 
 def register_combinable_fields(
-    lhs: type[Field] | type[None],
+    lhs: type[Field | None],
     connector: str,
-    rhs: type[Field] | type[None],
+    rhs: type[Field | None],
     result: type[Field],
 ) -> None:
     """
@@ -1657,7 +1648,7 @@ class OrderBy(Expression):
         self.nulls_last = nulls_last
         self.descending = descending
         if not isinstance(expression, ResolvableExpression):
-            raise ValueError("expression must be an expression type")
+            raise TypeError("expression must be an expression type")
         self.expression = expression
 
     def __repr__(self) -> str:

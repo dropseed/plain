@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import total_ordering
 from typing import TYPE_CHECKING, Any, cast
 
@@ -150,7 +151,7 @@ class MigrationGraph:
             self.validate_consistency()
 
     def remove_replaced_nodes(
-        self, replacement: tuple[str, str], replaced: list[tuple[str, str]]
+        self, replacement: tuple[str, str], replaced: Sequence[tuple[str, str]]
     ) -> None:
         """
         Remove each of the `replaced` nodes (when they exist). Any
@@ -187,7 +188,7 @@ class MigrationGraph:
                         parent.add_child(replacement_node)
 
     def remove_replacement_node(
-        self, replacement: tuple[str, str], replaced: list[tuple[str, str]]
+        self, replacement: tuple[str, str], replaced: Sequence[tuple[str, str]]
     ) -> None:
         """
         The inverse operation to `remove_replaced_nodes`. Almost. Remove the

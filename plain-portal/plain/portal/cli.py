@@ -7,7 +7,6 @@ import os
 import sys
 
 import click
-
 from plain.cli import register_cli
 
 from .protocol import (
@@ -55,11 +54,14 @@ def cli() -> None:
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
 def start(writable: bool, timeout: int, relay_host: str, yes: bool) -> None:
     """Start a portal session on the remote machine."""
-    if writable and not yes:
-        if not click.confirm(
+    if (
+        writable
+        and not yes
+        and not click.confirm(
             "This session allows writes to the production database. Continue?"
-        ):
-            return
+        )
+    ):
+        return
 
     from .remote import run_remote
 
@@ -169,7 +171,7 @@ def push(local_path: str, remote_path: str) -> None:
     async def _push_all() -> dict:
         chunks = chunk_count(file_size)
         response = {}
-        with open(local_path, "rb") as f:
+        with open(local_path, "rb") as f:  # noqa: ASYNC230 — dedicated transfer loop; the file IO is the work
             for i in range(chunks):
                 data = f.read(FILE_CHUNK_SIZE)
                 request = make_file_push(

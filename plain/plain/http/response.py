@@ -23,7 +23,7 @@ from plain.utils.http import content_disposition_header, http_date
 from plain.utils.regex_helper import _lazy_re_compile
 
 _charset_from_content_type_re = _lazy_re_compile(
-    r";\s*charset=(?P<charset>[^\s;]+)", re.I
+    r";\s*charset=(?P<charset>[^\s;]+)", re.IGNORECASE
 )
 
 
@@ -179,13 +179,14 @@ class Response:
             return self._charset
         # The Content-Type header may not yet be set, because the charset is
         # being inserted *into* it.
-        if content_type := self.headers.get("Content-Type"):
-            if matched := _charset_from_content_type_re.search(content_type):
-                # Extract the charset and strip its double quotes.
-                # Note that having parsed it from the Content-Type, we don't
-                # store it back into the _charset for later intentionally, to
-                # allow for the Content-Type to be switched again later.
-                return matched["charset"].replace('"', "")
+        if (content_type := self.headers.get("Content-Type")) and (
+            matched := _charset_from_content_type_re.search(content_type)
+        ):
+            # Extract the charset and strip its double quotes.
+            # Note that having parsed it from the Content-Type, we don't
+            # store it back into the _charset for later intentionally, to
+            # allow for the Content-Type to be switched again later.
+            return matched["charset"].replace('"', "")
         return "utf-8"
 
     @charset.setter
@@ -204,7 +205,7 @@ class Response:
         self,
         key: str,
         value: str = "",
-        max_age: int | float | datetime.timedelta | None = None,
+        max_age: float | datetime.timedelta | None = None,
         expires: str | datetime.datetime | None = None,
         path: str | None = "/",
         domain: str | None = None,
@@ -530,11 +531,9 @@ class FileResponse(StreamingResponse):
                 filelike.seek(0, io.SEEK_END)
                 self.headers["Content-Length"] = str(filelike.tell() - initial_position)
                 filelike.seek(initial_position)
-            elif hasattr(filelike, "getbuffer") and callable(
-                getattr(filelike, "getbuffer")
-            ):
+            elif callable(getbuffer := getattr(filelike, "getbuffer", None)):
                 self.headers["Content-Length"] = str(
-                    filelike.getbuffer().nbytes - filelike.tell()  # ty: ignore[call-non-callable]
+                    getbuffer().nbytes - filelike.tell()
                 )
             elif os.path.exists(filename):
                 self.headers["Content-Length"] = str(
@@ -584,9 +583,7 @@ def _is_external_url(url: str) -> bool:
     if url[:2].replace("\\", "/") == "//":
         return True
     colon_pos = url.find("://")
-    if colon_pos > 0 and url[:colon_pos].isalpha():
-        return True
-    return False
+    return colon_pos > 0 and url[:colon_pos].isalpha()
 
 
 class RedirectResponse(Response):

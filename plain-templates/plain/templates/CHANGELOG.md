@@ -61,6 +61,7 @@
     from plain.templates.views import NotFoundView
     from plain.urls import Router, path
 
+
     class AppRouter(Router):
         urls = [
             # ... your routes ...

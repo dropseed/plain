@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import pytest
 from app.examples.models.defaults import DefaultsExample
-
 from plain.postgres import fields as plain_fields
 from plain.postgres import get_connection, types
 
@@ -93,7 +92,7 @@ def test_add_only_empty_default_field_backfills_populated_table(db, field, expec
 
     table = DefaultsExample.model_options.db_table
     with connection.cursor() as cursor:
-        cursor.execute(f'SELECT "added_column" FROM "{table}"')  # noqa: S608
+        cursor.execute(f'SELECT "added_column" FROM "{table}"')
         rows = cursor.fetchall()
     value = rows[0][0]
     if isinstance(value, memoryview):
@@ -189,7 +188,6 @@ def test_special_char_string_default_round_trip(isolated_db):
     → pg_get_expr → normalize the model side → compare. Otherwise every
     sync would flag CHANGED for safe-but-ugly inputs."""
     from conftest_convergence import column_default_sql, execute
-
     from plain.postgres.convergence.analysis import _normalize_default_expr
     from plain.postgres.ddl import compile_literal_default_sql
 
@@ -235,7 +233,6 @@ def test_jsonb_default_no_drift_when_keys_reordered(isolated_db):
     every sync of a JSONField default whose author rearranged keys would
     report spurious CHANGED."""
     from conftest_convergence import execute
-
     from plain.postgres import JSONField
     from plain.postgres.convergence.analysis import _compare_column_default
     from plain.postgres.introspection import ColumnState, introspect_table
@@ -286,7 +283,6 @@ def test_jsonb_default_drift_when_values_differ(isolated_db):
     must still report CHANGED. Pins the negative case so the fallback
     can't drift into a "never reports JSONField drift" bug."""
     from conftest_convergence import execute
-
     from plain.postgres import JSONField
     from plain.postgres.convergence.analysis import (
         ColumnDefaultDrift,

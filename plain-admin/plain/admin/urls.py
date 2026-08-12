@@ -20,7 +20,7 @@ __all__ = ["AdminRouter"]
 
 class AdminRouter(Router):
     namespace = "admin"
-    urls = [
+    urls = (
         path("search", AdminSearchView, name="search"),
         path("ui", UIView, name="ui"),
         path("settings", SettingsView, name="settings"),
@@ -33,4 +33,4 @@ class AdminRouter(Router):
         include("impersonate", ImpersonateRouter),
         include("", registry.get_urls()),
         path("", AdminIndexView, name="index"),
-    ]
+    )

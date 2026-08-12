@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from plain.auth import get_request_user
 from plain.sessions import get_request_session
-from plain.urls import path, reverse_lazy
+from plain.urls import URLPattern, path, reverse_lazy
 
 if TYPE_CHECKING:
     from plain.http import Request
@@ -100,7 +100,7 @@ class AdminViewRegistry:
                 sorted(sections.items(), key=lambda x: ("z" if x[0] else "", x[0]))
             )
 
-    def get_urls(self) -> list:
+    def get_urls(self) -> tuple[URLPattern, ...]:
         urls = []
         paths_seen = {}
 
@@ -122,7 +122,7 @@ class AdminViewRegistry:
 
             urls.append(path(f"p/{view_path}", view, name=view.view_name()))
 
-        return urls
+        return tuple(urls)
 
     def get_list_views(self, user: Model) -> list[type[AdminView]]:
         from plain.admin.views.objects import AdminListView
@@ -220,14 +220,13 @@ class AdminViewRegistry:
         for slug in recent_slugs:
             if len(tabs) >= max_tabs:
                 break
-            if slug not in used_slugs:
-                if view := self.get_view_by_slug(slug):
-                    if view.nav_section is None:
-                        continue
-                    if not view.has_permission(user):
-                        continue
-                    tabs.append({"view": view, "pinned": False})
-                    used_slugs.add(slug)
+            if slug not in used_slugs and (view := self.get_view_by_slug(slug)):
+                if view.nav_section is None:
+                    continue
+                if not view.has_permission(user):
+                    continue
+                tabs.append({"view": view, "pinned": False})
+                used_slugs.add(slug)
 
         return tabs[:max_tabs]
 

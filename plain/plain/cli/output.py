@@ -23,17 +23,7 @@ def iterate_markdown(content: str) -> Iterator[str]:
 
         if in_code_block:
             yield click.style(line, dim=True)
-        elif line.startswith("# "):
-            yield click.style(line, fg="yellow", bold=True)
-        elif line.startswith("## "):
-            yield click.style(line, fg="yellow", bold=True)
-        elif line.startswith("### "):
-            yield click.style(line, fg="yellow", bold=True)
-        elif line.startswith("#### "):
-            yield click.style(line, fg="yellow", bold=True)
-        elif line.startswith("##### "):
-            yield click.style(line, fg="yellow", bold=True)
-        elif line.startswith("###### "):
+        elif line.startswith(("# ", "## ", "### ", "#### ", "##### ", "###### ")):
             yield click.style(line, fg="yellow", bold=True)
         elif line.startswith("**") and line.endswith("**"):
             yield click.style(line, bold=True)

@@ -1,7 +1,8 @@
 import uuid
 
-from plain import postgres
 from plain.postgres import migrations
+
+from plain import postgres
 
 
 def set_uuids(models, schema_editor):
@@ -12,11 +13,9 @@ def set_uuids(models, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [
-        ("examples", "0001_initial"),
-    ]
+    dependencies = (("examples", "0001_initial"),)
 
-    operations = [
+    operations = (
         migrations.AddField(
             model_name="car",
             name="uuid",
@@ -27,4 +26,4 @@ class Migration(migrations.Migration):
             model_name="car",
             name="uuid",
         ),
-    ]
+    )

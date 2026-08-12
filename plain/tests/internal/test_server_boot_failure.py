@@ -15,9 +15,8 @@ import signal
 import socket
 import threading
 
-from server_stubs import StubApp
-
 from plain.server.workers import boot_failure
+from server_stubs import StubApp
 
 
 class _StubHeartbeat:

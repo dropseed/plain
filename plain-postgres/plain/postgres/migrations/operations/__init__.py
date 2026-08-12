@@ -9,16 +9,16 @@ from .models import (
 from .special import RunPython, RunSQL, SeparateDatabaseAndState
 
 __all__ = [
+    "AddField",
+    "AlterField",
+    "AlterModelOptions",
+    "AlterModelTable",
     "CreateModel",
     "DeleteModel",
-    "AlterModelTable",
-    "RenameModel",
-    "AlterModelOptions",
-    "AddField",
     "RemoveField",
-    "AlterField",
     "RenameField",
-    "SeparateDatabaseAndState",
-    "RunSQL",
+    "RenameModel",
     "RunPython",
+    "RunSQL",
+    "SeparateDatabaseAndState",
 ]

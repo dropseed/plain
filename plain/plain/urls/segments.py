@@ -109,8 +109,7 @@ def _route_to_segments(route: str) -> tuple[Segment, ...]:
             "fragment in URLs and can't appear in route patterns."
         )
 
-    if route.endswith("/"):
-        route = route[:-1]
+    route = route.removesuffix("/")
 
     if route == "":
         return ()

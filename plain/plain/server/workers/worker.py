@@ -80,7 +80,7 @@ class Worker:
         ppid: int,
         sockets: Sequence[sock.BaseSocket],
         app: ServerApplication,
-        timeout: int | float,
+        timeout: float,
         heartbeat: WorkerHeartbeat,
         handler: Any,
     ):
@@ -140,13 +140,16 @@ class Worker:
     def _count_request(self) -> None:
         """Increment the request counter and signal for replacement if the limit is reached."""
         self.total_requests += 1
-        if self.max_requests and self.total_requests >= self.max_requests:
-            if not self.heartbeat.is_retiring():
-                self.heartbeat.set_retiring()
-                self.log.info(
-                    "Worker reached max requests, requesting replacement",
-                    extra={"max_requests": self.max_requests},
-                )
+        if (
+            self.max_requests
+            and self.total_requests >= self.max_requests
+            and not self.heartbeat.is_retiring()
+        ):
+            self.heartbeat.set_retiring()
+            self.log.info(
+                "Worker reached max requests, requesting replacement",
+                extra={"max_requests": self.max_requests},
+            )
 
     def notify(self) -> None:
         self.heartbeat.notify()

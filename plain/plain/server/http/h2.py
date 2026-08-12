@@ -4,7 +4,7 @@ import asyncio
 import io
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import h2.config
@@ -13,7 +13,6 @@ import h2.errors
 import h2.events
 import h2.exceptions
 import h2.settings
-
 from plain.http import AsyncStreamingResponse, FileResponse, StreamingResponse
 from plain.http import Request as HttpRequest
 from plain.logs import get_framework_logger
@@ -41,7 +40,7 @@ _H2_SKIP_HEADERS = frozenset(
 class H2Stream:
     """Accumulates headers and data for a single HTTP/2 stream."""
 
-    __slots__ = ("stream_id", "headers", "data", "data_size")
+    __slots__ = ("data", "data_size", "headers", "stream_id")
 
     def __init__(self, stream_id: int) -> None:
         self.stream_id = stream_id
@@ -620,7 +619,7 @@ async def _async_handle_stream_inner(
     stream: H2Stream,
 ) -> None:
     """Inner stream handler — budget acquire/release is in the caller."""
-    request_start = datetime.now()
+    request_start = datetime.now(UTC)
 
     try:
         h2_req, http_request, h2_resp = _prepare_stream_request(
@@ -645,7 +644,7 @@ async def _async_handle_stream_inner(
                 state, stream.stream_id, http_response, h2_resp
             )
         finally:
-            request_time = datetime.now() - request_start
+            request_time = datetime.now(UTC) - request_start
             if http_response.log_access:
                 log_access(h2_resp, h2_req, request_time)
             if isinstance(http_response, AsyncStreamingResponse):

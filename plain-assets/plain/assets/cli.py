@@ -6,7 +6,6 @@ from importlib.metadata import entry_points
 from pathlib import Path
 
 import click
-
 import plain.runtime
 from plain.cli import register_cli
 from plain.cli.print import print_event
@@ -64,7 +63,7 @@ def compile_cmd(keep_original: bool, fingerprint: bool, compress: bool) -> None:
             .items()
         ):
             print_event(f"{name}...")
-            result = subprocess.run(data["cmd"], shell=True)
+            result = subprocess.run(data["cmd"], shell=True, check=False)
             if result.returncode:
                 click.secho(f"Error in {name} (exit {result.returncode})", fg="red")
                 sys.exit(result.returncode)

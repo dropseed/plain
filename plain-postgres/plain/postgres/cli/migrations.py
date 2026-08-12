@@ -5,7 +5,6 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.runtime import common_command
 from plain.packages import packages_registry
@@ -999,9 +998,8 @@ def squash(
         for migration in migrations_to_squash:
             click.echo(f" - {migration.name}")
 
-        if interactive:
-            if not click.confirm("Do you wish to proceed?"):
-                return
+        if interactive and not click.confirm("Do you wish to proceed?"):
+            return
 
     # Load the operations from all those migrations and concat together,
     # along with collecting external dependencies and detecting double-squashing

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 import re
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Any, NamedTuple
@@ -9,6 +8,7 @@ from plain.postgres.fields.related import (
     RECURSIVE_RELATIONSHIP_CONSTANT,
     RelatedField,
 )
+from plain.utils import timezone
 
 if TYPE_CHECKING:
     from plain.postgres.fields import Field
@@ -30,14 +30,14 @@ class RegexObject:
         self.pattern = obj.pattern
         self.flags = obj.flags
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, RegexObject):
             return NotImplemented
         return self.pattern == other.pattern and self.flags == other.flags
 
 
 def get_migration_name_timestamp() -> str:
-    return datetime.datetime.now().strftime("%Y%m%d_%H%M")
+    return timezone.localtime().strftime("%Y%m%d_%H%M")
 
 
 def resolve_relation(
@@ -92,14 +92,13 @@ def field_references(
         return False
     references_to = None
     references_through = None
-    if resolve_relation(remote_field.model, *model_tuple) == reference_model_tuple:
-        # ForeignObject always references 'id'
-        if (
-            reference_field_name is None
-            or reference_field_name == "id"
-            or (reference_field is None or reference_field.primary_key)
-        ):
-            references_to = (remote_field, ["id"])
+    # ForeignObject always references 'id'
+    if resolve_relation(remote_field.model, *model_tuple) == reference_model_tuple and (
+        reference_field_name is None
+        or reference_field_name == "id"
+        or (reference_field is None or reference_field.primary_key)
+    ):
+        references_to = (remote_field, ["id"])
     through = getattr(remote_field, "through", None)
     if through and resolve_relation(through, *model_tuple) == reference_model_tuple:
         through_fields = getattr(remote_field, "through_fields", None)

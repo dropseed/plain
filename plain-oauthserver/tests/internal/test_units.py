@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from oauth_helpers import generate_pkce_pair
-
 from plain.oauthserver.models import (
     AuthorizationCode,
     OAuthApplication,

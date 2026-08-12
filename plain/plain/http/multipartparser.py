@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from plain.http.request import Request
     from plain.internal.files.uploadhandler import FileUploadHandler
 
-__all__ = ["MultiPartParser", "MultiPartParserError", "InputStreamExhausted"]
+__all__ = ["InputStreamExhausted", "MultiPartParser", "MultiPartParserError"]
 
 
 class MultiPartParserError(BadRequestError400):
@@ -45,8 +45,6 @@ class InputStreamExhausted(Exception):
     """
     No more reads are allowed from this device.
     """
-
-    pass
 
 
 _RAW = "raw"

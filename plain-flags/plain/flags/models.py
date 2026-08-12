@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import re
 
-from plain import postgres
 from plain.exceptions import ValidationError
 from plain.postgres import types
+
+from plain import postgres
 
 __all__ = ["Flag", "FlagResult"]
 

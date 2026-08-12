@@ -3,8 +3,9 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from plain import postgres
 from plain.postgres import types
+
+from plain import postgres
 
 if TYPE_CHECKING:
     from plain.http import Request

@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from typing import NoReturn
 
+from plain.admin.urls import AdminRouter
+from plain.assets.urls import AssetsRouter
+from plain.auth.views import LogoutView
+from plain.passwords.views import PasswordLoginView
+from plain.templates.views import NotFoundView, TemplateView
+from plain.urls import Router, include, path
+
 from app.contacts.urls import ContactsRouter
 from app.mcp import NotesMCP
 from app.notes.urls import NotesRouter
@@ -10,12 +17,6 @@ from app.tasks.urls import TasksRouter
 from app.views.api import APIRouter
 from app.views.jobs import RunExampleJobView
 from app.views.sse import ClockView, StockTickerView
-from plain.admin.urls import AdminRouter
-from plain.assets.urls import AssetsRouter
-from plain.auth.views import LogoutView
-from plain.passwords.views import PasswordLoginView
-from plain.templates.views import NotFoundView, TemplateView
-from plain.urls import Router, include, path
 
 
 class LoginView(PasswordLoginView):
@@ -40,7 +41,7 @@ class ErrorView(TemplateView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("admin", AdminRouter),
         include("assets", AssetsRouter),
         include("notes", NotesRouter),
@@ -58,4 +59,4 @@ class AppRouter(Router):
         path("jobs/run", RunExampleJobView, name="run_example_job"),
         path("", IndexView, name="index"),
         path("<path:_>", NotFoundView),
-    ]
+    )

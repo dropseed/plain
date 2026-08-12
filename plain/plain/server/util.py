@@ -23,13 +23,18 @@ import urllib.parse
 # In the future, concatenation server header values
 # might be better, but nothing else does it and
 # dropping them is easier.
-hop_headers = set(
-    """
-    connection keep-alive proxy-authenticate proxy-authorization
-    te trailers transfer-encoding upgrade
-    server date
-    """.split()
-)
+hop_headers = {
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "transfer-encoding",
+    "upgrade",
+    "server",
+    "date",
+}
 
 
 def is_ipv6(addr: str) -> bool:

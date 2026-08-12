@@ -8,7 +8,6 @@ import urllib.request
 from pathlib import Path
 
 import click
-
 from plain.runtime import PLAIN_CACHE_PATH
 
 
@@ -89,6 +88,7 @@ class MkcertManager:
             [self.mkcert_bin, "-CAROOT"],
             capture_output=True,
             text=True,
+            check=False,
         )
         if result.returncode == 0:
             return Path(result.stdout.strip())
@@ -113,7 +113,7 @@ class MkcertManager:
             return
 
         # Don't capture output so user can see messages and respond to password prompts
-        result = subprocess.run([self.mkcert_bin, "-install"])
+        result = subprocess.run([self.mkcert_bin, "-install"], check=False)
 
         if result.returncode != 0:
             click.secho("Failed to install mkcert CA", fg="red")
@@ -128,11 +128,15 @@ class MkcertManager:
         update_interval = 60 * 24 * 3600  # 60 days in seconds
 
         # Check if the certs exist and if the timestamp is recent enough
-        if not force_regenerate:
-            if cert_path.exists() and key_path.exists() and timestamp_path.exists():
-                last_updated = timestamp_path.stat().st_mtime
-                if time.time() - last_updated < update_interval:
-                    return cert_path, key_path
+        if (
+            not force_regenerate
+            and cert_path.exists()
+            and key_path.exists()
+            and timestamp_path.exists()
+        ):
+            last_updated = timestamp_path.stat().st_mtime
+            if time.time() - last_updated < update_interval:
+                return cert_path, key_path
 
         storage_path.mkdir(parents=True, exist_ok=True)
 

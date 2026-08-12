@@ -34,13 +34,9 @@ BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 class BadSignature(Exception):
     """Signature does not match."""
 
-    pass
-
 
 class SignatureExpired(BadSignature):
     """Signature timestamp is older than required max_age."""
-
-    pass
 
 
 def b62_encode(s: int) -> str:
@@ -231,7 +227,7 @@ class TimestampSigner:
         return self._signer.sign(value)
 
     def unsign(
-        self, value: str, max_age: int | float | datetime.timedelta | None = None
+        self, value: str, max_age: float | datetime.timedelta | None = None
     ) -> str:
         """
         Retrieve original value and check it wasn't signed more
@@ -281,7 +277,7 @@ class TimestampSigner:
         self,
         signed_obj: str,
         serializer: type[JSONSerializer] = JSONSerializer,
-        max_age: int | float | datetime.timedelta | None = None,
+        max_age: float | datetime.timedelta | None = None,
     ) -> Any:
         """Unsign and decode an object, optionally checking max_age."""
         base64d = self.unsign(signed_obj, max_age=max_age).encode()

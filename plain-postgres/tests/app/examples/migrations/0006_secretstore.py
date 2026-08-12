@@ -1,19 +1,18 @@
 # Generated manually for encrypted field tests
 
-from plain import postgres
 from plain.postgres import migrations
 from plain.postgres.fields.encrypted import (
     EncryptedJSONField,
     EncryptedTextField,
 )
 
+from plain import postgres
+
 
 class Migration(migrations.Migration):
-    dependencies = [
-        ("examples", "0005_feature_carfeature_car_features"),
-    ]
+    dependencies = (("examples", "0005_feature_carfeature_car_features"),)
 
-    operations = [
+    operations = (
         migrations.CreateModel(
             name="SecretStore",
             fields=[
@@ -24,4 +23,4 @@ class Migration(migrations.Migration):
                 ("config", EncryptedJSONField(allow_null=True, required=False)),
             ],
         ),
-    ]
+    )

@@ -3,7 +3,6 @@ from __future__ import annotations
 import click
 import pytest
 from click.testing import CliRunner
-
 from plain.cli.options import SettingOption
 
 

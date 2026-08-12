@@ -12,9 +12,8 @@ from functools import cached_property
 from itertools import islice
 from typing import TYPE_CHECKING, Any, Never, Self, overload
 
-import psycopg
-
 import plain.runtime
+import psycopg
 from plain.exceptions import ValidationError
 from plain.postgres import transaction
 from plain.postgres.constants import LOOKUP_SEP, OnConflict
@@ -48,7 +47,7 @@ from plain.postgres.utils import resolve_callables
 from plain.utils.functional import partition
 
 # Re-exports for public API
-__all__ = ["F", "Q", "QuerySet", "RawQuerySet", "Prefetch"]
+__all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet"]
 
 if TYPE_CHECKING:
     from plain.postgres import Model
@@ -289,7 +288,6 @@ class QuerySet[T: "Model"]:
 
     def __init__(self):
         """Minimal init for descriptor mode. Use from_model() to create instances."""
-        pass
 
     @classmethod
     def from_model(cls, model: type[T], query: Query | None = None) -> Self:
@@ -553,7 +551,7 @@ class QuerySet[T: "Model"]:
             # can't be set automatically or AttributeError if it isn't an
             # attribute.
             try:
-                arg.default_alias
+                arg.default_alias  # noqa: B018 — probe; raises for complex aggregates
             except (AttributeError, TypeError):
                 raise TypeError("Complex aggregates require an alias")
             kwargs[arg.default_alias] = arg
@@ -1335,19 +1333,17 @@ class QuerySet[T: "Model"]:
         """
         if isinstance(self, EmptyQuerySet):
             return True
-        if self.sql_query.order_by:
-            return True
-        elif (
-            self.sql_query.default_ordering
-            and self.sql_query.model
-            and self.sql_query.model._model_meta.ordering  # ty: ignore[unresolved-attribute]
-            and
-            # A default ordering doesn't affect GROUP BY queries.
-            not self.sql_query.group_by
-        ):
-            return True
-        else:
-            return False
+        return bool(
+            self.sql_query.order_by
+            or (
+                self.sql_query.default_ordering
+                and self.sql_query.model
+                and self.sql_query.model._model_meta.ordering  # ty: ignore[unresolved-attribute]
+                and
+                # A default ordering doesn't affect GROUP BY queries.
+                not self.sql_query.group_by
+            )
+        )
 
     ###################
     # PRIVATE METHODS #

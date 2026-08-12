@@ -10,7 +10,6 @@ exercise the parser's handling of `//foo/` is to call it directly.
 from __future__ import annotations
 
 import pytest
-
 from plain.urls.paths import (
     BadPath,
     ParsedPath,

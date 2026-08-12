@@ -4,7 +4,6 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 from jinja2.runtime import Context
-
 from plain.runtime import settings
 from plain.templates import Template
 from plain.utils.safestring import SafeString, mark_safe
@@ -35,13 +34,13 @@ class Toolbar:
         if settings.DEBUG:
             return True
 
-        if get_request_impersonator:
-            if impersonator := get_request_impersonator(self.request):
-                return getattr(impersonator, "is_admin", False)
+        if get_request_impersonator and (
+            impersonator := get_request_impersonator(self.request)
+        ):
+            return getattr(impersonator, "is_admin", False)
 
-        if get_request_user:
-            if user := get_request_user(self.request):
-                return getattr(user, "is_admin", False)
+        if get_request_user and (user := get_request_user(self.request)):
+            return getattr(user, "is_admin", False)
 
         return False
 

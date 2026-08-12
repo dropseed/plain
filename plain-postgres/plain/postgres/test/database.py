@@ -5,8 +5,6 @@ import sys
 from collections.abc import Generator
 from contextlib import contextmanager
 
-from psycopg import errors
-
 from plain.postgres.connection import DatabaseConnection
 from plain.postgres.database_url import (
     DatabaseConfig,
@@ -20,6 +18,7 @@ from plain.postgres.migrations.executor import MigrationExecutor
 from plain.postgres.sources import DirectSource
 from plain.postgres.utils import names_digest
 from plain.runtime import settings
+from psycopg import errors
 
 TEST_DATABASE_PREFIX = "test_"
 

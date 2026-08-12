@@ -109,6 +109,7 @@ def process_exited(pid: int) -> bool:
         ["ps", "-p", str(pid), "-o", "stat="],
         capture_output=True,
         text=True,
+        check=False,
     )
     stat = result.stdout.strip()
     return not stat or stat.startswith("Z")

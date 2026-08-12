@@ -16,14 +16,14 @@ from .models import NotFoundLog, Redirect, RedirectLog
 class RedirectForm(ModelForm):
     class Meta:
         model = Redirect
-        fields = [
+        fields = (
             "from_pattern",
             "to_pattern",
             "http_status",
             "order",
             "enabled",
             "is_regex",
-        ]
+        )
 
 
 @register_viewset
@@ -34,8 +34,8 @@ class RedirectAdmin(AdminViewset):
         nav_icon = "signpost-split"
         title = "Redirects"
         description = "URL redirect rules processed in order."
-        fields = ["from_pattern", "to_pattern", "http_status", "order", "enabled"]
-        search_fields = ["from_pattern", "to_pattern"]
+        fields = ("from_pattern", "to_pattern", "http_status", "order", "enabled")
+        search_fields = ("from_pattern", "to_pattern")
 
     class DetailView(AdminModelDetailView):
         model = Redirect
@@ -61,7 +61,7 @@ class RedirectLogAdmin(AdminViewset):
         nav_section = "Redirection"
         nav_icon = "arrow-repeat"
         title = "Redirect logs"
-        fields = [
+        fields = (
             "created_at",
             "from_url",
             "to_url",
@@ -69,8 +69,8 @@ class RedirectLogAdmin(AdminViewset):
             "user_agent",
             "ip_address",
             "referrer",
-        ]
-        search_fields = ["from_url", "to_url", "user_agent", "ip_address", "referrer"]
+        )
+        search_fields = ("from_url", "to_url", "user_agent", "ip_address", "referrer")
 
     class DetailView(AdminModelDetailView):
         model = RedirectLog
@@ -84,8 +84,8 @@ class NotFoundLogAdmin(AdminViewset):
         nav_icon = "exclamation-circle"
         title = "404 logs"
         description = "URLs that returned 404 - useful for finding broken links."
-        fields = ["created_at", "url", "user_agent", "ip_address", "referrer"]
-        search_fields = ["url", "user_agent", "ip_address", "referrer"]
+        fields = ("created_at", "url", "user_agent", "ip_address", "referrer")
+        search_fields = ("url", "user_agent", "ip_address", "referrer")
 
     class DetailView(AdminModelDetailView):
         model = NotFoundLog

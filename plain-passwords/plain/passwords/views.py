@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import hmac
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from app.users.models import User
-
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthView
@@ -42,7 +41,7 @@ class PasswordForgotView(FormView[PasswordResetForm]):
                 "id": user.id,
                 "email": user.email,
                 "password": user.password,  # Hashed password
-                "timestamp": datetime.now().timestamp(),  # Makes each token unique
+                "timestamp": datetime.now(UTC).timestamp(),  # Makes each token unique
             },
             compress=True,
         )

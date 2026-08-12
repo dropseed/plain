@@ -20,7 +20,6 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider, sampling
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.attributes import service_attributes
-
 from plain.packages import PackageConfig, register_config
 from plain.runtime import settings
 
@@ -49,9 +48,7 @@ class _ExporterLoopFilter(logging.Filter):
         name = record.name
         if name == "opentelemetry" or name.startswith("opentelemetry."):
             return False
-        if threading.current_thread().name.startswith("Otel"):
-            return False
-        return True
+        return not threading.current_thread().name.startswith("Otel")
 
 
 @register_config
@@ -148,11 +145,12 @@ class Config(PackageConfig):
             # Accept either a level name ("INFO") or an int (20).
             raw_level = settings.CONNECT_LOG_LEVEL
             if isinstance(raw_level, str):
-                log_level = logging.getLevelName(raw_level.upper())
-                if not isinstance(log_level, int):
+                level_names = logging.getLevelNamesMapping()
+                if raw_level.upper() not in level_names:
                     raise ValueError(
                         f"CONNECT_LOG_LEVEL={raw_level!r} is not a valid logging level."
                     )
+                log_level = level_names[raw_level.upper()]
             else:
                 log_level = int(raw_level)
 

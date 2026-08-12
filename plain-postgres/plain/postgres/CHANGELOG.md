@@ -408,7 +408,11 @@
 
     ```python
     # Before
-    from plain.postgres.connections import get_connection, read_only, use_management_connection
+    from plain.postgres.connections import (
+        get_connection,
+        read_only,
+        use_management_connection,
+    )
 
     # After
     from plain.postgres.db import get_connection, read_only, use_management_connection

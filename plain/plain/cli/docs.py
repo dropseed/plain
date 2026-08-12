@@ -219,11 +219,11 @@ def _search_docs(doc_paths: list[Path], pattern: re.Pattern[str]) -> dict[str, s
             ):
                 results[current_section] = stripped
 
-            if pattern.search(stripped):
-                if current_section not in results:
-                    results[current_section] = stripped
-                elif _should_upgrade_preview(results[current_section], stripped):
-                    results[current_section] = stripped
+            if pattern.search(stripped) and (
+                current_section not in results
+                or _should_upgrade_preview(results[current_section], stripped)
+            ):
+                results[current_section] = stripped
     return results
 
 

@@ -33,14 +33,14 @@ class Secret(MCPTool):
 
 class PublicMCP(MCPView):
     name = "public"
-    tools = [Echo]
+    tools = (Echo,)
 
 
 class AuthedMCP(MCPView):
     """Bearer token auth via `before_request` override — mirrors the README recipe."""
 
     name = "authed"
-    tools = [Secret]
+    tools = (Secret,)
 
     _token = "topsecret"
 
@@ -57,7 +57,7 @@ class BoomMCP(MCPView):
     5xx branch is exercised end to end."""
 
     name = "boom"
-    tools: list[type[MCPTool]] = []
+    tools = ()
 
     def before_request(self) -> None:
         raise RuntimeError("mcp boom")
@@ -68,7 +68,7 @@ class RPCBoomMCP(MCPView):
     is exercised."""
 
     name = "rpc_boom"
-    tools: list[type[MCPTool]] = []
+    tools = ()
 
     def rpc_boom(self, params: dict) -> dict:
         raise RuntimeError("rpc handler boom")
@@ -91,7 +91,7 @@ class OAuthMCP(OAuthResourceServer, MCPView):
     """OAuth-protected endpoint with a stub token validator."""
 
     name = "oauth"
-    tools = [Secret, WhoAmI]
+    tools = (Secret, WhoAmI)
 
     def authenticate_token(self, token: str) -> TokenInfo | None:
         if token == "valid-token":
@@ -100,8 +100,8 @@ class OAuthMCP(OAuthResourceServer, MCPView):
 
 
 class OAuthPRM(MCPProtectedResourceView):
-    authorization_servers = ["https://auth.example.com"]
-    oauth_scopes_supported = ["read"]
+    authorization_servers = ("https://auth.example.com",)
+    oauth_scopes_supported = ("read",)
 
 
 class OAuthPRMSameApp(MCPProtectedResourceView):
@@ -110,7 +110,7 @@ class OAuthPRMSameApp(MCPProtectedResourceView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("mcp", PublicMCP, name="public_mcp"),
         path("authed", AuthedMCP, name="authed_mcp"),
         path("boom", BoomMCP, name="boom_mcp"),
@@ -126,4 +126,4 @@ class AppRouter(Router):
             OAuthPRMSameApp,
             name="oauth_prm_sameapp",
         ),
-    ]
+    )

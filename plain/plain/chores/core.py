@@ -24,4 +24,3 @@ class Chore(ABC):
     @abstractmethod
     def run(self) -> Any:
         """Run the chore. Must be implemented by subclasses."""
-        pass

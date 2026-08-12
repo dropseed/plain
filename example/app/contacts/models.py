@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from plain import postgres
 from plain.postgres import types
+
+from plain import postgres
 
 SUBJECT_GENERAL = "general"
 SUBJECT_BUG = "bug"

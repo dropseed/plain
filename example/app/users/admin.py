@@ -1,4 +1,3 @@
-from plain import postgres
 from plain.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
@@ -6,6 +5,8 @@ from plain.admin.views import (
     register_viewset,
 )
 from plain.http import Response
+
+from plain import postgres
 
 from .models import User
 
@@ -17,11 +18,11 @@ class UserAdmin(AdminViewset):
         nav_section = "Users"
         nav_icon = "person"
         title = "Users"
-        fields = ["id", "email", "is_admin", "created_at"]
-        search_fields = ["email"]
-        actions = ["Make admin", "Remove admin", "Export emails"]
+        fields = ("id", "email", "is_admin", "created_at")
+        search_fields = ("email",)
+        actions = ("Make admin", "Remove admin", "Export emails")
         allow_global_search = True
-        queryset_order = ["-created_at"]
+        queryset_order = ("-created_at",)
 
         def perform_action(
             self, action: str, objects: postgres.QuerySet

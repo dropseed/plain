@@ -11,7 +11,6 @@ from typing import Any
 import click
 import httpx
 import tomlkit
-
 from plain.packages import packages_registry
 from plain.runtime import APP_PATH, PLAIN_CACHE_PATH, PLAIN_TEMP_PATH, settings
 
@@ -61,10 +60,8 @@ class Tailwind:
         plain_sources_path = os.path.join(self.target_directory, "tailwind.css")
         with open(plain_sources_path, "w") as f:
             # @import rules must come before any other rules per the CSS spec.
-            for path in import_paths:
-                f.write(f'@import "{path}";\n')
-            for path in source_paths:
-                f.write(f'@source "{path}";\n')
+            f.writelines(f'@import "{path}";\n' for path in import_paths)
+            f.writelines(f'@source "{path}";\n' for path in source_paths)
 
     def invoke(self, *args: Any, cwd: str | None = None) -> None:
         version = self.get_version_from_config()
@@ -72,7 +69,9 @@ class Tailwind:
             raise RuntimeError(
                 "No Tailwind version configured in pyproject.toml — run `plain tailwind install`"
             )
-        result = subprocess.run([self.binary_path(version)] + list(args), cwd=cwd)
+        result = subprocess.run(
+            [self.binary_path(version)] + list(args), cwd=cwd, check=False
+        )
         if result.returncode != 0:
             sys.exit(result.returncode)
 
@@ -148,16 +147,18 @@ class Tailwind:
                 response.raise_for_status()
                 total = int(response.headers.get("Content-Length", 0))
 
-                with open(tmp_path, "wb") as f:
-                    with click.progressbar(
+                with (
+                    open(tmp_path, "wb") as f,
+                    click.progressbar(
                         length=total,
                         label="Downloading Tailwind",
                         width=0,
-                    ) as bar:
-                        for chunk in response.iter_bytes(chunk_size=1024 * 1024):
-                            if chunk:
-                                f.write(chunk)
-                                bar.update(len(chunk))
+                    ) as bar,
+                ):
+                    for chunk in response.iter_bytes(chunk_size=1024 * 1024):
+                        if chunk:
+                            f.write(chunk)
+                            bar.update(len(chunk))
 
             os.chmod(tmp_path, 0o755)
 
@@ -199,4 +200,4 @@ class Tailwind:
         if uname == "Darwin":
             return "macos-x64"
 
-        raise Exception("Unsupported platform for Tailwind standalone")
+        raise RuntimeError("Unsupported platform for Tailwind standalone")

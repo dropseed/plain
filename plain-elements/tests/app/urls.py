@@ -9,6 +9,4 @@ class ExampleView(View):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
-        path("", ExampleView),
-    ]
+    urls = (path("", ExampleView),)

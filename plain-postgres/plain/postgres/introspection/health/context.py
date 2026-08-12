@@ -33,7 +33,7 @@ def gather_context(cursor: Any, table_owners: dict[str, TableOwner]) -> dict[str
     """)
     context["tables"] = []
     for row in cursor.fetchall():
-        source, package, model_class, model_file = _table_info(row[0], table_owners)
+        source, package, _model_class, _model_file = _table_info(row[0], table_owners)
         context["tables"].append(
             {
                 "table": row[0],

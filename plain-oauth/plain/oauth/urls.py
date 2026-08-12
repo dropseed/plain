@@ -7,10 +7,10 @@ __all__ = ["OAuthRouter"]
 
 class OAuthRouter(Router):
     namespace = "oauth"
-    urls = [
+    urls = (
         include(
             "<str:provider>",
-            [
+            (
                 # Login and Signup are both handled here, because the intent is the same
                 path("login", views.OAuthLoginView, name="login"),
                 path("connect", views.OAuthConnectView, name="connect"),
@@ -20,6 +20,6 @@ class OAuthRouter(Router):
                     name="disconnect",
                 ),
                 path("callback", views.OAuthCallbackView, name="callback"),
-            ],
+            ),
         ),
-    ]
+    )

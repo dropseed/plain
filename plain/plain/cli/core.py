@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import os
+import sys
 import traceback
 from importlib.metadata import version
 from typing import Any
 
 import click
-from click.core import Command, Context
-
 import plain.runtime
+from click.core import Command, Context
 from plain.exceptions import ImproperlyConfigured
 
 from .agent import agent
@@ -118,7 +118,7 @@ class PlainCommandCollection(click.CommandCollection):
                 fg="red",
                 err=True,
             )
-            exit(1)
+            sys.exit(1)
         except Exception as e:
             # Show the exception and exit
             print("---")
@@ -130,7 +130,7 @@ class PlainCommandCollection(click.CommandCollection):
                 fg="red",
                 err=True,
             )
-            exit(1)
+            sys.exit(1)
 
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         # Set PLAIN_ENV default before any setup runs so plain.dev's dotenv

@@ -10,7 +10,7 @@ class OnDelete:
     clause — there is no application-level traversal.
     """
 
-    __slots__ = ("name", "sql_clause", "confdeltype")
+    __slots__ = ("confdeltype", "name", "sql_clause")
 
     def __init__(self, name: str, sql_clause: str, confdeltype: str) -> None:
         self.name = name

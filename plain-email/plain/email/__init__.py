@@ -24,12 +24,12 @@ from .message import (
 )
 
 __all__ = [
+    "BadHeaderError",
     "EmailMessage",
     "EmailMultiAlternatives",
     "TemplateEmail",
-    "make_msgid",
-    "BadHeaderError",
     "get_connection",
+    "make_msgid",
     "send_mail",
     "send_mass_mail",
 ]

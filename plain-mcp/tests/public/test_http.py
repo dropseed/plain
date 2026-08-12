@@ -15,7 +15,6 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 from opentelemetry.trace import SpanKind, StatusCode
-
 from plain.mcp.views import (
     META_CLIENT_CAPABILITIES,
     META_PROTOCOL_VERSION,

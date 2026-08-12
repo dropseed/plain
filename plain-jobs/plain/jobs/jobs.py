@@ -23,10 +23,10 @@ from opentelemetry.semconv.attributes.code_attributes import (
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
-
-from plain import postgres
 from plain.postgres import transaction
 from plain.utils import timezone
+
+from plain import postgres
 
 from .locks import postgres_advisory_lock
 from .otel import (
@@ -153,37 +153,38 @@ class Job(metaclass=JobType):
                     span_id = None
 
                 # Use transaction with optional locking for race-free enqueue
-                with transaction.atomic():
-                    # Acquire lock via context manager (or nullcontext if None)
-                    with self.get_enqueue_lock(concurrency_key) or nullcontext():
-                        # Check with lock held (if using locks)
-                        if not self.should_enqueue(concurrency_key):
-                            span.set_attribute("job.enqueue.skipped", True)
-                            skipped = True
-                            return None
+                with (
+                    transaction.atomic(),
+                    self.get_enqueue_lock(concurrency_key) or nullcontext(),
+                ):
+                    # Check with lock held (if using locks)
+                    if not self.should_enqueue(concurrency_key):
+                        span.set_attribute("job.enqueue.skipped", True)
+                        skipped = True
+                        return None
 
-                        # Create job with lock held
-                        job_request = JobRequest(
-                            job_class=job_class_name,
-                            parameters=parameters,
-                            start_at=start_at,
-                            source=source,
-                            queue=queue,
-                            priority=priority,
-                            retries=retries,
-                            retry_attempt=retry_attempt,
-                            concurrency_key=concurrency_key,
-                            trace_id=trace_id,
-                            span_id=span_id,
-                        )
-                        job_request.create()
+                    # Create job with lock held
+                    job_request = JobRequest(
+                        job_class=job_class_name,
+                        parameters=parameters,
+                        start_at=start_at,
+                        source=source,
+                        queue=queue,
+                        priority=priority,
+                        retries=retries,
+                        retry_attempt=retry_attempt,
+                        concurrency_key=concurrency_key,
+                        trace_id=trace_id,
+                        span_id=span_id,
+                    )
+                    job_request.create()
 
-                        span.set_attribute(
-                            MESSAGING_MESSAGE_ID,
-                            str(job_request.uuid),
-                        )
+                    span.set_attribute(
+                        MESSAGING_MESSAGE_ID,
+                        str(job_request.uuid),
+                    )
 
-                        return job_request
+                    return job_request
             except Exception as e:
                 # Stamp ERROR_TYPE on the span and copy it into
                 # `metric_attributes` so the finally below picks up the

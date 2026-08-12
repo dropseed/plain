@@ -33,6 +33,7 @@ from plain import postgres
 from plain.postgres import types
 from plain.passwords.models import PasswordField
 
+
 @postgres.register_model
 class User(postgres.Model):
     email: str = types.EmailField()
@@ -57,11 +58,10 @@ URLs use a `Router` class:
 from plain.urls import Router, path
 from . import views
 
+
 class UsersRouter(Router):
     namespace = "users"
-    urls = [
-        path("<int:pk>/", views.UserDetail),
-    ]
+    urls = (path("<int:pk>/", views.UserDetail),)
 ```
 
 Views are class-based:
@@ -70,6 +70,7 @@ Views are class-based:
 # app/users/views.py
 from plain.views import DetailView
 from .models import User
+
 
 class UserDetail(DetailView):
     template_name = "users/detail.html"

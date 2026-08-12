@@ -30,7 +30,6 @@ from typing import (
 )
 
 import psycopg
-
 from plain.postgres.aggregates import Count
 from plain.postgres.constants import LOOKUP_SEP, OnConflict
 from plain.postgres.db import get_connection
@@ -76,12 +75,12 @@ if TYPE_CHECKING:
     )
 
 __all__ = [
+    "AggregateQuery",
+    "DeleteQuery",
+    "InsertQuery",
     "Query",
     "RawQuery",
-    "DeleteQuery",
     "UpdateQuery",
-    "InsertQuery",
-    "AggregateQuery",
 ]
 
 
@@ -145,7 +144,7 @@ class RawQuery:
         return f"<{self.__class__.__name__}: {self}>"
 
     @property
-    def params_type(self) -> type[dict] | type[tuple] | None:
+    def params_type(self) -> type[dict | tuple] | None:
         if self.params is None:
             return None
         return dict if isinstance(self.params, Mapping) else tuple
@@ -1151,7 +1150,7 @@ class Query(BaseExpression):
                 return expression_lookups, (), expression
         assert self.model is not None, "Field lookups require a model"
         meta = self.model._model_meta
-        _, field, _, lookup_parts = self.names_to_path(lookup_splitted, meta)
+        _, _field, _, lookup_parts = self.names_to_path(lookup_splitted, meta)
         field_parts = lookup_splitted[0 : len(lookup_splitted) - len(lookup_parts)]
         if len(lookup_parts) > 1 and not field_parts:
             raise FieldError(
@@ -1168,11 +1167,12 @@ class Query(BaseExpression):
         """
         from plain.postgres import Model
 
-        if isinstance(value, Model):
-            if not check_rel_lookup_compatibility(value._model_meta.model, meta, field):
-                raise ValueError(
-                    f'Cannot query "{value}": Must be "{meta.model.model_options.object_name}" instance.'
-                )
+        if isinstance(value, Model) and not check_rel_lookup_compatibility(
+            value._model_meta.model, meta, field
+        ):
+            raise ValueError(
+                f'Cannot query "{value}": Must be "{meta.model.model_options.object_name}" instance.'
+            )
 
     def check_related_objects(
         self, field: RelatedField | ForeignObjectRel, value: Any, meta: Meta
@@ -1648,7 +1648,7 @@ class Query(BaseExpression):
         last_field_exception = None
         for pivot in range(len(names), 0, -1):
             try:
-                path, final_field, targets, rest = self.names_to_path(
+                path, final_field, targets, _rest = self.names_to_path(
                     names[:pivot],
                     meta,
                     allow_many,
@@ -2002,7 +2002,7 @@ class Query(BaseExpression):
                 join_info = self.setup_joins(
                     name.split(LOOKUP_SEP), meta, alias, allow_many=allow_m2m
                 )
-                targets, final_alias, joins = self.trim_joins(
+                targets, final_alias, _joins = self.trim_joins(
                     join_info.targets,
                     join_info.joins,
                     join_info.path,

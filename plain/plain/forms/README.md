@@ -148,10 +148,12 @@ You can also use Python enums directly.
 ```python
 from enum import Enum
 
+
 class Priority(Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+
 
 priority = forms.ChoiceField(choices=Priority)
 ```

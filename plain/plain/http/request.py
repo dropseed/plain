@@ -57,8 +57,6 @@ class RawPostDataException(Exception):
     FILES, etc..
     """
 
-    pass
-
 
 class Request:
     """A basic HTTP request."""
@@ -222,9 +220,10 @@ class Request:
         Only enable HTTP_X_FORWARDED_FOR when behind a trusted proxy that
         overwrites the X-Forwarded-For header.
         """
-        if settings.HTTP_X_FORWARDED_FOR:
-            if xff := self.headers.get("X-Forwarded-For"):
-                return xff.split(",")[0].strip()
+        if settings.HTTP_X_FORWARDED_FOR and (
+            xff := self.headers.get("X-Forwarded-For")
+        ):
+            return xff.split(",")[0].strip()
         return self.remote_addr
 
     @property
@@ -799,6 +798,7 @@ class MediaType:
         if self.is_all_types:
             return True
         other = MediaType(other)
-        if self.main_type == other.main_type and self.sub_type in {"*", other.sub_type}:
-            return True
-        return False
+        return self.main_type == other.main_type and self.sub_type in {
+            "*",
+            other.sub_type,
+        }

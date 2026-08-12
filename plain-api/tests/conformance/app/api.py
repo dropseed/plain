@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 from itertools import count
-from typing import Any
+from typing import Any, ClassVar
 
 from plain.api import openapi
 from plain.api.versioning import APIVersionChange, VersionedAPIView
@@ -385,7 +385,7 @@ class ChangeMsgMessage(APIVersionChange):
 
 
 class GreetingAPIView(VersionedAPIView):
-    api_versions = {
+    api_versions: ClassVar = {
         "v2": [],
         "v1": [ChangeToName, ChangeMsgMessage],
     }
@@ -454,7 +454,7 @@ class GreetingAPIView(VersionedAPIView):
 )
 class APIRouter(Router):
     namespace = "api"
-    openapi_components = {
+    openapi_components: ClassVar = {
         "schemas": {
             "Note": {
                 "type": "object",
@@ -496,7 +496,7 @@ class APIRouter(Router):
             }
         },
     }
-    urls = [
+    urls = (
         path("notes/", NoteListAPIView, name="notes_list"),
         path("notes/<int:id>/", NoteDetailAPIView, name="notes_detail"),
         path("echo-uuid/<uuid:id>/", EchoUUIDAPIView, name="echo_uuid"),
@@ -504,4 +504,4 @@ class APIRouter(Router):
         path("secret/", SecretAPIView, name="secret"),
         path("greeting/", GreetingAPIView, name="greeting"),
         path("<path:_>", JsonNotFoundView, name="not_found"),
-    ]
+    )

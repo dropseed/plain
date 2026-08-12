@@ -16,8 +16,8 @@ import os
 import sys
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
-from datetime import datetime
 
+from plain.utils import timezone
 from websockets.asyncio.client import ClientConnection
 from websockets.asyncio.client import connect as ws_connect
 from websockets.exceptions import ConnectionClosed
@@ -44,7 +44,7 @@ _real_stdout = sys.stdout
 
 
 def _log(msg: str) -> None:
-    ts = datetime.now().strftime("%H:%M:%S")
+    ts = timezone.localtime().strftime("%H:%M:%S")
     _real_stdout.write(f"[{ts}] {msg}\n")
     _real_stdout.flush()
 
@@ -171,7 +171,7 @@ async def run_remote(
                     expr_code = compile(
                         ast.Expression(last_expr.value), "<portal>", "eval"
                     )
-                    result = eval(expr_code, namespace)  # noqa: S307
+                    result = eval(expr_code, namespace)
                     if result is not None:
                         if json_output:
                             try:
@@ -224,7 +224,7 @@ async def run_remote(
 
             _log(f"       sending {name} ({file_size} bytes, {chunks} chunks)")
 
-            with open(remote_path, "rb") as f:
+            with open(remote_path, "rb") as f:  # noqa: ASYNC230 — dedicated transfer loop; the file IO is the work
                 for i in range(chunks):
                     data = f.read(FILE_CHUNK_SIZE)
                     msg = make_file_data(name=name, chunk=i, chunks=chunks, data=data)
@@ -259,7 +259,7 @@ async def run_remote(
 
         try:
             mode = "wb" if chunk_idx == 0 else "ab"
-            with open(remote_path, mode) as f:
+            with open(remote_path, mode) as f:  # noqa: ASYNC230 — dedicated transfer loop; the file IO is the work
                 f.write(data)
         except OSError as e:
             await _send_error(ws, encryptor, req_id, f"{type(e).__name__}: {e}")

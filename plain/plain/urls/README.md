@@ -30,11 +30,11 @@ from . import views
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("", views.HomeView),
         path("about", views.AboutView, name="about"),
         path("contact", views.ContactView, name="contact"),
-    ]
+    )
 ```
 
 The `URLS_ROUTER` setting in your `app/settings.py` tells Plain which router handles incoming requests:
@@ -78,11 +78,11 @@ from . import views
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("admin", AdminRouter),
         include("api", ApiRouter),
         path("", views.HomeView),
-    ]
+    )
 ```
 
 Each included router has its own `namespace` that prefixes URL names. For example, if `AdminRouter` has `namespace = "admin"` and a URL named `"dashboard"`, you reverse it as `"admin:dashboard"`.
@@ -90,10 +90,13 @@ Each included router has its own `namespace` that prefixes URL names. For exampl
 You can also include a list of patterns directly without creating a separate router class:
 
 ```python
-include("api", [
-    path("users", views.UsersAPIView, name="users"),
-    path("posts", views.PostsAPIView, name="posts"),
-])
+include(
+    "api",
+    [
+        path("users", views.UsersAPIView, name="users"),
+        path("posts", views.PostsAPIView, name="posts"),
+    ],
+)
 ```
 
 ## Path converters
@@ -140,7 +143,7 @@ Trailing slashes are an app-wide concept driven by the `URLS_TRAILING_SLASH` set
 # app/settings.py
 URLS_TRAILING_SLASH = False  # default — `/about` is canonical
 # or
-URLS_TRAILING_SLASH = True   # `/about/` is canonical
+URLS_TRAILING_SLASH = True  # `/about/` is canonical
 ```
 
 The slash on the route string is irrelevant — `path("about")` and `path("about/")` produce identical routes; the canonical form is decided by the setting. Requests at the non-canonical form 308-redirect to the canonical one (308 preserves the HTTP method and body across the redirect).
@@ -240,7 +243,9 @@ Use `absolute_url()` when you already have a path (e.g. from `get_absolute_url()
 ```python
 from plain.urls import absolute_url
 
-url = absolute_url(article.get_absolute_url())  # "https://example.com/articles/hello-world"
+url = absolute_url(
+    article.get_absolute_url()
+)  # "https://example.com/articles/hello-world"
 ```
 
 ## FAQs
@@ -283,7 +288,5 @@ from . import views
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
-        path("", views.HomeView),
-    ]
+    urls = (path("", views.HomeView),)
 ```

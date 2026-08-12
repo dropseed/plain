@@ -27,10 +27,10 @@ from plain.loginlink.views import LoginLinkFormView
 
 class AppRouter(Router):
     namespace = "app"
-    urls = [
+    urls = (
         path("login/", LoginLinkFormView, name="login"),
         include("loginlink/", LoginlinkRouter),
-    ]
+    )
 ```
 
 With this configuration, users visit `/login/` to enter their email, then receive a link that directs them to `/loginlink/token/<token>/` to complete authentication.
@@ -202,10 +202,10 @@ from plain.loginlink.views import LoginLinkFormView
 
 class AppRouter(Router):
     namespace = "app"
-    urls = [
+    urls = (
         path("login/", LoginLinkFormView, name="login"),
         include("loginlink/", LoginlinkRouter),
-    ]
+    )
 ```
 
 Set `AUTH_LOGIN_URL` in your settings to point to your login view:

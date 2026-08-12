@@ -265,10 +265,10 @@ from plain.urls import Router, include
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("oauth/", OAuthRouter),
         # ...
-    ]
+    )
 ```
 
 Sync the database:

@@ -75,7 +75,7 @@ class AuthView(SessionView):
     def check_auth(self) -> None:
         """Raise LoginRequired, ForbiddenError403, or NotFoundError404 when access is denied."""
         if not self.login_required and not self.admin_required:
-            return None
+            return
 
         if not self.user:
             raise LoginRequired(login_url=self.login_url)
@@ -83,15 +83,16 @@ class AuthView(SessionView):
         if self.admin_required:
             # At this point, we know user is authenticated (from check above)
             # Check if impersonation is active
-            if get_request_impersonator:
-                if impersonator := get_request_impersonator(self.request):
-                    # Impersonators should be able to view admin pages while impersonating.
-                    # There's probably never a case where an impersonator isn't admin, but it can be configured.
-                    if not impersonator.is_admin:
-                        raise ForbiddenError403(
-                            "You do not have permission to access this page."
-                        )
-                    return
+            if get_request_impersonator and (
+                impersonator := get_request_impersonator(self.request)
+            ):
+                # Impersonators should be able to view admin pages while impersonating.
+                # There's probably never a case where an impersonator isn't admin, but it can be configured.
+                if not impersonator.is_admin:
+                    raise ForbiddenError403(
+                        "You do not have permission to access this page."
+                    )
+                return
 
             if not self.user.is_admin:
                 # Show a 404 so we don't expose admin urls to non-admin users

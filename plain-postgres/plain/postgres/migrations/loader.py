@@ -336,11 +336,10 @@ class MigrationLoader:
                     # Skip unapplied squashed migrations that have all of their
                     # `replaces` applied.
                     # Use parent.key for dict lookup (Node.__eq__ allows `in` check)
-                    if parent.key in self.replacements:
-                        if all(
-                            m in applied for m in self.replacements[parent.key].replaces
-                        ):
-                            continue
+                    if parent.key in self.replacements and all(
+                        m in applied for m in self.replacements[parent.key].replaces
+                    ):
+                        continue
                     raise InconsistentMigrationHistory(
                         f"Migration {migration[0]}.{migration[1]} is applied before its dependency "
                         f"{parent[0]}.{parent[1]} on the database."

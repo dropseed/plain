@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import click
-
 from plain.assets.finders import _APP_ASSETS_DIR
 from plain.cli import register_cli
 
@@ -50,7 +50,7 @@ def sync() -> None:
 
     if errors:
         click.secho("Failed to install some dependencies.", fg="red")
-        exit(1)
+        sys.exit(1)
 
 
 @cli.command()
@@ -88,7 +88,7 @@ def update(name: tuple[str, ...]) -> None:
 
     if errors:
         click.secho("Failed to install some dependencies.", fg="red")
-        exit(1)
+        sys.exit(1)
 
 
 @cli.command()
@@ -108,7 +108,7 @@ def add(url: str, name: str | None, sourcemap: bool) -> None:
         vendored_path = dep.update()
     except DependencyError as e:
         click.secho(f"  {e}", fg="red")
-        exit(1)
+        sys.exit(1)
 
     vendored_path = vendored_path.relative_to(Path.cwd())
 

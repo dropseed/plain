@@ -7,6 +7,8 @@ if TYPE_CHECKING:
     from typing import Self
 
 
+from types import TracebackType
+
 from plain.logs import get_framework_logger
 from plain.postgres.ddl import compile_database_default_sql
 from plain.postgres.dialect import build_timeout_set_clauses, quote_name
@@ -69,7 +71,12 @@ class DatabaseSchemaEditor:
             self.atomic.__enter__()
         return self
 
-    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         if self.atomic_migration:
             self.atomic.__exit__(exc_type, exc_value, traceback)
 

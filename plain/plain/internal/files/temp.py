@@ -21,13 +21,10 @@ from __future__ import annotations
 import os
 import tempfile
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from types import TracebackType
+from typing import Self
 
 from plain.internal.files.utils import FileProxyMixin
-
-if TYPE_CHECKING:
-    from typing import Any
-
 
 if os.name == "nt":
 
@@ -74,7 +71,7 @@ if os.name == "nt":
         def __del__(self) -> None:
             self.close()
 
-        def __enter__(self) -> TemporaryFile:
+        def __enter__(self) -> Self:
             self.file.__enter__()
             return self
 
@@ -82,7 +79,7 @@ if os.name == "nt":
             self,
             exc: type[BaseException] | None,
             value: BaseException | None,
-            tb: Any,
+            tb: TracebackType | None,
         ) -> None:
             self.file.__exit__(exc, value, tb)
 

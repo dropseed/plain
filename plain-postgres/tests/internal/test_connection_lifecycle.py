@@ -18,9 +18,8 @@ import concurrent.futures
 from contextlib import contextmanager
 from unittest.mock import patch
 
-import pytest
-
 import plain.postgres.middleware
+import pytest
 from plain.http import Response, StreamingResponse
 from plain.internal.handlers.base import BaseHandler
 from plain.postgres.connection import DatabaseConnection
@@ -91,12 +90,12 @@ class StreamingDBQueryView(View):
 
 class TestRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("db-query", DBQueryView, name="db_query"),
         path("async-db-query", AsyncDBQueryView, name="async_db_query"),
         path("sse-db-query", DBQuerySSEView, name="sse_db_query"),
         path("streaming-db-query", StreamingDBQueryView, name="streaming_db_query"),
-    ]
+    )
 
 
 _tracking_seen: list[int | None] = []

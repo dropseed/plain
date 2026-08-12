@@ -11,9 +11,8 @@ if TYPE_CHECKING:
     from plain.postgres.meta import Meta
     from plain.postgres.options import Options
 
-import psycopg
-
 import plain.runtime
+import psycopg
 from plain.exceptions import ValidationError
 from plain.postgres import models_registry, transaction, types
 from plain.postgres.constants import LOOKUP_SEP
@@ -628,7 +627,6 @@ class Model(metaclass=ModelBase):
         by this method will not be associated with a particular field; it will
         have a special-case association with the field defined by NON_FIELD_ERRORS.
         """
-        pass
 
     def get_constraints(self) -> list[tuple[type[Model], list[Any]]]:
         constraints: list[tuple[type[Model], list[Any]]] = [
@@ -1214,10 +1212,8 @@ class Model(metaclass=ModelBase):
                 from plain.postgres.fields.related import ManyToManyField
                 from plain.postgres.fields.reverse_related import ForeignKeyRel
 
-                if (
-                    not isinstance(field, RelatedField)
-                    or isinstance(field, ManyToManyField)
-                    or isinstance(field, ForeignKeyRel)
+                if not isinstance(field, RelatedField) or isinstance(
+                    field, (ManyToManyField, ForeignKeyRel)
                 ):
                     continue
             except FieldDoesNotExist:

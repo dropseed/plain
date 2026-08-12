@@ -25,7 +25,7 @@ class PlainViewRaises500(View):
 
 class ErrorRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("plain-404/", PlainViewRaises404, name="plain-404"),
         path("plain-500/", PlainViewRaises500, name="plain-500"),
-    ]
+    )

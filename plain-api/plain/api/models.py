@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from plain import postgres
 from plain.postgres import types
 from plain.utils import timezone
+
+from plain import postgres
 
 __all__ = ["APIKey"]
 

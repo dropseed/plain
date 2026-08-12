@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from plain.postgres import fields
 from plain.postgres.fields.encrypted import EncryptedJSONField, EncryptedTextField
 from plain.postgres.fields.json import JSONField

@@ -15,10 +15,11 @@ import hmac
 from functools import cached_property
 from typing import Literal
 
-from app.notes.models import Note
-from app.users.models import User
 from plain.mcp import MCPTool, MCPUnauthorized, MCPView
 from plain.postgres import Q
+
+from app.notes.models import Note
+from app.users.models import User
 
 # Hardcoded dev credentials — not secrets, but treat as such if you fork.
 DEV_TOKEN = "local-dev-only"
@@ -199,7 +200,7 @@ class WhoAmI(NotesTool):
 
 class NotesMCP(MCPView):
     name = "plain-example"
-    tools = [
+    tools = (
         ListMyNotes,
         SearchMyNotes,
         GetMyNote,
@@ -208,7 +209,7 @@ class NotesMCP(MCPView):
         DeleteNote,
         CountMyNotesByAge,
         WhoAmI,
-    ]
+    )
 
     def before_request(self) -> None:
         header = self.request.headers.get("Authorization", "")

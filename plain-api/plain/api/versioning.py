@@ -1,6 +1,6 @@
 import json
 from functools import cached_property
-from typing import Any
+from typing import Any, ClassVar
 
 from plain.http import Request, Response
 from plain.views.exceptions import ResponseException
@@ -21,7 +21,6 @@ class APIVersionChange:
         If this version of the API made a change in how a request is processed,
         (ex. the name of an input changed) then you can
         """
-        pass
 
     def transform_response_backward(
         self, response: Response, data: dict[str, Any]
@@ -32,12 +31,11 @@ class APIVersionChange:
         We only transform the response data if we are moving backward to an older version.
         This is because the response data is always in the latest version.
         """
-        pass
 
 
 class VersionedAPIView(APIView):
     # API versions from newest to oldest
-    api_versions: dict[str, list[type[APIVersionChange]]] = {}
+    api_versions: ClassVar[dict[str, list[type[APIVersionChange]]]] = {}
     api_version_header = "API-Version"
     default_api_version: str = ""
 
@@ -72,10 +70,9 @@ class VersionedAPIView(APIView):
 
     def get_default_api_version(self) -> str:
         # If this view has an api_key, use its version name
-        if api_key := getattr(self, "api_key", None):
-            if api_key.api_version:
-                # If the API key has a version, use that
-                return api_key.api_version
+        if (api_key := getattr(self, "api_key", None)) and api_key.api_version:
+            # If the API key has a version, use that
+            return api_key.api_version
 
         return self.default_api_version
 

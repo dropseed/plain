@@ -18,7 +18,7 @@ class SeparateDatabaseAndState(Operation):
     that affect the state or not the database, or so on.
     """
 
-    serialization_expand_args = ["database_operations", "state_operations"]
+    serialization_expand_args = ("database_operations", "state_operations")
 
     def __init__(
         self,
@@ -157,7 +157,7 @@ class RunPython(Operation):
         self.atomic = atomic
         # Forwards code
         if not callable(code):
-            raise ValueError("RunPython must be supplied with a callable")
+            raise TypeError("RunPython must be supplied with a callable")
         self.code = code
         self.elidable = elidable
 

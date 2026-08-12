@@ -39,6 +39,7 @@ def _get_agent_dirs() -> list[Path]:
                             if agent_dir.exists() and agent_dir.is_dir():
                                 agent_dirs.append(agent_dir)
                     except Exception:
+                        # Best-effort plugin discovery; a broken package is skipped.
                         continue
     except Exception:
         pass
@@ -60,6 +61,7 @@ def _get_agent_dirs() -> list[Path]:
                             if agent_dir.exists() and agent_dir.is_dir():
                                 agent_dirs.append(agent_dir)
                     except Exception:
+                        # Best-effort plugin discovery; a broken package is skipped.
                         continue
     except Exception:
         pass
@@ -106,9 +108,11 @@ def _install_agent_dir(source_dir: Path, dest_dir: Path) -> tuple[int, int]:
             if rule_file.is_file() and rule_file.suffix == ".md":
                 dest_rule = dest_rules / rule_file.name
                 # Check mtime to skip unchanged
-                if dest_rule.exists():
-                    if rule_file.stat().st_mtime <= dest_rule.stat().st_mtime:
-                        continue
+                if (
+                    dest_rule.exists()
+                    and rule_file.stat().st_mtime <= dest_rule.stat().st_mtime
+                ):
+                    continue
                 shutil.copy2(rule_file, dest_rule)
                 installed_count += 1
 
@@ -202,7 +206,6 @@ def _cleanup_session_hook(dest_dir: Path) -> None:
 @click.group()
 def agent() -> None:
     """AI agent integration for Plain projects"""
-    pass
 
 
 @agent.command()

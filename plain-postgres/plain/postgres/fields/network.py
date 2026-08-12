@@ -3,11 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
-from plain import exceptions
 from plain.postgres.dialect import adapt_ipaddressfield_value
 from plain.preflight import PreflightResult
 from plain.utils.ipv6 import clean_ipv6_address
 from plain.validators import ip_address_validators
+
+from plain import exceptions
 
 from .base import NOT_PROVIDED, DefaultableField
 

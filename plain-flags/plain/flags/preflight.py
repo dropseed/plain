@@ -1,5 +1,4 @@
 import psycopg
-
 from plain.preflight import PreflightCheck, PreflightResult, register_check
 from plain.runtime import settings
 

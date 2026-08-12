@@ -11,7 +11,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from plain.mcp import MCPView
 from plain.mcp.views import (
     META_CLIENT_CAPABILITIES,

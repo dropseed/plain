@@ -391,7 +391,7 @@ class CSPAudit(Audit):
         object embeds.
         """
         has_nonces_or_hashes = any(
-            any(v.startswith("'nonce-") or v.startswith("'sha") for v in values)
+            any(v.startswith(("'nonce-", "'sha")) for v in values)
             for values in directives.values()
         )
 
@@ -561,7 +561,7 @@ class CSPAudit(Audit):
         for directive_name, values in directives.items():
             for value in values:
                 # Look for http:// (but not http: scheme which is checked elsewhere)
-                if value.startswith("http://") or value.startswith("'http://"):
+                if value.startswith(("http://", "'http://")):
                     http_sources.append(f"{directive_name}: {value}")
 
         if http_sources:
@@ -639,7 +639,7 @@ class CSPAudit(Audit):
         }
 
         # Check for unknown directives (typos)
-        for directive_name in directives.keys():
+        for directive_name in directives:
             if directive_name not in known_directives:
                 # Could be a typo or experimental directive
                 issues.append(f"unknown directive '{directive_name}' (typo?)")
@@ -659,15 +659,15 @@ class CSPAudit(Audit):
                         f"{directive_name} has unquoted keyword '{value}' (should be '{value}')"
                     )
                 # Quoted but not a recognized keyword (possible typo)
-                elif value.startswith("'") and value.endswith("'"):
-                    if (
-                        value not in known_keywords
-                        and not value.startswith("'nonce-")
-                        and not value.startswith("'sha")
-                    ):
-                        issues.append(
-                            f"{directive_name} has unrecognized keyword {value} (typo?)"
-                        )
+                elif (
+                    value.startswith("'")
+                    and value.endswith("'")
+                    and value not in known_keywords
+                    and not value.startswith(("'nonce-", "'sha"))
+                ):
+                    issues.append(
+                        f"{directive_name} has unrecognized keyword {value} (typo?)"
+                    )
 
         if issues:
             return CheckResult(
@@ -732,7 +732,7 @@ class CSPAudit(Audit):
 
         found_deprecated = []
 
-        for directive_name in directives.keys():
+        for directive_name in directives:
             if directive_name in deprecated:
                 reason = deprecated[directive_name]
                 found_deprecated.append(f"{directive_name} ({reason})")
@@ -947,14 +947,18 @@ class CSPAudit(Audit):
             return directive
 
         # Handle script-src-elem and script-src-attr fallback
-        if directive in ("script-src-attr", "script-src-elem"):
-            if "script-src" in directives:
-                return "script-src"
+        if (
+            directive in ("script-src-attr", "script-src-elem")
+            and "script-src" in directives
+        ):
+            return "script-src"
 
         # Handle style-src-elem and style-src-attr fallback
-        if directive in ("style-src-attr", "style-src-elem"):
-            if "style-src" in directives:
-                return "style-src"
+        if (
+            directive in ("style-src-attr", "style-src-elem")
+            and "style-src" in directives
+        ):
+            return "style-src"
 
         # Fetch directives fall back to default-src
         fetch_directives = {
@@ -1015,10 +1019,9 @@ class CSPAudit(Audit):
             has_nonces = any(v.startswith("'nonce-") for v in values)
             has_hashes = any(v.startswith("'sha") for v in values)
 
-            if has_nonces or has_hashes:
-                # CSP2+: Remove 'unsafe-inline' when nonces/hashes are present
-                if "'unsafe-inline'" in effective_values:
-                    effective_values.remove("'unsafe-inline'")
+            # CSP2+: Remove 'unsafe-inline' when nonces/hashes are present
+            if (has_nonces or has_hashes) and "'unsafe-inline'" in effective_values:
+                effective_values.remove("'unsafe-inline'")
 
             # Check if strict-dynamic is present
             has_strict_dynamic = "'strict-dynamic'" in values

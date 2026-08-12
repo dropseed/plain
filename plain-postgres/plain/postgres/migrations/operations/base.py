@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
     from plain.postgres.migrations.state import ProjectState
@@ -39,9 +39,9 @@ class Operation:
     # Should this operation be considered safe to elide and optimize across?
     elidable = False
 
-    serialization_expand_args: list[str] = []
+    serialization_expand_args: tuple[str, ...] = ()
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> Operation:
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
         # We capture the arguments to make returning them trivial
         self = object.__new__(cls)
         self._constructor_args = (args, kwargs)

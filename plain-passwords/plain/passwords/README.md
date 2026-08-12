@@ -59,10 +59,12 @@ The [`check_password`](./hashers.py#check_password) function verifies a password
 ```python
 from plain.passwords.hashers import check_password
 
+
 def setter(new_hash):
     # Called when the hash needs to be upgraded
     user.password = new_hash
     user.update()
+
 
 is_valid = check_password("user-password", stored_hash, setter=setter)
 ```
@@ -116,6 +118,7 @@ for validator in validators:
 from plain import postgres
 from plain.postgres import types
 from plain.passwords.models import PasswordField
+
 
 @postgres.register_model
 class User(postgres.Model):
@@ -201,12 +204,15 @@ Password reset requires two views and an email template. [`PasswordForgotView`](
 from plain.urls import path
 from plain.passwords.views import PasswordForgotView, PasswordResetView
 
+
 class MyPasswordForgotView(PasswordForgotView):
     reset_confirm_url_name = "password_reset"
     success_url = "/login/"
 
+
 class MyPasswordResetView(PasswordResetView):
     success_url = "/login/"
+
 
 urlpatterns = [
     path("password/forgot/", MyPasswordForgotView, name="password_forgot"),
@@ -244,9 +250,11 @@ Subclass [`PasswordLoginForm`](./forms.py#PasswordLoginForm) and set `form_class
 from plain.passwords.forms import PasswordLoginForm
 from plain.passwords.views import PasswordLoginView
 
+
 class MyLoginForm(PasswordLoginForm):
     # Add custom fields or validation
     pass
+
 
 class MyLoginView(PasswordLoginView):
     form_class = MyLoginForm
@@ -260,9 +268,11 @@ Pass custom validators to `PasswordField`:
 from plain.passwords.models import PasswordField
 from plain.passwords.validators import MinimumLengthValidator
 
-password = PasswordField(validators=[
-    MinimumLengthValidator(min_length=12),
-])
+password = PasswordField(
+    validators=[
+        MinimumLengthValidator(min_length=12),
+    ]
+)
 ```
 
 #### How do I use a different hashing algorithm?
@@ -300,6 +310,7 @@ Add the `password` field to your User model:
 from plain import postgres
 from plain.postgres import types
 from plain.passwords.models import PasswordField
+
 
 @postgres.register_model
 class User(postgres.Model):

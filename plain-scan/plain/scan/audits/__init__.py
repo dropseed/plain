@@ -10,14 +10,14 @@ from .status_code import StatusCodeAudit
 from .tls import TLSAudit
 
 __all__ = [
-    "StatusCodeAudit",
+    "CORSAudit",
     "CSPAudit",
+    "ContentTypeOptionsAudit",
+    "CookiesAudit",
+    "FrameOptionsAudit",
     "HSTSAudit",
     "RedirectsAudit",
-    "ContentTypeOptionsAudit",
-    "FrameOptionsAudit",
     "ReferrerPolicyAudit",
-    "CookiesAudit",
-    "CORSAudit",
+    "StatusCodeAudit",
     "TLSAudit",
 ]

@@ -21,4 +21,3 @@ class Audit(ABC):
     @abstractmethod
     def check(self, scanner: Scanner) -> AuditResult:
         """Run checks for this audit and return results."""
-        pass

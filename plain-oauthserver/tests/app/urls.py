@@ -12,8 +12,8 @@ class StubLoginView(View):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("oauth/", OAuthServerRouter),
         include(".well-known/", OAuthWellKnownRouter),
         path("login/", StubLoginView, name="login"),
-    ]
+    )

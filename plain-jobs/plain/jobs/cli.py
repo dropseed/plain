@@ -5,7 +5,6 @@ import signal
 from typing import Any
 
 import click
-
 from plain.cli import SettingOption, register_cli
 from plain.logs import get_framework_logger
 from plain.runtime import settings

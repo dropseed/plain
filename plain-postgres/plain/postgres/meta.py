@@ -39,16 +39,18 @@ class Meta:
     and the actual metadata instance (cached per model class).
     """
 
-    FORWARD_PROPERTIES = {
-        "fields",
-        "many_to_many",
-        "concrete_fields",
-        "local_concrete_fields",
-        "_non_pk_concrete_field_names",
-        "_forward_fields_map",
-        "base_queryset",
-    }
-    REVERSE_PROPERTIES = {"related_objects", "fields_map", "_relation_tree"}
+    FORWARD_PROPERTIES = frozenset(
+        {
+            "fields",
+            "many_to_many",
+            "concrete_fields",
+            "local_concrete_fields",
+            "_non_pk_concrete_field_names",
+            "_forward_fields_map",
+            "base_queryset",
+        }
+    )
+    REVERSE_PROPERTIES = frozenset({"related_objects", "fields_map", "_relation_tree"})
 
     # Type annotations for attributes set in _create_and_cache
     # These exist on cached instances, not on the descriptor itself

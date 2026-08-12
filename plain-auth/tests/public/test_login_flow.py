@@ -7,7 +7,6 @@ shortcut.
 """
 
 from app.users.models import User
-
 from plain.runtime import settings
 from plain.test import Client
 

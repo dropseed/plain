@@ -100,7 +100,10 @@ from plain.urls import path, Router
 
 class AppRouter(Router):
     routes = [
-        path("/old-location/", RedirectView.as_view(url="/new-location/", status_code=301)),
+        path(
+            "/old-location/",
+            RedirectView.as_view(url="/new-location/", status_code=301),
+        ),
     ]
 ```
 
@@ -151,11 +154,11 @@ from plain.views import ServerSentEvent
 
 class NotificationView(ServerSentEventsView):
     async def stream(self):
-        yield ServerSentEvent(data="hello")                        # Simple string
-        yield ServerSentEvent(data={"count": 1})                   # JSON data
-        yield ServerSentEvent(data="update", event="status")       # Named event type
-        yield ServerSentEvent(data="msg", id="42", retry=5000)     # With id and retry
-        yield ServerSentEvent.comment("keepalive")                 # SSE comment (keepalive)
+        yield ServerSentEvent(data="hello")  # Simple string
+        yield ServerSentEvent(data={"count": 1})  # JSON data
+        yield ServerSentEvent(data="update", event="status")  # Named event type
+        yield ServerSentEvent(data="msg", id="42", retry=5000)  # With id and retry
+        yield ServerSentEvent.comment("keepalive")  # SSE comment (keepalive)
 ```
 
 Connect from JavaScript using the standard [`EventSource`](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) API:
@@ -188,6 +191,7 @@ Runs before the HTTP method handler (`get`, `post`, etc.). Default is a no-op. R
 ```python
 from plain.http import ForbiddenError403
 
+
 class MyView(View):
     def before_request(self):
         if self.request.user and self.request.user.is_banned:
@@ -204,6 +208,7 @@ Runs after the response is built — for successes, responses from `handle_excep
 from plain.http import Response
 from plain.utils.cache import patch_cache_control
 
+
 class MyView(View):
     def after_response(self, response: Response) -> Response:
         patch_cache_control(response, private=True)
@@ -218,6 +223,7 @@ Converts an exception raised during `before_request` or the handler into a respo
 
 ```python
 from plain.http import Response
+
 
 class MyView(View):
     def handle_exception(self, exc: Exception) -> Response:
@@ -234,6 +240,7 @@ Plain's HTTP exceptions (`NotFoundError404`, `ForbiddenError403`, `BadRequestErr
 
 ```python
 from plain.http import HTTPException
+
 
 class PaymentRequiredError402(HTTPException):
     status_code = 402
@@ -252,9 +259,7 @@ from plain.http import Response
 class ExampleView(View):
     def get(self):
         if self.request.user and self.request.user.exceeds_rate_limit:
-            raise ResponseException(
-                Response("Rate limit exceeded", status_code=429)
-            )
+            raise ResponseException(Response("Rate limit exceeded", status_code=429))
 
         return Response("ok")
 ```
@@ -269,10 +274,10 @@ To get a styled 404 for URL-resolution failures (where no view runs), mount [`No
 from plain.templates.views import NotFoundView
 from plain.urls import path
 
-urls = [
+urls = (
     # ... your routes ...
     path("<path:_>", NotFoundView),
-]
+)
 ```
 
 The resolver treats a sole-segment terminal `<path:>` as a **catchall**: slash-agnostic, and yields to slash-mismatch redirects from specific routes. So you still get `/login` → 308 → `/login/` for `path("login/", LoginView)`, not a stray 404 from the catchall.
@@ -288,6 +293,7 @@ Class attributes execute at import time, not per request. Queries belong in meth
 class DashboardView(View):
     recent_users = User.query.order_by("-created_at")[:5]
 
+
 # Good — fresh per request
 class DashboardView(View):
     def get_template_context(self):
@@ -300,6 +306,7 @@ Always paginate querysets in list views. Unbounded queries get slower as data gr
 
 ```python
 from plain.paginator import Paginator
+
 
 def get_template_context(self):
     paginator = Paginator(Item.query.all(), per_page=25)

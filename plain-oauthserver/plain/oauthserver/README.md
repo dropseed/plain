@@ -26,10 +26,10 @@ from plain.urls import Router, include
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("oauth/", OAuthServerRouter),
         include(".well-known/", OAuthWellKnownRouter),
-    ]
+    )
 ```
 
 After `uv run plain postgres sync` you have authorization-code + PKCE, refresh-token rotation, revocation, dynamic client registration, and discovery metadata. The authorization flow reuses your existing [`plain.auth`](../../plain-auth/plain/auth/README.md) login — the user signs in and approves on a consent screen.
@@ -153,7 +153,7 @@ INSTALLED_PACKAGES = [
     "plain.postgres",
     "plain.templates",
     "plain.oauthserver",
-    ...
+    ...,
 ]
 ```
 

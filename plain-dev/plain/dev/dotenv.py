@@ -412,6 +412,7 @@ def _execute_command(command: str, timeout: float = 5.0) -> str:
             stdout=subprocess.PIPE,
             text=True,
             timeout=timeout,
+            check=False,
         )
         return result.stdout.strip() if result.returncode == 0 else ""
     except (subprocess.TimeoutExpired, OSError):

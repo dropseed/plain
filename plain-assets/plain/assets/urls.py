@@ -13,9 +13,7 @@ class AssetsRouter(Router):
     """
 
     namespace = "assets"
-    urls = [
-        path("<path:path>", AssetView, name="asset"),
-    ]
+    urls = (path("<path:path>", AssetView, name="asset"),)
 
 
 def get_asset_url(url_path: str) -> str:

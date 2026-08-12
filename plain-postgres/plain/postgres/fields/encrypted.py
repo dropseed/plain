@@ -16,10 +16,11 @@ except ImportError:
     hashes = None  # ty: ignore[invalid-assignment]
     PBKDF2HMAC = None  # ty: ignore[invalid-assignment]
 
-from plain import preflight
 from plain.postgres.lookups import Exact, IsNull
 from plain.runtime import settings
 from plain.utils.encoding import force_bytes
+
+from plain import preflight
 
 from .base import NOT_PROVIDED
 from .json import JSONField
@@ -33,8 +34,8 @@ if TYPE_CHECKING:
     from plain.preflight.results import PreflightResult
 
 __all__ = [
-    "EncryptedTextField",
     "EncryptedJSONField",
+    "EncryptedTextField",
 ]
 
 # Fixed salt for key derivation — changing this would invalidate all encrypted data.

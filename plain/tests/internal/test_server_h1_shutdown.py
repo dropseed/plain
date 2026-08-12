@@ -26,13 +26,12 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from server_stubs import StubApp, make_worker
-
 from plain.http import Response
 from plain.server.connection import Connection
 from plain.server.http import h1
 from plain.server.http.unreader import AsyncBridgeUnreader
 from plain.server.workers.worker import Worker
+from server_stubs import StubApp, make_worker
 
 
 class _Handler:

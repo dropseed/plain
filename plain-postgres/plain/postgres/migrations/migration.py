@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.migrations.utils import get_migration_name_timestamp
@@ -29,19 +29,19 @@ class Migration:
     Graph as instances, having been initialized with their app label and name.
     """
 
+    # Declared as tuples in migration files; __init__ copies each into a
+    # list on the instance because the autodetector mutates its copies.
+
     # Operations to apply during this migration, in order.
-    operations: list[Any] = []
+    operations: Sequence[Any] = ()
 
-    # Other migrations that should be run before this migration.
-    # Should be a list of (app, migration_name).
-    dependencies: list[tuple[str, str]] = []
+    # (package_label, migration_name) pairs to run before this migration.
+    dependencies: Sequence[tuple[str, str]] = ()
 
-    # Migration names in this app that this migration replaces. If this is
-    # non-empty, this migration will only be applied if all these migrations
-    # are not applied.
-    # Note: Despite the comment saying "migration names", this is actually a list of tuples
-    # (app_label, migration_name) as used throughout the codebase.
-    replaces: list[tuple[str, str]] = []
+    # (package_label, migration_name) pairs this migration replaces. If this
+    # is non-empty, this migration will only be applied if all of these are
+    # not applied.
+    replaces: Sequence[tuple[str, str]] = ()
 
     # Is this an initial migration? Initial migrations are skipped on
     # --fake-initial if the table or fields already exist. If None, check if

@@ -6,7 +6,6 @@ from contextlib import contextmanager
 from functools import cached_property, partial
 from typing import TYPE_CHECKING, Any, cast
 
-from plain import postgres
 from plain.packages import packages_registry
 from plain.postgres.exceptions import FieldDoesNotExist
 from plain.postgres.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT, RelatedField
@@ -14,6 +13,8 @@ from plain.postgres.meta import Meta
 from plain.postgres.migrations.utils import field_is_referenced, get_references
 from plain.postgres.registry import ModelsRegistry
 from plain.postgres.registry import models_registry as global_models
+
+from plain import postgres
 
 from .exceptions import InvalidBasesError
 from .utils import resolve_relation
@@ -433,10 +434,10 @@ class ProjectState:
     ) -> None:
         # Only process fields that have relations
         if not isinstance(field, RelatedField):
-            return None
+            return
         remote_field = field.remote_field
         if not remote_field:
-            return None
+            return
         if concretes is None:
             concretes = self._get_concrete_models_mapping()
 
@@ -450,7 +451,7 @@ class ProjectState:
 
         through = getattr(remote_field, "through", None)
         if not through:
-            return None
+            return
         self.update_model_field_relation(
             through, model_key, field_name, field, concretes
         )
@@ -482,7 +483,7 @@ class ProjectState:
 
     def _get_concrete_models_mapping(self) -> dict[tuple[str, str], tuple[str, str]]:
         concrete_models_mapping = {}
-        for model_key, model_state in self.models.items():
+        for model_key in self.models:
             concrete_models_mapping[model_key] = model_key
         return concrete_models_mapping
 
@@ -573,7 +574,7 @@ class StateModelsRegistry(ModelsRegistry):
         # decrease by at least one, meaning there's a base dependency loop/
         # missing base.
         if not model_states:
-            return None
+            return
         # Prevent that all model caches are expired for each render.
         with self.bulk_update():
             unrendered_models = model_states
@@ -637,11 +638,11 @@ class ModelState:
         self.fields: dict[str, Field] = dict(fields)
         self.options = options or {}
         self.bases = bases or (postgres.Model,)
-        for name, field in self.fields.items():
+        for field_name, field in self.fields.items():
             # Sanity-check that fields are NOT already bound to a model.
             if hasattr(field, "model"):
                 raise ValueError(
-                    f'ModelState.fields cannot be bound to a model - "{name}" is.'
+                    f'ModelState.fields cannot be bound to a model - "{field_name}" is.'
                 )
             # Sanity-check that relation fields are NOT referring to a model class.
             if isinstance(field, RelatedField) and hasattr(
@@ -698,10 +699,7 @@ class ModelState:
                     )
 
         def flatten_bases(model: type[postgres.Model]) -> list[type[postgres.Model]]:
-            bases = []
-            for base in model.__bases__:
-                bases.append(base)
-            return bases  # ty: ignore[invalid-return-type] (__bases__ widens to list[type])
+            return list(model.__bases__)  # ty: ignore[invalid-return-type] (__bases__ widens to list[type])
 
         # We can't rely on __mro__ directly because we only want to flatten
         # abstract models and not the whole tree. However by recursing on

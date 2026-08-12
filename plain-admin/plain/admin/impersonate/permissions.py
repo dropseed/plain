@@ -12,7 +12,4 @@ def can_impersonate_user(impersonator: Any, target_user: Any) -> bool:
         return False
 
     # You can't impersonate admin users
-    if target_user.is_admin:
-        return False
-
-    return True
+    return not target_user.is_admin

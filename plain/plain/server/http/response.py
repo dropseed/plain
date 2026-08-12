@@ -82,11 +82,9 @@ class Response:
             return False
         if self.req.method == "HEAD":
             return False
-        if self.status_code is not None and (
-            self.status_code < 200 or self.status_code in (204, 304)
-        ):
-            return False
-        return True
+        if self.status_code is None:
+            return True
+        return self.status_code >= 200 and self.status_code not in (204, 304)
 
     def set_status_and_headers(
         self,
@@ -130,7 +128,9 @@ class Response:
                     # handle websocket
                     if value.lower() == "upgrade":
                         self.upgrade = True
-                elif lname == "upgrade":
+                # Not collapsible: a non-websocket Upgrade must still hit
+                # the hop-by-hop `continue` below.
+                elif lname == "upgrade":  # noqa: SIM102
                     if value.lower() == "websocket":
                         self.headers.append((name, value))
 
@@ -142,9 +142,7 @@ class Response:
         # Only use chunked responses when the client is
         # speaking HTTP/1.1 or newer and there was
         # no Content-Length header set.
-        if self.response_length is not None:
-            return False
-        elif self.req.version <= (1, 0):
+        if self.response_length is not None or self.req.version <= (1, 0):
             return False
         elif self.req.method == "HEAD":
             # Responses to a HEAD request MUST NOT contain a response body.

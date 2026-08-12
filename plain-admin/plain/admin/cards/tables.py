@@ -7,9 +7,9 @@ class TableCard(Card):
     template_name = "admin/cards/table.html"
     size = Card.Sizes.FULL
 
-    headers = []
-    rows = []
-    footers = []
+    headers: tuple = ()
+    rows: tuple = ()
+    footers: tuple = ()
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
@@ -18,11 +18,11 @@ class TableCard(Card):
         context["footers"] = self.get_footers()
         return context
 
-    def get_headers(self) -> list:
-        return self.headers.copy()
+    def get_headers(self) -> tuple:
+        return self.headers
 
-    def get_rows(self) -> list:
-        return self.rows.copy()
+    def get_rows(self) -> tuple:
+        return self.rows
 
-    def get_footers(self) -> list:
-        return self.footers.copy()
+    def get_footers(self) -> tuple:
+        return self.footers
