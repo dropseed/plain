@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.29.7](https://github.com/dropseed/plain/releases/plain-auth@0.29.7) (2026-08-12)
+
+### What's changed
+
+- Internal simplification of `check_auth()` conditionals — no behavior changes ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.29.6](https://github.com/dropseed/plain/releases/plain-auth@0.29.6) (2026-08-02)
 
 ### What's changed
