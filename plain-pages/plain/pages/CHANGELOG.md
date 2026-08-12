@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.19.8](https://github.com/dropseed/plain/releases/plain-pages@0.19.8) (2026-08-12)
+
+### What's changed
+
+- `get_page_urls()` returns a tuple, matching the new `Router.urls` contract; internal lint cleanups ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.19.7](https://github.com/dropseed/plain/releases/plain-pages@0.19.7) (2026-08-02)
 
 ### What's changed
