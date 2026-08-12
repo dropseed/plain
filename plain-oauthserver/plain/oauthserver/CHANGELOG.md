@@ -1,5 +1,15 @@
 # plain-oauthserver changelog
 
+## [0.1.4](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.4) (2026-08-12)
+
+### What's changed
+
+- `urls` declared as tuples; internal lint cleanups ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.3](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.3) (2026-08-02)
 
 ### What's changed
