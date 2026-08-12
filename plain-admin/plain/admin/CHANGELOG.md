@@ -1,5 +1,20 @@
 # plain-admin changelog
 
+## [0.86.0](https://github.com/dropseed/plain/releases/plain-admin@0.86.0) (2026-08-12)
+
+### What's changed
+
+- Declarative view and card attributes are now tuple-typed: `fields`, `search_fields`, `actions`, `filters`, `queryset_order`, `cards`, and table card `headers`/`rows`/`footers`. List declarations still work — they're converted to tuples at class-definition time — but fail type checking ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `filters` on `AdminModelListView` is now explicitly typed as `tuple[str, ...] | dict[str, Q]`, documenting the existing dict-based auto-filtering support ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- The `get_fields()`/`get_actions()`/`get_filter_names()`/`get_cards()` (and table card) accessors return tuples directly instead of defensive list copies ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `get_field_value()` no longer swallows arbitrary exceptions when resolving choice display values — only a missing field or a does-not-exist race (e.g. a deferred field refreshed against a concurrently deleted row) falls back to the raw value; other errors now surface ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- The built-in demo chart uses the app's `TIME_ZONE` for its date labels ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- Convert admin viewset list attributes to tuples: `fields = ("id", "name")`, `actions = ("Delete",)`, etc. — required for type checking, though lists keep working at runtime
+- If you override `get_fields()` (or the other accessors) with an append-style pattern, rebuild the tuple instead: `return (*super().get_fields(), "extra")`
+
 ## [0.85.1](https://github.com/dropseed/plain/releases/plain-admin@0.85.1) (2026-08-02)
 
 ### What's changed
