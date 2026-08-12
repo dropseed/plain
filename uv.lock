@@ -896,7 +896,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-cloud"
-version = "0.4.2"
+version = "0.4.3"
 source = { editable = "plain-cloud" }
 dependencies = [
     { name = "click" },
