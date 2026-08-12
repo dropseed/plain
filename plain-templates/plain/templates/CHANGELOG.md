@@ -1,5 +1,15 @@
 # plain-templates changelog
 
+## [0.5.2](https://github.com/dropseed/plain/releases/plain-templates@0.5.2) (2026-08-12)
+
+### What's changed
+
+- Internal lint cleanups (sorted `__all__`, import grouping) — no behavior changes ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.5.1](https://github.com/dropseed/plain/releases/plain-templates@0.5.1) (2026-08-02)
 
 ### What's changed
