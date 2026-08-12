@@ -27,8 +27,10 @@ from plain.utils.os import get_cpu_count
 
 from .otel import WorkerMetrics, emit_error_consumer_span, record_span_error, tracer
 from .registry import jobs_registry
+from .scheduling import Schedule, schedule_entry_key, scheduled_concurrency_key
 
 if TYPE_CHECKING:
+    from .jobs import Job
     from .models import JobProcess, JobResult
 
 # Models are NOT imported at the top of this file!
@@ -108,7 +110,10 @@ class Worker:
         now = time.time()
         self._stats_logged_at = now
         self._job_results_checked_at = now
-        self._jobs_schedule_checked_at = now
+        # Except the schedule: evaluate it on the first tick so a slot that
+        # came due while no worker was running fires at startup, not a
+        # minute in.
+        self._jobs_schedule_checked_at = 0.0
 
         self.worker_id = uuid.uuid4()
         self._hostname = socket.gethostname()
@@ -495,45 +500,192 @@ class Worker:
             logger.exception(e)
 
     def _schedule_due(self, now: float) -> bool:
-        if not self.jobs_schedule:
-            return False
-        # Only need to check once every 60 seconds
-        return now - self._jobs_schedule_checked_at > 60
+        # Pre-ledger transition: the pass must run even when this worker has
+        # no schedule entries, so the legacy sweep still cleans rows an old
+        # worker re-created after the last entry was removed. Restore
+        # `if not self.jobs_schedule: return False` here when the transition
+        # machinery is removed.
+        #
+        # Passes must run more often than the smallest schedule period (one
+        # minute), or two slots could come due within a single gap and the
+        # latest-only catch-up below would silently drop the earlier one.
+        return now - self._jobs_schedule_checked_at > 30
 
     def maybe_schedule_jobs(self) -> None:
+        """Enqueue any schedule entry whose slot has come due.
+
+        Nothing is enqueued ahead of time — see ScheduleState for how the
+        ledger makes each slot fire exactly once and keeps removed entries
+        from leaving stale work behind.
+        """
         if not self._schedule_due(time.time()):
             return
+        # Stamp at the start: a slot can't be lost to a delayed stamp (the
+        # ledger owns slots), and a failing entry is contained per-entry
+        # below rather than re-running the whole pass every loop tick.
+        self._jobs_schedule_checked_at = time.time()
 
-        for job, schedule in self.jobs_schedule:
-            next_start_at = schedule.next()
+        # Lazy import - see _worker_process_initializer() comment for why
+        from .models import ScheduleState
 
-            # Leverage the concurrency_key to group scheduled jobs
-            # with the same start time
-            schedule_concurrency_key = f"{job.default_concurrency_key()}:scheduled:{int(next_start_at.timestamp())}"
+        now = timezone.localtime()
+
+        self._sweep_legacy_scheduled_requests(now)
+
+        if not self.jobs_schedule:
+            return
+
+        entries = [
+            (job, schedule, schedule_entry_key(job, schedule))
+            for job, schedule in self.jobs_schedule
+        ]
+
+        ledger = dict(
+            ScheduleState.query.filter(
+                schedule_key__in=[key for _, _, key in entries]
+            ).values_list("schedule_key", "last_enqueued_slot")
+        )
+
+        for job, schedule, schedule_key in entries:
+            try:
+                self._schedule_entry(
+                    job, schedule, schedule_key, ledger.get(schedule_key), now
+                )
+            except Exception as e:
+                # One broken entry must not starve the entries after it — but
+                # the catch also stops the SDK auto-record, so stamp the
+                # canonical failure signal on the active worker-loop span or
+                # APM would show a healthy worker while an entry never runs.
+                record_span_error(trace.get_current_span(), e)
+                logger.exception(e)
+
+    def _sweep_legacy_scheduled_requests(self, now: datetime.datetime) -> None:
+        """Pre-ledger transition: delete rows pre-enqueued by a pre-ledger
+        worker (before the upgrade, or re-created by one still running
+        during a rolling deploy).
+
+        Only future rows are swept — one whose slot already passed is a run
+        the old scheduler owed and still executes at pickup, preserving its
+        catch-up behavior through the upgrade. This scheduler never creates
+        future-dated slot rows (it enqueues only due slots), so any future
+        row whose key's trailing digits equal its own start time's epoch —
+        the old format's provenance — is legacy by definition. Removable
+        once pre-ledger workers can no longer be running.
+        """
+        # Lazy import - see _worker_process_initializer() comment for why
+        from .models import JobRequest
+
+        candidates = JobRequest.query.filter(
+            concurrency_key__regex=r":scheduled:\d+$",
+            retry_attempt=0,
+            start_at__gt=now,
+        ).values_list("id", "concurrency_key", "start_at")
+
+        ids = [
+            id
+            for id, concurrency_key, start_at in candidates
+            if int(concurrency_key.rsplit(":", 1)[1]) == int(start_at.timestamp())
+        ]
+
+        if ids:
+            deleted = JobRequest.query.filter(id__in=ids).delete()
+            logger.info(
+                "Swept legacy pre-enqueued scheduled requests",
+                extra={"deleted": deleted},
+            )
+
+    def _schedule_entry(
+        self,
+        job: Job,
+        schedule: Schedule,
+        schedule_key: str,
+        last_enqueued_slot: datetime.datetime | None,
+        now: datetime.datetime,
+    ) -> None:
+        # Lazy import - see _worker_process_initializer() comment for why
+        from .models import JobResult, ScheduleState
+
+        if last_enqueued_slot is None:
+            # First time this entry is seen: the ledger starts at now, so
+            # nothing fires retroactively — the first slot to fire is the
+            # next one after deployment.
+            ScheduleState.query.get_or_create(
+                schedule_key=schedule_key,
+                defaults={"last_enqueued_slot": now},
+            )
+            return
+
+        last_slot = timezone.localtime(last_enqueued_slot)
+        if schedule.next(now=last_slot) > now:
+            return
+
+        # A slot is due. Fire the latest one, but only if it falls inside
+        # the catch-up window — a worker returning from ordinary downtime
+        # replays the most recent miss, while a stale ledger row doesn't
+        # fire a long-gone slot. Walking from the window edge also bounds
+        # the loop over large gaps.
+        # Floored at two minutes: a window smaller than the gap between
+        # passes would classify slots that came due between two ordinary
+        # passes as stale and skip them — i.e. disable scheduling.
+        window = datetime.timedelta(
+            seconds=max(settings.JOBS_SCHEDULE_CATCHUP_WINDOW, 120)
+        )
+        due_slot = schedule.next(now=max(last_slot, now - window))
+        if due_slot > now:
+            # The only missed slots are older than the window. Advance the
+            # ledger without firing so they aren't re-evaluated every pass.
+            ScheduleState.query.filter(
+                schedule_key=schedule_key,
+                last_enqueued_slot=last_enqueued_slot,
+            ).update(last_enqueued_slot=now)
+            return
+        while (following := schedule.next(now=due_slot)) <= now:
+            due_slot = following
+
+        # Optimistically claim the slot: the ledger only advances if no
+        # other worker got there first, and the enqueue shares the
+        # transaction so a failed enqueue releases the slot to retry next
+        # pass.
+        with transaction.atomic():
+            claimed = ScheduleState.query.filter(
+                schedule_key=schedule_key,
+                last_enqueued_slot=last_enqueued_slot,
+            ).update(last_enqueued_slot=due_slot)
+            if not claimed:
+                return
+
+            concurrency_key = scheduled_concurrency_key(job, due_slot)
+
+            # Pre-ledger transition: a run for this slot that already
+            # completed leaves only a JobResult, which should_enqueue's
+            # pending/processing dedupe can't see — e.g. a row pre-enqueued
+            # by a pre-ledger worker during a rolling upgrade that ran
+            # before this pass. Keep the ledger advance, skip the enqueue.
+            # Removable once pre-ledger workers can no longer be running.
+            if JobResult.query.filter(
+                job_class=jobs_registry.get_job_class_name(job.__class__),
+                concurrency_key=concurrency_key,
+            ).exists():
+                return
 
             # Job's should_enqueue hook can control scheduling behavior
             result = job.run_in_worker(
-                delay=next_start_at,
-                concurrency_key=schedule_concurrency_key,
+                delay=due_slot,
+                concurrency_key=concurrency_key,
             )
-            # Result is None if should_enqueue returned False
-            if result:
-                logger.info(
-                    "Scheduling job",
-                    extra={
-                        "job_class": result.job_class,
-                        "job_queue": result.queue,
-                        "job_start_at": result.start_at,
-                        "job_schedule": schedule,
-                        "concurrency_key": result.concurrency_key,
-                    },
-                )
 
-        # Stamp only after the whole pass succeeds — a mid-pass failure
-        # (caught by the worker-loop catch) then retries next tick instead
-        # of waiting out the window and skipping the missed occurrence.
-        # Re-runs are deduped by the scheduled concurrency_key.
-        self._jobs_schedule_checked_at = time.time()
+        # Result is None if should_enqueue returned False
+        if result:
+            logger.info(
+                "Scheduling job",
+                extra={
+                    "job_class": result.job_class,
+                    "job_queue": result.queue,
+                    "job_start_at": result.start_at,
+                    "job_schedule": schedule,
+                    "concurrency_key": result.concurrency_key,
+                },
+            )
 
     def log_stats(self) -> None:
         # Lazy import - see _worker_process_initializer() comment for why

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import datetime
+import hashlib
 import subprocess
 from typing import Any
 
 from plain.utils import timezone
 
+from .exceptions import JobClassNotRegistered
 from .jobs import Job
 from .registry import jobs_registry, register_job
 
@@ -102,6 +104,17 @@ class _ScheduleComponent:
             result = str_conversions.get(value.upper(), value)
             return int(result)
 
+        def _validated(values: list[int]) -> list[int]:
+            # String forms ("25", "20-30") need the same bounds check as
+            # plain ints — an out-of-range value would otherwise only blow
+            # up later, inside Schedule.next()'s datetime arithmetic.
+            for v in values:
+                if v < min_allowed or v > max_allowed:
+                    raise ValueError(
+                        f"Schedule component should be between {min_allowed} and {max_allowed}"
+                    )
+            return values
+
         if "/" in value:
             values, step = value.split("/")
             values = cls.parse(values, min_allowed, max_allowed, str_conversions)
@@ -109,9 +122,11 @@ class _ScheduleComponent:
 
         if "-" in value:
             start, end = value.split("-")
-            return cls(list(range(_convert(start), _convert(end) + 1)), raw=value)
+            return cls(
+                _validated(list(range(_convert(start), _convert(end) + 1))), raw=value
+            )
 
-        return cls([_convert(value)], raw=value)
+        return cls(_validated([_convert(value)]), raw=value)
 
 
 class Schedule:
@@ -162,7 +177,16 @@ class Schedule:
     def __str__(self) -> str:
         if self._raw:
             return self._raw
-        return f"{self.minute} {self.hour} {self.day_of_month} {self.month} {self.day_of_week}"
+        fields = f"{self.minute} {self.hour} {self.day_of_month} {self.month} {self.day_of_week}"
+        if (
+            self.combine_days_with_or
+            and not self.day_of_month.is_wildcard
+            and not self.day_of_week.is_wildcard
+        ):
+            # The OR day-combination matches a different set of slots, so
+            # it's part of the schedule's identity (and ledger key).
+            fields += " (days OR)"
+        return fields
 
     def __repr__(self) -> str:
         return f"<Schedule {self}>"
@@ -272,24 +296,111 @@ class ScheduledCommand(Job):
 
     def default_concurrency_key(self) -> str:
         # The ScheduledCommand can be used for different commands,
-        # so we need the concurrency_key to separate them for uniqueness
-        return self.command
+        # so we need the concurrency_key to separate them for uniqueness.
+        # Digest only when the raw command wouldn't fit
+        # JobRequest.concurrency_key's 255-char bound once the
+        # ":scheduled:<epoch>" slot stamp (21 chars) is appended — a command
+        # that fits keeps its raw key, which also matches the keys
+        # pre-ledger workers produced so slot dedupe holds across the
+        # upgrade.
+        if len(self.command) <= 234:
+            return self.command
+        digest = hashlib.sha256(self.command.encode()).hexdigest()[:16]
+        return f"{self.command[:160]}...{digest}"
+
+
+def schedule_entry_key(job: Job, schedule: Schedule) -> str:
+    """
+    Stable identity of a JOBS_SCHEDULE entry, used as ScheduleState.schedule_key.
+
+    Includes the schedule itself, so changing an entry's timing starts a
+    fresh ledger row (the old one becomes inert) and two entries for the
+    same job with different schedules track independently.
+    """
+    job_class_name = jobs_registry.get_job_class_name(job.__class__)
+    return f"{job_class_name}:{job.default_concurrency_key()}:{schedule}"
+
+
+def schedule_entry_display(job: Job) -> str:
+    """How a JOBS_SCHEDULE entry names itself — the inverse of load_schedule's
+    parsing, so the `cmd:` convention lives in one module."""
+    if isinstance(job, ScheduledCommand):
+        return f"cmd:{job.command}"
+    return jobs_registry.get_job_class_name(job.__class__)
+
+
+def scheduled_concurrency_key(job: Job, slot: datetime.datetime) -> str:
+    """The concurrency_key stamped on a scheduled run's rows.
+
+    Groups a slot's request/process/result rows for queries, and its
+    uniqueness under should_enqueue() dedupes against a pending row another
+    process already created for the same slot (e.g. one pre-enqueued before
+    the upgrade to ledger-based scheduling — the sweep migration selects
+    legacy rows by this format's `:scheduled:` marker).
+    """
+    return f"{job.default_concurrency_key()}:scheduled:{int(slot.timestamp())}"
+
+
+def load_schedule_entry(
+    entry: tuple[str | Job, str | Schedule],
+) -> tuple[Job, Schedule]:
+    """Parse a single JOBS_SCHEDULE entry — raises if anything about it is
+    wrong (shape, unregistered class, malformed schedule)."""
+    job, schedule = entry
+
+    if isinstance(job, str):
+        if job.startswith("cmd:"):
+            job = ScheduledCommand(job[4:])
+        else:
+            job = jobs_registry.load_job(job, {"args": [], "kwargs": {}})
+
+    if isinstance(schedule, str):
+        schedule = Schedule.from_cron(schedule)
+
+    # The settings type only guarantees tuples, so validate what came out.
+    if not isinstance(job, Job):
+        raise ValueError(
+            f"JOBS_SCHEDULE job must be a Job class path, cmd: string, or "
+            f"Job instance — got {job!r}"
+        )
+    if not isinstance(schedule, Schedule):
+        raise ValueError(
+            f"JOBS_SCHEDULE schedule must be a cron string or Schedule — "
+            f"got {schedule!r}"
+        )
+
+    # A Job instance whose class was never registered would enqueue rows
+    # that can't be loaded at pickup.
+    job_class_name = jobs_registry.get_job_class_name(job.__class__)
+    if job_class_name not in jobs_registry.jobs:
+        raise JobClassNotRegistered(job_class_name)
+
+    return job, schedule
 
 
 def load_schedule(
     schedules: list[tuple[str | Job, str | Schedule]],
 ) -> list[tuple[Job, Schedule]]:
+    """Parse JOBS_SCHEDULE, failing on the first problem — the worker
+    refuses to boot on broken schedule config. Consumers that want to report
+    every problem (preflight) or render broken entries (admin) iterate with
+    load_schedule_entry instead."""
     jobs_schedule: list[tuple[Job, Schedule]] = []
+    seen_keys: set[str] = set()
 
-    for job, schedule in schedules:
-        if isinstance(job, str):
-            if job.startswith("cmd:"):
-                job = ScheduledCommand(job[4:])
-            else:
-                job = jobs_registry.load_job(job, {"args": [], "kwargs": {}})
+    for entry in schedules:
+        job, schedule = load_schedule_entry(entry)
 
-        if isinstance(schedule, str):
-            schedule = Schedule.from_cron(schedule)
+        # Entries with the same key would share one ledger row and only one
+        # of them would ever fire — refuse loudly instead.
+        key = schedule_entry_key(job, schedule)
+        if key in seen_keys:
+            raise ValueError(
+                f"Duplicate JOBS_SCHEDULE entry: {key!r}. Entries with the "
+                "same job class and schedule need distinct "
+                "default_concurrency_key() values to be scheduled separately."
+            )
+        seen_keys.add(key)
 
         jobs_schedule.append((job, schedule))
 
