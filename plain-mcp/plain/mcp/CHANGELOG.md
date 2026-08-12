@@ -1,5 +1,18 @@
 # plain-mcp changelog
 
+## [0.7.0](https://github.com/dropseed/plain/releases/plain-mcp@0.7.0) (2026-08-12)
+
+### What's changed
+
+- `MCPView.tools` and `resources` are now tuple-typed (`tuple[type[MCPTool], ...]`); list declarations still work at runtime but fail type checking ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `register_tool()`/`register_resource()` rebuild the class attribute as a tuple instead of mutating a list in place — this also makes registration work correctly on subclasses that declare their own `tools` tuple ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `MCPTool.input_schema` and `annotations` are annotated `ClassVar`, matching how they're declared per tool class ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- OAuth protected-resource metadata attributes (`authorization_servers`, `oauth_scopes_supported`) are tuples ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- Convert `tools = [...]` / `resources = [...]` declarations to tuples: `tools = (Echo, Search)` — single-element declarations need the trailing comma: `tools = (Echo,)`
+
 ## [0.6.0](https://github.com/dropseed/plain/releases/plain-mcp@0.6.0) (2026-08-10)
 
 ### What's changed
