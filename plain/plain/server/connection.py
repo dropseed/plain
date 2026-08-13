@@ -8,8 +8,11 @@ from . import util
 if TYPE_CHECKING:
     from .app import ServerApplication
 
-# Keep-alive connection timeout in seconds
-KEEPALIVE = 2
+# Per-recv progress timeout (seconds) while actively reading a request's
+# headers or body — slowloris protection, paired with HEADER_READ_TIMEOUT
+# in h1. Unrelated to how long an idle keep-alive connection may sit
+# between requests; that's SERVER_KEEPALIVE_TIMEOUT.
+RECV_PROGRESS_TIMEOUT = 2
 
 # Per-recv timeout floor during shutdown drain. The drain deadline caps
 # total read time, but each individual recv still gets at least this long
@@ -40,9 +43,10 @@ class Connection:
         self.is_ssl: bool = is_ssl
         self.req_count: int = 0
 
-        # Byte read during the keepalive wait, prepended to the next header
-        # read so wait_readable()'s peek isn't lost.
-        self._keepalive_byte: bytes = b""
+        # Bytes read by wait_readable()'s peek, handed back by the next
+        # recv() calls so the peek is never lost — recv() drains this
+        # before touching the reader, so callers don't need to know.
+        self._peeked: bytes = b""
 
     def close(self) -> None:
         if not self.writer.is_closing():
@@ -50,6 +54,14 @@ class Connection:
 
     async def recv(self, n: int) -> bytes:
         """Read up to n bytes from a connection."""
+        if self._peeked:
+            if len(self._peeked) <= n:
+                data = self._peeked
+                self._peeked = b""
+            else:
+                data = self._peeked[:n]
+                self._peeked = self._peeked[n:]
+            return data
         return await self.reader.read(n)
 
     async def sendall(self, data: bytes) -> None:
@@ -61,9 +73,22 @@ class Connection:
         """Send an HTTP error response on a connection."""
         await self.sendall(util._error_response_bytes(status_int, reason, mesg))
 
-    async def wait_readable(self) -> None:
-        """Return when the next request's bytes are available to recv."""
-        data = await self.reader.read(1)
+    async def wait_readable(self) -> bool:
+        """Wait for the next request's bytes; True when bytes arrived.
+
+        The peeked bytes are handed back by the next recv() calls.
+        Returns False on EOF (the peer closed). Reads a full segment
+        rather than one byte so a small request usually needs no second
+        reader round trip.
+        """
+        if self._peeked:
+            # Bytes from a previous peek are still buffered (e.g. a
+            # pipelined request behind an exactly-consumed body) — they
+            # ARE the next request; blocking on the socket would strand
+            # them until the idle timeout.
+            return True
+        data = await self.reader.read(65536)
         if data:
-            # Prepend the peeked byte back into the next read.
-            self._keepalive_byte = data
+            self._peeked += data
+            return True
+        return False

@@ -15,6 +15,12 @@ if [ $# -gt 0 ] && [[ "$1" == *:* ]]; then
     exit $?
 fi
 
+# Short idle timeout (default 300s) so the keepalive lifecycle test can
+# observe the idle close without waiting minutes. One variable keeps the
+# server and the test's expectation in sync.
+KEEPALIVE_TIMEOUT=5
+export PLAIN_SERVER_KEEPALIVE_TIMEOUT="$KEEPALIVE_TIMEOUT"
+
 source "$(dirname "$0")/start-example-server"
 
-uv run python "$REPO_ROOT/tools/server-worker-test.py" "127.0.0.1:$PORT" "$@"
+uv run python "$REPO_ROOT/tools/server-worker-test.py" "127.0.0.1:$PORT" --keepalive-timeout "$KEEPALIVE_TIMEOUT" "$@"

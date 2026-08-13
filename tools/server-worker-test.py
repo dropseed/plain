@@ -407,10 +407,20 @@ def test_expect_100_continue(addr: tuple[str, int]) -> bool | tuple[bool, str]:
         s.close()
 
 
-def test_keepalive_timeout(addr: tuple[str, int]) -> bool | tuple[bool, str]:
-    """Server closes idle keep-alive connections after timeout (~2s)."""
+def test_keepalive_timeout(
+    addr: tuple[str, int], keepalive_timeout: float | None
+) -> bool | tuple[bool, str]:
+    """A connection idle for a few seconds still serves the next request
+    (closing it would race a request being written onto it — Heroku H13),
+    and SERVER_KEEPALIVE_TIMEOUT then closes it. The idle-close phase is
+    skipped when --keepalive-timeout wasn't given.
+    """
+    # Idle longer than the 2s per-recv progress timeout, with margin
+    # below the keepalive timeout so the server can't close first.
+    idle = 3.5 if keepalive_timeout is None else min(3.5, keepalive_timeout / 2)
+
     s = connect(addr)
-    s.settimeout(10)
+    s.settimeout((keepalive_timeout or 0) + 5)
     try:
         s.sendall(SIMPLE_GET)
         resp = recv_response(s)
@@ -418,9 +428,24 @@ def test_keepalive_timeout(addr: tuple[str, int]) -> bool | tuple[bool, str]:
         if not is_valid(status):
             return False, f"Initial request status: {status}"
 
-        # Wait longer than keepalive timeout (2s default + margin)
-        time.sleep(3.5)
+        # Reuse the connection after the idle — it must still be serving.
+        time.sleep(idle)
 
+        try:
+            s.sendall(SIMPLE_GET)
+            resp = recv_response(s)
+        except OSError:
+            return False, "Connection closed during idle (H13 race)"
+        if not resp:
+            return False, "Connection closed during idle (H13 race)"
+        status = parse_status(resp)
+        if not is_valid(status):
+            return False, f"Request after idle: status {status}"
+
+        if keepalive_timeout is None:
+            return True
+
+        # The keepalive timeout does close an idle connection eventually.
         try:
             data = s.recv(4096)
             if data == b"":
@@ -467,11 +492,19 @@ def main() -> int:
         default=4,
         help="Thread count the server is running with (for exhaustion test)",
     )
+    parser.add_argument(
+        "--keepalive-timeout",
+        type=float,
+        default=None,
+        help="SERVER_KEEPALIVE_TIMEOUT the server is running with; when "
+        "omitted, the lifecycle test skips its idle-close phase",
+    )
     args = parser.parse_args()
 
     host, port_str = args.target.rsplit(":", 1)
     addr = (host, int(port_str))
     threads = args.threads
+    keepalive_timeout = args.keepalive_timeout
 
     tests: list[tuple[str, Callable[..., Any]]] = [
         ("Health check returns 200", test_healthcheck),
@@ -488,7 +521,10 @@ def main() -> int:
         ("Keep-alive after chunked POST body", test_keepalive_after_chunked_body),
         ("Large POST body (3MB, bridge path)", test_large_body_bridge),
         ("Expect: 100-continue", test_expect_100_continue),
-        ("Keep-alive timeout closes connection", test_keepalive_timeout),
+        (
+            "Keep-alive idle lifecycle (survives idle, closes at timeout)",
+            lambda addr: test_keepalive_timeout(addr, keepalive_timeout),
+        ),
     ]
 
     print(f"\n{BOLD}Server Worker Behavior{RESET}\n")

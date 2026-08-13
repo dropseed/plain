@@ -16,7 +16,8 @@ from __future__ import annotations
 #     4. Read body bytes (async, based on Content-Length or chunked)
 #     5. Dispatch view (thread pool for sync, event loop for async)
 #     6. Write response (async)
-#   Keepalive waits use asyncio.wait_for with a timeout.
+#   Keepalive waits race the next request against worker shutdown
+#   (see h1.handle_connection).
 import asyncio
 import logging
 import os
@@ -30,6 +31,7 @@ from concurrent.futures import ThreadPoolExecutor
 from types import FrameType
 from typing import TYPE_CHECKING, Any
 
+from plain.exceptions import ImproperlyConfigured
 from plain.internal.reloader import Reloader
 from plain.logs import get_framework_logger
 
@@ -103,11 +105,28 @@ class Worker:
         self.max_connections: int = settings.SERVER_CONNECTIONS
         self.max_keepalived: int = self.max_connections - self.app.threads
         self.max_body: int = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or (10 * 1024 * 1024)
+        self.keepalive_timeout: float = settings.SERVER_KEEPALIVE_TIMEOUT
+        if self.keepalive_timeout <= 0:
+            # Belt to the preflight check's braces — env vars bypass
+            # settings.py review, and a non-positive value would close
+            # every connection before it serves a single request.
+            raise ImproperlyConfigured(
+                f"SERVER_KEEPALIVE_TIMEOUT must be positive "
+                f"(got {self.keepalive_timeout})."
+            )
         healthcheck_path = settings.HEALTHCHECK_PATH
         self.healthcheck_path_bytes: bytes = (
             healthcheck_path.encode("ascii") if healthcheck_path else b""
         )
         self.nr_conns: int = 0
+        # Event loop for run(), published so the Reloader thread can hand
+        # _begin_drain to it. None until run() starts.
+        self._loop: asyncio.AbstractEventLoop | None = None
+        # Throttle so hitting the connection cap logs a warning at most
+        # once a minute, not once per rejected connection (rejections
+        # arrive at connection rate exactly when the worker is
+        # saturated).
+        self._capacity_warned_at: float = float("-inf")
         # Absolute time.monotonic() deadline for post-shutdown reads,
         # published when shutdown starts (None while alive). Connection
         # loops read it live via h1._recv_timeout, so it also bounds
@@ -117,8 +136,10 @@ class Worker:
         self._servers: list[asyncio.Server] = []
         self._notify_during_drain = True
         # Set (on the event loop) when shutdown starts — H2 connections
-        # watch this to refuse new streams and drain (h1 gates on alive).
-        self._shutdown_event: asyncio.Event = asyncio.Event()
+        # watch this to refuse new streams and drain; h1 keepalive waits
+        # watch it to collapse their idle window (h1 responses gate on
+        # alive).
+        self.shutdown_event: asyncio.Event = asyncio.Event()
         # Worker-level H2 stream budget — limits total in-flight H2 streams
         # across all connections to avoid overwhelming the thread pool.
         self._h2_stream_budget: asyncio.Semaphore = asyncio.Semaphore(
@@ -190,12 +211,20 @@ class Worker:
 
             def changed(fname: str) -> None:
                 self.log.debug("Server worker reloading", extra={"modified": fname})
-                # Runs on the Reloader thread — flag the heartbeat loop,
-                # which notices within about a second (longer if the
-                # thread pool is backed up) and shuts down gracefully.
-                # (sys.exit() here would only end the watcher thread,
-                # not the process.)
-                self.alive = False
+                # Runs on the Reloader thread — hand the drain to the
+                # event loop so shutdown_event is set alongside alive and
+                # idle connections collapse their waits immediately.
+                # Falls back to the alive flag if the loop isn't up yet
+                # or is already closed (post-drain save storm) — an
+                # unguarded RuntimeError here would kill the watcher
+                # thread. (sys.exit() here would only end the watcher
+                # thread, not the process.)
+                try:
+                    if self._loop is None:
+                        raise RuntimeError("Event loop not running")
+                    self._loop.call_soon_threadsafe(self._begin_drain)
+                except RuntimeError:
+                    self.alive = False
 
             self.reloader = Reloader(callback=changed, watch_html=True)
 
@@ -204,10 +233,16 @@ class Worker:
 
         # Enter main run loop
         self.booted = True
-        asyncio.run(self.run())
+        try:
+            asyncio.run(self.run())
+        finally:
+            # The loop is closed — stop the reloader callback from
+            # scheduling onto it.
+            self._loop = None
 
     async def run(self) -> None:
         loop = asyncio.get_running_loop()
+        self._loop = loop
 
         # Enable asyncio debug mode in development to detect blocking calls
         # in async views. Logs a warning when a callback takes > 0.1s.
@@ -310,7 +345,7 @@ class Worker:
         # gates on this state: h1 stops taking keep-alive requests once
         # alive is False (requests parsed from here on respond with
         # Connection: close; responses already dispatched still go out
-        # keep-alive), and h2 connections watch _shutdown_event to refuse
+        # keep-alive), and h2 connections watch shutdown_event to refuse
         # new streams and drain.
         self._begin_drain()
 
@@ -330,7 +365,16 @@ class Worker:
         # accepted (and TLS-negotiated for SSL) by the time we get here,
         # so queuing behind a semaphore would just waste resources.
         if self._capacity_semaphore.locked():
-            self.log.debug("Connection rejected: at capacity")
+            # Idle keep-alive connections hold slots for
+            # SERVER_KEEPALIVE_TIMEOUT, so hitting the cap should be
+            # diagnosable from logs rather than a mystery bare close.
+            now = time.monotonic()
+            if now - self._capacity_warned_at >= 60:
+                self._capacity_warned_at = now
+                self.log.warning(
+                    "Worker at connection capacity, rejecting new connections",
+                    extra={"max_connections": self.max_connections},
+                )
             writer.close()
             await writer.wait_closed()
             return
@@ -374,7 +418,8 @@ class Worker:
                     self.tpool,
                     stream_budget=self._h2_stream_budget,
                     on_stream_complete=self._count_request,
-                    shutdown_event=self._shutdown_event,
+                    shutdown_event=self.shutdown_event,
+                    keepalive_timeout=self.keepalive_timeout,
                 )
                 return
 
@@ -442,10 +487,10 @@ class Worker:
         """
         if self.drain_read_deadline is not None:
             self.alive = False
-            self._shutdown_event.set()
+            self.shutdown_event.set()
             return
         self.alive = False
-        self._shutdown_event.set()
+        self.shutdown_event.set()
 
         # Derive the read budget from the graceful window (and the
         # arbiter's SIGKILL time when one is published) so a final-request
@@ -473,13 +518,17 @@ class Worker:
 
     def _signal_quit(self) -> None:
         # Hard stop — the arbiter uses SIGQUIT for immediate termination.
-        # Intentionally bypasses _graceful_shutdown.
+        # Intentionally bypasses _graceful_shutdown. The event is set
+        # alongside alive to keep the contract that alive=False implies
+        # shutdown_event is set (connection loops watch the event).
         self.alive = False
+        self.shutdown_event.set()
         self.tpool.shutdown(wait=False, cancel_futures=True)
         sys.exit(0)
 
     def handle_abort(self, sig: int, frame: FrameType | None) -> None:
         self.alive = False
+        self.shutdown_event.set()
         self.tpool.shutdown(wait=False, cancel_futures=True)
         sys.exit(1)
 

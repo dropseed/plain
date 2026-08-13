@@ -27,10 +27,6 @@ log = get_framework_logger()
 # Fallback max request body size per H2 stream when DATA_UPLOAD_MAX_MEMORY_SIZE is None (10 MiB)
 _H2_BODY_FALLBACK = 10 * 1024 * 1024
 
-# Idle timeout for HTTP/2 connections with no active streams (seconds).
-# Browsers typically keep connections open for 5-10 minutes.
-H2_IDLE_TIMEOUT = 300
-
 # HTTP/1.1 hop-by-hop headers that must not appear in HTTP/2 responses
 _H2_SKIP_HEADERS = frozenset(
     ("connection", "transfer-encoding", "keep-alive", "upgrade")
@@ -305,9 +301,11 @@ async def async_handle_h2_connection(
     handler: Any,
     is_ssl: bool,
     executor: ThreadPoolExecutor,
+    *,
     stream_budget: asyncio.Semaphore | None = None,
     on_stream_complete: Callable[[], None] | None = None,
     shutdown_event: asyncio.Event | None = None,
+    keepalive_timeout: float,
 ) -> None:
     """Async HTTP/2 connection loop.
 
@@ -381,9 +379,14 @@ async def async_handle_h2_connection(
             waiters: set[asyncio.Task[Any]] = {read_task}
             if shutdown_wait is not None and not draining:
                 waiters.add(shutdown_wait)
+            # Stream completions wake the wait so the idle clock restarts
+            # when in-flight work ends, not at the last inbound frame —
+            # otherwise a long response eats its connection's idle window
+            # and the close races the next pooled request.
+            waiters.update(stream_tasks.values())
             done, _ = await asyncio.wait(
                 waiters,
-                timeout=0.5 if draining else H2_IDLE_TIMEOUT,
+                timeout=0.5 if draining else keepalive_timeout,
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
@@ -393,6 +396,17 @@ async def async_handle_h2_connection(
 
             if read_task not in done:
                 if draining:
+                    continue
+                if done or stream_tasks:
+                    # Not idle: either a stream just finished (done —
+                    # restart the idle clock from now) or dispatched
+                    # views are still running (e.g. a slow view with a
+                    # frame-quiet client). The keepalive timeout only
+                    # applies between requests, never to in-flight work.
+                    # Deliberately NOT state.streams: a half-open stream
+                    # (HEADERS arrived, body stalled, client silent for
+                    # the whole window) has no view running and would
+                    # otherwise hold the connection forever.
                     continue
                 log.debug("HTTP/2 idle timeout", extra={"client": client})
                 break

@@ -163,9 +163,10 @@ def test_inflight_drains(addr: tuple[str, int], pid: int) -> bool | tuple[bool, 
             return False, f"Expected 100 Continue, got {interim[:100]!r}"
 
         # Prime the probe right before the signal so its keep-alive idle
-        # clock (~2s server-side) is fresh — otherwise a slow run can have
-        # the server close the idle probe before SIGTERM, and that close
-        # would be misread below as a shutdown-dropped request.
+        # clock (SERVER_KEEPALIVE_TIMEOUT server-side) is fresh — so even a
+        # very slow run can't have the server close the idle probe before
+        # SIGTERM, which would be misread below as a shutdown-dropped
+        # request.
         probe.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
         if not recv_response(probe):
             return False, "Probe connection failed before shutdown"

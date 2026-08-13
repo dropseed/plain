@@ -110,6 +110,7 @@ Plain includes these checks out of the box:
 | Check                           | Description                                              | Deploy only |
 | ------------------------------- | -------------------------------------------------------- | ----------- |
 | `files.upload_temp_dir`         | Validates `FILE_UPLOAD_TEMP_DIR` exists                  | No          |
+| `server.keepalive_timeout`      | Ensures `SERVER_KEEPALIVE_TIMEOUT` is positive           | No          |
 | `settings.unused_env_vars`      | Detects env vars that look like settings but aren't used | No          |
 | `urls.config`                   | Validates URL patterns for common issues                 | No          |
 | `security.secret_key`           | Validates `SECRET_KEY` strength                          | Yes         |

@@ -181,6 +181,15 @@ SERVER_ACCESS_LOG_FIELDS: list[str] = [
     "referer",
 ]
 SERVER_GRACEFUL_TIMEOUT: int = 30
+# Idle timeout (seconds) for connections with no request in progress:
+# HTTP/1.1 connections waiting for a request (first or keep-alive reuse)
+# and HTTP/2 connections with no active streams. In-flight requests are
+# never affected. Must exceed any fronting router/load balancer's
+# connection reuse window so the router is always the side that closes an
+# idle connection — it knows not to reuse one it's closing, while a
+# server-side close races a request being written onto the connection
+# (Heroku H13).
+SERVER_KEEPALIVE_TIMEOUT: int = 300
 SERVER_SENDFILE: bool = True
 SERVER_CONNECTIONS: int = 1000
 SERVER_H2_MAX_CONCURRENT_STREAMS: int = 100

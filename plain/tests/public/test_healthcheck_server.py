@@ -30,6 +30,8 @@ class _StubWorker:
             healthcheck_path.encode("ascii") if healthcheck_path else b""
         )
         self.alive = True
+        self.shutdown_event = asyncio.Event()
+        self.keepalive_timeout = 300
         self.drain_read_deadline: float | None = None
         self.max_body = 10 * 1024 * 1024
         self.nr_conns = 0
@@ -39,6 +41,9 @@ class _StubWorker:
         self.timeout = 5
         self.app = _StubApp()
         self.handler = None
+
+    def _count_request(self) -> None:
+        pass
 
 
 # ---------------------------------------------------------------------------

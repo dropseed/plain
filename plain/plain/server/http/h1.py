@@ -11,7 +11,7 @@ from plain.logs import get_framework_logger
 
 from .. import http
 from ..accesslog import log_access
-from ..connection import DRAIN_MIN_RECV, KEEPALIVE, Connection
+from ..connection import DRAIN_MIN_RECV, RECV_PROGRESS_TIMEOUT, Connection
 from .errors import (
     ConfigurationProblem,
     InvalidHeader,
@@ -77,8 +77,8 @@ class _BodyTooLarge(Exception):
 
 
 # Total time allowed for reading all headers (slowloris protection).
-# Individual recv calls use KEEPALIVE as their timeout, but a client
-# could send one byte every ~1.9s to stay under the per-recv limit.
+# Individual recv calls use RECV_PROGRESS_TIMEOUT as their timeout, but a
+# client could send one byte every ~1.9s to stay under the per-recv limit.
 # This bounds the total wall-clock time for the header phase.
 HEADER_READ_TIMEOUT = 10
 
@@ -149,23 +149,64 @@ def _chunked_end(data: bytes | bytearray, start: int = 0) -> tuple[int, int]:
 
 
 def _recv_timeout(worker: Worker) -> float:
-    """Per-recv timeout: KEEPALIVE, capped by the worker's drain read
-    deadline once shutdown publishes one. Read live on every recv, so a
-    SIGTERM landing mid-request bounds that request's remaining reads too.
-    Floored at DRAIN_MIN_RECV so a ready request is never dropped by a
-    zero timeout; the total is bounded by the deadline checks in the read
-    loops themselves.
+    """Per-recv timeout: RECV_PROGRESS_TIMEOUT, capped by the worker's
+    drain read deadline once shutdown publishes one. Read live on every
+    recv, so a SIGTERM landing mid-request bounds that request's remaining
+    reads too. Floored at DRAIN_MIN_RECV so a ready request is never
+    dropped by a zero timeout; the total is bounded by the deadline checks
+    in the read loops themselves.
     """
     deadline = worker.drain_read_deadline
     if deadline is None:
-        return KEEPALIVE
-    return min(KEEPALIVE, max(DRAIN_MIN_RECV, deadline - time.monotonic()))
+        return RECV_PROGRESS_TIMEOUT
+    return min(RECV_PROGRESS_TIMEOUT, max(DRAIN_MIN_RECV, deadline - time.monotonic()))
 
 
 def _drain_expired(worker: Worker) -> bool:
     """True once shutdown's drain read deadline has passed."""
     deadline = worker.drain_read_deadline
     return deadline is not None and time.monotonic() >= deadline
+
+
+async def _wait_for_next_request(
+    worker: Worker,
+    conn: Connection,
+    shutdown_wait: asyncio.Task[bool],
+) -> bool:
+    """Park on an idle connection until the next request starts.
+
+    Runs before every request, the first on a fresh connection included.
+    Returns True when request bytes have arrived (peeked by
+    wait_readable, handed back by the next recv calls), False when the
+    connection should close — idle timeout, shutdown, EOF, or a socket
+    error.
+
+    The idle window is worker.keepalive_timeout — long, so the router is
+    always the side that closes an idle pooled connection (see
+    SERVER_KEEPALIVE_TIMEOUT in global_settings.py for the full
+    rationale). Worker shutdown (shutdown_wait) instead collapses the
+    wait to one _recv_timeout grace — the same window every drain read
+    gets, so it tightens as a published kill deadline approaches: a
+    request already in flight is served (framed Connection: close by
+    dispatch), otherwise the connection closes promptly.
+    """
+    idle_read = asyncio.get_running_loop().create_task(conn.wait_readable())
+    try:
+        await asyncio.wait(
+            (idle_read, shutdown_wait),
+            timeout=worker.keepalive_timeout,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if not idle_read.done() and shutdown_wait.done():
+            await asyncio.wait((idle_read,), timeout=_recv_timeout(worker))
+        return idle_read.done() and idle_read.exception() is None and idle_read.result()
+    finally:
+        idle_read.cancel()
+        if idle_read.done() and not idle_read.cancelled():
+            # Retrieve any exception so a connection task cancelled during
+            # drain in the same tick idle_read failed (e.g. a client RST)
+            # doesn't log "Task exception was never retrieved".
+            idle_read.exception()
 
 
 def _parse_body_headers(header_data: bytes) -> tuple[int, bool, bool]:
@@ -221,10 +262,6 @@ async def async_read_headers(worker: Worker, conn: Connection) -> tuple[bytes, b
     (or, mid-request, the shutdown drain deadline).
     """
     buf = bytearray()
-    # Prepend the byte peeked during the keepalive wait, if any.
-    if conn._keepalive_byte:
-        buf.extend(conn._keepalive_byte)
-        conn._keepalive_byte = b""
     header_deadline = time.monotonic() + HEADER_READ_TIMEOUT
     while True:
         idx = buf.find(b"\r\n\r\n")
@@ -649,179 +686,185 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
     Reads requests, dispatches them, and loops for keepalive.
     Called after TLS and ALPN detection in Worker._handle_connection.
 
-    Shutdown invariant: the loop exits exactly when a response was framed
-    Connection: close — never on worker.alive directly. A request that
-    arrived just as shutdown started (e.g. on a router's pooled
-    connection) is still read and served, with the close announced on the
-    wire before the socket closes; gating the loop on worker.alive
-    instead would drop it unread (Heroku router: H13). Shutdown is
-    consulted once, in dispatch(), right before the response is framed.
+    Shutdown invariant: a request that has been (or is being) read is
+    always answered, with the close announced on the wire before the
+    socket closes — dropping it unread is a Heroku router H13. Shutdown
+    is consulted in exactly two places: dispatch(), right before the
+    response is framed, and _wait_for_next_request().
     """
     loop = asyncio.get_running_loop()
 
-    while True:
-        # Read HTTP headers asynchronously on the event loop. Once
-        # shutdown starts, all reads are bounded by the worker's drain
-        # read deadline (see _recv_timeout).
-        try:
-            header_data, body_start = await async_read_headers(worker, conn)
-        except (TimeoutError, OSError):
-            break
-        except LimitRequestHeaders as e:
-            await async_handle_error(worker, None, conn, e)
-            break
-        if not header_data:
-            break
+    # Completed when worker shutdown starts — one task per connection (as
+    # h2 does), raced against wait_readable in _wait_for_next_request.
+    # Don't "optimize" to one worker-wide task shared across connections:
+    # asyncio.wait registers/removes a done-callback per waiter, which is
+    # O(connections) on a shared task — strictly worse.
+    shutdown_wait = loop.create_task(worker.shutdown_event.wait())
 
-        # Health check — respond on the event loop without touching the
-        # thread pool. Still answered during shutdown drain: the response
-        # is Connection: close and new connections are already refused, so
-        # it can't keep a load balancer pointed at a dying worker.
-        if worker.healthcheck_path_bytes:
-            path = extract_request_path(header_data)
-            if path == worker.healthcheck_path_bytes:
-                await conn.sendall(HEALTHCHECK_RESPONSE)
+    try:
+        while True:
+            # Long, shutdown-aware idle wait — first request included.
+            if not await _wait_for_next_request(worker, conn, shutdown_wait):
                 break
 
-        # Analyze headers to pick the body read strategy.
-        max_body = worker.max_body
-        content_length, is_chunked, expect_continue = _parse_body_headers(header_data)
-
-        if expect_continue:
+            # Read HTTP headers asynchronously on the event loop. Once
+            # shutdown starts, all reads are bounded by the worker's drain
+            # read deadline (see _recv_timeout).
             try:
-                await conn.sendall(b"HTTP/1.1 100 Continue\r\n\r\n")
-            except OSError:
+                header_data, body_start = await async_read_headers(worker, conn)
+            except (TimeoutError, OSError):
+                break
+            except LimitRequestHeaders as e:
+                await async_handle_error(worker, None, conn, e)
+                break
+            if not header_data:
                 break
 
-        # Large Content-Length bodies stream lazily through the bridge.
-        # Small known-length, bodiless, and chunked bodies pre-buffer here
-        # (chunked falls back to the bridge if it exceeds max_body).
-        use_bridge = content_length > max_body
-        pipelined = False
+            # Health check — respond on the event loop without touching the
+            # thread pool. Still answered during shutdown drain: the response
+            # is Connection: close and new connections are already refused, so
+            # it can't keep a load balancer pointed at a dying worker.
+            if worker.healthcheck_path_bytes:
+                path = extract_request_path(header_data)
+                if path == worker.healthcheck_path_bytes:
+                    await conn.sendall(HEALTHCHECK_RESPONSE)
+                    break
 
-        if use_bridge:
-            unreader = AsyncBridgeUnreader(
-                header_data + body_start,
-                conn,
-                loop,
-                timeout=worker.timeout,
-                worker=worker,
+            # Analyze headers to pick the body read strategy.
+            max_body = worker.max_body
+            content_length, is_chunked, expect_continue = _parse_body_headers(
+                header_data
             )
-        else:
-            try:
-                body_data, pipelined = await async_read_body(
-                    worker, conn, body_start, content_length, is_chunked
-                )
-            except _IncompleteBody:
-                await conn.write_error(
-                    408,
-                    "Request Timeout",
-                    "Incomplete request body",
-                )
-                break
-            except _BodyTooLarge as e:
-                # Chunked body exceeded the pre-buffer limit — fall back to
-                # the bridge with the partial data. Bridge requests are
-                # Connection: close, so no pipelining concern.
-                use_bridge = True
+
+            if expect_continue:
+                try:
+                    await conn.sendall(b"HTTP/1.1 100 Continue\r\n\r\n")
+                except OSError:
+                    break
+
+            # Large Content-Length bodies stream lazily through the bridge.
+            # Small known-length, bodiless, and chunked bodies pre-buffer here
+            # (chunked falls back to the bridge if it exceeds max_body).
+            use_bridge = content_length > max_body
+            pipelined = False
+
+            if use_bridge:
                 unreader = AsyncBridgeUnreader(
-                    header_data + e.partial_data,
+                    header_data + body_start,
                     conn,
                     loop,
                     timeout=worker.timeout,
                     worker=worker,
                 )
             else:
-                unreader = BufferUnreader(header_data + body_data)
-
-        # Parse the request. For bridge unreaders, parsing runs in
-        # the thread pool since the body reader may call chunk()
-        # which bridges back to the event loop.
-        try:
-            if use_bridge:
-                parse_result = await loop.run_in_executor(
-                    worker.tpool,
-                    parse_request,
-                    worker,
-                    conn,
-                    unreader,
-                    True,
-                )
-            else:
-                parse_result = parse_request(worker, conn, unreader)
-        except _ParseError:
-            break
-        except TimeoutError:
-            # Bridge body read timed out — send 408 (not 500)
-            await conn.write_error(
-                408,
-                "Request Timeout",
-                "Body read timed out",
-            )
-            break
-        except Exception as e:
-            await async_handle_error(worker, None, conn, e)
-            break
-
-        if parse_result is None:
-            break
-
-        req, http_request, resp, request_start = parse_result
-        conn.req_count += 1
-        worker._count_request()
-
-        # A pipelined request was buffered behind this one. We don't
-        # re-frame it (that would mean trusting our own body-boundary
-        # detection as a request splitter — a smuggling surface); close
-        # instead, and the client retries it on a fresh connection.
-        if pipelined:
-            resp.force_close()
-
-        keepalive = await dispatch(worker, req, conn, http_request, resp, request_start)
-
-        # For bridge connections with known Content-Length, drain
-        # unread body data so the client receives the response
-        # without TCP RST. Chunked-to-bridge fallback (content_length=-1)
-        # can't drain by length; force_close=True ensures the
-        # connection closes cleanly via Connection: close header.
-        if use_bridge and content_length > 0:
-            remaining = (
-                content_length - len(body_start) - unreader.socket_bytes_read  # ty: ignore[unresolved-attribute]
-            )
-            while remaining > 0:
                 try:
-                    data = await asyncio.wait_for(
-                        conn.recv(min(remaining, 65536)),
-                        # Plain KEEPALIVE, not the drain budget: the
-                        # response is already written, and cutting this
-                        # short would close an undrained socket — the
-                        # client sees an RST clobber that response.
-                        timeout=KEEPALIVE,
+                    body_data, pipelined = await async_read_body(
+                        worker, conn, body_start, content_length, is_chunked
                     )
-                except (TimeoutError, OSError):
+                except _IncompleteBody:
+                    await conn.write_error(
+                        408,
+                        "Request Timeout",
+                        "Incomplete request body",
+                    )
                     break
-                if not data:
-                    break
-                remaining -= len(data)
+                except _BodyTooLarge as e:
+                    # Chunked body exceeded the pre-buffer limit — fall back to
+                    # the bridge with the partial data. Bridge requests are
+                    # Connection: close, so no pipelining concern.
+                    use_bridge = True
+                    unreader = AsyncBridgeUnreader(
+                        header_data + e.partial_data,
+                        conn,
+                        loop,
+                        timeout=worker.timeout,
+                        worker=worker,
+                    )
+                else:
+                    unreader = BufferUnreader(header_data + body_data)
 
-        # See docstring: loop exit follows the response framing (keepalive
-        # is Response.framed_close, latched when the headers were written).
-        if not keepalive:
-            break
+            # Parse the request. For bridge unreaders, parsing runs in
+            # the thread pool since the body reader may call chunk()
+            # which bridges back to the event loop.
+            try:
+                if use_bridge:
+                    parse_result = await loop.run_in_executor(
+                        worker.tpool,
+                        parse_request,
+                        worker,
+                        conn,
+                        unreader,
+                        True,
+                    )
+                else:
+                    parse_result = parse_request(worker, conn, unreader)
+            except _ParseError:
+                break
+            except TimeoutError:
+                # Bridge body read timed out — send 408 (not 500)
+                await conn.write_error(
+                    408,
+                    "Request Timeout",
+                    "Body read timed out",
+                )
+                break
+            except Exception as e:
+                await async_handle_error(worker, None, conn, e)
+                break
 
-        # Don't solicit another request once shutdown has started. Normal
-        # responses already framed close (dispatch force_closes when not
-        # alive), but a response whose headers were framed keep-alive
-        # before shutdown (e.g. a long streaming response) would otherwise
-        # linger idle in the keepalive wait for the whole KEEPALIVE window.
-        if not worker.alive:
-            break
+            if parse_result is None:
+                break
 
-        # Wait for the next request on the keepalive connection.
-        try:
-            await asyncio.wait_for(
-                conn.wait_readable(),
-                timeout=KEEPALIVE,
+            req, http_request, resp, request_start = parse_result
+            conn.req_count += 1
+            worker._count_request()
+
+            # A pipelined request was buffered behind this one. We don't
+            # re-frame it (that would mean trusting our own body-boundary
+            # detection as a request splitter — a smuggling surface); close
+            # instead, and the client retries it on a fresh connection.
+            if pipelined:
+                resp.force_close()
+
+            keepalive = await dispatch(
+                worker, req, conn, http_request, resp, request_start
             )
-        except (TimeoutError, OSError):
-            break
+
+            # For bridge connections with known Content-Length, drain
+            # unread body data so the client receives the response
+            # without TCP RST. Chunked-to-bridge fallback (content_length=-1)
+            # can't drain by length; force_close=True ensures the
+            # connection closes cleanly via Connection: close header.
+            if use_bridge and content_length > 0:
+                remaining = (
+                    content_length - len(body_start) - unreader.socket_bytes_read  # ty: ignore[unresolved-attribute]
+                )
+                while remaining > 0:
+                    try:
+                        data = await asyncio.wait_for(
+                            conn.recv(min(remaining, 65536)),
+                            # Plain RECV_PROGRESS_TIMEOUT, not the drain
+                            # budget: the response is already written, and
+                            # cutting this short would close an undrained
+                            # socket — the client sees an RST clobber that
+                            # response.
+                            timeout=RECV_PROGRESS_TIMEOUT,
+                        )
+                    except (TimeoutError, OSError):
+                        break
+                    if not data:
+                        break
+                    remaining -= len(data)
+
+            # See docstring: loop exit follows the response framing (keepalive
+            # is Response.framed_close, latched when the headers were written).
+            # No worker.alive check here — every shutdown path sets
+            # worker.shutdown_event (alive=False implies the event), so
+            # the next _wait_for_next_request collapses to the grace
+            # window on its own (and grants a response that was framed
+            # keep-alive just before shutdown the same grace).
+            if not keepalive:
+                break
+
+    finally:
+        shutdown_wait.cancel()

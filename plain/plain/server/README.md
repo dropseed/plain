@@ -94,11 +94,14 @@ SERVER_ACCESS_LOG_FIELDS = [
     "referer",
 ]
 SERVER_GRACEFUL_TIMEOUT = 30
+SERVER_KEEPALIVE_TIMEOUT = 300  # idle connection timeout (h1 and h2)
 SERVER_SENDFILE = True
 SERVER_CONNECTIONS = 1000
 SERVER_MAX_REQUESTS = 1000  # 0 = disabled, restart worker after N requests
 SERVER_MAX_REQUESTS_JITTER = 100  # random +/- variance to stagger restarts
 ```
+
+`SERVER_KEEPALIVE_TIMEOUT` is how long an idle connection (no request in progress) stays open, for both HTTP/1.1 and HTTP/2 — in-flight requests are never affected. Keep it longer than your load balancer's connection reuse window so the balancer is always the side that closes idle connections; a server-side close races a request being written onto the connection (Heroku H13). Because idle pooled connections hold their slot for the whole window, size `SERVER_CONNECTIONS` above your balancer's total connection pool per server; a worker at the cap rejects new connections (and logs a warning).
 
 Settings can also be set via environment variables with the `PLAIN_` prefix (e.g., `PLAIN_SERVER_WORKERS=4`).
 

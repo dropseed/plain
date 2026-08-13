@@ -113,8 +113,12 @@ class AsyncBridgeUnreader(Unreader):
         self.socket_bytes_read = 0
 
     async def _async_read(self) -> bytes:
-        """Read the next bytes from the connection's stream."""
-        return await self._conn.reader.read(8192)
+        """Read the next bytes from the connection.
+
+        Goes through Connection.recv (never conn.reader directly) so
+        bytes peeked by wait_readable are drained, not skipped.
+        """
+        return await self._conn.recv(8192)
 
     def chunk(self) -> bytes:
         if self._eof:

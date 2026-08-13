@@ -1,6 +1,7 @@
 # Import these to force registration of checks
 import plain.preflight.files
 import plain.preflight.security
+import plain.preflight.server
 import plain.preflight.settings
 
 from .checks import PreflightCheck

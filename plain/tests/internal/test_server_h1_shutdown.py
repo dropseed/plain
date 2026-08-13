@@ -12,6 +12,11 @@ The invariant under test: the loop exits exactly when a response was
 framed Connection: close, no matter when shutdown starts — before the
 request is read, or mid-dispatch while the view is running.
 
+The idle wait between requests is long (SERVER_KEEPALIVE_TIMEOUT, so the
+router is always the side that closes an idle pooled connection), but it
+must collapse to a short grace window once shutdown starts — otherwise
+every drain pins to the full graceful timeout.
+
 These tests drive h1.handle_connection directly over a socketpair with a
 real Worker object — no listener, no signals. The socket-level contract
 (SIGTERM, drain, exit code) is covered by tools/shutdown-test.
@@ -48,6 +53,16 @@ class _Handler:
         for name, value in self.response_headers.items():
             response.headers[name] = value
         return response
+
+
+class _BodyLengthHandler:
+    """Reads the request body in the thread pool (bridge bodies block the
+    calling thread, so an async handler must not read them on the loop)."""
+
+    async def handle(self, request: Any, executor: Any) -> Response:
+        loop = asyncio.get_running_loop()
+        body = await loop.run_in_executor(executor, lambda: request.body)
+        return Response(str(len(body)), content_type="text/plain")
 
 
 _REQUEST = b"GET / HTTP/1.1\r\nHost: testserver\r\n\r\n"
@@ -144,7 +159,21 @@ async def _connect(worker: Worker) -> _Client:
     return _Client(client_reader, client_writer, conn, server_task, worker)
 
 
-def test_request_arriving_after_shutdown_starts_is_served_with_close() -> None:
+@pytest.mark.parametrize(
+    "full_drain",
+    [
+        pytest.param(True, id="begin_drain"),
+        pytest.param(False, id="alive_flips_first"),
+    ],
+)
+def test_request_arriving_after_shutdown_starts_is_served_with_close(
+    full_drain: bool,
+) -> None:
+    # full_drain=True is SIGTERM (Worker._begin_drain): the shutdown event
+    # collapses the idle wait to a short grace window, and a request
+    # already being written onto the pooled connection must land inside
+    # it. full_drain=False is the transient reload state — the Reloader
+    # thread flips alive before the heartbeat loop runs _begin_drain.
     async def scenario() -> None:
         worker = make_worker(handler=_Handler())
         client = await _connect(worker)
@@ -158,9 +187,12 @@ def test_request_arriving_after_shutdown_starts_is_served_with_close() -> None:
             assert body == b"ok"
 
             # Let the connection settle into the keepalive wait, then
-            # start shutdown — what Worker._signal_exit does on SIGTERM.
+            # start shutdown.
             await asyncio.sleep(0.05)
-            worker.alive = False
+            if full_drain:
+                worker._begin_drain()
+            else:
+                worker.alive = False
 
             # A request already on the wire when the worker notices
             # shutdown must be served, not dropped with the socket close.
@@ -361,6 +393,279 @@ def test_pipelined_request_gets_connection_close(payload: bytes) -> None:
             assert b"connection: close" in headers.lower()
             assert body == b"ok"
             # The second (pipelined) request is not served.
+            await client.assert_closed()
+        finally:
+            client.teardown()
+
+    asyncio.run(scenario())
+
+
+def test_idle_h1_connection_closes_promptly_on_shutdown() -> None:
+    # An idle keepalive connection must close within the short shutdown
+    # grace window, not park in the long SERVER_KEEPALIVE_TIMEOUT wait —
+    # that would pin every drain to the full graceful timeout and end in
+    # task cancellation (an RST to the client).
+    async def scenario() -> None:
+        worker = make_worker(handler=_Handler())
+        client = await _connect(worker)
+
+        try:
+            await client.send(_REQUEST)
+            headers, body = await client.read_response()
+            assert b"200" in headers.split(b"\r\n", 1)[0]
+            assert body == b"ok"
+
+            # Let the connection settle into the keepalive wait, then
+            # start shutdown — what SIGTERM triggers.
+            await asyncio.sleep(0.05)
+            worker._begin_drain()
+
+            # The grace window is _recv_timeout (~2s early in the drain),
+            # so the close lands well under the keepalive timeout and the
+            # graceful window, but not instantly. The bound leaves slack
+            # for a loaded CI box; what matters is ≪ 300s and ≪ 30s.
+            start = time.monotonic()
+            await client.assert_closed()
+            assert time.monotonic() - start < 4
+        finally:
+            client.teardown()
+
+    asyncio.run(scenario())
+
+
+def test_request_within_shutdown_grace_window_is_served() -> None:
+    # The grace window after shutdown must stay ~2s wide — production
+    # drains rely on it (routers keep writing onto pooled connections
+    # throughout the drain). This pins the lower bound so a refactor
+    # can't silently shrink it; the test above pins the upper bound.
+    async def scenario() -> None:
+        worker = make_worker(handler=_Handler())
+        client = await _connect(worker)
+
+        try:
+            await client.send(_REQUEST)
+            headers, _ = await client.read_response()
+            assert b"200" in headers.split(b"\r\n", 1)[0]
+
+            await asyncio.sleep(0.05)
+            worker._begin_drain()
+
+            # Well inside the ~2s grace, but past a 0.5s-style window.
+            await asyncio.sleep(1.0)
+
+            await client.send(_REQUEST)
+            headers, body = await client.read_response()
+            assert b"200" in headers.split(b"\r\n", 1)[0]
+            assert b"connection: close" in headers.lower()
+            assert body == b"ok"
+
+            await client.assert_closed()
+        finally:
+            client.teardown()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    "requests_before_idle",
+    [
+        pytest.param(0, id="fresh_connection"),
+        pytest.param(1, id="reused_connection"),
+    ],
+)
+def test_request_after_long_idle_is_served_keepalive(
+    monkeypatch: pytest.MonkeyPatch, requests_before_idle: int
+) -> None:
+    # The wait for a request's first byte is SERVER_KEEPALIVE_TIMEOUT,
+    # not the per-recv progress timeout — for a fresh pooled connection
+    # (the router doesn't distinguish fresh from reused when it writes a
+    # request onto the pool) and a reused one alike. A router reusing a
+    # connection after a quiet spell must get a normal keep-alive
+    # response, not a socket closed out from under its request (Heroku
+    # H13/H18). Shrink the per-recv timeout so a regression here fails in
+    # a fraction of a second instead of this test sleeping real seconds.
+    monkeypatch.setattr(h1, "RECV_PROGRESS_TIMEOUT", 0.2)
+
+    async def scenario() -> None:
+        worker = make_worker(handler=_Handler())
+        client = await _connect(worker)
+
+        try:
+            for _ in range(requests_before_idle):
+                await client.send(_REQUEST)
+                headers, _ = await client.read_response()
+                assert b"200" in headers.split(b"\r\n", 1)[0]
+                assert b"connection: close" not in headers.lower()
+
+            # Much longer than the per-recv progress timeout.
+            await asyncio.sleep(0.5)
+
+            await client.send(_REQUEST)
+            headers, body = await client.read_response()
+            assert b"200" in headers.split(b"\r\n", 1)[0]
+            assert b"connection: close" not in headers.lower()
+            assert body == b"ok"
+        finally:
+            client.teardown()
+
+    asyncio.run(scenario())
+
+
+_BIG_POST = (
+    b"POST / HTTP/1.1\r\nHost: testserver\r\nContent-Length: 20000\r\n\r\n"
+    + b"x" * 20000
+)
+
+
+def test_pipelined_request_after_exactly_consumed_body_is_served() -> None:
+    # A large body can be consumed exactly (recv returns precise slices
+    # of wait_readable's peeked buffer), leaving a pipelined request
+    # buffered with no body over-read to detect. Those bytes ARE the next
+    # request — the keepalive wait must notice them instead of blocking
+    # on the socket until the idle timeout, which would leave a fully
+    # received request unanswered.
+    async def scenario() -> None:
+        worker = make_worker(handler=_Handler())
+        client = await _connect(worker)
+
+        try:
+            await client.send(_BIG_POST + _REQUEST)
+
+            headers, body = await client.read_response()
+            assert b"200" in headers.split(b"\r\n", 1)[0]
+            assert body == b"ok"
+
+            # The pipelined GET is served as the next keepalive request.
+            headers, body = await client.read_response()
+            assert b"200" in headers.split(b"\r\n", 1)[0]
+            assert body == b"ok"
+        finally:
+            client.teardown()
+
+    asyncio.run(scenario())
+
+
+def test_partial_pipelined_request_prefix_is_not_lost() -> None:
+    # Bytes of the next request that arrive in the same segment as a
+    # fully-consumed body must survive the keepalive wait intact —
+    # skipping or overwriting them would desync the request framing.
+    async def scenario() -> None:
+        worker = make_worker(handler=_Handler())
+        client = await _connect(worker)
+
+        try:
+            await client.send(_BIG_POST + b"GET / HTTP/1.1\r\nHost: testserv")
+
+            headers, body = await client.read_response()
+            assert b"200" in headers.split(b"\r\n", 1)[0]
+            assert body == b"ok"
+
+            # Complete the second request; it must parse from the start.
+            await client.send(b"er\r\n\r\n")
+            headers, body = await client.read_response()
+            assert b"200" in headers.split(b"\r\n", 1)[0]
+            assert body == b"ok"
+        finally:
+            client.teardown()
+
+    asyncio.run(scenario())
+
+
+def test_large_body_bridge_reads_peeked_bytes() -> None:
+    # Bodies larger than max_body stream lazily through the bridge
+    # unreader, which must drain bytes peeked by the keepalive wait —
+    # reading the socket directly would strand them and stall the body
+    # read until it times out.
+    async def scenario() -> None:
+        worker = make_worker(handler=_BodyLengthHandler())
+        worker.max_body = 1000  # force the bridge path
+        client = await _connect(worker)
+
+        try:
+            await client.send(_BIG_POST)
+            headers, body = await client.read_response()
+            assert b"200" in headers.split(b"\r\n", 1)[0]
+            assert b"connection: close" in headers.lower()
+            assert body == b"20000"
+        finally:
+            client.teardown()
+
+    asyncio.run(scenario())
+
+
+def test_wait_readable_notices_already_peeked_bytes() -> None:
+    # Bytes stranded in the peek buffer (a pipelined request behind an
+    # exactly-consumed body) ARE the next request — wait_readable must
+    # return immediately rather than blocking on the socket. Seeds the
+    # buffer directly: whether real traffic strands bytes there depends
+    # on kernel segmentation, so the socket-level tests can't pin this.
+    async def scenario() -> None:
+        server_sock, client_sock = socket.socketpair()
+        server_reader, server_writer = await asyncio.open_connection(sock=server_sock)
+        _, client_writer = await asyncio.open_connection(sock=client_sock)
+        conn = Connection(
+            StubApp(),  # ty: ignore[invalid-argument-type]
+            server_reader,
+            server_writer,
+            ("127.0.0.1", 12345),
+            ("127.0.0.1", 80),
+        )
+
+        try:
+            conn._peeked = b"GET / HTTP/1.1\r\n"
+            assert await asyncio.wait_for(conn.wait_readable(), timeout=1)
+            assert conn._peeked == b"GET / HTTP/1.1\r\n"
+        finally:
+            client_writer.close()
+            server_writer.close()
+
+    asyncio.run(scenario())
+
+
+def test_bridge_unreader_drains_peeked_bytes() -> None:
+    # The bridge unreader must read through conn.recv so bytes peeked by
+    # the keepalive wait are drained, not stranded — reading conn.reader
+    # directly stalls the body read until it times out. Seeds the peek
+    # buffer directly (see test above for why).
+    async def scenario() -> None:
+        loop = asyncio.get_running_loop()
+        worker = make_worker(handler=_Handler())
+        server_sock, client_sock = socket.socketpair()
+        server_reader, server_writer = await asyncio.open_connection(sock=server_sock)
+        _, client_writer = await asyncio.open_connection(sock=client_sock)
+        conn = Connection(
+            StubApp(),  # ty: ignore[invalid-argument-type]
+            server_reader,
+            server_writer,
+            ("127.0.0.1", 12345),
+            ("127.0.0.1", 80),
+        )
+
+        try:
+            conn._peeked = b"peeked-body-bytes"
+            unreader = AsyncBridgeUnreader(b"", conn, loop, timeout=2, worker=worker)
+            chunk = await loop.run_in_executor(None, unreader.chunk)
+            assert chunk == b"peeked-body-bytes"
+        finally:
+            client_writer.close()
+            server_writer.close()
+            worker.tpool.shutdown(wait=False)
+
+    asyncio.run(scenario())
+
+
+def test_idle_keepalive_timeout_expiry_closes_the_connection() -> None:
+    # When SERVER_KEEPALIVE_TIMEOUT does expire with no request arriving,
+    # the connection closes cleanly.
+    async def scenario() -> None:
+        worker = make_worker(handler=_Handler())
+        worker.keepalive_timeout = 0.2
+        client = await _connect(worker)
+
+        try:
+            await client.send(_REQUEST)
+            await client.read_response()
+
             await client.assert_closed()
         finally:
             client.teardown()

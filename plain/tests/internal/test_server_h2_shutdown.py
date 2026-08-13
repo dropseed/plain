@@ -110,7 +110,9 @@ class _H2Client:
 
 
 async def _connect(
-    handler: _Handler, shutdown_event: asyncio.Event
+    handler: _Handler,
+    shutdown_event: asyncio.Event,
+    keepalive_timeout: float = 300.0,
 ) -> tuple[_H2Client, asyncio.Task[None], ThreadPoolExecutor]:
     server_sock, client_sock = socket.socketpair()
     server_reader, server_writer = await asyncio.open_connection(sock=server_sock)
@@ -127,6 +129,7 @@ async def _connect(
             False,
             executor,
             shutdown_event=shutdown_event,
+            keepalive_timeout=keepalive_timeout,
         )
     )
 
@@ -157,6 +160,83 @@ def test_idle_h2_connection_closes_promptly_on_shutdown() -> None:
             )
             await client.wait_for_eof(timeout=3.0)
             await asyncio.wait_for(server_task, timeout=3.0)
+        finally:
+            server_task.cancel()
+            executor.shutdown(wait=False)
+
+    asyncio.run(scenario())
+
+
+def test_inflight_stream_survives_keepalive_timeout() -> None:
+    # SERVER_KEEPALIVE_TIMEOUT applies between requests — a stream whose
+    # view is still running while the client sends no frames (slow view,
+    # SSE with a quiet client) must not be GOAWAY'd when the idle wait
+    # times out.
+    async def scenario() -> None:
+        shutdown_event = asyncio.Event()
+        handler = _Handler()
+        handler.release.clear()  # hold the stream open in the view
+        client, server_task, executor = await _connect(
+            handler, shutdown_event, keepalive_timeout=0.2
+        )
+        try:
+            await client.request(1)
+            await asyncio.sleep(0.7)  # several keepalive timeouts pass
+
+            handler.release.set()
+            response = await client.wait_for(
+                lambda e: isinstance(e, h2.events.ResponseReceived) and e.stream_id == 1
+            )
+            assert isinstance(response, h2.events.ResponseReceived)
+            assert dict(response.headers or [])[b":status"] == b"200"
+        finally:
+            server_task.cancel()
+            executor.shutdown(wait=False)
+
+    asyncio.run(scenario())
+
+
+def test_idle_clock_restarts_when_stream_finishes() -> None:
+    # The idle clock measures time since in-flight work ended, not since
+    # the last inbound frame: a response that takes most of the keepalive
+    # window must not leave the connection with only the window's
+    # remainder of idle reuse (the premature close races the next pooled
+    # request).
+    async def scenario() -> None:
+        shutdown_event = asyncio.Event()
+        handler = _Handler()
+        client, server_task, executor = await _connect(
+            handler, shutdown_event, keepalive_timeout=1.0
+        )
+        try:
+            # A first request/response drains the connection-setup acks,
+            # so the held stream's HEADERS below are the genuinely last
+            # inbound frames before the idle window.
+            await client.request(1)
+            await client.wait_for(
+                lambda e: isinstance(e, h2.events.StreamEnded) and e.stream_id == 1
+            )
+
+            # Hold the view for most of the keepalive window, then let
+            # the response go out.
+            handler.release.clear()
+            await client.request(3)
+            await asyncio.sleep(0.7)
+            handler.release.set()
+            await client.wait_for(
+                lambda e: isinstance(e, h2.events.StreamEnded) and e.stream_id == 3
+            )
+
+            # Idle past the original window's remainder (0.3s), but well
+            # inside a fresh window counted from the stream's completion.
+            await asyncio.sleep(0.6)
+
+            await client.request(5)
+            response = await client.wait_for(
+                lambda e: isinstance(e, h2.events.ResponseReceived) and e.stream_id == 5
+            )
+            assert isinstance(response, h2.events.ResponseReceived)
+            assert dict(response.headers or [])[b":status"] == b"200"
         finally:
             server_task.cancel()
             executor.shutdown(wait=False)
