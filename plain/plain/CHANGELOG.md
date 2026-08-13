@@ -1,5 +1,21 @@
 # plain changelog
 
+## [0.158.0](https://github.com/dropseed/plain/releases/plain@0.158.0) (2026-08-12)
+
+### What's changed
+
+- New `SERVER_KEEPALIVE_TIMEOUT` setting (default `300` seconds) controls how long an idle connection — no request in progress — stays open, for both HTTP/1.1 and HTTP/2. Previously the HTTP/1.1 server closed idle keep-alive connections after a hardcoded 2 seconds, while fronting routers and load balancers (Heroku's router, ALBs) pool connections to the server and reuse them for minutes — so the server was constantly closing connections the router might be writing a request onto in the same instant, and that request was lost (Heroku H13 "Connection closed without response" / H18). The server's idle timeout must exceed the balancer's connection-reuse window so the balancer is always the side that closes an idle connection; the new default follows the same guidance AWS documents for ALBs. HTTP/2's previously hardcoded 300-second idle timeout now uses the same setting. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- The idle wait now also covers a connection's first request, so a pooled connection that a router pre-establishes but hasn't used yet gets the same window instead of being closed after ~2 seconds — the same close race, just on request #1. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- Worker shutdown collapses idle keep-alive waits to a short grace window instead of letting them pin the drain: a request already arriving on a pooled connection when `SIGTERM` lands is still read and served with `Connection: close`, and idle connections close within a couple of seconds, so recycles and deploys drain as fast as before. Dev-server reloads now drain through the same path as `SIGTERM`. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- The HTTP/2 idle timeout only applies between requests, never to in-flight work: a slow view or SSE stream with a frame-quiet client is no longer torn down when the idle window expires, and the idle clock restarts when a stream finishes rather than at the last received frame — so a long response no longer eats its connection's idle reuse window. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- A new preflight check (`server.keepalive_timeout`) and a worker boot check reject non-positive `SERVER_KEEPALIVE_TIMEOUT` values, which would otherwise close connections that were promised keep-alive. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- A worker that hits `SERVER_CONNECTIONS` now logs a warning (throttled to once a minute) when it rejects new connections, since idle pooled connections hold capacity slots for the keep-alive window — size `SERVER_CONNECTIONS` above your load balancer's connection pool per server. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- `SERVER_MAX_REQUESTS` default raised from `1000` to `10000` (jitter `100` → `1000`). Count-based worker recycling at 1000 requests is minute-scale churn on busy apps that buys nothing when workers aren't leaking; 10000 keeps the memory-leak safety net — a genuinely leaky busy app still recycles every few hours — without constantly restarting healthy workers. ([4c5710aefa](https://github.com/dropseed/plain/commit/4c5710aefa))
+
+### Upgrade instructions
+
+- No changes required. If you run the server behind a load balancer with an idle/reuse window longer than 5 minutes, set `SERVER_KEEPALIVE_TIMEOUT` above it. If you relied on the previous aggressive worker recycling, set `SERVER_MAX_REQUESTS = 1000` explicitly.
+
 ## [0.157.0](https://github.com/dropseed/plain/releases/plain@0.157.0) (2026-08-12)
 
 ### What's changed
