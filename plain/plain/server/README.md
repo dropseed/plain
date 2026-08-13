@@ -97,8 +97,8 @@ SERVER_GRACEFUL_TIMEOUT = 30
 SERVER_KEEPALIVE_TIMEOUT = 300  # idle connection timeout (h1 and h2)
 SERVER_SENDFILE = True
 SERVER_CONNECTIONS = 1000
-SERVER_MAX_REQUESTS = 1000  # 0 = disabled, restart worker after N requests
-SERVER_MAX_REQUESTS_JITTER = 100  # random +/- variance to stagger restarts
+SERVER_MAX_REQUESTS = 10000  # 0 = disabled, restart worker after N requests
+SERVER_MAX_REQUESTS_JITTER = 1000  # random +/- variance to stagger restarts
 ```
 
 `SERVER_KEEPALIVE_TIMEOUT` is how long an idle connection (no request in progress) stays open, for both HTTP/1.1 and HTTP/2 — in-flight requests are never affected. Keep it longer than your load balancer's connection reuse window so the balancer is always the side that closes idle connections; a server-side close races a request being written onto the connection (Heroku H13). Because idle pooled connections hold their slot for the whole window, size `SERVER_CONNECTIONS` above your balancer's total connection pool per server; a worker at the cap rejects new connections (and logs a warning).
@@ -164,7 +164,7 @@ Access logging has three layers, each at the right level of abstraction:
 
 ### Worker recycling
 
-Long-running workers can accumulate memory from fragmentation, C extension leaks, or unbounded caches. By default, workers gracefully restart after 1000 requests (with +/- 100 jitter) to keep memory usage in check.
+Long-running workers can accumulate memory from fragmentation, C extension leaks, or unbounded caches. By default, workers gracefully restart after 10000 requests (with +/- 1000 jitter) as a safety net — a genuinely leaky busy app still recycles every few hours, while a small app effectively never does.
 
 When a worker reaches the limit, it stops accepting new connections and drains in-flight requests before exiting. The arbiter automatically spawns a replacement. The jitter prevents all workers from restarting at the same time in multi-worker deployments.
 

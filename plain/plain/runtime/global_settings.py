@@ -193,8 +193,8 @@ SERVER_KEEPALIVE_TIMEOUT: int = 300
 SERVER_SENDFILE: bool = True
 SERVER_CONNECTIONS: int = 1000
 SERVER_H2_MAX_CONCURRENT_STREAMS: int = 100
-SERVER_MAX_REQUESTS: int = 1000  # 0 = disabled
-SERVER_MAX_REQUESTS_JITTER: int = 100  # random variance to stagger restarts
+SERVER_MAX_REQUESTS: int = 10000  # 0 = disabled
+SERVER_MAX_REQUESTS_JITTER: int = 1000  # random variance to stagger restarts
 
 # MARK: Preflight Checks
 
