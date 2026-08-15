@@ -7,9 +7,8 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 import asyncio
-import io
-import os
 import time
+from collections import deque
 from typing import Any
 
 from ..connection import DRAIN_MIN_RECV
@@ -20,7 +19,15 @@ from ..connection import DRAIN_MIN_RECV
 
 class Unreader:
     def __init__(self):
-        self.buf = io.BytesIO()
+        # Buffered-but-unconsumed chunks, consumed from the front.
+        # _offset is the already-consumed prefix of _chunks[0]: advancing
+        # it instead of re-slicing the front chunk keeps read(size) O(size)
+        # even when the buffer holds an entire pre-buffered body — slicing
+        # would copy the remainder on every read, which is quadratic
+        # (multi-second stalls on multi-MB bodies).
+        self._chunks: deque[bytes] = deque()
+        self._offset = 0
+        self._buffered = 0
 
     def chunk(self) -> bytes:
         raise NotImplementedError()
@@ -35,31 +42,73 @@ class Unreader:
             if size < 0:
                 size = None
 
-        self.buf.seek(0, os.SEEK_END)
-
-        if size is None and self.buf.tell():
-            ret = self.buf.getvalue()
-            self.buf = io.BytesIO()
-            return ret
         if size is None:
-            d = self.chunk()
-            return d
+            if self._buffered:
+                return self._take(self._buffered)
+            return self.chunk()
 
-        while self.buf.tell() < size:
-            chunk = self.chunk()
-            if not chunk:
-                ret = self.buf.getvalue()
-                self.buf = io.BytesIO()
-                return ret
-            self.buf.write(chunk)
-        data = self.buf.getvalue()
-        self.buf = io.BytesIO()
-        self.buf.write(data[size:])
-        return data[:size]
+        while self._buffered < size:
+            data = self.chunk()
+            if not data:
+                # EOF before size bytes arrived — return what's buffered.
+                return self._take(self._buffered)
+            self._chunks.append(data)
+            self._buffered += len(data)
+
+        return self._take(size)
+
+    def read_some(self, max_size: int) -> bytes:
+        """Return up to max_size buffered bytes, or one chunk()'s worth.
+
+        Unlike read(size), this never waits for more than one chunk() —
+        a streaming body keeps flowing at whatever pace bytes arrive.
+        Bounding the piece size keeps the chunked parser's slicing O(1)
+        per piece when the buffer holds an entire pre-buffered body.
+        Returns b"" only at EOF.
+        """
+        if max_size <= 0:
+            # A non-positive cap would buffer a chunk() and return b"",
+            # which callers would misread as EOF.
+            raise ValueError("max_size must be positive.")
+        if not self._buffered:
+            data = self.chunk()
+            if not data:
+                return b""
+            self._chunks.append(data)
+            self._buffered += len(data)
+        return self._take(min(max_size, self._buffered))
+
+    def _take(self, size: int) -> bytes:
+        """Remove and return exactly size bytes from the buffer (size <= _buffered)."""
+        pieces = []
+        need = size
+        while need:
+            front = self._chunks[0]
+            available = len(front) - self._offset
+            if available <= need:
+                pieces.append(front[self._offset :] if self._offset else front)
+                self._chunks.popleft()
+                self._offset = 0
+                self._buffered -= available
+                need -= available
+            else:
+                pieces.append(front[self._offset : self._offset + need])
+                self._offset += need
+                self._buffered -= need
+                need = 0
+        return b"".join(pieces)
 
     def unread(self, data: bytes) -> None:
-        self.buf.seek(0, os.SEEK_END)
-        self.buf.write(data)
+        # Pushed back at the FRONT: an unread byte is the next byte read.
+        # Callers may unread while data is still buffered (the chunked
+        # parser over-reads via read_some and puts the tail back), so
+        # appending at the end would reorder the stream.
+        if data:
+            if self._offset:
+                self._chunks[0] = self._chunks[0][self._offset :]
+                self._offset = 0
+            self._chunks.appendleft(data)
+            self._buffered += len(data)
 
 
 class BufferUnreader(Unreader):
@@ -73,7 +122,7 @@ class BufferUnreader(Unreader):
 
     def __init__(self, data: bytes) -> None:
         super().__init__()
-        self.buf.write(data)
+        self.unread(data)
 
     def chunk(self) -> bytes:
         # All data is pre-buffered; nothing more to read.
@@ -102,7 +151,7 @@ class AsyncBridgeUnreader(Unreader):
         worker: Any = None,
     ) -> None:
         super().__init__()
-        self.buf.write(data)
+        self.unread(data)
         self._conn = conn
         self._loop = loop
         self._timeout = timeout

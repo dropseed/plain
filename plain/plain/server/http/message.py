@@ -11,7 +11,7 @@ import re
 from typing import Any
 
 from ..util import bytes_to_str, split_request_uri
-from .body import Body, ChunkedReader, EOFReader, LengthReader
+from .body import Body, ChunkedReader, LengthReader
 from .errors import (
     InvalidHeader,
     InvalidHeaderName,
@@ -195,7 +195,9 @@ class Message:
 
             self.body = Body(LengthReader(self.unreader, content_length))
         else:
-            self.body = Body(EOFReader(self.unreader))
+            # No Content-Length and not chunked: a request has no body
+            # (RFC 9112 §6).
+            self.body = Body(LengthReader(self.unreader, 0))
 
     def should_close(self) -> bool:
         if self.must_close:
@@ -357,8 +359,3 @@ class Request(Message):
         if not (1, 0) <= self.version < (2, 0):
             # Only HTTP/1.0 and HTTP/1.1 are supported
             raise InvalidHTTPVersion(self.version)
-
-    def set_body_reader(self) -> None:
-        super().set_body_reader()
-        if isinstance(self.body.reader, EOFReader):  # ty: ignore[unresolved-attribute]
-            self.body = Body(LengthReader(self.unreader, 0))

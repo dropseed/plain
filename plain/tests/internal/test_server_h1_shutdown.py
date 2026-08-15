@@ -35,8 +35,7 @@ from plain.http import Response
 from plain.server.connection import Connection
 from plain.server.http import h1
 from plain.server.http.unreader import AsyncBridgeUnreader
-from plain.server.workers.worker import Worker
-from server_stubs import StubApp, make_worker
+from server_stubs import StubApp, h1_connect, make_worker
 
 
 class _Handler:
@@ -74,89 +73,9 @@ _CHUNKED_POST = (
 )
 
 
-class _Client:
-    """Client half of the socketpair plus the running server task."""
-
-    def __init__(
-        self,
-        reader: asyncio.StreamReader,
-        writer: asyncio.StreamWriter,
-        conn: Connection,
-        server_task: asyncio.Task[None],
-        worker: Worker,
-    ) -> None:
-        self.reader = reader
-        self.writer = writer
-        self.conn = conn
-        self.server_task = server_task
-        self.worker = worker
-
-    async def send(self, data: bytes) -> None:
-        self.writer.write(data)
-        await self.writer.drain()
-
-    async def read_response(self) -> tuple[bytes, bytes]:
-        """Read one response; return (headers, body) split at the blank line."""
-        reader = self.reader
-        header_blob = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), timeout=5)
-
-        if b"transfer-encoding: chunked" in header_blob.lower():
-            body = b""
-            while True:
-                size_line = await asyncio.wait_for(reader.readuntil(b"\r\n"), timeout=5)
-                size = int(size_line.strip().split(b";")[0], 16)
-                chunk = await asyncio.wait_for(reader.readexactly(size + 2), timeout=5)
-                if size == 0:
-                    break
-                body += chunk[:-2]
-            return header_blob, body
-
-        content_length = 0
-        for line in header_blob.split(b"\r\n"):
-            if line.lower().startswith(b"content-length:"):
-                content_length = int(line.split(b":", 1)[1])
-        body = await asyncio.wait_for(reader.readexactly(content_length), timeout=5)
-        return header_blob, body
-
-    async def assert_closed(self) -> None:
-        """The keepalive loop exited and wrote nothing further.
-
-        The socket close itself is _on_connection's job, so mimic it here.
-        "Closed" reads as a clean EOF, or as a reset when the server closed
-        with an unread request still in the socket (Linux RSTs there where
-        macOS sends FIN) — both mean the connection is gone. An extra
-        *response* would instead surface as non-empty read bytes.
-        """
-        await asyncio.wait_for(self.server_task, timeout=5)
-        self.conn.close()
-        try:
-            assert await asyncio.wait_for(self.reader.read(1), timeout=5) == b""
-        except ConnectionResetError:
-            pass
-
-    def teardown(self) -> None:
-        self.server_task.cancel()
-        self.conn.close()
-        self.writer.close()
-        self.worker.tpool.shutdown(wait=False)
-
-
-async def _connect(worker: Worker) -> _Client:
-    server_sock, client_sock = socket.socketpair()
-    server_reader, server_writer = await asyncio.open_connection(sock=server_sock)
-    client_reader, client_writer = await asyncio.open_connection(sock=client_sock)
-
-    conn = Connection(
-        worker.app,
-        server_reader,
-        server_writer,
-        ("127.0.0.1", 12345),
-        ("127.0.0.1", 80),
-    )
-    server_task = asyncio.get_running_loop().create_task(
-        h1.handle_connection(worker, conn)
-    )
-    return _Client(client_reader, client_writer, conn, server_task, worker)
+# The socketpair harness (H1Client / h1_connect) lives in server_stubs
+# and is shared with test_server_upload_integrity.
+_connect = h1_connect
 
 
 @pytest.mark.parametrize(

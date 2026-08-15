@@ -11,11 +11,30 @@ import sys
 from collections.abc import Generator, Iterator
 from typing import TYPE_CHECKING
 
-from .errors import ChunkMissingTerminator, InvalidChunkSize, NoMoreData
+from .errors import (
+    ChunkMissingTerminator,
+    InvalidChunkSize,
+    LimitRequestHeaders,
+    NoMoreData,
+)
 
 if TYPE_CHECKING:
     from .message import Message
     from .unreader import Unreader
+
+# Ceiling per read while parsing a chunked body. The parser slices and
+# re-buffers the piece it's working on, so an unbounded read — which
+# returns an entire pre-buffered body at once — would make each of those
+# copies O(body) and the whole parse quadratic. read_some() never waits
+# to accumulate this much; it just caps what one call can return.
+CHUNK_PARSE_MAX_READ = 64 * 1024
+
+# Ceiling on the chunk-size line (hex size + optional extensions). A
+# legitimate line is tens of bytes; without a cap, a client trickling
+# bytes that never contain \r\n grows parse_chunk_size's buffer without
+# bound while it re-scans from the start — quadratic CPU and unbounded
+# memory on a single pre-auth request.
+CHUNK_SIZE_LINE_MAX = 8192
 
 
 class ChunkedReader:
@@ -53,6 +72,8 @@ class ChunkedReader:
         idx = buf.getvalue().find(b"\r\n\r\n")
         done = buf.getvalue()[:2] == b"\r\n"
         while idx < 0 and not done:
+            if buf.tell() > self.req.max_buffer_headers:
+                raise LimitRequestHeaders("max_buffer_headers")
             self.get_data(unreader, buf)
             idx = buf.getvalue().find(b"\r\n\r\n")
             done = buf.getvalue()[:2] == b"\r\n"
@@ -71,14 +92,14 @@ class ChunkedReader:
             while size > len(rest):
                 size -= len(rest)
                 yield rest
-                rest = unreader.read()
+                rest = unreader.read_some(CHUNK_PARSE_MAX_READ)
                 if not rest:
                     raise NoMoreData()
             yield rest[:size]
             # Remove \r\n after chunk
             rest = rest[size:]
             while len(rest) < 2:
-                new_data = unreader.read()
+                new_data = unreader.read_some(CHUNK_PARSE_MAX_READ)
                 if not new_data:
                     break
                 rest += new_data
@@ -95,8 +116,14 @@ class ChunkedReader:
 
         idx = buf.getvalue().find(b"\r\n")
         while idx < 0:
+            if buf.tell() > CHUNK_SIZE_LINE_MAX:
+                raise InvalidChunkSize(buf.getvalue()[:32])
             self.get_data(unreader, buf)
             idx = buf.getvalue().find(b"\r\n")
+        if idx > CHUNK_SIZE_LINE_MAX:
+            # The whole overlong line can arrive in one read — the loop
+            # cap above never sees it.
+            raise InvalidChunkSize(buf.getvalue()[:32])
 
         data = buf.getvalue()
         line, rest_chunk = data[:idx], data[idx + 2 :]
@@ -120,7 +147,7 @@ class ChunkedReader:
         return (chunk_size, rest_chunk)
 
     def get_data(self, unreader: Unreader, buf: io.BytesIO) -> None:
-        data = unreader.read()
+        data = unreader.read_some(CHUNK_PARSE_MAX_READ)
         if not data:
             raise NoMoreData()
         buf.write(data)
@@ -141,61 +168,21 @@ class LengthReader:
         if size == 0:
             return b""
 
-        buf = io.BytesIO()
-        data = self.unreader.read()
-        while data:
-            buf.write(data)
-            if buf.tell() >= size:
-                break
-            data = self.unreader.read()
-
-        buf_data = buf.getvalue()
-        ret, rest = buf_data[:size], buf_data[size:]
-        self.unreader.unread(rest)
-        self.length -= size
-        return ret
-
-
-class EOFReader:
-    def __init__(self, unreader: Unreader) -> None:
-        self.unreader = unreader
-        self.buf = io.BytesIO()
-        self.finished = False
-
-    def read(self, size: int) -> bytes:
-        if not isinstance(size, int):
-            raise TypeError("size must be an integral type")
-        if size < 0:
-            raise ValueError("Size must be positive.")
-        if size == 0:
-            return b""
-
-        if self.finished:
-            data = self.buf.getvalue()
-            ret, rest = data[:size], data[size:]
-            self.buf = io.BytesIO()
-            self.buf.write(rest)
-            return ret
-
-        data = self.unreader.read()
-        while data:
-            self.buf.write(data)
-            if self.buf.tell() > size:
-                break
-            data = self.unreader.read()
-
-        if not data:
-            self.finished = True
-
-        data = self.buf.getvalue()
-        ret, rest = data[:size], data[size:]
-        self.buf = io.BytesIO()
-        self.buf.write(rest)
-        return ret
+        # Sized read straight from the unreader — draining everything and
+        # unreading the remainder would copy the whole buffered body on
+        # every call (quadratic on large pre-buffered bodies).
+        data = self.unreader.read(size)
+        if len(data) < size:
+            # EOF before the declared length arrived — the body is done;
+            # length must reach 0 so this reader reads as finished.
+            self.length = 0
+        else:
+            self.length -= size
+        return data
 
 
 class Body:
-    def __init__(self, reader: ChunkedReader | LengthReader | EOFReader) -> None:
+    def __init__(self, reader: ChunkedReader | LengthReader) -> None:
         self.reader = reader
         self.buf = io.BytesIO()
 
@@ -232,7 +219,10 @@ class Body:
             return ret
 
         while size > self.buf.tell():
-            data = self.reader.read(1024)
+            # Never ask for more than the caller still needs: on a
+            # streaming (bridged) body, an oversized read would block
+            # waiting for bytes the caller never requested.
+            data = self.reader.read(min(CHUNK_PARSE_MAX_READ, size - self.buf.tell()))
             if not data:
                 break
             self.buf.write(data)
