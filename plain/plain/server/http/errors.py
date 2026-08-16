@@ -132,6 +132,17 @@ class LimitRequestHeaders(ParseException):
         return self.msg
 
 
+class LimitRequestBody(ParseException):
+    """Declared request body exceeds SERVER_MAX_REQUEST_BODY_SIZE."""
+
+    def __init__(self, size: int, max_size: int):
+        self.size = size
+        self.max_size = max_size
+
+    def __str__(self) -> str:
+        return f"Request body is too large ({self.size} > {self.max_size})"
+
+
 class InvalidProxyLine(ParseException):
     def __init__(self, line: str):
         self.line = line

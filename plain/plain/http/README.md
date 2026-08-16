@@ -383,7 +383,7 @@ raise ForbiddenError403("Access denied")
 raise BadRequestError400("Invalid input")
 ```
 
-Additional exceptions include [`SuspiciousOperationError400`](./exceptions.py#SuspiciousOperationError400), [`TooManyFieldsSentError400`](./exceptions.py#TooManyFieldsSentError400), [`TooManyFilesSentError400`](./exceptions.py#TooManyFilesSentError400), and [`RequestDataTooBigError400`](./exceptions.py#RequestDataTooBigError400).
+Additional exceptions include [`SuspiciousOperationError400`](./exceptions.py#SuspiciousOperationError400), [`TooManyFieldsSentError400`](./exceptions.py#TooManyFieldsSentError400), [`TooManyFilesSentError400`](./exceptions.py#TooManyFilesSentError400), and [`ContentTooLargeError413`](./exceptions.py#ContentTooLargeError413).
 
 ## FAQs
 
@@ -423,7 +423,7 @@ if self.request.is_https():
 
 #### How do I handle large file uploads?
 
-Configure `DATA_UPLOAD_MAX_MEMORY_SIZE` in settings. For very large files, consider streaming the upload instead of loading it into memory.
+Uploaded files don't load into memory — multipart uploads over 2.5MB (`FILE_UPLOAD_MAX_MEMORY_SIZE`) stream to a temporary file on disk, and `request.files` hands you the result either way. Multipart uploads must declare a `Content-Length` — a chunked multipart request parses as empty (`request.files` and `request.form_data` come back with nothing). The setting to check is `SERVER_MAX_REQUEST_BODY_SIZE` (default 100MB): requests with bodies over it get a 413, so raise it if you accept larger uploads. `DATA_UPLOAD_MAX_MEMORY_SIZE` separately caps what `request.body` and non-file form fields will materialize in RAM.
 
 ## Installation
 

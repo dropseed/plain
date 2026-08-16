@@ -35,7 +35,7 @@ from plain.http import Response
 from plain.server.connection import Connection
 from plain.server.http import h1
 from plain.server.http.unreader import AsyncBridgeUnreader
-from server_stubs import StubApp, h1_connect, make_worker
+from server_stubs import BodyLengthHandler, StubApp, h1_connect, make_worker
 
 
 class _Handler:
@@ -52,16 +52,6 @@ class _Handler:
         for name, value in self.response_headers.items():
             response.headers[name] = value
         return response
-
-
-class _BodyLengthHandler:
-    """Reads the request body in the thread pool (bridge bodies block the
-    calling thread, so an async handler must not read them on the loop)."""
-
-    async def handle(self, request: Any, executor: Any) -> Response:
-        loop = asyncio.get_running_loop()
-        body = await loop.run_in_executor(executor, lambda: request.body)
-        return Response(str(len(body)), content_type="text/plain")
 
 
 _REQUEST = b"GET / HTTP/1.1\r\nHost: testserver\r\n\r\n"
@@ -496,7 +486,7 @@ def test_large_body_bridge_reads_peeked_bytes() -> None:
     # reading the socket directly would strand them and stall the body
     # read until it times out.
     async def scenario() -> None:
-        worker = make_worker(handler=_BodyLengthHandler())
+        worker = make_worker(handler=BodyLengthHandler())
         worker.max_body = 1000  # force the bridge path
         client = await _connect(worker)
 

@@ -16,8 +16,8 @@ import time
 from typing import TYPE_CHECKING, cast
 
 import pytest
+from plain.http import BadRequestError400
 from plain.server.http.body import Body, ChunkedReader, LengthReader
-from plain.server.http.errors import InvalidChunkSize, LimitRequestHeaders
 from plain.server.http.unreader import BufferUnreader, Unreader
 from server_stubs import chunked_payload
 
@@ -69,6 +69,20 @@ class StubTrailerReq:
 
     max_buffer_headers = 32 * 1024
 
+    def __init__(self) -> None:
+        self.trailers: list[tuple[str, str]] | None = None
+
+    def parse_headers(
+        self, blob: bytes, from_trailer: bool = False
+    ) -> list[tuple[str, str]]:
+        # Minimal header-line split, enough to assert trailers landed.
+        headers = []
+        for line in blob.split(b"\r\n"):
+            if b":" in line:
+                name, _, value = line.partition(b":")
+                headers.append((name.decode().upper(), value.strip().decode()))
+        return headers
+
 
 def _read_all(body: Body) -> bytes:
     out = []
@@ -77,10 +91,12 @@ def _read_all(body: Body) -> bytes:
     return b"".join(out)
 
 
-def _chunked_body(unreader: Unreader, req: object = None) -> Body:
-    # ChunkedReader only touches req when parsing trailers, so tests pass
-    # a stub (or nothing) instead of building a fully parsed Message.
-    return Body(ChunkedReader(cast("Message", req), unreader))
+def _chunked_body(unreader: Unreader) -> Body:
+    # ChunkedReader only touches req for trailer handling, which any
+    # chunked payload can reach (the terminator landing on a read-window
+    # boundary enters parse_trailers) — so always give it the stub
+    # instead of building a fully parsed Message.
+    return Body(ChunkedReader(cast("Message", StubTrailerReq()), unreader))
 
 
 # ---------------------------------------------------------------------------
@@ -176,10 +192,30 @@ def test_length_reader_delivers_exact_length_and_leaves_pipelined_bytes():
 def test_length_reader_truncated_body_finishes():
     unreader = BufferUnreader(b"abc")
     reader = LengthReader(unreader, 10)
+    # Short reads are normal (streaming) — only b"" means EOF, at which
+    # point length must reach 0 so the reader registers as finished.
     assert reader.read(10) == b"abc"
-    # A short read means EOF — the reader must register as finished.
+    assert reader.read(10) == b""
     assert reader.length == 0
     assert reader.read(10) == b""
+
+
+def test_length_reader_returns_arrived_bytes_without_waiting():
+    # A streaming body must hand back what has arrived instead of
+    # blocking until a full stride accumulates — readline() on a short
+    # line the client already sent must not stall (issue: for-line-in-
+    # request over a bridged body timed out waiting for 1024 bytes).
+    unreader = ScriptedUnreader([b"hi\n", b"rest"])
+    reader = LengthReader(unreader, 10_000)
+    assert reader.read(1024) == b"hi\n"
+    assert unreader.chunk_calls == 1
+
+
+def test_body_readline_returns_short_line_promptly():
+    unreader = ScriptedUnreader([b"hi\n", b"never-read"])
+    body = Body(LengthReader(unreader, 10_000))
+    assert body.readline() == b"hi\n"
+    assert unreader.chunk_calls == 1
 
 
 # ---------------------------------------------------------------------------
@@ -209,9 +245,12 @@ def test_chunked_leaves_pipelined_bytes_in_unreader():
 
 def test_chunk_size_line_flood_is_rejected():
     # A stream that never terminates its chunk-size line must error out
-    # instead of buffering and re-scanning it without bound.
+    # instead of buffering and re-scanning it without bound. The error is
+    # an HTTPException (400) because it fires during lazy body reads
+    # mid-dispatch, where a ParseException would be misread as an OSError
+    # and produce no response at all.
     body = _chunked_body(BufferUnreader(b"f" * 100_000))
-    with pytest.raises(InvalidChunkSize):
+    with pytest.raises(BadRequestError400):
         body.read(1024)
 
 
@@ -221,16 +260,42 @@ def test_overlong_chunk_size_line_rejected_even_when_terminated():
     # must still reject it.
     payload = b"0;ext=" + b"x" * 9000 + b"\r\n\r\n"
     body = _chunked_body(BufferUnreader(payload))
-    with pytest.raises(InvalidChunkSize):
+    with pytest.raises(BadRequestError400):
         body.read(1024)
 
 
 def test_trailer_flood_is_rejected():
     # Same for trailers: bounded by the request's max_buffer_headers.
     payload = chunked_payload(b"data", 4, trailer=b"X-Junk: " + b"j" * 100_000)
-    body = _chunked_body(BufferUnreader(payload), req=StubTrailerReq())
-    with pytest.raises(LimitRequestHeaders):
+    body = _chunked_body(BufferUnreader(payload))
+    with pytest.raises(BadRequestError400):
         body.read(1024)
+
+
+def test_chunked_trailers_parse_and_preserve_pipelined_tail():
+    # A well-formed trailer section is consumed exactly: trailers land on
+    # the request and bytes past the terminator stay in the unreader.
+    data = _pattern(10_000)
+    tail = b"GET /next HTTP/1.1\r\n"
+    payload = chunked_payload(data, 1024, trailer=b"X-Trailer: yes")
+    req = StubTrailerReq()
+    unreader = BufferUnreader(payload + tail)
+    body = Body(ChunkedReader(cast("Message", req), unreader))
+    assert _read_all(body) == data
+    assert req.trailers == [("X-TRAILER", "yes")]
+    assert unreader.read() == tail
+
+
+def test_chunked_terminator_on_read_window_boundary():
+    # The terminating 0-chunk landing at the edge of a 64KB read window
+    # sends the parser into parse_trailers with an empty buffer — it must
+    # keep reading to the blank line, not error. (Regression guard: the
+    # trailer path is reachable by ordinary chunk alignment, so
+    # ChunkedReader always needs a real req, and the cap check must not
+    # fire on an empty buffer.)
+    payload = b"fff5\r\n" + b"x" * 0xFFF5 + b"\r\n" + b"0\r\n\r\n"
+    body = _chunked_body(BufferUnreader(payload))
+    assert _read_all(body) == b"x" * 0xFFF5
 
 
 # ---------------------------------------------------------------------------

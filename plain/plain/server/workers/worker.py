@@ -104,7 +104,38 @@ class Worker:
 
         self.max_connections: int = settings.SERVER_CONNECTIONS
         self.max_keepalived: int = self.max_connections - self.app.threads
-        self.max_body: int = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or (10 * 1024 * 1024)
+        # Server-edge policy cap on request body size (413 above it).
+        # Only None means unlimited — a negative value would silently
+        # reject every body instead of reporting the bad config.
+        self.max_request_body: int | None = settings.SERVER_MAX_REQUEST_BODY_SIZE
+        if self.max_request_body is not None and self.max_request_body < 0:
+            raise ImproperlyConfigured(
+                f"SERVER_MAX_REQUEST_BODY_SIZE must be non-negative or None "
+                f"(got {self.max_request_body})."
+            )
+        # h1 pre-buffer vs bridge threshold. Never above the policy cap —
+        # a body small enough to pre-buffer must also be small enough to
+        # accept, so pre-buffered bodies never need mid-stream rejection.
+        prebuffer = settings.SERVER_BODY_PREBUFFER_SIZE
+        if prebuffer <= 0:
+            # Belt to the preflight check's braces — env vars bypass
+            # settings.py review, and a non-positive prebuffer would
+            # force every body onto the bridge with Connection: close.
+            raise ImproperlyConfigured(
+                f"SERVER_BODY_PREBUFFER_SIZE must be positive (got {prebuffer})."
+            )
+        self.max_body: int = prebuffer
+        if self.max_request_body is not None:
+            self.max_body = min(self.max_body, self.max_request_body)
+        # H2 has no streaming path — streams buffer fully in memory — so
+        # total in-flight body bytes per connection are always bounded
+        # (503 above it): 10x the CONFIGURED prebuffer budget (not the
+        # policy-clamped one — a small request cap must not shrink the
+        # concurrency budget for many small legal streams), raised to the
+        # policy cap when one is set so a single max-size stream always
+        # fits.
+        cap = self.max_request_body if self.max_request_body is not None else 0
+        self.max_h2_aggregate_body: int = max(cap, prebuffer * 10)
         self.keepalive_timeout: float = settings.SERVER_KEEPALIVE_TIMEOUT
         if self.keepalive_timeout <= 0:
             # Belt to the preflight check's braces — env vars bypass
@@ -420,6 +451,8 @@ class Worker:
                     on_stream_complete=self._count_request,
                     shutdown_event=self.shutdown_event,
                     keepalive_timeout=self.keepalive_timeout,
+                    max_request_body=self.max_request_body,
+                    max_aggregate_body=self.max_h2_aggregate_body,
                 )
                 return
 

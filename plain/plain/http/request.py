@@ -27,7 +27,7 @@ from plain.utils.http import parse_header_parameters
 
 from .exceptions import (
     BadRequestError400,
-    RequestDataTooBigError400,
+    ContentTooLargeError413,
     TooManyFieldsSentError400,
     UnsupportedMediaTypeError415,
 )
@@ -334,7 +334,7 @@ class Request:
 
             # Fast path: reject immediately if Content-Length exceeds the limit.
             if max_size is not None and self.content_length > max_size:
-                raise RequestDataTooBigError400(
+                raise ContentTooLargeError413(
                     "Request body exceeded settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
                 )
 
@@ -351,7 +351,7 @@ class Request:
                             break
                         bytes_read += len(chunk)
                         if bytes_read > max_size:
-                            raise RequestDataTooBigError400(
+                            raise ContentTooLargeError413(
                                 "Request body exceeded settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
                             )
                         chunks.append(chunk)

@@ -11,10 +11,11 @@ import sys
 from collections.abc import Generator, Iterator
 from typing import TYPE_CHECKING
 
+from plain.http import BadRequestError400
+
 from .errors import (
     ChunkMissingTerminator,
     InvalidChunkSize,
-    LimitRequestHeaders,
     NoMoreData,
 )
 
@@ -72,8 +73,12 @@ class ChunkedReader:
         idx = buf.getvalue().find(b"\r\n\r\n")
         done = buf.getvalue()[:2] == b"\r\n"
         while idx < 0 and not done:
+            # HTTPException, not a ParseException: the body is parsed
+            # lazily as the app reads, so this raises mid-dispatch where
+            # a ParseException (an IOError) would be misread as a socket
+            # error and the client would get no response at all.
             if buf.tell() > self.req.max_buffer_headers:
-                raise LimitRequestHeaders("max_buffer_headers")
+                raise BadRequestError400("Chunked trailer section too large")
             self.get_data(unreader, buf)
             idx = buf.getvalue().find(b"\r\n\r\n")
             done = buf.getvalue()[:2] == b"\r\n"
@@ -116,14 +121,15 @@ class ChunkedReader:
 
         idx = buf.getvalue().find(b"\r\n")
         while idx < 0:
+            # HTTPException, not InvalidChunkSize — see parse_trailers.
             if buf.tell() > CHUNK_SIZE_LINE_MAX:
-                raise InvalidChunkSize(buf.getvalue()[:32])
+                raise BadRequestError400("Chunk size line too long")
             self.get_data(unreader, buf)
             idx = buf.getvalue().find(b"\r\n")
         if idx > CHUNK_SIZE_LINE_MAX:
             # The whole overlong line can arrive in one read — the loop
             # cap above never sees it.
-            raise InvalidChunkSize(buf.getvalue()[:32])
+            raise BadRequestError400("Chunk size line too long")
 
         data = buf.getvalue()
         line, rest_chunk = data[:idx], data[idx + 2 :]
@@ -168,16 +174,19 @@ class LengthReader:
         if size == 0:
             return b""
 
-        # Sized read straight from the unreader — draining everything and
-        # unreading the remainder would copy the whole buffered body on
-        # every call (quadratic on large pre-buffered bodies).
-        data = self.unreader.read(size)
-        if len(data) < size:
+        # read_some, not read(size): return whatever has arrived (up to
+        # size) instead of blocking until size bytes accumulate — on a
+        # streaming body, readline() must get the short line the client
+        # already sent, not wait for a full stride. Callers loop on short
+        # reads. It also never drains-and-unreads the whole buffer, which
+        # would be quadratic on large pre-buffered bodies.
+        data = self.unreader.read_some(size)
+        if not data:
             # EOF before the declared length arrived — the body is done;
             # length must reach 0 so this reader reads as finished.
             self.length = 0
         else:
-            self.length -= size
+            self.length -= len(data)
         return data
 
 

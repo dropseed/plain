@@ -34,6 +34,7 @@ def log_exception(request: Request, exc: Exception) -> None:
     # Deferred to avoid a circular import: plain.logs is loaded during
     # plain.runtime bootstrap, which happens before plain.http is ready.
     from plain.http.exceptions import (
+        ContentTooLargeError413,
         HTTPException,
         NotFoundError404,
         SuspiciousOperationError400,
@@ -48,11 +49,15 @@ def log_exception(request: Request, exc: Exception) -> None:
 
     base = {"path": request.path}
 
-    if isinstance(exc, SuspiciousOperationError400):
+    if isinstance(exc, SuspiciousOperationError400 | ContentTooLargeError413):
         # Logged on plain.security.* so operators can target an alert at
         # security events specifically. Warning (no exc_info) because the
         # rejection is the working-as-designed response — same noise
         # category as 404s once a scanner is probing nonexistent paths.
+        # ContentTooLargeError413 is included even though it no longer
+        # subclasses SuspiciousOperationError400 (it replaced
+        # RequestDataTooBigError400, which did) so existing
+        # plain.security.* alert rules keep seeing oversized-body floods.
         security_logger = logging.getLogger(f"plain.security.{type(exc).__name__}")
         security_logger.warning(str(exc), extra=base)
         return

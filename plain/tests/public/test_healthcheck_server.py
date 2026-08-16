@@ -34,6 +34,7 @@ class _StubWorker:
         self.keepalive_timeout = 300
         self.drain_read_deadline: float | None = None
         self.max_body = 10 * 1024 * 1024
+        self.max_request_body: int | None = None
         self.nr_conns = 0
         self.max_keepalived = 10
         self.log = logging.getLogger("test")

@@ -332,9 +332,11 @@ graph TD
     MW -->|write response async| EL
 ```
 
-**Request body handling:** Small request bodies (≤ `DATA_UPLOAD_MAX_MEMORY_SIZE`, default 2.5MB) are pre-buffered on the event loop before parsing. Large bodies use `AsyncBridgeUnreader` which streams data lazily from the socket — the parser runs in the thread pool and bridges back to the event loop for socket reads. This keeps memory bounded while supporting large file uploads through multipart streaming to temp files.
+**Request body size limit:** Bodies larger than `SERVER_MAX_REQUEST_BODY_SIZE` (default 100MB, `None` = unlimited) are rejected with a 413 — before the body is transferred when Content-Length declares it (on both HTTP/1.1 and HTTP/2). Chunked HTTP/1.1 bodies declare no length, so the cap applies as the application reads the body; HTTP/2 enforces it at ingest either way. This is the request-size policy; on HTTP/1.1 it is independent of how the body is buffered.
 
-**Async views note:** Async views that read the request body work with pre-buffered (small) requests. For large bodies on the bridge path, body reads must happen in the thread pool (sync views). If you need async views to handle large uploads, increase `DATA_UPLOAD_MAX_MEMORY_SIZE` to cover your expected body sizes.
+**Request body handling:** Small request bodies (≤ `SERVER_BODY_PREBUFFER_SIZE`, default 10MB) are pre-buffered on the event loop before parsing. Large bodies use `AsyncBridgeUnreader` which streams data lazily from the socket — the parser runs in the thread pool and bridges back to the event loop for socket reads, holding a request thread for the duration of the transfer (size `SERVER_THREADS` to cover expected concurrent large uploads). This keeps memory bounded while supporting large file uploads through multipart streaming to temp files. HTTP/2 has no streaming path — each stream's body buffers fully in memory up to the policy cap, and total in-flight HTTP/2 body bytes per connection are bounded at max(`SERVER_MAX_REQUEST_BODY_SIZE`, 10× `SERVER_BODY_PREBUFFER_SIZE`) — or 10× the prebuffer size when the cap is `None` — with a 503 above it.
+
+**Async views note:** Async views that read the request body work with pre-buffered (small) requests. For large bodies on the bridge path, body reads must happen in the thread pool (sync views). If you need async views to handle large uploads, increase `SERVER_BODY_PREBUFFER_SIZE` to cover your expected body sizes.
 
 ## Installation
 

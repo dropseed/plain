@@ -48,6 +48,13 @@ class UploadView(View):
         return Response(f"{type(uploaded).__name__}:{len(uploaded.read())}")
 
 
+class EchoBodyView(View):
+    """Echoes back the byte count of the raw request body."""
+
+    def post(self):
+        return Response(str(len(self.request.body)))
+
+
 def _query_span(sql: str, *, file_path: str, function: str, line: int) -> None:
     """Emit a span shaped like the one a db instrumentation would record."""
     with _tracer.start_as_current_span(
@@ -114,6 +121,7 @@ class AppRouter(Router):
         path("", TestView, name="index"),
         path("stream", StreamView, name="stream"),
         path("upload", UploadView, name="upload"),
+        path("echo-body", EchoBodyView, name="echo_body"),
         path("queries", QueriesView, name="queries"),
         path("boom", BoomView, name="boom"),
     )

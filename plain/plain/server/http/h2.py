@@ -24,9 +24,6 @@ from .response import FileWrapper
 
 log = get_framework_logger()
 
-# Fallback max request body size per H2 stream when DATA_UPLOAD_MAX_MEMORY_SIZE is None (10 MiB)
-_H2_BODY_FALLBACK = 10 * 1024 * 1024
-
 # HTTP/1.1 hop-by-hop headers that must not appear in HTTP/2 responses
 _H2_SKIP_HEADERS = frozenset(
     ("connection", "transfer-encoding", "keep-alive", "upgrade")
@@ -81,6 +78,52 @@ class H2Response:
         self.headers_sent: bool = False
 
 
+def _declared_content_length(headers: list[tuple[str, str]]) -> int | None:
+    """Parse the content-length header from decoded h2 request headers."""
+    for name, value in headers:
+        if name == "content-length":
+            try:
+                return int(value)
+            except ValueError:
+                return None
+    return None
+
+
+def _error_response_frames(status_code: int) -> tuple[list[tuple[str, str]], bytes]:
+    """Build the (headers, body) for a minimal H2 error response."""
+    body = f"<h1>{status_code}</h1>".encode()
+    headers = [
+        (":status", str(status_code)),
+        ("content-type", "text/html"),
+        ("content-length", str(len(body))),
+    ]
+    return headers, body
+
+
+def _send_stream_error(
+    conn: h2.connection.H2Connection,
+    stream_id: int,
+    status_code: int,
+) -> None:
+    """Send an error response on a stream and tell the client to stop.
+
+    RFC 9113 §8.1: after a complete response to a request the client is
+    still sending, RST_STREAM with NO_ERROR tells it to stop. Without
+    the reset the client keeps transferring the rejected body (later
+    frames are acked, reopening its flow window).
+    """
+    headers, body = _error_response_frames(status_code)
+    try:
+        conn.send_headers(stream_id, headers)
+        conn.send_data(stream_id, body, end_stream=True)
+        conn.reset_stream(stream_id, error_code=h2.errors.ErrorCodes.NO_ERROR)
+    except h2.exceptions.ProtocolError:
+        try:
+            conn.reset_stream(stream_id)
+        except h2.exceptions.ProtocolError:
+            pass
+
+
 def _reject_h2_stream(
     conn: h2.connection.H2Connection,
     state: H2ConnectionState,
@@ -88,23 +131,8 @@ def _reject_h2_stream(
     stream: H2Stream,
     status_code: int,
 ) -> None:
-    """Reject an H2 stream with an error response and clean up state."""
-    body = f"<h1>{status_code}</h1>".encode()
-    try:
-        conn.send_headers(
-            event.stream_id,
-            [
-                (":status", str(status_code)),
-                ("content-type", "text/html"),
-                ("content-length", str(len(body))),
-            ],
-        )
-        conn.send_data(event.stream_id, body, end_stream=True)
-    except h2.exceptions.ProtocolError:
-        try:
-            conn.reset_stream(event.stream_id)
-        except h2.exceptions.ProtocolError:
-            pass
+    """Reject an in-progress H2 stream and clean up its state."""
+    _send_stream_error(conn, event.stream_id, status_code)
     conn.acknowledge_received_data(event.flow_controlled_length, event.stream_id)
     state.aggregate_body_size -= stream.data_size
     state.streams.pop(event.stream_id, None)
@@ -254,7 +282,7 @@ class H2ConnectionState:
         executor: ThreadPoolExecutor,
         *,
         stream_budget: asyncio.Semaphore | None = None,
-        max_aggregate_body: int = 0,
+        max_aggregate_body: int | None = None,
         on_stream_complete: Callable[[], None] | None = None,
     ) -> None:
         self.conn = conn
@@ -306,6 +334,8 @@ async def async_handle_h2_connection(
     on_stream_complete: Callable[[], None] | None = None,
     shutdown_event: asyncio.Event | None = None,
     keepalive_timeout: float,
+    max_request_body: int | None = None,
+    max_aggregate_body: int | None = None,
 ) -> None:
     """Async HTTP/2 connection loop.
 
@@ -331,7 +361,16 @@ async def async_handle_h2_connection(
     )
 
     scheme = "https" if is_ssl else "http"
-    max_body = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or _H2_BODY_FALLBACK
+    # Server-edge request body policy (413 above it). Resolved by the
+    # Worker (see Worker.__init__) and passed in, like keepalive_timeout,
+    # so h1 and h2 always share one resolution. h2 has no streaming path
+    # — a stream's body is held in memory — so an unlimited policy still
+    # gets a per-stream floor at the connection buffering budget: the
+    # oversized stream itself draws the 413, instead of whichever
+    # innocent stream's frame happens to trip the aggregate 503.
+    max_body = max_request_body
+    if max_body is None:
+        max_body = max_aggregate_body
     healthcheck_path: str = settings.HEALTHCHECK_PATH
     state = H2ConnectionState(
         conn,
@@ -342,7 +381,7 @@ async def async_handle_h2_connection(
         scheme,
         executor,
         stream_budget=stream_budget,
-        max_aggregate_body=max_body * 10,
+        max_aggregate_body=max_aggregate_body,
         on_stream_complete=on_stream_complete,
     )
 
@@ -441,6 +480,26 @@ async def async_handle_h2_connection(
                         )
                         for n, v in event.headers
                     ]
+
+                    # Reject a declared-too-large body at the headers,
+                    # before any of it is transferred (mirrors h1's
+                    # fail-fast on Content-Length). The stream is never
+                    # registered, so its data frames are acked and
+                    # discarded by the stream-is-None branch below.
+                    if max_body is not None:
+                        declared_length = _declared_content_length(stream.headers)
+                        if declared_length is not None and declared_length > max_body:
+                            _send_stream_error(conn, event.stream_id, 413)
+                            log.warning(
+                                "H2 stream declared body over max size",
+                                extra={
+                                    "stream_id": event.stream_id,
+                                    "content_length": declared_length,
+                                    "max_body": max_body,
+                                },
+                            )
+                            continue
+
                     state.streams[event.stream_id] = stream
 
                 elif isinstance(event, h2.events.DataReceived):
@@ -452,17 +511,14 @@ async def async_handle_h2_connection(
                         conn.acknowledge_received_data(
                             event.flow_controlled_length, event.stream_id
                         )
+                    # Per-stream policy first: when one stream crosses
+                    # both limits on the same frame (they coincide at
+                    # default settings), the specific 413 must win over
+                    # the aggregate 503 — a 503 invites the client to
+                    # retry the very upload that was too large.
                     elif (
-                        state.max_aggregate_body > 0
-                        and state.aggregate_body_size + data_len
-                        > state.max_aggregate_body
+                        max_body is not None and stream.data_size + data_len > max_body
                     ):
-                        _reject_h2_stream(conn, state, event, stream, 503)
-                        log.warning(
-                            "H2 aggregate body budget exceeded",
-                            extra={"stream_id": event.stream_id},
-                        )
-                    elif stream.data_size + data_len > max_body:
                         _reject_h2_stream(conn, state, event, stream, 413)
                         log.warning(
                             "H2 stream exceeded max body size",
@@ -470,6 +526,16 @@ async def async_handle_h2_connection(
                                 "stream_id": event.stream_id,
                                 "max_body": max_body,
                             },
+                        )
+                    elif (
+                        state.max_aggregate_body is not None
+                        and state.aggregate_body_size + data_len
+                        > state.max_aggregate_body
+                    ):
+                        _reject_h2_stream(conn, state, event, stream, 503)
+                        log.warning(
+                            "H2 aggregate body budget exceeded",
+                            extra={"stream_id": event.stream_id},
                         )
                     else:
                         stream.data_size += data_len
@@ -865,12 +931,7 @@ async def _async_send_h2_error(
 ) -> None:
     """Send a simple error response on an HTTP/2 stream."""
     try:
-        body = f"<h1>{status_code}</h1>".encode()
-        headers = [
-            (":status", str(status_code)),
-            ("content-type", "text/html"),
-            ("content-length", str(len(body))),
-        ]
+        headers, body = _error_response_frames(status_code)
         async with state.write_lock:
             state.conn.send_headers(stream_id, headers)
             state.conn.send_data(stream_id, body, end_stream=True)

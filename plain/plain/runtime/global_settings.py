@@ -120,7 +120,9 @@ FILE_UPLOAD_HANDLERS: list[str] = [
 FILE_UPLOAD_MAX_MEMORY_SIZE: int = 2621440  # i.e. 2.5 MB
 
 # Maximum size in bytes of request data (excluding file uploads) that will be
-# read before a SuspiciousOperationError400 (RequestDataTooBigError400) is raised.
+# read into memory before a ContentTooLargeError413 is raised. This bounds
+# what request.body/form parsing materializes in RAM — the server-edge cap
+# on total request body size is SERVER_MAX_REQUEST_BODY_SIZE.
 DATA_UPLOAD_MAX_MEMORY_SIZE: int = 2621440  # i.e. 2.5 MB
 
 # Maximum number of GET/POST parameters that will be read before a
@@ -195,6 +197,24 @@ SERVER_CONNECTIONS: int = 1000
 SERVER_H2_MAX_CONCURRENT_STREAMS: int = 100
 SERVER_MAX_REQUESTS: int = 10000  # 0 = disabled
 SERVER_MAX_REQUESTS_JITTER: int = 1000  # random variance to stagger restarts
+# Largest request body the server accepts, enforced with a 413 on both
+# HTTP/1.1 (before the body is read when Content-Length declares it; for
+# chunked bodies, as the application reads them) and HTTP/2 (rejected at
+# the headers or mid-stream). None = no limit. This is the request-size
+# policy; on HTTP/1.1 it does not decide memory use — large uploads
+# stream (multipart files spool to temp files via FILE_UPLOAD_HANDLERS).
+# HTTP/2 has no streaming path and buffers each stream's body in memory
+# up to this cap, so on h2 the cap IS a per-stream memory bound.
+SERVER_MAX_REQUEST_BODY_SIZE: int | None = 104857600  # i.e. 100 MB
+# HTTP/1.1 bodies up to this size are received into memory on the event
+# loop before dispatch; larger bodies stream lazily from the socket while
+# the app reads them (holding a request thread for the duration). Internal
+# buffering strategy, not a request-size policy — see
+# SERVER_MAX_REQUEST_BODY_SIZE for that. Also anchors the HTTP/2
+# per-connection buffering budget: max(SERVER_MAX_REQUEST_BODY_SIZE,
+# 10x this value) of in-flight body bytes across a connection's streams
+# (503 above it), or 10x this value when the policy cap is None.
+SERVER_BODY_PREBUFFER_SIZE: int = 10485760  # i.e. 10 MB
 
 # MARK: Preflight Checks
 

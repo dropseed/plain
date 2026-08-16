@@ -236,7 +236,13 @@ class Request(Message):
         super().__init__(is_ssl, unreader, peer_addr)
 
     def get_data(self, unreader: Any, buf: io.BytesIO, stop: bool = False) -> None:
-        data = unreader.read()
+        # Bounded pull: an unsized read() would drain the ENTIRE
+        # pre-buffered request (headers + body) into this parse buffer —
+        # a multi-copy of the whole body just to find the header
+        # terminator. Header parsing never legitimately needs more than
+        # max_buffer_headers per pull; the unread in Message.__init__
+        # hands back what the headers didn't consume.
+        data = unreader.read_some(self.max_buffer_headers)
         if not data:
             if stop:
                 raise StopIteration()

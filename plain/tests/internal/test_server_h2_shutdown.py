@@ -14,16 +14,12 @@ The TLS/ALPN socket-level contract is covered by tools/h2-shutdown-test.
 from __future__ import annotations
 
 import asyncio
-import socket
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-import h2.config
-import h2.connection
 import h2.errors
 import h2.events
 from plain.http import Response
-from plain.server.http.h2 import async_handle_h2_connection
+from server_stubs import h2_connect
 
 
 class _Handler:
@@ -38,104 +34,9 @@ class _Handler:
         return Response(b"ok", content_type="text/plain")
 
 
-class _H2Client:
-    """Client half of the connection: real h2 state machine over streams."""
-
-    def __init__(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ) -> None:
-        self.reader = reader
-        self.writer = writer
-        self.conn = h2.connection.H2Connection(
-            config=h2.config.H2Configuration(client_side=True)
-        )
-        self.events: list[h2.events.Event] = []
-        self.eof = False
-
-    async def flush(self) -> None:
-        data = self.conn.data_to_send()
-        if data:
-            self.writer.write(data)
-            await self.writer.drain()
-
-    async def start(self) -> None:
-        self.conn.initiate_connection()
-        await self.flush()
-
-    async def request(self, stream_id: int, path: str = "/") -> None:
-        self.conn.send_headers(
-            stream_id,
-            [
-                (":method", "GET"),
-                (":path", path),
-                (":scheme", "http"),
-                (":authority", "testserver"),
-            ],
-            end_stream=True,
-        )
-        await self.flush()
-
-    async def wait_for(
-        self, predicate: Any, *, timeout: float = 5.0
-    ) -> h2.events.Event:
-        """Read frames until an event matching predicate arrives."""
-        for event in self.events:
-            if predicate(event):
-                return event
-        deadline = asyncio.get_running_loop().time() + timeout
-        while True:
-            remaining = deadline - asyncio.get_running_loop().time()
-            assert remaining > 0, f"timed out waiting; saw {self.events}"
-            data = await asyncio.wait_for(self.reader.read(65535), timeout=remaining)
-            if not data:
-                self.eof = True
-                raise AssertionError(f"connection closed; saw {self.events}")
-            new = self.conn.receive_data(data)
-            self.events.extend(new)
-            await self.flush()  # acks (SETTINGS, etc.)
-            for event in new:
-                if predicate(event):
-                    return event
-
-    async def wait_for_eof(self, *, timeout: float = 5.0) -> None:
-        deadline = asyncio.get_running_loop().time() + timeout
-        while not self.eof:
-            remaining = deadline - asyncio.get_running_loop().time()
-            assert remaining > 0, "timed out waiting for connection close"
-            data = await asyncio.wait_for(self.reader.read(65535), timeout=remaining)
-            if not data:
-                self.eof = True
-                break
-            self.events.extend(self.conn.receive_data(data))
-
-
-async def _connect(
-    handler: _Handler,
-    shutdown_event: asyncio.Event,
-    keepalive_timeout: float = 300.0,
-) -> tuple[_H2Client, asyncio.Task[None], ThreadPoolExecutor]:
-    server_sock, client_sock = socket.socketpair()
-    server_reader, server_writer = await asyncio.open_connection(sock=server_sock)
-    client_reader, client_writer = await asyncio.open_connection(sock=client_sock)
-
-    executor = ThreadPoolExecutor(max_workers=1)
-    server_task = asyncio.get_running_loop().create_task(
-        async_handle_h2_connection(
-            server_reader,
-            server_writer,
-            ("127.0.0.1", 12345),
-            ("127.0.0.1", 80),
-            handler,
-            False,
-            executor,
-            shutdown_event=shutdown_event,
-            keepalive_timeout=keepalive_timeout,
-        )
-    )
-
-    client = _H2Client(client_reader, client_writer)
-    await client.start()
-    return client, server_task, executor
+# The h2 socketpair harness (H2Client / h2_connect) lives in server_stubs
+# and is shared with test_server_body_limits.
+_connect = h2_connect
 
 
 def test_idle_h2_connection_closes_promptly_on_shutdown() -> None:

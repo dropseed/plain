@@ -20,7 +20,7 @@ from typing import Any
 
 from plain.http import Response
 from plain.server.workers.worker import Worker
-from server_stubs import chunked_payload, h1_connect, make_worker
+from server_stubs import chunked_request, h1_roundtrip, length_request, make_worker
 
 
 class _DigestHandler:
@@ -39,31 +39,12 @@ class _DigestHandler:
 
 async def _roundtrip(worker: Worker, request: bytes) -> bytes:
     """Send one raw request, return the response body."""
-    client = await h1_connect(worker)
-    try:
-        await client.send(request)
-        _, body = await client.read_response()
-        return body
-    finally:
-        client.teardown()
+    _, body = await h1_roundtrip(worker, request)
+    return body
 
 
 def _expected(body: bytes) -> bytes:
     return f"{len(body)}:{hashlib.sha256(body).hexdigest()}".encode()
-
-
-def _length_request(body: bytes) -> bytes:
-    return (
-        b"POST / HTTP/1.1\r\nHost: testserver\r\n"
-        b"Content-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body
-    )
-
-
-def _chunked_request(body: bytes, chunk_size: int) -> bytes:
-    return (
-        b"POST / HTTP/1.1\r\nHost: testserver\r\nTransfer-Encoding: chunked\r\n\r\n"
-        + chunked_payload(body, chunk_size)
-    )
 
 
 def _pattern(n: int) -> bytes:
@@ -74,7 +55,7 @@ def test_prebuffered_length_body_integrity():
     body = _pattern(1024 * 1024)
     worker = make_worker(handler=_DigestHandler())
     assert len(body) <= worker.max_body  # pre-buffer path
-    response = asyncio.run(_roundtrip(worker, _length_request(body)))
+    response = asyncio.run(_roundtrip(worker, length_request(body)))
     assert response == _expected(body)
 
 
@@ -82,7 +63,7 @@ def test_bridged_length_body_integrity():
     body = _pattern(1024 * 1024)
     worker = make_worker(handler=_DigestHandler())
     worker.max_body = 64 * 1024  # force the bridge path
-    response = asyncio.run(_roundtrip(worker, _length_request(body)))
+    response = asyncio.run(_roundtrip(worker, length_request(body)))
     assert response == _expected(body)
 
 
@@ -90,7 +71,7 @@ def test_prebuffered_chunked_body_integrity():
     body = _pattern(1024 * 1024)
     worker = make_worker(handler=_DigestHandler())
     assert len(body) <= worker.max_body  # pre-buffers, chunked
-    response = asyncio.run(_roundtrip(worker, _chunked_request(body, 12345)))
+    response = asyncio.run(_roundtrip(worker, chunked_request(body, 12345)))
     assert response == _expected(body)
 
 
@@ -100,5 +81,5 @@ def test_chunked_body_falls_back_to_bridge_with_integrity():
     # Chunked pre-buffering overflows max_body mid-read and falls back to
     # the bridge, handing over the partial data (_BodyTooLarge path).
     worker.max_body = 64 * 1024
-    response = asyncio.run(_roundtrip(worker, _chunked_request(body, 12345)))
+    response = asyncio.run(_roundtrip(worker, chunked_request(body, 12345)))
     assert response == _expected(body)

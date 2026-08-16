@@ -36,3 +36,13 @@ def test_large_upload_streams_to_temp_file():
 
     assert response.status_code == 200
     assert response.content == f"TemporaryUploadedFile:{size}".encode()
+
+
+def test_body_over_data_upload_limit_is_413():
+    """Reading a body larger than DATA_UPLOAD_MAX_MEMORY_SIZE is a 413."""
+    client = Client()
+    body = b"x" * (settings.DATA_UPLOAD_MAX_MEMORY_SIZE + 1)
+
+    response = client.post("/echo-body", data=body, content_type="text/plain")
+
+    assert response.status_code == 413

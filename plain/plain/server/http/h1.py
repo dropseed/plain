@@ -12,6 +12,7 @@ from plain.logs import get_framework_logger
 from .. import http
 from ..accesslog import log_access
 from ..connection import DRAIN_MIN_RECV, RECV_PROGRESS_TIMEOUT, Connection
+from .body import ChunkedReader
 from .errors import (
     ConfigurationProblem,
     InvalidHeader,
@@ -20,6 +21,7 @@ from .errors import (
     InvalidHTTPVersion,
     InvalidRequestLine,
     InvalidRequestMethod,
+    LimitRequestBody,
     LimitRequestHeaders,
     LimitRequestLine,
     ObsoleteFolding,
@@ -86,6 +88,15 @@ HEADER_READ_TIMEOUT = 10
 # This bounds the async read loop to prevent slow/malicious clients
 # from consuming unbounded memory.
 MAX_HEADER_SIZE = LIMIT_REQUEST_FIELDS * (LIMIT_REQUEST_FIELD_SIZE + 2) + 4
+
+# Lingering-close bounds for a request rejected before its body was read
+# (e.g. 413). A client that doesn't use Expect: 100-continue is already
+# sending the body, and closing with unread bytes in the socket sends an
+# RST that can clobber the error response before the client reads it.
+# The linger drains and discards just long enough for the response to
+# land; both bounds keep a hostile sender from pinning the connection.
+LINGER_CLOSE_TIMEOUT = 3.0
+LINGER_CLOSE_MAX_BYTES = 4 * 1024 * 1024
 
 
 def _chunked_end(data: bytes | bytearray, start: int = 0) -> tuple[int, int]:
@@ -166,6 +177,30 @@ def _drain_expired(worker: Worker) -> bool:
     """True once shutdown's drain read deadline has passed."""
     deadline = worker.drain_read_deadline
     return deadline is not None and time.monotonic() >= deadline
+
+
+async def _linger_discard(worker: Worker, conn: Connection) -> None:
+    """Read and discard incoming bytes briefly before closing.
+
+    See LINGER_CLOSE_TIMEOUT — gives a client that is mid-send a window
+    to read an already-written error response instead of an RST.
+    """
+    deadline = time.monotonic() + LINGER_CLOSE_TIMEOUT
+    discarded = 0
+    while discarded < LINGER_CLOSE_MAX_BYTES and not _drain_expired(worker):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            data = await asyncio.wait_for(
+                conn.recv(65536),
+                timeout=min(remaining, _recv_timeout(worker)),
+            )
+        except (TimeoutError, OSError):
+            break
+        if not data:
+            break
+        discarded += len(data)
 
 
 async def _wait_for_next_request(
@@ -413,7 +448,7 @@ def parse_request(
     NOTE: Async views that read request.body on the event loop will
     deadlock with bridge connections because chunk() blocks the calling
     thread. This is an acceptable limitation — large uploads (> max_body)
-    should use sync views. Increase DATA_UPLOAD_MAX_MEMORY_SIZE to avoid
+    should use sync views. Increase SERVER_BODY_PREBUFFER_SIZE to avoid
     the bridge path if async body access is needed.
 
     Returns (req, http_request, resp, request_start) or None on EOF/close.
@@ -431,7 +466,24 @@ def parse_request(
 
         # create_request sets _stream = req.body, which is the parser's
         # body reader — it properly decodes chunked/length-delimited data.
-        http_request = create_request(req, conn.client, conn.server)
+        # The policy cap backstops chunked bodies whose size the header
+        # fail-fast couldn't see. Keyed off the parser's own framing (not
+        # the header pre-scan, which is only a heuristic), and only on
+        # the bridge (force_close) — pre-buffered bodies are already
+        # bounded by worker.max_body <= the cap.
+        body_cap = None
+        if (
+            force_close
+            and req.body is not None
+            and isinstance(req.body.reader, ChunkedReader)
+        ):
+            body_cap = worker.max_request_body
+        http_request = create_request(
+            req,
+            conn.client,
+            conn.server,
+            max_request_body=body_cap,
+        )
 
         resp = Response(req, conn.writer, is_ssl=conn.is_ssl)
 
@@ -479,6 +531,7 @@ async def async_handle_error(
         | InvalidHostHeader
         | LimitRequestLine
         | LimitRequestHeaders
+        | LimitRequestBody
         | UnsupportedTransferCoding
         | ConfigurationProblem
         | ObsoleteFolding
@@ -512,6 +565,10 @@ async def async_handle_error(
             reason = "Request Header Fields Too Large"
             mesg = f"Error parsing headers: '{exc}'"
             status_int = 431
+        elif isinstance(exc, LimitRequestBody):
+            reason = "Content Too Large"
+            mesg = str(exc)
+            status_int = 413
         elif isinstance(exc, ssl.SSLError):
             reason = "Forbidden"
             mesg = f"'{exc}'"
@@ -716,6 +773,10 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
                 break
             except LimitRequestHeaders as e:
                 await async_handle_error(worker, None, conn, e)
+                # The client is mid-send of an oversized header block —
+                # closing now would RST-clobber the 431 (see
+                # LINGER_CLOSE_TIMEOUT).
+                await _linger_discard(worker, conn)
                 break
             if not header_data:
                 break
@@ -735,6 +796,29 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
             content_length, is_chunked, expect_continue = _parse_body_headers(
                 header_data
             )
+
+            # Reject a declared-too-large body before any of it is read —
+            # and before 100-continue below, so the client isn't invited
+            # to send a body that is already known to be refused. Chunked
+            # bodies declare no length; they're bounded at read time
+            # (see create_request's body cap).
+            if (
+                worker.max_request_body is not None
+                and content_length > worker.max_request_body
+            ):
+                await async_handle_error(
+                    worker,
+                    None,
+                    conn,
+                    LimitRequestBody(content_length, worker.max_request_body),
+                )
+                # Linger unconditionally: even an Expect: 100-continue
+                # client may already be sending (RFC 9110 §10.1.1 allows
+                # sending after a short wait, and body bytes can already
+                # sit in body_start). A client that stops on the 413 and
+                # closes ends the linger immediately via EOF.
+                await _linger_discard(worker, conn)
+                break
 
             if expect_continue:
                 try:
@@ -781,6 +865,22 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
                         worker=worker,
                     )
                 else:
+                    # The chunked pre-buffer can overshoot max_body by up
+                    # to one recv before completion is detected, so a
+                    # fully-received body can still exceed the policy cap
+                    # — reject it here, before dispatch. (Declared-length
+                    # bodies were already rejected from the headers.)
+                    if (
+                        worker.max_request_body is not None
+                        and len(body_data) > worker.max_request_body
+                    ):
+                        await async_handle_error(
+                            worker,
+                            None,
+                            conn,
+                            LimitRequestBody(len(body_data), worker.max_request_body),
+                        )
+                        break
                     unreader = BufferUnreader(header_data + body_data)
 
             # Parse the request. For bridge unreaders, parsing runs in
@@ -810,6 +910,10 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
                 break
             except Exception as e:
                 await async_handle_error(worker, None, conn, e)
+                if use_bridge:
+                    # A bridge body may still be streaming in — give the
+                    # client a window to read the error before the close.
+                    await _linger_discard(worker, conn)
                 break
 
             if parse_result is None:
@@ -832,9 +936,7 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
 
             # For bridge connections with known Content-Length, drain
             # unread body data so the client receives the response
-            # without TCP RST. Chunked-to-bridge fallback (content_length=-1)
-            # can't drain by length; force_close=True ensures the
-            # connection closes cleanly via Connection: close header.
+            # without TCP RST.
             if use_bridge and content_length > 0:
                 remaining = (
                     content_length - len(body_start) - unreader.socket_bytes_read  # ty: ignore[unresolved-attribute]
@@ -855,6 +957,22 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
                     if not data:
                         break
                     remaining -= len(data)
+            elif use_bridge and not (
+                req.body is not None
+                and isinstance(req.body.reader, ChunkedReader)
+                and req.body.reader.parser is None
+            ):
+                # Chunked-to-bridge bodies can't drain by length. If the
+                # app stopped reading early (e.g. the body cap raised a
+                # 413), the rest of the upload is still inbound and an
+                # immediate close would RST-clobber the response — linger
+                # briefly instead. Skipped when the parser ran to
+                # completion (parser is None): the body was fully
+                # consumed, nothing is inbound, and a client that got its
+                # response has no reason to send the FIN that would end
+                # the linger early — it would just pin the connection
+                # slot for the full timeout on every successful request.
+                await _linger_discard(worker, conn)
 
             # See docstring: loop exit follows the response framing (keepalive
             # is Response.framed_close, latched when the headers were written).
