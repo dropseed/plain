@@ -4,6 +4,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.base import ModelBase
+from plain.postgres.meta import require_field_name
 from plain.postgres.migrations.operations.base import Operation
 from plain.postgres.migrations.state import ModelState
 from plain.postgres.migrations.utils import field_references, resolve_relation
@@ -328,7 +329,7 @@ class RenameModel(ModelOperation):
                 )
             to_field = to_state.models_registry.get_model(
                 *related_key
-            )._model_meta.get_forward_field(related_object.field.name)
+            )._model_meta.get_forward_field(require_field_name(related_object.field))
             schema_editor.alter_field(
                 model,
                 related_object.field,

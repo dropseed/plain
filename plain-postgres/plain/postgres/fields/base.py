@@ -431,8 +431,10 @@ class Field[T](RegisterLookupMixin):
         # per field accessed -- this is what makes a foreign key partial
         # instance cheap to use beyond its primary key.
         if field_name not in data:
+            from plain.postgres.meta import require_field_name
+
             missing = [
-                f.name
+                require_field_name(f)
                 for f in instance._model_meta.concrete_fields
                 if f.name not in data
             ]

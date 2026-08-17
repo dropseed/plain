@@ -75,7 +75,9 @@ class ResponseHeaders(CaseInsensitiveMapping):
             if mime_encode:
                 value = Header(value, "utf-8", maxlinelen=sys.maxsize).encode()
             else:
-                if hasattr(e, "reason") and isinstance(e.reason, str):
+                if isinstance(
+                    e, UnicodeDecodeError | UnicodeEncodeError | UnicodeTranslateError
+                ):
                     e.reason += f", HTTP response headers must be in {charset} format"
                 raise
         return value

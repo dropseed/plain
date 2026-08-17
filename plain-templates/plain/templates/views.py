@@ -20,7 +20,7 @@ logger = get_framework_logger("plain.templates")
 try:
     from plain.postgres.exceptions import ObjectDoesNotExist
 except ImportError:
-    ObjectDoesNotExist = None  # ty: ignore[invalid-assignment]
+    ObjectDoesNotExist = None
 
 
 class TemplateView(View):

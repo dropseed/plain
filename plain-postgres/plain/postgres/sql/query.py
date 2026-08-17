@@ -13,7 +13,7 @@ import difflib
 import functools
 import sys
 from collections import Counter
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Iterator as TypingIterator
 from functools import cached_property
 from itertools import chain, count, product
@@ -96,7 +96,9 @@ EXPLAIN_OPTIONS_PATTERN = _lazy_re_compile(r"[\w\-]+")
 def get_field_names_from_opts(meta: Meta | None) -> set[str]:
     if meta is None:
         return set()
-    return {f.name for f in meta.get_fields()}
+    from plain.postgres.meta import require_field_name
+
+    return {require_field_name(f) for f in meta.get_fields()}
 
 
 class JoinInfo(NamedTuple):
@@ -550,8 +552,14 @@ class Query(BaseExpression):
         if not (q.distinct and q.is_sliced):
             if q.group_by is True:
                 assert self.model is not None, "GROUP BY requires a model"
+                from plain.postgres.meta import require_field_name
+
                 q.add_fields(
-                    (f.name for f in self.model._model_meta.concrete_fields), False
+                    (
+                        require_field_name(f)
+                        for f in self.model._model_meta.concrete_fields
+                    ),
+                    False,
                 )
                 # Disable GROUP BY aliases to avoid orphaning references to the
                 # SELECT clause which is about to be cleared.
@@ -2231,15 +2239,22 @@ class Query(BaseExpression):
             self.set_annotation_mask(annotation_names)
             selected = frozenset(field_names + annotation_names)
         else:
+            from plain.postgres.meta import require_field_name
+
             assert self.model is not None, "Default values query requires a model"
-            field_names = [f.name for f in self.model._model_meta.concrete_fields]
+            field_names = [
+                require_field_name(f) for f in self.model._model_meta.concrete_fields
+            ]
             selected = frozenset(field_names)
         # Selected annotations must be known before setting the GROUP BY
         # clause.
         if self.group_by is True:
+            from plain.postgres.meta import require_field_name
+
             assert self.model is not None, "GROUP BY True requires a model"
             self.add_fields(
-                (f.name for f in self.model._model_meta.concrete_fields), False
+                (require_field_name(f) for f in self.model._model_meta.concrete_fields),
+                False,
             )
             # Disable GROUP BY aliases to avoid orphaning references to the
             # SELECT clause which is about to be cleared.
@@ -2603,13 +2618,13 @@ class InsertQuery(Query):
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.fields: list[Field] = []
+        self.fields: Sequence[Field] = []
         self.objs: list[Any] = []
         self.on_conflict = on_conflict
         self.update_fields: list[Field] = update_fields or []
         self.unique_fields: list[Field] = unique_fields or []
 
-    def insert_values(self, fields: list[Any], objs: list[Any]) -> None:
+    def insert_values(self, fields: Sequence[Field], objs: list[Any]) -> None:
         self.fields = fields
         self.objs = objs
 

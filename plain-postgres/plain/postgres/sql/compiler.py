@@ -1015,6 +1015,7 @@ class SQLCompiler:
 
             if not select_related_descend(f, restricted, requested, select_mask):
                 continue
+            assert f.name is not None, "Field must have a name"
             related_select_mask = select_mask.get(f) or {}
             klass_info: dict[str, Any] = {
                 "model": f.remote_field.model,
@@ -1387,7 +1388,7 @@ class SQLInsertCompiler(SQLCompiler):
         return field.pre_save(obj, add=True)
 
     def assemble_as_sql(
-        self, fields: list[Any], value_rows: list[list[Any]]
+        self, fields: Sequence[Any], value_rows: list[list[Any]]
     ) -> tuple[Any, list[list[Any]]]:
         """
         Take a sequence of N fields and a sequence of M rows of values, and

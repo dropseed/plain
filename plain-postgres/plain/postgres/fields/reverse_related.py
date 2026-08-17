@@ -50,7 +50,6 @@ class ForeignObjectRel(FieldCacheMixin):
 
     # Type annotations for instance attributes
     model: type[Model]
-    field: RelatedField
     on_delete: OnDelete | None
 
     def __init__(
@@ -61,7 +60,11 @@ class ForeignObjectRel(FieldCacheMixin):
         related_query_name: str | None = None,
         on_delete: OnDelete | None = None,
     ):
-        self.field = field  # ty: ignore[invalid-assignment]
+        # Annotated here rather than in the class body: RelatedField is
+        # itself a descriptor (it implements __get__), and a class-body
+        # annotation of a descriptor type makes ty apply descriptor protocol
+        # to every access instead of treating it as a plain instance attribute.
+        self.field: RelatedField = field
         # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
         # (see related.py:250 where field.remote_field.model is overwritten)
         self.model = to  # ty: ignore[invalid-assignment]
@@ -137,7 +140,11 @@ class ForeignObjectRel(FieldCacheMixin):
         return state
 
     def get_joining_columns(self) -> tuple[str, str]:
-        return self.field.get_joining_columns(reverse_join=True)
+        # Only ForeignKeyField implements get_joining_columns (ManyToManyField
+        # does not), so this is unsound for a ManyToManyRel's `field`. Appears
+        # unreachable in practice: nothing in the codebase constructs the
+        # `sql.datastructures.Join` that's the only caller of this method.
+        return self.field.get_joining_columns(reverse_join=True)  # ty: ignore[unresolved-attribute]
 
     @cached_property
     def path_infos(self) -> list[PathInfo]:

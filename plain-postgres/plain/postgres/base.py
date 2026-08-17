@@ -30,7 +30,7 @@ from plain.postgres.fields import DATABASE_DEFAULT, Field
 from plain.postgres.fields.base import ColumnField
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ForeignObjectRel
-from plain.postgres.meta import Meta
+from plain.postgres.meta import Meta, require_field_name
 from plain.postgres.options import Options
 from plain.postgres.query import F, Q, QuerySet
 from plain.preflight import PreflightResult
@@ -126,6 +126,7 @@ class Model(metaclass=ModelBase):
             # meta.fields excludes ManyToManyField, so every iterated field
             # is column-backed and exposes the ColumnField surface.
             assert isinstance(field, ColumnField)
+            assert field.name is not None, "Field must have a name"
 
             is_related_object = False
             # Virtual field
@@ -196,12 +197,15 @@ class Model(metaclass=ModelBase):
         if len(values) != len(cls._model_meta.concrete_fields):
             values_iter = iter(values)
             values = [
-                next(values_iter) if f.name in field_names else DEFERRED
+                next(values_iter) if require_field_name(f) in field_names else DEFERRED
                 for f in cls._model_meta.concrete_fields
             ]
         # Build kwargs dict from field names and values
         field_dict = dict(
-            zip((f.name for f in cls._model_meta.concrete_fields), values)
+            zip(
+                (require_field_name(f) for f in cls._model_meta.concrete_fields),
+                values,
+            )
         )
         new = cls(_from_db=True, **field_dict)
         new._state.adding = False
@@ -280,7 +284,7 @@ class Model(metaclass=ModelBase):
         Return a set containing names of deferred fields for this instance.
         """
         return {
-            f.name
+            require_field_name(f)
             for f in self._model_meta.concrete_fields
             if f.name not in self.__dict__
         }
@@ -320,7 +324,7 @@ class Model(metaclass=ModelBase):
             db_instance_qs = db_instance_qs.only(*fields)
         elif deferred_fields:
             fields = [
-                f.name
+                require_field_name(f)
                 for f in self._model_meta.concrete_fields
                 if f.name not in deferred_fields
             ]
@@ -332,7 +336,9 @@ class Model(metaclass=ModelBase):
             if field.name in non_loaded_fields:
                 # This field wasn't refreshed - skip ahead.
                 continue
-            setattr(self, field.name, field.value_from_object(db_instance))
+            setattr(
+                self, require_field_name(field), field.value_from_object(db_instance)
+            )
             # Clear cached foreign keys.
             if isinstance(field, RelatedField) and field.is_cached(self):
                 field.delete_cached_value(self)
@@ -527,7 +533,7 @@ class Model(metaclass=ModelBase):
             # If the related field isn't cached, then an instance hasn't been
             # assigned and there's no need to worry about this check.
             if isinstance(field, RelatedField) and field.is_cached(self):
-                obj = getattr(self, field.name, None)
+                obj = getattr(self, require_field_name(field), None)
                 if not obj:
                     continue
                 # A pk may have been assigned manually to a model instance not
@@ -544,14 +550,14 @@ class Model(metaclass=ModelBase):
                 elif field.value_from_object(self) in field.empty_values:
                     # Set related object if it has been saved after an
                     # assignment.
-                    setattr(self, field.name, obj)
+                    setattr(self, require_field_name(field), obj)
                 # If the relationship's key was changed, clear the cached
                 # relationship. Compare the cached object's key against the raw
                 # key value -- not getattr(self, field.name), which for a
                 # foreign key returns the related object, not the key.
-                if getattr(obj, field.target_field.name) != field.value_from_object(
-                    self
-                ):
+                if getattr(
+                    obj, require_field_name(field.target_field)
+                ) != field.value_from_object(self):
                     field.delete_cached_value(self)
 
     def delete(self) -> int:
@@ -608,7 +614,7 @@ class Model(metaclass=ModelBase):
             exclude = set()
         meta = meta or self._model_meta
         return {
-            field.name: Value(field.value_from_object(self), field)
+            require_field_name(field): Value(field.value_from_object(self), field)
             for field in meta.local_concrete_fields
             if field.name not in exclude
         }
@@ -644,7 +650,7 @@ class Model(metaclass=ModelBase):
         names = set()
         for f in self._model_meta.fields:
             if self.__dict__.get(f.name) is DATABASE_DEFAULT or f.auto_fills_on_save:
-                names.add(f.name)
+                names.add(require_field_name(f))
         return names
 
     def validate_constraints(self, exclude: set[str] | None = None) -> None:
@@ -703,9 +709,13 @@ class Model(metaclass=ModelBase):
         if exclude is None:
             exclude = set()
 
-        errors = {}
+        errors: dict[str, list[Any]] = {}
         for f in self._model_meta.fields:
-            if f.name in exclude:
+            # meta.fields excludes ManyToManyField, so every iterated field
+            # is column-backed and exposes the ColumnField surface.
+            assert isinstance(f, ColumnField)
+            field_name = require_field_name(f)
+            if field_name in exclude:
                 continue
             # Skip validation for empty fields with required=False. The developer
             # is responsible for making sure they have a valid value.
@@ -713,9 +723,9 @@ class Model(metaclass=ModelBase):
             if not f.required and raw_value in f.empty_values:
                 continue
             try:
-                setattr(self, f.name, f.clean(raw_value, self))
+                setattr(self, field_name, f.clean(raw_value, self))
             except ValidationError as e:
-                errors[f.name] = e.error_list
+                errors[field_name] = e.error_list
 
         if errors:
             raise ValidationError(errors)
@@ -975,7 +985,7 @@ class Model(metaclass=ModelBase):
         # own fields_map instead of using get_field()
         forward_fields_map: dict[str, Field] = {}
         for field in cls._model_meta._get_fields(reverse=False):
-            forward_fields_map[field.name] = field
+            forward_fields_map[require_field_name(field)] = field
 
         errors: list[PreflightResult] = []
         for field_name in fields:
@@ -1087,9 +1097,9 @@ class Model(metaclass=ModelBase):
         meta = cls._model_meta
         valid_fields = set(
             chain.from_iterable(
-                (f.name,)
-                if not (f.auto_created and not f.concrete)
-                else (f.field.related_query_name(),)
+                (f.field.related_query_name(),)
+                if isinstance(f, ForeignObjectRel)
+                else (f.name,)
                 for f in chain(meta.fields, meta.related_objects)
             )
         )
