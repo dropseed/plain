@@ -1,5 +1,27 @@
 # plain changelog
 
+## [0.159.0](https://github.com/dropseed/plain/releases/plain@0.159.0) (2026-08-17)
+
+### What's changed
+
+- The server's request-body handling was rewritten around a unified body sink: both HTTP/1.1 and HTTP/2 now receive the entire request body on the event loop before dispatching to the view, holding it in memory up to a threshold and spooling to an anonymous temp file beyond it (unlinked at creation, so a killed worker can't leak spooled disk). This is the same model as Puma and Waitress, and it means request threads are held only for view time (a slow upload no longer pins a thread for the duration of the transfer), connections stay keep-alive after uploads of any size (previously forced `Connection: close`), and async views can read bodies of any size ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- New `SERVER_MAX_REQUEST_BODY_SIZE` setting (default 10MB): the per-request body cap, answered with a 413. A declared `Content-Length` over the cap is refused from the headers before any of the body transfers; bodies without a declared length are rejected the moment received bytes exceed it. This is a pre-auth allowance sized for forms, images, and documents — raise it for larger uploads, or send large files direct to object storage with presigned URLs ([c34fee2fb5](https://github.com/dropseed/plain/commit/c34fee2fb5), [9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- New `SERVER_BODY_MAX_MEMORY_SIZE` setting (default 1MB): the RAM-vs-disk spool threshold during ingest — purely a buffering knob, independent of the policy cap ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- New `SERVER_MAX_INFLIGHT_BODY_SIZE` setting (default 1GB): a worker-wide budget on total in-flight request-body bytes (memory + disk) across all connections. Exhaustion load-sheds with a 503 and `Retry-After: 1` ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- New `SERVER_BODY_MIN_BYTES_PER_SECOND` setting (default 240): a minimum transfer rate for request bodies, enforced after a grace period and sustained over a rolling window, answering violations with a 408. Inactivity timeouts can't stop a slow-drip body (R.U.D.Y.-style attacks); a throughput floor can ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- `ContentTooLargeError413` replaces `RequestDataTooBigError400`: an over-limit request body is now answered with the semantically correct 413 (Content Too Large) instead of a 400, at both the server edge and the app layer (`DATA_UPLOAD_MAX_MEMORY_SIZE`) ([c34fee2fb5](https://github.com/dropseed/plain/commit/c34fee2fb5))
+- Chunked (`Transfer-Encoding: chunked`) requests are de-chunked before dispatch: the app sees a real `Content-Length` and no `Transfer-Encoding` header, exactly as a buffering gateway would forward them. This also fixes chunked multipart uploads, which previously parsed silently as an empty form ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- The request's OpenTelemetry span now records what receiving the body cost — `http.request.body.size` and `plain.request.body_ingest_seconds` — since ingest happens before the span opens and a slow upload would otherwise look like a fast view ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- Upload throughput improved substantially: a large HTTP/1.1 body was buffered with quadratic copying (a 25MB upload burned ~24s of CPU), and the rewrite's zero-copy chunked decoding improved things further — 50MB declared uploads went from ~270ms to ~124ms, 20MB chunked from ~72ms to ~53ms ([252ad64106](https://github.com/dropseed/plain/commit/252ad64106), [9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- Chunked framing is parsed strictly per RFC 9112 (`1*HEXDIG` chunk sizes, whitespace tolerated only before chunk extensions), closing request-smuggling disagreements with stricter upstreams; `Expect` is honored as a comma-separated list; and a stray CRLF between keep-alive requests is tolerated per RFC 9112 §2.2 ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- A new preflight check validates that the body-size settings compose (memory threshold vs cap, cap vs in-flight budget) ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+
+### Upgrade instructions
+
+- If your app accepts uploads larger than 10MB, set `SERVER_MAX_REQUEST_BODY_SIZE` (or the `PLAIN_SERVER_MAX_REQUEST_BODY_SIZE` env var) above your largest expected request body — HTTP/1.1 uploads previously had no server-level cap, so a working large-upload flow can start returning 413s under the new default. For genuinely large files, prefer presigned direct-to-storage uploads over raising the cap.
+- If you import or catch `RequestDataTooBigError400`, rename it to `ContentTooLargeError413` (exported from `plain.http`). Clients now receive a 413 instead of a 400 for over-limit bodies, so update any client-side or test expectations on that status code.
+- If you have log alert rules targeting the `plain.security.RequestDataTooBigError400` logger, update them to `plain.security.ContentTooLargeError413` — oversized-body rejections still log to the `plain.security.*` namespace.
+
 ## [0.158.0](https://github.com/dropseed/plain/releases/plain@0.158.0) (2026-08-12)
 
 ### What's changed
