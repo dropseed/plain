@@ -126,11 +126,11 @@ class Model(metaclass=ModelBase):
             # meta.fields excludes ManyToManyField, so every iterated field
             # is column-backed and exposes the ColumnField surface.
             assert isinstance(field, ColumnField)
-            assert field.name is not None, "Field must have a name"
+            field_name = require_field_name(field)
 
             is_related_object = False
             # Virtual field
-            if field.name not in kwargs and field.column is None:
+            if field_name not in kwargs and field.column is None:
                 continue
             if isinstance(field, RelatedField) and isinstance(
                 field.remote_field, ForeignObjectRel
@@ -138,13 +138,13 @@ class Model(metaclass=ModelBase):
                 try:
                     # A foreign key is given by name -- either a related
                     # instance or a bare primary key value.
-                    rel_obj = kwargs.pop(field.name)
+                    rel_obj = kwargs.pop(field_name)
                     is_related_object = True
                 except KeyError:
                     val = field.get_default()
             else:
                 try:
-                    val = kwargs.pop(field.name)
+                    val = kwargs.pop(field_name)
                 except KeyError:
                     # This is done with an exception rather than the
                     # default argument on pop because we don't want
@@ -162,10 +162,10 @@ class Model(metaclass=ModelBase):
                 # Assign through the descriptor so a related instance is
                 # cached and a bare key value is stored correctly.
                 if rel_obj is not _DEFERRED:
-                    _setattr(self, field.name, rel_obj)
+                    _setattr(self, field_name, rel_obj)
             else:
                 if val is not _DEFERRED:
-                    _setattr(self, field.name, val)
+                    _setattr(self, field_name, val)
 
         # Handle any remaining kwargs (properties or virtual fields)
         property_names = meta._property_names

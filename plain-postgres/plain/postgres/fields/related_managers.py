@@ -23,6 +23,7 @@ from plain.postgres.dialect import quote_name
 from plain.postgres.expressions import RawSQL, Window
 from plain.postgres.functions import RowNumber
 from plain.postgres.lookups import GreaterThan, LessThanOrEqual
+from plain.postgres.meta import require_field_name
 from plain.postgres.query import QuerySet
 from plain.postgres.query_utils import Q
 from plain.postgres.utils import resolve_callables
@@ -85,7 +86,6 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
     def __init__(
         self, instance: Model, field: ForeignKeyField, related_model: type[Model]
     ):
-        assert field.name is not None, "Field must have a name"
         self.model = cast(type[T], related_model)
         self.instance = instance
         # Annotated here rather than in the class body: ForeignKeyField is
@@ -93,20 +93,17 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         # annotation of a descriptor type makes ty apply descriptor protocol
         # to every access instead of treating it as a plain instance attribute.
         self.field: ForeignKeyField = field
-        # Cached separately as `str` (field.name is `str | None` until the
-        # field is contributed to a model class, which already happened by
-        # the time a manager is constructed for it).
-        self.field_name: str = field.name
+        self.field_name: str = require_field_name(field)
         self.core_filters = {self.field_name: instance}
         self.allow_null = self.field.allow_null
 
     def _check_fk_val(self) -> None:
         field = self.field.target_field
-        assert field.name is not None, "Field must have a name"
-        if getattr(self.instance, field.name) is None:
+        field_name = require_field_name(field)
+        if getattr(self.instance, field_name) is None:
             raise ValueError(
                 f'"{self.instance!r}" needs to have a value for field '
-                f'"{field.name}" before this relationship can be used.'
+                f'"{field_name}" before this relationship can be used.'
             )
 
     def _apply_rel_filters(self, queryset: QuerySet) -> QuerySet:
@@ -116,8 +113,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         queryset._defer_next_filter = True
         queryset = queryset.filter(**self.core_filters)
         target_field = self.field.target_field
-        assert target_field.name is not None, "Field must have a name"
-        rel_obj_id = getattr(self.instance, target_field.name)
+        rel_obj_id = getattr(self.instance, require_field_name(target_field))
         if rel_obj_id is None:
             return queryset.none()
         queryset._known_related_objects = {self.field: {rel_obj_id: self.instance}}

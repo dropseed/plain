@@ -2217,6 +2217,8 @@ class Query(BaseExpression):
             self.set_annotation_mask(self.annotation_select_mask.union(names))
 
     def set_values(self, fields: list[str]) -> None:
+        from plain.postgres.meta import require_field_name
+
         self.select_related = False
         self.clear_deferred_loading()
         self.clear_select_fields()
@@ -2239,8 +2241,6 @@ class Query(BaseExpression):
             self.set_annotation_mask(annotation_names)
             selected = frozenset(field_names + annotation_names)
         else:
-            from plain.postgres.meta import require_field_name
-
             assert self.model is not None, "Default values query requires a model"
             field_names = [
                 require_field_name(f) for f in self.model._model_meta.concrete_fields
@@ -2249,8 +2249,6 @@ class Query(BaseExpression):
         # Selected annotations must be known before setting the GROUP BY
         # clause.
         if self.group_by is True:
-            from plain.postgres.meta import require_field_name
-
             assert self.model is not None, "GROUP BY True requires a model"
             self.add_fields(
                 (require_field_name(f) for f in self.model._model_meta.concrete_fields),
