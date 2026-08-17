@@ -332,12 +332,12 @@ def test_keepalive_after_chunked_body(
         s.close()
 
 
-def test_large_body_bridge(addr: tuple[str, int]) -> bool | tuple[bool, str]:
-    """Large POST body (3MB, above default 2.5MB limit) gets a response."""
+def test_large_body_spools_to_disk(addr: tuple[str, int]) -> bool | tuple[bool, str]:
+    """POST body above SERVER_BODY_MAX_MEMORY_SIZE (8MB, disk spool) gets a response."""
     s = connect(addr)
     s.settimeout(30)
     try:
-        body = b"x" * (3 * 1024 * 1024)  # 3MB
+        body = b"x" * (8 * 1024 * 1024)  # far over the default 1MB memory threshold
         post = (
             b"POST / HTTP/1.1\r\n"
             b"Host: localhost\r\n"
@@ -351,6 +351,130 @@ def test_large_body_bridge(addr: tuple[str, int]) -> bool | tuple[bool, str]:
         if is_valid(status):
             return True
         return False, f"Status: {status}"
+    finally:
+        s.close()
+
+
+def test_large_body_keepalive(addr: tuple[str, int]) -> bool | tuple[bool, str]:
+    """A body above the prebuffer keeps the connection alive.
+
+    The body sink fully consumes the body off the wire at ingest, so
+    reuse is safe by construction. (Before the sink, this size of body
+    streamed lazily and forced Connection: close — deliberate flip.)
+    """
+    s = connect(addr)
+    s.settimeout(30)
+    try:
+        body = b"x" * (8 * 1024 * 1024)
+        post = (
+            b"POST / HTTP/1.1\r\n"
+            b"Host: localhost\r\n"
+            b"Content-Length: " + str(len(body)).encode() + b"\r\n"
+            b"\r\n" + body
+        )
+        s.sendall(post)
+        resp = recv_response(s)
+        status = parse_status(resp)
+        if not is_valid(status):
+            return False, f"Status: {status}"
+        # A follow-up request on the same connection must be served.
+        s.sendall(SIMPLE_GET)
+        resp2 = recv_response(s)
+        status2 = parse_status(resp2)
+        if is_valid(status2):
+            return True
+        return False, f"Follow-up request got status {status2}"
+    finally:
+        s.close()
+
+
+def test_oversized_declared_body_fail_fast_413(
+    addr: tuple[str, int],
+) -> bool | tuple[bool, str]:
+    """A Content-Length over SERVER_MAX_REQUEST_BODY_SIZE is 413'd from
+    the headers alone — none of the body needs to be sent."""
+    s = connect(addr)
+    s.settimeout(10)
+    try:
+        # Declares 200MB (over the default cap); sends zero body bytes.
+        post = (
+            b"POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 209715200\r\n\r\n"
+        )
+        s.sendall(post)
+        resp = recv_response(s)
+        status = parse_status(resp)
+        if status == 413:
+            return True
+        return False, f"Expected 413, got {status}"
+    finally:
+        s.close()
+
+
+def test_oversized_expect_continue_refused_without_100(
+    addr: tuple[str, int],
+) -> bool | tuple[bool, str]:
+    """Expect: 100-continue with an over-cap Content-Length gets the 413
+    as the first response — the client is never told to send the body."""
+    s = connect(addr)
+    s.settimeout(10)
+    try:
+        post = (
+            b"POST / HTTP/1.1\r\n"
+            b"Host: localhost\r\n"
+            b"Expect: 100-continue\r\n"
+            b"Content-Length: 209715200\r\n"
+            b"\r\n"
+        )
+        s.sendall(post)
+        resp = recv_response(s)
+        if b"100 Continue" in resp:
+            return False, "Server sent 100 Continue for an over-cap body"
+        status = parse_status(resp)
+        if status == 413:
+            return True
+        return False, f"Expected 413, got {status}"
+    finally:
+        s.close()
+
+
+def test_slow_drip_body_408(addr: tuple[str, int]) -> bool | tuple[bool, str]:
+    """A body dripping below SERVER_BODY_MIN_BYTES_PER_SECOND is 408'd.
+
+    Each byte arrives inside the per-recv inactivity timeout, so only the
+    throughput floor can stop it. Takes ~6s: the floor's grace period is
+    5s of active waiting before enforcement.
+    """
+    s = connect(addr)
+    s.settimeout(15)
+    try:
+        s.sendall(
+            b"POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100000\r\n\r\n"
+        )
+        deadline = time.time() + 12
+        s.setblocking(False)
+        resp = b""
+        while time.time() < deadline:
+            try:
+                s.send(b"x")
+            except (BlockingIOError, OSError):
+                pass
+            time.sleep(0.4)
+            try:
+                data = s.recv(4096)
+                if data:
+                    resp += data
+                    if b"\r\n\r\n" in resp:
+                        break
+                else:
+                    break
+            except (BlockingIOError, TimeoutError):
+                continue
+            except OSError:
+                break
+        status = parse_status(resp)
+        if status == 408:
+            return True
+        return False, f"Expected 408, got {status or 'no response'}"
     finally:
         s.close()
 
@@ -519,7 +643,17 @@ def main() -> int:
         ("Keep-alive after POST body (1KB)", test_keepalive_after_post_body),
         ("Keep-alive after POST body (64KB)", test_keepalive_after_large_body),
         ("Keep-alive after chunked POST body", test_keepalive_after_chunked_body),
-        ("Large POST body (3MB, bridge path)", test_large_body_bridge),
+        ("Large POST body (8MB, disk spool)", test_large_body_spools_to_disk),
+        ("Large body keeps connection alive", test_large_body_keepalive),
+        (
+            "Over-cap Content-Length fail-fast 413",
+            test_oversized_declared_body_fail_fast_413,
+        ),
+        (
+            "Over-cap Expect: 100-continue refused",
+            test_oversized_expect_continue_refused_without_100,
+        ),
+        ("Slow-drip body 408 (throughput floor)", test_slow_drip_body_408),
         ("Expect: 100-continue", test_expect_100_continue),
         (
             "Keep-alive idle lifecycle (survives idle, closes at timeout)",

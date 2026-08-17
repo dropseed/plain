@@ -18,9 +18,11 @@ import h2.connection
 import h2.events
 import h2.exceptions
 from plain.http import ContentTooLargeError413, Response
+from plain.runtime import settings
 from plain.server.connection import Connection
 from plain.server.http import h1
 from plain.server.http.h2 import async_handle_h2_connection
+from plain.server.http.sink import BodyBudget
 from plain.server.workers.worker import Worker
 
 
@@ -199,8 +201,8 @@ async def h1_roundtrip(worker: Worker, request: bytes) -> tuple[bytes, bytes]:
 
 class BodyLengthHandler:
     """Handler that reads request.body in the thread pool and returns its
-    length — bridge bodies block the calling thread, so they must not be
-    read on the event loop. Maps the body-size policy exception to a 413
+    length — mirroring how production sync views read bodies. Maps the
+    app-layer body-size exception (DATA_UPLOAD_MAX_MEMORY_SIZE) to a 413
     the way the production handler maps any HTTPException.
     """
 
@@ -249,8 +251,13 @@ class H2Client:
         method: str | None = None,
         body_frames: list[bytes] | None = None,
         content_length: int | None = None,
+        end_stream: bool = True,
     ) -> None:
-        """Send a request; body_frames stream as DATA frames if given."""
+        """Send a request; body_frames stream as DATA frames if given.
+
+        end_stream=False leaves the request body open (an in-flight
+        upload) after the last frame.
+        """
         headers = [
             (":method", method or ("POST" if body_frames else "GET")),
             (":path", path),
@@ -260,11 +267,15 @@ class H2Client:
         if content_length is not None:
             headers.append(("content-length", str(content_length)))
         frames = body_frames or []
-        self.conn.send_headers(stream_id, headers, end_stream=not frames)
+        self.conn.send_headers(stream_id, headers, end_stream=not frames and end_stream)
         await self.flush()
         for i, frame in enumerate(frames):
             try:
-                self.conn.send_data(stream_id, frame, end_stream=i == len(frames) - 1)
+                self.conn.send_data(
+                    stream_id,
+                    frame,
+                    end_stream=end_stream and i == len(frames) - 1,
+                )
             except h2.exceptions.ProtocolError:
                 # Stream already closed by a server-side rejection.
                 break
@@ -324,7 +335,10 @@ async def h2_connect(
     keepalive_timeout: float = 300.0,
     *,
     max_request_body: int | None = None,
-    max_aggregate_body: int | None = None,
+    max_inflight_body: int | None = None,
+    spool_size: int | None = None,
+    body_min_rate: int = 0,
+    body_budget: BodyBudget | None = None,
 ) -> tuple[H2Client, asyncio.Task[None], ThreadPoolExecutor]:
     """Start async_handle_h2_connection over a socketpair with a real client."""
     server_sock, client_sock = socket.socketpair()
@@ -343,8 +357,22 @@ async def h2_connect(
             executor,
             shutdown_event=shutdown_event,
             keepalive_timeout=keepalive_timeout,
-            max_request_body=max_request_body,
-            max_aggregate_body=max_aggregate_body,
+            # Mirror the Worker's resolution: with no policy cap, the
+            # in-flight budget floors any single body.
+            max_request_body=(
+                max_request_body if max_request_body is not None else max_inflight_body
+            ),
+            body_budget=(
+                body_budget
+                if body_budget is not None
+                else BodyBudget(max_inflight_body)
+            ),
+            body_min_rate=body_min_rate,
+            spool_size=(
+                spool_size
+                if spool_size is not None
+                else settings.SERVER_BODY_MAX_MEMORY_SIZE
+            ),
         )
     )
 

@@ -34,7 +34,6 @@ import pytest
 from plain.http import Response
 from plain.server.connection import Connection
 from plain.server.http import h1
-from plain.server.http.unreader import AsyncBridgeUnreader
 from server_stubs import BodyLengthHandler, StubApp, h1_connect, make_worker
 
 
@@ -165,7 +164,7 @@ def test_sequential_keepalive_requests_are_served() -> None:
 
 
 def test_content_length_body_is_served() -> None:
-    # A known-length body (pre-buffer path) is read and the connection
+    # A known-length body (held in sink memory) is read and the connection
     # stays alive for the next request.
     async def scenario() -> None:
         worker = make_worker(handler=_Handler())
@@ -184,8 +183,8 @@ def test_content_length_body_is_served() -> None:
 
 
 def test_chunked_body_is_served_and_keepalives() -> None:
-    # A chunked body within max_body is pre-buffered and framed by the
-    # parser's ChunkedReader; the connection stays alive afterward.
+    # A chunked body, decoded at ingest by ChunkedDecoder; the
+    # connection stays alive afterward.
     async def scenario() -> None:
         worker = make_worker(handler=_Handler())
         client = await _connect(worker)
@@ -480,21 +479,22 @@ def test_partial_pipelined_request_prefix_is_not_lost() -> None:
     asyncio.run(scenario())
 
 
-def test_large_body_bridge_reads_peeked_bytes() -> None:
-    # Bodies larger than max_body stream lazily through the bridge
-    # unreader, which must drain bytes peeked by the keepalive wait —
-    # reading the socket directly would strand them and stall the body
-    # read until it times out.
+def test_large_body_ingest_reads_peeked_bytes() -> None:
+    # Bodies larger than max_body spool through the sink, whose ingest
+    # loop must drain bytes peeked by the keepalive wait — reading the
+    # socket directly would strand them and stall the body read until it
+    # times out. The connection stays reusable: the body was fully
+    # consumed at ingest.
     async def scenario() -> None:
         worker = make_worker(handler=BodyLengthHandler())
-        worker.max_body = 1000  # force the bridge path
+        worker.body_max_memory_size = 1000  # force the disk spool
         client = await _connect(worker)
 
         try:
             await client.send(_BIG_POST)
             headers, body = await client.read_response()
             assert b"200" in headers.split(b"\r\n", 1)[0]
-            assert b"connection: close" in headers.lower()
+            assert b"connection: close" not in headers.lower()
             assert body == b"20000"
         finally:
             client.teardown()
@@ -531,38 +531,6 @@ def test_wait_readable_notices_already_peeked_bytes() -> None:
     asyncio.run(scenario())
 
 
-def test_bridge_unreader_drains_peeked_bytes() -> None:
-    # The bridge unreader must read through conn.recv so bytes peeked by
-    # the keepalive wait are drained, not stranded — reading conn.reader
-    # directly stalls the body read until it times out. Seeds the peek
-    # buffer directly (see test above for why).
-    async def scenario() -> None:
-        loop = asyncio.get_running_loop()
-        worker = make_worker(handler=_Handler())
-        server_sock, client_sock = socket.socketpair()
-        server_reader, server_writer = await asyncio.open_connection(sock=server_sock)
-        _, client_writer = await asyncio.open_connection(sock=client_sock)
-        conn = Connection(
-            StubApp(),  # ty: ignore[invalid-argument-type]
-            server_reader,
-            server_writer,
-            ("127.0.0.1", 12345),
-            ("127.0.0.1", 80),
-        )
-
-        try:
-            conn._peeked = b"peeked-body-bytes"
-            unreader = AsyncBridgeUnreader(b"", conn, loop, timeout=2, worker=worker)
-            chunk = await loop.run_in_executor(None, unreader.chunk)
-            assert chunk == b"peeked-body-bytes"
-        finally:
-            client_writer.close()
-            server_writer.close()
-            worker.tpool.shutdown(wait=False)
-
-    asyncio.run(scenario())
-
-
 def test_idle_keepalive_timeout_expiry_closes_the_connection() -> None:
     # When SERVER_KEEPALIVE_TIMEOUT does expire with no request arriving,
     # the connection closes cleanly.
@@ -578,42 +546,6 @@ def test_idle_keepalive_timeout_expiry_closes_the_connection() -> None:
             await client.assert_closed()
         finally:
             client.teardown()
-
-    asyncio.run(scenario())
-
-
-def test_bridge_body_read_respects_drain_deadline() -> None:
-    # During shutdown drain, large-body (bridge) reads are capped by the
-    # same absolute deadline as pre-buffered reads — a stalled client
-    # can't hold the read open for a fresh worker.timeout per chunk.
-    async def scenario() -> None:
-        loop = asyncio.get_running_loop()
-        worker = make_worker(handler=_Handler())
-        server_sock, client_sock = socket.socketpair()
-        server_reader, server_writer = await asyncio.open_connection(sock=server_sock)
-        _, client_writer = await asyncio.open_connection(sock=client_sock)
-        conn = Connection(
-            StubApp(),  # ty: ignore[invalid-argument-type]
-            server_reader,
-            server_writer,
-            ("127.0.0.1", 12345),
-            ("127.0.0.1", 80),
-        )
-
-        try:
-            worker.alive = False
-            worker.drain_read_deadline = time.monotonic() + 0.2
-            unreader = AsyncBridgeUnreader(b"", conn, loop, timeout=30, worker=worker)
-            # The client sends nothing — the read must give up at the
-            # deadline, not after the 30s per-chunk timeout.
-            start = time.monotonic()
-            with pytest.raises(TimeoutError):
-                await loop.run_in_executor(None, unreader.chunk)
-            assert time.monotonic() - start < 2
-        finally:
-            client_writer.close()
-            server_writer.close()
-            worker.tpool.shutdown(wait=False)
 
     asyncio.run(scenario())
 
@@ -635,6 +567,7 @@ def test_shutdown_mid_body_read_bounds_the_read() -> None:
 
             # What Worker.run() does when shutdown starts mid-request.
             worker.alive = False
+            worker.shutdown_event.set()
             worker.drain_read_deadline = time.monotonic() + 0.3
 
             headers, _ = await client.read_response()
@@ -663,6 +596,7 @@ def test_shutdown_mid_chunked_read_bounds_the_read() -> None:
             await asyncio.sleep(0.05)  # server is waiting on more chunks
 
             worker.alive = False
+            worker.shutdown_event.set()
             worker.drain_read_deadline = time.monotonic() + 0.3
 
             headers, _ = await client.read_response()

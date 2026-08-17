@@ -3,65 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote_to_bytes
 
-from plain.http import ContentTooLargeError413
 from plain.http import Request as HttpRequest
 
 if TYPE_CHECKING:
-    from .body import Body
+    from plain.http.request import RequestStream
+
     from .message import Request as ServerRequest
-
-
-class CappedBodyStream:
-    """Body stream that raises once more than max_size bytes are read.
-
-    Backstop for SERVER_MAX_REQUEST_BODY_SIZE on bodies with no declared
-    Content-Length (chunked): those can't be rejected from the headers,
-    so the cap is enforced as the app reads. Declared-length bodies are
-    rejected before the body is read instead (h1 fail-fast), so h1 only
-    attaches this wrapper to chunked requests.
-    """
-
-    def __init__(self, stream: Body, max_size: int) -> None:
-        self._stream = stream
-        self._max_size = max_size
-        self._bytes_read = 0
-
-    def _count(self, data: bytes) -> bytes:
-        self._bytes_read += len(data)
-        if self._bytes_read > self._max_size:
-            raise ContentTooLargeError413(
-                "Request body exceeded settings.SERVER_MAX_REQUEST_BODY_SIZE."
-            )
-        return data
-
-    def _bound(self) -> int:
-        # One byte past the remaining allowance, so an over-cap body
-        # raises instead of silently truncating at the cap.
-        return self._max_size - self._bytes_read + 1
-
-    def read(self, size: int | None = None) -> bytes:
-        if size is None or size < 0:
-            # Read-to-EOF (None and negative sizes both mean that to the
-            # underlying Body) in allowance-bounded pieces: handing the
-            # stream an unbounded read would materialize an over-cap body
-            # in full before the count could raise — accounting, not a
-            # memory bound.
-            pieces = []
-            while True:
-                data = self._count(self._stream.read(self._bound()))
-                if not data:
-                    return b"".join(pieces)
-                pieces.append(data)
-        return self._count(self._stream.read(min(size, self._bound())))
-
-    def readline(self, size: int | None = None) -> bytes:
-        bound = self._bound()
-        if size is None or size < 0 or size > bound:
-            size = bound
-        return self._count(self._stream.readline(size))
-
-    def close(self) -> None:
-        self._stream.close()
 
 
 def _merge_headers(raw_headers: list[tuple[str, str]]) -> dict[str, str]:
@@ -102,7 +49,9 @@ def create_request(
     client: str | bytes | tuple[str, int],
     server: str | tuple[str, int],
     *,
-    max_request_body: int | None,
+    stream: RequestStream,
+    received: int,
+    ingest_seconds: float,
 ) -> HttpRequest:
     """Build a plain.http.Request directly from the server's parsed HTTP message."""
 
@@ -113,6 +62,15 @@ def create_request(
             host = hdr_value
 
     headers = _merge_headers(req.headers)
+
+    # The body was fully received before dispatch, so a chunked request
+    # is de-chunked here exactly like a buffering gateway (RFC 9112
+    # §7.1.3): drop Transfer-Encoding and advertise the actual length.
+    # Content-Length consumers (multipart parsing, request.content_length)
+    # then see chunked and declared bodies identically.
+    if "TRANSFER-ENCODING" in headers:
+        del headers["TRANSFER-ENCODING"]
+        headers["CONTENT-LENGTH"] = str(received)
     remote_addr = _resolve_remote_addr(client)
     server_name, server_port = _resolve_server_address(server, host, req.scheme)
     path = _resolve_path(req.path or "")
@@ -128,13 +86,12 @@ def create_request(
         remote_addr=remote_addr,
     )
 
-    # Body stream — set by the message parser before this point.
-    assert req.body is not None
-    if max_request_body is not None:
-        request._stream = CappedBodyStream(req.body, max_request_body)
-    else:
-        request._stream = req.body
+    # The fully-ingested body (see BodySink) — never a socket-backed
+    # reader, so app reads can't block on the client.
+    request._stream = stream
     request._read_started = False
+    if received:
+        request._body_ingest_seconds = ingest_seconds
 
     return request
 

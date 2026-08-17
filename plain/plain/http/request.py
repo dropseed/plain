@@ -66,6 +66,12 @@ class Request:
     # Set by the request creator (server, test client) before the view runs.
     _stream: RequestStream
 
+    # Stamped by the server after body ingest so the request span can
+    # report what receiving the body cost (a slow upload happens before
+    # dispatch and would otherwise be invisible in traces). None outside
+    # a real server request (test client, h2 requests with no body).
+    _body_ingest_seconds: float | None = None
+
     def __init__(
         self,
         *,

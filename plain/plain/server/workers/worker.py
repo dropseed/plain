@@ -39,6 +39,7 @@ from .. import sock, util
 from ..connection import Connection
 from ..http import h1
 from ..http.h2 import async_handle_h2_connection
+from ..http.sink import BodyBudget
 from .workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
@@ -113,29 +114,47 @@ class Worker:
                 f"SERVER_MAX_REQUEST_BODY_SIZE must be non-negative or None "
                 f"(got {self.max_request_body})."
             )
-        # h1 pre-buffer vs bridge threshold. Never above the policy cap —
-        # a body small enough to pre-buffer must also be small enough to
-        # accept, so pre-buffered bodies never need mid-stream rejection.
-        prebuffer = settings.SERVER_BODY_PREBUFFER_SIZE
-        if prebuffer <= 0:
-            # Belt to the preflight check's braces — env vars bypass
-            # settings.py review, and a non-positive prebuffer would
-            # force every body onto the bridge with Connection: close.
+        # Worker-wide in-flight body budget (503 past it) — bounds total
+        # memory + spooled disk across every connection's uploads.
+        self.max_inflight_body: int | None = settings.SERVER_MAX_INFLIGHT_BODY_SIZE
+        if self.max_inflight_body is not None and self.max_inflight_body < 0:
             raise ImproperlyConfigured(
-                f"SERVER_BODY_PREBUFFER_SIZE must be positive (got {prebuffer})."
+                f"SERVER_MAX_INFLIGHT_BODY_SIZE must be non-negative or None "
+                f"(got {self.max_inflight_body})."
             )
-        self.max_body: int = prebuffer
+        self.body_budget = BodyBudget(self.max_inflight_body)
+        if self.max_request_body is None:
+            # No policy cap: the in-flight budget still floors any
+            # single body, so the oversized request draws its own 413
+            # instead of an innocent concurrent request tripping the
+            # budget 503. Resolved once here so both protocols agree.
+            self.max_request_body = self.max_inflight_body
+        # RAM-vs-disk spool threshold for body ingest. Never above the
+        # policy cap — a body small enough to stay in memory must also
+        # be small enough to accept.
+        memory_size = settings.SERVER_BODY_MAX_MEMORY_SIZE
+        if memory_size <= 0:
+            # Belt to the preflight check's braces — env vars bypass
+            # settings.py review, and BodySink needs a positive spool
+            # threshold.
+            raise ImproperlyConfigured(
+                f"SERVER_BODY_MAX_MEMORY_SIZE must be positive (got {memory_size})."
+            )
+        self.body_max_memory_size: int = memory_size
         if self.max_request_body is not None:
-            self.max_body = min(self.max_body, self.max_request_body)
-        # H2 has no streaming path — streams buffer fully in memory — so
-        # total in-flight body bytes per connection are always bounded
-        # (503 above it): 10x the CONFIGURED prebuffer budget (not the
-        # policy-clamped one — a small request cap must not shrink the
-        # concurrency budget for many small legal streams), raised to the
-        # policy cap when one is set so a single max-size stream always
-        # fits.
-        cap = self.max_request_body if self.max_request_body is not None else 0
-        self.max_h2_aggregate_body: int = max(cap, prebuffer * 10)
+            # Floored at 1: a zero cap rejects every non-empty body
+            # before the spool matters, but SpooledTemporaryFile(0)
+            # disables rollover (unbounded RAM), so never hand the sink 0.
+            self.body_max_memory_size = max(
+                1, min(self.body_max_memory_size, self.max_request_body)
+            )
+        # Slow-drip (R.U.D.Y.) defense — see SERVER_BODY_MIN_BYTES_PER_SECOND.
+        self.body_min_rate: int = settings.SERVER_BODY_MIN_BYTES_PER_SECOND
+        if self.body_min_rate < 0:
+            raise ImproperlyConfigured(
+                f"SERVER_BODY_MIN_BYTES_PER_SECOND must be non-negative "
+                f"(got {self.body_min_rate})."
+            )
         self.keepalive_timeout: float = settings.SERVER_KEEPALIVE_TIMEOUT
         if self.keepalive_timeout <= 0:
             # Belt to the preflight check's braces — env vars bypass
@@ -452,7 +471,9 @@ class Worker:
                     shutdown_event=self.shutdown_event,
                     keepalive_timeout=self.keepalive_timeout,
                     max_request_body=self.max_request_body,
-                    max_aggregate_body=self.max_h2_aggregate_body,
+                    body_budget=self.body_budget,
+                    spool_size=self.body_max_memory_size,
+                    body_min_rate=self.body_min_rate,
                 )
                 return
 

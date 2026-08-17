@@ -46,7 +46,10 @@ class Connection:
         # Bytes read by wait_readable()'s peek, handed back by the next
         # recv() calls so the peek is never lost — recv() drains this
         # before touching the reader, so callers don't need to know.
+        # _peek_offset is the consumed prefix: advancing it instead of
+        # re-slicing keeps draining a large peek in small reads O(n).
         self._peeked: bytes = b""
+        self._peek_offset = 0
 
     def close(self) -> None:
         if not self.writer.is_closing():
@@ -55,12 +58,18 @@ class Connection:
     async def recv(self, n: int) -> bytes:
         """Read up to n bytes from a connection."""
         if self._peeked:
-            if len(self._peeked) <= n:
-                data = self._peeked
+            available = len(self._peeked) - self._peek_offset
+            if available <= n:
+                data = (
+                    self._peeked[self._peek_offset :]
+                    if self._peek_offset
+                    else self._peeked
+                )
                 self._peeked = b""
+                self._peek_offset = 0
             else:
-                data = self._peeked[:n]
-                self._peeked = self._peeked[n:]
+                data = self._peeked[self._peek_offset : self._peek_offset + n]
+                self._peek_offset += n
             return data
         return await self.reader.read(n)
 
@@ -89,6 +98,7 @@ class Connection:
             return True
         data = await self.reader.read(65536)
         if data:
-            self._peeked += data
+            self._peeked = data
+            self._peek_offset = 0
             return True
         return False

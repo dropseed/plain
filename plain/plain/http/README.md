@@ -423,7 +423,7 @@ if self.request.is_https():
 
 #### How do I handle large file uploads?
 
-Uploaded files don't load into memory — multipart uploads over 2.5MB (`FILE_UPLOAD_MAX_MEMORY_SIZE`) stream to a temporary file on disk, and `request.files` hands you the result either way. Multipart uploads must declare a `Content-Length` — a chunked multipart request parses as empty (`request.files` and `request.form_data` come back with nothing). The setting to check is `SERVER_MAX_REQUEST_BODY_SIZE` (default 100MB): requests with bodies over it get a 413, so raise it if you accept larger uploads. `DATA_UPLOAD_MAX_MEMORY_SIZE` separately caps what `request.body` and non-file form fields will materialize in RAM.
+Uploaded files don't load into memory — multipart uploads over 2.5MB (`FILE_UPLOAD_MAX_MEMORY_SIZE`) stream to a temporary file on disk, and `request.files` hands you the result either way. Chunked uploads work too: the server receives the full body before dispatch and de-chunks it, so the app always sees a real `Content-Length`. The setting to check is `SERVER_MAX_REQUEST_BODY_SIZE` (default 10MB): requests with bodies over it get a 413, so raise it if you accept larger uploads — or better, send large files direct to object storage with presigned URLs instead of through the app server. `DATA_UPLOAD_MAX_MEMORY_SIZE` separately caps what `request.body` and non-file form fields will materialize in RAM.
 
 ## Installation
 

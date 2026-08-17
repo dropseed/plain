@@ -198,23 +198,45 @@ SERVER_H2_MAX_CONCURRENT_STREAMS: int = 100
 SERVER_MAX_REQUESTS: int = 10000  # 0 = disabled
 SERVER_MAX_REQUESTS_JITTER: int = 1000  # random variance to stagger restarts
 # Largest request body the server accepts, enforced with a 413 on both
-# HTTP/1.1 (before the body is read when Content-Length declares it; for
-# chunked bodies, as the application reads them) and HTTP/2 (rejected at
-# the headers or mid-stream). None = no limit. This is the request-size
-# policy; on HTTP/1.1 it does not decide memory use — large uploads
-# stream (multipart files spool to temp files via FILE_UPLOAD_HANDLERS).
-# HTTP/2 has no streaming path and buffers each stream's body in memory
-# up to this cap, so on h2 the cap IS a per-stream memory bound.
-SERVER_MAX_REQUEST_BODY_SIZE: int | None = 104857600  # i.e. 100 MB
-# HTTP/1.1 bodies up to this size are received into memory on the event
-# loop before dispatch; larger bodies stream lazily from the socket while
-# the app reads them (holding a request thread for the duration). Internal
-# buffering strategy, not a request-size policy — see
-# SERVER_MAX_REQUEST_BODY_SIZE for that. Also anchors the HTTP/2
-# per-connection buffering budget: max(SERVER_MAX_REQUEST_BODY_SIZE,
-# 10x this value) of in-flight body bytes across a connection's streams
-# (503 above it), or 10x this value when the policy cap is None.
-SERVER_BODY_PREBUFFER_SIZE: int = 10485760  # i.e. 10 MB
+# HTTP/1.1 and HTTP/2. A declared Content-Length over the cap is
+# rejected from the headers, before any of the body transfers; bodies
+# with no declared length (chunked) are rejected the moment the received
+# bytes exceed it, during ingest — always on bytes actually received,
+# never on the declared length alone. This is a pre-auth allowance —
+# what an anonymous client can make a worker receive and spool before
+# any app code runs — so the default covers forms, images, and
+# documents; raise it deliberately for larger uploads, or better, send
+# large files direct to object storage (presigned URLs) instead of
+# through the app server. None = no per-request cap of its own; the
+# request is then limited only by the worker-wide
+# SERVER_MAX_INFLIGHT_BODY_SIZE (a single body can never exceed the
+# in-flight budget, so the worker enforces that bound as this cap and
+# answers with the specific 413 instead of a 503). This is pure
+# request-size policy, not a memory bound: bodies past
+# SERVER_BODY_MAX_MEMORY_SIZE spool to an anonymous temp file.
+SERVER_MAX_REQUEST_BODY_SIZE: int | None = 10485760  # i.e. 10 MB
+# Request bodies are fully received before dispatch — in memory up to
+# this size, spooling to an anonymous temp file beyond it (both
+# protocols). Purely the RAM-vs-disk threshold, kept small because it
+# bounds worst-case ingest memory at roughly this value times the
+# concurrent request count. Per-write spool costs are microseconds
+# (page cache); crossing the threshold pays a one-time rollover copy of
+# this many bytes (~2ms at 1MB) on the event loop.
+SERVER_BODY_MAX_MEMORY_SIZE: int = 1048576  # i.e. 1 MB
+# Total in-flight request-body bytes (memory + disk spool) the worker
+# holds across ALL connections. A request that would push past it gets a
+# 503 — load shedding under an upload flood, bounding worst-case disk
+# use no matter how many clients upload at once. None = no limit.
+SERVER_MAX_INFLIGHT_BODY_SIZE: int | None = 1073741824  # i.e. 1 GB
+# Minimum transfer rate (bytes/second) a client must sustain while the
+# server is receiving a request body, after a short grace period for
+# TCP slow-start. Inactivity timeouts alone can't stop a slow-drip body
+# (R.U.D.Y.) — a client sending one byte per second stays "active"
+# forever while pinning server resources. Only receive time counts
+# (bodies are ingested before dispatch, so request processing can never
+# trip it). Violations get a 408. 0 = disabled. Default matches
+# Kestrel's MinRequestBodyDataRate.
+SERVER_BODY_MIN_BYTES_PER_SECOND: int = 240
 
 # MARK: Preflight Checks
 

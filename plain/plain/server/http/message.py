@@ -6,12 +6,10 @@ from __future__ import annotations
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-import io
 import re
 from typing import Any
 
 from ..util import bytes_to_str, split_request_uri
-from .body import Body, ChunkedReader, LengthReader
 from .errors import (
     InvalidHeader,
     InvalidHeaderName,
@@ -21,7 +19,6 @@ from .errors import (
     InvalidRequestMethod,
     LimitRequestHeaders,
     LimitRequestLine,
-    NoMoreData,
     ObsoleteFolding,
     UnsupportedTransferCoding,
 )
@@ -45,14 +42,16 @@ RFC9110_5_5_INVALID_AND_DANGEROUS = re.compile(r"[\0\r\n]")
 
 
 class Message:
-    def __init__(self, is_ssl: bool, unreader: Any, peer_addr: tuple[str, int] | Any):
-        self.unreader = unreader
+    def __init__(
+        self, is_ssl: bool, header_data: bytes, peer_addr: tuple[str, int] | Any
+    ):
         self.peer_addr = peer_addr
         self.remote_addr = peer_addr
         self.version: tuple[int, int] = (1, 1)
         self.headers: list[tuple[str, str]] = []
-        self.trailers: list[tuple[str, str]] = []
-        self.body: Body | None = None
+        # Body framing, set by set_body_framing: None for chunked bodies
+        # (undeclared length), 0 when there is no body.
+        self.content_length: int | None = 0
         self.scheme = "https" if is_ssl else "http"
         self.must_close = False
 
@@ -72,19 +71,16 @@ class Message:
             self.limit_request_fields * (max_header_field_size + 2) + 4
         )
 
-        unused = self.parse(self.unreader)
-        self.unreader.unread(unused)
-        self.set_body_reader()
+        self.parse(header_data)
+        self.set_body_framing()
 
     def force_close(self) -> None:
         self.must_close = True
 
-    def parse(self, unreader: Any) -> bytes:
+    def parse(self, data: bytes) -> None:
         raise NotImplementedError()
 
-    def parse_headers(
-        self, data: bytes, from_trailer: bool = False
-    ) -> list[tuple[str, str]]:
+    def parse_headers(self, data: bytes) -> list[tuple[str, str]]:
         headers = []
 
         # Split lines on \r\n
@@ -135,7 +131,13 @@ class Message:
 
         return headers
 
-    def set_body_reader(self) -> None:
+    def set_body_framing(self) -> None:
+        """Validate the body-framing headers and record what they declare.
+
+        The body itself is received elsewhere (the event loop's BodySink
+        ingest) — this only rejects ambiguous or unsupported framing and
+        leaves content_length for the ingest to act on (None = chunked).
+        """
         chunked = False
         content_length_str: str | None = None
 
@@ -179,7 +181,7 @@ class Message:
                 # we cannot be certain the message framing we understood matches proxy intent
                 #  -> whatever happens next, remaining input must not be trusted
                 raise InvalidHeader("CONTENT-LENGTH", req=self)
-            self.body = Body(ChunkedReader(self, self.unreader))
+            self.content_length = None
         elif content_length_str is not None:
             content_length: int
             try:
@@ -193,11 +195,11 @@ class Message:
             if content_length < 0:
                 raise InvalidHeader("CONTENT-LENGTH", req=self)
 
-            self.body = Body(LengthReader(self.unreader, content_length))
+            self.content_length = content_length
         else:
             # No Content-Length and not chunked: a request has no body
             # (RFC 9112 §6).
-            self.body = Body(LengthReader(self.unreader, 0))
+            self.content_length = 0
 
     def should_close(self) -> bool:
         if self.must_close:
@@ -217,7 +219,7 @@ class Request(Message):
     def __init__(
         self,
         is_ssl: bool,
-        unreader: Any,
+        header_data: bytes,
         peer_addr: tuple[str, int] | Any,
         req_number: int = 1,
     ):
@@ -233,56 +235,35 @@ class Request(Message):
             self.limit_request_line = MAX_REQUEST_LINE
 
         self.req_number = req_number
-        super().__init__(is_ssl, unreader, peer_addr)
+        super().__init__(is_ssl, header_data, peer_addr)
 
-    def get_data(self, unreader: Any, buf: io.BytesIO, stop: bool = False) -> None:
-        # Bounded pull: an unsized read() would drain the ENTIRE
-        # pre-buffered request (headers + body) into this parse buffer —
-        # a multi-copy of the whole body just to find the header
-        # terminator. Header parsing never legitimately needs more than
-        # max_buffer_headers per pull; the unread in Message.__init__
-        # hands back what the headers didn't consume.
-        data = unreader.read_some(self.max_buffer_headers)
-        if not data:
-            if stop:
-                raise StopIteration()
-            raise NoMoreData(buf.getvalue())
-        buf.write(data)
+    def parse(self, data: bytes) -> None:
+        """Parse a complete header block (request line through \\r\\n\\r\\n).
 
-    def parse(self, unreader: Any) -> bytes:
-        buf = io.BytesIO()
-        self.get_data(unreader, buf, stop=True)
+        The connection loop reads the block off the socket before this
+        runs (async_read_headers), so there is no I/O here — just
+        splitting and validating what already arrived.
+        """
+        if len(data) > self.max_buffer_headers:
+            raise LimitRequestHeaders("max buffer headers")
 
-        # get request line
-        line, rbuf = self.read_line(unreader, buf, self.limit_request_line)
+        # Request line
+        idx = data.find(b"\r\n")
+        if idx < 0:
+            raise InvalidRequestLine(bytes_to_str(data[:64]))
+        if idx > self.limit_request_line > 0:
+            raise LimitRequestLine(idx, self.limit_request_line)
+        self.parse_request_line(data[:idx])
 
-        self.parse_request_line(line)
-        buf = io.BytesIO()
-        buf.write(rbuf)
-
-        # Headers
-        data = buf.getvalue()
-        idx = data.find(b"\r\n\r\n")
-
-        done = data[:2] == b"\r\n"
-        while True:
-            idx = data.find(b"\r\n\r\n")
-            done = data[:2] == b"\r\n"
-
-            if idx < 0 and not done:
-                self.get_data(unreader, buf)
-                data = buf.getvalue()
-                if len(data) > self.max_buffer_headers:
-                    raise LimitRequestHeaders("max buffer headers")
-            else:
-                break
-
-        if done:
-            self.unreader.unread(data[2:])
-            ret = b""
+        # Headers: everything up to the terminating blank line.
+        rest = data[idx + 2 :]
+        end = rest.find(b"\r\n\r\n")
+        if rest[:2] == b"\r\n":
+            self.headers = []
+        elif end < 0:
+            raise InvalidRequestLine(bytes_to_str(data[:64]))
         else:
-            self.headers = self.parse_headers(data[:idx], from_trailer=False)
-            ret = data[idx + 4 :]
+            self.headers = self.parse_headers(rest[:end])
 
         if self.version >= (1, 1):
             host_headers = [v for name, v in self.headers if name == "HOST"]
@@ -292,31 +273,6 @@ class Request(Message):
                 raise InvalidHostHeader("multiple Host headers")
             if " " in host_headers[0] or "\t" in host_headers[0]:
                 raise InvalidHostHeader("invalid whitespace in Host value")
-
-        buf = None
-        return ret
-
-    def read_line(
-        self, unreader: Any, buf: io.BytesIO, limit: int = 0
-    ) -> tuple[bytes, bytes]:
-        data = buf.getvalue()
-
-        while True:
-            idx = data.find(b"\r\n")
-            if idx >= 0:
-                # check if the request line is too large
-                if idx > limit > 0:
-                    raise LimitRequestLine(idx, limit)
-                break
-            if len(data) - 2 > limit > 0:
-                raise LimitRequestLine(len(data), limit)
-            self.get_data(unreader, buf)
-            data = buf.getvalue()
-
-        return (
-            data[:idx],  # request line,
-            data[idx + 2 :],
-        )  # residue in the buffer, skip \r\n
 
     def parse_request_line(self, line_bytes: bytes) -> None:
         bits = [bytes_to_str(bit) for bit in line_bytes.split(b" ", 2)]
