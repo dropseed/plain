@@ -40,6 +40,9 @@ dev = [
   "plain-toolbar",
   "plain-tunnel",
   "plain-vendor",
+  # Optional runtime dep of plain's cli/agent.py plugin discovery; hoisted so
+  # ty resolves its imports in every dev/CI environment.
+  "plainx-dev",
   # Type checking and better dev experience
   "ty>=0.0.72",
   "psycopg[binary]>=3.2.12",
