@@ -44,7 +44,7 @@ class Greet(MCPTool):
 class AppMCP(MCPView, AuthView):
     name = "myapp"
     login_required = True
-    tools = [Greet]
+    tools = (Greet,)
 ```
 
 Mount it:
@@ -186,12 +186,12 @@ class ListMyNotes(AppTool):
 
 class AppMCP(OAuthResourceServer, MCPView):
     name = "myapp"
-    tools = [ListMyNotes]
+    tools = (ListMyNotes,)
 
     def authenticate_token(self, token: str) -> TokenInfo | None: ...
 ```
 
-The `mcp: AppMCP` annotation is a forward reference (resolved lazily), so this natural order just works — base tool and tools first, then the view with `tools = [...]`. A tool that needs nothing view-specific stays bare — `class Greet(MCPTool)` — and `self.mcp` is the base `MCPView` (request, no user).
+The `mcp: AppMCP` annotation is a forward reference (resolved lazily), so this natural order just works — base tool and tools first, then the view with `tools = (...)`. A tool that needs nothing view-specific stays bare — `class Greet(MCPTool)` — and `self.mcp` is the base `MCPView` (request, no user).
 
 **Signaling errors.** Raise [`MCPToolError`](./exceptions.py#MCPToolError) from `run()` for an expected, caller-facing failure — bad input, not found, forbidden. The message goes back to the client with `isError: true` (MCP's in-result error channel) so the model can self-correct, and it is _not_ logged as a server exception. Any other exception is treated as a bug: logged server-side and returned as an opaque "Tool execution failed".
 
@@ -284,7 +284,7 @@ class ListOrders(ReadTool):
 
 ## Resources
 
-Resources are addressable data sources your server exposes for reading. Each resource is an [`MCPResource`](./resources.py#MCPResource) subclass with a URI and a `read()` method. Declare them on the MCP with `resources = [...]` (parallel to `tools`):
+Resources are addressable data sources your server exposes for reading. Each resource is an [`MCPResource`](./resources.py#MCPResource) subclass with a URI and a `read()` method. Declare them on the MCP with `resources = (...)` (parallel to `tools`):
 
 ```python
 from pathlib import Path
@@ -315,7 +315,7 @@ class AppReadme(MCPResource):
 
 class AppMCP(MCPView):
     name = "myapp"
-    resources = [AppVersion, AppReadme]
+    resources = (AppVersion, AppReadme)
 ```
 
 Metadata is derived automatically:
@@ -370,13 +370,13 @@ from plain.mcp import MCPUnauthorized, MCPView
 class AppMCP(MCPView, AuthView):
     name = "myapp-api"
     login_required = True
-    tools = [ListCustomerOrders]
+    tools = (ListCustomerOrders,)
 
 
 class StaffMCP(MCPView, AuthView):
     name = "myapp-staff"
     login_required = True
-    tools = [DescribeSchema]
+    tools = (DescribeSchema,)
 
     def check_auth(self):
         super().check_auth()  # login_required from AuthView
@@ -498,7 +498,7 @@ from plain.oauthserver import validate_access_token
 
 class AppMCP(OAuthResourceServer, MCPView):
     name = "myapp"
-    tools = [...]
+    tools = (MyTool,)
 
     def authenticate_token(self, token: str) -> TokenInfo | None:
         at = validate_access_token(token, resource=self.oauth_resource)
@@ -590,7 +590,7 @@ class AppMCP(MCPView, AuthView):
 
     def get_tools(self):
         if self.user and self.user.is_superuser:
-            return self.tools  # superuser sees everything, skipping allowed_for
+            return list(self.tools)  # superuser sees everything, skipping allowed_for
         tools = super().get_tools()  # applies each tool's allowed_for
         if settings.READONLY_MODE:
             tools = [t for t in tools if not getattr(t, "mutates", False)]
