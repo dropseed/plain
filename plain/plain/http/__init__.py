@@ -1,10 +1,10 @@
 from .cookie import parse_cookie
 from .exceptions import (
     BadRequestError400,
+    ContentTooLargeError413,
     ForbiddenError403,
     HTTPException,
     NotFoundError404,
-    RequestDataTooBigError400,
     SuspiciousFileOperationError400,
     SuspiciousMultipartFormError400,
     SuspiciousOperationError400,
@@ -36,6 +36,7 @@ __all__ = [
     "AsyncStreamingResponse",
     "BadHeaderError",
     "BadRequestError400",
+    "ContentTooLargeError413",
     "FileResponse",
     "ForbiddenError403",
     "HTTPException",
@@ -48,7 +49,6 @@ __all__ = [
     "RawPostDataException",
     "RedirectResponse",
     "Request",
-    "RequestDataTooBigError400",
     "RequestHeaders",
     "Response",
     "StreamingResponse",

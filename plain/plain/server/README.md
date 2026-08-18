@@ -320,21 +320,24 @@ graph TD
     C -->|TLS ALPN| P{Protocol?}
     P -->|h2| H2[HTTP/2 handler]
     P -->|http/1.1| HDR[Read headers async]
-    HDR --> BODY{Body size?}
-    BODY -->|"small (≤ limit)"| PRE[Pre-buffer body async]
-    BODY -->|"large (> limit)"| BRIDGE[AsyncBridgeUnreader]
-    PRE --> PARSE[Parse request]
-    BRIDGE -->|"parse in thread pool"| PARSE
+    HDR --> PARSE[Parse request]
+    PARSE --> SINK[Ingest body via BodySink]
     H2 -->|"h2 codec (sans-I/O)"| STREAMS[Multiplexed streams]
-    STREAMS -->|per stream| TP[Thread pool]
-    PARSE --> TP
+    STREAMS -->|DATA frames| SINK
+    SINK -->|body complete| TP[Thread pool]
     TP --> MW[before_request + view + after_response]
     MW -->|write response async| EL
 ```
 
-**Request body handling:** Small request bodies (≤ `DATA_UPLOAD_MAX_MEMORY_SIZE`, default 2.5MB) are pre-buffered on the event loop before parsing. Large bodies use `AsyncBridgeUnreader` which streams data lazily from the socket — the parser runs in the thread pool and bridges back to the event loop for socket reads. This keeps memory bounded while supporting large file uploads through multipart streaming to temp files.
+**Request body handling:** Both protocols receive the entire request body on the event loop before dispatch, through one ingestion path (the body sink): bodies stay in memory up to `SERVER_BODY_MAX_MEMORY_SIZE` (default 1MB) and spool to an anonymous temp file beyond it — the file is unlinked at creation, so a killed worker can never leak spooled disk (disk is a request-path dependency: a spool write failure is a 500 for that request, nothing more). Chunked transfer encoding is decoded during ingest, and the request is handed to the app de-chunked — a real `Content-Length`, no `Transfer-Encoding` — exactly as a buffering gateway would forward it, so `Content-Length` consumers like multipart parsing behave identically for chunked and declared bodies. Because the body is fully consumed off the wire before the response, connections keep-alive after uploads of any size, request threads are held only for view time, and async views can read bodies of any size.
 
-**Async views note:** Async views that read the request body work with pre-buffered (small) requests. For large bodies on the bridge path, body reads must happen in the thread pool (sync views). If you need async views to handle large uploads, increase `DATA_UPLOAD_MAX_MEMORY_SIZE` to cover your expected body sizes.
+This is the same model as Puma, Waitress, and PHP-FPM: views never stream a request body as it arrives — dispatch starts when the body is complete. Ingest happens before the request span opens, so its cost is recorded on the span as `http.request.body.size` and `plain.request.body_ingest_seconds` — check those before blaming a view for a slow upload.
+
+**Request body limits:** Three independent bounds apply during ingest:
+
+- `SERVER_MAX_REQUEST_BODY_SIZE` (default 10MB) — per-request policy cap, rejected with a 413. A declared Content-Length over the cap is refused from the headers, before any of the body transfers (and before any `100 Continue`); bodies with no declared length are rejected the moment received bytes exceed it. This is a pre-auth allowance — what an anonymous client can make a worker receive before any app code runs — so the default covers forms, images, and documents. Raise it deliberately if the app accepts larger uploads; for genuinely large files, prefer uploading direct to object storage (presigned URLs) rather than through the app server. `None` means no per-request cap of its own — a single body is then still bounded by the in-flight budget below, answered with a 413.
+- `SERVER_MAX_INFLIGHT_BODY_SIZE` (default 1GB, `None` = unlimited) — worker-wide budget on total in-flight body bytes (memory + disk) across all connections, rejected with a 503 (with `Retry-After: 1` — this is load shedding, and the shed request is safe to retry). This bounds worst-case disk use under an upload flood; completed requests release their share.
+- `SERVER_BODY_MIN_BYTES_PER_SECOND` (default 240, `0` = disabled) — minimum transfer rate while a request body is being received, after a short grace period and sustained over a rolling window (bytes sent early can't bank unbounded credit toward later silence). Inactivity timeouts can't stop a slow-drip body (R.U.D.Y.); the throughput floor can — on HTTP/1.1 against active socket-wait time, on HTTP/2 per stream. Violations get a 408.
 
 ## Installation
 

@@ -24,7 +24,7 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 from .exceptions import (
     BadRequestError400,
-    RequestDataTooBigError400,
+    ContentTooLargeError413,
     SuspiciousMultipartFormError400,
     TooManyFieldsSentError400,
     TooManyFilesSentError400,
@@ -239,7 +239,7 @@ class MultiPartParser:
                         settings.DATA_UPLOAD_MAX_MEMORY_SIZE is not None
                         and num_bytes_read > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
                     ):
-                        raise RequestDataTooBigError400(
+                        raise ContentTooLargeError413(
                             "Request body exceeded "
                             "settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
                         )

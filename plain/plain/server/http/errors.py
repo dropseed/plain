@@ -99,20 +99,20 @@ class UnsupportedTransferCoding(ParseException):
         return f"Unsupported transfer coding: {self.hdr!r}"
 
 
-class InvalidChunkSize(IOError):
-    def __init__(self, data: bytes):
-        self.data = data
+class ChunkedFramingError(ParseException):
+    def __init__(self, info: str):
+        self.info = info
 
     def __str__(self) -> str:
-        return f"Invalid chunk size: {self.data!r}"
+        return f"Invalid chunked transfer encoding: {self.info}"
 
 
-class ChunkMissingTerminator(IOError):
-    def __init__(self, term: bytes):
-        self.term = term
+class BodyBudgetExceeded(ParseException):
+    def __init__(self, limit: int):
+        self.limit = limit
 
     def __str__(self) -> str:
-        return f"Invalid chunk terminator is not '\\r\\n': {self.term!r}"
+        return f"In-flight request bodies exceeded {self.limit} bytes"
 
 
 class LimitRequestLine(ParseException):
@@ -130,6 +130,17 @@ class LimitRequestHeaders(ParseException):
 
     def __str__(self) -> str:
         return self.msg
+
+
+class LimitRequestBody(ParseException):
+    """Declared request body exceeds SERVER_MAX_REQUEST_BODY_SIZE."""
+
+    def __init__(self, size: int, max_size: int):
+        self.size = size
+        self.max_size = max_size
+
+    def __str__(self) -> str:
+        return f"Request body is too large ({self.size} > {self.max_size})"
 
 
 class InvalidProxyLine(ParseException):

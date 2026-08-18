@@ -88,9 +88,13 @@ def _error_response_bytes(status_int: int, reason: str, mesg: str) -> bytes:
         "</html>\n"
     )
 
+    # The load-shedding 503 explicitly invites a retry — tell
+    # well-behaved clients how soon.
+    retry_after = "Retry-After: 1\r\n" if status_int == 503 else ""
     response = (
         f"HTTP/1.1 {status_int} {reason}\r\n"
         f"Connection: close\r\n"
+        f"{retry_after}"
         f"Content-Type: text/html\r\n"
         f"Content-Length: {len(body)}\r\n"
         f"\r\n"

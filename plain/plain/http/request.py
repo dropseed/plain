@@ -27,7 +27,7 @@ from plain.utils.http import parse_header_parameters
 
 from .exceptions import (
     BadRequestError400,
-    RequestDataTooBigError400,
+    ContentTooLargeError413,
     TooManyFieldsSentError400,
     UnsupportedMediaTypeError415,
 )
@@ -65,6 +65,12 @@ class Request:
 
     # Set by the request creator (server, test client) before the view runs.
     _stream: RequestStream
+
+    # Stamped by the server after body ingest so the request span can
+    # report what receiving the body cost (a slow upload happens before
+    # dispatch and would otherwise be invisible in traces). None outside
+    # a real server request (test client, h2 requests with no body).
+    _body_ingest_seconds: float | None = None
 
     def __init__(
         self,
@@ -334,7 +340,7 @@ class Request:
 
             # Fast path: reject immediately if Content-Length exceeds the limit.
             if max_size is not None and self.content_length > max_size:
-                raise RequestDataTooBigError400(
+                raise ContentTooLargeError413(
                     "Request body exceeded settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
                 )
 
@@ -351,7 +357,7 @@ class Request:
                             break
                         bytes_read += len(chunk)
                         if bytes_read > max_size:
-                            raise RequestDataTooBigError400(
+                            raise ContentTooLargeError413(
                                 "Request body exceeded settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
                             )
                         chunks.append(chunk)

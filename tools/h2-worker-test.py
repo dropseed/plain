@@ -348,10 +348,10 @@ def test_post_with_body(addr: tuple[str, int]) -> bool | tuple[bool, str]:
 
 
 def test_oversized_body_413(addr: tuple[str, int]) -> bool | tuple[bool, str]:
-    """POST body exceeding DATA_UPLOAD_MAX_MEMORY_SIZE gets 413."""
+    """POST body exceeding SERVER_MAX_REQUEST_BODY_SIZE gets 413."""
     sock, conn = create_h2_connection(addr)
     try:
-        # Default DATA_UPLOAD_MAX_MEMORY_SIZE is 2621440 (2.5 MB)
+        # The launcher sets PLAIN_SERVER_MAX_REQUEST_BODY_SIZE=2621440 (2.5 MB)
         body = b"x" * (3 * 1024 * 1024)
         _, response = send_large_body(conn, sock, body)
         status = response["status"]

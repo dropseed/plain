@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from io import BytesIO
 
@@ -13,7 +14,7 @@ from opentelemetry.semconv.attributes.db_attributes import (
     DB_OPERATION_NAME,
     DB_QUERY_TEXT,
 )
-from plain.http import Response, StreamingResponse
+from plain.http import JsonResponse, Response, StreamingResponse
 from plain.urls import Router, path
 from plain.views import View
 
@@ -46,6 +47,43 @@ class UploadView(View):
     def post(self):
         uploaded = self.request.files["upload"]
         return Response(f"{type(uploaded).__name__}:{len(uploaded.read())}")
+
+
+class EchoBodyView(View):
+    """Echoes back the byte count of the raw request body."""
+
+    def post(self):
+        return Response(str(len(self.request.body)))
+
+
+class MultipartEchoView(View):
+    """Describes everything the multipart parser produced for a request.
+
+    File contents come back as a sha256 digest so large uploads can be
+    compared byte-for-byte without shipping the bytes through the response.
+    """
+
+    def post(self):
+        return JsonResponse(
+            {
+                "form_data": dict(self.request.form_data.lists()),
+                "files": [
+                    {
+                        "field_name": field_name,
+                        "name": uploaded.name,
+                        "content_type": uploaded.content_type,
+                        # The parser hands back `charset` as bytes rather than
+                        # str, so repr() is what keeps that visible through JSON.
+                        "charset_repr": repr(uploaded.charset),
+                        "size": uploaded.size,
+                        "handler": type(uploaded).__name__,
+                        "sha256": hashlib.sha256(uploaded.read()).hexdigest(),
+                    }
+                    for field_name, uploads in self.request.files.lists()
+                    for uploaded in uploads
+                ],
+            }
+        )
 
 
 def _query_span(sql: str, *, file_path: str, function: str, line: int) -> None:
@@ -114,6 +152,8 @@ class AppRouter(Router):
         path("", TestView, name="index"),
         path("stream", StreamView, name="stream"),
         path("upload", UploadView, name="upload"),
+        path("echo-body", EchoBodyView, name="echo_body"),
+        path("multipart-echo", MultipartEchoView, name="multipart_echo"),
         path("queries", QueriesView, name="queries"),
         path("boom", BoomView, name="boom"),
     )

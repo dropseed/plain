@@ -69,8 +69,12 @@ class TooManyFilesSentError400(SuspiciousOperationError400):
     """
 
 
-class RequestDataTooBigError400(SuspiciousOperationError400):
+class ContentTooLargeError413(HTTPException):
+    """The request body is larger than the server or app accepts (HTTP 413).
+
+    Raised when a body exceeds settings.SERVER_MAX_REQUEST_BODY_SIZE at the
+    server edge, or when the bytes read into memory (excluding file
+    uploads) exceed settings.DATA_UPLOAD_MAX_MEMORY_SIZE.
     """
-    The size of the request (excluding any file uploads) exceeded
-    settings.DATA_UPLOAD_MAX_MEMORY_SIZE.
-    """
+
+    status_code = 413

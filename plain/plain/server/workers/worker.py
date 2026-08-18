@@ -39,6 +39,7 @@ from .. import sock, util
 from ..connection import Connection
 from ..http import h1
 from ..http.h2 import async_handle_h2_connection
+from ..http.sink import BodyBudget
 from .workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
@@ -104,7 +105,56 @@ class Worker:
 
         self.max_connections: int = settings.SERVER_CONNECTIONS
         self.max_keepalived: int = self.max_connections - self.app.threads
-        self.max_body: int = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or (10 * 1024 * 1024)
+        # Server-edge policy cap on request body size (413 above it).
+        # Only None means unlimited — a negative value would silently
+        # reject every body instead of reporting the bad config.
+        self.max_request_body: int | None = settings.SERVER_MAX_REQUEST_BODY_SIZE
+        if self.max_request_body is not None and self.max_request_body < 0:
+            raise ImproperlyConfigured(
+                f"SERVER_MAX_REQUEST_BODY_SIZE must be non-negative or None "
+                f"(got {self.max_request_body})."
+            )
+        # Worker-wide in-flight body budget (503 past it) — bounds total
+        # memory + spooled disk across every connection's uploads.
+        self.max_inflight_body: int | None = settings.SERVER_MAX_INFLIGHT_BODY_SIZE
+        if self.max_inflight_body is not None and self.max_inflight_body < 0:
+            raise ImproperlyConfigured(
+                f"SERVER_MAX_INFLIGHT_BODY_SIZE must be non-negative or None "
+                f"(got {self.max_inflight_body})."
+            )
+        self.body_budget = BodyBudget(self.max_inflight_body)
+        if self.max_request_body is None:
+            # No policy cap: the in-flight budget still floors any
+            # single body, so the oversized request draws its own 413
+            # instead of an innocent concurrent request tripping the
+            # budget 503. Resolved once here so both protocols agree.
+            self.max_request_body = self.max_inflight_body
+        # RAM-vs-disk spool threshold for body ingest. Never above the
+        # policy cap — a body small enough to stay in memory must also
+        # be small enough to accept.
+        memory_size = settings.SERVER_BODY_MAX_MEMORY_SIZE
+        if memory_size <= 0:
+            # Belt to the preflight check's braces — env vars bypass
+            # settings.py review, and BodySink needs a positive spool
+            # threshold.
+            raise ImproperlyConfigured(
+                f"SERVER_BODY_MAX_MEMORY_SIZE must be positive (got {memory_size})."
+            )
+        self.body_max_memory_size: int = memory_size
+        if self.max_request_body is not None:
+            # Floored at 1: a zero cap rejects every non-empty body
+            # before the spool matters, but SpooledTemporaryFile(0)
+            # disables rollover (unbounded RAM), so never hand the sink 0.
+            self.body_max_memory_size = max(
+                1, min(self.body_max_memory_size, self.max_request_body)
+            )
+        # Slow-drip (R.U.D.Y.) defense — see SERVER_BODY_MIN_BYTES_PER_SECOND.
+        self.body_min_rate: int = settings.SERVER_BODY_MIN_BYTES_PER_SECOND
+        if self.body_min_rate < 0:
+            raise ImproperlyConfigured(
+                f"SERVER_BODY_MIN_BYTES_PER_SECOND must be non-negative "
+                f"(got {self.body_min_rate})."
+            )
         self.keepalive_timeout: float = settings.SERVER_KEEPALIVE_TIMEOUT
         if self.keepalive_timeout <= 0:
             # Belt to the preflight check's braces — env vars bypass
@@ -420,6 +470,10 @@ class Worker:
                     on_stream_complete=self._count_request,
                     shutdown_event=self.shutdown_event,
                     keepalive_timeout=self.keepalive_timeout,
+                    max_request_body=self.max_request_body,
+                    body_budget=self.body_budget,
+                    spool_size=self.body_max_memory_size,
+                    body_min_rate=self.body_min_rate,
                 )
                 return
 
