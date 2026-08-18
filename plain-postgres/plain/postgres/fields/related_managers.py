@@ -23,7 +23,6 @@ from plain.postgres.dialect import quote_name
 from plain.postgres.expressions import RawSQL, Window
 from plain.postgres.functions import RowNumber
 from plain.postgres.lookups import GreaterThan, LessThanOrEqual
-from plain.postgres.meta import require_field_name
 from plain.postgres.query import QuerySet
 from plain.postgres.query_utils import Q
 from plain.postgres.utils import resolve_callables
@@ -93,13 +92,13 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         # annotation of a descriptor type makes ty apply descriptor protocol
         # to every access instead of treating it as a plain instance attribute.
         self.field: ForeignKeyField = field
-        self.field_name: str = require_field_name(field)
+        self.field_name: str = field.contributed_name
         self.core_filters = {self.field_name: instance}
         self.allow_null = self.field.allow_null
 
     def _check_fk_val(self) -> None:
         field = self.field.target_field
-        field_name = require_field_name(field)
+        field_name = field.contributed_name
         if getattr(self.instance, field_name) is None:
             raise ValueError(
                 f'"{self.instance!r}" needs to have a value for field '
@@ -113,7 +112,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         queryset._defer_next_filter = True
         queryset = queryset.filter(**self.core_filters)
         target_field = self.field.target_field
-        rel_obj_id = getattr(self.instance, require_field_name(target_field))
+        rel_obj_id = getattr(self.instance, target_field.contributed_name)
         if rel_obj_id is None:
             return queryset.none()
         queryset._known_related_objects = {self.field: {rel_obj_id: self.instance}}

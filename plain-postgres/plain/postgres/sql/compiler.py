@@ -33,7 +33,7 @@ from plain.postgres.fields import DATABASE_DEFAULT
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.functions import Cast, Random
 from plain.postgres.lookups import Lookup
-from plain.postgres.meta import Meta, require_field_name
+from plain.postgres.meta import Meta
 from plain.postgres.query_utils import select_related_descend
 from plain.postgres.sql.constants import (
     CURSOR,
@@ -1015,7 +1015,7 @@ class SQLCompiler:
 
             if not select_related_descend(f, restricted, requested, select_mask):
                 continue
-            field_name = require_field_name(f)
+            field_name = f.contributed_name
             related_select_mask = select_mask.get(f) or {}
             klass_info: dict[str, Any] = {
                 "model": f.remote_field.model,

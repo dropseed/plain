@@ -770,8 +770,6 @@ class ManyToManyField(RelatedField):
                     :2
                 ]
 
-                from plain.postgres.meta import require_field_name
-
                 for field_name, related_model in (
                     (source_field_name, source),
                     (target_field_name, target),
@@ -782,7 +780,7 @@ class ManyToManyField(RelatedField):
                             hasattr(f, "remote_field")
                             and getattr(f.remote_field, "model", None) == related_model
                         ):
-                            possible_field_names.append(require_field_name(f))
+                            possible_field_names.append(f.contributed_name)
                     if possible_field_names:
                         fix = (
                             "Did you mean one of the following foreign keys to '{}': "

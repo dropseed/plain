@@ -31,17 +31,6 @@ def make_immutable_fields_list[T](name: str, data: Iterable[T]) -> ImmutableList
     return ImmutableList(data, warning=IMMUTABLE_WARNING % name)
 
 
-def require_field_name(field: Field) -> str:
-    """Narrow a field's name from `str | None` to `str`.
-
-    Field.name is only `None` before contribute_to_class() runs; every field
-    reachable through Meta (fields, concrete_fields, get_fields(), etc.) has
-    already been contributed to a model class and always has a name.
-    """
-    assert field.name is not None, "Field must have a name"
-    return field.name
-
-
 class Meta:
     """
     Model metadata descriptor and container.
@@ -296,8 +285,7 @@ class Meta:
     @cached_property
     def _forward_fields_map(self) -> dict[str, Field]:
         return {
-            require_field_name(field): field
-            for field in self._get_fields(reverse=False)
+            field.contributed_name: field for field in self._get_fields(reverse=False)
         }
 
     @cached_property
@@ -556,7 +544,7 @@ class Meta:
         names = []
         for field in self.concrete_fields:
             if not field.primary_key:
-                names.append(require_field_name(field))
+                names.append(field.contributed_name)
         return frozenset(names)
 
     @cached_property

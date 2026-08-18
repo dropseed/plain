@@ -96,9 +96,7 @@ EXPLAIN_OPTIONS_PATTERN = _lazy_re_compile(r"[\w\-]+")
 def get_field_names_from_opts(meta: Meta | None) -> set[str]:
     if meta is None:
         return set()
-    from plain.postgres.meta import require_field_name
-
-    return {require_field_name(f) for f in meta.get_fields()}
+    return {f.contributed_name for f in meta.get_fields()}
 
 
 class JoinInfo(NamedTuple):
@@ -552,11 +550,9 @@ class Query(BaseExpression):
         if not (q.distinct and q.is_sliced):
             if q.group_by is True:
                 assert self.model is not None, "GROUP BY requires a model"
-                from plain.postgres.meta import require_field_name
-
                 q.add_fields(
                     (
-                        require_field_name(f)
+                        f.contributed_name
                         for f in self.model._model_meta.concrete_fields
                     ),
                     False,
@@ -2217,8 +2213,6 @@ class Query(BaseExpression):
             self.set_annotation_mask(self.annotation_select_mask.union(names))
 
     def set_values(self, fields: list[str]) -> None:
-        from plain.postgres.meta import require_field_name
-
         self.select_related = False
         self.clear_deferred_loading()
         self.clear_select_fields()
@@ -2243,7 +2237,7 @@ class Query(BaseExpression):
         else:
             assert self.model is not None, "Default values query requires a model"
             field_names = [
-                require_field_name(f) for f in self.model._model_meta.concrete_fields
+                f.contributed_name for f in self.model._model_meta.concrete_fields
             ]
             selected = frozenset(field_names)
         # Selected annotations must be known before setting the GROUP BY
@@ -2251,7 +2245,7 @@ class Query(BaseExpression):
         if self.group_by is True:
             assert self.model is not None, "GROUP BY True requires a model"
             self.add_fields(
-                (require_field_name(f) for f in self.model._model_meta.concrete_fields),
+                (f.contributed_name for f in self.model._model_meta.concrete_fields),
                 False,
             )
             # Disable GROUP BY aliases to avoid orphaning references to the

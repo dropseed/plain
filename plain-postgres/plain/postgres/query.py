@@ -1556,8 +1556,6 @@ class RawQuerySet:
         self,
     ) -> tuple[list[str], list[int], list[tuple[str, int]]]:
         """Resolve the init field names and value positions."""
-        from plain.postgres.meta import require_field_name
-
         model = self.model
         assert model is not None
         model_init_fields = [
@@ -1569,7 +1567,7 @@ class RawQuerySet:
             if column not in self.model_fields
         ]
         model_init_order = [self.columns.index(f.column) for f in model_init_fields]
-        model_init_names = [require_field_name(f) for f in model_init_fields]
+        model_init_names = [f.contributed_name for f in model_init_fields]
         return model_init_names, model_init_order, annotation_fields
 
     def prefetch_related(self, *lookups: str | Prefetch | None) -> RawQuerySet:
