@@ -480,6 +480,8 @@ The impersonate feature lets admin users log in as another user to debug issues 
 
 To start impersonating, visit a user's detail page in the admin and click the "Impersonate" link. The admin toolbar will show who you're impersonating and provide a link to stop.
 
+Inside the admin itself, the account menu in the top right keeps showing *your* avatar while you impersonate — it acts on your account, not the impersonated user's — and it lists who you're impersonating with a "Stop impersonating" item.
+
 By default, users with `is_admin=True` can impersonate other users. Admin users cannot be impersonated (for security). You can customize who can impersonate by defining `IMPERSONATE_ALLOWED` in your settings:
 
 ```python
