@@ -107,7 +107,7 @@ class MCPView(View):
 
         class AppMCP(MCPView):
             name = "myapp"
-            tools = [Greet]
+            tools = (Greet,)
 
         # app/urls.py
         path("mcp", AppMCP, name="mcp")
@@ -122,7 +122,7 @@ class MCPView(View):
 
         class AppMCP(MCPView):
             name = "myapp"
-            tools = [Greet, Search]
+            tools = (Greet, Search)
 
     Or imperatively, which is how third-party packages attach to a shared
     MCPView they don't own (e.g. `plain.admin.mcp.AdminMCP`):
