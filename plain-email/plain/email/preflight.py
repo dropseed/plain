@@ -1,7 +1,9 @@
 """Deploy checks for email configuration.
 
-Both run only under `plain preflight --deploy`, and only when
-`plain.email` is installed — the preflight autodiscovery imports this
+Registered with `deploy=True`, so they run under `plain preflight --deploy`
+and anywhere else deploy checks are included — the admin preflight view and
+the toolbar badge pull them in whenever `DEBUG` is False. They exist only
+when `plain.email` is installed, since preflight autodiscovery imports this
 module per installed package.
 """
 
@@ -44,22 +46,35 @@ class CheckEmailBackend(PreflightCheck):
 
 @register_check(name="email.smtp_host", deploy=True)
 class CheckEmailSMTPHost(PreflightCheck):
-    """Warns when the SMTP backend is still pointed at the default host."""
+    """Ensures the SMTP backend points at a mail server in production deployment."""
 
     def run(self) -> list[PreflightResult]:
         if settings.EMAIL_BACKEND != SMTP_BACKEND:
+            # A non-delivering backend is email.backend's to report, and a
+            # third-party backend may not read EMAIL_HOST at all.
             return []
 
-        if settings.EMAIL_HOST != DEFAULT_EMAIL_HOST:
-            return []
+        if not settings.EMAIL_HOST:
+            # smtplib skips connecting when the host is empty, so the first
+            # send raises SMTPServerDisconnected. Never intentional.
+            return [
+                PreflightResult(
+                    fix="EMAIL_HOST is empty while using the SMTP backend, so every send fails "
+                    "with SMTPServerDisconnected. Set EMAIL_HOST to your mail server.",
+                    id="email.smtp_host_empty",
+                )
+            ]
 
-        return [
-            PreflightResult(
-                fix=f"EMAIL_HOST is still the default {DEFAULT_EMAIL_HOST!r} while using the SMTP "
-                "backend. That only delivers if a mail relay is running on the same host — "
-                "otherwise every send fails. Set EMAIL_HOST to your mail provider, or silence "
-                "this result if you do run a local relay.",
-                id="email.smtp_host_is_default",
-                warning=True,
-            )
-        ]
+        if settings.EMAIL_HOST == DEFAULT_EMAIL_HOST:
+            return [
+                PreflightResult(
+                    fix=f"EMAIL_HOST is still the default {DEFAULT_EMAIL_HOST!r} while using the "
+                    "SMTP backend. That only delivers if a mail relay is running on this host — "
+                    "otherwise every send fails. Set EMAIL_HOST to your mail server, or silence "
+                    "this result if you do run a local relay.",
+                    id="email.smtp_host_is_default",
+                    warning=True,
+                )
+            ]
+
+        return []

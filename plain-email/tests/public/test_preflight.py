@@ -34,6 +34,18 @@ def test_third_party_backend_passes(monkeypatch):
     assert CheckEmailBackend().run() == []
 
 
+def test_smtp_host_empty_is_an_error(monkeypatch):
+    """An empty host leaves smtplib unconnected — every send raises."""
+    monkeypatch.setattr(settings, "EMAIL_BACKEND", SMTP_BACKEND)
+    monkeypatch.setattr(settings, "EMAIL_HOST", "")
+
+    results = CheckEmailSMTPHost().run()
+
+    assert len(results) == 1
+    assert results[0].id == "email.smtp_host_empty"
+    assert not results[0].warning
+
+
 def test_smtp_host_left_at_default_warns(monkeypatch):
     monkeypatch.setattr(settings, "EMAIL_BACKEND", SMTP_BACKEND)
     monkeypatch.setattr(settings, "EMAIL_HOST", "localhost")
