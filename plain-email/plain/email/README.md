@@ -181,6 +181,27 @@ Captures sent messages in a list instead of delivering them — intended for tes
 EMAIL_BACKEND = "plain.email.backends.locmem.EmailBackend"
 ```
 
+## Deploy checks
+
+Two [preflight](/plain/plain/preflight/README.md) checks run under `plain preflight --deploy`, catching email config that looks fine but doesn't deliver.
+
+| Check             | Flags                                                             | Severity |
+| ----------------- | ----------------------------------------------------------------- | -------- |
+| `email.backend`   | `EMAIL_BACKEND` set to the console, preview, or in-memory backend | Error    |
+| `email.smtp_host` | SMTP backend with `EMAIL_HOST` still at its default `"localhost"` | Warning  |
+
+`email.backend` is an error because the non-delivering backends report every send as a success — nothing raises, so no exception tracker sees the loss. Anything that depends on email (password resets, login links) silently stops working.
+
+`email.smtp_host` is only a warning: a mail relay running on the same host is a legitimate setup, in which case `"localhost"` is correct.
+
+Deployments that intentionally send no email can silence either one:
+
+```python
+PREFLIGHT_SILENCED_RESULTS = [
+    "email.backend_does_not_deliver",
+]
+```
+
 ## Testing
 
 `plain.email` ships a `mailoutbox` pytest fixture. It routes email to the in-memory backend for the duration of a test and yields the captured messages:
