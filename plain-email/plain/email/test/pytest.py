@@ -5,10 +5,9 @@ from __future__ import annotations
 from collections.abc import Generator
 
 import pytest
+from plain.email.backends import LOCMEM_BACKEND
 from plain.email.backends.locmem import outbox
 from plain.runtime import settings
-
-_LOCMEM_BACKEND = "plain.email.backends.locmem.EmailBackend"
 
 
 @pytest.fixture
@@ -20,7 +19,7 @@ def mailoutbox() -> Generator[list]:
     original backend afterward.
     """
     original = settings.EMAIL_BACKEND
-    settings.EMAIL_BACKEND = _LOCMEM_BACKEND
+    settings.EMAIL_BACKEND = LOCMEM_BACKEND
     outbox.clear()
     try:
         yield outbox

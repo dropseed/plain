@@ -181,6 +181,29 @@ Captures sent messages in a list instead of delivering them — intended for tes
 EMAIL_BACKEND = "plain.email.backends.locmem.EmailBackend"
 ```
 
+## Deploy checks
+
+Two [preflight](/plain/plain/preflight/README.md) checks run under `plain preflight --deploy`, catching email config that looks fine but doesn't deliver. (The admin's preflight view and toolbar badge include them too, whenever `DEBUG` is False.)
+
+| Check             | Result id                        | Flags                                                             | Severity |
+| ----------------- | -------------------------------- | ----------------------------------------------------------------- | -------- |
+| `email.backend`   | `email.backend_does_not_deliver` | `EMAIL_BACKEND` set to the console, preview, or in-memory backend | Error    |
+| `email.smtp_host` | `email.smtp_host_empty`          | SMTP backend with an empty `EMAIL_HOST`                           | Error    |
+| `email.smtp_host` | `email.smtp_host_is_default`     | SMTP backend with `EMAIL_HOST` still at its default `"localhost"` | Warning  |
+
+`email.backend` is an error because the non-delivering backends report every send as a success — nothing raises, so no exception tracker sees the loss. Anything that depends on email (password resets, login links) silently stops working.
+
+`email.smtp_host_is_default` is only a warning: a mail relay running on the same host is a legitimate setup, in which case `"localhost"` is correct. An empty `EMAIL_HOST` is an error — `smtplib` never connects, so every send raises `SMTPServerDisconnected`.
+
+Silence any of them by result id — a deployment that intentionally sends no email, or one that really does deliver through a local relay:
+
+```python
+PREFLIGHT_SILENCED_RESULTS = [
+    "email.backend_does_not_deliver",
+    "email.smtp_host_is_default",
+]
+```
+
 ## Testing
 
 `plain.email` ships a `mailoutbox` pytest fixture. It routes email to the in-memory backend for the duration of a test and yields the captured messages:

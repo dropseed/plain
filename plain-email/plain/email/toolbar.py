@@ -7,9 +7,9 @@ from typing import Any
 from plain.runtime import settings
 from plain.toolbar import ToolbarItem, register_toolbar_item
 
+from .backends import PREVIEW_BACKEND
 from .backends.preview import EMAIL_DIR
 
-PREVIEW_BACKEND = "plain.email.backends.preview.EmailBackend"
 MAX_MESSAGES = 20
 
 
