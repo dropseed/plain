@@ -877,5 +877,19 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
             if not keepalive:
                 break
 
+    except OSError:
+        # Socket-level failures are the client's side of the story —
+        # not an application error. (Mirrors h2; CancelledError from
+        # shutdown teardown still propagates.)
+        log.debug("HTTP/1.1 connection closed", extra={"client": conn.client})
+    except Exception:
+        # Last-resort catch so a bug in the connection handler is logged
+        # by plain itself with its traceback, instead of escaping into
+        # asyncio's default exception handler on a logger plain doesn't
+        # configure. Mirrors h2's connection-level catch.
+        log.exception(
+            "Unexpected error in HTTP/1.1 connection",
+            extra={"client": conn.client},
+        )
     finally:
         shutdown_wait.cancel()
