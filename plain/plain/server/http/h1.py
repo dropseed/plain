@@ -335,6 +335,11 @@ async def async_ingest_body(
                     pass
             if not recv_task.done():
                 recv_task.cancel()
+                # The error path reads this connection again
+                # (_linger_discard) — wait for the cancelled read to
+                # release the StreamReader first. asyncio.wait absorbs
+                # the task's CancelledError but still propagates our own.
+                await asyncio.wait((recv_task,))
                 raise _IncompleteBody("Body read timed out or shutdown")
             chunk = recv_task.result()
         except OSError:
