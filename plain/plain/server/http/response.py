@@ -12,7 +12,11 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from plain.http import FileResponse
-from plain.http.response import response_omits_body, status_omits_body
+from plain.http.response import (
+    content_length_forbidden,
+    response_omits_body,
+    status_omits_body,
+)
 
 from .. import util
 from .errors import InvalidHeader, InvalidHeaderName
@@ -26,11 +30,6 @@ if TYPE_CHECKING:
 HEADER_VALUE_RE = re.compile(r"[ \t\x21-\x7e\x80-\xff]*")
 
 log = logging.getLogger(__name__)
-
-
-def content_length_forbidden(status_code: int | None) -> bool:
-    """RFC 9110 8.6: 1xx and 204 must not carry Content-Length; 304 may."""
-    return status_omits_body(status_code) and status_code != 304
 
 
 def warn_dropped_body(
@@ -91,9 +90,12 @@ class Response:
         self.sent = 0
         self.upgrade = False
         self.status_code: int | None = None
-        # True when this response sends only headers: a HEAD request, or
-        # a bodiless status (1xx/204/304). Set in set_status_and_headers.
-        self.omits_body = False
+
+    @property
+    def omits_body(self) -> bool:
+        """True when this response sends only headers: a HEAD request,
+        or a bodiless status (1xx/204/304)."""
+        return response_omits_body(self.req.method, self.status_code)
 
     def force_close(self) -> None:
         self.must_close = True
@@ -130,7 +132,6 @@ class Response:
         except ValueError:
             self.status_code = None
 
-        self.omits_body = response_omits_body(self.req.method, self.status_code)
         self.process_headers(headers)
         self.chunked = self.is_chunked()
 

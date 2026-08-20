@@ -80,6 +80,18 @@ def test_async_streaming_response_bodiless_status_raises():
         AsyncStreamingResponse(agen(), status_code=204)
 
 
+@pytest.mark.parametrize("status_code", [204, 304])
+def test_bodiless_status_gets_no_default_content_type(status_code):
+    # No representation to describe — and on a 304, caches update stored
+    # representation headers from the response. Explicit values are kept.
+    response = Response(status_code=status_code)
+    assert "Content-Type" not in response.headers
+
+    explicit = Response(status_code=status_code, content_type="application/json")
+    assert explicit.headers["Content-Type"] == "application/json"
+
+
 def test_regular_response_unaffected():
     response = Response("hello", status_code=200)
     assert response.content == b"hello"
+    assert response.headers["Content-Type"] == "text/html; charset=utf-8"

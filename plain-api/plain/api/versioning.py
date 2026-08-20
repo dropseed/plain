@@ -133,6 +133,10 @@ class VersionedAPIView(APIView):
             # No changes to apply, just return
             return
 
+        if not response.content:
+            # An empty body has nothing to transform (and isn't JSON).
+            return
+
         # Get the original response JSON
         response_data = json.loads(response.content)
 

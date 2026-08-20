@@ -224,6 +224,57 @@ def test_h1_head_early_413_has_no_body() -> None:
     asyncio.run(scenario())
 
 
+def test_h1_head_unparseable_request_gets_bodiless_error() -> None:
+    # HEAD-ness is latched from the request line before parsing, so even
+    # an error response to a request that failed to parse is bodiless.
+    async def scenario() -> None:
+        worker = make_worker(
+            handler=ResponseHandler(lambda: Response(b"ok", content_type="text/plain"))
+        )
+        client = await h1_connect(worker)
+        try:
+            # Obsolete header folding — rejected at parse time.
+            await client.send(
+                b"HEAD / HTTP/1.1\r\nHost: testserver\r\nX-Foo: a\r\n b\r\n\r\n"
+            )
+            headers = await client.read_headers()
+            assert headers.startswith(b"HTTP/1.1 400")
+            assert b"content-length" in headers.lower()
+            client.writer.write_eof()
+            await asyncio.wait_for(client.server_task, timeout=5)
+            client.conn.close()
+            extra = await asyncio.wait_for(client.reader.read(4096), timeout=5)
+            assert extra == b""
+        finally:
+            client.teardown()
+
+    asyncio.run(scenario())
+
+
+def test_h1_head_healthcheck_has_no_body() -> None:
+    async def scenario() -> None:
+        worker = make_worker(
+            handler=ResponseHandler(lambda: Response(b"ok", content_type="text/plain"))
+        )
+        worker.healthcheck_path_bytes = b"/up/"
+        client = await h1_connect(worker)
+        try:
+            await client.send(b"HEAD /up/ HTTP/1.1\r\nHost: testserver\r\n\r\n")
+            headers = await client.read_headers()
+            assert headers.startswith(b"HTTP/1.1 200")
+            # Content-Length describes the GET body; no body follows.
+            assert b"content-length: 2" in headers.lower()
+            client.writer.write_eof()
+            await asyncio.wait_for(client.server_task, timeout=5)
+            client.conn.close()
+            extra = await asyncio.wait_for(client.reader.read(4096), timeout=5)
+            assert extra == b""
+        finally:
+            client.teardown()
+
+    asyncio.run(scenario())
+
+
 def test_h1_head_on_sse_never_consumes_stream() -> None:
     # HEAD to an SSE view: headers only, and the (never-terminating)
     # generator must not be consumed — before the omits_body guard in

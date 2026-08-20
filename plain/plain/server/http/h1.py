@@ -38,17 +38,18 @@ if TYPE_CHECKING:
 
 log = get_framework_logger()
 
-HEALTHCHECK_RESPONSE = (
+# Built headers-first from the body literal so the GET and HEAD
+# variants can't drift: HEAD is the header block (Content-Length
+# describes the GET body — RFC 9110 9.3.2), GET appends the body.
+_HEALTHCHECK_BODY = b"ok"
+HEALTHCHECK_RESPONSE_HEAD = (
     b"HTTP/1.1 200 OK\r\n"
     b"Content-Type: text/plain\r\n"
-    b"Content-Length: 2\r\n"
+    b"Content-Length: " + str(len(_HEALTHCHECK_BODY)).encode() + b"\r\n"
     b"Connection: close\r\n"
-    b"\r\nok"
+    b"\r\n"
 )
-
-# HEAD variant: same headers (Content-Length describes the GET body),
-# no body bytes (RFC 9110 9.3.2).
-HEALTHCHECK_RESPONSE_HEAD = HEALTHCHECK_RESPONSE.removesuffix(b"ok")
+HEALTHCHECK_RESPONSE = HEALTHCHECK_RESPONSE_HEAD + _HEALTHCHECK_BODY
 
 
 def extract_request_path(header_data: bytes) -> bytes:
@@ -498,12 +499,7 @@ async def async_handle_error(
         log_access(resp, req, request_time)
 
     try:
-        await conn.write_error(
-            status_int,
-            reason,
-            mesg,
-            head=req is not None and req.method == "HEAD",
-        )
+        await conn.write_error(status_int, reason, mesg)
     except Exception:
         worker.log.debug("Failed to send error message.")
 
@@ -683,6 +679,7 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
             # Read HTTP headers asynchronously on the event loop. Once
             # shutdown starts, all reads are bounded by the worker's drain
             # read deadline (see _recv_timeout).
+            conn.request_is_head = False
             try:
                 header_data, body_start = await async_read_headers(worker, conn)
             except (TimeoutError, OSError):
@@ -697,6 +694,11 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
             if not header_data:
                 break
 
+            # Latch HEAD-ness from the request line before any parsing —
+            # everything written from here on (healthcheck, parse-failure
+            # errors, the response itself) consults this one fact.
+            conn.request_is_head = header_data.startswith(b"HEAD ")
+
             # Health check — respond on the event loop without touching the
             # thread pool. Still answered during shutdown drain: the response
             # is Connection: close and new connections are already refused, so
@@ -704,7 +706,7 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
             if worker.healthcheck_path_bytes:
                 path = extract_request_path(header_data)
                 if path == worker.healthcheck_path_bytes:
-                    if header_data.startswith(b"HEAD "):
+                    if conn.request_is_head:
                         await conn.sendall(HEALTHCHECK_RESPONSE_HEAD)
                     else:
                         await conn.sendall(HEALTHCHECK_RESPONSE)
@@ -743,9 +745,7 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
                 and content_length is not None
                 and content_length > worker.max_request_body
             ):
-                # The request parsed, so pass it along: the 413 gets an
-                # access-log line like other rejections, and a HEAD
-                # request gets a bodiless error response.
+                # The request parsed, so pass it along for the access log.
                 await async_handle_error(
                     worker,
                     req,
@@ -797,7 +797,6 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
                             408,
                             "Request Timeout",
                             "Incomplete request body",
-                            head=req.method == "HEAD",
                         )
                     except OSError:
                         break

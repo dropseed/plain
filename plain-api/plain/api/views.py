@@ -50,7 +50,11 @@ def _error_response(
     message: str,
     status_code: int,
     errors: list[FieldError] | None = None,
-) -> JsonResponse:
+) -> Response:
+    if status_omits_body(status_code):
+        # A bodiless status (e.g. a user-defined 304 HTTPException) can't
+        # carry the JSON error body.
+        return Response(status_code=status_code)
     body: ErrorSchema = {"id": error_id, "message": message}
     if errors is not None:
         body["errors"] = errors
@@ -205,6 +209,8 @@ class APIView(View[APIResult]):
                         f"A {status_code} response cannot include data — "
                         f"return a 200 with the data, or just Response(status_code={status_code})."
                     )
+                # No Content-Type either — there is no representation to
+                # describe (and nothing for version transforms to touch).
                 return Response(status_code=status_code)
             return JsonResponse(result, status_code=status_code)
 

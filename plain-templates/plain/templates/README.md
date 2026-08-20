@@ -148,7 +148,7 @@ Override `get_page_size()` to compute the page size per request. A paginated que
 
 ## Error views
 
-`TemplateView` overrides `handle_exception` to render `{status}.html` for any exception that escapes the handler — `404.html` for `NotFoundError404`, `500.html` for unhandled errors, etc. The context is `{request, status_code, exception, DEBUG}`. On `TemplateFileMissing` the view returns a plain-text status response (`404 Not Found`, `500 Internal Server Error`); on any other render failure it logs and returns a bare-status `Response` so `_respond_to_exception` can still attach `response.exception` for observability.
+`TemplateView` overrides `handle_exception` to render `{status}.html` for any exception that escapes the handler — `404.html` for `NotFoundError404`, `500.html` for unhandled errors, etc. The context is `{request, status_code, exception, DEBUG}`. Bodiless statuses (204, 304) skip the template entirely — those responses can't carry a body, so a `304.html` is never rendered. On `TemplateFileMissing` the view returns a plain-text status response (`404 Not Found`, `500 Internal Server Error`); on any other render failure it logs and returns a bare-status `Response` so `_respond_to_exception` can still attach `response.exception` for observability.
 
 Plain core's exception handler — the one that catches pre-view failures like URL resolution and middleware errors — returns plain text. To get a styled 404 for unmatched URLs, mount [`NotFoundView`](./views.py#NotFoundView) as the last route:
 

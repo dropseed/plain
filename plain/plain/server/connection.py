@@ -51,6 +51,14 @@ class Connection:
         self._peeked: bytes = b""
         self._peek_offset = 0
 
+        # True while the current request is a HEAD — latched from the
+        # request line the moment its header bytes are read, before any
+        # parsing, so even an error response to an unparseable request
+        # is bodiless for HEAD (RFC 9110 9.3.2). Reset per request by
+        # the h1 connection loop; False when the request line was never
+        # read (e.g. oversized headers).
+        self.request_is_head: bool = False
+
     def close(self) -> None:
         if not self.writer.is_closing():
             self.writer.close()
@@ -78,12 +86,15 @@ class Connection:
         self.writer.write(data)
         await self.writer.drain()
 
-    async def write_error(
-        self, status_int: int, reason: str, mesg: str, *, head: bool = False
-    ) -> None:
-        """Send an HTTP error response on a connection."""
+    async def write_error(self, status_int: int, reason: str, mesg: str) -> None:
+        """Send an HTTP error response on a connection.
+
+        Headers-only when the current request is a HEAD.
+        """
         await self.sendall(
-            util._error_response_bytes(status_int, reason, mesg, head=head)
+            util._error_response_bytes(
+                status_int, reason, mesg, head=self.request_is_head
+            )
         )
 
     async def wait_readable(self) -> bool:

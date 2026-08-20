@@ -149,7 +149,7 @@ response = Response(
 response = Response("<h1>Hello</h1>", content_type="text/html")
 ```
 
-Statuses that never have a body (204, 304) refuse content at construction — `Response("Deleted", status_code=204)` raises `ValueError`. HTTP clients stop reading these responses at the headers, so a body would corrupt the next response on a keep-alive connection. Return a `200` if you want the message to reach the client, or `Response(status_code=204)` with no content. 1xx interim statuses can't be constructed at all — those belong to the server.
+Statuses that never have a body (204, 304) refuse content at construction — `Response("Deleted", status_code=204)` raises `ValueError`. HTTP clients stop reading these responses at the headers, so a body would corrupt the next response on a keep-alive connection. Return a `200` if you want the message to reach the client, or `Response(status_code=204)` with no content — bodiless responses also skip the default `Content-Type` header, since there's no representation to describe. 1xx interim statuses can't be constructed at all — those belong to the server.
 
 ### Response types
 

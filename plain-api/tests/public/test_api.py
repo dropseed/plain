@@ -39,6 +39,23 @@ def test_tuple_bodiless_status_sends_empty_response():
     response = view.convert_result_to_response((204, {}))
     assert response.status_code == 204
     assert response.content == b""
+    # No representation, no Content-Type — and nothing for versioning
+    # transforms to parse.
+    assert "Content-Type" not in response.headers
+
+
+def test_handle_exception_bodiless_http_exception():
+    """A user-defined 304/204 HTTPException renders as that status, not a 500."""
+    from plain.http import HTTPException
+
+    class NotModified304(HTTPException):
+        status_code = 304
+
+    view = APIView(request=RequestFactory().get("/"))
+    response = view.handle_exception(NotModified304())
+    assert response.status_code == 304
+    assert response.content == b""
+    assert "Content-Type" not in response.headers
 
 
 def test_tuple_bodiless_status_with_data_raises():

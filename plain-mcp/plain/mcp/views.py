@@ -13,6 +13,7 @@ from plain.http import (
     JsonResponse,
     Response,
 )
+from plain.http.response import status_omits_body
 from plain.logs import get_framework_logger, log_exception
 from plain.runtime import settings
 from plain.utils.otel import format_exception_type
@@ -255,6 +256,11 @@ class MCPView(View):
                 message = "Internal error"
             else:
                 message = str(exc) or HTTPStatus(status).phrase
+
+        if status_omits_body(status):
+            # A bodiless status (e.g. a user-defined 304 HTTPException)
+            # can't carry the JSON-RPC error body.
+            return Response(status_code=status)
 
         return JsonResponse(
             _error_response(

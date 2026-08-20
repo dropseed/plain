@@ -10,7 +10,7 @@ from urllib.parse import urljoin, urlparse, urlsplit
 
 from plain.http import AsyncStreamingResponse, QueryDict, Request, StreamingResponse
 from plain.http import Response as HttpResponse
-from plain.http.response import response_omits_body
+from plain.http.response import content_length_forbidden, response_omits_body
 from plain.internal.handlers.base import BaseHandler
 from plain.json import PlainJSONEncoder
 from plain.urls import get_resolver
@@ -170,6 +170,9 @@ def _conditional_content_removal(request: Request, response: Response) -> Respon
             response.streaming_content = iter([])
         elif not response.streaming:
             response.content = b""
+        if content_length_forbidden(response.status_code):
+            # The server writers strip it too (kept on HEAD/304).
+            del response.headers["Content-Length"]
     return response
 
 

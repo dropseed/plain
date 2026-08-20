@@ -29,7 +29,7 @@ class HelloWorldView(APIView):
         return {"message": "Hello, world!"}
 ```
 
-More complex responses can use the [`JsonResponse`](/plain/plain/http/response.py#JsonResponse) class, and you can return a status code with the response body by returning a tuple of `(status_code, data)` (ex. `return 201, {...}`).
+More complex responses can use the [`JsonResponse`](/plain/plain/http/response.py#JsonResponse) class, and you can return a status code with the response body by returning a tuple of `(status_code, data)` (ex. `return 201, {...}`). Bodiless statuses can't carry data — `return 204, {}` sends an empty 204, while `return 204, {...}` with actual data raises an error.
 
 Here is a more complete example that shows how to build a custom API with authentication and authorization:
 
@@ -531,7 +531,7 @@ Yes. The `APIKey` model requires `plain.postgres`, but you can use `APIView` wit
 
 You can return status codes in several ways:
 
-- Return a tuple of `(status_code, data)`: `return 201, {"id": note.id}`
+- Return a tuple of `(status_code, data)`: `return 201, {"id": note.id}` — for bodiless statuses the data must be empty (`return 204, {}`), since a 204 can't carry a body
 - Return `None`: automatically returns 404
 - Return a `Response` with a custom status code: `return Response(status_code=204)` (for no content)
 - Return a `JsonResponse` with a custom status code: `return JsonResponse({"error": "Bad request"}, status_code=400)`

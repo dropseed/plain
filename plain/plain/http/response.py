@@ -127,6 +127,11 @@ def response_omits_body(method: str | None, status_code: int | None) -> bool:
     return method == "HEAD" or status_omits_body(status_code)
 
 
+def content_length_forbidden(status_code: int | None) -> bool:
+    """RFC 9110 8.6: 1xx and 204 must not carry Content-Length; 304 may."""
+    return status_omits_body(status_code) and status_code != 304
+
+
 class Response:
     """
     An HTTP response class with a bytes body.
@@ -151,10 +156,29 @@ class Response:
     ):
         self.headers = ResponseHeaders(headers)
         self._charset = charset
+        if status_code is not None:
+            try:
+                self.status_code = int(status_code)
+            except (ValueError, TypeError):
+                raise TypeError("HTTP status code must be an integer.")
+
+        # Validate the effective status — the argument above, or a
+        # subclass's class attribute (e.g. `status_code = 304`).
+        if not 200 <= self.status_code <= 599:
+            raise ValueError(
+                "HTTP status code must be an integer from 200 to 599 "
+                "(1xx interim responses are sent by the server, not "
+                "application code)."
+            )
         if "Content-Type" not in self.headers:
-            if content_type is None:
+            # A bodiless status (204/304) gets no default Content-Type:
+            # there is no representation to describe, and on a 304 caches
+            # update stored representation headers from the response
+            # (RFC 9110 15.4.5). An explicit content_type is respected.
+            if content_type is None and not status_omits_body(self.status_code):
                 content_type = f"text/html; charset={self.charset}"
-            self.headers["Content-Type"] = content_type
+            if content_type is not None:
+                self.headers["Content-Type"] = content_type
         elif content_type:
             raise ValueError(
                 "'headers' must not contain 'Content-Type' when the "
@@ -163,19 +187,6 @@ class Response:
         self._resource_closers = []
         self.cookies = SimpleCookie()
         self.closed = False
-        if status_code is not None:
-            try:
-                self.status_code = int(status_code)
-            except (ValueError, TypeError):
-                raise TypeError("HTTP status code must be an integer.")
-
-        # Validate the effective status — the argument above, or a
-        # subclass's class attribute (e.g. `status_code = 304`). 1xx
-        # interim responses (100 Continue, 101 Switching Protocols)
-        # belong to the server, not application code — a final 1xx would
-        # leave the client waiting forever for the real response.
-        if not 200 <= self.status_code <= 599:
-            raise ValueError("HTTP status code must be an integer from 200 to 599.")
         self._reason_phrase = reason
         # Exception that caused this response, if any (primarily for 500 errors)
         self.exception: Exception | None = None
@@ -378,8 +389,10 @@ class Response:
         else:
             content = self.make_bytes(value)
         if content and status_omits_body(self.status_code):
-            # Return a 200 with the message, or drop the body.
-            raise ValueError(f"A {self.status_code} response cannot have a body.")
+            raise ValueError(
+                f"A {self.status_code} response cannot have a body — "
+                "send the content with a 200, or drop it."
+            )
         self._container = [content]
 
     def __iter__(self) -> Iterator[bytes]:
@@ -486,6 +499,15 @@ class AsyncStreamingResponse(Response):
             headers=headers,
         )
         if status_omits_body(self.status_code):
+            # aclose() can't be awaited in __init__; an unstarted async
+            # generator finalizes cleanly without it, so best-effort a
+            # sync close() for custom iterators that offer one.
+            close = getattr(streaming_content, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:
+                    pass
             raise ValueError(
                 f"A {self.status_code} response cannot have a body — "
                 "it can't be a streaming response."
@@ -681,7 +703,8 @@ class RedirectResponse(Response):
 
 
 class NotModifiedResponse(Response):
-    """HTTP 304 response"""
+    """HTTP 304 response — headers only, no Content-Type (the base class
+    skips the default for bodiless statuses)."""
 
     status_code = 304
 
@@ -697,7 +720,6 @@ class NotModifiedResponse(Response):
             charset=charset,
             headers=headers,
         )
-        del self.headers["content-type"]
 
 
 class NotAllowedResponse(Response):

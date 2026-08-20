@@ -18,9 +18,18 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
 
     status = exc.status_code if isinstance(exc, HTTPException) else 500
 
+    if not 200 <= status <= 599:
+        # A broken HTTPException subclass (e.g. a 1xx status_code) must
+        # not crash the last-resort renderer — Response construction
+        # would refuse it. Degrade to a 500 carrying the exception.
+        status = 500
+
+    if status_omits_body(status):
+        # Headers only — the constructor skips Content-Type for these.
+        return Response(status_code=status)
+
     response = Response(status_code=status, content_type="text/plain; charset=utf-8")
-    if not status_omits_body(status):
-        response.content = f"{status} {response.reason_phrase}"
+    response.content = f"{status} {response.reason_phrase}"
     if status >= 500:
         response.exception = exc
     return response
