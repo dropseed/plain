@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from plain.http import HTTPException, Response
+from plain.http.response import status_omits_body
 from plain.logs import log_exception
 
 if TYPE_CHECKING:
@@ -18,7 +19,8 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
     status = exc.status_code if isinstance(exc, HTTPException) else 500
 
     response = Response(status_code=status, content_type="text/plain; charset=utf-8")
-    response.content = f"{status} {response.reason_phrase}"
+    if not status_omits_body(status):
+        response.content = f"{status} {response.reason_phrase}"
     if status >= 500:
         response.exception = exc
     return response

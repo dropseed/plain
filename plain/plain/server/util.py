@@ -77,7 +77,9 @@ def close_on_exec(fd: int) -> None:
     fcntl.fcntl(fd, fcntl.F_SETFD, flags)
 
 
-def _error_response_bytes(status_int: int, reason: str, mesg: str) -> bytes:
+def _error_response_bytes(
+    status_int: int, reason: str, mesg: str, *, head: bool = False
+) -> bytes:
     body = (
         "<html>\n"
         f"  <head><title>{reason}</title></head>\n"
@@ -98,7 +100,9 @@ def _error_response_bytes(status_int: int, reason: str, mesg: str) -> bytes:
         f"Content-Type: text/html\r\n"
         f"Content-Length: {len(body)}\r\n"
         f"\r\n"
-        f"{body}"
+        # A HEAD response keeps the Content-Length but sends no body
+        # (RFC 9110 9.3.2).
+        f"{'' if head else body}"
     )
     return response.encode("latin1")
 

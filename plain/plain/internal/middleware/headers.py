@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from plain.http import HttpMiddleware
+from plain.http.response import status_omits_body
 from plain.runtime import settings
 
 if TYPE_CHECKING:
@@ -41,8 +42,14 @@ class DefaultHeadersMiddleware(HttpMiddleware):
                     response.headers[header] = value
 
         # Add the Content-Length header to non-streaming responses if not
-        # already set.
-        if not response.streaming and "Content-Length" not in response.headers:
+        # already set. Never on a bodiless status: RFC 9110 8.6 forbids
+        # it on 1xx/204, and on 304 it must describe the representation a
+        # 200 would have sent — not the empty 304 body.
+        if (
+            not response.streaming
+            and not status_omits_body(response.status_code)
+            and "Content-Length" not in response.headers
+        ):
             response.headers["Content-Length"] = str(len(response.content))
 
         return response

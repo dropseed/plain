@@ -46,6 +46,10 @@ HEALTHCHECK_RESPONSE = (
     b"\r\nok"
 )
 
+# HEAD variant: same headers (Content-Length describes the GET body),
+# no body bytes (RFC 9110 9.3.2).
+HEALTHCHECK_RESPONSE_HEAD = HEALTHCHECK_RESPONSE.removesuffix(b"ok")
+
 
 def extract_request_path(header_data: bytes) -> bytes:
     """Extract the raw path (without query string) from an HTTP/1.x request line.
@@ -489,7 +493,12 @@ async def async_handle_error(
         log_access(resp, req, request_time)
 
     try:
-        await conn.write_error(status_int, reason, mesg)
+        await conn.write_error(
+            status_int,
+            reason,
+            mesg,
+            head=req is not None and req.method == "HEAD",
+        )
     except Exception:
         worker.log.debug("Failed to send error message.")
 
@@ -604,14 +613,19 @@ async def stream_async_response(
     client_disconnected = False
     try:
         resp.prepare_response(http_response)
-        await resp.async_send_headers()
 
-        async for chunk in http_response:
-            try:
-                await resp.async_write(chunk)
-            except OSError:
-                client_disconnected = True
-                break
+        # A bodiless response (e.g. HEAD on an SSE view) never consumes
+        # the stream — it may not terminate. The finally sends the
+        # headers via async_close().
+        if not resp.omits_body:
+            await resp.async_send_headers()
+
+            async for chunk in http_response:
+                try:
+                    await resp.async_write(chunk)
+                except OSError:
+                    client_disconnected = True
+                    break
     finally:
         try:
             if hasattr(http_response, "aclose"):
@@ -685,7 +699,10 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
             if worker.healthcheck_path_bytes:
                 path = extract_request_path(header_data)
                 if path == worker.healthcheck_path_bytes:
-                    await conn.sendall(HEALTHCHECK_RESPONSE)
+                    if header_data.startswith(b"HEAD "):
+                        await conn.sendall(HEALTHCHECK_RESPONSE_HEAD)
+                    else:
+                        await conn.sendall(HEALTHCHECK_RESPONSE)
                     # Like every other pre-body early exit: closing with
                     # unread bytes in the socket (a healthcheck POST's
                     # body, say) can RST-clobber the response. A checker
@@ -721,9 +738,12 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
                 and content_length is not None
                 and content_length > worker.max_request_body
             ):
+                # The request parsed, so pass it along: the 413 gets an
+                # access-log line like other rejections, and a HEAD
+                # request gets a bodiless error response.
                 await async_handle_error(
                     worker,
-                    None,
+                    req,
                     conn,
                     LimitRequestBody(content_length, worker.max_request_body),
                 )
@@ -772,6 +792,7 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
                             408,
                             "Request Timeout",
                             "Incomplete request body",
+                            head=req.method == "HEAD",
                         )
                     except OSError:
                         break

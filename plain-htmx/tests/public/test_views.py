@@ -27,7 +27,7 @@ class ActionView(HTMXView):
         pass
 
     def htmx_post_redirect(self) -> Response:
-        return Response("redirected", status_code=204)
+        return Response(status_code=204, headers={"HX-Redirect": "/next/"})
 
     def htmx_post_bad_return(self) -> str:
         # Wrong return type — must raise loudly, not silently propagate.
@@ -115,7 +115,7 @@ def test_action_returning_response_passes_through():
     view = ActionView(request=request)
     response = view.get_response()
     assert response.status_code == 204
-    assert response.content.decode() == "redirected"
+    assert response.headers["HX-Redirect"] == "/next/"
 
 
 def test_convert_result_to_response_none_renders_template():

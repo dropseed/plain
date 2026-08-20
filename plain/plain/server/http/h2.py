@@ -15,13 +15,14 @@ import h2.exceptions
 import h2.settings
 from plain.http import AsyncStreamingResponse, FileResponse, StreamingResponse
 from plain.http import Request as HttpRequest
+from plain.http.response import response_omits_body
 from plain.logs import get_framework_logger
 
 from ..accesslog import log_access
 from ..util import http_date
 from .errors import BodyBudgetExceeded, LimitRequestBody
 from .request import _merge_headers, _resolve_path, _resolve_remote_addr
-from .response import FileWrapper
+from .response import FileWrapper, content_length_forbidden, warn_dropped_body
 from .sink import BodyBudget, BodyRateFloor, BodySink
 
 if TYPE_CHECKING:
@@ -140,6 +141,14 @@ def _declared_content_length(headers: list[tuple[str, str]]) -> int | None:
     return None
 
 
+def _stream_is_head(stream: H2Stream) -> bool:
+    """True when the stream's request method is HEAD."""
+    for name, value in stream.headers:
+        if name == ":method":
+            return value == "HEAD"
+    return False
+
+
 def _send_stream_response(
     conn: h2.connection.H2Connection,
     stream_id: int,
@@ -148,6 +157,7 @@ def _send_stream_response(
     content_type: str,
     *,
     extra_headers: list[tuple[str, str]] | None = None,
+    head: bool = False,
 ) -> None:
     """Send a complete server-generated response and close the stream.
 
@@ -155,6 +165,10 @@ def _send_stream_response(
     may still be sending, RST_STREAM with NO_ERROR tells it to stop.
     Without the reset the client keeps transferring the body (later
     frames are acked, reopening its flow window).
+
+    head=True sends the headers (Content-Length included) with no DATA —
+    a strict h2 client treats body bytes on a HEAD response as a
+    connection-level protocol error that kills every stream.
     """
     headers = [
         (":status", str(status_code)),
@@ -164,8 +178,11 @@ def _send_stream_response(
     if extra_headers:
         headers.extend(extra_headers)
     try:
-        conn.send_headers(stream_id, headers)
-        conn.send_data(stream_id, body, end_stream=True)
+        if head:
+            conn.send_headers(stream_id, headers, end_stream=True)
+        else:
+            conn.send_headers(stream_id, headers)
+            conn.send_data(stream_id, body, end_stream=True)
         conn.reset_stream(stream_id, error_code=h2.errors.ErrorCodes.NO_ERROR)
     except h2.exceptions.ProtocolError:
         try:
@@ -178,6 +195,8 @@ def _send_stream_error(
     conn: h2.connection.H2Connection,
     stream_id: int,
     status_code: int,
+    *,
+    head: bool = False,
 ) -> None:
     _send_stream_response(
         conn,
@@ -187,6 +206,7 @@ def _send_stream_error(
         "text/html",
         # The load-shedding 503 explicitly invites a retry (h1 ditto).
         extra_headers=[("retry-after", "1")] if status_code == 503 else None,
+        head=head,
     )
 
 
@@ -198,7 +218,7 @@ def _reject_h2_stream(
     status_code: int,
 ) -> None:
     """Reject an in-progress H2 stream and clean up its state."""
-    _send_stream_error(conn, event.stream_id, status_code)
+    _send_stream_error(conn, event.stream_id, status_code, head=_stream_is_head(stream))
     conn.acknowledge_received_data(event.flow_controlled_length, event.stream_id)
     state.streams.pop(event.stream_id, None)
     stream.sink.close()
@@ -342,11 +362,14 @@ def _build_h2_response_headers(http_response: Any) -> list[tuple[str, str]]:
         ("date", http_date()),
     ]
 
+    status_code = http_response.status_code
     for key, value in http_response.headers.items():
         if value is None:
             continue
         lkey = key.lower()
         if lkey in _H2_SKIP_HEADERS:
+            continue
+        if lkey == "content-length" and content_length_forbidden(status_code):
             continue
         # RFC 9113 §8.2.2: TE header is only valid with value "trailers"
         if lkey == "te" and value.strip().lower() != "trailers":
@@ -490,7 +513,9 @@ async def async_handle_h2_connection(
             if stream.declared is not None and stream.sink.received >= stream.declared:
                 continue
             if stream.observe_rate(now):
-                _send_stream_error(conn, stream.stream_id, 408)
+                _send_stream_error(
+                    conn, stream.stream_id, 408, head=_stream_is_head(stream)
+                )
                 state.streams.pop(stream.stream_id, None)
                 stream.sink.close()
                 swept = True
@@ -625,7 +650,9 @@ async def async_handle_h2_connection(
                         and stream.declared is not None
                         and stream.declared > max_request_body
                     ):
-                        _send_stream_error(conn, event.stream_id, 413)
+                        _send_stream_error(
+                            conn, event.stream_id, 413, head=_stream_is_head(stream)
+                        )
                         stream.sink.close()
                         log.warning(
                             "H2 stream declared body over max size",
@@ -649,7 +676,12 @@ async def async_handle_h2_connection(
                                 break
                         if stream_path == healthcheck_path:
                             _send_stream_response(
-                                conn, event.stream_id, 200, b"ok", "text/plain"
+                                conn,
+                                event.stream_id,
+                                200,
+                                b"ok",
+                                "text/plain",
+                                head=_stream_is_head(stream),
                             )
                             stream.sink.close()
                             continue
@@ -884,7 +916,9 @@ async def _async_handle_stream_inner(
             "Error building HTTP/2 request",
             extra={"stream_id": stream.stream_id},
         )
-        await _async_send_h2_error(state, stream.stream_id, 500)
+        await _async_send_h2_error(
+            state, stream.stream_id, 500, head=_stream_is_head(stream)
+        )
         return
 
     try:
@@ -895,7 +929,7 @@ async def _async_handle_stream_inner(
                 return
 
             await _async_write_h2_response(
-                state, stream.stream_id, http_response, h2_resp
+                state, stream.stream_id, http_response, h2_resp, h2_req.method
             )
         finally:
             request_time = datetime.now(UTC) - request_start
@@ -933,7 +967,9 @@ async def _async_handle_stream_inner(
                     except Exception:
                         pass
             else:
-                await _async_send_h2_error(state, stream.stream_id, 500)
+                await _async_send_h2_error(
+                    state, stream.stream_id, 500, head=_stream_is_head(stream)
+                )
 
 
 async def _async_write_h2_response(
@@ -941,6 +977,7 @@ async def _async_write_h2_response(
     stream_id: int,
     http_response: Any,
     h2_resp: H2Response,
+    method: str,
 ) -> None:
     """Write a plain.http response as HTTP/2 frames."""
     loop = asyncio.get_running_loop()
@@ -950,6 +987,16 @@ async def _async_write_h2_response(
     h2_resp.status = f"{status_code} {http_response.reason_phrase}"
 
     response_headers = _build_h2_response_headers(http_response)
+
+    if response_omits_body(method, status_code):
+        # Headers only, END_STREAM, no DATA frames — a 204/304-with-DATA
+        # is malformed per RFC 9113 8.1.1. The body is never read.
+        warn_dropped_body(http_response, method=method, status_code=status_code)
+        async with state.write_lock:
+            conn.send_headers(stream_id, response_headers, end_stream=True)
+            await state.flush()
+            h2_resp.headers_sent = True
+        return
 
     # Async streaming (SSE, etc.) — iterate on event loop
     if isinstance(http_response, AsyncStreamingResponse):
@@ -1112,6 +1159,8 @@ async def _async_send_h2_error(
     state: H2ConnectionState,
     stream_id: int,
     status_code: int,
+    *,
+    head: bool = False,
 ) -> None:
     """Send a simple error response on an HTTP/2 stream."""
     try:
@@ -1122,8 +1171,11 @@ async def _async_send_h2_error(
             ("content-length", str(len(body))),
         ]
         async with state.write_lock:
-            state.conn.send_headers(stream_id, headers)
-            state.conn.send_data(stream_id, body, end_stream=True)
+            if head:
+                state.conn.send_headers(stream_id, headers, end_stream=True)
+            else:
+                state.conn.send_headers(stream_id, headers)
+                state.conn.send_data(stream_id, body, end_stream=True)
             await state.flush()
     except Exception:
         log.debug(

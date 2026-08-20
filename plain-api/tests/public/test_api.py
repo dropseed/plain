@@ -1,11 +1,12 @@
 from typing import Literal, TypedDict
 
+import pytest
 from plain.api import openapi
 from plain.api.openapi.generator import OpenAPISchemaGenerator
 from plain.api.openapi.utils import schema_from_type
 from plain.api.openapi.validation import validate_openapi_schema
 from plain.api.views import APIKeyView, APIView
-from plain.test import Client
+from plain.test import Client, RequestFactory
 from plain.urls import Router, path
 
 
@@ -30,6 +31,21 @@ def test_tuple_status_code_return_overrides_default_200():
     response = client.post("/tuple-status-return")
     assert response.status_code == 201
     assert response.json() == {"id": 42, "created": True}
+
+
+def test_tuple_bodiless_status_sends_empty_response():
+    """`return 204, {}` sends a bodiless 204 (a 204 can't carry JSON)."""
+    view = APIView(request=RequestFactory().post("/"))
+    response = view.convert_result_to_response((204, {}))
+    assert response.status_code == 204
+    assert response.content == b""
+
+
+def test_tuple_bodiless_status_with_data_raises():
+    """`return 204, {...}` is a contradiction — raise with a pointed message."""
+    view = APIView(request=RequestFactory().post("/"))
+    with pytest.raises(ValueError, match="cannot include data"):
+        view.convert_result_to_response((204, {"deleted": True}))
 
 
 def test_versioned_api_view():

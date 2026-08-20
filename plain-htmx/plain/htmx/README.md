@@ -246,7 +246,7 @@ This can be a matter of preference, but typically you may end up building out an
 You can also handle HTMX requests without a specific action by just implementing the HTTP method:
 
 ```python
-from plain.http import HttpResponse
+from plain.http import Response
 
 
 class PullRequestDetailView(HTMXView, DetailView):
@@ -258,7 +258,7 @@ class PullRequestDetailView(HTMXView, DetailView):
         self.object.delete()
 
         # Tell HTMX to do a client-side redirect when it receives the response
-        response = HttpResponse(status_code=204)
+        response = Response(status_code=204)
         response.headers["HX-Redirect"] = "/"
         return response
 ```

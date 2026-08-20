@@ -109,6 +109,24 @@ class BadHeaderError(ValueError):
 _NO_CONTENT: Any = object()
 
 
+def status_omits_body(status_code: int | None) -> bool:
+    """True for statuses whose responses never have a body (RFC 9110).
+
+    A client stops reading a 1xx/204/304 response at the header block,
+    so any body bytes written after it would be parsed as the start of
+    the NEXT response on a keep-alive connection. The single definition
+    shared by Response construction, the test client, and the server's
+    h1/h2 writers. (The 1xx arm is a backstop: Response rejects 1xx at
+    construction, so it's only reachable by mutating status_code.)
+    """
+    return status_code is not None and (status_code < 200 or status_code in (204, 304))
+
+
+def response_omits_body(method: str | None, status_code: int | None) -> bool:
+    """True when a response sends only headers: HEAD, or a bodiless status."""
+    return method == "HEAD" or status_omits_body(status_code)
+
+
 class Response:
     """
     An HTTP response class with a bytes body.
@@ -151,8 +169,13 @@ class Response:
             except (ValueError, TypeError):
                 raise TypeError("HTTP status code must be an integer.")
 
-            if not 100 <= self.status_code <= 599:
-                raise ValueError("HTTP status code must be an integer from 100 to 599.")
+        # Validate the effective status — the argument above, or a
+        # subclass's class attribute (e.g. `status_code = 304`). 1xx
+        # interim responses (100 Continue, 101 Switching Protocols)
+        # belong to the server, not application code — a final 1xx would
+        # leave the client waiting forever for the real response.
+        if not 200 <= self.status_code <= 599:
+            raise ValueError("HTTP status code must be an integer from 200 to 599.")
         self._reason_phrase = reason
         # Exception that caused this response, if any (primarily for 500 errors)
         self.exception: Exception | None = None
@@ -354,6 +377,9 @@ class Response:
                     pass
         else:
             content = self.make_bytes(value)
+        if content and status_omits_body(self.status_code):
+            # Return a 200 with the message, or drop the body.
+            raise ValueError(f"A {self.status_code} response cannot have a body.")
         self._container = [content]
 
     def __iter__(self) -> Iterator[bytes]:
@@ -389,6 +415,18 @@ class StreamingResponse(Response):
             charset=charset,
             headers=headers,
         )
+        if status_omits_body(self.status_code):
+            if hasattr(streaming_content, "close") and callable(
+                getattr(streaming_content, "close")
+            ):
+                try:
+                    streaming_content.close()
+                except Exception:
+                    pass
+            raise ValueError(
+                f"A {self.status_code} response cannot have a body — "
+                "it can't be a streaming response."
+            )
         # `streaming_content` should be an iterable of bytestrings.
         # See the `streaming_content` property methods.
         self.streaming_content = streaming_content
@@ -447,6 +485,11 @@ class AsyncStreamingResponse(Response):
             charset=charset,
             headers=headers,
         )
+        if status_omits_body(self.status_code):
+            raise ValueError(
+                f"A {self.status_code} response cannot have a body — "
+                "it can't be a streaming response."
+            )
         self._async_iterator = streaming_content
 
     @property
@@ -655,14 +698,6 @@ class NotModifiedResponse(Response):
             headers=headers,
         )
         del self.headers["content-type"]
-
-    @Response.content.setter
-    def content(self, value: bytes | str | Iterator[bytes]) -> None:
-        if value:
-            raise AttributeError(
-                "You cannot set content to a 304 (Not Modified) response"
-            )
-        self._container = []
 
 
 class NotAllowedResponse(Response):

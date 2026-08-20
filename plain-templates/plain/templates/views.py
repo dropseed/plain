@@ -8,6 +8,7 @@ from typing import Any, NoReturn
 from plain.exceptions import ImproperlyConfigured
 from plain.forms import BaseForm, Form
 from plain.http import HTTPException, NotFoundError404, RedirectResponse, Response
+from plain.http.response import status_omits_body
 from plain.logs import get_framework_logger
 from plain.paginator import Page, Paginator
 from plain.runtime import settings
@@ -86,6 +87,9 @@ class TemplateView(View):
     def handle_exception(self, exc: Exception) -> Response:
         """Render `{status}.html` for the exception, falling through on missing template."""
         status = exc.status_code if isinstance(exc, HTTPException) else 500
+        if status_omits_body(status):
+            # No error page for a status that can't carry one.
+            return Response(status_code=status)
         try:
             body = Template(f"{status}.html").render(
                 {

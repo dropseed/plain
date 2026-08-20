@@ -78,9 +78,13 @@ class Connection:
         self.writer.write(data)
         await self.writer.drain()
 
-    async def write_error(self, status_int: int, reason: str, mesg: str) -> None:
+    async def write_error(
+        self, status_int: int, reason: str, mesg: str, *, head: bool = False
+    ) -> None:
         """Send an HTTP error response on a connection."""
-        await self.sendall(util._error_response_bytes(status_int, reason, mesg))
+        await self.sendall(
+            util._error_response_bytes(status_int, reason, mesg, head=head)
+        )
 
     async def wait_readable(self) -> bool:
         """Wait for the next request's bytes; True when bytes arrived.

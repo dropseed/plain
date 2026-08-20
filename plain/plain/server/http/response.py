@@ -12,6 +12,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from plain.http import FileResponse
+from plain.http.response import response_omits_body, status_omits_body
 
 from .. import util
 from .errors import InvalidHeader, InvalidHeaderName
@@ -25,6 +26,31 @@ if TYPE_CHECKING:
 HEADER_VALUE_RE = re.compile(r"[ \t\x21-\x7e\x80-\xff]*")
 
 log = logging.getLogger(__name__)
+
+
+def content_length_forbidden(status_code: int | None) -> bool:
+    """RFC 9110 8.6: 1xx and 204 must not carry Content-Length; 304 may."""
+    return status_omits_body(status_code) and status_code != 304
+
+
+def warn_dropped_body(
+    http_response: Any, *, method: str | None, status_code: int | None
+) -> None:
+    """Warn when an app-supplied body is dropped for a bodiless status.
+
+    HEAD is silent — a body there is correct app behavior (HEAD == GET
+    without the body). Streaming bodies are never consumed, so they
+    can't be inspected. Response construction rejects these outright;
+    this only fires when status_code was mutated afterwards.
+    """
+    if method == "HEAD" or not status_omits_body(status_code):
+        return
+    if http_response.streaming or not http_response.content:
+        return
+    log.warning(
+        "Response body dropped for bodiless status",
+        extra={"status": status_code, "method": method},
+    )
 
 
 class FileWrapper:
@@ -65,6 +91,9 @@ class Response:
         self.sent = 0
         self.upgrade = False
         self.status_code: int | None = None
+        # True when this response sends only headers: a HEAD request, or
+        # a bodiless status (1xx/204/304). Set in set_status_and_headers.
+        self.omits_body = False
 
     def force_close(self) -> None:
         self.must_close = True
@@ -84,7 +113,7 @@ class Response:
             return False
         if self.status_code is None:
             return True
-        return self.status_code >= 200 and self.status_code not in (204, 304)
+        return not self.omits_body
 
     def set_status_and_headers(
         self,
@@ -101,6 +130,7 @@ class Response:
         except ValueError:
             self.status_code = None
 
+        self.omits_body = response_omits_body(self.req.method, self.status_code)
         self.process_headers(headers)
         self.chunked = self.is_chunked()
 
@@ -122,6 +152,8 @@ class Response:
             value = value.strip(" \t")
             lname = name.lower()
             if lname == "content-length":
+                if content_length_forbidden(self.status_code):
+                    continue
                 self.response_length = int(value)
             elif util.is_hoppish(name):
                 if lname == "connection":
@@ -144,14 +176,8 @@ class Response:
         # no Content-Length header set.
         if self.response_length is not None or self.req.version <= (1, 0):
             return False
-        elif self.req.method == "HEAD":
-            # Responses to a HEAD request MUST NOT contain a response body.
-            return False
-        elif self.status_code is not None and self.status_code in (204, 304):
-            # Do not use chunked responses when the response is guaranteed to
-            # not have a response body.
-            return False
-        return True
+        # HEAD, 1xx, 204, and 304 responses have no body to frame.
+        return not self.omits_body
 
     def default_headers(self) -> list[str]:
         # Set the connection header and latch the close decision. The
@@ -216,6 +242,10 @@ class Response:
         await self.async_send_headers()
         if not isinstance(arg, bytes):
             raise TypeError(f"{arg!r} is not a byte")
+        if self.omits_body:
+            # Backstop: the write paths skip body iteration for bodiless
+            # responses before reaching here — see async_write_response.
+            return
         arglen = len(arg)
         tosend = arglen
         if self.response_length is not None:
@@ -239,6 +269,15 @@ class Response:
     async def async_write_response(self, http_response: Any) -> None:
         """Write a plain.http.Response using async I/O."""
         self.prepare_response(http_response)
+
+        if self.omits_body:
+            # Headers only (HEAD keeps its Content-Length) — the body is
+            # never read or written.
+            warn_dropped_body(
+                http_response, method=self.req.method, status_code=self.status_code
+            )
+            await self.async_close()
+            return
 
         if (
             isinstance(http_response, FileResponse)

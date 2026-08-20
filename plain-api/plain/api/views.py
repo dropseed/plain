@@ -11,6 +11,7 @@ from plain.http import (
     NotFoundError404,
     Response,
 )
+from plain.http.response import status_omits_body
 from plain.utils import timezone
 from plain.utils.cache import patch_cache_control
 from plain.views.base import View
@@ -196,6 +197,15 @@ class APIView(View[APIResult]):
             status_code, result = cast(tuple[int, dict[str, Any] | list[Any]], result)
 
         if isinstance(result, dict | list):
+            if status_omits_body(status_code):
+                # A bodiless status can't carry JSON — `return 204, {}`
+                # sends an empty 204; anything else is a contradiction.
+                if result:
+                    raise ValueError(
+                        f"A {status_code} response cannot include data — "
+                        f"return a 200 with the data, or just Response(status_code={status_code})."
+                    )
+                return Response(status_code=status_code)
             return JsonResponse(result, status_code=status_code)
 
         raise TypeError(f"Unexpected APIView return type: {type(result).__name__}")

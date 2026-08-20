@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import os
 import socket
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
@@ -93,10 +94,19 @@ class H1Client:
         self.writer.write(data)
         await self.writer.drain()
 
+    async def read_headers(self) -> bytes:
+        """Read exactly one response header block (through the blank line).
+
+        This is how a client reads a bodiless response (HEAD, 1xx, 204,
+        304) — even one carrying a Content-Length, which describes the
+        body a GET would have had, not bytes that follow.
+        """
+        return await asyncio.wait_for(self.reader.readuntil(b"\r\n\r\n"), timeout=5)
+
     async def read_response(self) -> tuple[bytes, bytes]:
         """Read one response; return (headers, body) split at the blank line."""
         reader = self.reader
-        header_blob = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), timeout=5)
+        header_blob = await self.read_headers()
 
         if b"transfer-encoding: chunked" in header_blob.lower():
             body = b""
@@ -199,6 +209,16 @@ async def h1_roundtrip(worker: Worker, request: bytes) -> tuple[bytes, bytes]:
         client.teardown()
 
 
+class ResponseHandler:
+    """Handler stub that builds a fresh response per request."""
+
+    def __init__(self, make_response: Callable[[], Response]) -> None:
+        self.make_response = make_response
+
+    async def handle(self, request: Any, executor: Any) -> Response:
+        return self.make_response()
+
+
 class BodyLengthHandler:
     """Handler that reads request.body in the thread pool and returns its
     length — mirroring how production sync views read bodies. Maps the
@@ -281,8 +301,10 @@ class H2Client:
                 break
             await self.flush()
 
-    async def response_status(self, stream_id: int, *, timeout: float = 5.0) -> str:
-        """Wait for the response headers on a stream; return its :status."""
+    async def response_headers(
+        self, stream_id: int, *, timeout: float = 5.0
+    ) -> dict[bytes, bytes]:
+        """Wait for the response headers on a stream; return them as a dict."""
         event = await self.wait_for(
             lambda e: (
                 isinstance(e, h2.events.ResponseReceived) and e.stream_id == stream_id
@@ -290,10 +312,15 @@ class H2Client:
             timeout=timeout,
         )
         assert isinstance(event, h2.events.ResponseReceived)
-        for name, value in event.headers or []:
-            if name == b":status":
-                return value.decode()
-        raise AssertionError(f"response without :status: {event.headers}")
+        return dict(event.headers or [])
+
+    async def response_status(self, stream_id: int, *, timeout: float = 5.0) -> str:
+        """Wait for the response headers on a stream; return its :status."""
+        headers = await self.response_headers(stream_id, timeout=timeout)
+        status = headers.get(b":status")
+        if status is None:
+            raise AssertionError(f"response without :status: {headers}")
+        return status.decode()
 
     async def wait_for(
         self, predicate: Any, *, timeout: float = 5.0

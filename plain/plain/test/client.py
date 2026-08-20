@@ -10,6 +10,7 @@ from urllib.parse import urljoin, urlparse, urlsplit
 
 from plain.http import AsyncStreamingResponse, QueryDict, Request, StreamingResponse
 from plain.http import Response as HttpResponse
+from plain.http.response import response_omits_body
 from plain.internal.handlers.base import BaseHandler
 from plain.json import PlainJSONEncoder
 from plain.urls import get_resolver
@@ -164,12 +165,7 @@ def _conditional_content_removal(request: Request, response: Response) -> Respon
     responses for HEAD requests, 1xx, 204, and 304 responses. Ensure
     compliance with RFC 9112 Section 6.3.
     """
-    should_strip = (
-        100 <= response.status_code < 200
-        or response.status_code in (204, 304)
-        or request.method == "HEAD"
-    )
-    if should_strip:
+    if response_omits_body(request.method, response.status_code):
         if isinstance(response, StreamingResponse):
             response.streaming_content = iter([])
         elif not response.streaming:
@@ -204,8 +200,16 @@ class ClientHandler(BaseHandler):
                 response = result
 
             # Collect async streaming content so tests can use response.content.
+            # Bodiless responses (HEAD, 204/304) never consume the stream —
+            # mirroring the server writers, since an SSE generator may
+            # never terminate.
             if isinstance(response, AsyncStreamingResponse):
-                response = self._collect_async_streaming(response)
+                response = self._collect_async_streaming(
+                    response,
+                    consume=not response_omits_body(
+                        request.method, response.status_code
+                    ),
+                )
 
             self._finalize_span(span, response)
 
@@ -223,13 +227,16 @@ class ClientHandler(BaseHandler):
 
         return response
 
-    def _collect_async_streaming(self, response: AsyncStreamingResponse) -> Response:
+    def _collect_async_streaming(
+        self, response: AsyncStreamingResponse, *, consume: bool = True
+    ) -> Response:
         """Collect async streaming content into a regular Response for tests."""
 
         async def _collect(resp: AsyncStreamingResponse) -> HttpResponse:
             chunks = []
-            async for chunk in resp:
-                chunks.append(chunk)
+            if consume:
+                async for chunk in resp:
+                    chunks.append(chunk)
             collected = b"".join(chunks)
 
             sync_response = HttpResponse(
