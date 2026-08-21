@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.57.3](https://github.com/dropseed/plain/releases/plain-jobs@0.57.3) (2026-08-21)
+
+### What's changed
+
+- Worker error logs are now written inside the one-off CONSUMER span that carries the same failure, so the log record and the exception span share trace and span ids. Previously a claim, heartbeat, or job-process failure exported a span _and_ a span-less error log describing the same event, reporting it twice with no link between them ([4b8bd51127](https://github.com/dropseed/plain/commit/4b8bd51127))
+- A failed `JobProcess` lookup, middleware that won't import or construct, and errors escaping `run()` are all covered by a single CONSUMER error span in `process_job`'s catch-all, replacing the narrower span around the row lookup alone ([4b8bd51127](https://github.com/dropseed/plain/commit/4b8bd51127))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.57.2](https://github.com/dropseed/plain/releases/plain-jobs@0.57.2) (2026-08-12)
 
 ### What's changed
