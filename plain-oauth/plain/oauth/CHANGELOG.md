@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.50.4](https://github.com/dropseed/plain/releases/plain-oauth@0.50.4) (2026-08-21)
+
+### What's changed
+
+- The OAuth error page renders at its 400 status directly via `self.render(status_code=400)`, instead of rendering a 200 and mutating the status afterwards — response statuses are now fixed at construction ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+
+### Upgrade instructions
+
+- No changes required.
+- Requires `plain.templates>=0.6.0`.
+
 ## [0.50.3](https://github.com/dropseed/plain/releases/plain-oauth@0.50.3) (2026-08-12)
 
 ### What's changed
