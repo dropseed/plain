@@ -1,5 +1,18 @@
 # plain-templates changelog
 
+## [0.6.0](https://github.com/dropseed/plain/releases/plain-templates@0.6.0) (2026-08-21)
+
+### What's changed
+
+- `TemplateView.render()` accepts `status_code=` — the way to render a template at a non-200 status (a form's 422, say), now that `Response.status_code` is fixed at construction. The name is reserved: a template variable called `status_code` has to come from `get_template_context()` instead ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- `handle_exception` uses the shared `status_for_exception()`, so an out-of-range status on an exception instance can't crash the error template renderer. Bodiless statuses (204, 304) skip the template entirely — those responses can't carry a body, so a `304.html` is never rendered ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4), [5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43))
+
+### Upgrade instructions
+
+- Replace `response = self.render(...)` followed by `response.status_code = X` with `self.render(status_code=X, ...)`.
+- If a view passes a template variable named `status_code` to `render()`, move it into `get_template_context()`.
+- Requires `plain>=0.160.0`.
+
 ## [0.5.2](https://github.com/dropseed/plain/releases/plain-templates@0.5.2) (2026-08-12)
 
 ### What's changed
