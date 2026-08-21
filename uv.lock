@@ -964,7 +964,7 @@ dev = [
 requires-dist = [
     { name = "cryptography", specifier = ">=42.0.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.34.1" },
-    { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
+    { name = "opentelemetry-sdk", specifier = ">=1.34.1,<2" },
     { name = "plain", editable = "plain" },
 ]
 
