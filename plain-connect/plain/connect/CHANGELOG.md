@@ -1,5 +1,16 @@
 # plain-connect changelog
 
+## [0.8.0](https://github.com/dropseed/plain/releases/plain-connect@0.8.0) (2026-08-21)
+
+### What's changed
+
+- Exported log records now carry a module-qualified `exception.type` (e.g. `plain.http.exceptions.NotFoundError404`), matching what spans already record via `record_exception`. The OpenTelemetry SDK's logging handler stamps the bare class `__name__`, which gave the same exception class two different identities depending on which signal reported it — so log-reported and span-reported exceptions couldn't be correlated or grouped together. Builtins stay bare (`ValueError` is still `ValueError`) ([58ec1bd2e6](https://github.com/dropseed/plain/commit/58ec1bd2e6))
+- The `opentelemetry-sdk` dependency is now capped below 2.0, since the log handler overrides a private SDK method ([58ec1bd2e6](https://github.com/dropseed/plain/commit/58ec1bd2e6))
+
+### Upgrade instructions
+
+- If you have dashboards, monitors, or saved queries that filter log records on `exception.type` for a non-builtin exception, update them to the module-qualified name — this is the same value your spans already report for that exception, so the two signals now agree.
+
 ## [0.7.3](https://github.com/dropseed/plain/releases/plain-connect@0.7.3) (2026-08-12)
 
 ### What's changed
