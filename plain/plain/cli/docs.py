@@ -33,7 +33,6 @@ KNOWN_PACKAGES = {
     "plain-pages": "Serve static pages, markdown, and assets",
     "plain-passwords": "Password authentication",
     "plain-pytest": "Test with pytest",
-    "plain-redirection": "URL redirection with admin and logging",
     "plain-scan": "Test for production best practices",
     "plain-sessions": "Database-backed sessions",
     "plain-start": "Bootstrap a new project from templates",

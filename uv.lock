@@ -29,7 +29,6 @@ members = [
     "plain-portal",
     "plain-postgres",
     "plain-pytest",
-    "plain-redirection",
     "plain-scan",
     "plain-sessions",
     "plain-start",
@@ -247,7 +246,6 @@ dependencies = [
     { name = "plain-portal" },
     { name = "plain-postgres" },
     { name = "plain-pytest" },
-    { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
     { name = "plain-tailwind" },
@@ -281,7 +279,6 @@ requires-dist = [
     { name = "plain-portal", editable = "plain-portal" },
     { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-pytest", editable = "plain-pytest" },
-    { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
@@ -1369,29 +1366,6 @@ requires-dist = [
 ]
 
 [[package]]
-name = "plain-redirection"
-version = "0.36.2"
-source = { editable = "plain-redirection" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-postgres" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "plain-pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-postgres", editable = "plain-postgres" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
-
-[[package]]
 name = "plain-scan"
 version = "0.6.6"
 source = { editable = "plain-scan" }
@@ -1587,7 +1561,6 @@ dev = [
     { name = "plain-portal" },
     { name = "plain-postgres" },
     { name = "plain-pytest" },
-    { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
     { name = "plain-tailwind" },
@@ -1628,7 +1601,6 @@ dev = [
     { name = "plain-portal", editable = "plain-portal" },
     { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-pytest", editable = "plain-pytest" },
-    { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-tailwind", editable = "plain-tailwind" },

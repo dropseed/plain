@@ -25,7 +25,6 @@ INSTALLED_PACKAGES = [
     "plain.tailwind",
     "plain.templates",
     "plain.toolbar",
-    "plain.redirection",
     "app.users",
     "app.notes",
     "app.contacts",

@@ -149,7 +149,6 @@ plain docs --search "queryset"         # search across all packages
 - [plain.jobs](https://plainframework.com/docs/plain-jobs/plain/jobs/) — background jobs
 - [plain.email](https://plainframework.com/docs/plain-email/plain/email/) — sending email
 - [plain.cache](https://plainframework.com/docs/plain-cache/plain/cache/) — caching layer
-- [plain.redirection](https://plainframework.com/docs/plain-redirection/plain/redirection/) — URL redirects
 - [plain.vendor](https://plainframework.com/docs/plain-vendor/plain/vendor/) — vendored dependencies
 
 **Frontend:**
