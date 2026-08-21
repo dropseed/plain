@@ -1,5 +1,16 @@
 # plain-htmx changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-htmx@0.21.0) (2026-08-21)
+
+### What's changed
+
+- `HTMXView.render()` accepts `status_code=`, forwarded to the fragment response and to `TemplateView.render()` alike. Response statuses are now fixed at construction, so this replaces mutating `response.status_code` after rendering ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4), [5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43))
+
+### Upgrade instructions
+
+- Replace `response = self.render(...)` followed by `response.status_code = X` with `self.render(status_code=X, ...)`.
+- Requires `plain.templates>=0.6.0`.
+
 ## [0.20.3](https://github.com/dropseed/plain/releases/plain-htmx@0.20.3) (2026-08-12)
 
 ### What's changed
