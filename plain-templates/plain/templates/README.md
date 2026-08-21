@@ -211,7 +211,7 @@ class ProductView(TemplateView):
         return self.render(product=Product.query.get(id=self.url_kwargs["id"]))
 ```
 
-`render(**context)` layers `context` over `get_template_context()`, so the base context (`request`, `DEBUG`, `template_names`) and anything the view's `get_template_context()` adds are still present.
+`render(**context)` layers `context` over `get_template_context()`, so the base context (`request`, `DEBUG`, `template_names`) and anything the view's `get_template_context()` adds are still present. Pass `status_code=` to render at a non-200 status (a form's 422, say) — response statuses are fixed at construction, so this replaces mutating `response.status_code` afterwards.
 
 ## Built-in globals
 

@@ -111,7 +111,7 @@ You can also redirect to a named URL using `url_name`, or preserve query paramet
 
 ## Async views
 
-Any view method defined with `async def` runs directly on the worker's event loop. This enables non-blocking I/O patterns like SSE, WebSockets, and async HTTP clients.
+Any view method defined with `async def` runs directly on the worker's event loop. This enables non-blocking I/O patterns like SSE and async HTTP clients.
 
 **Important:** Blocking calls in async views freeze the entire worker process — no other requests can be processed until the blocking call returns. Plain's ORM, sessions, and auth layers are all synchronous and must not be called directly from async views.
 

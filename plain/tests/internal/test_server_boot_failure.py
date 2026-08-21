@@ -65,6 +65,8 @@ def test_serves_traceback_then_returns_on_file_change(monkeypatch) -> None:
                 b"POST / HTTP/1.1\r\nHost: test\r\n"
                 b"Content-Type: text/html\r\nContent-Length: 0\r\n\r\n"
             )
+            # HEAD gets the header block only (RFC 9110 9.3.2).
+            results["head"] = request(b"HEAD / HTTP/1.1\r\nHost: test\r\n\r\n")
         finally:
             # Fire the reloader callback even if the reads failed, so a
             # broken serve loop fails the assertions instead of hanging
@@ -114,5 +116,11 @@ def test_serves_traceback_then_returns_on_file_change(monkeypatch) -> None:
     # Only the Accept header selects HTML — a text/html Content-Type
     # elsewhere in the request still gets the plain-text variant.
     assert b"Content-Type: text/plain" in results["not_accept"]
+
+    head = results["head"]
+    assert head.startswith(b"HTTP/1.1 500 ")
+    assert b"Content-Length:" in head
+    # Header block only — no body bytes follow the terminator.
+    assert head.endswith(b"\r\n\r\n")
 
     assert heartbeat.notifies >= 1

@@ -8,6 +8,7 @@ from plain.http import HTTPException, NotModifiedResponse, Response
 from plain.internal.handlers.exception import response_for_exception
 from plain.internal.middleware.headers import DefaultHeadersMiddleware
 from plain.test import RequestFactory
+from plain.test.client import _conditional_content_removal
 
 
 class _NotModifiedError(HTTPException):
@@ -30,15 +31,25 @@ def test_error_renderer_bodiless_status_has_no_body():
 
 
 def test_error_renderer_out_of_range_status_degrades_to_500():
-    # A broken HTTPException subclass (1xx or nonsense status) must not
-    # crash the last-resort renderer.
-    class _TooEarlyError(HTTPException):
-        status_code = 103
-
+    # Subclass definition rejects an out-of-range status_code outright,
+    # so the only way one reaches the renderer is instance-level
+    # mutation — the clamp still must not crash the last-resort renderer.
+    exc = HTTPException()
+    exc.status_code = 103
     request = RequestFactory().get("/")
-    response = response_for_exception(request, _TooEarlyError())
+    response = response_for_exception(request, exc)
     assert response.status_code == 500
-    assert isinstance(response.exception, _TooEarlyError)
+    assert response.exception is exc
+
+
+def test_error_renderer_non_int_status_degrades_to_500():
+    # Instance mutation can also plant a non-int — the renderer that
+    # must never raise must not TypeError on the comparison.
+    exc = HTTPException()
+    exc.status_code = "404"  # ty: ignore[invalid-assignment]
+    request = RequestFactory().get("/")
+    response = response_for_exception(request, exc)
+    assert response.status_code == 500
 
 
 def test_error_renderer_regular_status_keeps_body():
@@ -69,8 +80,6 @@ def test_default_headers_middleware_no_content_length_on_bodiless():
 def test_client_strips_content_length_on_204():
     # The test client mirrors the wire: the writers drop Content-Length
     # where forbidden (1xx/204) and keep it on HEAD/304.
-    from plain.test.client import _conditional_content_removal
-
     request = RequestFactory().get("/")
 
     response = Response(status_code=204)

@@ -6,6 +6,7 @@ from plain.api.openapi.generator import OpenAPISchemaGenerator
 from plain.api.openapi.utils import schema_from_type
 from plain.api.openapi.validation import validate_openapi_schema
 from plain.api.views import APIKeyView, APIView
+from plain.http import HTTPException
 from plain.test import Client, RequestFactory
 from plain.urls import Router, path
 
@@ -44,15 +45,20 @@ def test_tuple_bodiless_status_sends_empty_response():
     assert "Content-Type" not in response.headers
 
 
-def test_handle_exception_bodiless_http_exception():
-    """A user-defined 304/204 HTTPException renders as that status, not a 500."""
-    from plain.http import HTTPException
+def test_bodiless_http_exception_renders_bodiless():
+    """A user-defined 304/204 HTTPException renders as that status, not a
+    500. The bodiless answer lives in the View funnel, so it holds for
+    every renderer without per-package handling."""
 
     class NotModified304(HTTPException):
         status_code = 304
 
-    view = APIView(request=RequestFactory().get("/"))
-    response = view.handle_exception(NotModified304())
+    class RaisingView(APIView):
+        def get(self):
+            raise NotModified304()
+
+    view = RaisingView(request=RequestFactory().get("/"))
+    response = view.get_response()
     assert response.status_code == 304
     assert response.content == b""
     assert "Content-Type" not in response.headers

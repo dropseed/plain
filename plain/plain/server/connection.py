@@ -55,8 +55,8 @@ class Connection:
         # request line the moment its header bytes are read, before any
         # parsing, so even an error response to an unparseable request
         # is bodiless for HEAD (RFC 9110 9.3.2). Reset per request by
-        # the h1 connection loop; False when the request line was never
-        # read (e.g. oversized headers).
+        # the h1 connection loop; oversized-header 431s latch it from
+        # the partial buffer before LimitRequestHeaders is raised.
         self.request_is_head: bool = False
 
     def close(self) -> None:

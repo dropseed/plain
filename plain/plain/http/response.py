@@ -103,10 +103,24 @@ class BadHeaderError(ValueError):
     pass
 
 
+# Distinguishes "subclass declared status_code = None" (invalid, rejected)
+# from "subclass declared nothing".
+_NOT_DECLARED: Any = object()
+
 # Private sentinel streaming subclasses pass to skip bytes-body setup in
-# Response.__init__. Using a dedicated object (not None) keeps Response(None)
-# working as before — it goes through the content setter and becomes b"None".
+# Response.__init__ entirely — their `content` property raises, so the
+# setter (and _container) must never be touched. A dedicated object, not
+# None: an explicit None is a real value meaning "no body".
 _NO_CONTENT: Any = object()
+
+
+def is_valid_status_code(status_code: object) -> bool:
+    """True for an int in the constructible range (bools excluded)."""
+    return (
+        isinstance(status_code, int)
+        and not isinstance(status_code, bool)
+        and 200 <= status_code <= 599
+    )
 
 
 def status_omits_body(status_code: int | None) -> bool:
@@ -116,13 +130,14 @@ def status_omits_body(status_code: int | None) -> bool:
     so any body bytes written after it would be parsed as the start of
     the NEXT response on a keep-alive connection. The single definition
     shared by Response construction, the test client, and the server's
-    h1/h2 writers. (The 1xx arm is a backstop: Response rejects 1xx at
-    construction, so it's only reachable by mutating status_code.)
+    h1/h2 writers. (The 1xx arm is a wire-level backstop: 1xx is
+    unrepresentable on a Response — rejected at construction, and
+    status_code has no setter.)
     """
     return status_code is not None and (status_code < 200 or status_code in (204, 304))
 
 
-def response_omits_body(method: str | None, status_code: int | None) -> bool:
+def response_omits_body(*, method: str | None, status_code: int | None) -> bool:
     """True when a response sends only headers: HEAD, or a bodiless status."""
     return method == "HEAD" or status_omits_body(status_code)
 
@@ -141,12 +156,42 @@ class Response:
     middleware with `Response` to cover all response shapes.
     """
 
-    status_code = 200
     streaming = False
+    _default_status_code = 200
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        super().__init_subclass__(**kwargs)
+        declared = cls.__dict__.get("status_code", _NOT_DECLARED)
+        if declared is _NOT_DECLARED or isinstance(declared, property):
+            return
+        # Declarative subclasses write `status_code = 304`. Left as a
+        # plain class attribute it would shadow the validating property
+        # below, so validate it at the line that wrote it and fold it
+        # into the default the property serves.
+        if not is_valid_status_code(declared):
+            raise ValueError(
+                f"{cls.__name__}.status_code must be an integer from "
+                f"200 to 599, got {declared!r}."
+            )
+        delattr(cls, "status_code")
+        cls._default_status_code = declared
+
+    @property
+    def status_code(self) -> int:
+        """Fixed at construction — there is deliberately no setter.
+
+        Status is part of a response's identity: headers defaulting,
+        the bodiless rules (RFC 9110), transports, and caches all read
+        it as a settled fact. Pass `status_code=` to the constructor
+        (`TemplateView.render()` takes it too) instead of mutating a
+        built response — assignment fails the type check and raises
+        AttributeError at runtime.
+        """
+        return self._status_code
 
     def __init__(
         self,
-        content: bytes | str | Iterator[bytes] = b"",
+        content: bytes | str | Iterator[bytes] | None = b"",
         *,
         content_type: str | None = None,
         status_code: int | None = None,
@@ -156,19 +201,31 @@ class Response:
     ):
         self.headers = ResponseHeaders(headers)
         self._charset = charset
-        if status_code is not None:
+        # Materialized on every instance so copies (e.g. the test
+        # client's) never depend on class lookup. The class default was
+        # validated at definition; an argument is validated here — the
+        # only door, since status_code has no setter.
+        if status_code is None:
+            self._status_code = self._default_status_code
+        else:
             try:
-                self.status_code = int(status_code)
+                status_code = int(status_code)
             except (ValueError, TypeError):
                 raise TypeError("HTTP status code must be an integer.")
-
-        # Validate the effective status — the argument above, or a
-        # subclass's class attribute (e.g. `status_code = 304`).
-        if not 200 <= self.status_code <= 599:
+            if not is_valid_status_code(status_code):
+                raise ValueError(
+                    "HTTP status code must be an integer from 200 to 599 "
+                    "(1xx interim responses are sent by the server, not "
+                    "application code)."
+                )
+            self._status_code = status_code
+        if content is _NO_CONTENT and status_omits_body(self._status_code):
+            # Streaming subclasses pass the sentinel. Refusing here —
+            # before the iterator is ever assigned — means the caller
+            # keeps ownership of it and nothing needs closing.
             raise ValueError(
-                "HTTP status code must be an integer from 200 to 599 "
-                "(1xx interim responses are sent by the server, not "
-                "application code)."
+                f"A {self._status_code} response cannot have a body — "
+                "it can't be a streaming response."
             )
         if "Content-Type" not in self.headers:
             # A bodiless status (204/304) gets no default Content-Type:
@@ -375,7 +432,7 @@ class Response:
         return b"".join(self._container)
 
     @content.setter
-    def content(self, value: bytes | str | Iterator[bytes]) -> None:
+    def content(self, value: bytes | str | Iterator[bytes] | None) -> None:
         # Consume iterators upon assignment to allow repeated iteration.
         if hasattr(value, "__iter__") and not isinstance(
             value, bytes | memoryview | str
@@ -386,6 +443,9 @@ class Response:
                     value.close()  # ty: ignore[call-non-callable]
                 except Exception:
                     pass
+        elif value is None:
+            # An explicit None means "no body".
+            content = b""
         else:
             content = self.make_bytes(value)
         if content and status_omits_body(self.status_code):
@@ -428,18 +488,6 @@ class StreamingResponse(Response):
             charset=charset,
             headers=headers,
         )
-        if status_omits_body(self.status_code):
-            if hasattr(streaming_content, "close") and callable(
-                getattr(streaming_content, "close")
-            ):
-                try:
-                    streaming_content.close()
-                except Exception:
-                    pass
-            raise ValueError(
-                f"A {self.status_code} response cannot have a body — "
-                "it can't be a streaming response."
-            )
         # `streaming_content` should be an iterable of bytestrings.
         # See the `streaming_content` property methods.
         self.streaming_content = streaming_content
@@ -498,20 +546,6 @@ class AsyncStreamingResponse(Response):
             charset=charset,
             headers=headers,
         )
-        if status_omits_body(self.status_code):
-            # aclose() can't be awaited in __init__; an unstarted async
-            # generator finalizes cleanly without it, so best-effort a
-            # sync close() for custom iterators that offer one.
-            close = getattr(streaming_content, "close", None)
-            if callable(close):
-                try:
-                    close()
-                except Exception:
-                    pass
-            raise ValueError(
-                f"A {self.status_code} response cannot have a body — "
-                "it can't be a streaming response."
-            )
         self._async_iterator = streaming_content
 
     @property
@@ -520,6 +554,26 @@ class AsyncStreamingResponse(Response):
             f"This {self.__class__.__name__} instance has no `content` attribute. Use "
             "`streaming_content` instead."
         )
+
+    def _to_buffered_response(self, body: bytes) -> Response:
+        """Materialize the streamed body into a plain Response.
+
+        Used by the test client after collecting the stream. The body
+        routes through the constructor (and its validation), then the
+        rest of the instance state — including anything app code set on
+        the response — transfers wholesale, so tests assert against the
+        same object shape production sends. `closed` deliberately starts
+        fresh, and the resource closers move over.
+        """
+        response = Response(body, status_code=self.status_code)
+        state = {
+            k: v
+            for k, v in self.__dict__.items()
+            if k not in ("_async_iterator", "closed", "_container", "_status_code")
+        }
+        response.__dict__.update(state)
+        self._resource_closers = []
+        return response
 
     def __iter__(self) -> Iterator[bytes]:
         raise TypeError(
@@ -559,14 +613,24 @@ class FileResponse(StreamingResponse):
         self.as_attachment = as_attachment
         self.filename = filename
         self._no_explicit_content_type = content_type is None
-        super().__init__(
-            streaming_content,
-            content_type=content_type,
-            status_code=status_code,
-            reason=reason,
-            charset=charset,
-            headers=headers,
-        )
+        try:
+            super().__init__(
+                streaming_content,
+                content_type=content_type,
+                status_code=status_code,
+                reason=reason,
+                charset=charset,
+                headers=headers,
+            )
+        except ValueError:
+            # Unlike a generic iterator (which stays the caller's on a
+            # bodiless rejection), FileResponse owns the file handle it
+            # was given — the idiomatic call is FileResponse(open(p)),
+            # which leaves the caller nothing to close.
+            close = getattr(streaming_content, "close", None)
+            if callable(close):
+                close()
+            raise
 
     def _set_streaming_content(self, value: Any) -> None:
         if not hasattr(value, "read"):
@@ -704,7 +768,10 @@ class RedirectResponse(Response):
 
 class NotModifiedResponse(Response):
     """HTTP 304 response — headers only, no Content-Type (the base class
-    skips the default for bodiless statuses)."""
+    skips the default for bodiless statuses).
+
+    The constructor is pinned: no content/content_type/status_code
+    parameters, so this class always means exactly "bodiless 304"."""
 
     status_code = 304
 

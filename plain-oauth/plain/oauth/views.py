@@ -41,9 +41,7 @@ class OAuthCallbackView(TemplateView):
             logger.warning("OAuth error: %s", e.message)
             self.oauth_error = e
 
-            response = super().get()
-            response.status_code = 400
-            return response
+            return self.render(status_code=400)
 
     def get_template_names(self) -> list[str]:
         names = []

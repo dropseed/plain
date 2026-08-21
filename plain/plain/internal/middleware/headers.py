@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plain.http import HttpMiddleware
-from plain.http.response import status_omits_body
+from plain.http import HttpMiddleware, status_omits_body
 from plain.runtime import settings
 
 if TYPE_CHECKING:

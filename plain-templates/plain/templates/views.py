@@ -7,8 +7,12 @@ from typing import Any, NoReturn
 
 from plain.exceptions import ImproperlyConfigured
 from plain.forms import BaseForm, Form
-from plain.http import HTTPException, NotFoundError404, RedirectResponse, Response
-from plain.http.response import status_omits_body
+from plain.http import (
+    NotFoundError404,
+    RedirectResponse,
+    Response,
+    status_for_exception,
+)
 from plain.logs import get_framework_logger
 from plain.paginator import Page, Paginator
 from plain.runtime import settings
@@ -69,16 +73,23 @@ class TemplateView(View):
 
         raise TemplateFileMissing(template_names)
 
-    def render(self, **context: Any) -> Response:
+    def render(self, *, status_code: int = 200, **context: Any) -> Response:
         """Render the template to a `Response`, layering `context` over `get_template_context()`.
 
         A handler passes what the template needs straight in —
         `self.render(form=form)` — rather than stashing it on `self` for
         `get_template_context()` to read back. Called with no arguments it
         renders `get_template_context()` as-is, which is what `get()` does.
+
+        `status_code` sets the response status (a form's 422, say) —
+        `Response.status_code` is fixed at construction, so this is the
+        way to render a template at a non-200 status. The name is
+        reserved: a template variable called `status_code` has to come
+        from `get_template_context()` instead.
         """
         return Response(
-            self.get_template().render({**self.get_template_context(), **context})
+            self.get_template().render({**self.get_template_context(), **context}),
+            status_code=status_code,
         )
 
     def get(self) -> Response:
@@ -86,10 +97,7 @@ class TemplateView(View):
 
     def handle_exception(self, exc: Exception) -> Response:
         """Render `{status}.html` for the exception, falling through on missing template."""
-        status = exc.status_code if isinstance(exc, HTTPException) else 500
-        if status_omits_body(status):
-            # No error page for a status that can't carry one.
-            return Response(status_code=status)
+        status = status_for_exception(exc)
         try:
             body = Template(f"{status}.html").render(
                 {

@@ -10,8 +10,9 @@ from plain.http import (
     JsonResponse,
     NotFoundError404,
     Response,
+    status_for_exception,
+    status_omits_body,
 )
-from plain.http.response import status_omits_body
 from plain.utils import timezone
 from plain.utils.cache import patch_cache_control
 from plain.views.base import View
@@ -50,11 +51,7 @@ def _error_response(
     message: str,
     status_code: int,
     errors: list[FieldError] | None = None,
-) -> Response:
-    if status_omits_body(status_code):
-        # A bodiless status (e.g. a user-defined 304 HTTPException) can't
-        # carry the JSON error body.
-        return Response(status_code=status_code)
+) -> JsonResponse:
     body: ErrorSchema = {"id": error_id, "message": message}
     if errors is not None:
         body["errors"] = errors
@@ -199,9 +196,15 @@ class APIView(View[APIResult]):
                     "Tuple response must be of length 2 (status_code, data)"
                 )
             status_code, result = cast(tuple[int, dict[str, Any] | list[Any]], result)
+            if status_code is None:
+                # Old contract: None meant JsonResponse's default 200.
+                status_code = 200
 
         if isinstance(result, dict | list):
-            if status_omits_body(status_code):
+            # The isinstance guard keeps a non-int status (str, etc.) out
+            # of the predicate — Response construction below remains the
+            # single validator for type and range.
+            if isinstance(status_code, int) and status_omits_body(status_code):
                 # A bodiless status can't carry JSON — `return 204, {}`
                 # sends an empty 204; anything else is a contradiction.
                 if result:
@@ -237,12 +240,14 @@ class APIView(View[APIResult]):
                 status_code=400,
             )
         if isinstance(exc, HTTPException):
-            error_id = _STATUS_ERROR_IDS.get(exc.status_code, "http_error")
+            # Clamped: a poked-in out-of-range status must not crash the
+            # error renderer (subclass definitions are validated already).
+            status_code = status_for_exception(exc)
+            error_id = _STATUS_ERROR_IDS.get(status_code, "http_error")
             return _error_response(
                 error_id=error_id,
-                message=str(exc)
-                or http_status_phrases.get(exc.status_code, "HTTP error"),
-                status_code=exc.status_code,
+                message=str(exc) or http_status_phrases.get(status_code, "HTTP error"),
+                status_code=status_code,
             )
         return _error_response(
             error_id="server_error",

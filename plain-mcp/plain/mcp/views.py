@@ -9,11 +9,10 @@ from typing import Any, ClassVar
 from opentelemetry import trace
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from plain.http import (
-    HTTPException,
     JsonResponse,
     Response,
+    status_for_exception,
 )
-from plain.http.response import status_omits_body
 from plain.logs import get_framework_logger, log_exception
 from plain.runtime import settings
 from plain.utils.otel import format_exception_type
@@ -251,16 +250,11 @@ class MCPView(View):
             if exc.www_authenticate:
                 headers = {"WWW-Authenticate": exc.www_authenticate}
         else:
-            status = exc.status_code if isinstance(exc, HTTPException) else 500
+            status = status_for_exception(exc)
             if status >= 500:
                 message = "Internal error"
             else:
                 message = str(exc) or HTTPStatus(status).phrase
-
-        if status_omits_body(status):
-            # A bodiless status (e.g. a user-defined 304 HTTPException)
-            # can't carry the JSON-RPC error body.
-            return Response(status_code=status)
 
         return JsonResponse(
             _error_response(

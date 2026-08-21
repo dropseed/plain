@@ -35,6 +35,7 @@ Plain is a Django fork but has different APIs. Package-specific differences are 
 - **URLs**: Use `Router` with a `urls` tuple, not Django's `urlpatterns`
 - **Request data**: Use `request.query_params` not `request.GET`, `request.form_data` not `request.POST`, `request.json_data` not `json.loads(request.body)`, `request.files` not `request.FILES`
 - **Middleware**: Middleware uses `before_request(self, request) -> Response | None` and `after_response(self, request, response) -> Response` — not Django's `__init__(self, get_response)` / `__call__` pattern. No `AuthMiddleware` exists — auth works through sessions + view-level checks (`AuthViewMixin`).
+- **Response status**: `response.status_code` is read-only — never assign it after construction (Django allows this; Plain raises). Pass `status_code=` to the `Response` constructor or `TemplateView.render()`; to change a built response's status, construct a new response.
 
 When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 
@@ -42,7 +43,7 @@ When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 
 - **Message format**: Capitalized sentence fragments — `"User logged in"`, `"Payment failed"`, not snake_case tokens or inline key=value
 - **No f-strings or % formatting** in log messages — pass variable data via `context={}` instead
-- Use `context={}` for `app_logger`, `extra={"context": {...}}` for standard loggers (`logging.getLogger("plain.xxx")`)
+- Use `context={}` for `app_logger`; standard loggers (`logging.getLogger(...)`) take a flat `extra={...}` dict
 
 Run `uv run plain docs logs` for full examples and anti-patterns.
 
@@ -83,9 +84,9 @@ If the exception propagates out of the span context, the SDK auto-records and se
 - HTTP requests — SERVER (`plain/internal/handlers/base.py`)
 - View 5xx attachment — `plain/views/base.py:_respond_to_exception` (records on the SERVER span via `_finalize_span`)
 - Job enqueue — PRODUCER (`plain-jobs/jobs/jobs.py`)
-- Job execute — CONSUMER (`plain-jobs/jobs/models.py`), plus a fallback CONSUMER span in `plain-jobs/jobs/workers.py:process_job` that catches lookup-time failures before `run()` is reached
+- Job execute — CONSUMER (`plain-jobs/jobs/models.py`), plus a one-off CONSUMER span in `plain-jobs/jobs/workers.py:process_job`'s catch-all for library errors outside `run()` (row lookup, middleware setup, errors escaping `run()`)
 - Worker maintenance loop — CONSUMER (`plain-jobs/jobs/workers.py`), opened only on ticks where a maintenance task is due — fully idle ticks emit no spans at all
-- Worker claim/heartbeat failures — one-off `claim job` / `worker heartbeat` CONSUMER error spans via `emit_error_consumer_span` (`plain-jobs/jobs/otel.py`); the claim transaction, heartbeat writes, gauge queries, and done-callback bookkeeping are otherwise untraced (`plain.postgres.otel.suppress_db_tracing`)
+- Worker claim/heartbeat failures — one-off `claim job` / `worker heartbeat` CONSUMER error spans via the `error_consumer_span` context manager (`plain-jobs/jobs/otel.py`), with the paired `logger.exception` call made inside the span so the log record carries its trace/span ids; the claim transaction, heartbeat writes, gauge queries, and done-callback bookkeeping are otherwise untraced (`plain.postgres.otel.suppress_db_tracing`)
 - Chore execution — CONSUMER (`plain/cli/chores.py`)
 - MCP RPC dispatch — SERVER (`plain-mcp/mcp/views.py`)
 

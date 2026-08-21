@@ -13,16 +13,21 @@ import h2.errors
 import h2.events
 import h2.exceptions
 import h2.settings
-from plain.http import AsyncStreamingResponse, FileResponse, StreamingResponse
+from plain.http import (
+    AsyncStreamingResponse,
+    FileResponse,
+    StreamingResponse,
+    content_length_forbidden,
+    response_omits_body,
+)
 from plain.http import Request as HttpRequest
-from plain.http.response import content_length_forbidden, response_omits_body
 from plain.logs import get_framework_logger
 
 from ..accesslog import log_access
-from ..util import http_date
+from ..util import HEALTHCHECK_BODY, http_date
 from .errors import BodyBudgetExceeded, LimitRequestBody
 from .request import _merge_headers, _resolve_path, _resolve_remote_addr
-from .response import FileWrapper, warn_dropped_body
+from .response import FileWrapper
 from .sink import BodyBudget, BodyRateFloor, BodySink
 
 if TYPE_CHECKING:
@@ -50,7 +55,7 @@ class H2Stream:
         "_rate_marked_received",
         "declared",
         "headers",
-        "is_head",
+        "method",
         "opened",
         "rate",
         "sink",
@@ -72,10 +77,9 @@ class H2Stream:
         # an undeclared-length body — the rate sweep can't tell "done" from
         # "still arriving" for those and keeps watching.
         self.declared: int | None = None
-        # True for a HEAD request, set once headers are parsed. Every
-        # response written for this stream — including server-generated
-        # errors — must then be headers-only.
-        self.is_head = False
+        # The ":method" pseudo-header, set once headers are parsed.
+        # None until then (and for a malformed request without one).
+        self.method: str | None = None
         self.sink = BodySink(spool_size=spool_size, max_size=max_size, budget=budget)
         self.rate = BodyRateFloor(min_rate)
         self.opened = time.monotonic()
@@ -97,6 +101,12 @@ class H2Stream:
         self._rate_marked_at = now
         self._rate_marked_received = self.sink.received
         return self.rate.violated()
+
+    @property
+    def is_head(self) -> bool:
+        """Every response written for a HEAD stream — including
+        server-generated errors — must be headers-only."""
+        return self.method == "HEAD"
 
 
 class H2Request:
@@ -180,7 +190,12 @@ def _send_stream_response(
         else:
             conn.send_headers(stream_id, headers)
             conn.send_data(stream_id, body, end_stream=True)
-        conn.reset_stream(stream_id, error_code=h2.errors.ErrorCodes.NO_ERROR)
+        try:
+            conn.reset_stream(stream_id, error_code=h2.errors.ErrorCodes.NO_ERROR)
+        except h2.exceptions.StreamClosedError:
+            # The client already ended its side (e.g. an app error after
+            # END_STREAM) — there is nothing to tell it to stop sending.
+            pass
     except h2.exceptions.ProtocolError:
         try:
             conn.reset_stream(stream_id)
@@ -222,15 +237,16 @@ def _extract_headers_from_stream(
     stream: H2Stream, scheme: str
 ) -> tuple[str, str, str, str, list[tuple[str, str]]]:
     """Extract method, path, authority, scheme, and regular headers from an H2Stream."""
-    method = "GET"
+    # The single :method derivation is stream.method (set at
+    # RequestReceived) — re-deriving here could silently frame the
+    # response for one method while dispatching the view for another.
+    method = stream.method or "GET"
     path = "/"
     authority = ""
     raw_headers: list[tuple[str, str]] = []
 
     for name, value in stream.headers:
-        if name == ":method":
-            method = value
-        elif name == ":path":
+        if name == ":path":
             path = value
         elif name == ":authority":
             authority = value
@@ -631,9 +647,11 @@ async def async_handle_h2_connection(
                     ]
 
                     stream.declared = _declared_content_length(stream.headers)
-                    stream.is_head = any(
-                        name == ":method" and value == "HEAD"
-                        for name, value in stream.headers
+                    # RFC 9113 8.3: pseudo-headers precede regular fields,
+                    # so this stops at the front of the list.
+                    stream.method = next(
+                        (value for name, value in stream.headers if name == ":method"),
+                        None,
                     )
 
                     # Reject a declared-too-large body at the headers,
@@ -670,7 +688,7 @@ async def async_handle_h2_connection(
                                 break
                         if stream_path == healthcheck_path:
                             _send_stream_response(
-                                conn, stream, 200, b"ok", "text/plain"
+                                conn, stream, 200, HEALTHCHECK_BODY, "text/plain"
                             )
                             stream.sink.close()
                             continue
@@ -811,13 +829,9 @@ async def async_handle_h2_connection(
                 await state.flush()
         except OSError:
             pass
-    except OSError:
-        log.debug("HTTP/2 connection closed", extra={"client": client})
-    except Exception:
-        log.exception(
-            "Unexpected error in HTTP/2 connection",
-            extra={"client": client},
-        )
+    # Connection-level error triage (socket noise vs. unexpected bug)
+    # lives in Worker._on_connection; only the h2-specific ProtocolError
+    # flush above is handled here.
     finally:
         if read_task is not None:
             read_task.cancel()
@@ -915,9 +929,7 @@ async def _async_handle_stream_inner(
             if stream.stream_id in state.reset_streams:
                 return
 
-            await _async_write_h2_response(
-                state, stream.stream_id, http_response, h2_resp, h2_req.method
-            )
+            await _async_write_h2_response(state, stream, http_response, h2_resp)
         finally:
             request_time = datetime.now(UTC) - request_start
             if http_response.log_access:
@@ -959,24 +971,24 @@ async def _async_handle_stream_inner(
 
 async def _async_write_h2_response(
     state: H2ConnectionState,
-    stream_id: int,
+    stream: H2Stream,
     http_response: Any,
     h2_resp: H2Response,
-    method: str,
 ) -> None:
     """Write a plain.http response as HTTP/2 frames."""
     loop = asyncio.get_running_loop()
     conn = state.conn
     executor = state.executor
+    stream_id = stream.stream_id
+    method = stream.method
     status_code = http_response.status_code
     h2_resp.status = f"{status_code} {http_response.reason_phrase}"
 
     response_headers = _build_h2_response_headers(http_response)
 
-    if response_omits_body(method, status_code):
+    if response_omits_body(method=method, status_code=status_code):
         # Headers only, END_STREAM, no DATA frames — a 204/304-with-DATA
         # is malformed per RFC 9113 8.1.1. The body is never read.
-        warn_dropped_body(http_response, method=method, status_code=status_code)
         async with state.write_lock:
             conn.send_headers(stream_id, response_headers, end_stream=True)
             await state.flush()

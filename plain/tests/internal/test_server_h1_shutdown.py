@@ -632,11 +632,10 @@ def test_unsupported_transfer_encoding_is_rejected_by_parser() -> None:
     asyncio.run(scenario())
 
 
-def test_upgrade_response_still_honors_shutdown_close() -> None:
-    # An upgrade response frames "Connection: upgrade", but the loop exit
-    # must still follow the close decision — otherwise force_close()
-    # (shutdown) is silently ignored and the connection keeps serving
-    # requests for the whole graceful window.
+def test_app_connection_header_cannot_override_shutdown_close() -> None:
+    # Hop-by-hop headers are the server's to frame — an app-supplied
+    # "Connection: upgrade" is dropped, and force_close() (shutdown)
+    # still frames "Connection: close" and exits the loop.
     async def scenario() -> None:
         handler = _Handler()
         worker = make_worker(handler=handler)
@@ -647,7 +646,8 @@ def test_upgrade_response_still_honors_shutdown_close() -> None:
         try:
             await client.send(_REQUEST)
             headers, _ = await client.read_response()
-            assert b"connection: upgrade" in headers.lower()
+            assert b"connection: close" in headers.lower()
+            assert b"upgrade" not in headers.lower()
 
             # A follow-up request must not be served.
             await client.send(_REQUEST)

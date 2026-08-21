@@ -133,8 +133,9 @@ class VersionedAPIView(APIView):
             # No changes to apply, just return
             return
 
-        if not response.content:
-            # An empty body has nothing to transform (and isn't JSON).
+        if response.streaming or not response.content:
+            # A streaming body can't be inspected (its `content` raises)
+            # and an empty body has nothing to transform.
             return
 
         # Get the original response JSON

@@ -11,6 +11,7 @@ from plain.logs import get_framework_logger
 
 from ..accesslog import log_access
 from ..connection import DRAIN_MIN_RECV, RECV_PROGRESS_TIMEOUT, Connection
+from ..util import HEALTHCHECK_BODY
 from .errors import (
     BodyBudgetExceeded,
     ChunkedFramingError,
@@ -41,15 +42,16 @@ log = get_framework_logger()
 # Built headers-first from the body literal so the GET and HEAD
 # variants can't drift: HEAD is the header block (Content-Length
 # describes the GET body — RFC 9110 9.3.2), GET appends the body.
-_HEALTHCHECK_BODY = b"ok"
+# HEALTHCHECK_BODY lives in ..util because h2 answers the same
+# healthcheck with the same body.
 HEALTHCHECK_RESPONSE_HEAD = (
-    b"HTTP/1.1 200 OK\r\n"
-    b"Content-Type: text/plain\r\n"
-    b"Content-Length: " + str(len(_HEALTHCHECK_BODY)).encode() + b"\r\n"
-    b"Connection: close\r\n"
-    b"\r\n"
-)
-HEALTHCHECK_RESPONSE = HEALTHCHECK_RESPONSE_HEAD + _HEALTHCHECK_BODY
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Type: text/plain\r\n"
+    f"Content-Length: {len(HEALTHCHECK_BODY)}\r\n"
+    "Connection: close\r\n"
+    "\r\n"
+).encode()
+HEALTHCHECK_RESPONSE = HEALTHCHECK_RESPONSE_HEAD + HEALTHCHECK_BODY
 
 
 def extract_request_path(header_data: bytes) -> bytes:
@@ -209,7 +211,13 @@ async def async_read_headers(worker: Worker, conn: Connection) -> tuple[bytes, b
     Raises LimitRequestHeaders if headers exceed MAX_HEADER_SIZE.
     Raises TimeoutError if the header read exceeds HEADER_READ_TIMEOUT
     (or, mid-request, the shutdown drain deadline).
+
+    Owns the `conn.request_is_head` latch: reset on entry, set from the
+    request line both on success and on the oversized-header raise, so
+    every response written afterwards — including the 431 — is bodiless
+    for HEAD (RFC 9110 9.3.2).
     """
+    conn.request_is_head = False
     buf = bytearray()
     scan_from = 0
     header_deadline = time.monotonic() + HEADER_READ_TIMEOUT
@@ -231,9 +239,11 @@ async def async_read_headers(worker: Worker, conn: Connection) -> tuple[bytes, b
             # A complete request is served even if the drain deadline has
             # since passed — the deadline only stops us waiting for more.
             header_end = idx + 4
+            conn.request_is_head = buf.startswith(b"HEAD ")
             return bytes(buf[:header_end]), bytes(buf[header_end:])
 
         if len(buf) > MAX_HEADER_SIZE:
+            conn.request_is_head = buf.startswith(b"HEAD ")
             raise LimitRequestHeaders("Request headers exceeded max size")
 
         remaining = header_deadline - time.monotonic()
@@ -638,7 +648,9 @@ async def stream_async_response(
             if not client_disconnected:
                 await resp.async_close()
         except OSError:
-            pass
+            # The client vanished during the header/terminator write —
+            # classify it so the connection isn't framed keep-alive.
+            client_disconnected = True
         finally:
             request_time = datetime.now(UTC) - request_start
             if http_response.log_access:
@@ -679,7 +691,6 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
             # Read HTTP headers asynchronously on the event loop. Once
             # shutdown starts, all reads are bounded by the worker's drain
             # read deadline (see _recv_timeout).
-            conn.request_is_head = False
             try:
                 header_data, body_start = await async_read_headers(worker, conn)
             except (TimeoutError, OSError):
@@ -693,11 +704,6 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
                 break
             if not header_data:
                 break
-
-            # Latch HEAD-ness from the request line before any parsing —
-            # everything written from here on (healthcheck, parse-failure
-            # errors, the response itself) consults this one fact.
-            conn.request_is_head = header_data.startswith(b"HEAD ")
 
             # Health check — respond on the event loop without touching the
             # thread pool. Still answered during shutdown drain: the response
@@ -877,19 +883,7 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
             if not keepalive:
                 break
 
-    except OSError:
-        # Socket-level failures are the client's side of the story —
-        # not an application error. (Mirrors h2; CancelledError from
-        # shutdown teardown still propagates.)
-        log.debug("HTTP/1.1 connection closed", extra={"client": conn.client})
-    except Exception:
-        # Last-resort catch so a bug in the connection handler is logged
-        # by plain itself with its traceback, instead of escaping into
-        # asyncio's default exception handler on a logger plain doesn't
-        # configure. Mirrors h2's connection-level catch.
-        log.exception(
-            "Unexpected error in HTTP/1.1 connection",
-            extra={"client": conn.client},
-        )
     finally:
+        # Connection-level error triage (socket noise vs. unexpected
+        # bug) lives in Worker._on_connection, one level up.
         shutdown_wait.cancel()

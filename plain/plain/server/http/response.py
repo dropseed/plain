@@ -11,11 +11,10 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
-from plain.http import FileResponse
-from plain.http.response import (
+from plain.http import (
+    FileResponse,
     content_length_forbidden,
     response_omits_body,
-    status_omits_body,
 )
 
 from .. import util
@@ -30,26 +29,6 @@ if TYPE_CHECKING:
 HEADER_VALUE_RE = re.compile(r"[ \t\x21-\x7e\x80-\xff]*")
 
 log = logging.getLogger(__name__)
-
-
-def warn_dropped_body(
-    http_response: Any, *, method: str | None, status_code: int | None
-) -> None:
-    """Warn when an app-supplied body is dropped for a bodiless status.
-
-    HEAD is silent — a body there is correct app behavior (HEAD == GET
-    without the body). Streaming bodies are never consumed, so they
-    can't be inspected. Response construction rejects these outright;
-    this only fires when status_code was mutated afterwards.
-    """
-    if method == "HEAD" or not status_omits_body(status_code):
-        return
-    if http_response.streaming or not http_response.content:
-        return
-    log.warning(
-        "Response body dropped for bodiless status",
-        extra={"status": status_code, "method": method},
-    )
 
 
 class FileWrapper:
@@ -88,14 +67,13 @@ class Response:
         self.headers_sent = False
         self.response_length: int | None = None
         self.sent = 0
-        self.upgrade = False
         self.status_code: int | None = None
 
     @property
     def omits_body(self) -> bool:
         """True when this response sends only headers: a HEAD request,
         or a bodiless status (1xx/204/304)."""
-        return response_omits_body(self.req.method, self.status_code)
+        return response_omits_body(method=self.req.method, status_code=self.status_code)
 
     def force_close(self) -> None:
         self.must_close = True
@@ -111,10 +89,8 @@ class Response:
             return True
         if self.response_length is not None or self.chunked:
             return False
-        if self.req.method == "HEAD":
-            return False
-        if self.status_code is None:
-            return True
+        # Nothing frames the body, so close delimits it — unless there
+        # is none at all (HEAD/1xx/204/304). An unparsed status closes.
         return not self.omits_body
 
     def set_status_and_headers(
@@ -157,17 +133,8 @@ class Response:
                     continue
                 self.response_length = int(value)
             elif util.is_hoppish(name):
-                if lname == "connection":
-                    # handle websocket
-                    if value.lower() == "upgrade":
-                        self.upgrade = True
-                # Not collapsible: a non-websocket Upgrade must still hit
-                # the hop-by-hop `continue` below.
-                elif lname == "upgrade":  # noqa: SIM102
-                    if value.lower() == "websocket":
-                        self.headers.append((name, value))
-
-                # ignore hopbyhop headers
+                # Hop-by-hop headers (Connection, Upgrade, ...) are the
+                # server's to frame, never the app's — drop them.
                 continue
             self.headers.append((name, value))
 
@@ -181,18 +148,10 @@ class Response:
         return not self.omits_body
 
     def default_headers(self) -> list[str]:
-        # Set the connection header and latch the close decision. The
-        # latch records the decision, not the header text: an upgrade
-        # response frames "Connection: upgrade" but the keepalive loop
-        # still follows should_close() — otherwise force_close() (e.g.
-        # shutdown) would be silently ignored on upgrade responses.
+        # Set the connection header and latch the close decision so the
+        # keepalive loop follows what the client was actually told.
         close = self.should_close()
-        if self.upgrade:
-            connection = "upgrade"
-        elif close:
-            connection = "close"
-        else:
-            connection = "keep-alive"
+        connection = "close" if close else "keep-alive"
 
         self.framed_close = close
 
@@ -243,10 +202,6 @@ class Response:
         await self.async_send_headers()
         if not isinstance(arg, bytes):
             raise TypeError(f"{arg!r} is not a byte")
-        if self.omits_body:
-            # Backstop: the write paths skip body iteration for bodiless
-            # responses before reaching here — see async_write_response.
-            return
         arglen = len(arg)
         tosend = arglen
         if self.response_length is not None:
@@ -273,10 +228,9 @@ class Response:
 
         if self.omits_body:
             # Headers only (HEAD keeps its Content-Length) — the body is
-            # never read or written.
-            warn_dropped_body(
-                http_response, method=self.req.method, status_code=self.status_code
-            )
+            # never read or written. A status/body contradiction is
+            # unrepresentable on a plain.http Response (immutable,
+            # validated status), so this is framing, not cleanup.
             await self.async_close()
             return
 

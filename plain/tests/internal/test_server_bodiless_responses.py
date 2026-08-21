@@ -20,11 +20,10 @@ must be the next response's status line.
 from __future__ import annotations
 
 import asyncio
-import logging
 
 import h2.events
-import pytest
 from plain.http import AsyncStreamingResponse, Response
+from plain.server.http.h1 import MAX_HEADER_SIZE
 from server_stubs import H1Client, ResponseHandler, h1_connect, h2_connect, make_worker
 
 _GET = b"GET / HTTP/1.1\r\nHost: testserver\r\n\r\n"
@@ -32,10 +31,11 @@ _HEAD = b"HEAD / HTTP/1.1\r\nHost: testserver\r\n\r\n"
 
 
 def _mutated_204() -> Response:
-    # The path construction-time enforcement can't see: the status is
-    # changed after the body was set.
+    # A status/body contradiction is unrepresentable through the public
+    # API (the status setter validates on assignment) — poke the private
+    # attribute to pin the transport's wire-level backstop anyway.
     response = Response(b"leaked body bytes", content_type="text/plain")
-    response.status_code = 204
+    response._status_code = 204
     return response
 
 
@@ -45,14 +45,6 @@ async def _assert_next_response_clean(client: H1Client) -> None:
     await client.send(_GET)
     headers = await client.read_headers()
     assert headers.startswith(b"HTTP/1.1 ")
-
-
-def _dropped_body_warnings(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
-    return [
-        record
-        for record in caplog.records
-        if record.getMessage() == "Response body dropped for bodiless status"
-    ]
 
 
 def test_h1_204_body_dropped_and_connection_not_poisoned() -> None:
@@ -172,7 +164,9 @@ def test_h1_304_content_length_preserved_no_body() -> None:
 def test_h1_1xx_not_chunked() -> None:
     def make_response() -> Response:
         response = Response()
-        response.status_code = 101
+        # 1xx is unbuildable through the public API — private poke, so
+        # the transport's 1xx wire handling stays pinned as a backstop.
+        response._status_code = 101
         # Forbidden on 1xx (RFC 9110 8.6) — must be stripped on the wire.
         response.headers["Content-Length"] = "5"
         return response
@@ -214,10 +208,32 @@ def test_h1_head_early_413_has_no_body() -> None:
             # drain: anything after the header block would be the
             # (forbidden) body.
             client.writer.write_eof()
-            await asyncio.wait_for(client.server_task, timeout=5)
-            client.conn.close()
-            extra = await asyncio.wait_for(client.reader.read(4096), timeout=5)
-            assert extra == b""
+            await client.assert_closed()
+        finally:
+            client.teardown()
+
+    asyncio.run(scenario())
+
+
+def test_h1_head_oversized_headers_get_bodiless_431() -> None:
+    # HEAD-ness is latched from the partial buffer when the header-size
+    # limit trips, so even the 431 — written before the request ever
+    # parses — is bodiless for HEAD.
+    async def scenario() -> None:
+        worker = make_worker(
+            handler=ResponseHandler(lambda: Response(b"ok", content_type="text/plain"))
+        )
+        client = await h1_connect(worker)
+        try:
+            await client.send(
+                b"HEAD / HTTP/1.1\r\nX-Big: " + b"a" * (MAX_HEADER_SIZE + 1)
+            )
+            headers = await client.read_headers()
+            assert headers.startswith(b"HTTP/1.1 431")
+            # Half-close so the server's linger sees EOF, then drain:
+            # anything after the header block would be the forbidden body.
+            client.writer.write_eof()
+            await client.assert_closed()
         finally:
             client.teardown()
 
@@ -241,10 +257,7 @@ def test_h1_head_unparseable_request_gets_bodiless_error() -> None:
             assert headers.startswith(b"HTTP/1.1 400")
             assert b"content-length" in headers.lower()
             client.writer.write_eof()
-            await asyncio.wait_for(client.server_task, timeout=5)
-            client.conn.close()
-            extra = await asyncio.wait_for(client.reader.read(4096), timeout=5)
-            assert extra == b""
+            await client.assert_closed()
         finally:
             client.teardown()
 
@@ -265,10 +278,7 @@ def test_h1_head_healthcheck_has_no_body() -> None:
             # Content-Length describes the GET body; no body follows.
             assert b"content-length: 2" in headers.lower()
             client.writer.write_eof()
-            await asyncio.wait_for(client.server_task, timeout=5)
-            client.conn.close()
-            extra = await asyncio.wait_for(client.reader.read(4096), timeout=5)
-            assert extra == b""
+            await client.assert_closed()
         finally:
             client.teardown()
 
@@ -303,44 +313,6 @@ def test_h1_head_on_sse_never_consumes_stream() -> None:
             client.teardown()
 
     asyncio.run(scenario())
-
-
-def test_h1_dropped_body_warns_once(caplog: pytest.LogCaptureFixture) -> None:
-    async def scenario() -> None:
-        worker = make_worker(handler=ResponseHandler(_mutated_204))
-        client = await h1_connect(worker)
-        try:
-            await client.send(_GET)
-            headers = await client.read_headers()
-            assert headers.startswith(b"HTTP/1.1 204")
-        finally:
-            client.teardown()
-
-    with caplog.at_level(logging.WARNING, logger="plain.server.http.response"):
-        asyncio.run(scenario())
-
-    warnings = _dropped_body_warnings(caplog)
-    assert len(warnings) == 1
-    assert warnings[0].status == 204  # ty: ignore[unresolved-attribute]
-
-
-def test_h1_head_strip_is_silent(caplog: pytest.LogCaptureFixture) -> None:
-    # Even against a bodiless-status response with a body (the case that
-    # warns on a non-HEAD request), HEAD stays silent — the app body is
-    # legitimate there.
-    async def scenario() -> None:
-        worker = make_worker(handler=ResponseHandler(_mutated_204))
-        client = await h1_connect(worker)
-        try:
-            await client.send(_HEAD)
-            await client.read_headers()
-        finally:
-            client.teardown()
-
-    with caplog.at_level(logging.WARNING, logger="plain.server.http.response"):
-        asyncio.run(scenario())
-
-    assert not _dropped_body_warnings(caplog)
 
 
 def test_h2_204_headers_only_end_stream() -> None:

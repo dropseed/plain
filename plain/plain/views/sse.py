@@ -4,7 +4,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
-from plain.http import AsyncStreamingResponse, Response
+from plain.http import AsyncStreamingResponse
 
 from .base import View
 
@@ -24,12 +24,6 @@ class ServerSentEventsView(View):
     def get(self) -> AsyncStreamingResponse:
         return AsyncStreamingResponse(
             streaming_content=self._format_events(),
-            content_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-        )
-
-    def head(self) -> Response:
-        return Response(
             content_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )

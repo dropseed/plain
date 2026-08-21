@@ -154,7 +154,9 @@ def serve_boot_failure(
         thread.join(timeout=max(0.0, join_deadline - time.monotonic()))
 
 
-def _build_response(*, content_type: str, body_text: str) -> bytes:
+def _build_response(*, content_type: str, body_text: str) -> tuple[bytes, bytes]:
+    """Returns (head, full). HEAD requests get only the header block —
+    its Content-Length still describes the GET body (RFC 9110 9.3.2)."""
     body = body_text.encode("utf-8", errors="replace")
     head = (
         "HTTP/1.1 500 Internal Server Error\r\n"
@@ -162,8 +164,8 @@ def _build_response(*, content_type: str, body_text: str) -> bytes:
         f"Content-Type: {content_type}\r\n"
         f"Content-Length: {len(body)}\r\n"
         "\r\n"
-    )
-    return head.encode("ascii") + body
+    ).encode("ascii")
+    return head, head + body
 
 
 def _recv_head(*, conn: socket.socket, deadline: float) -> bytes:
@@ -190,8 +192,8 @@ def _respond_and_close(
     *,
     conn: socket.socket,
     tls_context: ssl.SSLContext | None,
-    text_response: bytes,
-    html_response: bytes,
+    text_response: tuple[bytes, bytes],
+    html_response: tuple[bytes, bytes],
 ) -> None:
     try:
         # One time budget for the whole exchange. Count caps alone would
@@ -203,7 +205,8 @@ def _respond_and_close(
         if tls_context:
             conn = tls_context.wrap_socket(conn, server_side=True)
         request = _recv_head(conn=conn, deadline=deadline)
-        conn.sendall(html_response if _wants_html(request) else text_response)
+        head, full = html_response if _wants_html(request) else text_response
+        conn.sendall(head if request.startswith(b"HEAD ") else full)
         # Closing with unread request data (a POST body) still in the
         # buffer makes the kernel send RST, which discards the response
         # before the client reads it. Half-close and drain until the

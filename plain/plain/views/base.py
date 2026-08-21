@@ -8,6 +8,8 @@ from plain.http import (
     NotAllowedResponse,
     Request,
     Response,
+    status_for_exception,
+    status_omits_body,
 )
 from plain.logs import get_framework_logger, log_exception
 
@@ -147,6 +149,12 @@ class View[HandlerResult = Response]:
     def _respond_to_exception(self, exc: Exception) -> Response:
         if isinstance(exc, ResponseException):
             return exc.response
+        status = status_for_exception(exc)
+        if status_omits_body(status):
+            # A bodiless status (204/304 HTTPException) can't carry any
+            # error representation — answer here, once, so no renderer
+            # (this class's or any subclass's) has to special-case it.
+            return Response(status_code=status)
         response = self.handle_exception(exc)
         # 5xx responses from handle_exception represent a real failure that
         # the view chose to render itself. Stamp the response with the

@@ -8,9 +8,15 @@ from io import BytesIO, IOBase
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse, urlsplit
 
-from plain.http import AsyncStreamingResponse, QueryDict, Request, StreamingResponse
+from plain.http import (
+    AsyncStreamingResponse,
+    QueryDict,
+    Request,
+    StreamingResponse,
+    content_length_forbidden,
+    response_omits_body,
+)
 from plain.http import Response as HttpResponse
-from plain.http.response import content_length_forbidden, response_omits_body
 from plain.internal.handlers.base import BaseHandler
 from plain.json import PlainJSONEncoder
 from plain.urls import get_resolver
@@ -100,9 +106,25 @@ class ClientResponse:
         """Delegate attribute access to the wrapped response."""
         return getattr(object.__getattribute__(self, "_response"), name)
 
+    # Attributes the wrapper owns; everything else belongs to the
+    # wrapped response. An explicit list keeps the split intentional —
+    # a name-collision rule would shift per response subclass.
+    _test_attributes = frozenset(
+        {"client", "request", "redirect_chain", "resolver_match", "user"}
+    )
+
     def __setattr__(self, name: str, value: Any) -> None:
-        """Set attributes on the wrapper itself."""
-        object.__setattr__(self, name, value)
+        """Delegate response attributes to the wrapped response.
+
+        Assignments to response attributes behave exactly as they would
+        on the raw response — `response.status_code = ...` raises the
+        same AttributeError. Test-only attributes land on the wrapper.
+        """
+        if name in type(self)._test_attributes:
+            object.__setattr__(self, name, value)
+        else:
+            response = object.__getattribute__(self, "_response")
+            setattr(response, name, value)
 
     def __repr__(self) -> str:
         """Return repr of wrapped response."""
@@ -165,11 +187,14 @@ def _conditional_content_removal(request: Request, response: Response) -> Respon
     responses for HEAD requests, 1xx, 204, and 304 responses. Ensure
     compliance with RFC 9112 Section 6.3.
     """
-    if response_omits_body(request.method, response.status_code):
-        if isinstance(response, StreamingResponse):
-            response.streaming_content = iter([])
-        elif not response.streaming:
-            response.content = b""
+    if response_omits_body(method=request.method, status_code=response.status_code):
+        # Only HEAD needs its body cleared — a bodiless *status* can't
+        # carry one in the first place (immutable, validated status).
+        if request.method == "HEAD":
+            if isinstance(response, StreamingResponse):
+                response.streaming_content = iter([])
+            elif not response.streaming:
+                response.content = b""
         if content_length_forbidden(response.status_code):
             # The server writers strip it too (kept on HEAD/304).
             del response.headers["Content-Length"]
@@ -210,7 +235,7 @@ class ClientHandler(BaseHandler):
                 response = self._collect_async_streaming(
                     response,
                     consume=not response_omits_body(
-                        request.method, response.status_code
+                        method=request.method, status_code=response.status_code
                     ),
                 )
 
@@ -231,7 +256,7 @@ class ClientHandler(BaseHandler):
         return response
 
     def _collect_async_streaming(
-        self, response: AsyncStreamingResponse, *, consume: bool = True
+        self, response: AsyncStreamingResponse, *, consume: bool
     ) -> Response:
         """Collect async streaming content into a regular Response for tests."""
 
@@ -242,17 +267,7 @@ class ClientHandler(BaseHandler):
                     chunks.append(chunk)
             collected = b"".join(chunks)
 
-            sync_response = HttpResponse(
-                collected,
-                status_code=resp.status_code,
-                content_type=resp.headers.get("Content-Type"),
-            )
-            for key, value in resp.headers.items():
-                if key != "Content-Type":
-                    sync_response.headers[key] = value
-            sync_response.cookies = resp.cookies
-            sync_response._resource_closers = resp._resource_closers
-            resp._resource_closers = []
+            sync_response = resp._to_buffered_response(collected)
             await resp.aclose()
             return sync_response
 

@@ -16,6 +16,10 @@ import socket
 import time
 import urllib.parse
 
+# Healthcheck body shared by the h1 and h2 responders so the two
+# protocols can't drift apart.
+HEALTHCHECK_BODY = b"ok"
+
 # Server and Date aren't technically hop-by-hop
 # headers, but they are in the purview of the
 # origin server, so we drop them and add our own.
