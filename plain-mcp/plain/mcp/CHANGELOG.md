@@ -1,5 +1,16 @@
 # plain-mcp changelog
 
+## [0.7.1](https://github.com/dropseed/plain/releases/plain-mcp@0.7.1) (2026-08-21)
+
+### What's changed
+
+- Error responses derive their status through the shared `status_for_exception()`, so an out-of-range status on an exception instance can't crash the error renderer ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+
+### Upgrade instructions
+
+- No changes required.
+- Requires `plain>=0.160.0`.
+
 ## [0.7.0](https://github.com/dropseed/plain/releases/plain-mcp@0.7.0) (2026-08-12)
 
 ### What's changed
