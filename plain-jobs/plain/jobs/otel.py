@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import importlib.metadata
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
 from functools import wraps
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -69,13 +70,20 @@ def record_span_error(span: trace.Span, exc: BaseException) -> str:
     return error_type
 
 
-def emit_error_consumer_span(name: str, exc: BaseException) -> None:
+@contextmanager
+def error_consumer_span(*, name: str, exc: BaseException) -> Iterator[None]:
     """Open a one-off CONSUMER span solely to carry a failure that has no
     other entry span — a DB error before the span that would normally own
     the work is ever reached. Stamps the canonical failure signal so the
-    error lands in entry-span error attribution."""
+    error lands in entry-span error attribution.
+
+    Run the paired ``logger.exception`` call inside the ``with`` block so the
+    log record is created while this span is current — the record then carries
+    the span's trace/span ids instead of exporting as a span-less error log
+    that reports the same failure a second time."""
     with tracer.start_as_current_span(name, kind=trace.SpanKind.CONSUMER) as span:
         record_span_error(span, exc)
+        yield
 
 
 def process_metric_attributes(queue: str, job_class: str) -> dict[str, Any]:

@@ -24,7 +24,7 @@ from plain.utils import timezone
 from plain.utils.module_loading import import_string
 from plain.utils.os import get_cpu_count
 
-from .otel import WorkerMetrics, emit_error_consumer_span, record_span_error, tracer
+from .otel import WorkerMetrics, error_consumer_span, record_span_error, tracer
 from .registry import jobs_registry
 
 if TYPE_CHECKING:
@@ -251,9 +251,10 @@ class Worker:
             except Exception as e:
                 # A transient DB failure while claiming shouldn't kill the
                 # worker. With the claim's CLIENT spans suppressed there is
-                # no entry span to carry the failure, so emit one.
-                emit_error_consumer_span("claim job", e)
-                logger.exception("Failed to claim job")
+                # no entry span to carry the failure, so emit one and log
+                # inside it so the record shares its trace.
+                with error_consumer_span(name="claim job", exc=e):
+                    logger.exception("Failed to claim job")
                 consecutive_claim_failures += 1
                 if consecutive_claim_failures >= 30:
                     # This isn't a blip (e.g. schema drift or lost table
@@ -434,13 +435,13 @@ class Worker:
             # Until it succeeds, _heartbeat_registered stays False and the run
             # loop won't claim work. That's serious enough to deserve error
             # attribution, and there's no entry span here to carry it.
-            emit_error_consumer_span("worker heartbeat", e)
-            logger.exception("Worker registration failed")
-            logger.warning(
-                "Worker heartbeat registration failed; worker will not claim "
-                "jobs until a heartbeat row is created",
-                extra={"worker_id": str(self.worker_id)},
-            )
+            with error_consumer_span(name="worker heartbeat", exc=e):
+                logger.exception("Worker registration failed")
+                logger.warning(
+                    "Worker heartbeat registration failed; worker will not claim "
+                    "jobs until a heartbeat row is created",
+                    extra={"worker_id": str(self.worker_id)},
+                )
 
     def _heartbeat_due(self, now: float) -> bool:
         return (
@@ -464,11 +465,12 @@ class Worker:
             # DB is unreachable for long enough, our row goes stale and
             # rescue marks our jobs LOST — that's the intended behavior.
             # The catch swallows the exception, so stamp the failure on its
-            # own CONSUMER span — otherwise a heartbeat outage exports only
+            # own CONSUMER span (logging inside it so the record shares its
+            # trace) — otherwise a heartbeat outage exports only
             # healthy-looking spans (or, during drain, nothing at all).
             self._heartbeat_registered = False
-            emit_error_consumer_span("worker heartbeat", e)
-            logger.exception("Worker heartbeat failed")
+            with error_consumer_span(name="worker heartbeat", exc=e):
+                logger.exception("Worker heartbeat failed")
 
     def deregister_heartbeat(self) -> None:
         # Lazy import - see _worker_process_initializer() comment for why
@@ -735,16 +737,7 @@ def process_job(job_process_uuid: str) -> None:
     try:
         worker_pid = os.getpid()
 
-        try:
-            job_process = JobProcess.query.get(uuid=job_process_uuid)
-        except Exception as e:
-            # The CONSUMER span inside JobProcess.run() is never reached if
-            # the lookup itself fails. Emit one here so the failure has an
-            # entry-span home in OTel (e.g. a psycopg transient on this read
-            # would otherwise leave only a CLIENT span, which entry-span
-            # filtering excludes).
-            emit_error_consumer_span("process job", e)
-            raise
+        job_process = JobProcess.query.get(uuid=job_process_uuid)
 
         logger.info(
             "Executing job",
@@ -795,12 +788,20 @@ def process_job(job_process_uuid: str) -> None:
                 "job_queue_time": queue_time,
             },
         )
-    except Exception:
-        # Raising exceptions inside the worker process doesn't
-        # seem to be caught/shown anywhere as configured.
-        # So we at least log it out here.
-        # (A job should catch it's own user-code errors, so this is for library errors)
-        logger.exception("Job process errored")
+    except Exception as e:
+        # Raising exceptions inside the worker process doesn't seem to be
+        # caught/shown anywhere as configured, so log it here. (A job
+        # catches its own user-code errors — this is for library errors:
+        # a failed JobProcess lookup, middleware that won't import or
+        # construct, or an error escaping run().) None of those has a
+        # *live* entry span, so stamp the failure on a one-off CONSUMER
+        # span and log inside it so the record carries its trace ids.
+        # For the rare library error escaping run(), run()'s own span
+        # already recorded the failure — the deliberate cost of this
+        # catch-all is that such an error reports on both spans, in
+        # exchange for the log never exporting span-less.
+        with error_consumer_span(name="process job", exc=e):
+            logger.exception("Job process errored")
     finally:
         return_database_connection()
         gc.collect()

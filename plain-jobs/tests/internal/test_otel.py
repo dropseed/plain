@@ -8,9 +8,11 @@ hottest user-facing path.
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 import uuid
+from collections.abc import Generator
 
 import pytest
 from opentelemetry.metrics import CallbackOptions
@@ -18,7 +20,7 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
-from opentelemetry.trace import SpanKind
+from opentelemetry.trace import SpanContext, SpanKind, StatusCode, get_current_span
 from plain.jobs import Job, otel
 from plain.jobs.registry import register_job
 from plain.jobs.workers import Worker
@@ -47,6 +49,62 @@ class _ExclusiveJob(Job):
 
     def should_enqueue(self, concurrency_key: str) -> bool:
         return False
+
+
+class _SpanContextCapturingHandler(logging.Handler):
+    """Captures the active span context at emit time — the ambient context the
+    OTel LoggingHandler reads to stamp trace/span ids onto exported records.
+    A record emitted with no span current would export with empty ids and
+    double-report its failure alongside the span's exception event."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.emitted: list[tuple[logging.LogRecord, SpanContext]] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.emitted.append((record, get_current_span().get_span_context()))
+
+    def span_context_for(self, message: str) -> SpanContext:
+        [context] = [
+            ctx for record, ctx in self.emitted if record.getMessage() == message
+        ]
+        return context
+
+
+@pytest.fixture
+def jobs_log_contexts() -> Generator[_SpanContextCapturingHandler]:
+    handler = _SpanContextCapturingHandler()
+    jobs_logger = logging.getLogger("plain.jobs")
+    jobs_logger.addHandler(handler)
+    try:
+        yield handler
+    finally:
+        jobs_logger.removeHandler(handler)
+
+
+def test_error_consumer_span_is_current_for_the_paired_log(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """error_consumer_span keeps its span current while the body runs, so the
+    paired logger.exception record picks up the span's trace/span ids —
+    otherwise the record exports span-less and the one failure gets reported
+    twice downstream (span exception event + orphan error log)."""
+    from plain.jobs.otel import error_consumer_span
+
+    with error_consumer_span(name="claim job", exc=RuntimeError("boom")):
+        ambient_context = get_current_span().get_span_context()
+
+    assert ambient_context.is_valid
+    [span] = otel_spans.get_finished_spans()
+    assert span.name == "claim job"
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    assert [e for e in span.events if e.name == "exception"]
+    assert span.context is not None
+    assert ambient_context.trace_id == span.context.trace_id
+    assert ambient_context.span_id == span.context.span_id
 
 
 @pytest.mark.usefixtures("db")
@@ -85,7 +143,6 @@ def test_failed_enqueue_marks_producer_span_as_errored(
     """A failing enqueue's PRODUCER span carries the canonical failure signal:
     status=ERROR plus error.type. Don't branch on exception.escaped — it's
     deprecated upstream and unreliable in the Python SDK."""
-    from opentelemetry.trace import StatusCode
 
     def _boom(*args, **kwargs):
         raise RuntimeError("create failed")
@@ -119,8 +176,6 @@ def test_failing_job_marks_consumer_span_as_errored(
     status=ERROR plus error.type. The exception is caught inside the span's
     with-block by JobProcess.run, so only the manual record_span_error event
     fires."""
-    from opentelemetry.trace import StatusCode
-
     request = _BoomJob().run_in_worker()
     assert request is not None
     process = request.convert_to_job_process(worker_id=uuid.uuid4())
@@ -171,13 +226,14 @@ def test_enqueue_failure_records_error_type_on_metric(
 @pytest.mark.usefixtures("db")
 def test_process_job_emits_consumer_span_when_lookup_fails(
     otel_spans: InMemorySpanExporter,
+    jobs_log_contexts: _SpanContextCapturingHandler,
 ) -> None:
     """JobProcess.run() creates the CONSUMER span — but `process_job` does the
     JobProcess row lookup first. A DB transient on that lookup leaves only a
     CLIENT span, which entry-span filtering correctly excludes. The fallback
     CONSUMER span at the top of process_job ensures lookup failures still
-    surface."""
-    from opentelemetry.trace import StatusCode
+    surface, and the `Job process errored` record is logged inside it so the
+    two report as one failure."""
     from plain.jobs.workers import process_job
 
     # A random UUID won't match any row — JobProcess.query.get raises
@@ -195,6 +251,11 @@ def test_process_job_emits_consumer_span_when_lookup_fails(
     assert "DoesNotExist" in str(span.attributes["error.type"])
     exception_events = [e for e in span.events if e.name == "exception"]
     assert exception_events
+
+    assert span.context is not None
+    log_context = jobs_log_contexts.span_context_for("Job process errored")
+    assert log_context.trace_id == span.context.trace_id
+    assert log_context.span_id == span.context.span_id
 
 
 # --- Worker run-loop span -----------------------------------------------
@@ -240,8 +301,6 @@ def test_worker_loop_emits_consumer_span_when_maintenance_due(
     span — the worker is consuming a recurring maintenance schedule, so its
     failures belong in the canonical entry-span error filter (SERVER /
     CONSUMER / PRODUCER) alongside chores and jobs."""
-    from opentelemetry.trace import StatusCode
-
     worker = _build_worker_for_loop_test(heartbeat_due=True)
 
     def shutdown_during_heartbeat() -> None:
@@ -284,8 +343,6 @@ def test_worker_loop_records_error_when_maintenance_fails(
     failure signal (status=ERROR + error.type) on the `worker loop` span. This
     is the path that previously swallowed DB transients like the production
     `psycopg.OperationalError` we saw escaping `rescue_job_results`."""
-    from opentelemetry.trace import StatusCode
-
     worker = _build_worker_for_loop_test(heartbeat_due=True)
 
     def boom_then_shutdown() -> None:
@@ -308,13 +365,15 @@ def test_worker_loop_records_error_when_maintenance_fails(
 
 @pytest.mark.usefixtures("db")
 def test_worker_loop_claim_failure_emits_error_span_and_continues(
-    otel_spans: InMemorySpanExporter, monkeypatch: pytest.MonkeyPatch
+    otel_spans: InMemorySpanExporter,
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_log_contexts: _SpanContextCapturingHandler,
 ) -> None:
     """A transient DB failure while claiming a job must not kill the worker.
     The loop catches it, emits a one-off `claim job` CONSUMER error span
     (the claim's own CLIENT spans are suppressed, so there is no other entry
-    span to carry the failure), and keeps running."""
-    from opentelemetry.trace import StatusCode
+    span to carry the failure) with the `Failed to claim job` record logged
+    inside it, and keeps running."""
     from plain.jobs.models import JobRequestQuerySet
 
     worker = _build_worker_for_loop_test()
@@ -337,6 +396,44 @@ def test_worker_loop_claim_failure_emits_error_span_and_continues(
     assert span.attributes["error.type"] == "RuntimeError"
     exception_events = [e for e in span.events if e.name == "exception"]
     assert exception_events
+
+    assert span.context is not None
+    log_context = jobs_log_contexts.span_context_for("Failed to claim job")
+    assert log_context.trace_id == span.context.trace_id
+    assert log_context.span_id == span.context.span_id
+
+
+def test_heartbeat_failure_emits_error_span_with_correlated_log(
+    otel_spans: InMemorySpanExporter,
+    jobs_log_contexts: _SpanContextCapturingHandler,
+) -> None:
+    """A heartbeat write failure is swallowed by maybe_heartbeat, so its only
+    OTel trace is the one-off `worker heartbeat` CONSUMER span — and the
+    `Worker heartbeat failed` record must be logged inside that span so it
+    carries the span's trace/span ids."""
+    worker = _build_worker_for_loop_test(stub_maintenance=False, heartbeat_due=True)
+
+    def boom() -> None:
+        raise RuntimeError("db transient")
+
+    worker._refresh_heartbeat = boom  # ty: ignore[invalid-assignment]
+    # Must NOT raise — heartbeat failures are non-fatal by design.
+    worker.maybe_heartbeat()
+
+    assert worker._heartbeat_registered is False
+    spans = [s for s in otel_spans.get_finished_spans() if s.name == "worker heartbeat"]
+    assert len(spans) == 1
+    span = spans[0]
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    assert [e for e in span.events if e.name == "exception"]
+
+    assert span.context is not None
+    log_context = jobs_log_contexts.span_context_for("Worker heartbeat failed")
+    assert log_context.trace_id == span.context.trace_id
+    assert log_context.span_id == span.context.span_id
 
 
 def test_maintenance_due_covers_every_task() -> None:
