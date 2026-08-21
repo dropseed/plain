@@ -1,5 +1,35 @@
 # plain changelog
 
+## [0.160.0](https://github.com/dropseed/plain/releases/plain@0.160.0) (2026-08-21)
+
+### What's changed
+
+- `Response.status_code` is now read-only. Status is part of a response's identity — header defaulting, the bodiless rules, transports, and caches all read it as a settled fact — so it's fixed at construction and there is deliberately no setter. Pass `status_code=` to the constructor (or to `TemplateView.render()`); assigning to a built response now fails the type check and raises `AttributeError` at runtime ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- Statuses that never have a body refuse one by construction: `Response("Deleted", status_code=204)` raises `ValueError`, and a streaming response can't be given a bodiless status at all. A client stops reading a 204/304 at the header block, so body bytes written after it are parsed as the start of the _next_ response on a keep-alive connection — a response-splitting bug that used to be silently constructible ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43), [4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- 1xx interim statuses can no longer be constructed on a `Response` — those belong to the server, not application code. The accepted range is now 200–599 (was 100–599) ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- An `HTTPException` subclass whose `status_code` is out of range (or isn't an int) is now rejected when the class is defined, so a bad status fails at import instead of crashing an error renderer at request time ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- Bodiless responses no longer get a default `Content-Type` — there's no representation to describe, and on a 304 caches update stored representation headers from the response (RFC 9110 15.4.5). `Content-Length` is likewise never added to a 1xx/204/304 ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4), [20ef4b19ba](https://github.com/dropseed/plain/commit/20ef4b19ba))
+- `HEAD` requests are now bodiless everywhere the server can answer one, not just through the normal view path: h1 error responses, the 431 for oversized headers, the healthcheck endpoint, and the boot-failure page all send the header block alone (with the `Content-Length` a GET would have had, per RFC 9110 9.3.2) ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43), [20ef4b19ba](https://github.com/dropseed/plain/commit/20ef4b19ba))
+- HTTP/2 responses to a HEAD stream, and 204/304 responses on any stream, now send headers with `END_STREAM` and no DATA frames. Body bytes on those streams are malformed per RFC 9113 8.1.1 and a strict h2 client treats them as a connection-level protocol error that kills every stream on the connection ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43), [20ef4b19ba](https://github.com/dropseed/plain/commit/20ef4b19ba))
+- A `HEAD` request to an async streaming view (SSE) no longer consumes the stream. Previously the server iterated a generator that may never terminate just to throw the bytes away — the request would hang ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43))
+- New predicates exported from `plain.http` — `status_omits_body()`, `response_omits_body()`, `content_length_forbidden()`, and `status_for_exception()` — the single shared definitions the framework itself uses, for writing your own handlers and middleware ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43), [4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- Fixed a `RuntimeError` when a request body stalls mid-transfer: the error path re-read the connection while a cancelled read still held the `StreamReader` ([d7d07b727b](https://github.com/dropseed/plain/commit/d7d07b727b))
+- Unexpected connection-level errors in the HTTP/1.1 and HTTP/2 handlers are now caught and logged by Plain with their traceback, instead of escaping into asyncio's default exception handler where they landed on an unconfigured logger and never reached exception tracking. Genuine client-side socket and TLS noise is separated out and logged at debug ([9211e67612](https://github.com/dropseed/plain/commit/9211e67612))
+- The test client now mirrors the server's framing rules: `HEAD`/204/304 bodies and forbidden `Content-Length` headers are stripped the same way, async streams aren't consumed for bodiless responses, and assigning to a response attribute through the client wrapper behaves exactly as it does on the raw response ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43), [4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- Dead WebSocket scaffolding is gone from the server's response writer — `Connection: upgrade` is no longer special-cased, and hop-by-hop headers are always dropped as the server's to frame ([20ef4b19ba](https://github.com/dropseed/plain/commit/20ef4b19ba))
+- `FileResponse` closes the file handle it was given if construction is rejected, since the idiomatic `FileResponse(open(path))` leaves the caller nothing to close ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- A 413 for an oversized declared body now reaches the access log with its parsed request instead of a blank entry ([20ef4b19ba](https://github.com/dropseed/plain/commit/20ef4b19ba))
+
+### Upgrade instructions
+
+- Replace every `response.status_code = X` with a construction-time status: `Response(content, status_code=X)`, or `self.render(status_code=X)` in a `TemplateView`. This is the most likely place your code breaks — the type checker will find these for you.
+- `Response(content, status_code=204)` and `Response(content, status_code=304)` now raise `ValueError`. If the message needs to reach the client, return a 200; otherwise use `Response(status_code=204)` with no content.
+- `Response(status_code=1xx)` now raises `ValueError`. Interim responses are the server's to send.
+- If you subclass `HTTPException`, make sure `status_code` is an int from 200 to 599 — an invalid one now raises at class definition.
+- `NotModifiedResponse` no longer accepts `content`, `content_type`, or `status_code`; it always means exactly "bodiless 304".
+- If you defined a custom `head()` on a `ServerSentEventsView` subclass, remove it — bodiless HEAD handling is now built in.
+- 204 and 304 responses no longer carry a default `Content-Type` or a `Content-Length`. Update tests that assert on those headers.
+
 ## [0.159.0](https://github.com/dropseed/plain/releases/plain@0.159.0) (2026-08-17)
 
 ### What's changed
