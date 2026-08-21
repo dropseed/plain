@@ -67,6 +67,8 @@ Only those three span kinds count for error attribution. `INTERNAL` and `CLIENT`
 
 If a failure inside an `INTERNAL`/`CLIENT` span is a real application error, the surrounding entry span should carry the failure. If there's no entry span and the failure matters, you probably need to add one.
 
+**Span-less failures are still visible.** A `logger.exception(...)` (or any ERROR-level log with `exc_info`) on a `plain.*` or `app` logger is exported as a log record carrying `exception.type` / `exception.stacktrace`, and Plain Cloud promotes span-less records like that into exception issues. So code that runs outside any span (connection handlers, background threads, arbiter paths) needs the log call, not a synthetic span — a span additionally gives trace attribution and, when the log call is made inside it, links the two. Never let a failure land on an unconfigured logger (e.g. escaping to `asyncio`'s default handler); catch it and log it on a Plain logger.
+
 The canonical failure signal on an entry span is `status_code=ERROR` + `error.type` attribute + a recorded exception event. Don't branch on `exception.escaped` — deprecated upstream, unreliable in the Python SDK.
 
 If the surrounding code catches the exception inside the `with span:` block, the SDK's auto-record on context exit won't fire — stamp the canonical signal explicitly:
