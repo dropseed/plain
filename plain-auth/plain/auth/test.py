@@ -26,6 +26,7 @@ def login_client(client: Client, user: Any) -> None:
     login(request, user)
     session = get_request_session(request)
     session.save()
+    assert session.session_key is not None, "session.save() always assigns a key"
     session_cookie = settings.SESSION_COOKIE_NAME
     client.cookies[session_cookie] = session.session_key
     cookie_data = {
@@ -35,7 +36,10 @@ def login_client(client: Client, user: Any) -> None:
         "secure": settings.SESSION_COOKIE_SECURE or None,
         "expires": None,
     }
-    client.cookies[session_cookie].update(cookie_data)
+    # Morsel is a plain dict at runtime and accepts these attribute values
+    # (some legitimately None/bool), but typeshed's override of update()
+    # only declares the str-value case.
+    client.cookies[session_cookie].update(cookie_data)  # ty: ignore[invalid-argument-type]
 
 
 def logout_client(client: Client) -> None:

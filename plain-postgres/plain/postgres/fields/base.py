@@ -192,6 +192,18 @@ class Field[T](RegisterLookupMixin):
         else:
             return []
 
+    @property
+    def contributed_name(self) -> str:
+        """Narrow `name` from `str | None` to `str`.
+
+        `name` is only `None` before `contribute_to_class()` runs; any field
+        reached through `Meta` (`fields`, `concrete_fields`, `get_fields()`,
+        etc.) has already been contributed to a model class and always has
+        a name.
+        """
+        assert self.name is not None, "Field must have a name"
+        return self.name
+
     def get_col(self, alias: str | None, output_field: Field | None = None) -> Col:
         if alias == self.model.model_options.db_table and (
             output_field is None or output_field == self
@@ -432,7 +444,7 @@ class Field[T](RegisterLookupMixin):
         # instance cheap to use beyond its primary key.
         if field_name not in data:
             missing = [
-                f.name
+                f.contributed_name
                 for f in instance._model_meta.concrete_fields
                 if f.name not in data
             ]

@@ -79,29 +79,30 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
     # Type hints for attributes
     model: type[T]
     instance: Model
-    field: ForeignKeyField
     core_filters: dict[str, Model]
     allow_null: bool
 
     def __init__(
         self, instance: Model, field: ForeignKeyField, related_model: type[Model]
     ):
-        assert field.name is not None, "Field must have a name"
         self.model = cast(type[T], related_model)
         self.instance = instance
-        # ForeignKeyField is itself a descriptor type (it inherits the field
-        # descriptor protocol), so ty reads this plain attribute as a
-        # descriptor slot; storing the field object on it is fine.
-        self.field = field  # ty: ignore[invalid-assignment]
-        self.core_filters = {self.field.name: instance}
+        # Annotated here rather than in the class body: ForeignKeyField is
+        # itself a descriptor (it implements __get__), and a class-body
+        # annotation of a descriptor type makes ty apply descriptor protocol
+        # to every access instead of treating it as a plain instance attribute.
+        self.field: ForeignKeyField = field
+        self.field_name: str = field.contributed_name
+        self.core_filters = {self.field_name: instance}
         self.allow_null = self.field.allow_null
 
     def _check_fk_val(self) -> None:
         field = self.field.target_field
-        if getattr(self.instance, field.name) is None:
+        field_name = field.contributed_name
+        if getattr(self.instance, field_name) is None:
             raise ValueError(
                 f'"{self.instance!r}" needs to have a value for field '
-                f'"{field.name}" before this relationship can be used.'
+                f'"{field_name}" before this relationship can be used.'
             )
 
     def _apply_rel_filters(self, queryset: QuerySet) -> QuerySet:
@@ -111,7 +112,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         queryset._defer_next_filter = True
         queryset = queryset.filter(**self.core_filters)
         target_field = self.field.target_field
-        rel_obj_id = getattr(self.instance, target_field.name)
+        rel_obj_id = getattr(self.instance, target_field.contributed_name)
         if rel_obj_id is None:
             return queryset.none()
         queryset._known_related_objects = {self.field: {rel_obj_id: self.instance}}
@@ -152,14 +153,14 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         rel_obj_attr = self.field.get_local_related_value
         instance_attr = self.field.get_foreign_related_value
         instances_dict = {instance_attr(inst): inst for inst in instances}
-        queryset = _filter_prefetch_queryset(queryset, self.field.name, instances)
+        queryset = _filter_prefetch_queryset(queryset, self.field_name, instances)
 
         # Since we just bypassed this class' get_queryset(), we must manage
         # the reverse relation manually.
         for rel_obj in queryset:
             if not self.field.is_cached(rel_obj):
                 instance = instances_dict[rel_obj_attr(rel_obj)]
-                setattr(rel_obj, self.field.name, instance)
+                setattr(rel_obj, self.field_name, instance)
         cache_name = self.field.remote_field.get_cache_name()
         return queryset, rel_obj_attr, instance_attr, False, cache_name, False
 
@@ -172,7 +173,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
                 raise TypeError(
                     f"'{self.model.model_options.object_name}' instance expected, got {obj!r}"
                 )
-            setattr(obj, self.field.name, self.instance)
+            setattr(obj, self.field_name, self.instance)
 
         if bulk:
             ids = []
@@ -186,7 +187,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
                 ids.append(obj.id)
             self.model._model_meta.base_queryset.filter(id__in=ids).update(
                 **{
-                    self.field.name: self.instance,
+                    self.field_name: self.instance,
                 }
             )
         else:
@@ -202,17 +203,17 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
 
     def create(self, **kwargs: Any) -> T:
         self._check_fk_val()
-        kwargs[self.field.name] = self.instance
+        kwargs[self.field_name] = self.instance
         return self.model.query.create(**kwargs)
 
     def get_or_create(self, **kwargs: Any) -> tuple[T, bool]:
         self._check_fk_val()
-        kwargs[self.field.name] = self.instance
+        kwargs[self.field_name] = self.instance
         return self.model.query.get_or_create(**kwargs)
 
     def update_or_create(self, **kwargs: Any) -> tuple[T, bool]:
         self._check_fk_val()
-        kwargs[self.field.name] = self.instance
+        kwargs[self.field_name] = self.instance
         return self.model.query.update_or_create(**kwargs)
 
     def remove(self, *objs: T, bulk: bool = True) -> None:
@@ -220,7 +221,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         if not self.allow_null:
             raise AttributeError(
                 f"Cannot call remove() on a related manager for field "
-                f"{self.field.name} where null=False."
+                f"{self.field_name} where null=False."
             )
         if not objs:
             return
@@ -246,7 +247,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         if not self.allow_null:
             raise AttributeError(
                 f"Cannot call clear() on a related manager for field "
-                f"{self.field.name} where null=False."
+                f"{self.field_name} where null=False."
             )
         self._check_fk_val()
         self._clear(self.query, bulk)
@@ -255,12 +256,12 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         self._remove_prefetched_objects()
         if bulk:
             # `QuerySet.update()` is intrinsically atomic.
-            queryset.update(**{self.field.name: None})
+            queryset.update(**{self.field_name: None})
         else:
             with transaction.atomic(savepoint=False):
                 for obj in queryset:
-                    setattr(obj, self.field.name, None)
-                    obj.update(fields=[self.field.name])
+                    setattr(obj, self.field_name, None)
+                    obj.update(fields=[self.field_name])
 
     def set(self, objs: Any, *, bulk: bool = True, clear: bool = False) -> None:
         self._check_fk_val()

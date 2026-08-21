@@ -100,8 +100,10 @@ class RelatedField(FieldCacheMixin, Field):
 
     # RelatedField always has a remote_field (never None)
     remote_field: ForeignObjectRel
-    # path_infos is implemented as @cached_property in subclasses (ForeignKey, ManyToManyField)
+    # path_infos/reverse_path_infos are implemented as @cached_property in
+    # subclasses (ForeignKey, ManyToManyField)
     path_infos: list[PathInfo]
+    reverse_path_infos: list[PathInfo]
     # Set by ForeignKeyField / ManyToManyField in their __init__; declared
     # here so RelatedField methods (deconstruct, related_query_name) can
     # reference them without isinstance-narrowing.
@@ -115,7 +117,7 @@ class RelatedField(FieldCacheMixin, Field):
         obj = super().__deepcopy__(memodict)
         obj.remote_field = copy.copy(self.remote_field)
         if hasattr(self.remote_field, "field") and self.remote_field.field is self:
-            obj.remote_field.field = obj  # ty: ignore[invalid-assignment]
+            obj.remote_field.field = obj
         return obj
 
     @cached_property
@@ -772,13 +774,13 @@ class ManyToManyField(RelatedField):
                     (source_field_name, source),
                     (target_field_name, target),
                 ):
-                    possible_field_names = []
+                    possible_field_names: list[str] = []
                     for f in through._model_meta.fields:
                         if (
                             hasattr(f, "remote_field")
                             and getattr(f.remote_field, "model", None) == related_model
                         ):
-                            possible_field_names.append(f.name)
+                            possible_field_names.append(f.contributed_name)
                     if possible_field_names:
                         fix = (
                             "Did you mean one of the following foreign keys to '{}': "

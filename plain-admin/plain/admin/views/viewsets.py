@@ -1,9 +1,9 @@
-from plain.views import View
+from .base import AdminView
 
 
 class AdminViewset:
     @classmethod
-    def get_views(cls) -> list[type[View]]:
+    def get_views(cls) -> list[type[AdminView]]:
         """Views are defined as inner classes on the viewset class."""
 
         # Primary views that we can interlink automatically
@@ -30,26 +30,26 @@ class AdminViewset:
         views = []
 
         for attr in cls.__dict__.values():
-            if isinstance(attr, type) and issubclass(attr, View):
+            if isinstance(attr, type) and issubclass(attr, AdminView):
                 views.append(attr)
 
         for view in views:
             # Dynamic attributes stamped onto the view class by the viewset.
-            view.viewset = cls  # ty: ignore[unresolved-attribute]
+            view.viewset = cls
 
             if ListView:
-                view.get_list_url = ListView.get_view_url  # ty: ignore[unresolved-attribute]
+                view.get_list_url = ListView.get_view_url
 
             if CreateView:
-                view.get_create_url = CreateView.get_view_url  # ty: ignore[unresolved-attribute]
+                view.get_create_url = CreateView.get_view_url
 
             if DetailView:
-                view.get_detail_url = DetailView.get_view_url  # ty: ignore[unresolved-attribute]
+                view.get_detail_url = DetailView.get_view_url
 
             if UpdateView:
-                view.get_update_url = UpdateView.get_view_url  # ty: ignore[unresolved-attribute]
+                view.get_update_url = UpdateView.get_view_url
 
             if DeleteView:
-                view.get_delete_url = DeleteView.get_view_url  # ty: ignore[unresolved-attribute]
+                view.get_delete_url = DeleteView.get_view_url
 
         return views

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from plain.auth.views import AuthView
@@ -67,6 +68,14 @@ class AdminView(AuthView, TemplateView):
 
     # Set dynamically by AdminViewset.get_views()
     viewset: type[AdminViewset] | None = None
+    # Set dynamically by AdminViewset.get_views() to a sibling view's
+    # get_view_url classmethod, so e.g. a DetailView can link back to its
+    # viewset's ListView without each view needing to know its siblings.
+    get_list_url: Callable[..., str] | None = None
+    get_create_url: Callable[..., str] | None = None
+    get_detail_url: Callable[..., str] | None = None
+    get_update_url: Callable[..., str] | None = None
+    get_delete_url: Callable[..., str] | None = None
 
     template_name = "admin/page.html"
     cards: tuple[Card, ...] = ()

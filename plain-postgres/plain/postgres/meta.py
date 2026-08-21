@@ -284,7 +284,9 @@ class Meta:
 
     @cached_property
     def _forward_fields_map(self) -> dict[str, Field]:
-        return {field.name: field for field in self._get_fields(reverse=False)}
+        return {
+            field.contributed_name: field for field in self._get_fields(reverse=False)
+        }
 
     @cached_property
     def fields_map(self) -> dict[str, Field | ForeignObjectRel]:
@@ -542,7 +544,7 @@ class Meta:
         names = []
         for field in self.concrete_fields:
             if not field.primary_key:
-                names.append(field.name)
+                names.append(field.contributed_name)
         return frozenset(names)
 
     @cached_property

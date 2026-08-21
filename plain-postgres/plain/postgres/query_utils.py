@@ -11,7 +11,7 @@ from __future__ import annotations
 import functools
 import inspect
 from collections.abc import Callable, Generator
-from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self
+from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self, TypeIs
 
 import psycopg
 from plain.logs import get_framework_logger
@@ -326,17 +326,21 @@ class RegisterLookupMixin:
 
 
 def select_related_descend(
-    field: Any,
+    field: Field,
     restricted: bool | None,
     requested: dict[str, Any] | None,
     select_mask: Any,
     reverse: bool = False,
-) -> bool:
+) -> TypeIs[ForeignKeyField]:
     """
     Return True if this field should be used to descend deeper for
     select_related() purposes. Used by both the query construction code
     (compiler.get_related_selections()) and the model instance creation code
     (compiler.klass_info).
+
+    select_related() only ever traverses ForeignKeyFields (a single-row join);
+    ManyToManyFields are excluded upstream by both callers, and are excluded
+    here too since they have no `allow_null` to check below.
 
     Arguments:
      * field - the field to be checked
@@ -346,9 +350,9 @@ def select_related_descend(
      * select_mask - the dictionary of selected fields.
      * reverse - boolean, True if we are checking a reverse select related
     """
-    from plain.postgres.fields.related import RelatedField
+    from plain.postgres.fields.related import ForeignKeyField
 
-    if not isinstance(field, RelatedField):
+    if not isinstance(field, ForeignKeyField):
         return False
     if restricted:
         assert requested is not None, "requested must be provided when restricted=True"

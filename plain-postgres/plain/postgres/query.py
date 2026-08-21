@@ -1352,7 +1352,7 @@ class QuerySet[T: "Model"]:
     def _insert(
         self,
         objs: list[T],
-        fields: list[Field],
+        fields: Sequence[Field],
         returning_fields: list[Field] | None = None,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
@@ -1375,7 +1375,7 @@ class QuerySet[T: "Model"]:
     def _batched_insert(
         self,
         objs: list[T],
-        fields: list[Field],
+        fields: Sequence[Field],
         batch_size: int | None,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
@@ -1567,7 +1567,7 @@ class RawQuerySet:
             if column not in self.model_fields
         ]
         model_init_order = [self.columns.index(f.column) for f in model_init_fields]
-        model_init_names = [f.name for f in model_init_fields]
+        model_init_names = [f.contributed_name for f in model_init_fields]
         return model_init_names, model_init_order, annotation_fields
 
     def prefetch_related(self, *lookups: str | Prefetch | None) -> RawQuerySet:

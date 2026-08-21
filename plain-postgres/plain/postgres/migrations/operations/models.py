@@ -328,7 +328,7 @@ class RenameModel(ModelOperation):
                 )
             to_field = to_state.models_registry.get_model(
                 *related_key
-            )._model_meta.get_forward_field(related_object.field.name)
+            )._model_meta.get_forward_field(related_object.field.contributed_name)
             schema_editor.alter_field(
                 model,
                 related_object.field,

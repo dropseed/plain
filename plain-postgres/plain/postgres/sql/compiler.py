@@ -1015,6 +1015,7 @@ class SQLCompiler:
 
             if not select_related_descend(f, restricted, requested, select_mask):
                 continue
+            field_name = f.contributed_name
             related_select_mask = select_mask.get(f) or {}
             klass_info: dict[str, Any] = {
                 "model": f.remote_field.model,
@@ -1027,7 +1028,9 @@ class SQLCompiler:
             }
             related_klass_infos.append(klass_info)
             select_fields = []
-            _, _, _, joins, _, _ = self.query.setup_joins([f.name], opts, root_alias)
+            _, _, _, joins, _, _ = self.query.setup_joins(
+                [field_name], opts, root_alias
+            )
             alias = joins[-1]
             columns = self.get_default_columns(
                 related_select_mask,
@@ -1387,7 +1390,7 @@ class SQLInsertCompiler(SQLCompiler):
         return field.pre_save(obj, add=True)
 
     def assemble_as_sql(
-        self, fields: list[Any], value_rows: list[list[Any]]
+        self, fields: Sequence[Any], value_rows: list[list[Any]]
     ) -> tuple[Any, list[list[Any]]]:
         """
         Take a sequence of N fields and a sequence of M rows of values, and
