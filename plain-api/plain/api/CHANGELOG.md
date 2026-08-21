@@ -1,5 +1,20 @@
 # plain-api changelog
 
+## [0.35.0](https://github.com/dropseed/plain/releases/plain-api@0.35.0) (2026-08-21)
+
+### What's changed
+
+- Returning data with a bodiless status now raises instead of producing a malformed response. `return 204, {}` sends an empty 204 (no `Content-Type` — there's no representation to describe); `return 204, {"id": 1}` raises `ValueError`, since a client stops reading a 204 at the headers and the JSON would be parsed as the start of the next response ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43), [4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- `return None, data` from a handler is once again treated as the default 200, matching the pre-tuple contract ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- API version transforms skip streaming responses (whose `content` can't be inspected) and empty bodies (which have nothing to transform), instead of raising ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- `HTTPException` error rendering goes through the shared `status_for_exception()`, so an out-of-range status poked onto an exception instance can't crash the error renderer ([20ef4b19ba](https://github.com/dropseed/plain/commit/20ef4b19ba), [4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+
+### Upgrade instructions
+
+- If any handler returns data alongside a 204 or 304, change it to return a 200 with the data, or drop the data (`return 204, {}`). The previous behavior produced a response that could corrupt the next one on a keep-alive connection.
+- 204 responses from `APIView` no longer carry a `Content-Type` header — update tests that assert on it.
+- Requires `plain>=0.160.0`.
+
 ## [0.34.2](https://github.com/dropseed/plain/releases/plain-api@0.34.2) (2026-08-12)
 
 ### What's changed
