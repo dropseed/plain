@@ -490,7 +490,6 @@ class Model(metaclass=ModelBase):
         )
         if results:
             for value, field in zip(results[0], returning_fields):
-                assert field.name is not None
                 setattr(self, field.name, value)
 
     def _update_row(self, fields: Iterable[str] | None) -> None:
@@ -576,7 +575,6 @@ class Model(metaclass=ModelBase):
         with transaction.mark_for_rollback_on_error():
             count = self._model_meta.base_queryset.filter(id=self.id)._raw_delete()
         id_field = self._model_meta.get_forward_field("id")
-        assert id_field.name is not None
         setattr(self, id_field.name, None)
         # Only the id is cleared -- every other field value survives so callers
         # can still reference a deleted row (correlate it, log it, check it's
@@ -705,6 +703,8 @@ class Model(metaclass=ModelBase):
 
         errors = {}
         for f in self._model_meta.fields:
+            # See __init__ above: meta.fields is always ColumnField.
+            assert isinstance(f, ColumnField)
             if f.name in exclude:
                 continue
             # Skip validation for empty fields with required=False. The developer
@@ -1087,9 +1087,9 @@ class Model(metaclass=ModelBase):
         meta = cls._model_meta
         valid_fields = set(
             chain.from_iterable(
-                (f.name,)
-                if not (f.auto_created and not f.concrete)
-                else (f.field.related_query_name(),)
+                (f.field.related_query_name(),)
+                if isinstance(f, ForeignObjectRel)
+                else (f.name,)
                 for f in chain(meta.fields, meta.related_objects)
             )
         )

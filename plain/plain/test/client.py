@@ -314,7 +314,7 @@ class RequestFactory:
     ) -> None:
         self.json_encoder = json_encoder
         self._default_headers: dict[str, str] = headers or {}
-        self.cookies: SimpleCookie[str] = SimpleCookie()
+        self.cookies: SimpleCookie = SimpleCookie()
 
     def _build_request(
         self,
@@ -583,12 +583,12 @@ class Client:
         self.raise_request_exception = raise_request_exception
 
     @property
-    def cookies(self) -> SimpleCookie[str]:
+    def cookies(self) -> SimpleCookie:
         """Access the cookies from the request factory."""
         return self._request_factory.cookies
 
     @cookies.setter
-    def cookies(self, value: SimpleCookie[str]) -> None:
+    def cookies(self, value: SimpleCookie) -> None:
         """Set the cookies on the request factory."""
         self._request_factory.cookies = value
 

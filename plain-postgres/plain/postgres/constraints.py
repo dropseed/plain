@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 from types import NoneType
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ValidationError
 from plain.postgres.constants import LOOKUP_SEP
@@ -485,7 +485,7 @@ class UniqueConstraint(BaseConstraint):
         field_names[-1] = f"and {field_names[-1]}"
         # Comma-join when more than two, otherwise just space-join.
         sep = ", " if len(field_names) > 2 else " "
-        params["field_label"] = sep.join(cast(list[str], field_names))
+        params["field_label"] = sep.join(field_names)
 
         # Use the first field's message format.
         message = meta.get_forward_field(unique_check[0]).unique_error_message

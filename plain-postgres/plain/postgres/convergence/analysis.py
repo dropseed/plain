@@ -612,8 +612,6 @@ def _compare_columns(
         if f.primary_key:
             pk_suffix = f.db_type_suffix() or ""
 
-        # Fields reached via local_fields are always contributed (name set).
-        assert f.name is not None
         statuses.append(
             ColumnStatus(
                 name=f.column,
@@ -1209,9 +1207,6 @@ def _compare_foreign_keys(
     expected_fks: dict[tuple[str, str, str], tuple[str, str, str, str]] = {}
     for f in model._model_meta.local_fields:
         if isinstance(f, ForeignKeyField):
-            # Contributed fields always have a name; never silently exclude an
-            # FK from expected_fks (that would flag a live constraint UNDECLARED).
-            assert f.name is not None
             to_table = f.target_field.model.model_options.db_table
             to_column = f.target_field.column
             constraint_name = generate_fk_constraint_name(

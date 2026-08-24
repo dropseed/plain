@@ -100,8 +100,10 @@ class RelatedField(FieldCacheMixin, Field):
 
     # RelatedField always has a remote_field (never None)
     remote_field: ForeignObjectRel
-    # path_infos is implemented as @cached_property in subclasses (ForeignKey, ManyToManyField)
+    # path_infos and reverse_path_infos are implemented as @cached_property
+    # in subclasses (ForeignKeyField, ManyToManyField)
     path_infos: list[PathInfo]
+    reverse_path_infos: list[PathInfo]
     # Set by ForeignKeyField / ManyToManyField in their __init__; declared
     # here so RelatedField methods (deconstruct, related_query_name) can
     # reference them without isinstance-narrowing.
@@ -115,7 +117,7 @@ class RelatedField(FieldCacheMixin, Field):
         obj = super().__deepcopy__(memodict)
         obj.remote_field = copy.copy(self.remote_field)
         if hasattr(self.remote_field, "field") and self.remote_field.field is self:
-            obj.remote_field.field = obj  # ty: ignore[invalid-assignment]
+            obj.remote_field.field = obj
         return obj
 
     @cached_property
@@ -266,7 +268,7 @@ class RelatedField(FieldCacheMixin, Field):
             field=self,
         )
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self._related_query_name is not None:
             kwargs["related_query_name"] = self._related_query_name
@@ -300,7 +302,6 @@ class RelatedField(FieldCacheMixin, Field):
         return self.path_infos[-1].target_field
 
     def get_cache_name(self) -> str:
-        assert self.name is not None, "Field name must be set"
         return self.name
 
 
@@ -448,7 +449,7 @@ class ForeignKeyField(ColumnField, RelatedField):
             )
         return results
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         kwargs["on_delete"] = self.remote_field.on_delete
 
@@ -491,7 +492,6 @@ class ForeignKeyField(ColumnField, RelatedField):
         (.only()/.defer()) it is loaded first, so save/serialize/validate paths
         never mistake a deferred column for a NULL value.
         """
-        assert self.name is not None
         if self.name not in instance.__dict__:
             instance.refresh_from_db(fields=[self.name])
         return instance.__dict__.get(self.name)
@@ -772,7 +772,7 @@ class ManyToManyField(RelatedField):
                     (source_field_name, source),
                     (target_field_name, target),
                 ):
-                    possible_field_names = []
+                    possible_field_names: list[str] = []
                     for f in through._model_meta.fields:
                         if (
                             hasattr(f, "remote_field")
@@ -841,7 +841,7 @@ class ManyToManyField(RelatedField):
             ]
         return []
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
 
         # Lowercase model names as they should be treated as case-insensitive.
@@ -965,7 +965,7 @@ class ManyToManyField(RelatedField):
         )
 
         # Add the descriptor for the m2m relation.
-        setattr(cls, self.name, ForwardManyToManyDescriptor(self.remote_field))  # ty: ignore[invalid-argument-type]
+        setattr(cls, self.name, ForwardManyToManyDescriptor(self.remote_field))
 
         # Set up the accessor for the m2m table name for the relation.
         self.m2m_db_table = self._get_m2m_db_table
@@ -989,11 +989,9 @@ class ManyToManyField(RelatedField):
         pass
 
     def value_from_object(self, obj: Model) -> list[Any]:
-        assert self.name is not None
         return [] if obj.id is None else list(getattr(obj, self.name).query)
 
     def save_form_data(self, instance: Model, data: Any) -> None:
-        assert self.name is not None
         getattr(instance, self.name).set(data)
 
     def db_type(self) -> None:

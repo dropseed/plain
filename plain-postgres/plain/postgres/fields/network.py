@@ -63,7 +63,7 @@ class GenericIPAddressField[T: (str, str | None) = str](DefaultableField[T]):
             ]
         return []
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.unpack_ipv4 is not False:
             kwargs["unpack_ipv4"] = self.unpack_ipv4

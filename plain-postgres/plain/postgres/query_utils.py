@@ -11,7 +11,7 @@ from __future__ import annotations
 import functools
 import inspect
 from collections.abc import Callable, Generator
-from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self
+from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self, TypeGuard
 
 import psycopg
 from plain.logs import get_framework_logger
@@ -22,8 +22,8 @@ from plain.utils import tree
 if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.fields import Field
-    from plain.postgres.fields.related import ForeignKeyField
-    from plain.postgres.fields.reverse_related import ForeignObjectRel
+    from plain.postgres.fields.related import ForeignKeyField, RelatedField
+    from plain.postgres.fields.reverse_related import ForeignKeyRel, ForeignObjectRel
     from plain.postgres.lookups import Lookup, Transform
     from plain.postgres.meta import Meta
     from plain.postgres.sql.where import WhereNode
@@ -41,7 +41,7 @@ class PathInfo(NamedTuple):
     from_meta: Meta
     to_meta: Meta
     target_field: Field
-    join_field: ForeignKeyField | ForeignObjectRel
+    join_field: ForeignKeyField | ForeignKeyRel
     m2m: bool
     direct: bool
 
@@ -331,7 +331,7 @@ def select_related_descend(
     requested: dict[str, Any] | None,
     select_mask: Any,
     reverse: bool = False,
-) -> bool:
+) -> TypeGuard[RelatedField]:
     """
     Return True if this field should be used to descend deeper for
     select_related() purposes. Used by both the query construction code

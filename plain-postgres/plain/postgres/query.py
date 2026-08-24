@@ -718,7 +718,6 @@ class QuerySet[T: "Model"]:
                 for obj_with_id, results in zip(objs_with_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
                         if field != id_field:
-                            assert field.name is not None
                             setattr(obj_with_id, field.name, result)
                 for obj_with_id in objs_with_id:
                     obj_with_id._state.adding = False
@@ -736,7 +735,6 @@ class QuerySet[T: "Model"]:
                     assert len(returned_columns) == len(objs_without_id)
                 for obj_without_id, results in zip(objs_without_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
-                        assert field.name is not None
                         setattr(obj_without_id, field.name, result)
                     obj_without_id._state.adding = False
 
@@ -791,7 +789,6 @@ class QuerySet[T: "Model"]:
                 case_statement = Case(*when_statements, output_field=field)
                 # PostgreSQL requires casted CASE in updates
                 case_statement = Cast(case_statement, output_field=field)
-                assert field.name is not None
                 update_kwargs[field.name] = case_statement
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
@@ -1352,7 +1349,7 @@ class QuerySet[T: "Model"]:
     def _insert(
         self,
         objs: list[T],
-        fields: list[Field],
+        fields: Sequence[Field],
         returning_fields: list[Field] | None = None,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
@@ -1375,7 +1372,7 @@ class QuerySet[T: "Model"]:
     def _batched_insert(
         self,
         objs: list[T],
-        fields: list[Field],
+        fields: Sequence[Field],
         batch_size: int | None,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,

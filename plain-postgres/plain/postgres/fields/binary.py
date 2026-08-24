@@ -41,7 +41,7 @@ class BinaryField[
         if self.max_length is not None:
             self.validators.append(MaxLengthValidator(self.max_length))
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.max_length is not None:
             kwargs["max_length"] = self.max_length

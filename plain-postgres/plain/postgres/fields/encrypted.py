@@ -14,7 +14,7 @@ except ImportError:
     InvalidToken = None  # ty: ignore[invalid-assignment]
     MultiFernet = None  # ty: ignore[invalid-assignment]
     hashes = None  # ty: ignore[invalid-assignment]
-    PBKDF2HMAC = None  # ty: ignore[invalid-assignment]
+    PBKDF2HMAC = None
 
 from plain.postgres.lookups import Exact, IsNull
 from plain.runtime import settings

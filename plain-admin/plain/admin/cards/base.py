@@ -102,6 +102,6 @@ class Card:
     def get_filters(self) -> list[str] | Enum | None:
         if isinstance(self.filters, list):
             # Avoid mutating the class attribute
-            return self.filters.copy()  # type: ignore
+            return self.filters.copy()
         else:
             return self.filters

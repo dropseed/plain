@@ -50,7 +50,6 @@ class ForeignObjectRel(FieldCacheMixin):
 
     # Type annotations for instance attributes
     model: type[Model]
-    field: RelatedField
     on_delete: OnDelete | None
 
     def __init__(
@@ -61,7 +60,11 @@ class ForeignObjectRel(FieldCacheMixin):
         related_query_name: str | None = None,
         on_delete: OnDelete | None = None,
     ):
-        self.field = field  # ty: ignore[invalid-assignment]
+        # Annotated here rather than as a class-body attribute: RelatedField
+        # is itself a descriptor, so a class-body `field: RelatedField` would
+        # route every `self.field` read through its __get__. ForeignKeyRel
+        # and ManyToManyRel below narrow this further, the same way.
+        self.field: RelatedField = field
         # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
         # (see related.py:250 where field.remote_field.model is overwritten)
         self.model = to  # ty: ignore[invalid-assignment]
@@ -136,9 +139,6 @@ class ForeignObjectRel(FieldCacheMixin):
         state.pop("path_infos", None)
         return state
 
-    def get_joining_columns(self) -> tuple[str, str]:
-        return self.field.get_joining_columns(reverse_join=True)
-
     @cached_property
     def path_infos(self) -> list[PathInfo]:
         return self.field.reverse_path_infos
@@ -164,7 +164,6 @@ class ForeignKeyRel(ForeignObjectRel):
     """
 
     # Type annotations for instance attributes
-    field: ForeignKeyField
     on_delete: OnDelete  # narrowed: FK rel always has a concrete action
 
     def __init__(
@@ -181,11 +180,18 @@ class ForeignKeyRel(ForeignObjectRel):
             related_query_name=related_query_name,
             on_delete=on_delete,
         )
+        # Narrows self.field from RelatedField to ForeignKeyField (see
+        # ForeignObjectRel.__init__ for why this can't be a class-body
+        # annotation).
+        self.field: ForeignKeyField
 
     def __getstate__(self) -> dict[str, Any]:
         state = super().__getstate__()
         state.pop("related_model", None)
         return state
+
+    def get_joining_columns(self) -> tuple[str, str]:
+        return self.field.get_joining_columns(reverse_join=True)
 
 
 class ManyToManyRel(ForeignObjectRel):
@@ -197,7 +203,6 @@ class ManyToManyRel(ForeignObjectRel):
     """
 
     # Type annotations for instance attributes
-    field: ManyToManyField
     through: type[Model]
     through_fields: tuple[str, str] | None
 
@@ -216,6 +221,10 @@ class ManyToManyRel(ForeignObjectRel):
             to=to,
             related_query_name=related_query_name,
         )
+        # Narrows self.field from RelatedField to ManyToManyField (see
+        # ForeignObjectRel.__init__ for why this can't be a class-body
+        # annotation).
+        self.field: ManyToManyField
 
         # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
         # (see related.py:1143 where field.remote_field.through is overwritten)

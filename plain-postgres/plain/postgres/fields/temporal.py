@@ -213,7 +213,7 @@ class DateTimeField[
             ]
         return []
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.create_now:
             kwargs["create_now"] = True
@@ -273,7 +273,6 @@ class DateTimeField[
         )
 
     def pre_save(self, model_instance: Model, add: bool) -> datetime.datetime | None:
-        assert self.name is not None
         if self.update_now:
             value = timezone.now()
             setattr(model_instance, self.name, value)
