@@ -39,6 +39,11 @@ dev = [
   "plain-toolbar",
   "plain-tunnel",
   "plain-vendor",
+  # Workspace member, but only reachable through the optional `import plainx`
+  # plugin discovery in plain/cli/agent.py; listed here so ty resolves it in
+  # every dev/CI environment rather than only where a previous
+  # `uv sync --all-packages` happened to leave it installed.
+  "plainx-dev",
   # Type checking and better dev experience
   "ty>=0.0.74",
   "psycopg[binary]>=3.2.12",

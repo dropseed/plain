@@ -1568,6 +1568,7 @@ dev = [
     { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
+    { name = "plainx-dev" },
     { name = "psycopg", extra = ["binary"] },
     { name = "ty" },
 ]
@@ -1608,6 +1609,7 @@ dev = [
     { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },
+    { name = "plainx-dev", editable = "plainx-dev" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.12" },
     { name = "ty", specifier = ">=0.0.74" },
 ]
