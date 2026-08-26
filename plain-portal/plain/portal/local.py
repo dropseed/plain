@@ -1,8 +1,9 @@
 """Local side of a portal session.
 
-Runs on the developer's machine. `connect` establishes the encrypted
-tunnel through the relay and listens on a Unix socket. Subsequent
-commands (exec, pull, push) talk to the connect process over the socket.
+Runs on the developer's machine. `connect` spawns a background daemon that
+establishes the encrypted tunnel through the relay and listens on a Unix
+socket. Subsequent commands (exec, pull, push) talk to the daemon over the
+socket, and `disconnect` stops it.
 """
 
 from __future__ import annotations
@@ -10,11 +11,15 @@ from __future__ import annotations
 import asyncio
 import fcntl
 import functools
+import hashlib
 import json
 import os
 import signal
 import struct
+import subprocess
 import sys
+import tempfile
+import time
 from collections.abc import Callable
 
 import websockets.exceptions
@@ -40,14 +45,146 @@ def _portal_dir() -> str:
 
 
 def _socket_path() -> str:
-    return os.path.join(_portal_dir(), "portal.sock")
+    """Unix socket path, kept short and project-scoped.
+
+    AF_UNIX paths are limited to ~104 bytes on macOS, so the socket can't
+    live under the project's .plain/ directory -- a deep checkout path
+    fails with "AF_UNIX path too long".  Hash the project dir into the
+    system temp dir instead.
+    """
+    project_hash = hashlib.sha256(_portal_dir().encode()).hexdigest()[:12]
+    return os.path.join(tempfile.gettempdir(), f"plain-portal-{project_hash}.sock")
 
 
 def _lock_path() -> str:
+    """The daemon holds an exclusive flock on this file for its lifetime and
+    records its pid in it.  Liveness comes from the lock (the kernel drops it
+    on crash), identity from the contents -- so a stale pid is never signalled."""
     return os.path.join(_portal_dir(), "portal.lock")
 
 
-_lock_fd = None
+def _log_path() -> str:
+    return os.path.join(_portal_dir(), "connect.log")
+
+
+# The daemon prints this once the Unix socket is listening.  `connect` waits
+# for it in the log to know the session is ready.
+_SESSION_ACTIVE_LINE = "Connected to remote. Session active."
+
+# How long `connect` waits for the daemon to reach the relay and open its socket
+_DAEMON_STARTUP_TIMEOUT = 30
+
+_lock_fd: int | None = None
+
+
+def _acquire_lock() -> bool:
+    """Claim the session lock for this process's lifetime, recording our pid.
+
+    Returns False if another live daemon holds it.
+    """
+    global _lock_fd
+    fd = os.open(_lock_path(), os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        return False
+    os.ftruncate(fd, 0)
+    os.write(fd, str(os.getpid()).encode())
+    _lock_fd = fd  # Held open until process exit.
+    return True
+
+
+def _live_daemon_pid() -> int | None:
+    """Return the pid of the daemon holding the lock, or None if nobody does."""
+    try:
+        fd = os.open(_lock_path(), os.O_RDONLY)
+    except FileNotFoundError:
+        return None
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        # Locked -- a daemon is alive and its pid is in the file.
+        contents = os.read(fd, 32).decode().strip()
+        return int(contents) if contents else None
+    else:
+        # We got the lock, so no daemon holds it.  Drop it again.
+        return None
+    finally:
+        os.close(fd)
+
+
+def spawn_connect_daemon(code: str, *, relay_host: str) -> None:
+    """Run `connect --foreground` as a detached background process.
+
+    Returns once the daemon reports the session is active, so callers can
+    go straight to `exec`/`pull`/`push`. Exits non-zero (with the daemon's
+    output) if it fails to connect for any reason -- bad code, relay down,
+    session already active.
+
+    This is a spawn, not a fork -- os.fork() after the interpreter is up
+    crashes on macOS (ObjC runtime fork safety).
+    """
+    log_path = _log_path()
+    with open(log_path, "w") as log:
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "plain",
+                "portal",
+                "connect",
+                "--foreground",
+                "--relay-host",
+                relay_host,
+                code,
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+
+    deadline = time.monotonic() + _DAEMON_STARTUP_TIMEOUT
+    while time.monotonic() < deadline:
+        with open(log_path) as log:
+            output = log.read()
+        if _SESSION_ACTIVE_LINE in output:
+            print(_SESSION_ACTIVE_LINE)
+            return
+        if process.poll() is not None:
+            break
+        time.sleep(0.1)
+    else:
+        process.terminate()
+
+    # The daemon exited or never came up -- surface whatever it printed.
+    with open(log_path) as log:
+        output = log.read().strip()
+    print(output or "Portal connect failed to start.", file=sys.stderr)
+    sys.exit(1)
+
+
+def disconnect_daemon() -> None:
+    """Stop the background connect process, if there is one."""
+    pid = _live_daemon_pid()
+    if pid is None:
+        print("No active portal session.")
+        return
+
+    os.kill(pid, signal.SIGTERM)
+
+    # The lock is released when the daemon exits.
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        if _live_daemon_pid() is None:
+            break
+        time.sleep(0.1)
+    else:
+        os.kill(pid, signal.SIGKILL)
+
+    _cleanup()
+    print("Portal session disconnected.")
 
 
 async def _send_framed(writer: asyncio.StreamWriter, data: bytes) -> None:
@@ -81,16 +218,7 @@ async def connect(
         print(f"Invalid portal code: {code}", file=sys.stderr)
         sys.exit(1)
 
-    # Acquire an exclusive file lock before anything else.  Holds for the
-    # lifetime of the process — released automatically on exit/crash.
-    # Stored at module level to prevent GC from closing the fd.
-    global _lock_fd
-    _lock_fd = open(_lock_path(), "w")  # noqa: SIM115, ASYNC230 — held for the process lifetime
-    try:
-        fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        _lock_fd.close()
-        _lock_fd = None
+    if not _acquire_lock():
         print("A portal session is already active.", file=sys.stderr)
         sys.exit(1)
 
@@ -107,8 +235,6 @@ async def connect(
         sys.exit(1)
 
     encryptor = await perform_key_exchange(ws, code, side="connect")
-
-    print("Connected to remote. Session active.")
 
     # Exec requests use queues (for streaming exec_stdout + exec_result).
     # All other request types use single-shot futures.
@@ -245,6 +371,8 @@ async def connect(
         )
     finally:
         os.umask(old_umask)
+
+    print(_SESSION_ACTIVE_LINE, flush=True)
 
     loop = asyncio.get_running_loop()
 

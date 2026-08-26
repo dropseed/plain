@@ -96,11 +96,32 @@ def start(
     default=DEFAULT_RELAY_HOST,
     hidden=True,
 )
-def connect(code: str, relay_host: str) -> None:
-    """Connect to a remote portal session."""
-    from .local import connect as do_connect
+@click.option(
+    "--foreground",
+    is_flag=True,
+    help="Run in the foreground instead of as a background daemon.",
+)
+def connect(code: str, relay_host: str, foreground: bool) -> None:
+    """Connect to a remote portal session.
 
-    asyncio.run(do_connect(code, relay_host=relay_host))
+    Starts a background daemon that holds the tunnel open, then returns.
+    Use `plain portal disconnect` to end the session.
+    """
+    from .local import connect as do_connect
+    from .local import spawn_connect_daemon
+
+    if foreground:
+        asyncio.run(do_connect(code, relay_host=relay_host))
+    else:
+        spawn_connect_daemon(code, relay_host=relay_host)
+
+
+@cli.command()
+def disconnect() -> None:
+    """Disconnect the active portal session."""
+    from .local import disconnect_daemon
+
+    disconnect_daemon()
 
 
 @cli.command("exec")
