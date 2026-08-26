@@ -44,7 +44,6 @@ def _portal_dir() -> str:
     return d
 
 
-@functools.lru_cache
 def _socket_path() -> str:
     """Unix socket path, kept short and project-scoped.
 
@@ -58,44 +57,76 @@ def _socket_path() -> str:
 
 
 def _lock_path() -> str:
+    """The daemon holds an exclusive flock on this file for its lifetime and
+    records its pid in it.  Liveness comes from the lock (the kernel drops it
+    on crash), identity from the contents -- so a stale pid is never signalled."""
     return os.path.join(_portal_dir(), "portal.lock")
-
-
-def _pid_path() -> str:
-    return os.path.join(_portal_dir(), "portal.pid")
 
 
 def _log_path() -> str:
     return os.path.join(_portal_dir(), "connect.log")
 
 
-_lock_fd = None
+# The daemon prints this once the Unix socket is listening.  `connect` waits
+# for it in the log to know the session is ready.
+_SESSION_ACTIVE_LINE = "Connected to remote. Session active."
+
+# How long `connect` waits for the daemon to reach the relay and open its socket
+_DAEMON_STARTUP_TIMEOUT = 30
+
+_lock_fd: int | None = None
+
+
+def _acquire_lock() -> bool:
+    """Claim the session lock for this process's lifetime, recording our pid.
+
+    Returns False if another live daemon holds it.
+    """
+    global _lock_fd
+    fd = os.open(_lock_path(), os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        return False
+    os.ftruncate(fd, 0)
+    os.write(fd, str(os.getpid()).encode())
+    _lock_fd = fd  # Held open until process exit.
+    return True
+
+
+def _live_daemon_pid() -> int | None:
+    """Return the pid of the daemon holding the lock, or None if nobody does."""
+    try:
+        fd = os.open(_lock_path(), os.O_RDONLY)
+    except FileNotFoundError:
+        return None
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        # Locked -- a daemon is alive and its pid is in the file.
+        contents = os.read(fd, 32).decode().strip()
+        return int(contents) if contents else None
+    else:
+        # We got the lock, so no daemon holds it.  Drop it again.
+        return None
+    finally:
+        os.close(fd)
 
 
 def spawn_connect_daemon(code: str, *, relay_host: str) -> None:
     """Run `connect --foreground` as a detached background process.
 
-    Returns once the daemon is listening on the Unix socket, so callers can
+    Returns once the daemon reports the session is active, so callers can
     go straight to `exec`/`pull`/`push`. Exits non-zero (with the daemon's
-    output) if it fails to connect.
+    output) if it fails to connect for any reason -- bad code, relay down,
+    session already active.
 
     This is a spawn, not a fork -- os.fork() after the interpreter is up
     crashes on macOS (ObjC runtime fork safety).
     """
-    # Refuse early if a session is already active, so we don't remove a
-    # live socket below.  The daemon takes the lock for real once it starts.
-    with open(_lock_path(), "w") as probe:
-        try:
-            fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            print("A portal session is already active.", file=sys.stderr)
-            sys.exit(1)
-
-    # A stale socket from a crashed session would look like readiness.
-    _cleanup()
-
     log_path = _log_path()
-    with open(log_path, "w") as log, open(os.devnull) as devnull:
+    with open(log_path, "w") as log:
         process = subprocess.Popen(
             [
                 sys.executable,
@@ -108,28 +139,26 @@ def spawn_connect_daemon(code: str, *, relay_host: str) -> None:
                 relay_host,
                 code,
             ],
-            stdin=devnull,
+            stdin=subprocess.DEVNULL,
             stdout=log,
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
 
-    with open(_pid_path(), "w") as f:
-        f.write(str(process.pid))
-
     deadline = time.monotonic() + _DAEMON_STARTUP_TIMEOUT
     while time.monotonic() < deadline:
-        if os.path.exists(_socket_path()):
-            print("Connected to remote. Session active.")
+        with open(log_path) as log:
+            output = log.read()
+        if _SESSION_ACTIVE_LINE in output:
+            print(_SESSION_ACTIVE_LINE)
             return
         if process.poll() is not None:
             break
         time.sleep(0.1)
+    else:
+        process.terminate()
 
     # The daemon exited or never came up -- surface whatever it printed.
-    if process.poll() is None:
-        process.terminate()
-    _remove_pid_file()
     with open(log_path) as log:
         output = log.read().strip()
     print(output or "Portal connect failed to start.", file=sys.stderr)
@@ -138,41 +167,24 @@ def spawn_connect_daemon(code: str, *, relay_host: str) -> None:
 
 def disconnect_daemon() -> None:
     """Stop the background connect process, if there is one."""
-    try:
-        with open(_pid_path()) as f:
-            pid = int(f.read().strip())
-    except (FileNotFoundError, ValueError):
+    pid = _live_daemon_pid()
+    if pid is None:
         print("No active portal session.")
         return
 
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        _remove_pid_file()
-        _cleanup()
-        print("No active portal session.")
-        return
+    os.kill(pid, signal.SIGTERM)
 
+    # The lock is released when the daemon exits.
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
+        if _live_daemon_pid() is None:
             break
         time.sleep(0.1)
     else:
         os.kill(pid, signal.SIGKILL)
 
-    _remove_pid_file()
     _cleanup()
     print("Portal session disconnected.")
-
-
-def _remove_pid_file() -> None:
-    try:
-        os.unlink(_pid_path())
-    except FileNotFoundError:
-        pass
 
 
 async def _send_framed(writer: asyncio.StreamWriter, data: bytes) -> None:
@@ -181,9 +193,6 @@ async def _send_framed(writer: asyncio.StreamWriter, data: bytes) -> None:
     writer.write(data)
     await writer.drain()
 
-
-# How long `connect` waits for the daemon to reach the relay and open its socket
-_DAEMON_STARTUP_TIMEOUT = 30
 
 # 75MB — large enough for 50MB files base64-encoded (~67MB), prevents unbounded allocation
 _MAX_FRAME_SIZE = 75 * 1024 * 1024
@@ -209,16 +218,7 @@ async def connect(
         print(f"Invalid portal code: {code}", file=sys.stderr)
         sys.exit(1)
 
-    # Acquire an exclusive file lock before anything else.  Holds for the
-    # lifetime of the process — released automatically on exit/crash.
-    # Stored at module level to prevent GC from closing the fd.
-    global _lock_fd
-    _lock_fd = open(_lock_path(), "w")  # noqa: SIM115, ASYNC230 — held for the process lifetime
-    try:
-        fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        _lock_fd.close()
-        _lock_fd = None
+    if not _acquire_lock():
         print("A portal session is already active.", file=sys.stderr)
         sys.exit(1)
 
@@ -372,7 +372,7 @@ async def connect(
     finally:
         os.umask(old_umask)
 
-    print("Connected to remote. Session active.", flush=True)
+    print(_SESSION_ACTIVE_LINE, flush=True)
 
     loop = asyncio.get_running_loop()
 

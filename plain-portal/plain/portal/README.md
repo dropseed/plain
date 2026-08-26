@@ -165,8 +165,7 @@ The local side uses a background daemon and Unix socket:
 
 - `plain portal connect <code>` spawns `plain portal connect --foreground <code>` as a detached process (a spawn, not a fork -- forking after the interpreter is up crashes on macOS). The daemon establishes the WebSocket connection, performs the key exchange, and listens on a project-scoped Unix socket in the system temp directory. `connect` returns once that socket exists.
 - `exec`, `pull`, and `push` connect to the local Unix socket, send a request through the tunnel, and print the response.
-- `plain portal disconnect` stops the daemon (via the PID recorded in `.plain/portal/portal.pid`) and cleans up the socket.
-- Only one session per project at a time. A file lock in `.plain/portal/` guards against a second `connect`.
+- Only one session per project at a time. The daemon holds a file lock on `.plain/portal/portal.lock` for its lifetime and records its pid there -- the lock is what proves it is alive, so a second `connect` is refused and `plain portal disconnect` never signals a stale pid.
 
 The tunnel stays open across commands, but each `exec` gets a fresh Python namespace on the remote side. If you need setup code, put it all in one code block. Users who want a stateful interactive REPL should use `plain shell` directly on the remote machine.
 
