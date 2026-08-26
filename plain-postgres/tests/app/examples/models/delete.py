@@ -48,13 +48,6 @@ class ChildSetNull(postgres.Model):
     query: postgres.QuerySet[ChildSetNull] = postgres.QuerySet()
 
 
-@postgres.register_model
-class ChildNoAction(postgres.Model):
-    parent = types.ForeignKeyField(DeleteParent, on_delete=postgres.NO_ACTION)
-
-    query: postgres.QuerySet[ChildNoAction] = postgres.QuerySet()
-
-
 class _HideGhostsQuerySet(postgres.QuerySet):
     """QuerySet with a default filter. Rows named "ghost" are hidden from
     the public queryset — mirrors real-world patterns like soft-delete or
@@ -132,8 +125,8 @@ class DiamondChild(postgres.Model):
 
 
 # ---------------------------------------------------------------------------
-# Circular FKs — A.partner → B, B.partner → A, both CASCADE. Relies on
-# DEFERRABLE INITIALLY DEFERRED for circular insertion and deletion.
+# Circular FKs — A.partner → B, B.partner → A, both CASCADE and nullable, so
+# the cycle can be built with create → create → update under immediate checks.
 # ---------------------------------------------------------------------------
 
 

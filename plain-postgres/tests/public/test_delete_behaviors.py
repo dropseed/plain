@@ -3,12 +3,12 @@ Delete / on_delete behavior tests.
 
 Cascading is enforced entirely by Postgres. Model.delete() and
 QuerySet.delete() issue a single DELETE statement; child rows are handled
-via the declared `ON DELETE` clauses (CASCADE, SET_NULL, RESTRICT, NO_ACTION).
+via the declared `ON DELETE` clauses (CASCADE, SET_NULL, RESTRICT).
 
 Sections:
     1. on_delete options — instance + queryset paths for each action
     2. Graph shapes — multi-level, diamond, self-ref, M2M, mixed, circular
-    3. Deferred FK / transaction semantics
+    3. FK / transaction semantics
     4. Return value — delete() returns an int row count
     5. QuerySet operator rejections / leniency
     6. Related manager + M2M through-table mutation
@@ -22,7 +22,6 @@ import psycopg
 import pytest
 from app.examples.models.delete import (
     ChildCascade,
-    ChildNoAction,
     ChildRestrict,
     ChildSetNull,
     CircA,
@@ -73,8 +72,7 @@ def test_cascade_queryset(db):
 
 
 def test_restrict_instance(db):
-    """RESTRICT is immediate — raises at the DELETE call site even inside
-    a transaction, regardless of DEFERRABLE INITIALLY DEFERRED."""
+    """RESTRICT raises at the DELETE call site, even inside a transaction."""
     _create_parents()
     parent = DeleteParent.query.get(name="parent")
     ChildRestrict.query.create(parent=parent)
@@ -126,24 +124,6 @@ def test_set_null_bulk(db):
 
     nulls = ChildSetNull.query.filter(id__in=child_ids, parent__isnull=True).count()
     assert nulls == 100
-
-
-def test_no_action_raises_at_commit(db):
-    """
-    NO_ACTION respects DEFERRABLE INITIALLY DEFERRED — orphan detection is
-    deferred to commit. Force the check inside a savepoint so the outer
-    transaction stays clean under pytest's never-committed atomic wrapper.
-    """
-    from plain.postgres.db import get_connection
-
-    _create_parents()
-    parent = DeleteParent.query.get(name="parent")
-    ChildNoAction.query.create(parent=parent)
-
-    with pytest.raises(psycopg.IntegrityError), transaction.atomic():  # noqa: PT012
-        parent.delete()
-        with get_connection().cursor() as cur:
-            cur.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
 def test_filtered_delete_only_cascades_filtered(db):
@@ -244,9 +224,8 @@ def test_mixed_on_delete_restrict_blocks_cascade(db):
 
 def test_circular_fk_cascade_inside_atomic(db):
     """
-    A.partner → B, B.partner → A, both CASCADE. Plain's FK constraints are
-    DEFERRABLE INITIALLY DEFERRED, so deleting either side inside one atomic
-    should cascade to the other and commit cleanly.
+    A.partner → B, B.partner → A, both CASCADE and nullable. Deleting either
+    side inside one atomic cascades to the other and commits cleanly.
     """
     with transaction.atomic():
         a = CircA.query.create(name="a")
@@ -262,14 +241,14 @@ def test_circular_fk_cascade_inside_atomic(db):
 
 
 # ===========================================================================
-# 3. Deferred FK / transaction semantics
+# 3. FK / transaction semantics
 # ===========================================================================
 
 
-def test_delete_and_reinsert_replacement_in_one_atomic(db):
+def test_repoint_child_then_delete_parent_in_one_atomic(db):
     """
-    FK is DEFERRABLE INITIALLY DEFERRED. Delete a parent and re-point a child
-    at a replacement inside one atomic — commit must succeed.
+    Re-point a child at a replacement, then delete the old parent, inside one
+    atomic — commit must succeed.
     """
     _create_parents()
     parent = DeleteParent.query.get(name="parent")
@@ -286,36 +265,15 @@ def test_delete_and_reinsert_replacement_in_one_atomic(db):
     assert child.parent.id == DeleteParent.query.get(name="replacement").id
 
 
-def test_child_insert_before_parent_in_one_atomic(db):
-    """
-    Insert a child pointing at a not-yet-existing parent id, then insert the
-    parent. Deferred FK means the constraint is only checked at commit, by
-    which point the parent exists.
-    """
-    from plain.postgres.db import get_connection
+def test_child_insert_before_parent_raises_at_the_insert(db):
+    """FK constraints are checked at the write, not at commit — there is no
+    deferred window to insert the parent in afterwards."""
+    missing_id = 10**9
 
-    with transaction.atomic():
-        with get_connection().cursor() as cur:
-            cur.execute(
-                "SELECT nextval(pg_get_serial_sequence('examples_deleteparent', 'id'))"
-            )
-            row = cur.fetchone()
-            assert row is not None
-            (new_id,) = row
+    with pytest.raises(psycopg.errors.ForeignKeyViolation), transaction.atomic():
+        ChildCascade(parent=missing_id).create(clean_and_validate=False)
 
-        child = ChildCascade(parent=new_id)
-        child.create(clean_and_validate=False)
-
-        # Insert the parent with the reserved id. The constructor rejects a
-        # manual `id`, so set it via attribute, then create() -- the deliberate
-        # path for the rare case (here, a sequence-reserved id for a deferred
-        # FK) where you genuinely own the value.
-        parent = DeleteParent(name="late")
-        parent.id = new_id
-        parent.create(clean_and_validate=False)
-
-    assert DeleteParent.query.filter(id=new_id).exists()
-    assert ChildCascade.query.filter(parent=new_id).exists()
+    assert not ChildCascade.query.filter(parent=missing_id).exists()
 
 
 # ===========================================================================

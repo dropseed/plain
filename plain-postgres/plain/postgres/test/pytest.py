@@ -84,15 +84,19 @@ def db(setup_db: Any, request: Any) -> Generator[None]:
 
     with suppress_db_tracing():
         conn = get_connection()
-        # PostgreSQL can defer constraint checks. Skip when the connection is
-        # already in an aborted-transaction state (e.g. the test raised a
-        # DB error) — further commands would just raise InFailedSqlTransaction.
+        # Explicitly deferred constraints (UniqueConstraint(deferrable=
+        # Deferrable.DEFERRED)) are only checked at commit, which never
+        # happens here — run their checks now so a violation fails the test.
+        # Skip when the connection is already in an aborted-transaction state
+        # (e.g. the test raised a DB error) — further commands would just
+        # raise InFailedSqlTransaction.
         if (
             not conn.needs_rollback
             and conn.connection is not None
             and conn.connection.info.transaction_status != pq.TransactionStatus.INERROR
         ):
-            conn.check_constraints()
+            with conn.cursor() as cursor:
+                cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
         conn.set_rollback(True)
         atomic.__exit__(None, None, None)

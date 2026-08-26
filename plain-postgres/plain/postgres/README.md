@@ -983,6 +983,12 @@ The first access to any non-key field loads the whole row in a single query. The
 
 The partial-instance shortcut is safe because Plain always creates a database foreign-key constraint, so the referenced row is guaranteed to exist.
 
+### Foreign keys are checked immediately
+
+Foreign key constraints are checked at each write, not at commit — the same as Postgres's own default. Inserting a child row that points at a parent that doesn't exist yet fails at that `INSERT`, with a traceback pointing at the offending write, and deleting a parent with `RESTRICT` children fails at that `DELETE`. Create parents before children. A cycle of foreign keys needs a nullable back-reference: create both rows, then `update()` the back-reference. Two required foreign keys pointing at each other can never be inserted.
+
+Because nothing is queued until commit, a migration can add a column, backfill it in `RunPython`, and drop or alter columns on the same table, all in one transaction. The one exception is a model with an explicitly deferred constraint (`UniqueConstraint(deferrable=Deferrable.DEFERRED)`) — its checks do queue, and Postgres refuses `ALTER TABLE` on a table with queued checks until they run (`RunSQL("SET CONSTRAINTS ALL IMMEDIATE")`).
+
 ### Reverse relationships
 
 When you define a `ForeignKey` or `ManyToManyField`, Plain automatically creates a reverse accessor on the related model (like `author.book_set`). You can explicitly declare these reverse relationships using [`ReverseForeignKey`](./fields/reverse_descriptors.py#ReverseForeignKey) and [`ReverseManyToMany`](./fields/reverse_descriptors.py#ReverseManyToMany):

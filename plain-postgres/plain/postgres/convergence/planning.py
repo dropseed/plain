@@ -41,6 +41,7 @@ from .corrections import (
     ReplaceForeignKeyCorrection,
     ResetStorageParameterCorrection,
     SetColumnDefaultCorrection,
+    SetConstraintNotDeferrableCorrection,
     SetNotNullCorrection,
     SetStorageParameterCorrection,
     ValidateConstraintCorrection,
@@ -126,6 +127,8 @@ def _plan_drift(drift: Drift) -> PlanItem:
             return PlanItem(drift, ValidateConstraintCorrection(t, n))
         case ForeignKeyNameDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
             return PlanItem(drift, DropConstraintCorrection(t, n))
+        case ForeignKeyNameDrift(kind=DriftKind.DEFERRABLE, table=t, name=n):
+            return PlanItem(drift, SetConstraintNotDeferrableCorrection(t, n))
         case ColumnShouldBeNotNullDrift(has_null_rows=False, table=t, column=col):
             return PlanItem(drift, SetNotNullCorrection(t, col))
         case ColumnShouldBeNotNullDrift(has_null_rows=True):

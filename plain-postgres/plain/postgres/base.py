@@ -570,9 +570,9 @@ class Model(metaclass=ModelBase):
         # should always be deletable — custom querysets shape reads, not
         # internal row lifecycle operations.
         #
-        # mark_for_rollback_on_error: FK errors (RESTRICT / NO_ACTION) leave
-        # the DB transaction aborted. Mark the connection so outer atomic()
-        # blocks see the abort state even if the caller catches IntegrityError.
+        # mark_for_rollback_on_error: RESTRICT violations leave the DB
+        # transaction aborted. Mark the connection so outer atomic() blocks
+        # see the abort state even if the caller catches IntegrityError.
         with transaction.mark_for_rollback_on_error():
             count = self._model_meta.base_queryset.filter(id=self.id)._raw_delete()
         id_field = self._model_meta.get_forward_field("id")

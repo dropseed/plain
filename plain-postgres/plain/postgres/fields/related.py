@@ -348,7 +348,7 @@ class ForeignKeyField(ColumnField, RelatedField):
         if not isinstance(on_delete, OnDelete):
             raise TypeError(
                 "on_delete must be one of plain.postgres.CASCADE, SET_NULL, "
-                f"RESTRICT, or NO_ACTION; got {on_delete!r}"
+                f"or RESTRICT; got {on_delete!r}"
             )
 
         super().__init__(

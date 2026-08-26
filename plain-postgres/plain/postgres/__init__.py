@@ -12,7 +12,7 @@ from .base import Model
 from .constraints import CheckConstraint, UniqueConstraint
 from .db import get_connection, use_management_connection
 from .middleware import DatabaseConnectionMiddleware
-from .deletion import CASCADE, NO_ACTION, RESTRICT, SET_NULL
+from .deletion import CASCADE, RESTRICT, SET_NULL
 from .expressions import F
 from .enums import TextChoices
 from .fields import (
@@ -57,7 +57,6 @@ from . import types
 # imported from their specific modules (e.g., plain.postgres.aggregates).
 __all__ = [
     "CASCADE",
-    "NO_ACTION",
     "RESTRICT",
     "SET_NULL",
     "BigIntegerField",

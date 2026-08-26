@@ -21,7 +21,6 @@ from ..ddl import (
     compile_literal_default_sql,
     deferrable_sql,
 )
-from ..deletion import sql_on_delete
 from ..dialect import quote_name
 from ..fields.base import ColumnField
 from ..fields.related import ForeignKeyField
@@ -55,6 +54,7 @@ class DriftKind(StrEnum):
     RENAMED = "renamed"
     UNDECLARED = "undeclared"
     UNVALIDATED = "unvalidated"
+    DEFERRABLE = "deferrable"
 
 
 @dataclass
@@ -199,15 +199,18 @@ class ForeignKeyChangedDrift:
 
 @dataclass
 class ForeignKeyNameDrift:
-    """An existing FK constraint to validate (UNVALIDATED) or drop (UNDECLARED)."""
+    """An existing FK constraint to validate (UNVALIDATED), drop (UNDECLARED),
+    or make NOT DEFERRABLE (DEFERRABLE — Plain checks every FK immediately)."""
 
     table: str
     name: str
-    kind: Literal[DriftKind.UNVALIDATED, DriftKind.UNDECLARED]
+    kind: Literal[DriftKind.UNVALIDATED, DriftKind.UNDECLARED, DriftKind.DEFERRABLE]
 
     def describe(self) -> str:
         if self.kind is DriftKind.UNVALIDATED:
             return f"{self.table}: FK {self.name} NOT VALID"
+        if self.kind is DriftKind.DEFERRABLE:
+            return f"{self.table}: FK {self.name} DEFERRABLE"
         return f"{self.table}: FK {self.name} not declared"
 
 
@@ -1193,6 +1196,18 @@ def _compare_check_constraints(
     return statuses
 
 
+def _fk_status(
+    name: str, column: str, issue: str | None, drift: ForeignKeyDrift | None
+) -> ConstraintStatus:
+    return ConstraintStatus(
+        name=name,
+        constraint_type=ConType.FOREIGN_KEY,
+        fields=[column],
+        issue=issue,
+        drift=drift,
+    )
+
+
 def _compare_foreign_keys(
     model: type[Model], db: TableState, table: str
 ) -> list[ConstraintStatus]:
@@ -1217,12 +1232,12 @@ def _compare_foreign_keys(
             constraint_name = generate_fk_constraint_name(
                 table, f.column, to_table, to_column
             )
-            on_delete_clause, confdeltype = sql_on_delete(f.remote_field.on_delete)
+            on_delete = f.remote_field.on_delete
             expected_fks[(f.column, to_table, to_column)] = (
                 f.name,
                 constraint_name,
-                on_delete_clause,
-                confdeltype,
+                on_delete.sql_clause,
+                on_delete.confdeltype,
             )
 
     # Build actual FKs from DB: shape → (constraint_name, ConstraintState)
@@ -1245,46 +1260,62 @@ def _compare_foreign_keys(
             actual_name, cs = match
             matched_fk_names.add(actual_name)
 
-            issue: str | None = None
-            drift: ForeignKeyDrift | None = None
-
-            # on_delete action mismatch — drop + re-add with new clause
             if (
                 cs.on_delete_action is not None
                 and cs.on_delete_action != expected_action
             ):
-                issue = (
-                    f"on_delete action differs "
-                    f"({cs.on_delete_action!r} → {expected_action!r})"
-                )
+                # on_delete action mismatch — drop + re-add with new clause.
+                # The re-added constraint is NOT DEFERRABLE and gets validated,
+                # so this covers the other two cases as well.
                 col, to_table, to_column = key
-                drift = ForeignKeyChangedDrift(
-                    table=table,
-                    name=actual_name,
-                    column=col,
-                    target_table=to_table,
-                    target_column=to_column,
-                    on_delete_clause=on_delete_clause,
-                    actual_action=cs.on_delete_action,
-                    expected_action=expected_action,
+                statuses.append(
+                    _fk_status(
+                        actual_name,
+                        key[0],
+                        f"on_delete action differs "
+                        f"({cs.on_delete_action!r} → {expected_action!r})",
+                        ForeignKeyChangedDrift(
+                            table=table,
+                            name=actual_name,
+                            column=col,
+                            target_table=to_table,
+                            target_column=to_column,
+                            on_delete_clause=on_delete_clause,
+                            actual_action=cs.on_delete_action,
+                            expected_action=expected_action,
+                        ),
+                    )
                 )
-            elif not cs.validated:
-                issue = "NOT VALID — needs validation"
-                drift = ForeignKeyNameDrift(
-                    table=table,
-                    name=actual_name,
-                    kind=DriftKind.UNVALIDATED,
-                )
+                continue
 
-            statuses.append(
-                ConstraintStatus(
-                    name=actual_name,
-                    constraint_type=ConType.FOREIGN_KEY,
-                    fields=[key[0]],
-                    issue=issue,
-                    drift=drift,
+            # Deferrable and NOT VALID are independent — report both so one
+            # converge pass fixes both.
+            if cs.deferrable:
+                # Older Plain releases created every FK DEFERRABLE INITIALLY
+                # DEFERRED. Flipping it is a catalog-only ALTER CONSTRAINT.
+                statuses.append(
+                    _fk_status(
+                        actual_name,
+                        key[0],
+                        "DEFERRABLE — Plain FKs are NOT DEFERRABLE",
+                        ForeignKeyNameDrift(
+                            table=table, name=actual_name, kind=DriftKind.DEFERRABLE
+                        ),
+                    )
                 )
-            )
+            if not cs.validated:
+                statuses.append(
+                    _fk_status(
+                        actual_name,
+                        key[0],
+                        "NOT VALID — needs validation",
+                        ForeignKeyNameDrift(
+                            table=table, name=actual_name, kind=DriftKind.UNVALIDATED
+                        ),
+                    )
+                )
+            if not cs.deferrable and cs.validated:
+                statuses.append(_fk_status(actual_name, key[0], None, None))
         else:
             col, to_table, to_column = key
             statuses.append(
