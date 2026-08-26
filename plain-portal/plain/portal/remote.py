@@ -113,10 +113,12 @@ async def run_remote(
     code = generate_code()
 
     mode = "writable" if writable else "read-only"
+    # Flush so the code shows up immediately even when stdout is a pipe or
+    # file (e.g. an agent running `heroku run ...` in the background).
     print(f"Portal code: {code}")
     print(f"Session mode: {mode}")
     print("Waiting for connection...")
-    print()
+    print(flush=True)
 
     cid = channel_id(code)
     relay_url = make_relay_url(relay_host, cid, "start")

@@ -21,13 +21,15 @@ The remote side must be running first. Either start it yourself (if you have acc
 
 `start` requires either `--read-only` or `--read-write`. Always use `--read-only` unless the user has explicitly asked for database writes.
 
-**Both `start` and `connect` are long-running foreground processes.** If you run `start` yourself, use `run_in_background` so you don't block. Once it prints a portal code (e.g. `7-crossword-pineapple`), read the code from the output. If the user ran it, ask them for the code.
+**`start` is a long-running foreground process** -- it keeps the remote dyno/container alive. If you run it yourself, use `run_in_background` so you don't block, then read the portal code (e.g. `7-crossword-pineapple`) from its output. If the user ran it, ask them for the code.
 
-Then connect (also use `run_in_background`):
+**`connect` is an ordinary blocking command.** It starts a background daemon, waits until the tunnel is up, and returns. Do not use `run_in_background` for it:
 
 ```
 uv run plain portal connect <code>
 ```
+
+It prints `Connected to remote. Session active.` on success, or exits non-zero with the daemon's output if the connection failed (a wrong or expired code, for example).
 
 ## 2. Run commands
 
@@ -62,7 +64,11 @@ Push is restricted to `/tmp/` on the remote machine.
 
 ## 3. Disconnect
 
-Kill the `connect` process to end the session. This also frees the remote process.
+```
+uv run plain portal disconnect
+```
+
+This stops the local daemon and frees the remote process.
 
 ## Important
 

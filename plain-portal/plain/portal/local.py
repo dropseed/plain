@@ -1,8 +1,9 @@
 """Local side of a portal session.
 
-Runs on the developer's machine. `connect` establishes the encrypted
-tunnel through the relay and listens on a Unix socket. Subsequent
-commands (exec, pull, push) talk to the connect process over the socket.
+Runs on the developer's machine. `connect` spawns a background daemon that
+establishes the encrypted tunnel through the relay and listens on a Unix
+socket. Subsequent commands (exec, pull, push) talk to the daemon over the
+socket, and `disconnect` stops it.
 """
 
 from __future__ import annotations
@@ -10,11 +11,15 @@ from __future__ import annotations
 import asyncio
 import fcntl
 import functools
+import hashlib
 import json
 import os
 import signal
 import struct
+import subprocess
 import sys
+import tempfile
+import time
 from collections.abc import Callable
 
 import websockets.exceptions
@@ -39,15 +44,135 @@ def _portal_dir() -> str:
     return d
 
 
+@functools.lru_cache
 def _socket_path() -> str:
-    return os.path.join(_portal_dir(), "portal.sock")
+    """Unix socket path, kept short and project-scoped.
+
+    AF_UNIX paths are limited to ~104 bytes on macOS, so the socket can't
+    live under the project's .plain/ directory -- a deep checkout path
+    fails with "AF_UNIX path too long".  Hash the project dir into the
+    system temp dir instead.
+    """
+    project_hash = hashlib.sha256(_portal_dir().encode()).hexdigest()[:12]
+    return os.path.join(tempfile.gettempdir(), f"plain-portal-{project_hash}.sock")
 
 
 def _lock_path() -> str:
     return os.path.join(_portal_dir(), "portal.lock")
 
 
+def _pid_path() -> str:
+    return os.path.join(_portal_dir(), "portal.pid")
+
+
+def _log_path() -> str:
+    return os.path.join(_portal_dir(), "connect.log")
+
+
 _lock_fd = None
+
+
+def spawn_connect_daemon(code: str, *, relay_host: str) -> None:
+    """Run `connect --foreground` as a detached background process.
+
+    Returns once the daemon is listening on the Unix socket, so callers can
+    go straight to `exec`/`pull`/`push`. Exits non-zero (with the daemon's
+    output) if it fails to connect.
+
+    This is a spawn, not a fork -- os.fork() after the interpreter is up
+    crashes on macOS (ObjC runtime fork safety).
+    """
+    # Refuse early if a session is already active, so we don't remove a
+    # live socket below.  The daemon takes the lock for real once it starts.
+    with open(_lock_path(), "w") as probe:
+        try:
+            fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print("A portal session is already active.", file=sys.stderr)
+            sys.exit(1)
+
+    # A stale socket from a crashed session would look like readiness.
+    _cleanup()
+
+    log_path = _log_path()
+    with open(log_path, "w") as log, open(os.devnull) as devnull:
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "plain",
+                "portal",
+                "connect",
+                "--foreground",
+                "--relay-host",
+                relay_host,
+                code,
+            ],
+            stdin=devnull,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+
+    with open(_pid_path(), "w") as f:
+        f.write(str(process.pid))
+
+    deadline = time.monotonic() + _DAEMON_STARTUP_TIMEOUT
+    while time.monotonic() < deadline:
+        if os.path.exists(_socket_path()):
+            print("Connected to remote. Session active.")
+            return
+        if process.poll() is not None:
+            break
+        time.sleep(0.1)
+
+    # The daemon exited or never came up -- surface whatever it printed.
+    if process.poll() is None:
+        process.terminate()
+    _remove_pid_file()
+    with open(log_path) as log:
+        output = log.read().strip()
+    print(output or "Portal connect failed to start.", file=sys.stderr)
+    sys.exit(1)
+
+
+def disconnect_daemon() -> None:
+    """Stop the background connect process, if there is one."""
+    try:
+        with open(_pid_path()) as f:
+            pid = int(f.read().strip())
+    except (FileNotFoundError, ValueError):
+        print("No active portal session.")
+        return
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        _remove_pid_file()
+        _cleanup()
+        print("No active portal session.")
+        return
+
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.1)
+    else:
+        os.kill(pid, signal.SIGKILL)
+
+    _remove_pid_file()
+    _cleanup()
+    print("Portal session disconnected.")
+
+
+def _remove_pid_file() -> None:
+    try:
+        os.unlink(_pid_path())
+    except FileNotFoundError:
+        pass
 
 
 async def _send_framed(writer: asyncio.StreamWriter, data: bytes) -> None:
@@ -56,6 +181,9 @@ async def _send_framed(writer: asyncio.StreamWriter, data: bytes) -> None:
     writer.write(data)
     await writer.drain()
 
+
+# How long `connect` waits for the daemon to reach the relay and open its socket
+_DAEMON_STARTUP_TIMEOUT = 30
 
 # 75MB — large enough for 50MB files base64-encoded (~67MB), prevents unbounded allocation
 _MAX_FRAME_SIZE = 75 * 1024 * 1024
@@ -107,8 +235,6 @@ async def connect(
         sys.exit(1)
 
     encryptor = await perform_key_exchange(ws, code, side="connect")
-
-    print("Connected to remote. Session active.")
 
     # Exec requests use queues (for streaming exec_stdout + exec_result).
     # All other request types use single-shot futures.
@@ -245,6 +371,8 @@ async def connect(
         )
     finally:
         os.umask(old_umask)
+
+    print("Connected to remote. Session active.", flush=True)
 
     loop = asyncio.get_running_loop()
 

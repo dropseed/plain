@@ -87,16 +87,19 @@ Exactly one of `--read-only` or `--read-write` is required. There is no default,
 
 ### `plain portal connect <code>`
 
-Connect to a remote portal session. Establishes the encrypted tunnel and backgrounds itself.
+Connect to a remote portal session. Starts a background daemon that holds the encrypted tunnel open, waits until it is ready, then returns -- so the next command can be `exec` straight away.
 
 ```console
 $ plain portal connect 7-crossword-pineapple
+Connected to remote. Session active.
 $ plain portal connect 7-crossword-pineapple --foreground
 ```
 
-| Option         | Description                                | Default |
-| -------------- | ------------------------------------------ | ------- |
-| `--foreground` | Run in foreground instead of backgrounding | Off     |
+| Option         | Description                                             | Default |
+| -------------- | ------------------------------------------------------- | ------- |
+| `--foreground` | Run in the foreground instead of as a background daemon | Off     |
+
+If the daemon fails to connect, `connect` exits non-zero and prints the daemon's output. The daemon's log is kept at `.plain/portal/connect.log`.
 
 ### `plain portal exec <code>`
 
@@ -132,11 +135,7 @@ Pushed ./fix.py -> /tmp/fix.py (892 bytes)
 
 ### `plain portal disconnect`
 
-Kill the background daemon and clean up the local session.
-
-### `plain portal status`
-
-Show whether a portal session is active and its process ID.
+Stop the background daemon and clean up the local session. The remote side exits when the tunnel closes.
 
 ## How it works
 
@@ -164,9 +163,10 @@ Production (heroku run, fly ssh, kubectl exec, etc.)     Local machine
 
 The local side uses a background daemon and Unix socket:
 
-- `plain portal connect <code>` establishes the WebSocket connection, performs the key exchange, then forks into the background and listens on a Unix socket (`/tmp/plain-portal.sock`).
+- `plain portal connect <code>` spawns `plain portal connect --foreground <code>` as a detached process (a spawn, not a fork -- forking after the interpreter is up crashes on macOS). The daemon establishes the WebSocket connection, performs the key exchange, and listens on a project-scoped Unix socket in the system temp directory. `connect` returns once that socket exists.
 - `exec`, `pull`, and `push` connect to the local Unix socket, send a request through the tunnel, and print the response.
-- `plain portal disconnect` kills the background process and cleans up the socket.
+- `plain portal disconnect` stops the daemon (via the PID recorded in `.plain/portal/portal.pid`) and cleans up the socket.
+- Only one session per project at a time. A file lock in `.plain/portal/` guards against a second `connect`.
 
 The tunnel stays open across commands, but each `exec` gets a fresh Python namespace on the remote side. If you need setup code, put it all in one code block. Users who want a stateful interactive REPL should use `plain shell` directly on the remote machine.
 
