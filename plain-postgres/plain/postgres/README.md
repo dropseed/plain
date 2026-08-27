@@ -983,11 +983,13 @@ The first access to any non-key field loads the whole row in a single query. The
 
 The partial-instance shortcut is safe because Plain always creates a database foreign-key constraint, so the referenced row is guaranteed to exist.
 
-### Foreign keys are checked immediately
+### Constraints are checked immediately
 
-Foreign key constraints are checked at each write, not at commit — the same as Postgres's own default. Inserting a child row that points at a parent that doesn't exist yet fails at that `INSERT`, with a traceback pointing at the offending write, and deleting a parent with `RESTRICT` children fails at that `DELETE`. Create parents before children. A cycle of foreign keys needs a nullable back-reference: create both rows, then `update()` the back-reference. Two required foreign keys pointing at each other can never be inserted.
+Every constraint is checked at the write that violates it, never at commit — the same as Postgres's own default. Inserting a child row that points at a parent that doesn't exist yet fails at that `INSERT`, with a traceback pointing at the offending write, and deleting a parent with `RESTRICT` children fails at that `DELETE`. Create parents before children. A cycle of foreign keys needs a nullable back-reference: create both rows, then `update()` the back-reference. Two required foreign keys pointing at each other can never be inserted.
 
-Because nothing is queued until commit, a migration can add a column, backfill it in `RunPython`, and drop or alter columns on the same table, all in one transaction. The one exception is a model with an explicitly deferred constraint (`UniqueConstraint(deferrable=Deferrable.DEFERRED)`) — its checks do queue, and Postgres refuses `ALTER TABLE` on a table with queued checks until they run (`RunSQL("SET CONSTRAINTS ALL IMMEDIATE")`).
+To swap two rows' values under a unique constraint (reordering by `position`, say), move one row to a temporary value first — a single `UPDATE` that swaps them fails, because Postgres checks uniqueness per row.
+
+A migration can add a column, backfill it in `RunPython`, and drop or alter columns on the same table, all in one transaction.
 
 ### Reverse relationships
 
@@ -1117,8 +1119,6 @@ except (psycopg.IntegrityError, ValidationError):
 ```
 
 For a plain insert-or-update with no per-row logic, `bulk_create(..., update_conflicts=True, unique_fields=[...])` is an atomic upsert with no race to catch.
-
-Two caveats. The mapping covers **immediate** constraints — the default. An explicitly deferred constraint (`UniqueConstraint(deferrable=Deferrable.DEFERRED)`) is checked at commit, _after_ the write returns, so its violation still surfaces as a raw `psycopg.IntegrityError`. And when a row violates several constraints at once, a form's pre-check (or an explicit `validate_constraints()`) reports them all, while a direct `create()`/`update()` gets only the first one the database hits.
 
 ### Indexes and constraints
 

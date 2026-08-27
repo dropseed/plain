@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from enum import Enum
 from types import NoneType
 from typing import TYPE_CHECKING, Any, cast
 
@@ -10,7 +9,6 @@ from plain.postgres.ddl import (
     build_include_sql,
     compile_expression_sql,
     compile_index_expressions_sql,
-    deferrable_sql,
 )
 from plain.postgres.dialect import quote_name
 from plain.postgres.exceptions import FieldError
@@ -26,7 +24,7 @@ from plain.postgres.query_utils import Q
 if TYPE_CHECKING:
     from plain.postgres.base import Model
 
-__all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]
+__all__ = ["BaseConstraint", "CheckConstraint", "UniqueConstraint"]
 
 
 ViolationError = str | dict[str, Any] | list[Any] | ValidationError
@@ -190,15 +188,6 @@ class CheckConstraint(BaseConstraint):
         return path, args, kwargs
 
 
-class Deferrable(Enum):
-    DEFERRED = "deferred"
-    IMMEDIATE = "immediate"
-
-    # A similar format was proposed for Python 3.10.
-    def __repr__(self) -> str:
-        return f"{self.__class__.__qualname__}.{self._name_}"
-
-
 class UniqueConstraint(BaseConstraint):
     expressions: tuple[ReplaceableExpression, ...]
 
@@ -208,7 +197,6 @@ class UniqueConstraint(BaseConstraint):
         fields: tuple[str, ...] | list[str] = (),
         name: str | None = None,
         condition: Q | None = None,
-        deferrable: Deferrable | None = None,
         include: tuple[str, ...] | list[str] | None = None,
         opclasses: tuple[str, ...] | list[str] = (),
         violation_error: ViolationError | None = None,
@@ -226,22 +214,10 @@ class UniqueConstraint(BaseConstraint):
             )
         if not isinstance(condition, NoneType | Q):
             raise TypeError("UniqueConstraint.condition must be a Q instance.")
-        if condition and deferrable:
-            raise ValueError("UniqueConstraint with conditions cannot be deferred.")
-        if include and deferrable:
-            raise ValueError("UniqueConstraint with include fields cannot be deferred.")
-        if opclasses and deferrable:
-            raise ValueError("UniqueConstraint with opclasses cannot be deferred.")
-        if expressions and deferrable:
-            raise ValueError("UniqueConstraint with expressions cannot be deferred.")
         if expressions and opclasses:
             raise ValueError(
                 "UniqueConstraint.opclasses cannot be used with expressions. "
                 "Use a custom OpClass() instead."
-            )
-        if not isinstance(deferrable, NoneType | Deferrable):
-            raise TypeError(
-                "UniqueConstraint.deferrable must be a Deferrable instance."
             )
         if not isinstance(include, NoneType | list | tuple):
             raise TypeError("UniqueConstraint.include must be a list or tuple.")
@@ -254,7 +230,6 @@ class UniqueConstraint(BaseConstraint):
             )
         self.fields = tuple(fields)
         self.condition = condition
-        self.deferrable = deferrable
         self.include = tuple(include) if include else ()
         self.opclasses = opclasses
         self.expressions = tuple(
@@ -311,7 +286,7 @@ class UniqueConstraint(BaseConstraint):
         elif condition or self.include or self.opclasses or self.expressions:
             return f"CREATE UNIQUE INDEX {name} ON {table} ({columns_sql}){include_sql}{condition_sql}"
         else:
-            return f"ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE ({columns_sql}){deferrable_sql(self.deferrable)}"
+            return f"ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE ({columns_sql})"
 
     def to_attach_sql(self, model: type[Model]) -> str:
         """Generate ALTER TABLE ADD CONSTRAINT UNIQUE USING INDEX SQL.
@@ -321,18 +296,15 @@ class UniqueConstraint(BaseConstraint):
         """
         table = quote_name(model.model_options.db_table)
         name = quote_name(self.name)
-        sql = f"ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE USING INDEX {name}"
-        sql += deferrable_sql(self.deferrable)
-        return sql
+        return f"ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE USING INDEX {name}"
 
     def __repr__(self) -> str:
-        return "<{}:{}{}{}{}{}{}{}{}>".format(
+        return "<{}:{}{}{}{}{}{}{}>".format(
             self.__class__.__qualname__,
             "" if not self.fields else f" fields={self.fields!r}",
             "" if not self.expressions else f" expressions={self.expressions!r}",
             f" name={self.name!r}",
             "" if self.condition is None else f" condition={self.condition}",
-            "" if self.deferrable is None else f" deferrable={self.deferrable!r}",
             "" if not self.include else f" include={self.include!r}",
             "" if not self.opclasses else f" opclasses={self.opclasses!r}",
             (
@@ -348,7 +320,6 @@ class UniqueConstraint(BaseConstraint):
                 self.name == other.name
                 and self.fields == other.fields
                 and self.condition == other.condition
-                and self.deferrable == other.deferrable
                 and self.include == other.include
                 and self.opclasses == other.opclasses
                 and self.expressions == other.expressions
@@ -362,8 +333,6 @@ class UniqueConstraint(BaseConstraint):
             kwargs["fields"] = self.fields
         if self.condition:
             kwargs["condition"] = self.condition
-        if self.deferrable:
-            kwargs["deferrable"] = self.deferrable
         if self.include:
             kwargs["include"] = self.include
         if self.opclasses:

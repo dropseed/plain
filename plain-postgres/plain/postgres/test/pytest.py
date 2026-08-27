@@ -7,7 +7,6 @@ from typing import Any
 
 import pytest
 from plain.postgres.otel import suppress_db_tracing
-from psycopg import pq
 
 from .. import transaction
 from ..connection import DatabaseConnection
@@ -84,25 +83,9 @@ def db(setup_db: Any, request: Any) -> Generator[None]:
 
     with suppress_db_tracing():
         conn = get_connection()
-        # Explicitly deferred constraints (UniqueConstraint(deferrable=
-        # Deferrable.DEFERRED)) are only checked at commit, which never
-        # happens here — run their checks now so a violation fails the test.
-        # Skip when the connection is already in an aborted-transaction state
-        # (e.g. the test raised a DB error) — further commands would just
-        # raise InFailedSqlTransaction.
-        try:
-            if (
-                not conn.needs_rollback
-                and conn.connection is not None
-                and conn.connection.info.transaction_status
-                != pq.TransactionStatus.INERROR
-            ):
-                with conn.cursor() as cursor:
-                    cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
-        finally:
-            conn.set_rollback(True)
-            atomic.__exit__(None, None, None)
-            conn.close()
+        conn.set_rollback(True)
+        atomic.__exit__(None, None, None)
+        conn.close()
 
 
 @pytest.fixture

@@ -378,6 +378,7 @@ class SetConstraintNotDeferrableCorrection(Correction):
     ALTER CONSTRAINT only rewrites the catalog — the constraint stays
     validated and nothing is scanned — but it does take a brief ACCESS
     EXCLUSIVE lock on both tables, bounded by the usual lock_timeout.
+    Postgres only allows this on foreign keys.
     """
 
     pass_order = 2
@@ -527,9 +528,11 @@ class RenameConstraintCorrection(Correction):
     """Rename a constraint (catalog-only, instant).
 
     For unique constraints, Postgres automatically renames the backing index.
+    Runs before pass-2 corrections so anything else planned for the same
+    constraint can address it by its new name.
     """
 
-    pass_order = 2
+    pass_order = 1
 
     table: str
     old_name: str

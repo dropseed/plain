@@ -523,7 +523,11 @@ class ForeignKeyField(ColumnField, RelatedField):
     ) -> ValidationError:
         """The ValidationError for a ForeignKeyViolation on a write of
         ``instance`` — the referenced row doesn't exist. Routed to this field,
-        like a single-field unique violation."""
+        like a single-field unique violation.
+
+        Same signature as ``BaseConstraint._db_violation_error`` so the write
+        path treats a foreign key and a declared constraint alike; ``model``
+        is unused here."""
         assert self.name is not None
         error = ValidationError(
             self.does_not_exist_error_message,

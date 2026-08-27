@@ -19,7 +19,6 @@ from plain.postgres.sql.query import Query
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
-    from plain.postgres.constraints import Deferrable
 
 
 def quote_value(value: Any) -> str:
@@ -32,21 +31,6 @@ def quote_value(value: Any) -> str:
         value = value.replace("%", "%%")
     conn = get_connection()
     return psycopg.sql.quote(value, conn.connection)
-
-
-def deferrable_sql(deferrable: Deferrable | None) -> str:
-    """Return the DEFERRABLE clause for a constraint, or empty string."""
-    from plain.postgres.constraints import (
-        Deferrable,  # circular: constraints imports ddl
-    )
-
-    if deferrable is None:
-        return ""
-    if deferrable == Deferrable.DEFERRED:
-        return " DEFERRABLE INITIALLY DEFERRED"
-    if deferrable == Deferrable.IMMEDIATE:
-        return " DEFERRABLE INITIALLY IMMEDIATE"
-    return ""
 
 
 def compile_expression_sql(model: type[Model], expression_q: Q) -> str:

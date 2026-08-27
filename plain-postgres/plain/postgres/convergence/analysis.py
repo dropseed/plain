@@ -19,7 +19,6 @@ from ..ddl import (
     compile_expression_sql,
     compile_index_expressions_sql,
     compile_literal_default_sql,
-    deferrable_sql,
 )
 from ..dialect import quote_name
 from ..fields.base import ColumnField
@@ -1296,8 +1295,8 @@ def _compare_foreign_keys(
         if renamed:
             # RenameField/RenameModel leave the constraint under its old
             # name, and the write path maps a violation back to the field by
-            # the generated name. The rename runs first (same pass, planned
-            # first), so the drifts below address the constraint by its new
+            # the generated name. The rename correction runs in an earlier
+            # pass, so the drifts below address the constraint by its new
             # name.
             statuses.append(
                 _fk_status(
@@ -1944,8 +1943,8 @@ def _get_expected_unique_definition(
     prints it.
 
     PostgreSQL only stores field-based unique constraints (with optional
-    INCLUDE and DEFERRABLE) in pg_constraint. Expression-based, conditional,
-    and opclass constraints remain as indexes only — those are compared via
+    INCLUDE) in pg_constraint. Expression-based, conditional, and opclass
+    constraints remain as indexes only — those are compared via
     the index-definition path.
     """
     columns_sql = ", ".join(
@@ -1953,6 +1952,5 @@ def _get_expected_unique_definition(
         for f in constraint.fields
     )
     include_sql = build_include_sql(model, constraint.include)
-    defer_sql = deferrable_sql(constraint.deferrable)
-    clause = f"UNIQUE ({columns_sql}){include_sql}{defer_sql}"
+    clause = f"UNIQUE ({columns_sql}){include_sql}"
     return _normalize_constraint_def(cursor, model, clause)
