@@ -82,7 +82,6 @@ class ConstraintState:
     target_table: str | None = None  # FK only
     target_column: str | None = None  # FK only
     on_delete_action: str | None = None  # FK only: pg_constraint.confdeltype char
-    deferrable: bool = False  # FK only: pg_constraint.condeferrable
 
 
 @dataclass
@@ -152,7 +151,6 @@ def introspect_table(
                     target_table=fk_target[0],
                     target_column=fk_target[1],
                     on_delete_action=info.get("on_delete_action"),
-                    deferrable=info.get("deferrable", False),
                 )
         elif info.get("index"):
             indexes[name] = IndexState(

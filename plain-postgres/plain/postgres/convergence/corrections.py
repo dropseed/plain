@@ -371,34 +371,6 @@ class ReplaceForeignKeyCorrection(Correction):
 
 
 @dataclass
-class SetConstraintNotDeferrableCorrection(Correction):
-    """Make a DEFERRABLE FK constraint NOT DEFERRABLE.
-
-    Older Plain releases created every FK DEFERRABLE INITIALLY DEFERRED.
-    ALTER CONSTRAINT only rewrites the catalog — the constraint stays
-    validated and nothing is scanned — but it does take a brief ACCESS
-    EXCLUSIVE lock on both tables, bounded by the usual lock_timeout.
-    Postgres only allows this on foreign keys.
-    """
-
-    pass_order = 2
-
-    table: str
-    name: str
-
-    def describe(self) -> str:
-        return f"{self.table}: make FK {self.name} NOT DEFERRABLE"
-
-    def apply(self) -> str:
-        sql = (
-            f"ALTER TABLE {quote_name(self.table)}"
-            f" ALTER CONSTRAINT {quote_name(self.name)} NOT DEFERRABLE"
-        )
-        _execute_and_commit(sql)
-        return sql
-
-
-@dataclass
 class SetNotNullCorrection(Correction):
     """Enforce NOT NULL via CHECK NOT VALID → VALIDATE → SET NOT NULL.
 

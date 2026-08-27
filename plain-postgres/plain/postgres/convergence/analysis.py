@@ -53,7 +53,6 @@ class DriftKind(StrEnum):
     RENAMED = "renamed"
     UNDECLARED = "undeclared"
     UNVALIDATED = "unvalidated"
-    DEFERRABLE = "deferrable"
 
 
 @dataclass
@@ -214,18 +213,16 @@ class ForeignKeyRenameDrift:
 
 @dataclass
 class ForeignKeyNameDrift:
-    """An existing FK constraint to validate (UNVALIDATED), drop (UNDECLARED),
-    or make NOT DEFERRABLE (DEFERRABLE — Plain checks every FK immediately)."""
+    """An existing FK constraint to validate (UNVALIDATED) or drop
+    (UNDECLARED)."""
 
     table: str
     name: str
-    kind: Literal[DriftKind.UNVALIDATED, DriftKind.UNDECLARED, DriftKind.DEFERRABLE]
+    kind: Literal[DriftKind.UNVALIDATED, DriftKind.UNDECLARED]
 
     def describe(self) -> str:
         if self.kind is DriftKind.UNVALIDATED:
             return f"{self.table}: FK {self.name} NOT VALID"
-        if self.kind is DriftKind.DEFERRABLE:
-            return f"{self.table}: FK {self.name} DEFERRABLE"
         return f"{self.table}: FK {self.name} not declared"
 
 
@@ -1315,8 +1312,8 @@ def _compare_foreign_keys(
             and cs.on_delete_action != on_delete.confdeltype
         ):
             # on_delete action mismatch — drop + re-add with new clause.
-            # The re-added constraint is NOT DEFERRABLE and gets validated,
-            # so this covers the other two cases as well.
+            # The re-added constraint gets validated, so this covers the
+            # unvalidated case as well.
             statuses.append(
                 _fk_status(
                     actual_name,
@@ -1339,21 +1336,6 @@ def _compare_foreign_keys(
             )
             continue
 
-        # Deferrable and NOT VALID are independent — report both so one
-        # converge pass fixes both.
-        if cs.deferrable:
-            # Older Plain releases created every FK DEFERRABLE INITIALLY
-            # DEFERRED. Flipping it is a catalog-only ALTER CONSTRAINT.
-            statuses.append(
-                _fk_status(
-                    actual_name,
-                    col,
-                    issue="DEFERRABLE — Plain FKs are NOT DEFERRABLE",
-                    drift=ForeignKeyNameDrift(
-                        table=table, name=actual_name, kind=DriftKind.DEFERRABLE
-                    ),
-                )
-            )
         if not cs.validated:
             statuses.append(
                 _fk_status(
@@ -1365,7 +1347,7 @@ def _compare_foreign_keys(
                     ),
                 )
             )
-        if not renamed and not cs.deferrable and cs.validated:
+        if not renamed and cs.validated:
             statuses.append(_fk_status(actual_name, col, issue=None, drift=None))
 
     for name in sorted(actual.keys() - matched_fk_names):
