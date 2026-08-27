@@ -1093,7 +1093,7 @@ class User(postgres.Model):
 
 Field-level validation happens automatically based on field types and constraints.
 
-**The database is authoritative for constraints.** `create()`/`update()` don't pre-check your declared unique/check constraints — they attempt the write, and if Postgres rejects it, translate the `IntegrityError` into a `ValidationError` (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). You get the same field-level error you'd expect, the write costs no per-constraint `SELECT`, and a raced concurrent insert can't slip through as a 500. (FK violations, `NOT NULL`, and a hand-set primary-key collision have no declared constraint to map to and re-raise as the original `IntegrityError`. `create()` always inserts, so passing a stray `id` that already exists is rejected by Postgres as the original `IntegrityError`.)
+**The database is authoritative for constraints.** `create()`/`update()` don't pre-check your declared unique/check constraints — they attempt the write, and if Postgres rejects it, translate the `IntegrityError` into a `ValidationError` (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). You get the same field-level error you'd expect, the write costs no per-constraint `SELECT`, and a raced concurrent insert can't slip through as a 500. A foreign key pointing at a row that doesn't exist maps the same way, as an error on that field. (`NOT NULL` and a hand-set primary-key collision have no declared constraint to map to and re-raise as the original `IntegrityError`. `create()` always inserts, so passing a stray `id` that already exists is rejected by Postgres as the original `IntegrityError`.)
 
 Because the rejected write reaches the database, it aborts the surrounding transaction. If you catch the `ValidationError` and want to keep using the transaction, wrap the write in `transaction.atomic()` so it rolls back to a savepoint:
 
@@ -1107,7 +1107,7 @@ except ValidationError:
 
 Forms are the exception: a `ModelForm` pre-checks constraints explicitly (a `validate_constraints()` call in its `_post_clean`) so it can surface every violation at once, then writes via `form.create()`/`form.update()` with validation already done. A direct `create()`/`update()` reports the first violation Postgres hits.
 
-This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to. If you retry on a unique conflict, catch both:
+This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to, and so does a `delete()` blocked by `RESTRICT` children. If you retry on a unique conflict, catch both:
 
 ```python
 try:

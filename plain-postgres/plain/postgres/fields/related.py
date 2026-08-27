@@ -5,11 +5,12 @@ from collections.abc import Callable, Sequence
 from functools import cached_property, partial
 from typing import TYPE_CHECKING, Any, Self, cast
 
+from plain.exceptions import ValidationError
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.deletion import SET_NULL, OnDelete
 from plain.postgres.exceptions import FieldDoesNotExist
 from plain.postgres.query_utils import PathInfo
-from plain.postgres.utils import make_model_tuple
+from plain.postgres.utils import generate_fk_constraint_name, make_model_tuple
 from plain.preflight import PreflightResult
 
 from ..registry import models_registry
@@ -324,6 +325,8 @@ class ForeignKeyField(ColumnField, RelatedField):
 
     empty_strings_allowed = False
 
+    does_not_exist_error_message = "%(object_name)s with id %(value)s does not exist."
+
     def __init__(
         self,
         to: type[Model] | str,
@@ -503,6 +506,34 @@ class ForeignKeyField(ColumnField, RelatedField):
 
     def value_from_object(self, obj: Model) -> Any:
         return self._get_raw_value(obj)
+
+    def db_constraint_name(self) -> str:
+        """The name Postgres reports in ``err.diag.constraint_name`` when this
+        foreign key is violated."""
+        assert self.model is not None
+        return generate_fk_constraint_name(
+            self.model.model_options.db_table,
+            self.column,
+            self.target_field.model.model_options.db_table,
+            self.target_field.column,
+        )
+
+    def _db_violation_error(
+        self, instance: Model, model: type[Model]
+    ) -> ValidationError:
+        """The ValidationError for a ForeignKeyViolation on a write of
+        ``instance`` — the referenced row doesn't exist. Routed to this field,
+        like a single-field unique violation."""
+        assert self.name is not None
+        error = ValidationError(
+            self.does_not_exist_error_message,
+            code="invalid_choice",
+            params={
+                "object_name": self.related_model.model_options.object_name,
+                "value": self.value_from_object(instance),
+            },
+        )
+        return ValidationError({self.name: [error]})
 
     def get_db_prep_save(self, value: Any, connection: DatabaseConnection) -> Any:
         if value is None or (

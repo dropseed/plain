@@ -37,6 +37,7 @@ from app.examples.models.delete import (
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.trees import TreeNode
+from plain.exceptions import ValidationError
 from plain.postgres import transaction
 
 
@@ -270,7 +271,7 @@ def test_child_insert_before_parent_raises_at_the_insert(db):
     deferred window to insert the parent in afterwards."""
     missing_id = 10**9
 
-    with pytest.raises(psycopg.errors.ForeignKeyViolation), transaction.atomic():
+    with pytest.raises(ValidationError), transaction.atomic():
         ChildCascade(parent=missing_id).create(clean_and_validate=False)
 
     assert not ChildCascade.query.filter(parent=missing_id).exists()

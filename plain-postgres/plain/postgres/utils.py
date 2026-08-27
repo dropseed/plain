@@ -309,6 +309,15 @@ def names_digest(*args: str, length: int) -> str:
     return h.hexdigest()[:length]
 
 
+def generate_fk_constraint_name(
+    table: str, column: str, target_table: str, target_column: str
+) -> str:
+    """The deterministic name of a foreign key constraint."""
+    _, target_table_name = split_identifier(target_table)
+    suffix = f"_fk_{target_table_name}_{target_column}"
+    return generate_identifier_name(table, [column], suffix)
+
+
 def generate_identifier_name(
     table_name: str, column_names: list[str], suffix: str = ""
 ) -> str:

@@ -21,20 +21,23 @@ from plain.postgres.convergence.analysis import (
     DriftKind,
     ForeignKeyChangedDrift,
     ForeignKeyDrift,
+    ForeignKeyMissingDrift,
     ForeignKeyNameDrift,
-    generate_fk_constraint_name,
+    ForeignKeyRenameDrift,
 )
 from plain.postgres.convergence.corrections import (
     AddForeignKeyCorrection,
     DropConstraintCorrection,
+    RenameConstraintCorrection,
     ReplaceForeignKeyCorrection,
     SetConstraintNotDeferrableCorrection,
     ValidateConstraintCorrection,
 )
+from plain.postgres.utils import generate_fk_constraint_name
 
 
 def _recreate_fk(
-    table: str, column: str, target_table: str, target_column: str, clause: str = ""
+    table: str, column: str, target_table: str, target_column: str, *, clause: str
 ) -> str:
     """Drop the model's FK (if present) and recreate it by hand with
     ``clause`` appended — the way a manual or legacy DDL would have."""
@@ -70,11 +73,7 @@ class TestForeignKeyDetection:
         with conn.cursor() as cursor:
             analysis = analyze_model(conn, cursor, WidgetTag)
 
-        missing = [
-            d
-            for d in analysis.drifts
-            if isinstance(d, ForeignKeyDrift) and d.kind == DriftKind.MISSING
-        ]
+        missing = [d for d in analysis.drifts if isinstance(d, ForeignKeyMissingDrift)]
         assert len(missing) == 1
         assert missing[0].table == "examples_widgettag"
         assert missing[0].name is not None
@@ -93,7 +92,7 @@ class TestForeignKeyDetection:
         undeclared = [
             d
             for d in analysis.drifts
-            if isinstance(d, ForeignKeyDrift) and d.kind == DriftKind.UNDECLARED
+            if isinstance(d, ForeignKeyNameDrift) and d.kind == DriftKind.UNDECLARED
         ]
         assert len(undeclared) == 1
         assert undeclared[0].name == "examples_widget_fake_fk"
@@ -132,7 +131,7 @@ class TestForeignKeyDetection:
         unvalidated = [
             d
             for d in analysis.drifts
-            if isinstance(d, ForeignKeyDrift) and d.kind == DriftKind.UNVALIDATED
+            if isinstance(d, ForeignKeyNameDrift) and d.kind == DriftKind.UNVALIDATED
         ]
         assert len(unvalidated) == 1
         assert unvalidated[0].name == fk_name
@@ -286,21 +285,16 @@ class TestForeignKeyFixes:
         fk_names = get_fk_constraint_names("examples_widgettag")
 
         # Drop one FK and leave another as NOT VALID to get both in one plan
-        tag_fk = generate_fk_constraint_name(
-            "examples_widgettag", "tag_id", "examples_tag", "id"
-        )
-
         if widget_fk in fk_names:
             execute(f'ALTER TABLE "examples_widgettag" DROP CONSTRAINT "{widget_fk}"')
 
-        if tag_fk in fk_names:
-            _recreate_fk(
-                "examples_widgettag",
-                "tag_id",
-                "examples_tag",
-                "id",
-                clause=" ON DELETE CASCADE NOT VALID",
-            )
+        _recreate_fk(
+            "examples_widgettag",
+            "tag_id",
+            "examples_tag",
+            "id",
+            clause=" ON DELETE CASCADE NOT VALID",
+        )
 
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -514,7 +508,7 @@ class TestForeignKeyDeferrable:
     every FK DEFERRABLE INITIALLY DEFERRED) is drift, fixed with a catalog-only
     ALTER CONSTRAINT — no revalidation scan."""
 
-    def test_detects_deferrable_fk(self, isolated_db):
+    def test_detects_deferrable_fk(self, db):
         fk_name = _recreate_fk(
             "examples_childcascade",
             "parent_id",
@@ -579,6 +573,91 @@ class TestForeignKeyDeferrable:
         assert not constraint_is_deferrable("examples_childcascade", fk_name)
         assert constraint_is_valid("examples_childcascade", fk_name)
         assert fk_on_delete_action("examples_childcascade", fk_name) == "c"
+
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, ChildCascade)
+        assert [d for d in analysis.drifts if isinstance(d, ForeignKeyDrift)] == []
+
+
+class TestForeignKeyRename:
+    """RenameField/RenameModel leave the FK constraint under its old name.
+    The write path maps a violation back to the field by the generated name,
+    so a stale name is drift, fixed with a rename."""
+
+    def test_stale_fk_name_is_rename_drift(self, db):
+        expected = generate_fk_constraint_name(
+            "examples_childcascade", "parent_id", "examples_deleteparent", "id"
+        )
+        execute(
+            f'ALTER TABLE "examples_childcascade" RENAME CONSTRAINT "{expected}"'
+            ' TO "childcascade_old_name_fkey"'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, ChildCascade)
+        assert [d for d in analysis.drifts if isinstance(d, ForeignKeyDrift)] == [
+            ForeignKeyRenameDrift(
+                table="examples_childcascade",
+                old_name="childcascade_old_name_fkey",
+                new_name=expected,
+            )
+        ]
+        # One row for the constraint, not a rename row plus a clean row.
+        assert [c.name for c in analysis.constraints if c.name == expected] == [
+            expected
+        ]
+
+    def test_rename_and_on_delete_change_converge_in_one_pass(self, isolated_db):
+        """A rename that lands together with an on_delete change: the rename
+        is planned first and the replace addresses the new name."""
+        expected = generate_fk_constraint_name(
+            "examples_childcascade", "parent_id", "examples_deleteparent", "id"
+        )
+        _recreate_fk(
+            "examples_childcascade",
+            "parent_id",
+            "examples_deleteparent",
+            "id",
+            clause=" ON DELETE RESTRICT",
+        )
+        execute(
+            f'ALTER TABLE "examples_childcascade" RENAME CONSTRAINT "{expected}"'
+            ' TO "childcascade_old_name_fkey"'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            plan = plan_model_convergence(conn, cursor, ChildCascade)
+        items = plan.executable()
+        assert [type(item.correction) for item in items] == [
+            RenameConstraintCorrection,
+            ReplaceForeignKeyCorrection,
+        ]
+        assert all(item.blocks_sync for item in items)
+        assert execute_plan(items).ok
+
+        assert constraint_exists("examples_childcascade", expected)
+        assert fk_on_delete_action("examples_childcascade", expected) == "c"
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, ChildCascade)
+        assert [d for d in analysis.drifts if isinstance(d, ForeignKeyDrift)] == []
+
+    def test_stale_fk_name_is_renamed(self, isolated_db):
+        expected = generate_fk_constraint_name(
+            "examples_childcascade", "parent_id", "examples_deleteparent", "id"
+        )
+        execute(
+            f'ALTER TABLE "examples_childcascade" RENAME CONSTRAINT "{expected}"'
+            ' TO "childcascade_old_name_fkey"'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            items = plan_model_convergence(conn, cursor, ChildCascade).executable()
+        assert [type(item.correction) for item in items] == [RenameConstraintCorrection]
+        assert execute_plan(items).ok
+        assert constraint_exists("examples_childcascade", expected)
 
         with conn.cursor() as cursor:
             analysis = analyze_model(conn, cursor, ChildCascade)

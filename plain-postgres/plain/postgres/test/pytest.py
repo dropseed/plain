@@ -90,18 +90,19 @@ def db(setup_db: Any, request: Any) -> Generator[None]:
         # Skip when the connection is already in an aborted-transaction state
         # (e.g. the test raised a DB error) — further commands would just
         # raise InFailedSqlTransaction.
-        if (
-            not conn.needs_rollback
-            and conn.connection is not None
-            and conn.connection.info.transaction_status != pq.TransactionStatus.INERROR
-        ):
-            with conn.cursor() as cursor:
-                cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
-
-        conn.set_rollback(True)
-        atomic.__exit__(None, None, None)
-
-        conn.close()
+        try:
+            if (
+                not conn.needs_rollback
+                and conn.connection is not None
+                and conn.connection.info.transaction_status
+                != pq.TransactionStatus.INERROR
+            ):
+                with conn.cursor() as cursor:
+                    cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+        finally:
+            conn.set_rollback(True)
+            atomic.__exit__(None, None, None)
+            conn.close()
 
 
 @pytest.fixture
