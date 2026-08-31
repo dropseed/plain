@@ -69,7 +69,7 @@ Use `Model.query` to build querysets (e.g., `User.query.filter(is_active=True)`)
 - Use `.values_list()` when you only need specific columns
 - Wrap multi-step writes in `transaction.atomic()`
 - Instance writes are `obj.create()` (always INSERT) and `obj.update()` (always UPDATE; `update(fields=[...])` limits the columns) — there is no `save()`, `force_insert`, or `force_update`. Constructing an instance then `create()`-ing it inserts; a hand-set `id` that collides raises `IntegrityError`.
-- `create()`/`update()` raise `ValidationError` (not raw `psycopg.IntegrityError`) on a declared unique/check constraint violation, even a raced one — the DB enforces it, so inside an open `transaction.atomic()` the violation aborts the transaction (wrap the write in its own `atomic()` to catch and keep using the transaction). Set-based writes (`QuerySet.update()`/`bulk_create()`) raise raw `psycopg.IntegrityError`. Retrying on conflict? `except (psycopg.IntegrityError, ValidationError)`, or `bulk_create(..., update_conflicts=True)`
+- `create()`/`update()` raise `ValidationError` (not raw `psycopg.IntegrityError`) on a declared unique/check constraint violation or a foreign key pointing at a missing row, even a raced one — the DB enforces it, so inside an open `transaction.atomic()` the violation aborts the transaction (wrap the write in its own `atomic()` to catch and keep using the transaction). Set-based writes (`QuerySet.update()`/`bulk_create()`) and `delete()` blocked by `RESTRICT` raise raw `psycopg.IntegrityError`. Retrying on conflict? `except (psycopg.IntegrityError, ValidationError)`, or `bulk_create(..., update_conflicts=True)`
 - Always paginate list queries — unbounded querysets get slower as data grows
 
 Run `uv run plain docs postgres` for full patterns with code examples.
@@ -81,6 +81,7 @@ Run `uv run plain docs postgres` for full patterns with code examples.
 - Indexes: `{table}_{column(s)}_idx`
 - Constraints: `{table}_{column(s)}_{type}` (e.g., `_unique`, `_check`)
 - Choose `on_delete` deliberately: CASCADE for owned children, RESTRICT for referenced data, SET_NULL for optional references
+- Foreign keys are checked at each write, not at commit — create parents before children. A backfill followed by DDL on the same table in one migration is fine.
 - No `allow_null` on string fields — use `default=""`. Optional string fields are `required=False, default=""` — the declared default is what lets the column be added to a populated table (`required=False` alone only affects Python-side validation)
 
 Run `uv run plain docs postgres` for full patterns with code examples.

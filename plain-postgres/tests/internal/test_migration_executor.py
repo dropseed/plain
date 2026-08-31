@@ -3,9 +3,11 @@ from __future__ import annotations
 import psycopg
 import pytest
 from plain.postgres import get_connection
+from plain.postgres.fields import TextField
 from plain.postgres.migrations.executor import MigrationExecutor
 from plain.postgres.migrations.migration import Migration
-from plain.postgres.migrations.operations.special import RunSQL
+from plain.postgres.migrations.operations.fields import AddField, RemoveField
+from plain.postgres.migrations.operations.special import RunPython, RunSQL
 from plain.postgres.migrations.recorder import MigrationRecorder
 
 
@@ -90,3 +92,34 @@ class TestMigrationTransactionAtomicity:
             assert _migration_is_recorded("examples", "test_fake")
         finally:
             _clean_up_migration_record("examples", "test_fake")
+
+
+def _backfill_tmp_reach(models_registry, schema_editor):
+    DeleteParent = models_registry.get_model("examples", "DeleteParent")
+    ChildCascade = models_registry.get_model("examples", "ChildCascade")
+    parent = DeleteParent.query.create(name="p")
+    ChildCascade.query.create(parent=parent)
+    ChildCascade.query.filter(parent=parent).update(tmp_reach="judge")
+
+
+def test_add_field_backfill_remove_field_on_same_table(db):
+    """AddField → RunPython backfill → RemoveField on one table, in one
+    transaction. With deferred FKs the backfill's child INSERT would queue an
+    RI trigger event and Postgres would refuse the RemoveField with "cannot
+    ALTER TABLE ... because it has pending trigger events". FKs are immediate
+    now, so the natural shape just works."""
+    migration = Migration("test_backfill_then_ddl", "examples")
+    migration.operations = [
+        AddField(
+            model_name="childcascade",
+            name="tmp_reach",
+            field=TextField(default="manual"),
+        ),
+        RunPython(_backfill_tmp_reach),
+        RemoveField(model_name="childcascade", name="tmp_reach"),
+    ]
+
+    # Everything runs inside the db fixture's transaction and rolls back.
+    executor = MigrationExecutor(get_connection())
+    executor.apply_migration(executor.loader.project_state(), migration)
+    assert _migration_is_recorded("examples", "test_backfill_then_ddl")

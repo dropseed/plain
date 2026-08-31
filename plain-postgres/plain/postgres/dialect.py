@@ -53,9 +53,6 @@ MAX_NAME_LENGTH: int = 63
 # Value to use during INSERT to specify that a field should use its default value.
 PK_DEFAULT_VALUE: str = "DEFAULT"
 
-# SQL clause to make a constraint "initially deferred" during CREATE TABLE.
-DEFERRABLE_SQL: str = " DEFERRABLE INITIALLY DEFERRED"
-
 # EXTRACT format validation pattern.
 _EXTRACT_FORMAT_RE = _lazy_re_compile(r"[A-Z_]+")
 

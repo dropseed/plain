@@ -248,10 +248,7 @@ class AddConstraintCorrection(Correction):
             add_sql = self.constraint.to_sql(self.model, not_valid=True)
             _execute_and_commit(add_sql)
 
-            validate_sql = (
-                f"ALTER TABLE {quote_name(self.table)}"
-                f" VALIDATE CONSTRAINT {quote_name(self.constraint.name)}"
-            )
+            validate_sql = _validate_constraint_sql(self.table, self.constraint.name)
             _execute_and_commit(validate_sql, blocking=False)
 
             return f"{add_sql}; {validate_sql}"
@@ -259,6 +256,23 @@ class AddConstraintCorrection(Correction):
         sql = self.constraint.to_sql(self.model)
         _execute_and_commit(sql)
         return sql
+
+
+def _foreign_key_not_valid_sql(
+    column: str, target_table: str, target_column: str, on_delete_clause: str
+) -> str:
+    """The FK definition shared by add and replace: NOT VALID, and NOT
+    DEFERRABLE (Postgres's default) — Plain checks every FK immediately."""
+    return (
+        f" FOREIGN KEY ({quote_name(column)})"
+        f" REFERENCES {quote_name(target_table)} ({quote_name(target_column)})"
+        f"{on_delete_clause}"
+        f" NOT VALID"
+    )
+
+
+def _validate_constraint_sql(table: str, name: str) -> str:
+    return f"ALTER TABLE {quote_name(table)} VALIDATE CONSTRAINT {quote_name(name)}"
 
 
 @dataclass
@@ -279,7 +293,7 @@ class AddForeignKeyCorrection(Correction):
     column: str
     target_table: str
     target_column: str
-    on_delete_clause: str = ""  # e.g. " ON DELETE CASCADE" or "" for NO ACTION
+    on_delete_clause: str  # e.g. " ON DELETE CASCADE"
 
     def describe(self) -> str:
         return f"{self.table}: add FK {self.constraint_name} ({self.column} → {self.target_table}.{self.target_column})"
@@ -288,18 +302,16 @@ class AddForeignKeyCorrection(Correction):
         add_sql = (
             f"ALTER TABLE {quote_name(self.table)}"
             f" ADD CONSTRAINT {quote_name(self.constraint_name)}"
-            f" FOREIGN KEY ({quote_name(self.column)})"
-            f" REFERENCES {quote_name(self.target_table)} ({quote_name(self.target_column)})"
-            f"{self.on_delete_clause}"
-            f" DEFERRABLE INITIALLY DEFERRED"
-            f" NOT VALID"
+            + _foreign_key_not_valid_sql(
+                self.column,
+                self.target_table,
+                self.target_column,
+                self.on_delete_clause,
+            )
         )
         _execute_and_commit(add_sql)
 
-        validate_sql = (
-            f"ALTER TABLE {quote_name(self.table)}"
-            f" VALIDATE CONSTRAINT {quote_name(self.constraint_name)}"
-        )
+        validate_sql = _validate_constraint_sql(self.table, self.constraint_name)
         _execute_and_commit(validate_sql, blocking=False)
 
         return f"{add_sql}; {validate_sql}"
@@ -343,21 +355,47 @@ class ReplaceForeignKeyCorrection(Correction):
             f"ALTER TABLE {quote_name(self.table)}"
             f" DROP CONSTRAINT {quote_name(self.constraint_name)},"
             f" ADD CONSTRAINT {quote_name(self.constraint_name)}"
-            f" FOREIGN KEY ({quote_name(self.column)})"
-            f" REFERENCES {quote_name(self.target_table)} ({quote_name(self.target_column)})"
-            f"{self.on_delete_clause}"
-            f" DEFERRABLE INITIALLY DEFERRED"
-            f" NOT VALID"
+            + _foreign_key_not_valid_sql(
+                self.column,
+                self.target_table,
+                self.target_column,
+                self.on_delete_clause,
+            )
         )
         _execute_and_commit(replace_sql)
 
-        validate_sql = (
-            f"ALTER TABLE {quote_name(self.table)}"
-            f" VALIDATE CONSTRAINT {quote_name(self.constraint_name)}"
-        )
+        validate_sql = _validate_constraint_sql(self.table, self.constraint_name)
         _execute_and_commit(validate_sql, blocking=False)
 
         return f"{replace_sql}; {validate_sql}"
+
+
+@dataclass
+class SetConstraintNotDeferrableCorrection(Correction):
+    """Make a DEFERRABLE FK constraint NOT DEFERRABLE.
+
+    Older Plain releases created every FK DEFERRABLE INITIALLY DEFERRED.
+    ALTER CONSTRAINT only rewrites the catalog — the constraint stays
+    validated and nothing is scanned — but it does take a brief ACCESS
+    EXCLUSIVE lock on both tables, bounded by the usual lock_timeout.
+    Postgres only allows this on foreign keys.
+    """
+
+    pass_order = 2
+
+    table: str
+    name: str
+
+    def describe(self) -> str:
+        return f"{self.table}: make FK {self.name} NOT DEFERRABLE"
+
+    def apply(self) -> str:
+        sql = (
+            f"ALTER TABLE {quote_name(self.table)}"
+            f" ALTER CONSTRAINT {quote_name(self.name)} NOT DEFERRABLE"
+        )
+        _execute_and_commit(sql)
+        return sql
 
 
 @dataclass
@@ -490,9 +528,11 @@ class RenameConstraintCorrection(Correction):
     """Rename a constraint (catalog-only, instant).
 
     For unique constraints, Postgres automatically renames the backing index.
+    Runs before pass-2 corrections so anything else planned for the same
+    constraint can address it by its new name.
     """
 
-    pass_order = 2
+    pass_order = 1
 
     table: str
     old_name: str
@@ -520,7 +560,7 @@ class ValidateConstraintCorrection(Correction):
         return f"{self.table}: validate constraint {self.name}"
 
     def apply(self) -> str:
-        sql = f"ALTER TABLE {quote_name(self.table)} VALIDATE CONSTRAINT {quote_name(self.name)}"
+        sql = _validate_constraint_sql(self.table, self.name)
         _execute_and_commit(sql, blocking=False)
         return sql
 

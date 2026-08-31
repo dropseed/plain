@@ -438,16 +438,20 @@ class Model(metaclass=ModelBase):
         """
         Map a Postgres constraint violation back to the constraint that raised
         it and return the ValidationError the in-Python check produces for that
-        constraint, or None when the violation doesn't correspond to a declared
-        constraint that can describe it (PK collisions, FK violations, and NOT
-        NULL — which carries no constraint name — all fall through to None and
-        re-raise as the original IntegrityError). A PK collision reaches here
-        when create() inserts a hand-set id that's already taken.
+        constraint or foreign key, or None when the violation doesn't
+        correspond to a declared constraint that can describe it (PK
+        collisions and NOT NULL — which carries no constraint name — fall
+        through to None and re-raise as the original IntegrityError). A PK
+        collision reaches here when create() inserts a hand-set id that's
+        already taken.
         """
         constraint_name = exc.diag.constraint_name
         if not constraint_name:
             return None
-        constraint = self._model_meta.constraints_by_name.get(constraint_name)
+        meta = self._model_meta
+        constraint = meta.constraints_by_name.get(
+            constraint_name
+        ) or meta.foreign_keys_by_constraint_name.get(constraint_name)
         if constraint is None:
             return None
         error = constraint._db_violation_error(self, self.__class__)
@@ -531,11 +535,9 @@ class Model(metaclass=ModelBase):
                 if not obj:
                     continue
                 # A pk may have been assigned manually to a model instance not
-                # saved to the database (or auto-generated in a case like
-                # UUIDField), but we allow the save to proceed and rely on the
-                # database to raise an IntegrityError if applicable. If
-                # constraints aren't supported by the database, there's the
-                # unavoidable risk of data corruption.
+                # saved to the database, but we allow the write to proceed and
+                # rely on the database's foreign key check (mapped to a
+                # ValidationError on the field) if the row doesn't exist.
                 if obj.id is None:
                     raise ValueError(
                         f"{operation_name}() prohibited to prevent data loss due to unsaved "
@@ -570,9 +572,9 @@ class Model(metaclass=ModelBase):
         # should always be deletable — custom querysets shape reads, not
         # internal row lifecycle operations.
         #
-        # mark_for_rollback_on_error: FK errors (RESTRICT / NO_ACTION) leave
-        # the DB transaction aborted. Mark the connection so outer atomic()
-        # blocks see the abort state even if the caller catches IntegrityError.
+        # mark_for_rollback_on_error: RESTRICT violations leave the DB
+        # transaction aborted. Mark the connection so outer atomic() blocks
+        # see the abort state even if the caller catches IntegrityError.
         with transaction.mark_for_rollback_on_error():
             count = self._model_meta.base_queryset.filter(id=self.id)._raw_delete()
         id_field = self._model_meta.get_forward_field("id")

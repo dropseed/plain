@@ -7,7 +7,6 @@ from typing import Any
 
 import pytest
 from plain.postgres.otel import suppress_db_tracing
-from psycopg import pq
 
 from .. import transaction
 from ..connection import DatabaseConnection
@@ -84,19 +83,8 @@ def db(setup_db: Any, request: Any) -> Generator[None]:
 
     with suppress_db_tracing():
         conn = get_connection()
-        # PostgreSQL can defer constraint checks. Skip when the connection is
-        # already in an aborted-transaction state (e.g. the test raised a
-        # DB error) — further commands would just raise InFailedSqlTransaction.
-        if (
-            not conn.needs_rollback
-            and conn.connection is not None
-            and conn.connection.info.transaction_status != pq.TransactionStatus.INERROR
-        ):
-            conn.check_constraints()
-
         conn.set_rollback(True)
         atomic.__exit__(None, None, None)
-
         conn.close()
 
 

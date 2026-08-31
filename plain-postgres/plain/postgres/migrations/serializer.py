@@ -308,9 +308,9 @@ class UUIDSerializer(BaseSerializer):
 
 
 class OnDeleteSerializer(BaseSerializer):
-    """Serialize on_delete sentinels (CASCADE, SET_NULL, RESTRICT, NO_ACTION)
-    as bare references to their exported names, preserving singleton identity
-    across migration load/reload cycles."""
+    """Serialize on_delete sentinels (CASCADE, SET_NULL, RESTRICT) as bare
+    references to their exported names, preserving singleton identity across
+    migration load/reload cycles."""
 
     def serialize(self) -> tuple[str, set[str]]:
         return f"postgres.{self.value.name}", {"from plain import postgres"}
