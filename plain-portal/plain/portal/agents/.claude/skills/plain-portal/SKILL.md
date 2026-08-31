@@ -11,13 +11,15 @@ Open an encrypted tunnel to a remote machine and run Python code on it.
 
 The remote side must be running first. Either start it yourself (if you have access to the platform CLI) or ask the user to start it:
 
-| Platform   | Command                                             |
-| ---------- | --------------------------------------------------- |
-| Heroku     | `heroku run plain portal start`                     |
-| Fly.io     | `fly ssh console -C "plain portal start"`           |
-| Kubernetes | `kubectl exec -it deploy/app -- plain portal start` |
-| Docker     | `docker exec -it container plain portal start`      |
-| SSH        | `ssh server plain portal start`                     |
+| Platform   | Command                                                         |
+| ---------- | --------------------------------------------------------------- |
+| Heroku     | `heroku run plain portal start --read-only`                     |
+| Fly.io     | `fly ssh console -C "plain portal start --read-only"`           |
+| Kubernetes | `kubectl exec -it deploy/app -- plain portal start --read-only` |
+| Docker     | `docker exec -it container plain portal start --read-only`      |
+| SSH        | `ssh server plain portal start --read-only`                     |
+
+`start` requires either `--read-only` or `--read-write`. Always use `--read-only` unless the user has explicitly asked for database writes.
 
 **Both `start` and `connect` are long-running foreground processes.** If you run `start` yourself, use `run_in_background` so you don't block. Once it prints a portal code (e.g. `7-crossword-pineapple`), read the code from the output. If the user ran it, ask them for the code.
 
@@ -64,7 +66,7 @@ Kill the `connect` process to end the session. This also frees the remote proces
 
 ## Important
 
-- Sessions are **read-only** by default. Database writes will fail unless the remote was started with `--writable --yes`.
+- Use `--read-only` sessions. Database writes will fail unless the remote was started with `--read-write --yes`, which should only happen at the user's explicit request.
 - Each `exec` gets a **fresh namespace**. Variables don't carry between commands. Put setup and queries in one code block if they depend on each other.
 - Use `plain portal exec` for quick queries. For heavy data export, write to `/tmp/` on the remote and `pull` the file.
 - If the session drops, the remote side must be restarted and a new code used to reconnect.

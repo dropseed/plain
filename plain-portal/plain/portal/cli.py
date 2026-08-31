@@ -37,7 +37,16 @@ def cli() -> None:
 
 @cli.command()
 @click.option(
-    "--writable", is_flag=True, help="Allow database writes (default: read-only)."
+    "--read-only",
+    "read_only",
+    is_flag=True,
+    help="Enforce a read-only database connection.",
+)
+@click.option(
+    "--read-write",
+    "read_write",
+    is_flag=True,
+    help="Allow database writes (prompts for confirmation).",
 )
 @click.option(
     "--timeout",
@@ -52,10 +61,19 @@ def cli() -> None:
     hidden=True,
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
-def start(writable: bool, timeout: int, relay_host: str, yes: bool) -> None:
-    """Start a portal session on the remote machine."""
+def start(
+    read_only: bool, read_write: bool, timeout: int, relay_host: str, yes: bool
+) -> None:
+    """Start a portal session on the remote machine.
+
+    The database mode must be stated explicitly with --read-only or --read-write,
+    so the intent is visible in the command itself.
+    """
+    if read_only == read_write:
+        raise click.UsageError("Specify exactly one of --read-only or --read-write.")
+
     if (
-        writable
+        read_write
         and not yes
         and not click.confirm(
             "This session allows writes to the production database. Continue?"
@@ -66,7 +84,7 @@ def start(writable: bool, timeout: int, relay_host: str, yes: bool) -> None:
     from .remote import run_remote
 
     asyncio.run(
-        run_remote(writable=writable, timeout_minutes=timeout, relay_host=relay_host)
+        run_remote(writable=read_write, timeout_minutes=timeout, relay_host=relay_host)
     )
 
 

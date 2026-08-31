@@ -35,7 +35,7 @@ Portal requires only outbound internet access on both sides. No firewall rules, 
 **1. Start a session on the remote machine** (via whatever mechanism your platform provides):
 
 ```console
-$ heroku run plain portal start
+$ heroku run plain portal start --read-only
 Portal code: 7-crossword-pineapple
 Session mode: read-only
 Waiting for connection...
@@ -72,15 +72,18 @@ Portal session disconnected.
 Start a portal session on the remote machine. Connects to the relay, prints a portal code, and waits for a local client to connect.
 
 ```console
-$ plain portal start
-$ plain portal start --writable
-$ plain portal start --timeout 60
+$ plain portal start --read-only
+$ plain portal start --read-write
+$ plain portal start --read-only --timeout 60
 ```
 
-| Option       | Description                                      | Default         |
-| ------------ | ------------------------------------------------ | --------------- |
-| `--writable` | Allow database writes (prompts for confirmation) | Off (read-only) |
-| `--timeout`  | Idle timeout in minutes (0 to disable)           | 30              |
+Exactly one of `--read-only` or `--read-write` is required. There is no default, so the database mode is always visible in the command itself -- useful when an agent (or a permission prompt) needs to judge whether a command is safe.
+
+| Option         | Description                                      | Default |
+| -------------- | ------------------------------------------------ | ------- |
+| `--read-only`  | Enforce a read-only database connection          | --      |
+| `--read-write` | Allow database writes (prompts for confirmation) | --      |
+| `--timeout`    | Idle timeout in minutes (0 to disable)           | 30      |
 
 ### `plain portal connect <code>`
 
@@ -176,16 +179,16 @@ The tunnel stays open across commands, but each `exec` gets a fresh Python names
 
 ## Read-only mode
 
-By default, the remote session enforces a read-only database connection. Any INSERT, UPDATE, DELETE, or DDL statement raises a database error.
+With `--read-only`, the remote session enforces a read-only database connection. Any INSERT, UPDATE, DELETE, or DDL statement raises a database error.
 
 ```console
-$ plain portal start
+$ plain portal start --read-only
 ```
 
-To allow writes, pass `--writable`. This prompts for confirmation before starting:
+To allow writes, pass `--read-write` instead. This prompts for confirmation before starting:
 
 ```console
-$ plain portal start --writable
+$ plain portal start --read-write
 This session allows writes to the production database. Continue? [y/N]
 ```
 
@@ -230,7 +233,7 @@ $ plain portal exec "exec(open('/tmp/backfill.py').read())"
 
 - **Max file size**: 50 MB per transfer. Files are chunked into 256 KB messages so individual WebSocket frames stay small.
 - **Push destination**: `push` only writes to `/tmp/` on the remote side. Attempts to write outside `/tmp/` are rejected.
-- **`--writable` is independent**: `push` always works regardless of read-only mode. Pushing a script to `/tmp/` and running it read-only is a valid workflow.
+- **`--read-write` is independent**: `push` always works regardless of read-only mode. Pushing a script to `/tmp/` and running it read-only is a valid workflow.
 
 ## Output
 
@@ -319,19 +322,19 @@ The portal does not add its own authorization layer. Security comes from three b
 
 The portal is intentionally unrestricted once connected -- it can run any Python code, just like `plain shell`. The access control question is "can you start the remote process?" If you can, you already have full access anyway.
 
-`--writable` controls database write access only, not general code execution.
+`--read-write` controls database write access only, not general code execution.
 
 ## Platform compatibility
 
 Portal works anywhere you can run a process with outbound internet access:
 
-| Platform      | How to start the remote side                        |
-| ------------- | --------------------------------------------------- |
-| Heroku        | `heroku run plain portal start`                     |
-| Fly.io        | `fly ssh console -C "plain portal start"`           |
-| Kubernetes    | `kubectl exec -it deploy/app -- plain portal start` |
-| Docker        | `docker exec -it container plain portal start`      |
-| Any VM/server | `ssh myserver plain portal start`                   |
+| Platform      | How to start the remote side                                    |
+| ------------- | --------------------------------------------------------------- |
+| Heroku        | `heroku run plain portal start --read-only`                     |
+| Fly.io        | `fly ssh console -C "plain portal start --read-only"`           |
+| Kubernetes    | `kubectl exec -it deploy/app -- plain portal start --read-only` |
+| Docker        | `docker exec -it container plain portal start --read-only`      |
+| Any VM/server | `ssh myserver plain portal start --read-only`                   |
 
 On the local side, run `plain portal connect <code>` in your normal terminal. No special setup needed.
 
@@ -373,15 +376,15 @@ Waiting for connection...
 
 This is important for the **support use case**: a customer running a self-hosted app can start a portal and share the code with the developer. The developer connects and debugs, but the customer watches the full session on their terminal. They see every command executed and every file transferred, and can Ctrl-C to kill the session at any time.
 
-The customer does not need to grant SSH access, open firewall ports, or share credentials. They run `plain portal start`, share the code, and supervise.
+The customer does not need to grant SSH access, open firewall ports, or share credentials. They run `plain portal start --read-only`, share the code, and supervise.
 
 ### Idle timeout
 
 The remote side auto-disconnects after 30 minutes of inactivity (no commands received). A warning is printed before disconnecting. The timeout is configurable:
 
 ```console
-$ plain portal start --timeout 60   # 60 minutes
-$ plain portal start --timeout 0    # no timeout
+$ plain portal start --read-only --timeout 60   # 60 minutes
+$ plain portal start --read-only --timeout 0    # no timeout
 ```
 
 ## Installation
