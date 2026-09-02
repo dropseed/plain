@@ -433,6 +433,7 @@ class ForeignKeyField(ColumnField, RelatedField):
         return [
             *super().preflight(**kwargs),
             *self._check_on_delete(),
+            *self._check_required_cycle(),
         ]
 
     def _check_on_delete(self) -> list[PreflightResult]:
@@ -450,6 +451,69 @@ class ForeignKeyField(ColumnField, RelatedField):
                 )
             )
         return results
+
+    def _check_required_cycle(self) -> list[PreflightResult]:
+        """Foreign keys are NOT DEFERRABLE, so every one of them is checked at
+        the INSERT that would violate it. A cycle of required (allow_null=False)
+        foreign keys therefore has no valid insert order — every row in the
+        cycle needs a row that doesn't exist yet.
+        """
+        if self.allow_null:
+            return []
+
+        target = self.remote_field.model
+        if isinstance(target, str):
+            # Unresolved string reference — nothing to walk.
+            return []
+
+        start = self.model
+
+        # Depth-first walk over required foreign key edges only, looking for a
+        # path from this field's target back to this field's own model.
+        cycle: list[ForeignKeyField] = []
+        visited: set[type[Model]] = set()
+        stack: list[tuple[type[Model], list[ForeignKeyField]]] = [(target, [self])]
+        while stack:
+            model, path = stack.pop()
+            if model is start:
+                cycle = path
+                break
+            if model in visited:
+                continue
+            visited.add(model)
+            for field in model._model_meta.fields:
+                if not isinstance(field, ForeignKeyField) or field.allow_null:
+                    continue
+                next_model = field.remote_field.model
+                if isinstance(next_model, str):
+                    continue
+                stack.append((next_model, [*path, field]))
+
+        if not cycle:
+            return []
+
+        # Every field in the cycle finds the same cycle, so only the
+        # first-sorting edge reports it.
+        edges = [(edge.model.model_options.label, edge.name) for edge in cycle]
+        if min(edges) != (start.model_options.label, self.name):
+            return []
+
+        path_labels = [f"{label}.{name}" for label, name in edges]
+        path_labels.append(start.model_options.label)
+        arrow_path = " → ".join(path_labels)
+
+        return [
+            PreflightResult(
+                fix=(
+                    f"Required foreign keys form a cycle ({arrow_path}): "
+                    "no row can be inserted into these tables. "
+                    "Make one foreign key in the cycle allow_null=True and "
+                    "set it after creating both rows."
+                ),
+                obj=self,
+                id="fields.foreign_key_required_cycle",
+            )
+        ]
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
