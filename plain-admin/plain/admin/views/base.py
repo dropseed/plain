@@ -11,6 +11,7 @@ from plain.templates.views import TemplateView
 from plain.urls import reverse
 from plain.utils import timezone
 
+from ..impersonate import get_request_impersonator
 from ..models import PinnedNavItem
 from .registry import registry, track_recent_nav
 from .types import Img
@@ -118,6 +119,9 @@ class AdminView(AuthView, TemplateView):
             )
         )
         context["preflight_counts"] = get_check_counts()
+        # The real, logged-in user when impersonation is active (None otherwise).
+        # The header's account menu belongs to *them*, not the impersonated user.
+        context["impersonator"] = get_request_impersonator(self.request)
         context["admin_url"] = registry.get_url
 
         return context
