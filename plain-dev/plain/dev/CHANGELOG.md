@@ -1,5 +1,27 @@
 # plain-dev changelog
 
+## [0.67.0](https://github.com/dropseed/plain/releases/plain-dev@0.67.0) (2026-09-02)
+
+### What's changed
+
+- Secrets can now be committed in `.env.dev` as encrypted values — `STRIPE_SECRET_KEY=encrypted:gAAAAA...`. The dotenv loader decrypts them with `DEV_ENV_KEY`, one symmetric key per project, so a fresh checkout (or a hosted agent sandbox) gets every dev credential from git and only needs that one key ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- New `plain env` command for writing and reading those values: `plain env key` prints a new project key (stdout alone, so it can be piped), `plain env set NAME VALUE` encrypts and writes the binding, `plain env set NAME < key.pem` takes a multi-line value from stdin, and `plain env get NAME` decrypts one. `--file` / `-f` targets a file other than `.env.{PLAIN_ENV}`. `set` replaces an existing binding in place and appends otherwise, leaving the rest of the file byte for byte ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- `plain env` reaches the CLI through Plain's new `plain.cli` entry point group, so it runs without loading your app and never decrypts on the way in. That's what makes it usable on a fresh clone that has no key yet, and lets `DEV_ENV_KEY=<new key> plain env set NAME value` re-encrypt a value under a new key without needing the old one ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- `encrypted:` is recognized syntactically — at the start of an _unquoted_ value, before anything is expanded. So an encrypted value is never variable-expanded or command-substituted, decrypted plaintext is bound literally, and quoting is the escape hatch for text that starts with it (`MODE='encrypted:aes'` is the string `encrypted:aes`) ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- Decryption happens once, after every file in the ladder has loaded, so the key line can live wherever suits you — your gitignored `.env.dev.local`, a shell `export`, a hosted agent's environment, or a committed `DEV_ENV_KEY=$(op read "op://...")` reference sitting next to the values themselves ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- Failures are loud, never silent. A missing or empty `DEV_ENV_KEY`, a key that doesn't decrypt, an unquoted `encrypted:` value that isn't a valid token, and a `$NAME` reference pointing at an encrypted value each raise `ImproperlyConfigured` naming the variable and the file. Nothing is quietly bound empty ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- `plain env set` warns when the target file is gitignored (encrypted values are meant to be committed — a blanket `.env*` rule defeats the point) and when something that loads earlier, your shell or a higher-precedence file, already binds that name, so the value you just committed wouldn't be used on your machine ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- `load_dotenv()`, `load_dotenv_files()`, and `parse_dotenv()` take a new `decrypt=` keyword; `decrypt=False` binds plain values as usual and leaves encrypted ones alone, needing no key ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- New `cryptography>=42` dependency (Fernet) ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+
+### Upgrade instructions
+
+- No changes required — existing `.env` files load exactly as they did before.
+- To start using encrypted values: run `plain env key`, store the key somewhere durable (1Password, your keychain), and bind it as `DEV_ENV_KEY` — usually a `DEV_ENV_KEY=$(op read "op://...")` line in your gitignored `.env.dev.local`, or committed in `.env.dev` itself since the reference is not the key. Then `plain env set NAME value`.
+- Check your `.gitignore`: it should ignore `.env.local` and `.env.*.local`, not `.env*`, or the committed encrypted values won't actually be committed.
+- Put encrypted values in `.env.dev`, not `.env` — `.env` loads for every command, including `plain test`, which would make every command need the key.
+- Requires `plain>=0.161.0` for the `plain.cli` entry point group.
+
 ## [0.66.1](https://github.com/dropseed/plain/releases/plain-dev@0.66.1) (2026-08-12)
 
 ### What's changed
