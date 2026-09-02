@@ -606,8 +606,7 @@ class DatabaseConnection:
                 WHERE fka.attrelid = c.confrelid AND fka.attnum = c.confkey[1]),
                 c.convalidated,
                 pg_get_constraintdef(c.oid),
-                c.confdeltype,
-                c.condeferrable
+                c.confdeltype
             FROM pg_constraint AS c
             JOIN pg_class AS cl ON c.conrelid = cl.oid
             WHERE cl.relname = %s AND pg_catalog.pg_table_is_visible(cl.oid)
@@ -622,7 +621,6 @@ class DatabaseConnection:
             validated,
             constraintdef,
             confdeltype,
-            condeferrable,
         ) in cursor.fetchall():
             constraints[constraint] = {
                 "columns": columns,
@@ -632,7 +630,6 @@ class DatabaseConnection:
                 "definition": constraintdef,
                 "validated": validated,
                 "on_delete_action": confdeltype if kind == "f" else None,
-                "deferrable": condeferrable if kind == "f" else None,
             }
         # Now get indexes. Sort order, opclasses, INCLUDE, and predicates all
         # ride along inside `pg_get_indexdef` and are compared via the
