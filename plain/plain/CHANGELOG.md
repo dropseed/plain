@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.161.0](https://github.com/dropseed/plain/releases/plain@0.161.0) (2026-09-02)
+
+### What's changed
+
+- New `plain.cli` entry point group: a package can now contribute a top-level `plain` command that runs _without_ `plain.runtime.setup()`. `register_cli` commands are imported by setup itself, so they can't help when setting up the app is the thing that fails — an entry point can. Built-in command names always win, and an entry point is imported only when one of its commands is actually asked for, so an installed package costs nothing until it's used. This is what `plain env` (from `plain.dev`) uses, since you run it exactly when a missing encryption key stops the app from loading ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- `PLAIN_ENV` no longer trips the `settings.unused_env_vars` preflight check. It's set by the CLI to pick `.env.<env>` files, not a setting, so it was being reported as a typo'd `PLAIN_`-prefixed setting ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- `plain.redirection` is gone from the package listings in the README, `plain docs`, and the agent rules — the package itself has been removed. Its logging half (`RedirectLog`, `NotFoundLog`) is redundant now that traces answer "what's 404ing" from SERVER spans, and the redirect half is thin next to `plain.pages` `.redirect` files ([72acbd1cea](https://github.com/dropseed/plain/commit/72acbd1cea))
+
+### Upgrade instructions
+
+- If you had `plain.redirection` installed, remove `"plain.redirection"` from `INSTALLED_PACKAGES` and drop the `plain-redirection` dependency. Move any database-managed redirects to `plain.pages` `.redirect` files, and use traces (SERVER spans) for 404 and redirect visibility.
+- Otherwise, no changes required.
+
 ## [0.160.0](https://github.com/dropseed/plain/releases/plain@0.160.0) (2026-08-21)
 
 ### What's changed
