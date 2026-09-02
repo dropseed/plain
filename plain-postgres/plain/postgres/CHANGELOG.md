@@ -1,5 +1,28 @@
 # plain-postgres changelog
 
+## [0.115.0](https://github.com/dropseed/plain/releases/plain-postgres@0.115.0) (2026-09-02)
+
+### What's changed
+
+- **Foreign keys are now `NOT DEFERRABLE`** (Postgres's own default) and checked at each write. Plain inherited Django's `DEFERRABLE INITIALLY DEFERRED` foreign keys, added in 2007 so fixtures could contain forward references. Plain has no fixtures, and the deferral was causing real problems: a migration that adds a column, backfills it in `RunPython`, then alters the same table failed with "cannot ALTER TABLE ... because it has pending trigger events" whenever the backfill touched a row, and FK violations only surfaced at `COMMIT` with a traceback pointing at `atomic.__exit__` instead of the offending write ([8cbfa0cb40](https://github.com/dropseed/plain/commit/8cbfa0cb40))
+- Convergence detects an existing `DEFERRABLE` foreign key as drift and fixes it with a catalog-only `ALTER CONSTRAINT ... NOT DEFERRABLE` — no revalidation scan, just a brief `ACCESS EXCLUSIVE` lock bounded by the usual `lock_timeout` — so the first `postgres sync` after upgrading rewrites every FK quickly. A legacy `DEFERRABLE` + `NOT VALID` foreign key gets both corrections in one pass ([8cbfa0cb40](https://github.com/dropseed/plain/commit/8cbfa0cb40))
+- `NO_ACTION` is removed. Its only meaning was deferred checking — use `RESTRICT` ([8cbfa0cb40](https://github.com/dropseed/plain/commit/8cbfa0cb40))
+- A foreign key violation from `create()`/`update()` now surfaces as a `ValidationError` routed to the `ForeignKeyField` — "Author with id 5 does not exist." — with code `invalid_choice` so forms can override it. It lands in the same `IntegrityError` mapping that unique and check constraints already used, so a missing related row reports like any other field error instead of a 500. The message is `ForeignKeyField.does_not_exist_error_message`. Set-based writes (`QuerySet.update()`, `bulk_create()`) and a `delete()` blocked by `RESTRICT` still raise the raw `psycopg` error, since there's no instance to attribute it to ([31df77e665](https://github.com/dropseed/plain/commit/31df77e665))
+- That mapping keys on the foreign key's generated constraint name, so convergence now treats a stale name — left behind by `RenameField`/`RenameModel`, which only rename the column or table — as drift and renames the constraint. Because the write-path mapping depends on those corrections having run, FK renames and the `NOT DEFERRABLE` flip block sync on failure. `generate_fk_constraint_name()` moved to `plain.postgres.utils` and is now the single source of that name for both convergence and the write path ([31df77e665](https://github.com/dropseed/plain/commit/31df77e665))
+- **`UniqueConstraint(deferrable=...)` and the `Deferrable` enum are removed.** With foreign keys immediate, this was the last deferred-constraint concept in Plain, nothing in Plain's own packages used it, and it forced a caveat onto every "constraints are checked at the write" statement while keeping the pending-trigger-events failure alive for one case. Rails (pre-7.1), Ecto, and Laravel never had it for uniques. Every constraint is now checked at the write that violates it, never at commit ([fd1e7f1e13](https://github.com/dropseed/plain/commit/fd1e7f1e13))
+- `DatabaseConnection.check_constraints()` is gone, and the pytest `db` fixture no longer forces deferred constraints to immediate at teardown — there is nothing left to defer ([fd1e7f1e13](https://github.com/dropseed/plain/commit/fd1e7f1e13))
+- Constraint renames now run in convergence pass 1, matching index renames, so anything else planned for the same constraint in that pass addresses it by its new name ([fd1e7f1e13](https://github.com/dropseed/plain/commit/fd1e7f1e13))
+- New README section, "Constraints are checked immediately", covering the patterns this changes: create parents before children, use a nullable back-reference for a foreign key cycle (two required FKs pointing at each other can never be inserted), and move through a temporary value when swapping two rows under a unique constraint, since Postgres checks uniqueness per row even within a single `UPDATE` ([8cbfa0cb40](https://github.com/dropseed/plain/commit/8cbfa0cb40), [fd1e7f1e13](https://github.com/dropseed/plain/commit/fd1e7f1e13))
+
+### Upgrade instructions
+
+- Replace `NO_ACTION` with `RESTRICT` in your models **and in any historical migration file that references it** — `postgres.NO_ACTION` no longer exists, so a migration importing it fails to load.
+- Remove `deferrable=` from every `UniqueConstraint(...)` and drop any `Deferrable` import. An existing deferred unique constraint in the database shows as CHANGED drift with staged-rollout guidance — nothing is rewritten silently.
+- Run `plain postgres sync` after upgrading. It flips every existing foreign key to `NOT DEFERRABLE` (catalog-only, no table scan) and renames foreign key constraints left stale by past `RenameField`/`RenameModel`.
+- Code that inserted a child row before its parent, or deleted a parent and re-pointed its children later in the same transaction, now raises `ForeignKeyViolation` at that statement rather than succeeding by commit time. Create parents before children; for a foreign key cycle, create both rows and then `update()` the nullable back-reference.
+- If you catch `psycopg.IntegrityError` around `create()`/`update()` to handle a missing related row, catch `ValidationError` instead — or both, if the same block also covers set-based writes.
+- If you called `connection.check_constraints()`, remove the call.
+
 ## [0.114.0](https://github.com/dropseed/plain/releases/plain-postgres@0.114.0) (2026-08-12)
 
 ### What's changed
