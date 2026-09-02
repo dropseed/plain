@@ -8,6 +8,7 @@
     - [Register a shortcut command](#register-a-shortcut-command)
     - [Mark commands as common](#mark-commands-as-common)
     - [Bridge CLI options to settings](#bridge-cli-options-to-settings)
+    - [Commands that run before app setup](#commands-that-run-before-app-setup)
 - [Shell](#shell)
     - [Standalone scripts](#standalone-scripts)
     - [SHELL_IMPORT](#shell_import)
@@ -136,6 +137,18 @@ def worker(max_processes):
 Pass `cls=SettingOption` and `setting="SETTING_NAME"` to any `@click.option`. The setting name shown in `--help` output alongside the default value.
 
 `SettingOption` cannot be combined with `envvar=` or `default=` — the setting is the single source of truth for both the default value and environment variable resolution.
+
+### Commands that run before app setup
+
+`register_cli` commands are imported by `plain.runtime.setup()`, so they can't help when setting up the app is the thing that fails. A package can contribute a command that runs _without_ setup through the `plain.cli` entry point group instead — that's how `plain env` (from plain.dev) works, since you run it exactly when a missing encryption key stops the app from loading.
+
+```toml
+# pyproject.toml
+[project.entry-points."plain.cli"]
+env = "plain.dev.env:cli"
+```
+
+Entry points are imported only when one of their commands is asked for, and a built-in command with the same name always wins. Use `register_cli` for everything else — a command that needs settings, models, or any other app code belongs there.
 
 ## Shell
 

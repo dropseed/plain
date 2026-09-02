@@ -980,6 +980,7 @@ version = "0.66.1"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
+    { name = "cryptography" },
     { name = "plain" },
     { name = "plain-assets" },
     { name = "rich" },
@@ -993,6 +994,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
+    { name = "cryptography", specifier = ">=42" },
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
     { name = "rich" },

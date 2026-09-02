@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import traceback
-from importlib.metadata import version
+from importlib.metadata import EntryPoint, entry_points, version
 from typing import Any
 
 import click
@@ -38,7 +38,8 @@ def plain_cli() -> None:
 
 # Maps top-level command names to the PLAIN_ENV they imply. Set before
 # plain.runtime.setup() runs so plain.dev's dotenv loader picks up the right
-# `.env.<env>*` files for the active command.
+# `.env.<env>*` files for the active command. `plain env` isn't here — it runs
+# without setup and sets its own PLAIN_ENV.
 _PLAIN_ENV_DEFAULTS = {
     "dev": "dev",
     "test": "test",
@@ -63,6 +64,49 @@ plain_cli.add_command(upgrade)
 plain_cli.add_command(server)
 
 
+class EntryPointCommands(click.Group):
+    """Commands packages contribute through the `plain.cli` entry point group.
+
+    Everything here runs *without* `plain.runtime.setup()` — being in this group
+    is the definition of a command that has to work before the app can load.
+    Entry points are only imported when one of their commands is actually asked
+    for, so an installed package costs nothing until it is used.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self._entry_points = {
+            entry_point.name: entry_point
+            for entry_point in entry_points(group="plain.cli")
+        }
+
+    def list_commands(self, ctx: Context) -> list[str]:
+        return sorted(self._entry_points)
+
+    def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
+        entry_point = self._entry_points.get(cmd_name)
+        if entry_point is None:
+            return None
+
+        try:
+            cmd = entry_point.load()
+        except Exception as e:
+            raise click.ClickException(
+                f"The `{cmd_name}` command from {_entry_point_package(entry_point)} "
+                f"could not be loaded ({entry_point.value}): {e}"
+            ) from e
+
+        cmd.without_runtime_setup = True
+        return cmd
+
+
+def _entry_point_package(entry_point: EntryPoint) -> str:
+    """The installed package an entry point came from, for error messages."""
+    if entry_point.dist:
+        return entry_point.dist.name
+    return "an unknown package"
+
+
 class CLIRegistryGroup(click.Group):
     """
     Click Group that exposes commands from the CLI registry.
@@ -84,8 +128,9 @@ class PlainCommandCollection(click.CommandCollection):
     context_class = PlainContext
 
     def __init__(self, *args: Any, **kwargs: Any):
-        # Start with only built-in commands (no setup needed)
-        sources = [plain_cli]
+        # Commands that don't need setup: built-ins first, so a package entry
+        # point can never take over a built-in name.
+        sources = [plain_cli, EntryPointCommands()]
 
         super().__init__(*args, **kwargs)
         self.sources = sources
@@ -163,14 +208,13 @@ class PlainCommandCollection(click.CommandCollection):
         """Format commands with separate sections for common, core, and package commands."""
         self._ensure_registry_loaded()
 
-        # Get all commands from both sources, tracking their source
+        # Get every command, remembering whether it is one of Plain's own
         commands = []
-        for source_index, source in enumerate(self.sources):
+        for source in self.sources:
             for name in source.list_commands(ctx):
                 cmd = source.get_command(ctx, name)
                 if cmd is not None:
-                    # source_index 0 = plain_cli (core), 1+ = registry (packages)
-                    commands.append((name, cmd, source_index))
+                    commands.append((name, cmd, source is plain_cli))
 
         if not commands:
             return
@@ -183,7 +227,7 @@ class PlainCommandCollection(click.CommandCollection):
         core_commands = []
         package_commands = []
 
-        for name, cmd, source_index in commands:
+        for name, cmd, is_core in commands:
             help_text = cmd.get_short_help_str(limit=200)
 
             # Check if command is marked as common via decorator
@@ -198,12 +242,11 @@ class PlainCommandCollection(click.CommandCollection):
                         alias_info = click.style(f"(→ {shortcut_for})", italic=True)
                         help_text = f"{help_text} {alias_info}"
                 common_commands.append((name, help_text))
-            elif source_index == 0:
-                # Package command (from registry, inserted at index 0)
-                package_commands.append((name, help_text))
-            else:
-                # Core command (from plain_cli, at index 1)
+            elif is_core:
                 core_commands.append((name, help_text))
+            else:
+                # From the registry or a `plain.cli` entry point
+                package_commands.append((name, help_text))
 
         # Write common commands section if any exist
         if common_commands:

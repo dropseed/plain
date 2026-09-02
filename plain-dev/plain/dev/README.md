@@ -21,6 +21,7 @@
     - [Where the server comes from](#where-the-server-comes-from)
     - [Server lifecycle](#server-lifecycle)
 - [`.env` files](#env-files)
+    - [Encrypted values](#encrypted-values)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -256,18 +257,52 @@ marks the current project and tells you how many are running.
 
 Files are read in this order (highest precedence first — the first file to define a key wins):
 
-| File                     | Committed? | When loaded                          |
-| ------------------------ | ---------- | ------------------------------------ |
-| `.env.{PLAIN_ENV}.local` | No         | If `PLAIN_ENV` is set                |
-| `.env.local`             | No         | Always, except when `PLAIN_ENV=test` |
-| `.env.{PLAIN_ENV}`       | Yes        | If `PLAIN_ENV` is set                |
-| `.env`                   | Yes        | Always                               |
+| File                     | Committed?                                             | When loaded                          |
+| ------------------------ | ------------------------------------------------------ | ------------------------------------ |
+| `.env.{PLAIN_ENV}.local` | No                                                     | If `PLAIN_ENV` is set                |
+| `.env.local`             | No                                                     | Always, except when `PLAIN_ENV=test` |
+| `.env.{PLAIN_ENV}`       | Yes (secrets as [encrypted values](#encrypted-values)) | If `PLAIN_ENV` is set                |
+| `.env`                   | Yes                                                    | Always                               |
 
-Add `.env.local` and `.env.*.local` to your `.gitignore`.
+Add `.env.local` and `.env.*.local` to your `.gitignore` (not `.env*`, which would also ignore the committed files).
 
-`PLAIN_ENV` is set automatically by the CLI: `plain dev` → `dev`, `plain test` → `test`. Other commands leave `PLAIN_ENV` unset (only `.env.local` and `.env` load). Export `PLAIN_ENV` yourself to override.
+`PLAIN_ENV` is set automatically by the CLI: `plain dev` → `dev`, `plain test` → `test`. `plain env` sets `dev` itself, since it runs before any app setup. Other commands leave `PLAIN_ENV` unset (only `.env.local` and `.env` load). Export `PLAIN_ENV` yourself to override.
 
 Under `PLAIN_ENV=test`, `.env.local` is skipped (matches Next.js and Rails dotenv) so test runs stay deterministic and personal credentials don't leak into the suite. `plain test` sets `PLAIN_ENV=test` for you; the pytest plugin also sets it when `pytest` is invoked directly — and opportunistically loads `.env.test*` if `plain.dev` is installed.
+
+### Encrypted values
+
+Secrets can be committed in `.env.dev` as encrypted values, so a fresh checkout (or a hosted agent) gets every dev credential from git and only needs one key:
+
+```bash
+GITHUB_APP_PRIVATE_KEY=encrypted:gAAAAABo...
+```
+
+An unquoted value that starts with `encrypted:` is decrypted by the loader with `DEV_ENV_KEY`, one symmetric key per project. The tag is recognized where it's written, before anything is expanded, so an encrypted value is never expanded — and quoting the value is the escape hatch for text that starts with it (`MODE='encrypted:aes'` is the string `encrypted:aes`). An unquoted `encrypted:` value that doesn't decrypt is an error, not text. Generate a key with `plain env key`, store it somewhere durable (1Password, your keychain), and bind it as `DEV_ENV_KEY`. The loader only reads it from the environment, wherever it came from — the usual place is your personal, gitignored `.env.dev.local`:
+
+```bash
+# .env.dev.local (gitignored)
+DEV_ENV_KEY=$(op read "op://Engineering/myapp-env-key/password")
+# or macOS keychain
+DEV_ENV_KEY=$(security find-generic-password -s myapp-env-key -w)
+```
+
+Or commit that same `$(op read ...)` line in `.env.dev` itself: the reference is not the key, and teammates with vault access get zero setup. Decryption happens after every file has loaded, so either placement works. A shell `export DEV_ENV_KEY=...` or an environment variable in a hosted agent sandbox works the same way. Don't put the key line in `.env.local` — that file loads for every command, so the `$(...)` lookup would run on every `plain` invocation.
+
+Write and read values with `plain env`:
+
+```bash
+plain env key                                   # print a new key (stdout only, so it can be piped)
+plain env set STRIPE_SECRET_KEY sk_test_...     # writes STRIPE_SECRET_KEY=encrypted:... to .env.dev
+plain env set GITHUB_APP_PRIVATE_KEY < key.pem  # multi-line values come from stdin
+plain env get STRIPE_SECRET_KEY                 # decrypt and print one value
+```
+
+`--file` / `-f` targets another file — the default is `.env.{PLAIN_ENV}`, which is `.env.dev` for `plain env`. `set` replaces an existing binding in place and appends otherwise; everything else in the file is left byte for byte. It warns if something that loads earlier — your shell, or a higher-precedence file — already binds that name, because the value you just committed would be ignored on your machine.
+
+`plain env` runs without loading your app, and never decrypts on the way in. So it works on a fresh clone that has no key yet (`plain env key`), and `DEV_ENV_KEY=<new key> plain env set NAME value` re-encrypts a value under a new key without needing the old one.
+
+Put encrypted values in `.env.dev`, not `.env`: `.env` loads for every command, including `plain test`, and then every command would need the key. Without `DEV_ENV_KEY` (or with the wrong one), loading fails with an `ImproperlyConfigured` error naming the variable and file — nothing is silently bound empty. Decrypted plaintext is bound literally: no `$VAR` expansion or `$(command)` substitution is applied to it. Encrypted values also can't be referenced from other values — a `$NAME` pointing at one is an error naming both variables, not a silent empty string.
 
 ## Settings
 
