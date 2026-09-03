@@ -11,6 +11,8 @@
         h1 { font-size: 1.25rem; margin-bottom: 1rem; }
         .app-name { font-weight: 600; color: #111; }
         .scope { background: #f0f0f0; border-radius: 4px; padding: 0.5rem 0.75rem; margin: 1rem 0; font-size: 0.875rem; color: #555; }
+        .detail { font-size: 0.875rem; color: #555; margin-top: 0.5rem; }
+        .warning { background: #fff7e6; border-radius: 4px; padding: 0.5rem 0.75rem; margin-top: 1rem; font-size: 0.875rem; color: #7a4b00; }
         .actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
         button { flex: 1; padding: 0.75rem; border: none; border-radius: 6px; font-size: 0.875rem; font-weight: 500; cursor: pointer; }
         .approve { background: #111; color: #fff; }
@@ -24,6 +26,16 @@
             <p class="error">{{ error }}</p>
         {% elif application %}
             <h1><span class="app-name">{{ application.name }}</span> wants to access your account</h1>
+
+            {% if client_host %}
+                <p class="detail">Client hosted at <strong>{{ client_host }}</strong></p>
+            {% endif %}
+            {% if redirect_host %}
+                <p class="detail">You will be sent back to <strong>{{ redirect_host }}</strong></p>
+            {% endif %}
+            {% if loopback_only %}
+                <p class="warning">This client runs on your own computer. Only approve it if you started it yourself.</p>
+            {% endif %}
 
             {% if scope %}
                 <div class="scope">Requested scope: {{ scope }}</div>

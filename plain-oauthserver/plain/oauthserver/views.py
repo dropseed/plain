@@ -5,6 +5,7 @@ connector) needs to authenticate an end user against a Plain app:
 
 - Authorization server metadata (RFC 8414)
 - Dynamic client registration (RFC 7591) — public clients, PKCE
+- Client ID Metadata Documents (SEP-991) — URL client_ids, see cimd.py
 - Authorization code grant with PKCE (RFC 7636), audience-bound (RFC 8707)
 - Token endpoint with refresh-token rotation (RFC 6749, OAuth 2.1)
 - Token revocation (RFC 7009)
@@ -25,14 +26,20 @@ from plain.urls import reverse
 from plain.utils import timezone
 from plain.views import View
 
+from .cimd import (
+    ClientMetadataError,
+    is_client_id_url,
+    is_loopback_only,
+    resolve_client_metadata,
+)
 from .models import (
-    _LOOPBACK_HOSTS,
     AccessToken,
     AuthorizationCode,
     OAuthApplication,
     RefreshToken,
     _generate_token,
     _hash_token,
+    _is_allowed_redirect_uri,
 )
 
 _GRANT_TYPES = ["authorization_code", "refresh_token"]
@@ -42,20 +49,6 @@ _RESPONSE_TYPES = ["code"]
 def _issuer(request: Request) -> str:
     # request.scheme is proxy-aware (X-Forwarded-Proto), matching build_absolute_uri.
     return f"{request.scheme}://{request.host}"
-
-
-def _is_allowed_redirect_uri(uri: str) -> bool:
-    """OAuth 2.1: redirect URIs must be HTTPS, or loopback for native clients."""
-    # Reject whitespace and fragments: redirect_uris are stored space-joined, so a
-    # value containing whitespace would smuggle in a second, unvalidated URI.
-    if any(c.isspace() for c in uri):
-        return False
-    parsed = urlparse(uri)
-    if parsed.fragment:
-        return False
-    if parsed.scheme == "https":
-        return True
-    return parsed.scheme == "http" and parsed.hostname in _LOOPBACK_HOSTS
 
 
 class AuthorizationServerMetadataView(View):
@@ -76,6 +69,10 @@ class AuthorizationServerMetadataView(View):
         }
         if settings.OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION:
             metadata["registration_endpoint"] = issuer + reverse("oauthserver:register")
+        # Claude picks CIMD over DCR only when this is true *and* "none" is in
+        # token_endpoint_auth_methods_supported (it always is — see above).
+        if settings.OAUTH_SERVER_ALLOW_CLIENT_ID_METADATA_DOCUMENTS:
+            metadata["client_id_metadata_document_supported"] = True
         return JsonResponse(metadata)
 
 
@@ -139,10 +136,22 @@ class AuthorizeView(AuthView):
         if error:
             return self._render({"error": error})
 
+        assert application is not None  # a None error implies a valid client
         params = self.request.query_params
+        client_id = params.get("client_id", "")
+        redirect_uri = params.get("redirect_uri", "")
         return self._render(
             {
                 "application": application,
+                # A metadata document's client_name is self-asserted, so the
+                # consent screen also shows where the document is hosted.
+                "client_host": (
+                    urlparse(client_id).hostname
+                    if is_client_id_url(client_id)
+                    else None
+                ),
+                "redirect_host": urlparse(redirect_uri).hostname or "",
+                "loopback_only": is_loopback_only(application),
                 "scope": params.get("scope", ""),
                 "params": {
                     "response_type": "code",
@@ -200,6 +209,9 @@ class AuthorizeView(AuthView):
             "request": self.request,
             "error": None,
             "application": None,
+            "client_host": None,
+            "redirect_host": "",
+            "loopback_only": False,
             "scope": "",
             "params": {},
             **context,
@@ -222,10 +234,21 @@ class AuthorizeView(AuthView):
         client_id = params.get("client_id", "")
         if not client_id:
             return None, "Missing client_id"
-        try:
-            application = OAuthApplication.query.get(client_id=client_id)
-        except OAuthApplication.DoesNotExist:
-            return None, f"Unknown client_id: {client_id}"
+        if (
+            is_client_id_url(client_id)
+            and settings.OAUTH_SERVER_ALLOW_CLIENT_ID_METADATA_DOCUMENTS
+        ):
+            # A URL client_id names a hosted metadata document — fetched (or
+            # served from the stored copy) and registered on the fly.
+            try:
+                application = resolve_client_metadata(client_id)
+            except ClientMetadataError as e:
+                return None, f"Could not use client_id {client_id}: {e}"
+        else:
+            try:
+                application = OAuthApplication.query.get(client_id=client_id)
+            except OAuthApplication.DoesNotExist:
+                return None, f"Unknown client_id: {client_id}"
 
         # Validate the redirect target before anything else can act on it —
         # OAuth 2.1 §4.1.2.1 says to inform the user here, not redirect.
@@ -373,7 +396,13 @@ class RevocationView(View):
 
 
 def _resolve_client(request: Request) -> OAuthApplication | JsonResponse:
-    """Look up the public client by client_id (PKCE / the refresh token is the proof)."""
+    """Look up the public client by client_id (PKCE / the refresh token is the proof).
+
+    A metadata-document client is looked up the same way — its row was created
+    at /authorize, and nothing here depends on the document (the redirect_uri
+    is bound to the code, not re-checked against the registration), so the
+    token and revocation endpoints never fetch.
+    """
     client_id = request.form_data.get("client_id", "")
     if not client_id:
         return _oauth_error("invalid_client", "Missing client_id", status_code=401)

@@ -488,7 +488,7 @@ Clients send the token in their config:
 
 ### OAuth for MCP clients
 
-Hosted MCP clients (Claude's custom connectors, etc.) authenticate over OAuth 2.1 — they discover your authorization server, register, and complete a browser login, with no token to paste. Compose [`OAuthResourceServer`](./oauth.py#OAuthResourceServer) with `MCPView` and implement `authenticate_token` to validate the bearer against whatever issued it:
+Hosted MCP clients (Claude's custom connectors, etc.) authenticate over OAuth 2.1 — they discover your authorization server, identify themselves, and complete a browser login, with no token to paste. Compose [`OAuthResourceServer`](./oauth.py#OAuthResourceServer) with `MCPView` and implement `authenticate_token` to validate the bearer against whatever issued it:
 
 ```python
 # app/mcp.py
@@ -545,7 +545,7 @@ Behind the scenes the client drives the whole handshake — you don't write any 
 
 1. Calls your MCP endpoint with no token → gets the `401` + `WWW-Authenticate` challenge.
 2. Reads the protected-resource metadata it points to → finds your authorization server.
-3. Fetches the server's metadata (`/.well-known/oauth-authorization-server`) and **registers itself** — no manual setup.
+3. Fetches the server's metadata (`/.well-known/oauth-authorization-server`) and **identifies itself** — either by presenting a hosted metadata document as its `client_id` (Claude's default) or by registering dynamically. No manual setup either way.
 4. Opens a browser to the authorize endpoint; the user logs in and approves.
 5. Exchanges the code (with PKCE) for an access + refresh token, then re-calls the endpoint with `Authorization: Bearer <token>`.
 
