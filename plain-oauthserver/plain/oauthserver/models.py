@@ -38,18 +38,39 @@ def _normalize_redirect_uri(uri: str) -> str:
     return uri
 
 
+def _is_allowed_redirect_uri(uri: str) -> bool:
+    """OAuth 2.1: redirect URIs must be HTTPS, or loopback for native clients."""
+    # Reject whitespace and fragments: redirect_uris are stored space-joined, so a
+    # value containing whitespace would smuggle in a second, unvalidated URI.
+    if any(c.isspace() for c in uri):
+        return False
+    parsed = urlparse(uri)
+    if parsed.fragment:
+        return False
+    if parsed.scheme == "https":
+        return True
+    return parsed.scheme == "http" and parsed.hostname in _LOOPBACK_HOSTS
+
+
 @postgres.register_model
 class OAuthApplication(postgres.Model):
     """A registered OAuth client (Claude's connector, a CLI).
 
     Always a public client — proven by PKCE on the code exchange and by the
     refresh token on refresh, never a client secret.
+
+    Registered clients get a random `client_id`. A client that presents a
+    metadata document instead (see `cimd.py`) has its document URL as the
+    `client_id`, and the `metadata_*` fields say when that document was
+    fetched and how long it's trusted.
     """
 
     client_id = types.RandomStringField(length=32)
     name = types.TextField(max_length=255, default="", required=False)
     redirect_uris = types.TextField(max_length=2000)
     created_at = types.DateTimeField(create_now=True)
+    metadata_fetched_at = types.DateTimeField(allow_null=True, required=False)
+    metadata_expires_at = types.DateTimeField(allow_null=True, required=False)
 
     query: postgres.QuerySet[OAuthApplication] = postgres.QuerySet()
 

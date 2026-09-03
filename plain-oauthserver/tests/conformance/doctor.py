@@ -5,8 +5,9 @@
 
 Turns "the connector won't connect" into a precise failure point: it probes the
 exact sequence Claude's custom connector follows — 401 challenge → protected
-resource metadata → authorization server metadata → dynamic registration — and
-prints which step breaks. Standard library only, so it runs anywhere.
+resource metadata → authorization server metadata → client metadata document
+(CIMD, Claude's default) or dynamic registration — and prints which step
+breaks. Standard library only, so it runs anywhere.
 """
 
 from __future__ import annotations
@@ -16,7 +17,11 @@ import re
 import sys
 import urllib.error
 import urllib.request
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
+
+# Claude's hosted Client ID Metadata Document and the redirect URI it lists.
+_CLAUDE_CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata"
+_CLAUDE_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 
 _OK = "\033[32m  ok \033[0m"
 _FAIL = "\033[31mFAIL \033[0m"
@@ -33,6 +38,21 @@ def _get_json(url: str) -> tuple[int, dict]:
             return resp.status, json.loads(resp.read())
     except urllib.error.HTTPError as e:
         return e.code, {}
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _get_without_redirects(url: str) -> tuple[int, str, str]:
+    """Return (status, Location header, body) without following redirects."""
+    opener = urllib.request.build_opener(_NoRedirect)
+    try:
+        with opener.open(url, timeout=10) as resp:
+            return resp.status, "", resp.read().decode(errors="replace")
+    except urllib.error.HTTPError as e:
+        return e.code, e.headers.get("Location", ""), e.read().decode(errors="replace")
 
 
 def _post_json(url: str, payload: dict) -> urllib.request.Request:
@@ -89,12 +109,50 @@ def main(mcp_url: str) -> int:
         "none" in (meta.get("token_endpoint_auth_methods_supported") or []),
         "public clients (auth method 'none') advertised",
     )
+    # Claude uses CIMD only when both of these hold; otherwise it falls back to DCR.
+    cimd = meta.get("client_id_metadata_document_supported") is True
+    passed &= _check(
+        cimd, "client_id_metadata_document_supported (CIMD, Claude's default)"
+    )
     reg = meta.get("registration_endpoint")
-    passed &= _check(bool(reg), "registration_endpoint present (DCR)", str(reg))
+    passed &= _check(
+        bool(reg) or cimd, "registration_endpoint present (DCR fallback)", str(reg)
+    )
 
-    # 4. Dynamic client registration (RFC 7591).
+    # 4. Client ID Metadata Document (SEP-991): the authorize endpoint must
+    # resolve Claude's hosted document instead of reporting an unknown client.
+    if cimd and meta.get("authorization_endpoint"):
+        print("\n4. Client ID Metadata Document (SEP-991)")
+        query = urlencode(
+            {
+                "response_type": "code",
+                "client_id": _CLAUDE_CLIENT_ID,
+                "redirect_uri": _CLAUDE_REDIRECT_URI,
+                "state": "oauth-doctor",
+                "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                "code_challenge_method": "S256",
+            }
+        )
+        status, location, body = _get_without_redirects(
+            f"{meta['authorization_endpoint']}?{query}"
+        )
+        # Either the consent screen (200) or a redirect to log in (3xx) means
+        # the client resolved; a redirect back to Claude carrying an error, or
+        # an error page, means it didn't.
+        resolved = (
+            status == 200
+            and "Could not use client_id" not in body
+            and "Unknown client_id" not in body
+        ) or (300 <= status < 400 and not location.startswith(_CLAUDE_REDIRECT_URI))
+        passed &= _check(
+            resolved,
+            "authorize resolves Claude's client_id URL",
+            f"status {status}" + (f" → {location}" if location else ""),
+        )
+
+    # 5. Dynamic client registration (RFC 7591) — the fallback path.
     if reg:
-        print("\n4. Dynamic client registration (RFC 7591)")
+        print("\n5. Dynamic client registration (RFC 7591)")
         try:
             req = _post_json(
                 reg,
