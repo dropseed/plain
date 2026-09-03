@@ -137,8 +137,14 @@ class PlainCommandCollection(click.CommandCollection):
         self._registry_group = None
         self._setup_attempted = False
 
-    def _ensure_registry_loaded(self) -> None:
-        """Lazy load the registry group (requires setup)."""
+    def _ensure_registry_loaded(self, cmd_name: str) -> None:
+        """Lazy load the registry group (requires setup).
+
+        `cmd_name` is the command that made us load the app, so a failure can
+        say which one. A name that isn't a built-in could still be an app or
+        package command, so we can't tell a typo from a real command until the
+        registry loads — when it doesn't, the app's failure is the real answer.
+        """
         if self._registry_group is not None or self._setup_attempted:
             return
 
@@ -165,13 +171,11 @@ class PlainCommandCollection(click.CommandCollection):
             )
             sys.exit(1)
         except Exception as e:
-            # Show the exception and exit
-            print("---")
-            print(traceback.format_exc())
-            print("---")
-
+            # Traceback on stderr too, so it stays directly above the error
+            # line when output is piped or redirected.
+            click.echo(traceback.format_exc(), err=True)
             click.secho(
-                f"Error: {e}",
+                f"Error loading the app, which `plain {cmd_name}` needs: {e}",
                 fg="red",
                 err=True,
             )
@@ -188,11 +192,11 @@ class PlainCommandCollection(click.CommandCollection):
 
         if cmd is None:
             # Command not found in built-ins, try registry (requires setup)
-            self._ensure_registry_loaded()
+            self._ensure_registry_loaded(cmd_name)
             cmd = super().get_command(ctx, cmd_name)
         elif not getattr(cmd, "without_runtime_setup", False):
             # Command found but needs setup - ensure registry is loaded
-            self._ensure_registry_loaded()
+            self._ensure_registry_loaded(cmd_name)
 
         if cmd:
             # Pass the formatting down to subcommands automatically
@@ -201,12 +205,12 @@ class PlainCommandCollection(click.CommandCollection):
 
     def list_commands(self, ctx: Context) -> list[str]:
         # For help listing, we need to show registry commands too
-        self._ensure_registry_loaded()
+        self._ensure_registry_loaded("--help")
         return super().list_commands(ctx)
 
     def format_commands(self, ctx: Context, formatter: Any) -> None:
         """Format commands with separate sections for common, core, and package commands."""
-        self._ensure_registry_loaded()
+        self._ensure_registry_loaded("--help")
 
         # Get every command, remembering whether it is one of Plain's own
         commands = []
