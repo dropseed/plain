@@ -1,7 +1,10 @@
 import click
 from plain.utils.crypto import get_random_string
 
+from .runtime import without_runtime_setup
 
+
+@without_runtime_setup
 @click.group()
 def utils() -> None:
     """Utility commands"""

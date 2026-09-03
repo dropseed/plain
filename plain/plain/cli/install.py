@@ -3,7 +3,10 @@ import sys
 
 import click
 
+from .runtime import without_runtime_setup
 
+
+@without_runtime_setup
 @click.command()
 @click.argument("packages", nargs=-1, required=True)
 def install(packages: tuple[str, ...]) -> None:
