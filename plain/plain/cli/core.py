@@ -136,16 +136,12 @@ class PlainCommandCollection(click.CommandCollection):
         self.sources = sources
         self._registry_group = None
         self._setup_attempted = False
+        self._setup_error: Exception | None = None
+        self._setup_warned = False
 
-    def _ensure_registry_loaded(self, cmd_name: str) -> None:
-        """Lazy load the registry group (requires setup).
-
-        `cmd_name` is the command that made us load the app, so a failure can
-        say which one. A name that isn't a built-in could still be an app or
-        package command, so we can't tell a typo from a real command until the
-        registry loads — when it doesn't, the app's failure is the real answer.
-        """
-        if self._registry_group is not None or self._setup_attempted:
+    def _load_registry(self) -> None:
+        """Run setup() once, remembering a failure instead of raising it."""
+        if self._setup_attempted:
             return
 
         self._setup_attempted = True
@@ -155,31 +151,67 @@ class PlainCommandCollection(click.CommandCollection):
             self._registry_group = CLIRegistryGroup()
             # Add registry group to sources
             self.sources.insert(0, self._registry_group)
-        except plain.runtime.AppPathNotFound:
+        except Exception as e:
+            self._setup_error = e
+
+    def _warn_once(self, message: str) -> None:
+        """Warn that some commands are missing, however many times we're asked."""
+        if self._setup_warned:
+            return
+
+        self._setup_warned = True
+        click.secho(message, fg="yellow", err=True)
+
+    def _ensure_registry_loaded(self, cmd_name: str, *, required: bool = True) -> None:
+        """Lazy load the registry group (requires setup).
+
+        `cmd_name` is the command that made us load the app, so a failure can
+        say which one. A name that isn't a built-in could still be an app or
+        package command, so we can't tell a typo from a real command until the
+        registry loads — when it doesn't, the app's failure is the real answer.
+
+        `required` is False when we're only listing commands for help. The
+        registry would have added to that listing, but the built-ins are still
+        worth showing — especially to someone trying to fix the app that just
+        failed to load — so a failure there is a warning rather than an exit.
+        """
+        self._load_registry()
+
+        error = self._setup_error
+        if error is None:
+            return
+
+        if isinstance(error, plain.runtime.AppPathNotFound):
             # Allow built-in commands to work regardless of being in a valid app
-            click.secho(
-                "Plain `app` directory not found. Some commands may be missing.",
-                fg="yellow",
-                err=True,
+            self._warn_once(
+                "Plain `app` directory not found. Some commands may be missing."
             )
-        except ImproperlyConfigured as e:
+            return
+
+        if not required:
+            self._warn_once(
+                f"App and package commands are missing — the app failed to load: {error}"
+            )
+            return
+
+        if isinstance(error, ImproperlyConfigured):
             # Show what was configured incorrectly and exit
             click.secho(
-                str(e),
+                str(error),
                 fg="red",
                 err=True,
             )
             sys.exit(1)
-        except Exception as e:
-            # Traceback on stderr too, so it stays directly above the error
-            # line when output is piped or redirected.
-            click.echo(traceback.format_exc(), err=True)
-            click.secho(
-                f"Error loading the app, which `plain {cmd_name}` needs: {e}",
-                fg="red",
-                err=True,
-            )
-            sys.exit(1)
+
+        # Traceback on stderr too, so it stays directly above the error line
+        # when output is piped or redirected.
+        click.echo("".join(traceback.format_exception(error)), err=True)
+        click.secho(
+            f"Error loading the app, which `plain {cmd_name}` needs: {error}",
+            fg="red",
+            err=True,
+        )
+        sys.exit(1)
 
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         # Set PLAIN_ENV default before any setup runs so plain.dev's dotenv
@@ -205,12 +237,12 @@ class PlainCommandCollection(click.CommandCollection):
 
     def list_commands(self, ctx: Context) -> list[str]:
         # For help listing, we need to show registry commands too
-        self._ensure_registry_loaded("--help")
+        self._ensure_registry_loaded("--help", required=False)
         return super().list_commands(ctx)
 
     def format_commands(self, ctx: Context, formatter: Any) -> None:
         """Format commands with separate sections for common, core, and package commands."""
-        self._ensure_registry_loaded("--help")
+        self._ensure_registry_loaded("--help", required=False)
 
         # Get every command, remembering whether it is one of Plain's own
         commands = []
