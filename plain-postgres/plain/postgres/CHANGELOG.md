@@ -1,5 +1,25 @@
 # plain-postgres changelog
 
+## [0.116.0](https://github.com/dropseed/plain/releases/plain-postgres@0.116.0) (2026-09-04)
+
+### What's changed
+
+- **`Meta` now exposes exactly two forward-field collections: `fields` and `many_to_many`.** `local_fields`, `local_many_to_many`, `concrete_fields`, and `local_concrete_fields` are gone. Plain has no model inheritance and no non-concrete forward fields, so "local" and "concrete" drew distinctions that could never differ — four names for two lists, each with its own cached property and its own filtering pass. `fields` is every column-backed field (primary key first, then sorted by name) and `many_to_many` is every `ManyToManyField` (sorted by name); both now read straight from the storage `add_field()` fills, instead of re-filtering `_get_fields()` on each access ([9f0d0da22d](https://github.com/dropseed/plain/commit/9f0d0da22d))
+- `Meta.fields` is typed as `ImmutableList[ColumnField]` and `Meta.many_to_many` as `ImmutableList[ManyToManyField]`, so the column attributes (`column`, `db_type()`, `primary_key`) are readable off a field without an `isinstance` check first. `add_field()` enforces that by raising `TypeError` for a field that is neither a `ColumnField` nor a `ManyToManyField` ([996c099e2b](https://github.com/dropseed/plain/commit/996c099e2b), [9f0d0da22d](https://github.com/dropseed/plain/commit/9f0d0da22d))
+- The `postgres.non_local_field_reference` preflight check is removed. It rejected an `indexes` or `constraints` entry naming a field "not local to" the model — unreachable without inheritance, since a forward field found on the model is always the model's own ([9f0d0da22d](https://github.com/dropseed/plain/commit/9f0d0da22d))
+- `Field.name` is typed `str` instead of `str | None` — it starts as `""` and becomes the real name in `set_attributes_from_name()`. That drops roughly twenty `assert self.name is not None` guards from the field descriptor, save, and preflight paths. `Field.deconstruct()` (and the `ColumnField`, `DefaultableField`, `ChoicesField`, `RelatedField`, `ForeignKeyField`, and `ManyToManyField` overrides) returns `tuple[str, str, list, dict]` accordingly ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+- `get_joining_columns()` moved from `ForeignObjectRel` to `ForeignKeyRel`. It delegates to `field.get_joining_columns(reverse_join=True)`, which only a foreign key has ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+- `PathInfo.join_field` is typed `ForeignKeyField | ForeignKeyRel` (was `ForeignKeyField | ForeignObjectRel`), and `select_related_descend()` is a `TypeGuard[RelatedField]` so a passing field narrows at the call site ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+- `QuerySet._update()`, `_insert()`, `_batched_insert()`, `UpdateQuery.add_update_fields()`, and `InsertQuery.insert_values()` accept a `Sequence` of fields rather than requiring a `list`, so an `ImmutableList` from `Meta` can be passed straight through ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+
+### Upgrade instructions
+
+- Replace `_model_meta.local_fields`, `_model_meta.concrete_fields`, and `_model_meta.local_concrete_fields` with `_model_meta.fields`. In Plain these were always the same set of fields.
+- Replace `_model_meta.local_many_to_many` with `_model_meta.many_to_many`.
+- Replace `_model_meta._non_pk_concrete_field_names` with `_model_meta._non_pk_field_names`.
+- If you have a custom `Field` subclass, `deconstruct()` now returns `str` as its first element rather than `str | None`, and `self.name` is `""` (not `None`) before the field is contributed to a model class. Update any annotation or `is None` check accordingly.
+- If you called `get_joining_columns()` on a reverse relation, it is now available on `ForeignKeyRel` only.
+
 ## [0.115.0](https://github.com/dropseed/plain/releases/plain-postgres@0.115.0) (2026-09-02)
 
 ### What's changed
