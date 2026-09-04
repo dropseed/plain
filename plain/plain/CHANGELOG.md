@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.163.0](https://github.com/dropseed/plain/releases/plain@0.163.0) (2026-09-04)
+
+### What's changed
+
+- `forms.UUIDField` no longer subclasses `TextField`. It was inheriting a string pipeline it didn't want — `to_python()` had to run the parent's string coercion first and then re-parse the result, and the field advertised `max_length`, `min_length`, `strip`, and `empty_value` options that don't mean anything for a UUID. It now extends `Field` directly and parses in one step: `uuid.UUID` values pass through, empty values return `None`, and anything else is stringified, stripped, and handed to `uuid.UUID()`. Validation behavior is unchanged — surrounding whitespace is still tolerated and a bad value still raises "Enter a valid UUID." ([f00e707ed0](https://github.com/dropseed/plain/commit/f00e707ed0))
+- `MultiPartParser` closes upload handler files via `getattr(handler, "file", None)` instead of `hasattr` plus an unchecked attribute read. Same behavior, but the read is now narrowed rather than suppressed with a type-checker ignore ([d9406dfc6f](https://github.com/dropseed/plain/commit/d9406dfc6f))
+
+### Upgrade instructions
+
+- If you passed `max_length`, `min_length`, `strip`, or `empty_value` to `forms.UUIDField`, drop them — they were inherited from `TextField` and never affected UUID parsing. Any other use of `forms.UUIDField` needs no changes.
+
 ## [0.162.0](https://github.com/dropseed/plain/releases/plain@0.162.0) (2026-09-04)
 
 ### What's changed
