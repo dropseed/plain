@@ -1,5 +1,15 @@
 # plain-templates changelog
 
+## [0.6.1](https://github.com/dropseed/plain/releases/plain-templates@0.6.1) (2026-09-04)
+
+### What's changed
+
+- Dropped a no-longer-needed `ty: ignore` on the optional `plain.postgres` import fallback in `TemplateView`, from the ruff 0.16.4 / ty 0.0.74 upgrade. No runtime behavior changed ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.6.0](https://github.com/dropseed/plain/releases/plain-templates@0.6.0) (2026-08-21)
 
 ### What's changed
