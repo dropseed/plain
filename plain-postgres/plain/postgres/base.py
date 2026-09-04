@@ -27,7 +27,6 @@ from plain.postgres.exceptions import (
 )
 from plain.postgres.expressions import RawSQL, Value
 from plain.postgres.fields import DATABASE_DEFAULT, Field
-from plain.postgres.fields.base import ColumnField
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ForeignObjectRel
 from plain.postgres.meta import Meta
@@ -122,10 +121,6 @@ class Model(metaclass=ModelBase):
         # Process all fields from kwargs or use defaults
         for field in meta.fields:
             from plain.postgres.fields.related import RelatedField
-
-            # meta.fields excludes ManyToManyField, so every iterated field
-            # is column-backed and exposes the ColumnField surface.
-            assert isinstance(field, ColumnField)
 
             is_related_object = False
             # Virtual field
@@ -705,8 +700,6 @@ class Model(metaclass=ModelBase):
 
         errors = {}
         for f in self._model_meta.fields:
-            # See __init__ above: meta.fields is always ColumnField.
-            assert isinstance(f, ColumnField)
             if f.name in exclude:
                 continue
             # Skip validation for empty fields with required=False. The developer

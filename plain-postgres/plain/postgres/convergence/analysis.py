@@ -21,7 +21,6 @@ from ..ddl import (
     compile_literal_default_sql,
 )
 from ..dialect import quote_name
-from ..fields.base import ColumnField
 from ..fields.related import ForeignKeyField
 from ..indexes import Index
 from ..introspection import (
@@ -587,8 +586,6 @@ def _compare_columns(
     expected_col_names: set[str] = set()
 
     for f in model._model_meta.local_fields:
-        if not isinstance(f, ColumnField):
-            continue
         db_type = f.db_type()
         if db_type is None:
             continue
