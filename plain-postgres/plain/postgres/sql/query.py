@@ -2564,7 +2564,7 @@ class UpdateQuery(Query):
             values_seq.append((field, val))
         return self.add_update_fields(values_seq)
 
-    def add_update_fields(self, values_seq: list[tuple[Any, Any]]) -> None:
+    def add_update_fields(self, values_seq: Sequence[tuple[Any, Any]]) -> None:
         """
         Append a sequence of (field, value) pairs to the internal list that
         will be used to generate the UPDATE query.
