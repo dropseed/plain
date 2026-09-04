@@ -449,7 +449,11 @@ class ProjectState:
             concretes,
         )
 
-        through = remote_field.through_ref if isinstance(remote_field, ManyToManyRel) else None
+        through = (
+            remote_field.through_ref
+            if isinstance(remote_field, ManyToManyRel)
+            else None
+        )
         if not through:
             return
         self.update_model_field_relation(
@@ -648,7 +652,7 @@ class ModelState:
             if isinstance(field, RelatedField) and not isinstance(
                 field.remote_field.model_ref, str
             ):
-                raise ValueError(
+                raise TypeError(
                     f'ModelState.fields cannot refer to a model class - "{name}.to" does. '
                     "Use a string reference instead."
                 )
@@ -657,7 +661,7 @@ class ModelState:
             if isinstance(field, ManyToManyField) and not isinstance(
                 field.remote_field.through_ref, str
             ):
-                raise ValueError(
+                raise TypeError(
                     f'ModelState.fields cannot refer to a model class - "{name}.through" '
                     "does. Use a string reference instead."
                 )

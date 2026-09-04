@@ -21,7 +21,7 @@ def test_unresolved_model_is_not_swallowed_by_getattr():
 
     assert rel.model_ref == "examples.Missing"
     with pytest.raises(TypeError, match="not been resolved"):
-        rel.model
+        _ = rel.model
     # getattr()/hasattr() only swallow AttributeError, so a probe can never
     # quietly answer "no model" for a reference that just isn't resolved yet.
     with pytest.raises(TypeError):
@@ -34,7 +34,7 @@ def test_unresolved_through_is_not_swallowed_by_getattr():
 
     assert rel.through_ref == "examples.MissingThrough"
     with pytest.raises(TypeError, match="not been resolved"):
-        rel.through
+        _ = rel.through
     with pytest.raises(TypeError):
         hasattr(rel, "through")
 
@@ -111,7 +111,10 @@ def test_preflight_reports_unresolved_relations_instead_of_crashing():
         name="Post",
         fields=[
             ("author", types.ForeignKeyField("examples.Missing", on_delete=CASCADE)),
-            ("tags", ManyToManyField("examples.Tag", through="examples.MissingThrough")),
+            (
+                "tags",
+                ManyToManyField("examples.Tag", through="examples.MissingThrough"),
+            ),
             (
                 "labels",
                 ManyToManyField("examples.MissingTarget", through="examples.Labeling"),

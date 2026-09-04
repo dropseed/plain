@@ -892,8 +892,10 @@ class MigrationAutodetector:
                     package_label,
                     model_name,
                 )
-                if rename_key in self.renamed_models:
-                    new_field.remote_field.model_ref = old_field.remote_field.model_ref  # ty: ignore[unresolved-attribute]
+                if rename_key in self.renamed_models and isinstance(
+                    old_field, RelatedField
+                ):
+                    new_field.remote_field.model_ref = old_field.remote_field.model_ref
                 dependencies.extend(
                     self._get_dependencies_for_foreign_key(
                         package_label,
@@ -908,8 +910,12 @@ class MigrationAutodetector:
                     package_label,
                     model_name,
                 )
-                if rename_key in self.renamed_models:
-                    new_field.remote_field.through_ref = old_field.remote_field.through_ref  # ty: ignore[unresolved-attribute]
+                if rename_key in self.renamed_models and isinstance(
+                    old_field, ManyToManyField
+                ):
+                    new_field.remote_field.through_ref = (
+                        old_field.remote_field.through_ref
+                    )
             old_field_dec = self.deep_deconstruct(old_field)
             new_field_dec = self.deep_deconstruct(new_field)
             # Exclude non_migration_attrs (allow_null, default, on_delete, choices,
