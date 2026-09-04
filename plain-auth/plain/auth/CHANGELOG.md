@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.29.8](https://github.com/dropseed/plain/releases/plain-auth@0.29.8) (2026-09-04)
+
+### What's changed
+
+- `login_client()` sets the test session cookie's attributes one at a time through `Morsel.__setitem__` instead of `Morsel.update()`. Several of those attributes (`max-age`, `expires`, and `domain`/`secure` when unset) are legitimately `None`, which `update()` isn't typed for; `__setitem__` takes them while keeping Morsel's reserved-key validation. It also now asserts the session was actually saved before reading `session_key`. No runtime behavior changed ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.29.7](https://github.com/dropseed/plain/releases/plain-auth@0.29.7) (2026-08-12)
 
 ### What's changed
