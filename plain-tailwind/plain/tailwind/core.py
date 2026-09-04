@@ -170,7 +170,16 @@ class Tailwind:
 
             binary_path = self.binary_path(version)
             binary_path.parent.mkdir(parents=True, exist_ok=True)
-            os.replace(tmp_path, binary_path)
+            try:
+                os.replace(tmp_path, binary_path)
+            except PermissionError:
+                # Windows raises this if another process has binary_path open
+                # (e.g. `plain tailwind build --watch` in a different checkout
+                # sharing this machine-wide cache). If it's already there,
+                # another process finished installing this exact version —
+                # nothing left to do.
+                if not binary_path.exists():
+                    raise
         finally:
             tmp_path.unlink(missing_ok=True)
 
