@@ -15,7 +15,7 @@
 
 Login links let users authenticate by clicking a link sent to their email address, instead of entering a password. This approach is often called "magic links" and provides a simple, secure authentication experience.
 
-When a user enters their email address, they receive an email with a one-time login link. Clicking the link logs them in automatically. The links are cryptographically signed and include an expiration time for security.
+When a user enters their email address, they receive an email with a login link. Clicking the link logs them in automatically. The links are cryptographically signed and carry an embedded expiration, and they keep working until that expiration passes.
 
 ```python
 # app/urls.py
@@ -104,7 +104,7 @@ See [plain.email](/plain-email/plain/email/README.md) for more details on email 
 
 ## Customizing link expiration
 
-By default, login links expire after 1 hour (3600 seconds). You can change this by overriding the form's `maybe_send_link` call:
+By default, login links expire after 1 hour (3600 seconds). Change it by setting [`link_expires_in`](./forms.py#LoginLinkForm) on the form:
 
 ```python
 from plain.loginlink.views import LoginLinkFormView
@@ -112,13 +112,14 @@ from plain.loginlink.forms import LoginLinkForm
 
 
 class CustomLoginLinkForm(LoginLinkForm):
-    def maybe_send_link(self, request, expires_in=60 * 15):  # 15 minutes
-        return super().maybe_send_link(request, expires_in=expires_in)
+    link_expires_in = 60 * 15  # 15 minutes
 
 
 class CustomLoginView(LoginLinkFormView):
     form_class = CustomLoginLinkForm
 ```
+
+A link works for this entire window, not just once (see [Are login links single-use?](#are-login-links-single-use)), so choose a duration you're comfortable handing out for that long. Very short windows fail in practice — corporate mail can take minutes to deliver, and users get distracted mid-signup.
 
 ## Generating links manually
 
@@ -167,6 +168,18 @@ def validate_token(token):
 #### What happens if the email doesn't match any user?
 
 The form still redirects to the "sent" page without revealing whether the email exists. This prevents account enumeration attacks.
+
+#### Are login links single-use?
+
+No. A link works every time it is clicked until it expires. The security boundary is the expiration window, not consuming the link.
+
+This is a deliberate choice. Anyone who can read the inbox can request a fresh link, so a compromised inbox is equally exposed either way — single-use only covers a link that escaped the inbox, was already used, and is still unexpired. Against that narrow gain, marking a link spent on the first request breaks with corporate mail security (Safe Links, Mimecast, Barracuda), which fetches URLs in incoming email and would spend the link before the recipient ever clicks. Avoiding that means landing on a confirmation page and asking every user to click a button to finish signing in.
+
+Set an expiration you are comfortable handing out for that whole window. See [Customizing link expiration](#customizing-link-expiration).
+
+If you need single-use links, build the flow you want on top of [`plain.signing`](/plain/plain/signing.py) rather than reaching for a hook here. `TimestampSigner` covers the token half — [plain.passwords](/plain-passwords/plain/passwords/README.md) signs its reset tokens that way. The other half is storage, since marking a link spent means recording the ones you issued, and where that lives depends on what else you want from it — revocation, an audit trail, per-device rules.
+
+Note that the session created by a login link long outlives the link. Session lifetime and revocation belong to [plain.sessions](/plain-sessions/plain/sessions/README.md).
 
 #### Can I use this alongside password authentication?
 
