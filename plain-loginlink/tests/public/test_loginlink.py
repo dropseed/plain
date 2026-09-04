@@ -61,6 +61,23 @@ class TestRequestLink:
         assert len(mailoutbox) == 0
 
 
+class TestLinkExpiration:
+    def test_form_link_expires_in_is_honored(self, db, mailoutbox):
+        """A form's `link_expires_in` sets the window on the links it sends."""
+        User.query.create(email="shortlived@example.com")
+        client = Client()
+
+        client.post(
+            "/login-already-expired",
+            data={"email": "shortlived@example.com", "next": ""},
+        )
+
+        response = client.get(token_path(mailoutbox[0]), follow=True)
+
+        assert "Link Expired" in response.content.decode()
+        assert not is_logged_in(client)
+
+
 class TestAlreadyLoggedIn:
     def test_login_page_redirects_home(self, db):
         client = Client()
