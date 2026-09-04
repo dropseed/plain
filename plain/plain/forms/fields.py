@@ -1081,7 +1081,7 @@ class MultipleChoiceField(ChoiceField):
         return data.getlist(html_name)
 
 
-class UUIDField(TextField):
+class UUIDField(Field):
     default_error_messages: ClassVar = {
         "invalid": "Enter a valid UUID.",
     }
@@ -1091,16 +1091,15 @@ class UUIDField(TextField):
             return str(value)
         return value
 
-    def to_python(self, value: Any) -> uuid.UUID | None:  # ty: ignore[invalid-method-override]
-        value = super().to_python(value)
+    def to_python(self, value: Any) -> uuid.UUID | None:
         if value in self.empty_values:
             return None
-        if not isinstance(value, uuid.UUID):
-            try:
-                value = uuid.UUID(value)
-            except ValueError:
-                raise ValidationError(self.error_messages["invalid"], code="invalid")
-        return value
+        if isinstance(value, uuid.UUID):
+            return value
+        try:
+            return uuid.UUID(str(value).strip())
+        except ValueError:
+            raise ValidationError(self.error_messages["invalid"], code="invalid")
 
 
 class InvalidJSONInput(str):

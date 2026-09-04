@@ -1698,11 +1698,23 @@ class OrderBy(Expression):
             self.nulls_last = None
         return self
 
-    def asc(self) -> None:  # ty: ignore[invalid-method-override]
+    def asc(self, **kwargs: Any) -> OrderBy:
+        if kwargs:
+            raise TypeError(
+                "OrderBy.asc() takes no options; set nulls_first/nulls_last on "
+                "the OrderBy itself."
+            )
         self.descending = False
+        return self
 
-    def desc(self) -> None:  # ty: ignore[invalid-method-override]
+    def desc(self, **kwargs: Any) -> OrderBy:
+        if kwargs:
+            raise TypeError(
+                "OrderBy.desc() takes no options; set nulls_first/nulls_last on "
+                "the OrderBy itself."
+            )
         self.descending = True
+        return self
 
 
 class Window(Expression):
