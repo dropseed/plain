@@ -703,6 +703,10 @@ class FileResponse(StreamingResponse):
             self.headers["Content-Disposition"] = content_disposition
 
 
+# A URI scheme per RFC 3986: a letter, then letters, digits, "+", "-", ".".
+_SCHEME_PREFIX_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9+.\-]*:")
+
+
 def _is_external_url(url: str) -> bool:
     """Check if a URL would redirect to an external host."""
     if not url:
@@ -713,8 +717,10 @@ def _is_external_url(url: str) -> bool:
     # so \\ and /\ are equivalent to //
     if url[:2].replace("\\", "/") == "//":
         return True
-    colon_pos = url.find("://")
-    return colon_pos > 0 and url[:colon_pos].isalpha()
+    # Any scheme sends the browser off this origin, with or without "//"
+    # after it. Browsers normalize "http:/evil.com" (a single slash) to
+    # "http://evil.com", so matching on "://" alone lets that through.
+    return _SCHEME_PREFIX_RE.match(url) is not None
 
 
 class RedirectResponse(Response):
