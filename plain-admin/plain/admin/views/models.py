@@ -136,11 +136,11 @@ class AdminModelListView(AdminListView):
         # the queryset lazy. Coerce each id through the pk field and drop the
         # ones it rejects, so a stale or malformed id is ignored (per the base
         # contract) rather than raising.
-        pk_field = self.model._model_meta.get_field("id")
+        pk_field = self.model._model_meta.get_forward_field("id")
         valid_ids = []
         for raw_id in ids:
             try:
-                valid_ids.append(pk_field.to_python(raw_id))  # ty: ignore[unresolved-attribute]
+                valid_ids.append(pk_field.to_python(raw_id))
             except ValidationError:
                 continue
         return objects.filter(id__in=valid_ids)

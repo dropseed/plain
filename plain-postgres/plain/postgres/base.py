@@ -1033,7 +1033,11 @@ class Model(metaclass=ModelBase):
             fld = None
             for part in field.split(LOOKUP_SEP):
                 try:
-                    fld = _cls._model_meta.get_field(part)  # ty: ignore[unresolved-attribute]
+                    if _cls is None:
+                        # The previous part was not a relation, so there is
+                        # no model left to look the next part up on.
+                        raise FieldDoesNotExist(part)
+                    fld = _cls._model_meta.get_field(part)
                     if isinstance(fld, RelatedField):
                         _cls = fld.path_infos[-1].to_meta.model
                     else:
