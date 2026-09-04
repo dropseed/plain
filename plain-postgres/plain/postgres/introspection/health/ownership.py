@@ -29,7 +29,7 @@ def build_table_owners() -> dict[str, TableOwner]:
                 model_class=model.__name__,
                 model_file=_source_file(model),
             )
-            for field in model._model_meta.local_many_to_many:
+            for field in model._model_meta.many_to_many:
                 m2m_table = field.m2m_db_table()
                 if m2m_table in owners:
                     # Explicit "through" model already registered with its class.

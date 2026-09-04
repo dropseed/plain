@@ -550,9 +550,7 @@ class Query(BaseExpression):
         if not (q.distinct and q.is_sliced):
             if q.group_by is True:
                 assert self.model is not None, "GROUP BY requires a model"
-                q.add_fields(
-                    (f.name for f in self.model._model_meta.concrete_fields), False
-                )
+                q.add_fields((f.name for f in self.model._model_meta.fields), False)
                 # Disable GROUP BY aliases to avoid orphaning references to the
                 # SELECT clause which is about to be cleared.
                 q.set_group_by(allow_aliases=False)
@@ -691,7 +689,7 @@ class Query(BaseExpression):
         # loaded. If a relational field is encountered it gets added to the
         # mask for it be considered if `select_related` and the cycle continues
         # by recursively calling this function.
-        for field in meta.concrete_fields:
+        for field in meta.fields:
             field_mask = mask.pop(field.name, None)
             if field_mask is None:
                 select_mask.setdefault(field, {})
@@ -2232,15 +2230,13 @@ class Query(BaseExpression):
             selected = frozenset(field_names + annotation_names)
         else:
             assert self.model is not None, "Default values query requires a model"
-            field_names = [f.name for f in self.model._model_meta.concrete_fields]
+            field_names = [f.name for f in self.model._model_meta.fields]
             selected = frozenset(field_names)
         # Selected annotations must be known before setting the GROUP BY
         # clause.
         if self.group_by is True:
             assert self.model is not None, "GROUP BY True requires a model"
-            self.add_fields(
-                (f.name for f in self.model._model_meta.concrete_fields), False
-            )
+            self.add_fields((f.name for f in self.model._model_meta.fields), False)
             # Disable GROUP BY aliases to avoid orphaning references to the
             # SELECT clause which is about to be cleared.
             self.set_group_by(allow_aliases=False)

@@ -535,9 +535,7 @@ class DatabaseConnection:
         tables = set()
         for model in get_migratable_models():
             tables.add(model.model_options.db_table)
-            tables.update(
-                f.m2m_db_table() for f in model._model_meta.local_many_to_many
-            )
+            tables.update(f.m2m_db_table() for f in model._model_meta.many_to_many)
         tables = list(tables)
         if only_existing:
             existing_tables = set(self.table_names(include_views=include_views))

@@ -103,7 +103,7 @@ def model_to_dict(
 
     meta = instance._model_meta
     data = {}
-    for f in chain(meta.concrete_fields, meta.many_to_many):
+    for f in chain(meta.fields, meta.many_to_many):
         if fields is not None and f.name not in fields:
             continue
         value = f.value_from_object(instance)
@@ -138,9 +138,7 @@ def fields_for_model(
     ignored = []
     meta = model._model_meta
 
-    for f in sorted(
-        chain(meta.concrete_fields, meta.many_to_many), key=lambda f: f.name
-    ):
+    for f in sorted(chain(meta.fields, meta.many_to_many), key=lambda f: f.name):
         if fields is not None and f.name not in fields:
             continue
 

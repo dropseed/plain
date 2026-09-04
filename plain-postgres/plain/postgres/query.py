@@ -701,7 +701,7 @@ class QuerySet[T: "Model"]:
             update_fields_objs,
             unique_fields_objs,
         )
-        fields = meta.concrete_fields
+        fields = meta.fields
         self._prepare_for_bulk_create(objs)
         with transaction.atomic(savepoint=False):
             objs_with_id, objs_without_id = partition(lambda o: o.id is None, objs)
@@ -861,14 +861,14 @@ class QuerySet[T: "Model"]:
                 setattr(obj, k, v)
 
             update_fields = set(update_defaults)
-            concrete_field_names = self.model._model_meta._non_pk_concrete_field_names
-            # update_fields does not support non-concrete fields.
-            if concrete_field_names.issuperset(update_fields):
+            field_names = self.model._model_meta._non_pk_field_names
+            # update_fields only supports column-backed fields.
+            if field_names.issuperset(update_fields):
                 # Add fields which are set on pre_save(), e.g. update_now fields.
                 # This is to maintain backward compatibility as these fields
                 # are not updated unless explicitly specified in the
                 # update_fields list.
-                for field in self.model._model_meta.local_concrete_fields:
+                for field in self.model._model_meta.fields:
                     if not (
                         field.primary_key or field.__class__.pre_save is Field.pre_save
                     ):
