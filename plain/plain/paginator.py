@@ -35,9 +35,12 @@ class Paginator:
         orphans: int = 0,
         allow_empty_first_page: bool = True,
     ) -> None:
+        per_page = int(per_page)
+        if per_page < 1:
+            raise ValueError(f"per_page must be at least 1, got {per_page}")
         self.object_list = object_list
         self._check_object_list_is_ordered()
-        self.per_page = int(per_page)
+        self.per_page = per_page
         self.orphans = int(orphans)
         self.allow_empty_first_page = allow_empty_first_page
 
