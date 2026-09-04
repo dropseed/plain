@@ -5,6 +5,7 @@ from typing import Any
 
 from app.users.models import User
 from plain.exceptions import ValidationError
+from plain.postgres.fields.base import ColumnField
 from plain.postgres.forms import ModelForm
 
 from plain import forms
@@ -103,7 +104,12 @@ class PasswordSetForm(forms.Form):
         assert isinstance(password2, str), "new_password2 must be a string"
 
         # Clean it as if it were being put into the model directly
-        self.user._model_meta.get_field("password").clean(password2, self.user)  # ty: ignore[unresolved-attribute]
+        password_field = self.user._model_meta.get_forward_field("password")
+        if not isinstance(password_field, ColumnField):
+            raise TypeError(
+                f"{type(self.user).__name__}.password must be a column field"
+            )
+        password_field.clean(password2, self.user)
 
         return password2
 

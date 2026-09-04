@@ -1335,7 +1335,7 @@ class QuerySet[T: "Model"]:
             or (
                 self.sql_query.default_ordering
                 and self.sql_query.model
-                and self.sql_query.model._model_meta.ordering  # ty: ignore[unresolved-attribute]
+                and self.sql_query.model.model_options.ordering
                 and
                 # A default ordering doesn't affect GROUP BY queries.
                 not self.sql_query.group_by

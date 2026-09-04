@@ -407,8 +407,9 @@ class MultiPartParser:
         # We should document that...
         # (Maybe add handler.free_file to complement new_file)
         for handler in self._upload_handlers:
-            if hasattr(handler, "file"):
-                handler.file.close()  # ty: ignore[unresolved-attribute]
+            file = getattr(handler, "file", None)
+            if file is not None:
+                file.close()
 
 
 class LazyStream:

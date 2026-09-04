@@ -174,8 +174,8 @@ class ProjectState:
             if reference.through:
                 if changed_field is None:
                     changed_field = field.clone()
-                assert changed_field.remote_field is not None
-                changed_field.remote_field.through_ref = new_remote_model  # ty: ignore[unresolved-attribute]
+                assert isinstance(changed_field.remote_field, ManyToManyRel)
+                changed_field.remote_field.through_ref = new_remote_model
             if changed_field:
                 model_state.fields[name] = changed_field
                 to_reload.add((model_state.package_label, model_state.name_lower))
