@@ -234,7 +234,7 @@ class AdminModelDetailView(AdminDetailView):
         if fields := super().get_fields():
             return fields
 
-        return tuple(f.name for f in self.object._model_meta.get_fields() if f.concrete)
+        return tuple(f.name for f in self.object._model_meta.get_fields())
 
     def get_field_value(self, obj: Any, field: str) -> Any:
         try:

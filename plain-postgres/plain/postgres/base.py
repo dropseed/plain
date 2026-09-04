@@ -123,9 +123,6 @@ class Model(metaclass=ModelBase):
             from plain.postgres.fields.related import RelatedField
 
             is_related_object = False
-            # Virtual field
-            if field.name not in kwargs and field.column is None:
-                continue
             if isinstance(field, RelatedField) and isinstance(
                 field.remote_field, ForeignObjectRel
             ):
@@ -395,8 +392,8 @@ class Model(metaclass=ModelBase):
             non_model_fields = fields.difference(field_names)
             if non_model_fields:
                 raise ValueError(
-                    "The following fields do not exist in this model, are m2m "
-                    "fields, or are non-concrete fields: "
+                    "The following fields do not exist in this model or are m2m "
+                    "fields: "
                     f"{', '.join(sorted(non_model_fields))}"
                 )
             deferred_in_update = fields & deferred_fields

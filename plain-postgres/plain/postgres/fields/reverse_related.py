@@ -41,7 +41,6 @@ class ForeignObjectRel(FieldCacheMixin):
 
     # Field flags
     auto_created = True
-    concrete = False
 
     # Reverse relations are always nullable (Plain can't enforce that a
     # foreign key on the related model points to this model).

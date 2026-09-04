@@ -115,7 +115,6 @@ class Field[T](RegisterLookupMixin):
     name: str
     # Set by set_attributes_from_name (called by contribute_to_class)
     column: str
-    concrete: bool
     # Set by contribute_to_class
     model: type[Model]
 
@@ -376,7 +375,6 @@ class Field[T](RegisterLookupMixin):
         # The database column is the field name. A foreign key overrides this
         # method only to append the "_id" suffix to `column`.
         self.column = self.name
-        self.concrete = self.column is not None
 
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
         """
