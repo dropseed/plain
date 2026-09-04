@@ -112,17 +112,30 @@ def test_preflight_reports_unresolved_relations_instead_of_crashing():
         fields=[
             ("author", types.ForeignKeyField("examples.Missing", on_delete=CASCADE)),
             ("tags", ManyToManyField("examples.Tag", through="examples.MissingThrough")),
+            (
+                "labels",
+                ManyToManyField("examples.MissingTarget", through="examples.Labeling"),
+            ),
         ],
     ).render(registry)
     registry.ready = True
+
+    # The model-level entry point `plain preflight` uses must not blow up.
+    model_ids = {r.id for r in post.preflight()}
+    assert "fields.related_model_not_installed" in model_ids
+    assert "fields.m2m_through_model_not_installed" in model_ids
 
     author = post._model_meta.get_forward_field("author")
     assert isinstance(author, ForeignKeyField)
     assert isinstance(author.remote_field.model_ref, str)
     assert "fields.related_model_not_installed" in {r.id for r in author.preflight()}
 
-    (tags,) = post._model_meta.many_to_many
+    labels, tags = post._model_meta.many_to_many
     assert isinstance(tags.remote_field.through_ref, str)
     assert "fields.m2m_through_model_not_installed" in {
         r.id for r in tags.preflight(from_model=post)
+    }
+    assert isinstance(labels.remote_field.model_ref, str)
+    assert "fields.related_model_not_installed" in {
+        r.id for r in labels.preflight(from_model=post)
     }

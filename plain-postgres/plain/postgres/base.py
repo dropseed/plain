@@ -755,11 +755,14 @@ class Model(metaclass=ModelBase):
 
         fields = cls._model_meta.many_to_many
 
-        # Skip when the target model wasn't found.
-        fields = (f for f in fields if isinstance(f.remote_field.model, ModelBase))
-
-        # Skip when the relationship model wasn't found.
-        fields = (f for f in fields if isinstance(f.remote_field.through, ModelBase))
+        # Skip when the target or relationship model wasn't found; the field's
+        # own preflight reports those.
+        fields = (
+            f
+            for f in fields
+            if not isinstance(f.remote_field.model_ref, str)
+            and not isinstance(f.remote_field.through_ref, str)
+        )
 
         for f in fields:
             signature = (
