@@ -192,7 +192,16 @@ class OxcTool:
                         dst.write(extracted.read())
 
             os.chmod(tmp_path, 0o755)
-            os.replace(tmp_path, binary_path)
+            try:
+                os.replace(tmp_path, binary_path)
+            except PermissionError:
+                # Windows raises this if another process has binary_path open
+                # (e.g. another checkout sharing this machine-wide cache is
+                # currently running it). If it's already there, another
+                # process finished installing this exact version — nothing
+                # left to do.
+                if not binary_path.exists():
+                    raise
         finally:
             tmp_path.unlink(missing_ok=True)
 
