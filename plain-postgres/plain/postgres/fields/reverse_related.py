@@ -81,8 +81,10 @@ class ForeignObjectRel(FieldCacheMixin):
     @property
     def model(self) -> type[Model]:
         """The resolved target model class."""
+        # Deliberately not AttributeError: getattr(rel, "model", None) and
+        # hasattr() would swallow that and silently report "no model".
         if isinstance(self.model_ref, str):
-            raise AttributeError(
+            raise TypeError(
                 f"Related model {self.model_ref!r} for {self.field!r} has not been "
                 "resolved yet; use model_ref to read the unresolved reference."
             )
@@ -254,8 +256,9 @@ class ManyToManyRel(ForeignObjectRel):
     @property
     def through(self) -> type[Model]:
         """The resolved intermediary model class."""
+        # Deliberately not AttributeError, for the same reason as `model`.
         if isinstance(self.through_ref, str):
-            raise AttributeError(
+            raise TypeError(
                 f"Through model {self.through_ref!r} for {self.field!r} has not been "
                 "resolved yet; use through_ref to read the unresolved reference."
             )

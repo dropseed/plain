@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 from plain.packages import packages_registry
 from plain.postgres.exceptions import FieldDoesNotExist
 from plain.postgres.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT, RelatedField
+from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.meta import Meta
 from plain.postgres.migrations.utils import field_is_referenced, get_references
 from plain.postgres.registry import ModelsRegistry
@@ -448,7 +449,7 @@ class ProjectState:
             concretes,
         )
 
-        through = getattr(remote_field, "through", None)
+        through = remote_field.through_ref if isinstance(remote_field, ManyToManyRel) else None
         if not through:
             return
         self.update_model_field_relation(

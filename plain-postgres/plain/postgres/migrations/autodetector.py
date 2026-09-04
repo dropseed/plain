@@ -244,11 +244,9 @@ class MigrationAutodetector:
             )
             old_model_state = self.from_state.models[package_label, old_model_name]
             for field_name, field in old_model_state.fields.items():
-                if hasattr(field, "remote_field") and getattr(
-                    field.remote_field, "through", None
-                ):
+                if isinstance(field, ManyToManyField):
                     through_key = resolve_relation(
-                        field.remote_field.through_ref,  # ty: ignore[unresolved-attribute]
+                        field.remote_field.through_ref,
                         package_label,
                         model_name,
                     )
@@ -888,11 +886,9 @@ class MigrationAutodetector:
             dependencies: list[tuple[str, str, str | None, bool | str]] = []
             # Implement any model renames on relations; these are handled by RenameModel
             # so we need to exclude them from the comparison
-            if hasattr(new_field, "remote_field") and getattr(
-                new_field.remote_field, "model", None
-            ):
+            if isinstance(new_field, RelatedField):
                 rename_key = resolve_relation(
-                    new_field.remote_field.model_ref,  # ty: ignore[unresolved-attribute]
+                    new_field.remote_field.model_ref,
                     package_label,
                     model_name,
                 )
@@ -906,11 +902,9 @@ class MigrationAutodetector:
                         self.to_state,
                     )
                 )
-            if hasattr(new_field, "remote_field") and getattr(
-                new_field.remote_field, "through", None
-            ):
+            if isinstance(new_field, ManyToManyField):
                 rename_key = resolve_relation(
-                    new_field.remote_field.through_ref,  # ty: ignore[unresolved-attribute]
+                    new_field.remote_field.through_ref,
                     package_label,
                     model_name,
                 )
