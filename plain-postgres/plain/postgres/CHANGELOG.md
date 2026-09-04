@@ -1,5 +1,31 @@
 # plain-postgres changelog
 
+## [0.117.0](https://github.com/dropseed/plain/releases/plain-postgres@0.117.0) (2026-09-04)
+
+### What's changed
+
+- Fixed `QuerySet.ordered`, which raised `AttributeError: 'Meta' object has no attribute 'ordering'` for any queryset without an explicit `order_by()`. It was reading the model's default ordering off `_model_meta` instead of `model_options`, so the property only ever worked on the one branch that never reached the lookup. It now correctly reports `True` when the model declares `Meta.ordering` and `False` when it doesn't ([d9406dfc6f](https://github.com/dropseed/plain/commit/d9406dfc6f))
+- Unresolved relation references are now separate attributes from resolved model classes. `rel.model` and `ManyToManyRel.through` used to hold whatever you passed to the field — a `"package.Model"` string early on, the class after `lazy_related_operation` overwrote it — so every reader had to guess which it had, and the guessing was done inconsistently (`isinstance(..., str)` in some places, `isinstance(..., ModelBase)` in others, `hasattr(..., "_model_meta")` in others still). The raw reference now lives on `rel.model_ref` and `rel.through_ref`, and `rel.model` / `rel.through` are read-only properties that return the resolved class or raise `TypeError` if it isn't resolved yet. The `TypeError` is deliberate: an `AttributeError` would be swallowed by `hasattr`/`getattr` and silently read as "no model" ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- `ForeignKeyField.target_field` dropped its own unresolved-reference `TypeError` — the `rel.model` property raises it now, with a message naming the field ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- `ManyToManyField._check_through_fields` reports an unresolved target by name instead of crashing on `related_model.model_options.object_name`, so a `through_fields` mistake on a not-yet-resolved relation produces the intended preflight message ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- `ModelState` now raises `TypeError` (was `ValueError`) when a field's `to` or `through` refers to a model class instead of a string reference, and detects it by checking the reference directly rather than probing for `_model_meta` ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- Removed `Field.concrete`. It was set to `self.column is not None` right after `column` was assigned the field's name, so it was `True` on every forward field and the checks that consulted it were dead. `bulk_create()` and `bulk_update()` now say what they actually reject — "bulk_update() cannot be used with many-to-many fields." rather than "can only be used with concrete fields." — and `Model.save(update_fields=...)` drops "non-concrete fields" from its error message. `ForeignObjectRel.concrete` and the unreachable virtual-field skip in `Model.__init__` are gone too ([af56244677](https://github.com/dropseed/plain/commit/af56244677))
+- `OrderBy.asc()` and `.desc()` return the `OrderBy` instead of `None`, matching every other expression's `asc`/`desc` and making `expr.desc().asc()` and inline use work. They still take no options — passing `nulls_first` or `nulls_last` raises `TypeError` pointing you at the attributes on the `OrderBy` itself, rather than being silently ignored ([f00e707ed0](https://github.com/dropseed/plain/commit/f00e707ed0))
+- Preflight expression checks no longer crash when a lookup path continues past a non-relation field — for example `Meta.ordering = ("name__nope",)` on a text field. The traversal now raises `FieldDoesNotExist` for the trailing part, which preflight already reports, instead of an `AttributeError` on `None` ([d9406dfc6f](https://github.com/dropseed/plain/commit/d9406dfc6f))
+- `MigrationGraph.make_state()` raises `NodeNotFoundError` when the plan hits a placeholder node, instead of an `AttributeError` on `None` ([d9406dfc6f](https://github.com/dropseed/plain/commit/d9406dfc6f))
+- The migration autodetector and `ProjectState` narrow on `RelatedField` / `ManyToManyField` / `ManyToManyRel` instead of `hasattr(field, "remote_field")` and `getattr(remote_field, "through", None)`. Rename handling only rewrites a reference when the old field is the same kind of relation, so a field swapped between a plain relation and an M2M during a rename no longer copies a mismatched reference across ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- `ProjectState._get_related_models` reads a forward relation's target from `remote_field.model_ref` rather than `f.model` — which returned the model the field is _declared on_, not the one it points at ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- `Meta._expire_cache` propagation to a related model no longer swallows `AttributeError` to handle the unresolved-string case; it checks `model_ref` up front, so a genuine `AttributeError` inside `_expire_cache` surfaces ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+
+### Upgrade instructions
+
+- If you read `rel.model` or `rel.through` (via `field.remote_field`) in code that runs before models are fully loaded — preflight checks, `contribute_to_class`, custom fields, migration operations — switch to `rel.model_ref` / `rel.through_ref` and check `isinstance(ref, str)`. After model loading completes, `rel.model` and `rel.through` behave as before.
+- If you _assigned_ to `rel.model` or `rel.through`, assign to `rel.model_ref` / `rel.through_ref` instead — the plain names are now read-only properties.
+- If you referenced `Field.concrete` or `ForeignObjectRel.concrete`, remove the check. `concrete` was `True` for every forward field and `False` only on reverse relations, which `get_fields()` doesn't return unless you pass `include_reverse=True`.
+- If you asserted on the exact text of the `bulk_create()`, `bulk_update()`, or `save(update_fields=...)` errors, update the expected strings.
+- If you caught `ValueError` from `ModelState` for a model-class `to`/`through` reference, catch `TypeError`.
+- `OrderBy.asc()`/`.desc()` returning `self` is additive — existing calls that discarded the return value are unaffected.
+
 ## [0.116.0](https://github.com/dropseed/plain/releases/plain-postgres@0.116.0) (2026-09-04)
 
 ### What's changed
