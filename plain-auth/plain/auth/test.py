@@ -26,16 +26,23 @@ def login_client(client: Client, user: Any) -> None:
     login(request, user)
     session = get_request_session(request)
     session.save()
+    assert session.session_key is not None
     session_cookie = settings.SESSION_COOKIE_NAME
     client.cookies[session_cookie] = session.session_key
-    cookie_data = {
+    cookie_data: dict[str, Any] = {
         "max-age": None,
         "path": "/",
         "domain": settings.SESSION_COOKIE_DOMAIN,
         "secure": settings.SESSION_COOKIE_SECURE or None,
         "expires": None,
     }
-    client.cookies[session_cookie].update(cookie_data)
+    # Morsel.update() is typed for str-only values, but these cookie
+    # attributes are legitimately None (unset). Set them one at a time
+    # through __setitem__, which is typed for Any and keeps Morsel's own
+    # reserved-key validation (unlike bypassing update() with dict.update()).
+    morsel = client.cookies[session_cookie]
+    for key, value in cookie_data.items():
+        morsel[key] = value
 
 
 def logout_client(client: Client) -> None:

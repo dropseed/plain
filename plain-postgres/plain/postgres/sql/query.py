@@ -13,7 +13,7 @@ import difflib
 import functools
 import sys
 from collections import Counter
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Iterator as TypingIterator
 from functools import cached_property
 from itertools import chain, count, product
@@ -2603,13 +2603,13 @@ class InsertQuery(Query):
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.fields: list[Field] = []
+        self.fields: Sequence[Field] = []
         self.objs: list[Any] = []
         self.on_conflict = on_conflict
         self.update_fields: list[Field] = update_fields or []
         self.unique_fields: list[Field] = unique_fields or []
 
-    def insert_values(self, fields: list[Any], objs: list[Any]) -> None:
+    def insert_values(self, fields: Sequence[Any], objs: list[Any]) -> None:
         self.fields = fields
         self.objs = objs
 

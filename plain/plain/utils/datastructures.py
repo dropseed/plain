@@ -231,7 +231,7 @@ class MultiValueDict(dict[str, list[Any]]):
         return {key: self[key] for key in self}
 
 
-class ImmutableList(tuple):
+class ImmutableList[T](tuple[T, ...]):
     """
     A tuple-like object that raises useful errors when it is asked to mutate.
 

@@ -24,7 +24,7 @@ class PasswordField(postgres.TextField):
         )
         super().__init__(*args, **kwargs)
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if kwargs.get("max_length") == 128:
             del kwargs["max_length"]
@@ -36,7 +36,6 @@ class PasswordField(postgres.TextField):
         if value and not self._is_hashed(value):
             value = hash_password(value)
             # Set the hashed value back on the instance immediately too
-            assert self.name is not None
             setattr(model_instance, self.name, value)
 
         return value

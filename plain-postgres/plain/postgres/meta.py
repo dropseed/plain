@@ -136,8 +136,8 @@ class Meta:
                     field.contribute_to_class(model, attr_name)
 
         # Sort fields: primary key first, then alphabetically by name
-        instance.local_fields.sort(key=lambda f: (not f.primary_key, f.name or ""))
-        instance.local_many_to_many.sort(key=lambda f: f.name or "")
+        instance.local_fields.sort(key=lambda f: (not f.primary_key, f.name))
+        instance.local_many_to_many.sort(key=lambda f: f.name)
 
         return instance
 

@@ -110,8 +110,9 @@ class Field[T](RegisterLookupMixin):
     cast_db_type_sql: str | None = None
 
     # Instance attributes set during field lifecycle
-    # Set by __init__
-    name: str | None
+    # Set by __init__; becomes the real field name once contributed to a
+    # model class (set_attributes_from_name, called by contribute_to_class)
+    name: str
     # Set by set_attributes_from_name (called by contribute_to_class)
     column: str
     concrete: bool
@@ -134,7 +135,7 @@ class Field[T](RegisterLookupMixin):
     non_migration_attrs: tuple[str, ...] = ()
 
     def __init__(self) -> None:
-        self.name = None  # Set by set_attributes_from_name
+        self.name = ""  # Set by set_attributes_from_name
         self.primary_key = False
         self.auto_created = False
 
@@ -151,8 +152,8 @@ class Field[T](RegisterLookupMixin):
     def __repr__(self) -> str:
         """Display the module, class, and name of the field."""
         path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
-        name = getattr(self, "name", None)
-        if name is not None:
+        name = getattr(self, "name", "")
+        if name:
             return f"<{path}: {name}>"
         return f"<{path}>"
 
@@ -164,7 +165,6 @@ class Field[T](RegisterLookupMixin):
         Check if field name is valid, i.e. 1) does not end with an
         underscore, 2) does not contain "__" and 3) is not "id".
         """
-        assert self.name is not None, "Field name must be set before checking"
         if self.name.endswith("_"):
             return [
                 PreflightResult(
@@ -215,7 +215,7 @@ class Field[T](RegisterLookupMixin):
         """
         return sql, params
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         """
         Return enough information to recreate the field as a 4-tuple:
 
@@ -259,7 +259,6 @@ class Field[T](RegisterLookupMixin):
             cls_name = self.__class__.__qualname__
             if getattr(_postgres_root, cls_name, None) is self.__class__:
                 path = f"plain.postgres.{cls_name}"
-        # Note: self.name can be None during migration state rendering when fields are cloned
         return (self.name, path, [], keywords)
 
     def clone(self) -> Self:
@@ -305,7 +304,6 @@ class Field[T](RegisterLookupMixin):
             # values - so, this is very close to normal pickle.
             state = self.__dict__.copy()
             return _empty, (self.__class__,), state
-        assert self.name is not None
         options = model.model_options
         return _load_field, (
             options.package_label,
@@ -394,7 +392,6 @@ class Field[T](RegisterLookupMixin):
         # Field is its own descriptor; make sure it is set on the class so
         # attribute access hits __get__/__set__.
         if self.column:
-            assert self.name is not None
             setattr(cls, self.name, self)
 
     # Descriptor protocol implementation
@@ -422,7 +419,6 @@ class Field[T](RegisterLookupMixin):
             return self
 
         # Instance access - get value from instance dict
-        assert self.name is not None
         data = instance.__dict__
         field_name = self.name
 
@@ -472,7 +468,6 @@ class Field[T](RegisterLookupMixin):
             stored = self.to_python(value)
 
         # Store in instance dict
-        assert self.name is not None
         instance.__dict__[self.name] = stored
 
     def __delete__(self, instance: Model) -> None:
@@ -481,7 +476,6 @@ class Field[T](RegisterLookupMixin):
 
         Removes the value from instance.__dict__.
         """
-        assert self.name is not None
         try:
             del instance.__dict__[self.name]
         except KeyError:
@@ -491,7 +485,6 @@ class Field[T](RegisterLookupMixin):
 
     def pre_save(self, model_instance: Model, add: bool) -> T | None:
         """Return field's value just before saving."""
-        assert self.name is not None
         return getattr(model_instance, self.name)
 
     def get_prep_value(self, value: Any) -> Any:
@@ -544,12 +537,10 @@ class Field[T](RegisterLookupMixin):
         return self.get_db_default_expression() is not None
 
     def save_form_data(self, instance: Model, data: Any) -> None:
-        assert self.name is not None
         setattr(instance, self.name, data)
 
     def value_from_object(self, obj: Model) -> T | None:
         """Return the value of this field in the given model instance."""
-        assert self.name is not None
         return getattr(obj, self.name)
 
 
@@ -653,7 +644,7 @@ class ColumnField[T](Field[T]):
             return None
         return self._default_empty_value
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.required is not True:
             kwargs["required"] = self.required
@@ -750,7 +741,7 @@ class DefaultableField[T](ColumnField[T]):
         # shared state across instances.
         return copy.deepcopy(self.default)
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.default is not NOT_PROVIDED:
             kwargs["default"] = self.default
@@ -891,7 +882,7 @@ class ChoicesField[T](DefaultableField[T]):
             )
         super().validate(value, model_instance)
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.choices is not None:
             choices = self.choices

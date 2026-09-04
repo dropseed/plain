@@ -1387,7 +1387,7 @@ class SQLInsertCompiler(SQLCompiler):
         return field.pre_save(obj, add=True)
 
     def assemble_as_sql(
-        self, fields: list[Any], value_rows: list[list[Any]]
+        self, fields: Sequence[Any], value_rows: list[list[Any]]
     ) -> tuple[Any, list[list[Any]]]:
         """
         Take a sequence of N fields and a sequence of M rows of values, and

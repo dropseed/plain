@@ -98,7 +98,7 @@ class TimeZoneField[
             validators=validators,
         )
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         # Don't serialize choices - they're computed dynamically from system tzdata
         kwargs.pop("choices", None)

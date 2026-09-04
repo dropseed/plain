@@ -635,8 +635,6 @@ def _compare_columns(
         if f.primary_key:
             pk_suffix = f.db_type_suffix() or ""
 
-        # Fields reached via local_fields are always contributed (name set).
-        assert f.name is not None
         statuses.append(
             ColumnStatus(
                 name=f.column,

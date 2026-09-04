@@ -238,7 +238,7 @@ class DecimalField[T: (decimal.Decimal, decimal.Decimal | None) = decimal.Decima
     def context(self) -> decimal.Context:
         return decimal.Context(prec=self.max_digits)
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.max_digits is not None:
             kwargs["max_digits"] = self.max_digits

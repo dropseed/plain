@@ -44,7 +44,7 @@ class UUIDField[T: (UUID, UUID | None) = UUID](ColumnField[T]):
     def get_db_default_expression(self) -> Func | None:
         return self._db_default_expression
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.generate:
             kwargs["generate"] = True

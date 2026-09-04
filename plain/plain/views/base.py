@@ -137,7 +137,7 @@ class View[HandlerResult = Response]:
         return self.after_response(response)
 
     async def _dispatch_handler_async(
-        self, handler: Callable[[], Awaitable[Response]]
+        self, handler: Callable[[], Awaitable[HandlerResult]]
     ) -> Response:
         try:
             result = await handler()
