@@ -24,6 +24,18 @@ class TestRedirectResponse:
     @pytest.mark.parametrize(
         "url",
         [
+            "/orders/2024-01-01:summary",  # colon later in the path
+            "?next=https://evil.com",  # colon inside a query value
+            "#section:one",  # colon inside a fragment
+            "2fa:setup",  # not a scheme — schemes must start with a letter
+        ],
+    )
+    def test_internal_url_containing_colon_allowed(self, url):
+        assert RedirectResponse(url, status_code=302).url == url
+
+    @pytest.mark.parametrize(
+        "url",
+        [
             "https://evil.com",
             "http://evil.com",
             "ftp://evil.com",
@@ -35,6 +47,16 @@ class TestRedirectResponse:
             "\thttps://evil.com",  # leading tab bypass
             "\n//evil.com",  # leading newline bypass
             "HtTpS://evil.com",  # mixed-case scheme
+            # A scheme with a single slash: browsers normalize "http:/evil.com"
+            # to "http://evil.com", so these leave the origin too.
+            "http:/evil.com",
+            "https:/evil.com",
+            "http:evil.com",  # scheme with no slashes at all
+            # Schemes that never stay on this origin, whatever the browser
+            # does with them.
+            "javascript:alert(1)",
+            "data:text/html,<h1>x",
+            "view-source:https://evil.com",  # non-alpha scheme characters
         ],
     )
     def test_external_url_rejected_by_default(self, url):
