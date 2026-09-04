@@ -93,7 +93,7 @@ def field_references(
     references_to = None
     references_through = None
     # ForeignObject always references 'id'
-    if resolve_relation(remote_field.model, *model_tuple) == reference_model_tuple and (
+    if resolve_relation(remote_field.model_ref, *model_tuple) == reference_model_tuple and (
         reference_field_name is None
         or reference_field_name == "id"
         or (reference_field is None or reference_field.primary_key)

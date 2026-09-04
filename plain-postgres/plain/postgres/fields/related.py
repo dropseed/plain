@@ -166,13 +166,13 @@ class RelatedField(FieldCacheMixin, Field):
 
     def _check_relation_model_exists(self) -> list[PreflightResult]:
         rel_is_missing = (
-            self.remote_field.model not in self.meta.models_registry.get_models()
+            self.remote_field.model_ref not in self.meta.models_registry.get_models()
         )
-        rel_is_string = isinstance(self.remote_field.model, str)
+        rel_is_string = isinstance(self.remote_field.model_ref, str)
         model_name = (
-            self.remote_field.model
+            self.remote_field.model_ref
             if rel_is_string
-            else self.remote_field.model.model_options.object_name
+            else self.remote_field.model_ref.model_options.object_name
         )
         if rel_is_missing and rel_is_string:
             return [
@@ -259,13 +259,13 @@ class RelatedField(FieldCacheMixin, Field):
         def resolve_related_class(
             model: type[Model], related: type[Model], field: RelatedField
         ) -> None:
-            field.remote_field.model = related
+            field.remote_field.model_ref = related
             field.do_related_class(related, model)
 
         lazy_related_operation(
             resolve_related_class,
             cls,
-            self.remote_field.model,
+            self.remote_field.model_ref,
             field=self,
         )
 
@@ -456,14 +456,14 @@ class ForeignKeyField(ColumnField, RelatedField):
         name, path, args, kwargs = super().deconstruct()
         kwargs["on_delete"] = self.remote_field.on_delete
 
-        if isinstance(self.remote_field.model, str):
-            if "." in self.remote_field.model:
-                package_label, model_name = self.remote_field.model.split(".")
+        if isinstance(self.remote_field.model_ref, str):
+            if "." in self.remote_field.model_ref:
+                package_label, model_name = self.remote_field.model_ref.split(".")
                 kwargs["to"] = f"{package_label}.{model_name.lower()}"
             else:
-                kwargs["to"] = self.remote_field.model.lower()
+                kwargs["to"] = self.remote_field.model_ref.lower()
         else:
-            kwargs["to"] = self.remote_field.model.model_options.label_lower
+            kwargs["to"] = self.remote_field.model_ref.model_options.label_lower
 
         return name, path, args, kwargs
 
@@ -473,10 +473,6 @@ class ForeignKeyField(ColumnField, RelatedField):
     @cached_property
     def target_field(self) -> Field:
         """A foreign key points at exactly one column: the remote model's id."""
-        if isinstance(self.remote_field.model, str):
-            raise TypeError(
-                f"Related model {self.remote_field.model!r} cannot be resolved"
-            )
         return self.remote_field.model._model_meta.get_forward_field("id")
 
     def set_attributes_from_name(self, name: str) -> None:
@@ -851,7 +847,7 @@ class ManyToManyField(RelatedField):
         return errors
 
     def _check_table_uniqueness(self, **kwargs: Any) -> list[PreflightResult]:
-        if isinstance(self.remote_field.through, str):
+        if isinstance(self.remote_field.through_ref, str):
             return []
         registered_tables = {
             model.model_options.db_table: model
@@ -880,19 +876,19 @@ class ManyToManyField(RelatedField):
         name, path, args, kwargs = super().deconstruct()
 
         # Lowercase model names as they should be treated as case-insensitive.
-        if isinstance(self.remote_field.model, str):
-            if "." in self.remote_field.model:
-                package_label, model_name = self.remote_field.model.split(".")
+        if isinstance(self.remote_field.model_ref, str):
+            if "." in self.remote_field.model_ref:
+                package_label, model_name = self.remote_field.model_ref.split(".")
                 kwargs["to"] = f"{package_label}.{model_name.lower()}"
             else:
-                kwargs["to"] = self.remote_field.model.lower()
+                kwargs["to"] = self.remote_field.model_ref.lower()
         else:
-            kwargs["to"] = self.remote_field.model.model_options.label_lower
+            kwargs["to"] = self.remote_field.model_ref.model_options.label_lower
 
-        if isinstance(self.remote_field.through, str):
-            kwargs["through"] = self.remote_field.through
+        if isinstance(self.remote_field.through_ref, str):
+            kwargs["through"] = self.remote_field.through_ref
         else:
-            kwargs["through"] = self.remote_field.through.model_options.label
+            kwargs["through"] = self.remote_field.through_ref.model_options.label
 
         return name, path, args, kwargs
 
@@ -990,12 +986,12 @@ class ManyToManyField(RelatedField):
         def resolve_through_model(
             _: Any, model: type[Model], field: ManyToManyField
         ) -> None:
-            field.remote_field.through = model
+            field.remote_field.through_ref = model
 
         lazy_related_operation(
             resolve_through_model,
             cls,
-            self.remote_field.through,
+            self.remote_field.through_ref,
             field=self,
         )
 

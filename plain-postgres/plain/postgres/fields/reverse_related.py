@@ -49,8 +49,11 @@ class ForeignObjectRel(FieldCacheMixin):
     empty_strings_allowed = False
 
     # Type annotations for instance attributes
-    model: type[Model]
     on_delete: OnDelete | None
+    # The target model as given to the field: a "package.Model" string (or
+    # "self") until lazy_related_operation resolves it to the class. Read
+    # `model` for the resolved class.
+    model_ref: str | type[Model]
 
     def __init__(
         self,
@@ -65,9 +68,7 @@ class ForeignObjectRel(FieldCacheMixin):
         # route every `self.field` read through its __get__. ForeignKeyRel
         # and ManyToManyRel below narrow this further, the same way.
         self.field: RelatedField = field
-        # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
-        # (see related.py:250 where field.remote_field.model is overwritten)
-        self.model = to  # ty: ignore[invalid-assignment]
+        self.model_ref = to
         self.related_query_name = related_query_name
         self.on_delete = on_delete
 
@@ -77,6 +78,16 @@ class ForeignObjectRel(FieldCacheMixin):
     # __init__ as the field doesn't have its model yet. Calling these methods
     # before field.contribute_to_class() has been called will result in
     # AttributeError
+    @property
+    def model(self) -> type[Model]:
+        """The resolved target model class."""
+        if isinstance(self.model_ref, str):
+            raise AttributeError(
+                f"Related model {self.model_ref!r} for {self.field!r} has not been "
+                "resolved yet; use model_ref to read the unresolved reference."
+            )
+        return self.model_ref
+
     @cached_property
     def name(self) -> str:
         return self.field.related_query_name()
@@ -113,7 +124,7 @@ class ForeignObjectRel(FieldCacheMixin):
     def identity(self) -> tuple[Any, ...]:
         return (
             self.field,
-            self.model,
+            self.model_ref,
             self.related_query_name,
             self.on_delete,
             self.symmetrical,
@@ -203,8 +214,10 @@ class ManyToManyRel(ForeignObjectRel):
     """
 
     # Type annotations for instance attributes
-    through: type[Model]
     through_fields: tuple[str, str] | None
+    # The intermediary model as given to the field; a string until
+    # lazy_related_operation resolves it. Read `through` for the class.
+    through_ref: str | type[Model]
 
     def __init__(
         self,
@@ -226,9 +239,7 @@ class ManyToManyRel(ForeignObjectRel):
         # annotation).
         self.field: ManyToManyField
 
-        # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
-        # (see related.py:1143 where field.remote_field.through is overwritten)
-        self.through = through  # ty: ignore[invalid-assignment]
+        self.through_ref = through
         self.through_fields = through_fields
 
         self.symmetrical = symmetrical
@@ -236,6 +247,16 @@ class ManyToManyRel(ForeignObjectRel):
     @property
     def identity(self) -> tuple[Any, ...]:
         return super().identity + (
-            self.through,
+            self.through_ref,
             make_hashable(self.through_fields),
         )
+
+    @property
+    def through(self) -> type[Model]:
+        """The resolved intermediary model class."""
+        if isinstance(self.through_ref, str):
+            raise AttributeError(
+                f"Through model {self.through_ref!r} for {self.field!r} has not been "
+                "resolved yet; use through_ref to read the unresolved reference."
+            )
+        return self.through_ref

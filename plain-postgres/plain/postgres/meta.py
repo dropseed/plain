@@ -178,11 +178,10 @@ class Meta:
         # ideally, we'd just ask for field.related_model. However, related_model
         # is a cached property, and all the models haven't been loaded yet, so
         # we need to make sure we don't cache a string reference.
-        if isinstance(field, RelatedField) and field.remote_field.model:
-            try:
-                field.remote_field.model._model_meta._expire_cache(forward=False)
-            except AttributeError:
-                pass
+        if isinstance(field, RelatedField):
+            remote_model = field.remote_field.model_ref
+            if not isinstance(remote_model, str):
+                remote_model._model_meta._expire_cache(forward=False)
             self._expire_cache()
         else:
             self._expire_cache(reverse=False)
@@ -326,8 +325,8 @@ class Meta:
                 if isinstance(f, RelatedField)
             )
             for f in fields_with_relations:
-                if not isinstance(f.remote_field.model, str):
-                    remote_label = f.remote_field.model.model_options.label
+                if not isinstance(f.remote_field.model_ref, str):
+                    remote_label = f.remote_field.model_ref.model_options.label
                     related_objects_graph[remote_label].append(f)
 
         for model in all_models:

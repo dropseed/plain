@@ -1111,11 +1111,11 @@ class Model(metaclass=ModelBase):
 
         for f in cls._model_meta.many_to_many:
             # Skip nonexistent models.
-            if isinstance(f.remote_field.through, str):
+            if isinstance(f.remote_field.through_ref, str):
                 continue
 
             # Check if column name for the M2M field is too long for the database.
-            for m2m in f.remote_field.through._model_meta.fields:
+            for m2m in f.remote_field.through_ref._model_meta.fields:
                 rel_name = m2m.column
                 if rel_name is not None and len(rel_name) > allowed_len:
                     errors.append(
