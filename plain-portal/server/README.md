@@ -16,7 +16,7 @@ This starts `wrangler dev` on `http://localhost:8787` with `LOCALHOST_DEV=true`.
 **Terminal 2** — Start the remote side:
 
 ```
-PLAIN_PORTAL_RELAY_HOST=localhost:8787 uv run plain portal start
+PLAIN_PORTAL_RELAY_HOST=localhost:8787 uv run plain portal start --read-only
 ```
 
 **Terminal 3** — Connect the local side:

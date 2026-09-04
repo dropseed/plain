@@ -8,6 +8,8 @@ from pathlib import Path
 
 import click
 
+from .runtime import without_runtime_setup
+
 
 def _get_agent_dirs() -> list[Path]:
     """Get list of agents/.claude/ directories from installed plain.* and plainx.* packages."""
@@ -203,6 +205,7 @@ def _cleanup_session_hook(dest_dir: Path) -> None:
         settings_file.unlink()
 
 
+@without_runtime_setup
 @click.group()
 def agent() -> None:
     """AI agent integration for Plain projects"""

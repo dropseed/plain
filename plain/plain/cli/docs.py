@@ -8,6 +8,7 @@ from pathlib import Path
 import click
 
 from .llmdocs import LLMDocs
+from .runtime import without_runtime_setup
 
 # All known official Plain packages: pip name -> short description
 KNOWN_PACKAGES = {
@@ -305,6 +306,7 @@ def _find_section_content(doc_paths: list[Path], section_heading: str) -> str | 
     return None
 
 
+@without_runtime_setup
 @click.command()
 @click.option("--api", is_flag=True, help="Show public API surface only")
 @click.option("--list", "show_list", is_flag=True, help="List available packages")

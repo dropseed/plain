@@ -148,15 +148,6 @@ class DatabaseConnection:
         assert self.connection is not None
         self.connection.autocommit = autocommit
 
-    def check_constraints(self, table_names: list[str] | None = None) -> None:
-        """
-        Check constraints by setting them to immediate. Return them to deferred
-        afterward.
-        """
-        with self.cursor() as cursor:
-            cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
-            cursor.execute("SET CONSTRAINTS ALL DEFERRED")
-
     def make_debug_cursor(self, cursor: psycopg.Cursor[Any]) -> CursorDebugWrapper:
         return CursorDebugWrapper(cursor, self)
 
@@ -615,7 +606,8 @@ class DatabaseConnection:
                 WHERE fka.attrelid = c.confrelid AND fka.attnum = c.confkey[1]),
                 c.convalidated,
                 pg_get_constraintdef(c.oid),
-                c.confdeltype
+                c.confdeltype,
+                c.condeferrable
             FROM pg_constraint AS c
             JOIN pg_class AS cl ON c.conrelid = cl.oid
             WHERE cl.relname = %s AND pg_catalog.pg_table_is_visible(cl.oid)
@@ -630,6 +622,7 @@ class DatabaseConnection:
             validated,
             constraintdef,
             confdeltype,
+            condeferrable,
         ) in cursor.fetchall():
             constraints[constraint] = {
                 "columns": columns,
@@ -639,6 +632,7 @@ class DatabaseConnection:
                 "definition": constraintdef,
                 "validated": validated,
                 "on_delete_action": confdeltype if kind == "f" else None,
+                "deferrable": condeferrable if kind == "f" else None,
             }
         # Now get indexes. Sort order, opclasses, INCLUDE, and predicates all
         # ride along inside `pg_get_indexdef` and are compared via the

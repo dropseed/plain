@@ -49,6 +49,11 @@ dev = [
   "psycopg[binary]>=3.2.12",
 ]
 
+[tool.uv]
+# The workspace root is not a package. Without this, `uv sync` installs it
+# through the legacy setuptools fallback and litters build/ and *.egg-info.
+package = false
+
 [tool.uv.sources]
 "plain" = { workspace = true }
 "plain-admin" = { workspace = true }

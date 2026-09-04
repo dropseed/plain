@@ -195,6 +195,7 @@ def test_add_foreign_key_fix_blocking_add_then_nonblocking_validate(spy: _Spy):
         column="widget_id",
         target_table="examples_widget",
         target_column="id",
+        on_delete_clause=" ON DELETE CASCADE",
     )
     correction.apply()
     assert len(spy.commit_calls) == 2

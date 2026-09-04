@@ -32,19 +32,6 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
-            name="ChildNoAction",
-            fields=[
-                ("id", postgres.PrimaryKeyField()),
-                (
-                    "parent",
-                    postgres.ForeignKeyField(
-                        on_delete=plain.postgres.deletion.NO_ACTION,
-                        to="examples.deleteparent",
-                    ),
-                ),
-            ],
-        ),
-        migrations.CreateModel(
             name="ChildCascade",
             fields=[
                 ("id", postgres.PrimaryKeyField()),

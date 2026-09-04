@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import traceback
-from importlib.metadata import version
+from importlib.metadata import EntryPoint, entry_points, version
 from typing import Any
 
 import click
@@ -38,7 +38,8 @@ def plain_cli() -> None:
 
 # Maps top-level command names to the PLAIN_ENV they imply. Set before
 # plain.runtime.setup() runs so plain.dev's dotenv loader picks up the right
-# `.env.<env>*` files for the active command.
+# `.env.<env>*` files for the active command. `plain env` isn't here — it runs
+# without setup and sets its own PLAIN_ENV.
 _PLAIN_ENV_DEFAULTS = {
     "dev": "dev",
     "test": "test",
@@ -63,6 +64,49 @@ plain_cli.add_command(upgrade)
 plain_cli.add_command(server)
 
 
+class EntryPointCommands(click.Group):
+    """Commands packages contribute through the `plain.cli` entry point group.
+
+    Everything here runs *without* `plain.runtime.setup()` — being in this group
+    is the definition of a command that has to work before the app can load.
+    Entry points are only imported when one of their commands is actually asked
+    for, so an installed package costs nothing until it is used.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self._entry_points = {
+            entry_point.name: entry_point
+            for entry_point in entry_points(group="plain.cli")
+        }
+
+    def list_commands(self, ctx: Context) -> list[str]:
+        return sorted(self._entry_points)
+
+    def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
+        entry_point = self._entry_points.get(cmd_name)
+        if entry_point is None:
+            return None
+
+        try:
+            cmd = entry_point.load()
+        except Exception as e:
+            raise click.ClickException(
+                f"The `{cmd_name}` command from {_entry_point_package(entry_point)} "
+                f"could not be loaded ({entry_point.value}): {e}"
+            ) from e
+
+        cmd.without_runtime_setup = True
+        return cmd
+
+
+def _entry_point_package(entry_point: EntryPoint) -> str:
+    """The installed package an entry point came from, for error messages."""
+    if entry_point.dist:
+        return entry_point.dist.name
+    return "an unknown package"
+
+
 class CLIRegistryGroup(click.Group):
     """
     Click Group that exposes commands from the CLI registry.
@@ -84,17 +128,20 @@ class PlainCommandCollection(click.CommandCollection):
     context_class = PlainContext
 
     def __init__(self, *args: Any, **kwargs: Any):
-        # Start with only built-in commands (no setup needed)
-        sources = [plain_cli]
+        # Commands that don't need setup: built-ins first, so a package entry
+        # point can never take over a built-in name.
+        sources = [plain_cli, EntryPointCommands()]
 
         super().__init__(*args, **kwargs)
         self.sources = sources
         self._registry_group = None
         self._setup_attempted = False
+        self._setup_error: Exception | None = None
+        self._setup_warned = False
 
-    def _ensure_registry_loaded(self) -> None:
-        """Lazy load the registry group (requires setup)."""
-        if self._registry_group is not None or self._setup_attempted:
+    def _load_registry(self) -> None:
+        """Run setup() once, remembering a failure instead of raising it."""
+        if self._setup_attempted:
             return
 
         self._setup_attempted = True
@@ -104,33 +151,67 @@ class PlainCommandCollection(click.CommandCollection):
             self._registry_group = CLIRegistryGroup()
             # Add registry group to sources
             self.sources.insert(0, self._registry_group)
-        except plain.runtime.AppPathNotFound:
+        except Exception as e:
+            self._setup_error = e
+
+    def _warn_once(self, message: str) -> None:
+        """Warn that some commands are missing, however many times we're asked."""
+        if self._setup_warned:
+            return
+
+        self._setup_warned = True
+        click.secho(message, fg="yellow", err=True)
+
+    def _ensure_registry_loaded(self, cmd_name: str, *, required: bool = True) -> None:
+        """Lazy load the registry group (requires setup).
+
+        `cmd_name` is the command that made us load the app, so a failure can
+        say which one. A name that isn't a built-in could still be an app or
+        package command, so we can't tell a typo from a real command until the
+        registry loads — when it doesn't, the app's failure is the real answer.
+
+        `required` is False when we're only listing commands for help. The
+        registry would have added to that listing, but the built-ins are still
+        worth showing — especially to someone trying to fix the app that just
+        failed to load — so a failure there is a warning rather than an exit.
+        """
+        self._load_registry()
+
+        error = self._setup_error
+        if error is None:
+            return
+
+        if isinstance(error, plain.runtime.AppPathNotFound):
             # Allow built-in commands to work regardless of being in a valid app
-            click.secho(
-                "Plain `app` directory not found. Some commands may be missing.",
-                fg="yellow",
-                err=True,
+            self._warn_once(
+                "Plain `app` directory not found. Some commands may be missing."
             )
-        except ImproperlyConfigured as e:
+            return
+
+        if not required:
+            self._warn_once(
+                f"App and package commands are missing — the app failed to load: {error}"
+            )
+            return
+
+        if isinstance(error, ImproperlyConfigured):
             # Show what was configured incorrectly and exit
             click.secho(
-                str(e),
+                str(error),
                 fg="red",
                 err=True,
             )
             sys.exit(1)
-        except Exception as e:
-            # Show the exception and exit
-            print("---")
-            print(traceback.format_exc())
-            print("---")
 
-            click.secho(
-                f"Error: {e}",
-                fg="red",
-                err=True,
-            )
-            sys.exit(1)
+        # Traceback on stderr too, so it stays directly above the error line
+        # when output is piped or redirected.
+        click.echo("".join(traceback.format_exception(error)), err=True)
+        click.secho(
+            f"Error loading the app, which `plain {cmd_name}` needs: {error}",
+            fg="red",
+            err=True,
+        )
+        sys.exit(1)
 
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         # Set PLAIN_ENV default before any setup runs so plain.dev's dotenv
@@ -143,11 +224,11 @@ class PlainCommandCollection(click.CommandCollection):
 
         if cmd is None:
             # Command not found in built-ins, try registry (requires setup)
-            self._ensure_registry_loaded()
+            self._ensure_registry_loaded(cmd_name)
             cmd = super().get_command(ctx, cmd_name)
         elif not getattr(cmd, "without_runtime_setup", False):
             # Command found but needs setup - ensure registry is loaded
-            self._ensure_registry_loaded()
+            self._ensure_registry_loaded(cmd_name)
 
         if cmd:
             # Pass the formatting down to subcommands automatically
@@ -156,21 +237,20 @@ class PlainCommandCollection(click.CommandCollection):
 
     def list_commands(self, ctx: Context) -> list[str]:
         # For help listing, we need to show registry commands too
-        self._ensure_registry_loaded()
+        self._ensure_registry_loaded("--help", required=False)
         return super().list_commands(ctx)
 
     def format_commands(self, ctx: Context, formatter: Any) -> None:
         """Format commands with separate sections for common, core, and package commands."""
-        self._ensure_registry_loaded()
+        self._ensure_registry_loaded("--help", required=False)
 
-        # Get all commands from both sources, tracking their source
+        # Get every command, remembering whether it is one of Plain's own
         commands = []
-        for source_index, source in enumerate(self.sources):
+        for source in self.sources:
             for name in source.list_commands(ctx):
                 cmd = source.get_command(ctx, name)
                 if cmd is not None:
-                    # source_index 0 = plain_cli (core), 1+ = registry (packages)
-                    commands.append((name, cmd, source_index))
+                    commands.append((name, cmd, source is plain_cli))
 
         if not commands:
             return
@@ -183,7 +263,7 @@ class PlainCommandCollection(click.CommandCollection):
         core_commands = []
         package_commands = []
 
-        for name, cmd, source_index in commands:
+        for name, cmd, is_core in commands:
             help_text = cmd.get_short_help_str(limit=200)
 
             # Check if command is marked as common via decorator
@@ -198,12 +278,11 @@ class PlainCommandCollection(click.CommandCollection):
                         alias_info = click.style(f"(→ {shortcut_for})", italic=True)
                         help_text = f"{help_text} {alias_info}"
                 common_commands.append((name, help_text))
-            elif source_index == 0:
-                # Package command (from registry, inserted at index 0)
-                package_commands.append((name, help_text))
-            else:
-                # Core command (from plain_cli, at index 1)
+            elif is_core:
                 core_commands.append((name, help_text))
+            else:
+                # From the registry or a `plain.cli` entry point
+                package_commands.append((name, help_text))
 
         # Write common commands section if any exist
         if common_commands:

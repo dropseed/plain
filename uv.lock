@@ -739,7 +739,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.160.0"
+version = "0.161.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -976,10 +976,11 @@ dev = [
 
 [[package]]
 name = "plain-dev"
-version = "0.66.1"
+version = "0.67.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
+    { name = "cryptography" },
     { name = "plain" },
     { name = "plain-assets" },
     { name = "rich" },
@@ -993,6 +994,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
+    { name = "cryptography", specifier = ">=42" },
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
     { name = "rich" },
@@ -1288,7 +1290,7 @@ dev = [
 
 [[package]]
 name = "plain-portal"
-version = "0.2.10"
+version = "0.3.0"
 source = { editable = "plain-portal" }
 dependencies = [
     { name = "plain" },
@@ -1315,7 +1317,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-postgres"
-version = "0.114.0"
+version = "0.115.0"
 source = { editable = "plain-postgres" }
 dependencies = [
     { name = "plain" },

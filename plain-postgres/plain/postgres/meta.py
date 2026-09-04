@@ -16,7 +16,11 @@ if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.constraints import BaseConstraint
     from plain.postgres.fields import Field
-    from plain.postgres.fields.related import ManyToManyField, RelatedField
+    from plain.postgres.fields.related import (
+        ForeignKeyField,
+        ManyToManyField,
+        RelatedField,
+    )
     from plain.postgres.fields.reverse_related import ForeignObjectRel
 
 EMPTY_RELATION_TREE = ()
@@ -572,4 +576,16 @@ class Meta:
         return {
             constraint.name: constraint
             for constraint in self.model.model_options.constraints
+        }
+
+    @property
+    def foreign_keys_by_constraint_name(self) -> dict[str, ForeignKeyField]:
+        """Map each foreign key's database constraint name to its field — the
+        FK counterpart of ``constraints_by_name``, for the same error path."""
+        from plain.postgres.fields.related import ForeignKeyField
+
+        return {
+            field.db_constraint_name(): field
+            for field in self.local_fields
+            if isinstance(field, ForeignKeyField)
         }

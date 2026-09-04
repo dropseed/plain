@@ -938,9 +938,9 @@ class QuerySet[T: "Model"]:
         del_query.sql_query.select_related = False
         del_query.sql_query.clear_ordering(force=True)
 
-        # FK errors (RESTRICT / NO_ACTION) leave the DB transaction aborted.
-        # Mark the connection so outer atomic() blocks see the abort state
-        # even if the caller catches IntegrityError themselves.
+        # RESTRICT violations leave the DB transaction aborted. Mark the
+        # connection so outer atomic() blocks see the abort state even if the
+        # caller catches IntegrityError themselves.
         with transaction.mark_for_rollback_on_error():
             count = del_query._raw_delete()
 

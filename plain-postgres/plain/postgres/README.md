@@ -983,6 +983,14 @@ The first access to any non-key field loads the whole row in a single query. The
 
 The partial-instance shortcut is safe because Plain always creates a database foreign-key constraint, so the referenced row is guaranteed to exist.
 
+### Constraints are checked immediately
+
+Every constraint is checked at the write that violates it, never at commit — the same as Postgres's own default. Inserting a child row that points at a parent that doesn't exist yet fails at that `INSERT`, with a traceback pointing at the offending write, and deleting a parent with `RESTRICT` children fails at that `DELETE`. Create parents before children. A cycle of foreign keys needs a nullable back-reference: create both rows, then `update()` the back-reference. Two required foreign keys pointing at each other can never be inserted.
+
+To swap two rows' values under a unique constraint (reordering by `position`, say), move one row to a temporary value first — a single `UPDATE` that swaps them fails, because Postgres checks uniqueness per row.
+
+A migration can add a column, backfill it in `RunPython`, and drop or alter columns on the same table, all in one transaction.
+
 ### Reverse relationships
 
 When you define a `ForeignKey` or `ManyToManyField`, Plain automatically creates a reverse accessor on the related model (like `author.book_set`). You can explicitly declare these reverse relationships using [`ReverseForeignKey`](./fields/reverse_descriptors.py#ReverseForeignKey) and [`ReverseManyToMany`](./fields/reverse_descriptors.py#ReverseManyToMany):
@@ -1087,7 +1095,7 @@ class User(postgres.Model):
 
 Field-level validation happens automatically based on field types and constraints.
 
-**The database is authoritative for constraints.** `create()`/`update()` don't pre-check your declared unique/check constraints — they attempt the write, and if Postgres rejects it, translate the `IntegrityError` into a `ValidationError` (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). You get the same field-level error you'd expect, the write costs no per-constraint `SELECT`, and a raced concurrent insert can't slip through as a 500. (FK violations, `NOT NULL`, and a hand-set primary-key collision have no declared constraint to map to and re-raise as the original `IntegrityError`. `create()` always inserts, so passing a stray `id` that already exists is rejected by Postgres as the original `IntegrityError`.)
+**The database is authoritative for constraints.** `create()`/`update()` don't pre-check your declared unique/check constraints — they attempt the write, and if Postgres rejects it, translate the `IntegrityError` into a `ValidationError` (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). You get the same field-level error you'd expect, the write costs no per-constraint `SELECT`, and a raced concurrent insert can't slip through as a 500. A foreign key pointing at a row that doesn't exist maps the same way, as an error on that field. (`NOT NULL` and a hand-set primary-key collision have no declared constraint to map to and re-raise as the original `IntegrityError`. `create()` always inserts, so passing a stray `id` that already exists is rejected by Postgres as the original `IntegrityError`.)
 
 Because the rejected write reaches the database, it aborts the surrounding transaction. If you catch the `ValidationError` and want to keep using the transaction, wrap the write in `transaction.atomic()` so it rolls back to a savepoint:
 
@@ -1101,7 +1109,7 @@ except ValidationError:
 
 Forms are the exception: a `ModelForm` pre-checks constraints explicitly (a `validate_constraints()` call in its `_post_clean`) so it can surface every violation at once, then writes via `form.create()`/`form.update()` with validation already done. A direct `create()`/`update()` reports the first violation Postgres hits.
 
-This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to. If you retry on a unique conflict, catch both:
+This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to, and so does a `delete()` blocked by `RESTRICT` children. If you retry on a unique conflict, catch both:
 
 ```python
 try:
@@ -1111,8 +1119,6 @@ except (psycopg.IntegrityError, ValidationError):
 ```
 
 For a plain insert-or-update with no per-row logic, `bulk_create(..., update_conflicts=True, unique_fields=[...])` is an atomic upsert with no race to catch.
-
-Two caveats. The mapping covers **immediate** constraints — the default. An explicitly deferred constraint (`UniqueConstraint(deferrable=Deferrable.DEFERRED)`) is checked at commit, _after_ the write returns, so its violation still surfaces as a raw `psycopg.IntegrityError`. And when a row violates several constraints at once, a form's pre-check (or an explicit `validate_constraints()`) reports them all, while a direct `create()`/`update()` gets only the first one the database hits.
 
 ### Indexes and constraints
 
