@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.26.8](https://github.com/dropseed/plain/releases/plain-passwords@0.26.8) (2026-09-04)
+
+### What's changed
+
+- `PasswordField.deconstruct()` returns `tuple[str, str, list, dict]`, matching `plain.postgres`'s `Field.name` now being `str` rather than `str | None`. The `assert self.name is not None` in `pre_save()` is gone with it. No runtime behavior changed ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.26.7](https://github.com/dropseed/plain/releases/plain-passwords@0.26.7) (2026-08-12)
 
 ### What's changed
