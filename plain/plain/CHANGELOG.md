@@ -1,5 +1,21 @@
 # plain changelog
 
+## [0.162.0](https://github.com/dropseed/plain/releases/plain@0.162.0) (2026-09-04)
+
+### What's changed
+
+- `plain agent`, `plain docs`, `plain install`, and `plain utils` no longer run `plain.runtime.setup()`. None of them read settings or models, and they're exactly the commands you reach for when the app won't load — installing a package, reading docs about the error, wiring up agent rules. They now work in a broken app, and in a directory that isn't a Plain app at all ([28eeef062e](https://github.com/dropseed/plain/commit/28eeef062e))
+- `plain --help` still lists the built-in commands when the app fails to load. Previously any setup exception exited 1, so the app's own failure hid the help output from the person trying to fix it. Loading the app for a help listing now warns — `App and package commands are missing — the app failed to load: ...` — instead of exiting, and the app and package commands are simply absent from the listing ([e4f3897984](https://github.com/dropseed/plain/commit/e4f3897984))
+- A CLI app-load failure now names the command that needed the app — "Error loading the app, which `plain shell` needs: ..." — and prints the traceback on stderr alongside the error line instead of stdout, so it stays with the error when output is piped or redirected. A command name that isn't a built-in could still be an app or package command, so an unknown name reports the app's load failure rather than "no such command" ([e1d1f50faa](https://github.com/dropseed/plain/commit/e1d1f50faa))
+- `RedirectResponse` now rejects any scheme-prefixed URL, not just ones containing `://`. Browsers normalize `http:/evil.com` (single slash) and `http:evil.com` (no slashes) to `http://evil.com`, so the old `://` check let those through as internal redirects; `javascript:`, `data:`, and schemes with non-alphabetic characters like `view-source:` were also missed. Internal URLs that merely contain a colon — `/orders/2024-01-01:summary`, `?next=...`, `#section:one` — are still allowed, since a URI scheme has to start the string and start with a letter ([95655ebfd5](https://github.com/dropseed/plain/commit/95655ebfd5))
+- `ImmutableList` is now generic — `ImmutableList[T]` subscripts to the element type instead of erasing to `tuple` ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+- `Client.cookies` and `RequestFactory.cookies` are typed as `SimpleCookie` rather than `SimpleCookie[str]`, matching what the stdlib actually parameterizes ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+- `View._dispatch_handler_async` accepts a handler returning the view's `HandlerResult` instead of a bare `Response`, so async handlers on a `View[T]` type-check ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+
+### Upgrade instructions
+
+- If you relied on `RedirectResponse` accepting a scheme-prefixed URL as internal (for example redirecting to `mailto:` or a custom app scheme), pass `allow_external=True` explicitly.
+
 ## [0.161.0](https://github.com/dropseed/plain/releases/plain@0.161.0) (2026-09-02)
 
 ### What's changed
