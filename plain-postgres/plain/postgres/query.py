@@ -638,14 +638,12 @@ class QuerySet[T: "Model"]:
                 raise ValueError(
                     "Unique fields that can trigger the upsert must be provided."
                 )
-            # Updating primary keys and non-concrete fields is forbidden.
+            # Updating primary keys and many-to-many fields is forbidden.
             from plain.postgres.fields.related import ManyToManyField
 
-            if any(
-                not f.concrete or isinstance(f, ManyToManyField) for f in update_fields
-            ):
+            if any(isinstance(f, ManyToManyField) for f in update_fields):
                 raise ValueError(
-                    "bulk_create() can only be used with concrete fields in "
+                    "bulk_create() cannot be used with many-to-many fields in "
                     "update_fields."
                 )
             if any(f.primary_key for f in update_fields):
@@ -655,12 +653,9 @@ class QuerySet[T: "Model"]:
             if unique_fields:
                 from plain.postgres.fields.related import ManyToManyField
 
-                if any(
-                    not f.concrete or isinstance(f, ManyToManyField)
-                    for f in unique_fields
-                ):
+                if any(isinstance(f, ManyToManyField) for f in unique_fields):
                     raise ValueError(
-                        "bulk_create() can only be used with concrete fields "
+                        "bulk_create() cannot be used with many-to-many fields "
                         "in unique_fields."
                     )
             return OnConflict.UPDATE
@@ -758,8 +753,8 @@ class QuerySet[T: "Model"]:
         ]
         from plain.postgres.fields.related import ManyToManyField
 
-        if any(not f.concrete or isinstance(f, ManyToManyField) for f in fields_list):
-            raise ValueError("bulk_update() can only be used with concrete fields.")
+        if any(isinstance(f, ManyToManyField) for f in fields_list):
+            raise ValueError("bulk_update() cannot be used with many-to-many fields.")
         if any(f.primary_key for f in fields_list):
             raise ValueError("bulk_update() cannot be used with primary key fields.")
         if not objs_tuple:
