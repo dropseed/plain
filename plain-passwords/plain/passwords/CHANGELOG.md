@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.26.9](https://github.com/dropseed/plain/releases/plain-passwords@0.26.9) (2026-09-04)
+
+### What's changed
+
+- `PasswordSetForm` resolves the user's `password` field with `get_forward_field()` and asserts it's a `ColumnField` before calling `clean()`, replacing a type-checker ignore. A model whose `password` attribute isn't a column field now raises a clear `TypeError` naming the model instead of an `AttributeError` from the `clean()` call ([d9406dfc6f](https://github.com/dropseed/plain/commit/d9406dfc6f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.26.8](https://github.com/dropseed/plain/releases/plain-passwords@0.26.8) (2026-09-04)
 
 ### What's changed
