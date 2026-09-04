@@ -139,7 +139,7 @@ class MigrationAutodetector:
         fields_def = []
         for name, field in sorted(fields.items()):
             deconstruction = self.deep_deconstruct(field)
-            if isinstance(field, RelatedField) and field.remote_field.model:
+            if isinstance(field, RelatedField) and field.remote_field.model_ref:
                 deconstruction[2].pop("to", None)
             fields_def.append(deconstruction)
         return fields_def
@@ -244,11 +244,9 @@ class MigrationAutodetector:
             )
             old_model_state = self.from_state.models[package_label, old_model_name]
             for field_name, field in old_model_state.fields.items():
-                if hasattr(field, "remote_field") and getattr(
-                    field.remote_field, "through", None
-                ):
+                if isinstance(field, ManyToManyField):
                     through_key = resolve_relation(
-                        field.remote_field.through,  # ty: ignore[unresolved-attribute]
+                        field.remote_field.through_ref,
                         package_label,
                         model_name,
                     )
@@ -537,7 +535,7 @@ class MigrationAutodetector:
             related_fields = {}
             for field_name, field in model_state.fields.items():
                 if isinstance(field, RelatedField):
-                    if field.remote_field.model:
+                    if field.remote_field.model_ref:
                         related_fields[field_name] = field
                     if isinstance(field.remote_field, ManyToManyRel):
                         related_fields[field_name] = field
@@ -639,7 +637,7 @@ class MigrationAutodetector:
             related_fields = {}
             for field_name, field in model_state.fields.items():
                 if isinstance(field, RelatedField):
-                    if field.remote_field.model:
+                    if field.remote_field.model_ref:
                         related_fields[field_name] = field
                     if isinstance(field.remote_field, ManyToManyRel):
                         related_fields[field_name] = field
@@ -720,7 +718,7 @@ class MigrationAutodetector:
                     if (
                         isinstance(field, RelatedField)
                         and field.remote_field
-                        and field.remote_field.model
+                        and field.remote_field.model_ref
                         and "to" in old_field_dec[2]
                     ):
                         old_rel_to = old_field_dec[2]["to"]
@@ -790,7 +788,7 @@ class MigrationAutodetector:
             (package_label, model_name, field_name, False)
         ]
         # Fields that are foreignkeys/m2ms depend on stuff.
-        if isinstance(field, RelatedField) and field.remote_field.model:
+        if isinstance(field, RelatedField) and field.remote_field.model_ref:
             dependencies.extend(
                 self._get_dependencies_for_foreign_key(
                     package_label,
@@ -888,16 +886,16 @@ class MigrationAutodetector:
             dependencies: list[tuple[str, str, str | None, bool | str]] = []
             # Implement any model renames on relations; these are handled by RenameModel
             # so we need to exclude them from the comparison
-            if hasattr(new_field, "remote_field") and getattr(
-                new_field.remote_field, "model", None
-            ):
+            if isinstance(new_field, RelatedField):
                 rename_key = resolve_relation(
-                    new_field.remote_field.model,  # ty: ignore[unresolved-attribute]
+                    new_field.remote_field.model_ref,
                     package_label,
                     model_name,
                 )
-                if rename_key in self.renamed_models:
-                    new_field.remote_field.model = old_field.remote_field.model  # ty: ignore[unresolved-attribute]
+                if rename_key in self.renamed_models and isinstance(
+                    old_field, RelatedField
+                ):
+                    new_field.remote_field.model_ref = old_field.remote_field.model_ref
                 dependencies.extend(
                     self._get_dependencies_for_foreign_key(
                         package_label,
@@ -906,16 +904,18 @@ class MigrationAutodetector:
                         self.to_state,
                     )
                 )
-            if hasattr(new_field, "remote_field") and getattr(
-                new_field.remote_field, "through", None
-            ):
+            if isinstance(new_field, ManyToManyField):
                 rename_key = resolve_relation(
-                    new_field.remote_field.through,  # ty: ignore[unresolved-attribute]
+                    new_field.remote_field.through_ref,
                     package_label,
                     model_name,
                 )
-                if rename_key in self.renamed_models:
-                    new_field.remote_field.through = old_field.remote_field.through  # ty: ignore[unresolved-attribute]
+                if rename_key in self.renamed_models and isinstance(
+                    old_field, ManyToManyField
+                ):
+                    new_field.remote_field.through_ref = (
+                        old_field.remote_field.through_ref
+                    )
             old_field_dec = self.deep_deconstruct(old_field)
             new_field_dec = self.deep_deconstruct(new_field)
             # Exclude non_migration_attrs (allow_null, default, on_delete, choices,
@@ -1004,7 +1004,7 @@ class MigrationAutodetector:
     ) -> list[tuple[str, str, str | None, bool | str]]:
         remote_field_model = None
         if isinstance(field, RelatedField):
-            remote_field_model = field.remote_field.model
+            remote_field_model = field.remote_field.model_ref
         else:
             relations = project_state.relations[package_label, model_name]
             for (remote_package_label, remote_model_name), fields in relations.items():
@@ -1027,7 +1027,7 @@ class MigrationAutodetector:
             field.remote_field, ManyToManyRel
         ):
             through_package_label, through_object_name = resolve_relation(
-                field.remote_field.through,
+                field.remote_field.through_ref,
                 package_label,
                 model_name,
             )
