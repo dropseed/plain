@@ -772,7 +772,7 @@ dev = [
 
 [[package]]
 name = "plain-admin"
-version = "0.86.1"
+version = "0.86.2"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },

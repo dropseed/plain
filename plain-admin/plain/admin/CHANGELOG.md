@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.86.2](https://github.com/dropseed/plain/releases/plain-admin@0.86.2) (2026-09-04)
+
+### What's changed
+
+- `AdminModelListView` looks up the primary key field with `get_forward_field("id")` instead of `get_field("id")`, so the `to_python()` call that coerces incoming ids is statically known to exist rather than suppressed with a type-checker ignore ([d9406dfc6f](https://github.com/dropseed/plain/commit/d9406dfc6f))
+- `AdminModelDetailView.get_fields()` dropped its `if f.concrete` filter, following the removal of `Field.concrete` in plain-postgres. `get_fields()` returns forward fields only, and `concrete` was `True` for all of them, so the displayed fields are unchanged ([af56244677](https://github.com/dropseed/plain/commit/af56244677))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.86.1](https://github.com/dropseed/plain/releases/plain-admin@0.86.1) (2026-09-04)
 
 ### What's changed
