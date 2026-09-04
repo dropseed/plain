@@ -135,7 +135,7 @@ class DatabaseSchemaEditor:
         """Take a model and return its table definition."""
         column_sqls = []
         params = []
-        for field in model._model_meta.local_fields:
+        for field in model._model_meta.fields:
             definition, extra_params = self.column_sql(
                 model, field, include_default=field.has_persistent_column_default()
             )

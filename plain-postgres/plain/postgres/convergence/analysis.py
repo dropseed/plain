@@ -585,7 +585,7 @@ def _compare_columns(
     statuses: list[ColumnStatus] = []
     expected_col_names: set[str] = set()
 
-    for f in model._model_meta.local_fields:
+    for f in model._model_meta.fields:
         db_type = f.db_type()
         if db_type is None:
             continue
@@ -1188,7 +1188,7 @@ def _compare_check_constraints(
     # ignored rather than surfaced as undeclared user constraints.
     internal_checks = {
         generate_notnull_check_name(table, f.column)
-        for f in model._model_meta.local_fields
+        for f in model._model_meta.fields
         if f.db_type() is not None
     }
 
@@ -1240,7 +1240,7 @@ def _compare_foreign_keys(
     # Expected FKs from model fields, keyed by shape (column, target_table,
     # target_column) — the DB-side identity, since names can lag a rename.
     expected_fks: dict[tuple[str, str, str], ForeignKeyField] = {}
-    for f in model._model_meta.local_fields:
+    for f in model._model_meta.fields:
         if isinstance(f, ForeignKeyField):
             to_table = f.target_field.model.model_options.db_table
             expected_fks[(f.column, to_table, f.target_field.column)] = f

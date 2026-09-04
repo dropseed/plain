@@ -676,7 +676,7 @@ class ModelState:
         """Given a model, return a ModelState representing it."""
         # Deconstruct the fields
         fields = []
-        for field in model._model_meta.local_fields:
+        for field in model._model_meta.fields:
             if getattr(field, "remote_field", None) and exclude_rels:
                 continue
             name = field.name
@@ -688,7 +688,7 @@ class ModelState:
                     f"Couldn't reconstruct field {name} on {model.model_options.label}: {e}"
                 )
         if not exclude_rels:
-            for field in model._model_meta.local_many_to_many:
+            for field in model._model_meta.many_to_many:
                 name = field.name
                 assert name is not None
                 try:

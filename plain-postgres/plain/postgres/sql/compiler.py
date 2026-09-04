@@ -786,7 +786,7 @@ class SQLCompiler:
             opts = self.query.model._model_meta
         start_alias = start_alias or self.query.get_initial_alias()
 
-        for field in opts.concrete_fields:
+        for field in opts.fields:
             if select_mask and field not in select_mask:
                 continue
             result.append(field.get_col(start_alias))

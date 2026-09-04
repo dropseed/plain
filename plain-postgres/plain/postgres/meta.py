@@ -48,9 +48,7 @@ class Meta:
         {
             "fields",
             "many_to_many",
-            "concrete_fields",
-            "local_concrete_fields",
-            "_non_pk_concrete_field_names",
+            "_non_pk_field_names",
             "_forward_fields_map",
             "base_queryset",
         }
@@ -62,8 +60,10 @@ class Meta:
     model: type[Model]
     models_registry: Any
     _get_fields_cache: dict[Any, Any]
-    local_fields: list[ColumnField]
-    local_many_to_many: list[ManyToManyField]
+    # Mutable storage filled by add_field() while the model class is being
+    # built; read them through `fields` and `many_to_many`.
+    _fields: list[ColumnField]
+    _many_to_many: list[ManyToManyField]
 
     def __init__(self, models_registry: Any | None = None):
         """
@@ -111,8 +111,8 @@ class Meta:
         instance.model = model
         instance.models_registry = self._models_registry or default_models_registry
         instance._get_fields_cache = {}
-        instance.local_fields = []
-        instance.local_many_to_many = []
+        instance._fields = []
+        instance._many_to_many = []
 
         # Cache the instance BEFORE processing fields to prevent recursion
         self._cache[model] = instance
@@ -137,8 +137,8 @@ class Meta:
                     field.contribute_to_class(model, attr_name)
 
         # Sort fields: primary key first, then alphabetically by name
-        instance.local_fields.sort(key=lambda f: (not f.primary_key, f.name))
-        instance.local_many_to_many.sort(key=lambda f: f.name)
+        instance._fields.sort(key=lambda f: (not f.primary_key, f.name))
+        instance._many_to_many.sort(key=lambda f: f.name)
 
         return instance
 
@@ -164,9 +164,9 @@ class Meta:
         # two lists homogeneous is what lets the rest of the framework read
         # column attributes off `fields` without re-checking each one.
         if isinstance(field, ManyToManyField):
-            self.local_many_to_many.append(field)
+            self._many_to_many.append(field)
         elif isinstance(field, ColumnField):
-            self.local_fields.append(field)
+            self._fields.append(field)
         else:
             raise TypeError(f"{field!r} is neither a ColumnField nor a ManyToManyField")
 
@@ -190,60 +190,25 @@ class Meta:
     @cached_property
     def fields(self) -> ImmutableList[ColumnField]:
         """
-        Return a list of all column-backed forward fields on the model,
-        excluding ManyToManyFields.
+        All column-backed fields on the model, primary key first and then
+        sorted by name. ManyToManyFields live in `many_to_many`.
 
         Private API intended only to be used by Plain itself; get_fields()
         combined with filtering of field properties is the public API for
         obtaining this field list.
         """
-        return make_immutable_fields_list("fields", self.local_fields)
+        return make_immutable_fields_list("fields", self._fields)
 
     @cached_property
-    def concrete_fields(self) -> ImmutableList[ColumnField]:
+    def many_to_many(self) -> ImmutableList[ManyToManyField]:
         """
-        Return a list of all concrete fields on the model and its parents.
-
-        Private API intended only to be used by Plain itself; get_fields()
-        combined with filtering of field properties is the public API for
-        obtaining this field list.
-        """
-        return make_immutable_fields_list(
-            "concrete_fields", (f for f in self.fields if f.concrete)
-        )
-
-    @cached_property
-    def local_concrete_fields(self) -> ImmutableList[ColumnField]:
-        """
-        Return a list of all concrete fields on the model.
-
-        Private API intended only to be used by Plain itself; get_fields()
-        combined with filtering of field properties is the public API for
-        obtaining this field list.
-        """
-        return make_immutable_fields_list(
-            "local_concrete_fields", (f for f in self.local_fields if f.concrete)
-        )
-
-    @cached_property
-    def many_to_many(self) -> ImmutableList[Field]:
-        """
-        Return a list of all many to many fields on the model and its parents.
+        All ManyToManyFields on the model, sorted by name.
 
         Private API intended only to be used by Plain itself; get_fields()
         combined with filtering of field properties is the public API for
         obtaining this list.
         """
-        from plain.postgres.fields.related import ManyToManyField
-
-        return make_immutable_fields_list(
-            "many_to_many",
-            (
-                f
-                for f in self._get_fields(reverse=False)
-                if isinstance(f, ManyToManyField)
-            ),
-        )
+        return make_immutable_fields_list("many_to_many", self._many_to_many)
 
     @cached_property
     def related_objects(self) -> ImmutableList[ForeignObjectRel]:
@@ -497,8 +462,8 @@ class Meta:
                 collected.append(field.remote_field)
 
         if forward:
-            collected += self.local_fields
-            collected += self.local_many_to_many
+            collected += self._fields
+            collected += self._many_to_many
 
         # In order to avoid list manipulation. Always
         # return a shallow copy of the results
@@ -519,12 +484,12 @@ class Meta:
         return frozenset(names)
 
     @cached_property
-    def _non_pk_concrete_field_names(self) -> frozenset[str]:
+    def _non_pk_field_names(self) -> frozenset[str]:
         """
-        Return a set of the non-primary key concrete field names defined on the model.
+        Return a set of the non-primary key field names defined on the model.
         """
         names = []
-        for field in self.concrete_fields:
+        for field in self.fields:
             if not field.primary_key:
                 names.append(field.name)
         return frozenset(names)
@@ -566,6 +531,6 @@ class Meta:
 
         return {
             field.db_constraint_name(): field
-            for field in self.local_fields
+            for field in self.fields
             if isinstance(field, ForeignKeyField)
         }

@@ -428,9 +428,7 @@ class Field[T](RegisterLookupMixin):
         # instance cheap to use beyond its primary key.
         if field_name not in data:
             missing = [
-                f.name
-                for f in instance._model_meta.concrete_fields
-                if f.name not in data
+                f.name for f in instance._model_meta.fields if f.name not in data
             ]
             instance.refresh_from_db(fields=missing)
 
