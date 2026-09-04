@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.86.1](https://github.com/dropseed/plain/releases/plain-admin@0.86.1) (2026-09-04)
+
+### What's changed
+
+- Internal type annotations only — a `type: ignore` dropped from `Card.get_filters()` and an explicit `list[type[View]]` annotation in `AdminViewset`, from the ruff 0.16.4 / ty 0.0.74 upgrade. No runtime behavior changed ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.86.0](https://github.com/dropseed/plain/releases/plain-admin@0.86.0) (2026-08-12)
 
 ### What's changed
