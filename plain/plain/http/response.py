@@ -798,7 +798,10 @@ class NotModifiedResponse(Response):
 
 
 class NotAllowedResponse(Response):
-    """HTTP 405 response"""
+    """HTTP 405 response.
+
+    The constructor is pinned: no status_code parameter, so this class
+    always means exactly "405 method not allowed"."""
 
     status_code = 405
 
@@ -807,14 +810,12 @@ class NotAllowedResponse(Response):
         permitted_methods: list[str],
         *,
         content_type: str | None = None,
-        status_code: int | None = None,
         reason: str | None = None,
         charset: str | None = None,
         headers: dict[str, Any] | None = None,
     ):
         super().__init__(
             content_type=content_type,
-            status_code=status_code,
             reason=reason,
             charset=charset,
             headers=headers,
