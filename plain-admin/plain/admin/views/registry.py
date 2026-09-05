@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .base import AdminView
     from .viewsets import AdminViewset
 
-T = TypeVar("T")
+T = TypeVar("T", bound="AdminView")
 VS = TypeVar("VS", bound="AdminViewset")
 
 
@@ -41,7 +41,7 @@ class AdminViewRegistry:
         self, view: type[T] | None = None
     ) -> type[T] | Callable[[type[T]], type[T]]:
         def inner(view: type[T]) -> type[T]:
-            self.registered_views.add(view)  # ty: ignore[invalid-argument-type]
+            self.registered_views.add(view)
             # Invalidate lookup caches
             self.__dict__.pop("slug_to_view", None)
             self.__dict__.pop("path_to_view", None)
