@@ -37,12 +37,22 @@ def _portal_dir() -> str:
     they're kept beside the rest of the checkout's state rather than in
     `.plain/` — a working tree (and its `.plain/`) can be symlinked or copied
     between checkouts, which two live sockets can't survive.
+
+    Named by a hash of the checkout id alone, not `checkout_state_path`'s
+    readable directory name — a Unix socket path is capped at roughly 100
+    bytes by the kernel, and `checkout_state_path` embeds the full checkout
+    directory name, which can push the socket path over that limit for a
+    long-named project.
     """
+    import hashlib
     from pathlib import Path
 
-    from plain.runtime import checkout_state_path, find_project_root
+    from plain.runtime import PLAIN_CACHE_PATH, checkout_id, find_project_root
 
-    d = os.path.join(checkout_state_path(find_project_root(Path.cwd())), "portal")
+    digest = hashlib.sha256(
+        checkout_id(find_project_root(Path.cwd())).encode()
+    ).hexdigest()[:16]
+    d = os.path.join(PLAIN_CACHE_PATH, "portal", digest)
     os.makedirs(d, exist_ok=True)
     return d
 

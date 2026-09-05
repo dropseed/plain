@@ -12,7 +12,7 @@ import pytest
 import spake2
 from plain.portal.codegen import WORDLIST, generate_code, validate_code
 from plain.portal.crypto import PortalEncryptor, channel_id
-from plain.portal.local import _MAX_FRAME_SIZE, _recv_framed, _send_framed
+from plain.portal.local import _MAX_FRAME_SIZE, _portal_dir, _recv_framed, _send_framed
 from plain.portal.protocol import (
     DEFAULT_EXEC_TIMEOUT,
     FILE_CHUNK_SIZE,
@@ -706,3 +706,35 @@ class TestCryptoProtocolIntegration:
         assert enc_b.decrypt_message(ping_ct) == {"type": "ping"}
         pong_ct = enc_b.encrypt_message(make_pong())
         assert enc_a.decrypt_message(pong_ct) == {"type": "pong"}
+
+
+# ---------------------------------------------------------------------------
+# 7. Portal state directory
+# ---------------------------------------------------------------------------
+
+
+class TestPortalDir:
+    """`_portal_dir()` backs a Unix socket path, which the kernel caps at
+    roughly 100 bytes — it can't grow with the checkout's directory name."""
+
+    def _portal_dir_for(self, base, monkeypatch, checkout_name):
+        cache = base / "plain-cache"
+        monkeypatch.setattr("plain.runtime.PLAIN_CACHE_PATH", cache)
+        checkout = base / checkout_name
+        checkout.mkdir(parents=True)
+        (checkout / "pyproject.toml").touch()
+        monkeypatch.chdir(checkout)
+        _portal_dir.cache_clear()
+        return _portal_dir()
+
+    def test_socket_path_length_does_not_grow_with_checkout_name(
+        self, tmp_path, monkeypatch
+    ):
+        short = self._portal_dir_for(tmp_path / "b1", monkeypatch, "a")
+        long = self._portal_dir_for(tmp_path / "b2", monkeypatch, "a" * 80)
+        assert len(long) == len(short)
+
+    def test_different_checkouts_get_different_dirs(self, tmp_path, monkeypatch):
+        d1 = self._portal_dir_for(tmp_path, monkeypatch, "checkout-one")
+        d2 = self._portal_dir_for(tmp_path, monkeypatch, "checkout-two")
+        assert d1 != d2
