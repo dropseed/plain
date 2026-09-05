@@ -1,3 +1,4 @@
+import hashlib
 import importlib.metadata
 import os
 import sys
@@ -16,9 +17,24 @@ except importlib.metadata.PackageNotFoundError:
     __version__ = "dev"
 
 
+def find_project_root(start: Path) -> Path:
+    """The nearest directory at or above `start` holding a pyproject.toml.
+
+    One definition, used by `setup()` (which starts from the working
+    directory), the CLI (which starts from the app), and the dev supervisors,
+    because they have to agree: the project root decides where a checkout's
+    `.plain` lives and where its state is keyed. Two answers means two
+    checkouts.
+    """
+    for directory in [start, *start.parents]:
+        if (directory / "pyproject.toml").exists():
+            return directory
+    return start
+
+
 # Made available without setup or settings
 APP_PATH = Path.cwd() / "app"
-PLAIN_TEMP_PATH = Path.cwd() / ".plain"
+PLAIN_TEMP_PATH = find_project_root(Path.cwd()) / ".plain"
 
 # Machine-level cache for downloaded binaries (Tailwind, Oxc, mkcert),
 # shared across projects and checkouts.
@@ -28,6 +44,37 @@ elif _xdg_cache := os.environ.get("XDG_CACHE_HOME"):
     PLAIN_CACHE_PATH = Path(_xdg_cache).expanduser() / "plain"
 else:
     PLAIN_CACHE_PATH = Path.home() / ".cache" / "plain"
+
+
+def checkout_id(project_root: Path) -> str:
+    """What "this checkout" means when we record or compare ownership.
+
+    One definition because it's compared for exact equality against facts
+    recorded elsewhere, and two sites normalizing differently would silently
+    disagree forever rather than fail.
+    """
+    return str(project_root.resolve())
+
+
+def checkout_state_path(project_root: Path) -> Path:
+    """Where this checkout's facts about itself are kept.
+
+    A working tree is exactly what gets symlinked, copied, rsynced, and
+    mounted into containers, so state keyed by location (like `.plain`) is
+    eventually read by the wrong reader — two checkouts sharing one `.plain`
+    would quietly share a database, or one would refuse to start because the
+    other's dev server holds the pidfile. So a checkout's facts (as opposed to
+    artifacts like logs or compiled assets, which do belong in `.plain`) are
+    kept here instead, keyed by the checkout's resolved path, with the
+    readable checkout name in the directory too so the cache stays greppable.
+    """
+    resolved = project_root.resolve()
+    sanitized_name = "".join(
+        c if c.isalnum() else "_" for c in resolved.name.lower()
+    ).strip("_")
+    digest = hashlib.sha256(str(resolved).encode()).hexdigest()[:8]
+    return PLAIN_CACHE_PATH / "checkouts" / f"{sanitized_name}-{digest}"
+
 
 # from plain.runtime import settings
 settings = Settings()
@@ -91,6 +138,9 @@ __all__ = [
     "Secret",
     "SetupError",
     "__version__",
+    "checkout_id",
+    "checkout_state_path",
+    "find_project_root",
     "settings",
     "setup",
 ]

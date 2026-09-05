@@ -31,10 +31,18 @@ from .protocol import (
 
 @functools.lru_cache
 def _portal_dir() -> str:
-    """Return .plain/portal/ in the project root, creating it if needed."""
-    from plain.runtime import PLAIN_TEMP_PATH
+    """Return this checkout's portal state dir, creating it if needed.
 
-    d = os.path.join(PLAIN_TEMP_PATH, "portal")
+    The socket and lock are facts about a live process, not artifacts, so
+    they're kept beside the rest of the checkout's state rather than in
+    `.plain/` — a working tree (and its `.plain/`) can be symlinked or copied
+    between checkouts, which two live sockets can't survive.
+    """
+    from pathlib import Path
+
+    from plain.runtime import checkout_state_path, find_project_root
+
+    d = os.path.join(checkout_state_path(find_project_root(Path.cwd())), "portal")
     os.makedirs(d, exist_ok=True)
     return d
 
