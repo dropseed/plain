@@ -43,16 +43,22 @@ def _portal_dir() -> str:
     bytes by the kernel, and `checkout_state_path` embeds the full checkout
     directory name, which can push the socket path over that limit for a
     long-named project.
+
+    Rooted at the system temp dir rather than `PLAIN_CACHE_PATH` for the same
+    length-limit reason — `PLAIN_CACHE_PATH` is user-configurable (env var or
+    `XDG_CACHE_HOME`) and can itself be long enough to blow the budget even
+    with a fixed-length digest appended.
     """
     import hashlib
+    import tempfile
     from pathlib import Path
 
-    from plain.runtime import PLAIN_CACHE_PATH, checkout_id, find_project_root
+    from plain.runtime import checkout_id, find_project_root
 
     digest = hashlib.sha256(
         checkout_id(find_project_root(Path.cwd())).encode()
     ).hexdigest()[:16]
-    d = os.path.join(PLAIN_CACHE_PATH, "portal", digest)
+    d = os.path.join(tempfile.gettempdir(), "plain-portal", digest)
     os.makedirs(d, exist_ok=True)
     return d
 

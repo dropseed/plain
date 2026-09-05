@@ -715,10 +715,13 @@ class TestCryptoProtocolIntegration:
 
 class TestPortalDir:
     """`_portal_dir()` backs a Unix socket path, which the kernel caps at
-    roughly 100 bytes — it can't grow with the checkout's directory name."""
+    roughly 100 bytes — it can't grow with the checkout's directory name or
+    with a long `PLAIN_CACHE_PATH`."""
 
-    def _portal_dir_for(self, base, monkeypatch, checkout_name):
-        cache = base / "plain-cache"
+    def _portal_dir_for(
+        self, base, monkeypatch, checkout_name, *, cache_name="plain-cache"
+    ):
+        cache = base / cache_name
         monkeypatch.setattr("plain.runtime.PLAIN_CACHE_PATH", cache)
         checkout = base / checkout_name
         checkout.mkdir(parents=True)
@@ -732,6 +735,15 @@ class TestPortalDir:
     ):
         short = self._portal_dir_for(tmp_path / "b1", monkeypatch, "a")
         long = self._portal_dir_for(tmp_path / "b2", monkeypatch, "a" * 80)
+        assert len(long) == len(short)
+
+    def test_socket_path_length_does_not_grow_with_cache_path(
+        self, tmp_path, monkeypatch
+    ):
+        short = self._portal_dir_for(tmp_path / "b1", monkeypatch, "a")
+        long = self._portal_dir_for(
+            tmp_path / "b2", monkeypatch, "a", cache_name="c" * 80
+        )
         assert len(long) == len(short)
 
     def test_different_checkouts_get_different_dirs(self, tmp_path, monkeypatch):
