@@ -4,8 +4,3 @@ paths = ["**/*", "!**/tests/**/*"]
 reviewers = ["davegaeddert"]
 require = 1
 author_value = 1
-
-[[agents]]
-name = "codex"
-preset = "codex-review"
-paths = ["**"]
