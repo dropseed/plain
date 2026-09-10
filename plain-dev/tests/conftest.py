@@ -12,5 +12,5 @@ def isolated_checkout_state(tmp_path, monkeypatch):
     entry in the developer's own cache — once per run, never collected.
     """
     cache = tmp_path / "plain-cache"
-    monkeypatch.setattr("plain.dev.state.PLAIN_CACHE_PATH", cache)
+    monkeypatch.setattr("plain.runtime.PLAIN_CACHE_PATH", cache)
     return cache
