@@ -12,6 +12,10 @@ class User(postgres.Model):
 
     query: postgres.QuerySet[User] = postgres.QuerySet()
 
+    def get_avatar_url(self) -> str:
+        """The admin header renders this when the user model provides it."""
+        return f"https://avatars.example.com/{self.username}.png"
+
     @property
     def username_upper(self) -> str:
         """A computed (non-column) field, to exercise in-memory sorting."""

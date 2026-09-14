@@ -72,3 +72,24 @@ def test_admin_users_cannot_be_impersonated(db):
 
     # After the refusal the marker is cleared, so normal requests resume.
     assert client.get("/whoami").user.id == admin.id
+
+
+def test_admin_header_shows_the_impersonator_not_the_impersonated_user(db):
+    """The account menu acts on the real account, so it shows that avatar."""
+    admin = User.query.create(username="admin", is_admin=True)
+    target = User.query.create(username="target", is_admin=False)
+
+    client = Client()
+    client.force_login(admin)
+    client.get(f"/admin/impersonate/start/{target.id}")
+
+    # Land on a real admin page (the index redirects to the first list view).
+    admin_page = client.get(client.get("/admin").url)
+    assert admin_page.status_code == 200
+
+    content = admin_page.content.decode()
+    assert "https://avatars.example.com/admin.png" in content
+    assert "https://avatars.example.com/target.png" not in content
+
+    # ...and the menu says who is being impersonated, with a way out.
+    assert "Stop impersonating" in content
