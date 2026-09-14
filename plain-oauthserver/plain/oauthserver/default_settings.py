@@ -14,3 +14,13 @@ OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION: bool = True
 # Scopes advertised in authorization server metadata. `offline_access` signals
 # that refresh tokens are available.
 OAUTH_SERVER_SCOPES_SUPPORTED: list[str] = ["offline_access"]
+
+# Whether to accept a client_id that is an HTTPS URL to a hosted metadata
+# document (Client ID Metadata Documents, MCP SEP-991). Claude's connector
+# uses this by default, so it is on by default.
+OAUTH_SERVER_ALLOW_CLIENT_ID_METADATA_DOCUMENTS: bool = True
+
+# Hostnames whose metadata documents may be fetched. `None` allows any public
+# host; a list restricts the server to fetching only from those hosts
+# (e.g. ["claude.ai"]).
+OAUTH_SERVER_CLIENT_ID_METADATA_ALLOWED_HOSTS: list[str] | None = None

@@ -1206,6 +1206,7 @@ name = "plain-oauthserver"
 version = "0.1.4"
 source = { editable = "plain-oauthserver" }
 dependencies = [
+    { name = "httpx" },
     { name = "plain" },
     { name = "plain-auth" },
     { name = "plain-postgres" },
@@ -1219,6 +1220,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "plain", editable = "plain" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-postgres", editable = "plain-postgres" },
