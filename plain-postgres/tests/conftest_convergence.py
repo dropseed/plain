@@ -38,20 +38,6 @@ def constraint_is_valid(table: str, name: str) -> bool:
         return row[0] if row else False
 
 
-def constraint_is_deferrable(table: str, name: str) -> bool:
-    with get_connection().cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT c.condeferrable FROM pg_constraint c
-            JOIN pg_class cl ON c.conrelid = cl.oid
-            WHERE cl.relname = %s AND c.conname = %s
-            """,
-            [table, name],
-        )
-        row = cursor.fetchone()
-        return row[0] if row else False
-
-
 def create_invalid_index(
     name: str,
     table: str = "examples_widget",

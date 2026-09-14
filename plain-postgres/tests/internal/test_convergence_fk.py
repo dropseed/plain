@@ -5,7 +5,6 @@ from app.examples.models.relationships import Widget, WidgetTag
 from app.examples.models.trees import TreeNode
 from conftest_convergence import (
     constraint_exists,
-    constraint_is_deferrable,
     constraint_is_valid,
     execute,
     fk_on_delete_action,
@@ -30,7 +29,6 @@ from plain.postgres.convergence.corrections import (
     DropConstraintCorrection,
     RenameConstraintCorrection,
     ReplaceForeignKeyCorrection,
-    SetConstraintNotDeferrableCorrection,
     ValidateConstraintCorrection,
 )
 from plain.postgres.utils import generate_fk_constraint_name
@@ -178,7 +176,6 @@ class TestForeignKeyFixes:
 
         assert "NOT VALID" in sql
         assert "VALIDATE CONSTRAINT" in sql
-        assert "DEFERRABLE" not in sql
         assert constraint_exists("examples_widgettag", widget_fk)
         assert constraint_is_valid("examples_widgettag", widget_fk)
 
@@ -199,29 +196,6 @@ class TestForeignKeyFixes:
         correction.apply()
 
         assert constraint_is_valid("examples_widgettag", widget_fk)
-
-    def test_fk_is_not_deferrable(self, isolated_db):
-        """Convergence-created FK constraints are checked immediately."""
-        widget_fk = generate_fk_constraint_name(
-            "examples_widgettag", "widget_id", "examples_widget", "id"
-        )
-
-        # Drop and recreate via convergence correction
-        fk_names = get_fk_constraint_names("examples_widgettag")
-        if widget_fk in fk_names:
-            execute(f'ALTER TABLE "examples_widgettag" DROP CONSTRAINT "{widget_fk}"')
-
-        correction = AddForeignKeyCorrection(
-            table="examples_widgettag",
-            constraint_name=widget_fk,
-            column="widget_id",
-            target_table="examples_widget",
-            target_column="id",
-            on_delete_clause=" ON DELETE CASCADE",
-        )
-        correction.apply()
-
-        assert not constraint_is_deferrable("examples_widgettag", widget_fk)
 
     def test_undeclared_fk_drop(self, isolated_db):
         """DropConstraintCorrection drops an undeclared FK."""
@@ -457,7 +431,6 @@ class TestForeignKeyOnDelete:
 
         assert constraint_exists("examples_childcascade", fk_name)
         assert constraint_is_valid("examples_childcascade", fk_name)
-        assert not constraint_is_deferrable("examples_childcascade", fk_name)
         assert fk_on_delete_action("examples_childcascade", fk_name) == "c"
 
     def test_on_delete_drift_planned_and_executed(self, isolated_db):
@@ -501,82 +474,6 @@ class TestForeignKeyOnDelete:
         assert execute_plan(items).ok
 
         assert fk_on_delete_action("examples_childsetnull", fk_name) == "n"
-
-
-class TestForeignKeyDeferrable:
-    """Plain FKs are checked immediately. A DEFERRABLE FK (older releases made
-    every FK DEFERRABLE INITIALLY DEFERRED) is drift, fixed with a catalog-only
-    ALTER CONSTRAINT — no revalidation scan."""
-
-    def test_detects_deferrable_fk(self, db):
-        fk_name = _recreate_fk(
-            "examples_childcascade",
-            "parent_id",
-            "examples_deleteparent",
-            "id",
-            clause=" ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED",
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, ChildCascade)
-
-        fk_drifts = [d for d in analysis.drifts if isinstance(d, ForeignKeyDrift)]
-        assert fk_drifts == [
-            ForeignKeyNameDrift(
-                table="examples_childcascade",
-                name=fk_name,
-                kind=DriftKind.DEFERRABLE,
-            )
-        ]
-
-    def test_deferrable_and_not_valid_converge_in_one_pass(self, isolated_db):
-        """A legacy FK left DEFERRABLE and NOT VALID (old add committed, its
-        validate didn't) needs both corrections in the same plan."""
-        fk_name = _recreate_fk(
-            "examples_childcascade",
-            "parent_id",
-            "examples_deleteparent",
-            "id",
-            clause=" ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED NOT VALID",
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, ChildCascade).executable()
-        assert [type(item.correction) for item in items] == [
-            SetConstraintNotDeferrableCorrection,
-            ValidateConstraintCorrection,
-        ]
-        assert execute_plan(items).ok
-
-        assert not constraint_is_deferrable("examples_childcascade", fk_name)
-        assert constraint_is_valid("examples_childcascade", fk_name)
-
-    def test_deferrable_fk_made_not_deferrable(self, isolated_db):
-        fk_name = _recreate_fk(
-            "examples_childcascade",
-            "parent_id",
-            "examples_deleteparent",
-            "id",
-            clause=" ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED",
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, ChildCascade).executable()
-        assert [type(item.correction) for item in items] == [
-            SetConstraintNotDeferrableCorrection
-        ]
-        assert execute_plan(items).ok
-
-        assert not constraint_is_deferrable("examples_childcascade", fk_name)
-        assert constraint_is_valid("examples_childcascade", fk_name)
-        assert fk_on_delete_action("examples_childcascade", fk_name) == "c"
-
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, ChildCascade)
-        assert [d for d in analysis.drifts if isinstance(d, ForeignKeyDrift)] == []
 
 
 class TestForeignKeyRename:
