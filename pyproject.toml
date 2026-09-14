@@ -45,7 +45,7 @@ dev = [
   # `uv sync --all-packages` happened to leave it installed.
   "plainx-dev",
   # Type checking and better dev experience
-  "ty>=0.0.78",
+  "ty>=0.0.80",
   "psycopg[binary]>=3.2.12",
 ]
 

@@ -1468,13 +1468,11 @@ class SQLInsertCompiler(SQLCompiler):
             params = param_rows
             if conflict_suffix_sql:
                 result.append(conflict_suffix_sql)
-            # Skip empty r_sql in case returning_cols returns an empty string.
-            returning_cols = return_insert_columns(self.returning_fields)
-            if returning_cols:
-                r_sql, self.returning_params = returning_cols
-                if r_sql:
-                    result.append(r_sql)
-                    params += [list(self.returning_params)]
+            # Skip appending the RETURNING clause if it's an empty string.
+            r_sql, self.returning_params = return_insert_columns(self.returning_fields)
+            if r_sql:
+                result.append(r_sql)
+                params += [list(self.returning_params)]
             return [(" ".join(result), tuple(chain.from_iterable(params)))]
 
         # Bulk insert without returning fields
