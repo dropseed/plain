@@ -132,8 +132,6 @@ class MigrationExecutor:
                         state = self.apply_migration(state, migration, fake=fake)
                         migrations_to_run.remove(migration)
 
-        self.check_replacements()
-
         assert state is not None
         return state
 
@@ -143,41 +141,18 @@ class MigrationExecutor:
         """Run a migration forwards."""
         if self.progress_callback:
             self.progress_callback("apply_start", migration=migration, fake=fake)
-        if not fake:
+        if fake:
+            self.recorder.record_applied(migration.package_label, migration.name)
+        else:
             with self.connection.schema_editor(
                 atomic=migration.atomic
             ) as schema_editor:
                 state = migration.apply(
                     state, schema_editor, operation_callback=self.progress_callback
                 )
-                self.record_migration(migration)
-        else:
-            self.record_migration(migration)
+                # Recorded inside the schema editor's transaction, so the row
+                # commits with the DDL or rolls back with it.
+                self.recorder.record_applied(migration.package_label, migration.name)
         if self.progress_callback:
             self.progress_callback("apply_success", migration=migration, fake=fake)
         return state
-
-    def record_migration(self, migration: Migration) -> None:
-        # For replacement migrations, record individual statuses
-        if migration.replaces:
-            for package_label, name in migration.replaces:
-                self.recorder.record_applied(package_label, name)
-        else:
-            self.recorder.record_applied(migration.package_label, migration.name)
-
-    def check_replacements(self) -> None:
-        """
-        Mark replacement migrations applied if their replaced set all are.
-
-        Do this unconditionally on every migrate, rather than just when
-        migrations are applied or unapplied, to correctly handle the case
-        when a new squash migration is pushed to a deployment that already had
-        all its replaced migrations applied. In this case no new migration will
-        be applied, but the applied state of the squashed migration must be
-        maintained.
-        """
-        applied = self.recorder.applied_migrations()
-        for key, migration in self.loader.replacements.items():
-            all_applied = all(m in applied for m in migration.replaces)
-            if all_applied and key not in applied:
-                self.recorder.record_applied(*key)

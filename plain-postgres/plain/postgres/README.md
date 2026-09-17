@@ -131,7 +131,7 @@ PLAIN_POSTGRES_MANAGEMENT_URL=postgresql://app@postgres:5432/myapp
 
 When `POSTGRES_MANAGEMENT_URL` is set, these commands connect through it instead of `POSTGRES_URL`:
 
-- `plain migrations create`, `plain migrations apply`, `plain migrations list`, `plain migrations prune`, `plain migrations squash`
+- `plain migrations create`, `plain migrations apply`, `plain migrations list`, `plain migrations prune`
 - `plain postgres sync`, `plain postgres converge`, `plain postgres schema`
 - `plain postgres diagnose`, `plain postgres drop-unknown-tables`, `plain postgres shell`
 
@@ -590,15 +590,14 @@ Key flags:
 
 Shared commands (apply equally to structural and data migrations):
 
-| Command                                     | Purpose                                              |
-| ------------------------------------------- | ---------------------------------------------------- |
-| `plain migrations apply`                    | Apply pending migrations                             |
-| `plain migrations apply --plan`             | Preview what would run                               |
-| `plain migrations apply --check`            | Exit non-zero if unapplied migrations exist (for CI) |
-| `plain migrations apply --fake`             | Mark as applied without running SQL                  |
-| `plain migrations list`                     | View migration status by package                     |
-| `plain migrations squash <pkg> <migration>` | Squash migrations into one                           |
-| `plain migrations prune`                    | Remove stale migration records                       |
+| Command                          | Purpose                                              |
+| -------------------------------- | ---------------------------------------------------- |
+| `plain migrations apply`         | Apply pending migrations                             |
+| `plain migrations apply --plan`  | Preview what would run                               |
+| `plain migrations apply --check` | Exit non-zero if unapplied migrations exist (for CI) |
+| `plain migrations apply --fake`  | Mark as applied without running SQL                  |
+| `plain migrations list`          | View migration status by package                     |
+| `plain migrations prune`         | Remove stale migration records                       |
 
 #### Development workflow
 
@@ -613,19 +612,7 @@ Use this when migrations exist only in your local dev environment and haven't be
 3. `plain migrations create` — creates a single fresh migration with all the changes
 4. `plain migrations apply --fake` — marks the new migration as applied (the schema is already correct from the old migrations)
 
-**Consolidating committed migrations (squash):**
-
-Use this when migrations have already been committed or deployed to other environments.
-
-`plain migrations squash <package> <migration>` creates a replacement migration with a `replaces` list. Keep the original files until all environments have migrated past the squash point, then delete them and run `migrations prune`.
-
-**Which method to use:**
-
-| Scenario                                  | Method                                                  |
-| ----------------------------------------- | ------------------------------------------------------- |
-| Migrations are local only (not committed) | Delete-and-recreate                                     |
-| Migrations are committed but not deployed | Delete-and-recreate (if all developers reset) or squash |
-| Migrations are deployed to production     | Squash or full reset                                    |
+Migrations that are committed but not yet deployed anywhere can be consolidated the same way if every developer resets their database; production then applies the consolidated migration normally. Once a migration has reached any deployed environment, use a full reset (below).
 
 #### Resetting migrations
 
@@ -672,7 +659,7 @@ def forwards(models, schema_editor):
 
 For large tables, chunk the work (e.g. by ID range) and commit between batches so no single transaction holds locks for too long.
 
-See [Structural migrations](#structural-migrations) for shared commands (`apply`, `list`, `squash`, `prune`).
+See [Structural migrations](#structural-migrations) for shared commands (`apply`, `list`, `prune`).
 
 #### Cascading deletes inside data migrations
 

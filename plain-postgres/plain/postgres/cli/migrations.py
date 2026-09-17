@@ -10,14 +10,12 @@ from plain.cli.runtime import common_command
 from plain.packages import packages_registry
 from plain.utils.text import Truncator
 
-from .. import migrations
 from ..db import get_connection
 from ..migrations.autodetector import MigrationAutodetector
 from ..migrations.exceptions import MigrationSchemaError
 from ..migrations.executor import MigrationExecutor
 from ..migrations.loader import AmbiguityError, MigrationLoader
 from ..migrations.migration import Migration
-from ..migrations.optimizer import MigrationOptimizer
 from ..migrations.questioner import (
     InteractiveMigrationQuestioner,
     MigrationQuestioner,
@@ -414,7 +412,10 @@ def apply(
     executor = MigrationExecutor(get_connection(), migration_progress_callback)
 
     # Raise an error if any migrations are applied before their dependencies.
-    executor.loader.check_consistent_history(executor.connection)
+    # Faking an explicitly named migration is how that history gets repaired,
+    # so the check would only block the repair.
+    if not (fake and migration_name):
+        executor.loader.check_consistent_history(executor.connection)
 
     # Before anything else, see if there's conflicting packages and drop out
     # hard if there are any
@@ -457,14 +458,7 @@ def apply(
             raise click.ClickException(
                 f"Cannot find a migration matching '{migration_name}' from package '{package_label}'."
             )
-        target: tuple[str, str] = (package_label, migration.name)
-        if (
-            target not in executor.loader.graph.nodes
-            and target in executor.loader.replacements
-        ):
-            incomplete_migration = executor.loader.replacements[target]
-            target = incomplete_migration.replaces[-1]
-        targets = [target]
+        targets = [(package_label, migration.name)]
         target_package_labels_only = False
     elif package_label:
         targets = [
@@ -682,8 +676,6 @@ def list_migrations(
         """
         # Load migrations from disk/DB
         loader = MigrationLoader(connection, ignore_no_migrations=True)
-        recorder = MigrationRecorder(connection)
-        recorded_migrations = recorder.applied_migrations()
 
         graph = loader.graph
         # If we were passed a list of packages, validate it
@@ -702,32 +694,20 @@ def list_migrations(
             for node in graph.leaf_nodes(package_name):
                 for plan_node in graph.forwards_plan(node):
                     if plan_node not in shown and plan_node[0] == package_name:
-                        # Give it a nice title if it's a squashed one
-                        title = plan_node[1]
-                        migration_node = graph.nodes[plan_node]
-                        if migration_node and migration_node.replaces:
-                            title += (
-                                f" ({len(migration_node.replaces)} squashed migrations)"
-                            )
                         applied_migration = (
                             loader.applied_migrations.get(plan_node)
                             if loader.applied_migrations
                             else None
                         )
-                        # Mark it as applied/unapplied
-                        if applied_migration:
-                            if plan_node in recorded_migrations:
-                                output = f" [X] {title}"
-                            else:
-                                title += (
-                                    " Run `plain migrations apply` to finish recording."
-                                )
-                                output = f" [-] {title}"
-                            if verbosity >= 2 and hasattr(applied_migration, "applied"):
-                                output += f" (applied at {applied_migration.applied.strftime('%Y-%m-%d %H:%M:%S')})"
-                            click.echo(output)
-                        else:
-                            click.echo(f" [ ] {title}")
+                        marker = "X" if applied_migration else " "
+                        output = f" [{marker}] {plan_node[1]}"
+                        if (
+                            applied_migration
+                            and verbosity >= 2
+                            and hasattr(applied_migration, "applied")
+                        ):
+                            output += f" (applied at {applied_migration.applied.strftime('%Y-%m-%d %H:%M:%S')})"
+                        click.echo(output)
                         shown.add(plan_node)
             # If we didn't print anything, then a small message
             if not shown:
@@ -893,208 +873,3 @@ def prune(yes: bool) -> None:
         f"✓ Removed {total_count} stale migration record{'s' if total_count != 1 else ''}.",
         fg="green",
     )
-
-
-@cli.command("squash")
-@click.argument("package_label")
-@click.argument("start_migration_name", required=False)
-@click.argument("migration_name")
-@click.option(
-    "--no-optimize",
-    is_flag=True,
-    help="Do not try to optimize the squashed operations.",
-)
-@click.option(
-    "--noinput",
-    "--no-input",
-    "no_input",
-    is_flag=True,
-    help="Tells Plain to NOT prompt the user for input of any kind.",
-)
-@click.option("--squashed-name", help="Sets the name of the new squashed migration.")
-@click.option(
-    "-v",
-    "--verbosity",
-    type=int,
-    default=1,
-    help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
-)
-@database_management_command
-def squash(
-    package_label: str,
-    start_migration_name: str | None,
-    migration_name: str,
-    no_optimize: bool,
-    no_input: bool,
-    squashed_name: str | None,
-    verbosity: int,
-) -> None:
-    """Squash multiple migrations into one"""
-    interactive = not no_input
-
-    def find_migration(
-        loader: MigrationLoader, package_label: str, name: str
-    ) -> Migration:
-        try:
-            return loader.get_migration_by_prefix(package_label, name)
-        except AmbiguityError:
-            raise click.ClickException(
-                f"More than one migration matches '{name}' in package '{package_label}'. Please be more specific."
-            )
-        except KeyError:
-            raise click.ClickException(
-                f"Cannot find a migration matching '{name}' from package '{package_label}'."
-            )
-
-    # Validate package_label
-    try:
-        packages_registry.get_package_config(package_label)
-    except LookupError as err:
-        raise click.ClickException(str(err))
-
-    # Load the current graph state, check the app and migration they asked for exists
-    loader = MigrationLoader(get_connection())
-    if package_label not in loader.migrated_packages:
-        raise click.ClickException(
-            f"Package '{package_label}' does not have migrations (so squashmigrations on it makes no sense)"
-        )
-
-    migration = find_migration(loader, package_label, migration_name)
-
-    # Work out the list of predecessor migrations
-    migrations_to_squash: list[Migration] = []
-    for al, mn in loader.graph.forwards_plan((migration.package_label, migration.name)):
-        if al != migration.package_label:
-            continue
-        candidate = loader.get_migration(al, mn)
-        if candidate is None:
-            raise click.ClickException(f"Migration {mn} in package {al} is missing")
-        migrations_to_squash.append(candidate)
-
-    if start_migration_name:
-        start_migration = find_migration(loader, package_label, start_migration_name)
-        start = loader.get_migration(
-            start_migration.package_label, start_migration.name
-        )
-        if start is None:
-            raise click.ClickException(
-                f"Cannot find migration '{start_migration.name}' in package '{package_label}'."
-            )
-        try:
-            start_index = migrations_to_squash.index(start)
-            migrations_to_squash = migrations_to_squash[start_index:]
-        except ValueError:
-            raise click.ClickException(
-                f"The migration '{start_migration}' cannot be found. Maybe it comes after "
-                f"the migration '{migration}'?\n"
-                f"Have a look at:\n"
-                f"  plain migrations list {package_label}\n"
-                f"to debug this issue."
-            )
-
-    # Tell them what we're doing and optionally ask if we should proceed
-    if verbosity > 0 or interactive:
-        click.secho("Will squash the following migrations:", fg="cyan", bold=True)
-        for migration in migrations_to_squash:
-            click.echo(f" - {migration.name}")
-
-        if interactive and not click.confirm("Do you wish to proceed?"):
-            return
-
-    # Load the operations from all those migrations and concat together,
-    # along with collecting external dependencies and detecting double-squashing
-    operations = []
-    dependencies = set()
-    # We need to take all dependencies from the first migration in the list
-    # as it may be 0002 depending on 0001
-    first_migration = True
-    for smigration in migrations_to_squash:
-        if smigration.replaces:
-            raise click.ClickException(
-                "You cannot squash squashed migrations! Please transition it to a "
-                "normal migration first"
-            )
-        operations.extend(smigration.operations)
-        for dependency in smigration.dependencies:
-            if dependency[0] != smigration.package_label or first_migration:
-                dependencies.add(dependency)
-        first_migration = False
-
-    if no_optimize:
-        if verbosity > 0:
-            click.secho("(Skipping optimization.)", fg="yellow")
-        new_operations = operations
-    else:
-        if verbosity > 0:
-            click.secho("Optimizing...", fg="cyan")
-
-        optimizer = MigrationOptimizer()
-        new_operations = optimizer.optimize(operations, migration.package_label)
-
-        if verbosity > 0:
-            if len(new_operations) == len(operations):
-                click.echo("  No optimizations possible.")
-            else:
-                click.echo(
-                    f"  Optimized from {len(operations)} operations to {len(new_operations)} operations."
-                )
-
-    # Work out the value of replaces (any squashed ones we're re-squashing)
-    # need to feed their replaces into ours
-    replaces: list[tuple[str, str]] = []
-    for migration in migrations_to_squash:
-        if migration.replaces:
-            replaces.extend(migration.replaces)
-        else:
-            replaces.append((migration.package_label, migration.name))
-
-    # Make a new migration with those operations
-    subclass = type(
-        "Migration",
-        (migrations.Migration,),
-        {
-            "dependencies": dependencies,
-            "operations": new_operations,
-            "replaces": replaces,
-        },
-    )
-    if start_migration_name:
-        if squashed_name:
-            # Use the name from --squashed-name
-            prefix, _ = start_migration.name.split("_", 1)
-            name = f"{prefix}_{squashed_name}"
-        else:
-            # Generate a name
-            name = f"{start_migration.name}_squashed_{migration.name}"
-        new_migration = subclass(name, package_label)
-    else:
-        name = f"0001_{'squashed_' + migration.name if not squashed_name else squashed_name}"
-        new_migration = subclass(name, package_label)
-        new_migration.initial = True
-
-    # Write out the new migration file
-    writer = MigrationWriter(new_migration)
-    if os.path.exists(writer.path):
-        raise click.ClickException(
-            f"Migration {new_migration.name} already exists. Use a different name."
-        )
-    with open(writer.path, "w", encoding="utf-8") as fh:
-        fh.write(writer.as_string())
-
-    if verbosity > 0:
-        click.secho(
-            f"Created new squashed migration {writer.path}", fg="green", bold=True
-        )
-        click.echo(
-            "  You should commit this migration but leave the old ones in place;\n"
-            "  the new migration will be used for new installs. Once you are sure\n"
-            "  all instances of the codebase have applied the migrations you squashed,\n"
-            "  you can delete them."
-        )
-        if writer.needs_manual_porting:
-            click.secho("Manual porting required", fg="yellow", bold=True)
-            click.echo(
-                "  Your migrations contained functions that must be manually copied over,\n"
-                "  as we could not safely copy their implementation.\n"
-                "  See the comment at the top of the squashed migration for details."
-            )

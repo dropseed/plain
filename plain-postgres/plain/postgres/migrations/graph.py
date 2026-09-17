@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from functools import total_ordering
 from typing import TYPE_CHECKING, Any, cast
 
@@ -58,7 +57,7 @@ class Node:
 class DummyNode(Node):
     """
     A node that doesn't correspond to a migration file on disk.
-    (A squashed migration that was removed, for example.)
+    (A dependency on a migration that was deleted, for example.)
 
     After the migration graph is processed, all dummy nodes should be removed.
     If there are any left, a nonexistent dependency error is raised.
@@ -87,14 +86,6 @@ class MigrationGraph:
     merely a convention to aid file listing. Every new numbered migration
     has a declared dependency to the previous number, meaning that VCS
     branch merges can be detected and resolved.
-
-    Migrations files can be marked as replacing another set of migrations -
-    this is to support the "squash" feature. The graph handler isn't responsible
-    for these; instead, the code to load them in here should examine the
-    migration files and if the replaced migrations are all either unapplied
-    or not present, it should ignore the replaced ones, load in just the
-    replacing migration, and repoint any dependencies that pointed to the
-    replaced migrations to point to the replacing one.
 
     A node should be a tuple: (app_path, migration_name). The tree special-cases
     things within an app - namely, root nodes and leaf nodes ignore dependencies
@@ -149,81 +140,6 @@ class MigrationGraph:
         self.node_map[parent].add_child(self.node_map[child])
         if not skip_validation:
             self.validate_consistency()
-
-    def remove_replaced_nodes(
-        self, replacement: tuple[str, str], replaced: Sequence[tuple[str, str]]
-    ) -> None:
-        """
-        Remove each of the `replaced` nodes (when they exist). Any
-        dependencies that were referencing them are changed to reference the
-        `replacement` node instead.
-        """
-        # Cast list of replaced keys to set to speed up lookup later.
-        replaced_set: set[tuple[str, str]] = set(replaced)
-        try:
-            replacement_node = self.node_map[replacement]
-        except KeyError as err:
-            raise NodeNotFoundError(
-                f"Unable to find replacement node {replacement!r}. It was either never added"
-                " to the migration graph, or has been removed.",
-                replacement,
-            ) from err
-        for replaced_key in replaced_set:
-            self.nodes.pop(replaced_key, None)
-            replaced_node = self.node_map.pop(replaced_key, None)
-            if replaced_node:
-                for child in replaced_node.children:
-                    child.parents.remove(replaced_node)
-                    # We don't want to create dependencies between the replaced
-                    # node and the replacement node as this would lead to
-                    # self-referencing on the replacement node at a later iteration.
-                    if child.key not in replaced_set:
-                        replacement_node.add_child(child)
-                        child.add_parent(replacement_node)
-                for parent in replaced_node.parents:
-                    parent.children.remove(replaced_node)
-                    # Again, to avoid self-referencing.
-                    if parent.key not in replaced_set:
-                        replacement_node.add_parent(parent)
-                        parent.add_child(replacement_node)
-
-    def remove_replacement_node(
-        self, replacement: tuple[str, str], replaced: Sequence[tuple[str, str]]
-    ) -> None:
-        """
-        The inverse operation to `remove_replaced_nodes`. Almost. Remove the
-        replacement node `replacement` and remap its child nodes to `replaced`
-        - the list of nodes it would have replaced. Don't remap its parent
-        nodes as they are expected to be correct already.
-        """
-        self.nodes.pop(replacement, None)
-        try:
-            replacement_node = self.node_map.pop(replacement)
-        except KeyError as err:
-            raise NodeNotFoundError(
-                f"Unable to remove replacement node {replacement!r}. It was either never added"
-                " to the migration graph, or has been removed already.",
-                replacement,
-            ) from err
-        replaced_nodes: set[Node] = set()
-        replaced_nodes_parents: set[Node] = set()
-        for key in replaced:
-            replaced_node = self.node_map.get(key)
-            if replaced_node:
-                replaced_nodes.add(replaced_node)
-                replaced_nodes_parents |= replaced_node.parents
-        # We're only interested in the latest replaced node, so filter out
-        # replaced nodes that are parents of other replaced nodes.
-        replaced_nodes -= replaced_nodes_parents
-        for child in replacement_node.children:
-            child.parents.remove(replacement_node)
-            for replaced_node in replaced_nodes:
-                replaced_node.add_child(child)
-                child.add_parent(replaced_node)
-        for parent in replacement_node.parents:
-            parent.children.remove(replacement_node)
-            # NOTE: There is no need to remap parent dependencies as we can
-            # assume the replaced nodes already have the correct ancestry.
 
     def validate_consistency(self) -> None:
         """Ensure there are no dummy nodes remaining in the graph."""
