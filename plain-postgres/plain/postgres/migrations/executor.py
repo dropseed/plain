@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import nullcontext
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ..transaction import atomic
@@ -12,6 +13,19 @@ from .state import ProjectState
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
+
+
+@dataclass(frozen=True, kw_only=True)
+class PendingMigrations:
+    """What a plan does to the database: migrations it runs, baselines it
+    records without running."""
+
+    run: int
+    record: int
+
+    @property
+    def total(self) -> int:
+        return self.run + self.record
 
 
 class MigrationExecutor:
@@ -41,6 +55,14 @@ class MigrationExecutor:
         if self.repair_baseline is not None:
             keys = keys | {self.repair_baseline}
         return keys
+
+    def split_plan(self, plan: list[Migration]) -> PendingMigrations:
+        record_only = self.record_only
+        record = sum(
+            (migration.package_label, migration.name) in record_only
+            for migration in plan
+        )
+        return PendingMigrations(run=len(plan) - record, record=record)
 
     def migration_plan(
         self,
@@ -160,21 +182,18 @@ class MigrationExecutor:
 
         if plan is None:
             plan = self.migration_plan(targets)
-        # Create the forwards plan Plain would follow on an empty database
-        full_plan = self.migration_plan(
-            self.loader.graph.leaf_nodes(), clean_start=True
-        )
 
-        if not plan:
-            if state is None:
-                # The resulting state should include applied migrations.
-                state = self._create_project_state(with_applied_migrations=True)
-        else:
-            if state is None:
-                # The resulting state should still include applied migrations.
-                state = self._create_project_state(with_applied_migrations=True)
+        if state is None:
+            # The resulting state should include applied migrations.
+            state = self._create_project_state(with_applied_migrations=True)
+        if plan:
+            # Create the forwards plan Plain would follow on an empty database
+            full_plan = self.migration_plan(
+                self.loader.graph.leaf_nodes(), clean_start=True
+            )
 
             migrations_to_run = set(plan)
+            record_only = self.record_only
 
             # Choose context manager based on atomic_batch
             batch_context = atomic if (atomic_batch and len(plan) > 1) else nullcontext
@@ -195,11 +214,10 @@ class MigrationExecutor:
                             migration,
                             fake=fake,
                             record_only=(migration.package_label, migration.name)
-                            in self.record_only,
+                            in record_only,
                         )
                         migrations_to_run.remove(migration)
 
-        assert state is not None
         return state
 
     def apply_migration(

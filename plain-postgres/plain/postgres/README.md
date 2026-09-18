@@ -628,7 +628,7 @@ class Migration(migrations.Migration):
         ...,
         "0008_add_widgets",
     )  # every deleted name, so dependencies on them still resolve
-    since = "0.61"  # the release that shipped the reset, for messages
+    shipped_in = "0.61"  # the release that shipped the reset; empty until it has
     dependencies = (("users", "0001_initial"),)
     operations = (migrations.CreateModel(...), ...)
 ```
@@ -665,14 +665,14 @@ The command writes `NNNN_baseline.py` past the current leaf (the package's newes
 
 Options:
 
-- `--since <version>` — the release this reset ships in, named in the refusal a database that missed the leaf gets, and required before the package can be reset again. Plain's own packages leave it empty and fill it in at release time (a repository test enforces it, and the package's `plain.postgres` minimum is raised to the first release that understands baselines); an app should pass the version or deploy this ships in.
+- `--shipped-in <version>` — the release this reset ships in, named in the refusal a database that missed the leaf gets, and required before the package can be reset again. Plain's own packages leave it empty and fill it in at release time (a repository test enforces it, and the package's `plain.postgres` minimum is raised to the first release that understands baselines); an app should pass the version or deploy this ships in.
 - `--dry-run` — print the baseline and the deletion list, write nothing.
 
 **Dependencies.** The baseline depends on each other package its models reference, at the earliest migration of that package where the referenced models exist — and on nothing else. A package that another package pinned early _and_ whose models now point back at that package cannot get a single root: the graph would be a cycle, and the command refuses with it. That is a limit of migration graphs, not of the command; nothing to do with a second package fixes it.
 
 **Support boundaries.** Adoption checks that the sentinel is recorded and the tables exist, not columns; editing history behind a released leaf is outside what any check can catch. A data migration in _another_ package that read this package's historical state (a field the baseline no longer has) keeps loading but can fail on a fresh database; the command cannot see it.
 
-**Second reset.** Run it again later and the previous baseline joins `retired`. It refuses while the previous baseline's `since` is empty: nothing shipped it yet, so superseding its name would strand every database still at the original sentinel — once that baseline has shipped everywhere, set its `since` to the version that shipped it and reset again; otherwise restore the history and reset once.
+**Second reset.** Run it again later and the previous baseline joins `retired`. It refuses while the previous baseline's `shipped_in` is empty: nothing shipped it yet, so superseding its name would strand every database still at the original sentinel — once that baseline has shipped everywhere, set its `shipped_in` to the version that shipped it and reset again; otherwise restore the history and reset once.
 
 ### Data migrations
 
