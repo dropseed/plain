@@ -260,6 +260,8 @@ class EncryptedFieldMixin:
 # The mixin narrows Field's typed-query comparison methods to `Never` on
 # purpose — that narrowing is the type-level block, and it is exactly what a
 # Liskov check objects to, so the override diagnostic is suppressed here.
+# The suppression is class-wide (ty reports the conflict at the class line), so
+# any OTHER override added to this class has to be checked by hand.
 class EncryptedTextField[T: (str, str | None) = str](  # ty: ignore[invalid-method-override]
     EncryptedFieldMixin, TextField[T]
 ):
@@ -334,6 +336,8 @@ class EncryptedTextField[T: (str, str | None) = str](  # ty: ignore[invalid-meth
 # The mixin narrows Field's typed-query comparison methods to `Never` on
 # purpose — that narrowing is the type-level block, and it is exactly what a
 # Liskov check objects to, so the override diagnostic is suppressed here.
+# The suppression is class-wide (ty reports the conflict at the class line), so
+# any OTHER override added to this class has to be checked by hand.
 class EncryptedJSONField(EncryptedFieldMixin, JSONField):  # ty: ignore[invalid-method-override]
     """A JSONField that encrypts its serialized value before storing in the database.
 

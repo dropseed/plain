@@ -10,7 +10,7 @@ from that history so adding a migration to `examples` doesn't break these.
 
 from __future__ import annotations
 
-import re
+import importlib
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -34,10 +34,15 @@ LEAF = REAL_NAMES[-1]
 # The number a migration written on top of the copied history takes.
 NEXT = f"{int(LEAF.split('_')[0]) + 1:04d}"
 BASELINE = f"{NEXT}_baseline"
-# The models the leaf creates - deleting it makes exactly these pending.
-LEAF_MODELS = re.findall(
-    r'CreateModel\(\s*name="(\w+)"', (REAL_EXAMPLES / f"{LEAF}.py").read_text()
-)
+# The models the leaf migration creates, so deleting it has a known consequence.
+LEAF_CREATED_MODELS = [
+    operation.name
+    for operation in importlib.import_module(
+        f"app.examples.migrations.{LEAF}"
+    ).Migration.operations
+    if isinstance(operation, operations.CreateModel)
+]
+assert LEAF_CREATED_MODELS, f"{LEAF} creates no models, so this file needs a new anchor"
 
 
 def migration_source(
@@ -447,7 +452,7 @@ def test_pending_model_changes_refuse(migrations_dir: Path) -> None:
 
     assert result.exit_code != 0
     assert "model changes its migrations don't hold" in result.output
-    for model_name in LEAF_MODELS:
+    for model_name in LEAF_CREATED_MODELS:
         assert f"Create model {model_name}" in result.output
     assert len(examples_files(migrations_dir)) == len(REAL_NAMES) - 1
 
