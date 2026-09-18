@@ -1,5 +1,19 @@
 # plain-dev changelog
 
+## [0.68.0](https://github.com/dropseed/plain/releases/plain-dev@0.68.0) (2026-09-18)
+
+### What's changed
+
+- `plain db status` now reports what the migration planner would do with the checkout's database. The `Pending:` line splits the work into "N migration(s) not yet applied" and "N baseline(s) to record", and a red `Error:` line replaces a traceback when the planner refuses the database (records from before a package reset, missing or unrecorded tables) or a migration file won't load. `--json` gained `pending_baselines` (the record-only part of `pending_migrations`) and `migrations_error`; both counts are `null` when there is an error ([b89b33acae](https://github.com/dropseed/plain/commit/b89b33acae), [4eb466fa46](https://github.com/dropseed/plain/commit/4eb466fa46))
+- The shared-database guard — which forks a database owned by another checkout when this branch has migrations it hasn't applied — now also forks when the planner refuses the database with a `MigrationHistoryError`, instead of crashing on it ([b89b33acae](https://github.com/dropseed/plain/commit/b89b33acae), [4eb466fa46](https://github.com/dropseed/plain/commit/4eb466fa46))
+- The branch-switch "database is ahead of your code" check uses plain-postgres's `orphan_records()`, so records retired by a baseline are no longer reported as stale ([4eb466fa46](https://github.com/dropseed/plain/commit/4eb466fa46))
+- `plain.dev.postgres.schema_state.pending_migration_count()` was replaced by `pending_migrations()`, which returns plain-postgres's `PendingMigrations` ([4eb466fa46](https://github.com/dropseed/plain/commit/4eb466fa46))
+
+### Upgrade instructions
+
+- Upgrade `plain.postgres` to 0.118.0 or newer at the same time — `plain db status` and the shared-database guard use its new executor API and will fail on an older version.
+- If you parse `plain db status --json`, note the new `pending_baselines` and `migrations_error` keys, and that `pending_migrations` is `null` (not `0`) when `migrations_error` is set.
+
 ## [0.67.0](https://github.com/dropseed/plain/releases/plain-dev@0.67.0) (2026-09-02)
 
 ### What's changed
