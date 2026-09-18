@@ -279,3 +279,37 @@ def test_base_constraint_db_violation_error_defaults_to_none(db: None) -> None:
     instance = ConstraintExample(name="x", description="y")
     constraint = BaseConstraint(name="some_constraint")
     assert constraint._db_violation_error(instance, ConstraintExample) is None
+
+
+def test_modelform_pre_check_routes_single_field_unique_to_that_field(
+    db: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A single-field UniqueConstraint auto-routes its violation to that field,
+    so the rebuilt ModelForm's pre-check reports it under the field rather than
+    form-level. (The composite case, which has no single owning field, lands on
+    field=None — covered in tests/public/test_modelform.py.)"""
+    from plain.postgres.forms import ModelForm, model_field
+
+    constraint = UniqueConstraint(
+        fields=["name"],
+        name="unique_name_only",
+        violation_error="That name is taken.",
+    )
+    monkeypatch.setattr(
+        ConstraintExample.model_options,
+        "constraints",
+        (*ConstraintExample.model_options.constraints, constraint),
+    )
+
+    class Form(ModelForm):
+        name = model_field(ConstraintExample.name)
+        description = model_field(ConstraintExample.description)
+
+    ConstraintExample(name="dup", description="d1").create(clean_and_validate=False)
+
+    result = Form.validate({"name": "dup", "description": "d2"})
+
+    assert not result
+    assert [(e.field, e.message) for e in result.errors] == [
+        ("name", "That name is taken.")
+    ]

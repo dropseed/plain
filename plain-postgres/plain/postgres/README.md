@@ -1132,7 +1132,7 @@ except ValidationError:
     ...  # report it — the transaction is still usable
 ```
 
-A `ModelForm` is no exception — it validates shape and never writes, so the constraint is still enforced when `create_from()`/`update_from()` writes the row. Call `validate_constraints()` yourself before the write if you want every violation surfaced at once; otherwise `create()`/`update()` reports the first violation Postgres hits.
+Forms are the exception: `ModelForm.validate()` pre-checks the model's constraints against a constructed-but-unsaved instance, so one submission surfaces every violation at once as `Invalid` errors. The pre-check is not a lock — two submissions racing each other can both pass it, and the loser's write raises the same `ValidationError` through the mapping below. A direct `create()`/`update()` reports the first violation Postgres hits.
 
 This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to, and so does a `delete()` blocked by `RESTRICT` children. If you retry on a unique conflict, catch both:
 
@@ -1167,7 +1167,7 @@ class User(postgres.Model):
     )
 ```
 
-Constraints are checked by an explicit `validate_constraints()` call, but **not** by `full_clean()` (which validates shape only) or a direct `create()`/`update()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
+Constraints are checked by `validate_constraints()` — run by a `ModelForm`'s pre-check and by any explicit call — but **not** by `full_clean()` (which validates shape only) or a direct `create()`/`update()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
 
 ```python
 # Simple message — lands on NON_FIELD_ERRORS
@@ -1301,7 +1301,17 @@ class UserForm(ModelForm):
     is_admin = model_field(User.is_admin)
 ```
 
-`ModelForm` validates like any `Form` — `UserForm.validate(data)` returns a typed instance or an `Invalid`, and never writes to the database itself. Persist a validated result with `create_from()` (insert) or `update_from()` (update):
+`ModelForm` validates like any `Form` — `UserForm.validate(data)` returns a typed instance or an `Invalid`, and never writes to the database itself. On top of field shape it pre-checks the model's constraints, so a duplicate comes back as an `Invalid` alongside any other errors rather than blowing up at write time.
+
+When editing an existing row, pass `instance=` so the uniqueness lookup skips that row and unchanged values stay valid:
+
+```python
+result = UserForm.validate(request.form_data, instance=user)
+```
+
+On a `TemplateView`, `self.validate_form(UserForm, instance=self.object)` forwards it.
+
+Persist a validated result with `create_from()` (insert) or `update_from()` (update):
 
 ```python
 result = UserForm.validate(request.form_data)

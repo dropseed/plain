@@ -103,7 +103,7 @@ class TaskUpdateView(AuthView, DetailView):
 
     def post(self) -> Response:
         assert self.user is not None  # login_required
-        result = self.validate_form(TaskForm.for_owner(self.user))
+        result = self.validate_form(TaskForm.for_owner(self.user), instance=self.object)
         if isinstance(result, Response):
             return result
         update_from(self.object, result)

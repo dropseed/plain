@@ -59,7 +59,7 @@ class TestModelFieldDerivation:
 
 
 class TestValidate:
-    def test_success_is_a_typed_instance(self):
+    def test_success_is_a_typed_instance(self, db):
         result = WidgetForm.validate({"name": "Sprocket", "size": "L"})
         assert result
         assert result.name == "Sprocket"
@@ -113,7 +113,11 @@ class TestUpdateFrom:
         widget = Widget.query.create(name="Tagged", size="M")
         widget.tags.set([red])
 
-        result = WidgetForm.validate({"name": "Tagged", "size": "M", "tags": [blue.id]})
+        # `instance=` excludes this row from the uniqueness lookup, so
+        # keeping name/size unchanged stays valid.
+        result = WidgetForm.validate(
+            {"name": "Tagged", "size": "M", "tags": [blue.id]}, instance=widget
+        )
         assert result
         update_from(widget, result)
         assert set(widget.tags.query) == {blue}
@@ -187,3 +191,101 @@ class TestDatabaseDefaults:
         # If the empty value had been written, db_uuid would be None and the
         # row would have failed full_clean / a NOT NULL violation.
         assert row.db_uuid is not None
+
+
+class TestConstraintPreCheck:
+    """A ModelForm pre-checks the model's constraints, so one submission
+    reports every violation instead of whichever the database hits first.
+    The write path maps a raced violation to the same error — see
+    tests/public/test_integrity_error_mapping.py."""
+
+    def test_duplicate_unique_value_is_invalid_not_an_exception(self, db):
+        Widget.query.create(name="Sprocket", size="L")
+
+        result = WidgetForm.validate({"name": "Sprocket", "size": "L"})
+
+        assert not result
+        assert [e.code for e in result.errors] == ["unique"]
+
+    def test_composite_unique_error_is_form_level(self, db):
+        """Master routed a multi-column unique to NON_FIELD_ERRORS because no
+        single field owns it; the flat Invalid says the same with field=None."""
+        Widget.query.create(name="Sprocket", size="L")
+
+        result = WidgetForm.validate({"name": "Sprocket", "size": "L"})
+
+        assert not result
+        assert [e.field for e in result.errors] == [None]
+
+    def test_editing_a_row_keeps_its_own_value_valid(self, db):
+        widget = Widget.query.create(name="Sprocket", size="L")
+
+        assert WidgetForm.validate({"name": "Sprocket", "size": "L"}, instance=widget)
+        # ...while another row's value is still taken.
+        Widget.query.create(name="Cog", size="S")
+        assert not WidgetForm.validate({"name": "Cog", "size": "S"}, instance=widget)
+
+    def test_validate_does_not_touch_the_instance_being_edited(self, db):
+        widget = Widget.query.create(name="Sprocket", size="L")
+        Widget.query.create(name="Cog", size="S")
+
+        assert not WidgetForm.validate({"name": "Cog", "size": "S"}, instance=widget)
+
+        # A failed validate leaves the caller's object alone.
+        assert widget.name == "Sprocket"
+        assert Widget.query.get(id=widget.id).name == "Sprocket"
+
+    def test_shape_error_suppresses_the_constraint_lookup(self, db):
+        """A field that failed to clean has no value worth a lookup, so the
+        constraint over it is skipped rather than double-reported."""
+        Widget.query.create(name="Sprocket", size="L")
+
+        result = WidgetForm.validate({"name": "Sprocket"})  # size omitted
+
+        assert not result
+        assert [(e.field, e.code) for e in result.errors] == [("size", "required")]
+
+    def test_pre_check_costs_one_query(self, db, capture_queries):
+        with capture_queries() as queries:
+            WidgetForm.validate({"name": "Sprocket", "size": "L"})
+        assert len(queries) == 1, [q["sql"] for q in queries]
+
+    def test_unconstrained_model_costs_no_queries(self, db, capture_queries):
+        class FormsForm(ModelForm):
+            name = model_field(FormsExample.name)
+
+        with capture_queries() as queries:
+            FormsForm.validate({"name": "x"})
+        assert queries == []
+
+    def test_foreign_key_to_a_missing_row_is_invalid_choice(self, db):
+        class WidgetTagForm(ModelForm):
+            widget = model_field(WidgetTag.widget)
+            tag = model_field(WidgetTag.tag)
+
+        widget = Widget.query.create(name="Sprocket", size="L")
+
+        result = WidgetTagForm.validate({"widget": widget.id, "tag": 9999})
+
+        assert not result
+        assert [(e.field, e.code) for e in result.errors] == [("tag", "invalid_choice")]
+
+
+class TestModelDerivation:
+    def test_model_comes_from_the_declared_columns(self):
+        assert WidgetForm.model() is Widget
+
+    def test_a_form_with_no_model_fields_has_no_model(self):
+        class PlainForm(ModelForm):
+            note = types.TextField()
+
+        with pytest.raises(TypeError, match="declares no model_field"):
+            PlainForm.model()
+
+    def test_columns_from_two_models_are_rejected(self):
+        class MixedForm(ModelForm):
+            name = model_field(Widget.name)
+            tag_name = model_field(Tag.name)
+
+        with pytest.raises(TypeError, match="more than one model"):
+            MixedForm.model()
