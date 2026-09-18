@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import datetime
 import json
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 from plain.http import NotFoundError404, RedirectResponse, Response
 from plain.packages import packages_registry
 from plain.postgres import QuerySet
 from plain.preflight import run_checks, set_check_counts
 from plain.runtime import settings as plain_settings
+from plain.utils import timezone
 
 from .cards import Card, KeyValueCard, TableCard, TrendCard
 from .models import PinnedNavItem
@@ -28,7 +29,7 @@ class AdminIndexView(AdminView):
 
     def get(self) -> Response:
         if views := registry.get_list_views(user=self.user):
-            return RedirectResponse(list(views)[0].get_view_url(), status_code=302)
+            return RedirectResponse(next(iter(views)).get_view_url(), status_code=302)
 
         return super().get()
 
@@ -151,17 +152,17 @@ class SettingsView(AdminListView):
         "All framework and app settings with their current values and sources."
     )
     nav_section = None
-    fields = ["name", "source", "value"]
+    fields = ("name", "source", "value")
 
     @classmethod
     def get_view_url(cls, obj: Any = None) -> str:
         return "/admin/settings/"
 
-    search_fields = ["name"]
-    filters = ["default", "explicit", "env"]
+    search_fields = ("name",)
+    filters = ("default", "explicit", "env")
     page_size = 100
 
-    field_templates = {
+    field_templates: ClassVar = {
         "name": "admin/values/setting_name.html",
         "source": "admin/values/setting_source.html",
         "value": "admin/values/setting_value.html",
@@ -282,7 +283,7 @@ class _DemoMetricCard(Card):
 class _DemoKeyValueCard(KeyValueCard):
     title = "Latest deploy"
     size = Card.Sizes.MEDIUM
-    items = {
+    items: ClassVar = {
         "Branch": "main",
         "Commit": "4bc9003d",
         "Status": "Succeeded",
@@ -292,12 +293,12 @@ class _DemoKeyValueCard(KeyValueCard):
 
 class _DemoTableCard(TableCard):
     title = "Recent jobs"
-    headers = ["Job", "Result", "Duration"]
-    rows = [
-        ["send_welcome_email", "Successful", "1.2s"],
-        ["rebuild_search_index", "Successful", "12.4s"],
-        ["expire_sessions", "Errored", "0.3s"],
-    ]
+    headers = ("Job", "Result", "Duration")
+    rows = (
+        ("send_welcome_email", "Successful", "1.2s"),
+        ("rebuild_search_index", "Successful", "12.4s"),
+        ("expire_sessions", "Errored", "0.3s"),
+    )
 
 
 class _DemoTrendCard(TrendCard):
@@ -306,19 +307,19 @@ class _DemoTrendCard(TrendCard):
     size = Card.Sizes.FULL
     aggregates = ("sum", "avg")
 
-    _SERIES: list[tuple[str, str, list[int]]] = [
+    _SERIES: ClassVar[tuple[tuple[str, str, list[int]], ...]] = (
         ("Sage", "var(--chart-1)", [4, 5, 6, 5, 7, 8, 6, 5, 6, 7, 8, 9, 7, 6]),
         ("Steel", "var(--chart-2)", [3, 2, 4, 3, 4, 5, 4, 3, 4, 5, 4, 5, 6, 4]),
         ("Terracotta", "var(--chart-3)", [2, 3, 2, 3, 4, 3, 4, 5, 3, 4, 3, 4, 5, 3]),
         ("Teal", "var(--chart-4)", [1, 2, 2, 3, 2, 3, 4, 2, 3, 4, 3, 4, 3, 5]),
         ("Plum", "var(--chart-5)", [2, 1, 2, 1, 2, 2, 3, 2, 1, 2, 3, 2, 3, 2]),
-    ]
+    )
 
     def get_filters(self) -> Any:
         return None
 
     def get_chart_data(self) -> dict[str, Any]:
-        today = datetime.date.today()
+        today = timezone.localtime().date()
         days = len(self._SERIES[0][2])
         labels = [
             (today - datetime.timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")

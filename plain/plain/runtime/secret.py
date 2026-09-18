@@ -6,8 +6,6 @@ from typing import Annotated
 class _SecretMarker:
     """Runtime marker for secret settings. Used as Annotated metadata."""
 
-    pass
-
 
 type Secret[T] = Annotated[T, _SecretMarker()]
 """

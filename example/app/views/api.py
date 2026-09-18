@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from app.notes.models import Note
+from typing import ClassVar
+
 from plain.api import openapi
 from plain.api.views import APIView
 from plain.http import NotFoundError404
 from plain.urls import Router, path
+
+from app.notes.models import Note
 
 NOTE_SCHEMA = {
     "type": "object",
@@ -90,8 +93,8 @@ class NoteDetailAPIView(APIView):
 )
 class APIRouter(Router):
     namespace = "api"
-    openapi_components = {"schemas": {"Note": NOTE_SCHEMA}}
-    urls = [
+    openapi_components: ClassVar = {"schemas": {"Note": NOTE_SCHEMA}}
+    urls = (
         path("notes/", NoteListAPIView, name="notes_list"),
         path("notes/<int:id>/", NoteDetailAPIView, name="notes_detail"),
-    ]
+    )

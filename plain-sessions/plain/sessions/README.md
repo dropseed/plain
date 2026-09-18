@@ -25,23 +25,24 @@ In views that inherit from `SessionView`, you can use `self.session` like a stan
 ```python
 from plain.sessions.views import SessionView
 
+
 class MyView(SessionView):
     def get(self):
         # Store values in the session
-        self.session['username'] = 'jane'
-        self.session['cart_items'] = [1, 2, 3]
+        self.session["username"] = "jane"
+        self.session["cart_items"] = [1, 2, 3]
 
         # Retrieve values from the session
-        username = self.session.get('username')
-        cart_items = self.session.get('cart_items', [])
+        username = self.session.get("username")
+        cart_items = self.session.get("cart_items", [])
 
         # Check if a key exists
-        if 'username' in self.session:
+        if "username" in self.session:
             # User has a session
             pass
 
         # Delete values from the session
-        del self.session['cart_items']
+        del self.session["cart_items"]
 ```
 
 Outside of views, you can use `get_request_session()`:
@@ -50,7 +51,7 @@ Outside of views, you can use `get_request_session()`:
 from plain.sessions import get_request_session
 
 session = get_request_session(request)
-session['key'] = 'value'
+session["key"] = "value"
 ```
 
 The session data is automatically saved when you set or delete values. Sessions are stored in the database using the [`Session`](./models.py#Session) model.
@@ -93,6 +94,7 @@ self.session.flush()
 
 # Outside a view
 from plain.sessions import get_request_session
+
 session = get_request_session(request)
 session.flush()
 ```
@@ -107,6 +109,7 @@ self.session.cycle_key()
 
 # Outside a view
 from plain.sessions import get_request_session
+
 session = get_request_session(request)
 session.cycle_key()
 ```
@@ -121,6 +124,7 @@ if self.session.is_empty():
 
 # Outside a view
 from plain.sessions import get_request_session
+
 session = get_request_session(request)
 if session.is_empty():
     # No session data exists

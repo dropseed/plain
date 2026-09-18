@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import datetime
 import uuid
+from typing import ClassVar
 
 import pytest
 from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
-
 from plain.postgres import get_connection
 from plain.postgres.fields import DATABASE_DEFAULT
 from plain.postgres.functions import GenRandomUUID, Now
@@ -354,15 +354,19 @@ def test_construct_instance_preserves_db_default_on_blank_submission(db):
     # Minimal stand-in: construct_instance only reads `cleaned_data`, `data`,
     # `files`, and `form[name].field.empty_values` + `add_prefix`.
     class _FormField:
-        empty_values = [None, "", [], (), {}]
+        empty_values = (None, "", [], (), {})
 
     class _Bound:
         field = _FormField()
 
     class _Form:
-        cleaned_data = {"name": "from-form", "db_uuid": None, "created_at": None}
-        data = {"name": "from-form", "db_uuid": "", "created_at": ""}
-        files: dict = {}
+        cleaned_data: ClassVar = {
+            "name": "from-form",
+            "db_uuid": None,
+            "created_at": None,
+        }
+        data: ClassVar = {"name": "from-form", "db_uuid": "", "created_at": ""}
+        files: ClassVar[dict] = {}
 
         def add_prefix(self, name: str) -> str:
             return name
@@ -453,25 +457,27 @@ def test_uuid_accepts_default_none_only():
         plain_fields.UUIDField(default=uuid.uuid4)
 
 
-def test_datetime_accepts_default_none_and_flags_create_now_conflict():
-    """DateTimeField accepts `default` -- chiefly `default=None`, which marks a
-    nullable field omittable (so typed construction sees it as optional). A
-    *literal* default conflicts with create_now/update_now's DB-side default
-    and is flagged at preflight."""
+def test_datetime_accepts_default_none_only():
+    """DateTimeField accepts `default=None` -- the nullable-optional marker so
+    typed construction treats the field as omittable. A literal datetime default
+    is still rejected (use `create_now=True`/`update_now=True`), and
+    `default=None` without allow_null is rejected too."""
     from plain.postgres import fields as plain_fields
 
-    # default=None is accepted: the nullable-optional marker, no DB default.
+    # default=None is accepted with allow_null and yields None at construction.
     field = plain_fields.DateTimeField(allow_null=True, default=None)
-    assert field.has_default()
     assert field.get_default() is None
     assert not field.has_persistent_literal_default()
 
-    # A literal default alongside create_now is a conflict caught at preflight.
-    conflicted = plain_fields.DateTimeField(
-        create_now=True, default=datetime.datetime(2020, 1, 1)
-    )
-    results = conflicted._check_create_now_default_conflict()
-    assert any(r.id == "fields.datetime_create_now_default_conflict" for r in results)
+    # default=None without allow_null is rejected.
+    with pytest.raises(TypeError, match="requires allow_null=True"):
+        plain_fields.DateTimeField(default=None)
+
+    # A literal default is rejected -- create_now/update_now own the DB default.
+    with pytest.raises(TypeError, match="does not accept a persistent default"):
+        plain_fields.DateTimeField(
+            default=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC)
+        )
 
 
 def test_get_db_default_expression_returns_now_when_create_now():

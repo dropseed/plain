@@ -56,22 +56,20 @@ from .models import User
 class UserForm(ModelForm):
     class Meta:
         model = User
-        fields = ["email"]
+        fields = ("email",)
 
 
 @register_viewset
 class UserAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = User
-        fields = [
+        fields = (
             "id",
             "email",
             "created_at__date",
-        ]
-        queryset_order = ["-created_at"]
-        search_fields = [
-            "email",
-        ]
+        )
+        queryset_order = ("-created_at",)
+        search_fields = ("email",)
 
     class DetailView(AdminModelDetailView):
         model = User
@@ -101,13 +99,13 @@ For working with database models, use the model-specific view classes. These han
 class ProductAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = Product
-        fields = ["id", "name", "price", "created_at"]
-        queryset_order = ["-created_at"]
-        search_fields = ["name", "description"]
+        fields = ("id", "name", "price", "created_at")
+        queryset_order = ("-created_at",)
+        search_fields = ("name", "description")
 
     class DetailView(AdminModelDetailView):
         model = Product
-        fields = ["id", "name", "description", "price", "created_at", "updated_at"]
+        fields = ("id", "name", "description", "price", "created_at", "updated_at")
 
     class CreateView(AdminModelCreateView):
         model = Product
@@ -143,7 +141,7 @@ class ExternalAPIAdmin(AdminViewset):
         title = "External Items"
         nav_section = "Integrations"
         path = "external-items/"
-        fields = ["id", "name", "status"]
+        fields = ("id", "name", "status")
 
         def get_initial_objects(self):
             # Fetch from an external API, file, or any data source
@@ -158,7 +156,7 @@ Views appear in the admin sidebar based on their `nav_section` and `nav_title` a
 class ListView(AdminModelListView):
     model = Order
     nav_section = "Sales"  # Groups this view under "Sales" in the sidebar
-    nav_title = "Orders"   # Display name (defaults to model name)
+    nav_title = "Orders"  # Display name (defaults to model name)
     nav_icon = "shopping-cart"  # Icon for the section
 ```
 
@@ -221,6 +219,7 @@ class UsersCard(Card):
 
     def get_metric(self):
         from app.users.models import User
+
         return User.query.count()
 
     def get_link(self):
@@ -232,7 +231,7 @@ class DashboardView(AdminView):
     title = "Dashboard"
     path = "dashboard/"
     nav_section = ""
-    cards = [UsersCard]
+    cards = (UsersCard,)
 ```
 
 Card sizes control how much horizontal space they occupy in a four-column grid:
@@ -320,7 +319,7 @@ from plain.admin.views import AdminModelUpdateView
 class UserForm(ModelForm):
     class Meta:
         model = User
-        fields = ["email", "first_name", "last_name", "is_active"]
+        fields = ("email", "first_name", "last_name", "is_active")
 
 
 class UpdateView(AdminModelUpdateView):
@@ -383,11 +382,12 @@ On `AdminModelListView`, filters can be defined as a `dict[str, Q]` mapping filt
 ```python
 from plain.postgres import Q
 
+
 @register_viewset
 class UserAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = User
-        fields = ["id", "email", "created_at__date"]
+        fields = ("id", "email", "created_at__date")
         filters = {
             "Active": Q(is_active=True),
             "Inactive": Q(is_active=False),
@@ -415,8 +415,8 @@ For filters that need custom logic (e.g., annotations), use a `list[str]` and ov
 class UserAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = User
-        fields = ["id", "email", "created_at__date"]
-        filters = ["Active users", "Inactive users"]
+        fields = ("id", "email", "created_at__date")
+        filters = ("Active users", "Inactive users")
 
         def filter_queryset(self, queryset):
             if self.filter == "Active users":
@@ -433,8 +433,8 @@ List views support bulk actions on selected items. Define actions as a list of a
 ```python
 class ListView(AdminModelListView):
     model = User
-    fields = ["id", "email", "is_active"]
-    actions = ["Activate", "Deactivate", "Delete selected"]
+    fields = ("id", "email", "is_active")
+    actions = ("Activate", "Deactivate", "Delete selected")
 
     def perform_action(self, action, objects):
         if action == "Activate":
@@ -493,6 +493,7 @@ The impersonate URLs are included automatically with the admin router. You can c
 
 ```python
 from plain.admin.impersonate import get_request_impersonator
+
 
 def my_view(request):
     impersonator = get_request_impersonator(request)
@@ -810,6 +811,7 @@ if TYPE_CHECKING:
 
     from app.users.models import User
 
+
 def ADMIN_HAS_PERMISSION(view_cls: type[AdminView], user: User) -> bool:
     """Allow superusers to access all views, restrict others from package views."""
     if user.is_superuser:
@@ -925,12 +927,12 @@ from . import views
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("admin/", AdminRouter),
         path("login/", views.LoginView, name="login"),
         path("logout/", views.LogoutView, name="logout"),
         # other urls...
-    ]
+    )
 ```
 
 Create your first admin viewset for your User model:
@@ -952,8 +954,8 @@ class UserAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = User
         nav_section = "Users"
-        fields = ["id", "email", "is_admin", "created_at"]
-        search_fields = ["email"]
+        fields = ("id", "email", "is_admin", "created_at")
+        search_fields = ("email",)
 
     class DetailView(AdminModelDetailView):
         model = User

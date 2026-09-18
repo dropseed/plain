@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING, Any
 
 import psycopg
 from app.users.models import User
-
-from plain import postgres
 from plain.exceptions import ValidationError
 from plain.postgres import Field, transaction, types
 from plain.utils import timezone
+
+from plain import postgres
 
 from .exceptions import OAuthUserAlreadyExistsError
 
@@ -38,7 +38,7 @@ class OAuthConnection(postgres.Model):
     # Token data
     access_token: Field[str] = types.EncryptedTextField(max_length=2000)
     refresh_token: Field[str] = types.EncryptedTextField(
-        max_length=2000, required=False
+        max_length=2000, required=False, default=""
     )
     access_token_expires_at: Field[datetime | None] = types.DateTimeField(
         required=False, allow_null=True, default=None

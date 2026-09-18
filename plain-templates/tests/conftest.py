@@ -1,7 +1,6 @@
 import contextlib
 
 import pytest
-
 from plain.runtime import settings
 from plain.test import Client
 from plain.urls.resolvers import _get_cached_resolver

@@ -56,10 +56,10 @@ def get_field_label(field: str) -> str:
 
 class AdminListView(HTMXView, AdminView, ListView):
     template_name = "admin/list.html"
-    fields: list[str] = []
-    search_fields: list[str] = []
-    actions: list[str] = []
-    filters: list[str] = []
+    fields: tuple[str, ...] = ()
+    search_fields: tuple[str, ...] = ()
+    actions: tuple[str, ...] = ()
+    filters: tuple[str, ...] = ()
     page_size: int = 20
     allow_global_search = False
 
@@ -234,16 +234,14 @@ class AdminListView(HTMXView, AdminView, ListView):
                 )
         return objects
 
-    def get_fields(self) -> list:
-        return (
-            self.fields.copy()
-        )  # Avoid mutating the class attribute if using append etc
+    def get_fields(self) -> tuple[str, ...]:
+        return self.fields
 
-    def get_actions(self) -> list[str]:
-        return self.actions.copy()  # Avoid mutating the class attribute itself
+    def get_actions(self) -> tuple[str, ...]:
+        return self.actions
 
-    def get_filter_names(self) -> list[str]:
-        return self.filters.copy()  # Avoid mutating the class attribute itself
+    def get_filter_names(self) -> tuple[str, ...]:
+        return self.filters
 
     def get_object_id(self, obj: Any) -> Any:
         return self.get_field_value(obj, "id")
@@ -321,7 +319,7 @@ class AdminCreateView(AdminView, CreateView):
 class AdminDetailView(AdminView, DetailView):
     template_name = None
     nav_section = None
-    fields: list[str] = []
+    fields: tuple[str, ...] = ()
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
@@ -352,8 +350,8 @@ class AdminDetailView(AdminView, DetailView):
     def get_delete_url(self, obj: Any) -> str:
         return ""
 
-    def get_fields(self) -> list[str]:
-        return self.fields.copy()  # Avoid mutating the class attribute itself
+    def get_fields(self) -> tuple[str, ...]:
+        return self.fields
 
     def get_links(self) -> dict[str, str]:
         links = super().get_links()

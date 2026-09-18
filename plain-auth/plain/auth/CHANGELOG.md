@@ -1,5 +1,35 @@
 # plain-auth changelog
 
+## [0.29.8](https://github.com/dropseed/plain/releases/plain-auth@0.29.8) (2026-09-04)
+
+### What's changed
+
+- `login_client()` sets the test session cookie's attributes one at a time through `Morsel.__setitem__` instead of `Morsel.update()`. Several of those attributes (`max-age`, `expires`, and `domain`/`secure` when unset) are legitimately `None`, which `update()` isn't typed for; `__setitem__` takes them while keeping Morsel's reserved-key validation. It also now asserts the session was actually saved before reading `session_key`. No runtime behavior changed ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.29.7](https://github.com/dropseed/plain/releases/plain-auth@0.29.7) (2026-08-12)
+
+### What's changed
+
+- Internal simplification of `check_auth()` conditionals — no behavior changes ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.29.6](https://github.com/dropseed/plain/releases/plain-auth@0.29.6) (2026-08-02)
+
+### What's changed
+
+- `LogoutView` and `redirect_to_login()` now pass an explicit `status_code=302` to `RedirectResponse`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.29.5](https://github.com/dropseed/plain/releases/plain-auth@0.29.5) (2026-05-05)
 
 ### What's changed

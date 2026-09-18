@@ -82,10 +82,10 @@ A stored `None` counts as a hit, so caching a computed `None` won't recompute it
 ```python
 from plain.cache import cache
 
-cache.increment("page-views")          # 1 (starts at the delta on a miss)
-cache.increment("page-views")          # 2
-cache.increment("page-views", 10)      # 12
-cache.decrement("page-views", 2)       # 10
+cache.increment("page-views")  # 1 (starts at the delta on a miss)
+cache.increment("page-views")  # 2
+cache.increment("page-views", 10)  # 12
+cache.decrement("page-views", 2)  # 10
 ```
 
 A key with no numeric value yet — missing, or storing `None` — counts as `0`, so the first increment starts from the delta. Incrementing a key that holds a non-numeric value (a string, list, etc.) raises.
@@ -102,6 +102,7 @@ This makes a "count per period" limiter straightforward — e.g. capping request
 ```python
 from plain.cache import cache
 
+
 def check_rate_limit(key: str, *, limit: int, period: int) -> bool:
     """Allow up to `limit` calls per `period` seconds. Returns True if allowed."""
     return cache.increment(key, expiration=period) <= limit
@@ -113,7 +114,9 @@ For a **sliding TTL** — reset only after a stretch of inactivity, rather than 
 
 ```python
 cache.increment("failed-logins:42", expiration=900)
-cache.touch("failed-logins:42", expiration=900)  # push the deadline out on every attempt
+cache.touch(
+    "failed-logins:42", expiration=900
+)  # push the deadline out on every attempt
 ```
 
 ## Batch operations
@@ -138,7 +141,9 @@ To extend or change a live entry's expiration _without_ rewriting its value, use
 from datetime import timedelta
 from plain.cache import cache
 
-touched = cache.touch("my-key", expiration=timedelta(days=30))  # True if live, else False
+touched = cache.touch(
+    "my-key", expiration=timedelta(days=30)
+)  # True if live, else False
 ```
 
 `set()` always rewrites `value`, so refreshing a large entry's TTL re-TOASTs the whole blob. `touch()` writes only `expires_at` (and `updated_at`) — a heap-only write that reuses the existing TOAST pointer — so a multi-megabyte value isn't re-written. For refresh-heavy caches of large values (e.g. a conditional-request response cache with a sliding TTL), this avoids the dominant write cost.

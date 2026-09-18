@@ -7,6 +7,8 @@ from plain import postgres
 from plain.postgres import Field, types
 from plain.utils import timezone
 
+from plain import postgres
+
 __all__ = ["APIKey"]
 
 
@@ -22,11 +24,13 @@ class APIKey(postgres.Model):
         required=False, allow_null=True, default=None
     )
 
-    name: Field[str] = types.TextField(max_length=255, required=False)
+    name: Field[str] = types.TextField(max_length=255, required=False, default="")
 
     token: Field[str] = types.RandomStringField(length=40)
 
-    api_version: Field[str] = types.TextField(max_length=255, required=False)
+    api_version: Field[str] = types.TextField(
+        max_length=255, required=False, default=""
+    )
 
     model_options = postgres.Options(
         constraints=[

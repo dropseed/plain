@@ -13,7 +13,6 @@ from .requests import get_request_user, set_request_user
 
 if TYPE_CHECKING:
     from app.users.models import User
-
     from plain.http import Request
 
 _USER_ID_SESSION_KEY = "_auth_user_id"

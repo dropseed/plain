@@ -64,7 +64,7 @@ class WhoamiView(AuthView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("login", LoginView, name="login"),
         path("signup", SignupView, name="signup"),
         path("forgot", ForgotView, name="password_forgot"),
@@ -72,4 +72,4 @@ class AppRouter(Router):
         path("change", ChangeView, name="password_change"),
         path("done", DoneView, name="done"),
         path("whoami", WhoamiView, name="whoami"),
-    ]
+    )

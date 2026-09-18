@@ -270,7 +270,7 @@ def DateTimeField(
     update_now: bool = False,
     required: bool = True,
     allow_null: Literal[True],
-    default: Any = ...,
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _DateTimeField[datetime | None]: ...
 @overload
@@ -280,7 +280,6 @@ def DateTimeField(
     update_now: bool = False,
     required: bool = True,
     allow_null: Literal[False] = False,
-    default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _DateTimeField[datetime]: ...
 @overload
@@ -386,7 +385,15 @@ def BinaryField(
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
-    default: None = ...,
+    validators: Sequence[Callable[..., Any]] = (),
+) -> _BinaryField[bytes | memoryview | None]: ...
+@overload
+def BinaryField(
+    *,
+    max_length: int | None = None,
+    required: Literal[False],
+    allow_null: Literal[True],
+    default: Literal[b""] | None,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _BinaryField[bytes | memoryview | None]: ...
 @overload
@@ -395,6 +402,15 @@ def BinaryField(
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
+    validators: Sequence[Callable[..., Any]] = (),
+) -> _BinaryField[bytes | memoryview]: ...
+@overload
+def BinaryField(
+    *,
+    max_length: int | None = None,
+    required: Literal[False],
+    allow_null: Literal[False] = False,
+    default: Literal[b""],
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _BinaryField[bytes | memoryview]: ...
 @overload
@@ -445,7 +461,15 @@ def EncryptedTextField(
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
-    default: None = ...,
+    validators: Sequence[Callable[..., Any]] = (),
+) -> _EncryptedTextField[str | None]: ...
+@overload
+def EncryptedTextField(
+    *,
+    max_length: int | None = None,
+    required: Literal[False],
+    allow_null: Literal[True],
+    default: Literal[""] | None,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _EncryptedTextField[str | None]: ...
 @overload
@@ -457,13 +481,21 @@ def EncryptedTextField(
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _EncryptedTextField[str]: ...
 @overload
+def EncryptedTextField(
+    *,
+    max_length: int | None = None,
+    required: Literal[False],
+    allow_null: Literal[False] = False,
+    default: Literal[""],
+    validators: Sequence[Callable[..., Any]] = (),
+) -> _EncryptedTextField[str]: ...
+@overload
 def EncryptedJSONField(
     *,
     encoder: Any = None,
     decoder: Any = None,
     required: bool = True,
     allow_null: Literal[True],
-    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> Any: ...
 @overload

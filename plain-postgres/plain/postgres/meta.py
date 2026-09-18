@@ -16,7 +16,12 @@ if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.constraints import BaseConstraint
     from plain.postgres.fields import Field
-    from plain.postgres.fields.related import ManyToManyField, RelatedField
+    from plain.postgres.fields.base import ColumnField
+    from plain.postgres.fields.related import (
+        ForeignKeyField,
+        ManyToManyField,
+        RelatedField,
+    )
     from plain.postgres.fields.reverse_related import ForeignObjectRel
 
 EMPTY_RELATION_TREE = ()
@@ -39,24 +44,26 @@ class Meta:
     and the actual metadata instance (cached per model class).
     """
 
-    FORWARD_PROPERTIES = {
-        "fields",
-        "many_to_many",
-        "concrete_fields",
-        "local_concrete_fields",
-        "_non_pk_concrete_field_names",
-        "_forward_fields_map",
-        "base_queryset",
-    }
-    REVERSE_PROPERTIES = {"related_objects", "fields_map", "_relation_tree"}
+    FORWARD_PROPERTIES = frozenset(
+        {
+            "fields",
+            "many_to_many",
+            "_non_pk_field_names",
+            "_forward_fields_map",
+            "base_queryset",
+        }
+    )
+    REVERSE_PROPERTIES = frozenset({"related_objects", "fields_map", "_relation_tree"})
 
     # Type annotations for attributes set in _create_and_cache
     # These exist on cached instances, not on the descriptor itself
     model: type[Model]
     models_registry: Any
     _get_fields_cache: dict[Any, Any]
-    local_fields: list[Field]
-    local_many_to_many: list[ManyToManyField]
+    # Mutable storage filled by add_field() while the model class is being
+    # built; read them through `fields` and `many_to_many`.
+    _fields: list[ColumnField]
+    _many_to_many: list[ManyToManyField]
 
     def __init__(self, models_registry: Any | None = None):
         """
@@ -104,8 +111,8 @@ class Meta:
         instance.model = model
         instance.models_registry = self._models_registry or default_models_registry
         instance._get_fields_cache = {}
-        instance.local_fields = []
-        instance.local_many_to_many = []
+        instance._fields = []
+        instance._many_to_many = []
 
         # Cache the instance BEFORE processing fields to prevent recursion
         self._cache[model] = instance
@@ -130,8 +137,8 @@ class Meta:
                     field.contribute_to_class(model, attr_name)
 
         # Sort fields: primary key first, then alphabetically by name
-        instance.local_fields.sort(key=lambda f: (not f.primary_key, f.name))
-        instance.local_many_to_many.sort(key=lambda f: f.name)
+        instance._fields.sort(key=lambda f: (not f.primary_key, f.name))
+        instance._many_to_many.sort(key=lambda f: f.name)
 
         return instance
 
@@ -150,12 +157,18 @@ class Meta:
         return QuerySet.from_model(self.model)
 
     def add_field(self, field: Field) -> None:
+        from plain.postgres.fields.base import ColumnField
         from plain.postgres.fields.related import ManyToManyField, RelatedField
 
+        # Every field is either column-backed or a many-to-many; keeping the
+        # two lists homogeneous is what lets the rest of the framework read
+        # column attributes off `fields` without re-checking each one.
         if isinstance(field, ManyToManyField):
-            self.local_many_to_many.append(field)
+            self._many_to_many.append(field)
+        elif isinstance(field, ColumnField):
+            self._fields.append(field)
         else:
-            self.local_fields.append(field)
+            raise TypeError(f"{field!r} is neither a ColumnField nor a ManyToManyField")
 
         # If the field being added is a relation to another known field,
         # expire the cache on this field and the forward cache on the field
@@ -165,98 +178,36 @@ class Meta:
         # ideally, we'd just ask for field.related_model. However, related_model
         # is a cached property, and all the models haven't been loaded yet, so
         # we need to make sure we don't cache a string reference.
-        if isinstance(field, RelatedField) and field.remote_field.model:
-            try:
-                field.remote_field.model._model_meta._expire_cache(forward=False)
-            except AttributeError:
-                pass
+        if isinstance(field, RelatedField):
+            remote_model = field.remote_field.model_ref
+            if not isinstance(remote_model, str):
+                remote_model._model_meta._expire_cache(forward=False)
             self._expire_cache()
         else:
             self._expire_cache(reverse=False)
 
     @cached_property
-    def fields(self) -> ImmutableList[Field]:
-        from plain.postgres.fields.related import RelatedField
-
+    def fields(self) -> ImmutableList[ColumnField]:
         """
-        Return a list of all forward fields on the model and its parents,
-        excluding ManyToManyFields.
+        All column-backed fields on the model, primary key first and then
+        sorted by name. ManyToManyFields live in `many_to_many`.
 
         Private API intended only to be used by Plain itself; get_fields()
         combined with filtering of field properties is the public API for
         obtaining this field list.
         """
-
-        # For legacy reasons, the fields property should only contain forward
-        # fields that are not private or with a m2m cardinality.
-        def is_not_an_m2m_field(f: Any) -> bool:
-            from plain.postgres.fields.related import ManyToManyField
-
-            return not isinstance(f, ManyToManyField)
-
-        def is_not_a_generic_relation(f: Any) -> bool:
-            from plain.postgres.fields.related import ForeignKeyField, ManyToManyField
-
-            # Only ForeignKeyField and ManyToManyField are valid RelatedFields
-            # Anything else is a generic relation
-            if not isinstance(f, RelatedField):
-                return True
-            return isinstance(f, ForeignKeyField | ManyToManyField)
-
-        return make_immutable_fields_list(
-            "fields",
-            (
-                f
-                for f in self._get_fields(reverse=False)
-                if is_not_an_m2m_field(f) and is_not_a_generic_relation(f)
-            ),
-        )
+        return make_immutable_fields_list("fields", self._fields)
 
     @cached_property
-    def concrete_fields(self) -> ImmutableList[Field]:
+    def many_to_many(self) -> ImmutableList[ManyToManyField]:
         """
-        Return a list of all concrete fields on the model and its parents.
-
-        Private API intended only to be used by Plain itself; get_fields()
-        combined with filtering of field properties is the public API for
-        obtaining this field list.
-        """
-        return make_immutable_fields_list(
-            "concrete_fields", (f for f in self.fields if f.concrete)
-        )
-
-    @cached_property
-    def local_concrete_fields(self) -> ImmutableList[Field]:
-        """
-        Return a list of all concrete fields on the model.
-
-        Private API intended only to be used by Plain itself; get_fields()
-        combined with filtering of field properties is the public API for
-        obtaining this field list.
-        """
-        return make_immutable_fields_list(
-            "local_concrete_fields", (f for f in self.local_fields if f.concrete)
-        )
-
-    @cached_property
-    def many_to_many(self) -> ImmutableList[Field]:
-        """
-        Return a list of all many to many fields on the model and its parents.
+        All ManyToManyFields on the model, sorted by name.
 
         Private API intended only to be used by Plain itself; get_fields()
         combined with filtering of field properties is the public API for
         obtaining this list.
         """
-        from plain.postgres.fields.related import ManyToManyField
-
-        return make_immutable_fields_list(
-            "many_to_many",
-            (
-                f
-                for f in self._get_fields(reverse=False)
-                if isinstance(f, ManyToManyField)
-            ),
-        )
+        return make_immutable_fields_list("many_to_many", self._many_to_many)
 
     @cached_property
     def related_objects(self) -> ImmutableList[ForeignObjectRel]:
@@ -374,8 +325,8 @@ class Meta:
                 if isinstance(f, RelatedField)
             )
             for f in fields_with_relations:
-                if not isinstance(f.remote_field.model, str):
-                    remote_label = f.remote_field.model.model_options.label
+                if not isinstance(f.remote_field.model_ref, str):
+                    remote_label = f.remote_field.model_ref.model_options.label
                     related_objects_graph[remote_label].append(f)
 
         for model in all_models:
@@ -499,7 +450,7 @@ class Meta:
         except KeyError:
             pass
 
-        fields = []
+        collected: list[Field | ForeignObjectRel] = []
 
         if reverse:
             # Tree is computed once and cached until the app cache is expired.
@@ -507,16 +458,15 @@ class Meta:
             # the current model (reverse relations).
             all_fields = self._relation_tree
             for field in all_fields:
-                fields.append(field.remote_field)
+                collected.append(field.remote_field)
 
         if forward:
-            # get_fields() intentionally returns a heterogeneous list of field types.
-            fields += self.local_fields  # ty: ignore[unsupported-operator]
-            fields += self.local_many_to_many  # ty: ignore[unsupported-operator]
+            collected += self._fields
+            collected += self._many_to_many
 
         # In order to avoid list manipulation. Always
         # return a shallow copy of the results
-        fields = make_immutable_fields_list("get_fields()", fields)
+        fields = make_immutable_fields_list("get_fields()", collected)
 
         # Store result into cache for later access
         self._get_fields_cache[cache_key] = fields
@@ -533,12 +483,12 @@ class Meta:
         return frozenset(names)
 
     @cached_property
-    def _non_pk_concrete_field_names(self) -> frozenset[str]:
+    def _non_pk_field_names(self) -> frozenset[str]:
         """
-        Return a set of the non-primary key concrete field names defined on the model.
+        Return a set of the non-primary key field names defined on the model.
         """
         names = []
-        for field in self.concrete_fields:
+        for field in self.fields:
             if not field.primary_key:
                 names.append(field.name)
         return frozenset(names)
@@ -570,4 +520,16 @@ class Meta:
         return {
             constraint.name: constraint
             for constraint in self.model.model_options.constraints
+        }
+
+    @property
+    def foreign_keys_by_constraint_name(self) -> dict[str, ForeignKeyField]:
+        """Map each foreign key's database constraint name to its field — the
+        FK counterpart of ``constraints_by_name``, for the same error path."""
+        from plain.postgres.fields.related import ForeignKeyField
+
+        return {
+            field.db_constraint_name(): field
+            for field in self.fields
+            if isinstance(field, ForeignKeyField)
         }

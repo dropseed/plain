@@ -8,6 +8,15 @@ from .checks import PreflightCheck
 from .registry import register_check
 from .results import PreflightResult
 
+# The `PLAIN_`-prefixed variables core sets itself. They are not settings, so
+# they are not typos.
+NON_SETTING_ENV_VARS = frozenset(
+    {
+        "PLAIN_SETTINGS_MODULE",  # which settings module to import
+        "PLAIN_ENV",  # which `.env` files load, set by the CLI for `plain dev` / `plain test`
+    }
+)
+
 
 @register_check(name="settings.unused_env_vars")
 class CheckUnusedEnvVars(PreflightCheck):
@@ -19,6 +28,8 @@ class CheckUnusedEnvVars(PreflightCheck):
         # Get all env vars matching any configured prefix
         for prefix in settings._env_prefixes:
             for key in os.environ:
+                if key in NON_SETTING_ENV_VARS:
+                    continue
                 if key.startswith(prefix) and key.isupper():
                     setting_name = key[len(prefix) :]
                     # Skip empty setting names (just the prefix itself)
@@ -39,7 +50,7 @@ class CheckUnusedEnvVars(PreflightCheck):
                 for k in os.environ
                 if k.startswith("PLAIN_")
                 and k.isupper()
-                and k != "PLAIN_SETTINGS_MODULE"  # This one is always valid
+                and k not in NON_SETTING_ENV_VARS
             ]
             if plain_vars:
                 results.append(

@@ -18,13 +18,13 @@ class CachedItemViewset(AdminViewset):
         model = CachedItem
         title = "Cached items"
         description = "Database cache entries with expiration times."
-        fields = [
+        fields = (
             "key",
             "created_at",
             "expires_at",
             "updated_at",
-        ]
-        queryset_order = ["-id"]
+        )
+        queryset_order = ("-id",)
 
         def get_initial_queryset(self) -> QuerySet[CachedItem]:
             return (

@@ -11,9 +11,8 @@ if TYPE_CHECKING:
     from plain.postgres.meta import Meta
     from plain.postgres.options import Options
 
-import psycopg
-
 import plain.runtime
+import psycopg
 from plain.exceptions import ValidationError
 from plain.postgres import models_registry, transaction, types
 from plain.postgres.constants import LOOKUP_SEP
@@ -28,7 +27,6 @@ from plain.postgres.exceptions import (
 )
 from plain.postgres.expressions import RawSQL, Value
 from plain.postgres.fields import DATABASE_DEFAULT, Field
-from plain.postgres.fields.base import ColumnField
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ForeignObjectRel
 from plain.postgres.meta import Meta
@@ -165,14 +163,7 @@ class Model(metaclass=ModelBase):
         for field in meta.fields:
             from plain.postgres.fields.related import RelatedField
 
-            # meta.fields excludes ManyToManyField, so every iterated field
-            # is column-backed and exposes the ColumnField surface.
-            assert isinstance(field, ColumnField)
-
             is_related_object = False
-            # Virtual field
-            if field.name not in kwargs and field.column is None:
-                continue
             if isinstance(field, RelatedField) and isinstance(
                 field.remote_field, ForeignObjectRel
             ):
@@ -235,16 +226,14 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def from_db(cls, field_names: Iterable[str], values: Sequence[Any]) -> Model:
-        if len(values) != len(cls._model_meta.concrete_fields):
+        if len(values) != len(cls._model_meta.fields):
             values_iter = iter(values)
             values = [
                 next(values_iter) if f.name in field_names else DEFERRED
-                for f in cls._model_meta.concrete_fields
+                for f in cls._model_meta.fields
             ]
         # Build kwargs dict from field names and values
-        field_dict = dict(
-            zip((f.name for f in cls._model_meta.concrete_fields), values)
-        )
+        field_dict = dict(zip((f.name for f in cls._model_meta.fields), values))
         new = cls(_from_db=True, **field_dict)
         new._state.adding = False
         return new
@@ -321,11 +310,7 @@ class Model(metaclass=ModelBase):
         """
         Return a set containing names of deferred fields for this instance.
         """
-        return {
-            f.name
-            for f in self._model_meta.concrete_fields
-            if f.name not in self.__dict__
-        }
+        return {f.name for f in self._model_meta.fields if f.name not in self.__dict__}
 
     def refresh_from_db(self, fields: list[str] | None = None) -> None:
         """
@@ -362,15 +347,13 @@ class Model(metaclass=ModelBase):
             db_instance_qs = db_instance_qs.only(*fields)
         elif deferred_fields:
             fields = [
-                f.name
-                for f in self._model_meta.concrete_fields
-                if f.name not in deferred_fields
+                f.name for f in self._model_meta.fields if f.name not in deferred_fields
             ]
             db_instance_qs = db_instance_qs.only(*fields)
 
         db_instance = db_instance_qs.get()
         non_loaded_fields = db_instance.get_deferred_fields()
-        for field in self._model_meta.concrete_fields:
+        for field in self._model_meta.fields:
             if field.name in non_loaded_fields:
                 # This field wasn't refreshed - skip ahead.
                 continue
@@ -446,12 +429,12 @@ class Model(metaclass=ModelBase):
             if not fields:
                 return self  # explicit "update nothing" -- no-op
             fields = frozenset(fields)
-            field_names = self._model_meta._non_pk_concrete_field_names
+            field_names = self._model_meta._non_pk_field_names
             non_model_fields = fields.difference(field_names)
             if non_model_fields:
                 raise ValueError(
-                    "The following fields do not exist in this model, are m2m "
-                    "fields, or are non-concrete fields: "
+                    "The following fields do not exist in this model or are m2m "
+                    "fields: "
                     f"{', '.join(sorted(non_model_fields))}"
                 )
             deferred_in_update = fields & deferred_fields
@@ -462,7 +445,7 @@ class Model(metaclass=ModelBase):
                 )
         elif deferred_fields:
             # Loaded via .only()/.defer() -- write just the loaded fields.
-            loaded = self._model_meta._non_pk_concrete_field_names - deferred_fields
+            loaded = self._model_meta._non_pk_field_names - deferred_fields
             if loaded:
                 fields = loaded
         self._prepare_related_fields_for_save(
@@ -480,16 +463,20 @@ class Model(metaclass=ModelBase):
         """
         Map a Postgres constraint violation back to the constraint that raised
         it and return the ValidationError the in-Python check produces for that
-        constraint, or None when the violation doesn't correspond to a declared
-        constraint that can describe it (PK collisions, FK violations, and NOT
-        NULL — which carries no constraint name — all fall through to None and
-        re-raise as the original IntegrityError). A PK collision reaches here
-        when create() inserts a hand-set id that's already taken.
+        constraint or foreign key, or None when the violation doesn't
+        correspond to a declared constraint that can describe it (PK
+        collisions and NOT NULL — which carries no constraint name — fall
+        through to None and re-raise as the original IntegrityError). A PK
+        collision reaches here when create() inserts a hand-set id that's
+        already taken.
         """
         constraint_name = exc.diag.constraint_name
         if not constraint_name:
             return None
-        constraint = self._model_meta.constraints_by_name.get(constraint_name)
+        meta = self._model_meta
+        constraint = meta.constraints_by_name.get(
+            constraint_name
+        ) or meta.foreign_keys_by_constraint_name.get(constraint_name)
         if constraint is None:
             return None
         error = constraint._db_violation_error(self, self.__class__)
@@ -522,7 +509,7 @@ class Model(metaclass=ModelBase):
         fields from RETURNING. Omits id from the INSERT when unset so Postgres
         generates the identity value."""
         meta = self._model_meta
-        fields = list(meta.local_concrete_fields)
+        fields = list(meta.fields)
         if self.id is None:
             id_field = meta.get_forward_field("id")
             fields = [f for f in fields if f is not id_field]
@@ -532,7 +519,6 @@ class Model(metaclass=ModelBase):
         )
         if results:
             for value, field in zip(results[0], returning_fields):
-                assert field.name is not None
                 setattr(self, field.name, value)
 
     def _update_row(self, fields: Iterable[str] | None) -> None:
@@ -540,7 +526,7 @@ class Model(metaclass=ModelBase):
         row matched -- update() targets an existing row and has no INSERT
         fallback (that's create())."""
         meta = self._model_meta
-        non_pks = [f for f in meta.local_concrete_fields if not f.primary_key]
+        non_pks = [f for f in meta.fields if not f.primary_key]
         if fields:
             non_pks = [f for f in non_pks if f.name in fields]
         values = [(f, f.pre_save(self, False)) for f in non_pks]
@@ -563,7 +549,7 @@ class Model(metaclass=ModelBase):
     ) -> None:
         # Ensure that a model instance without a PK hasn't been assigned to
         # a ForeignKeyField on this model. If the field is nullable, allowing the save would result in silent data loss.
-        for field in self._model_meta.concrete_fields:
+        for field in self._model_meta.fields:
             if field_names and field.name not in field_names:
                 continue
             # If the related field isn't cached, then an instance hasn't been
@@ -573,11 +559,9 @@ class Model(metaclass=ModelBase):
                 if not obj:
                     continue
                 # A pk may have been assigned manually to a model instance not
-                # saved to the database (or auto-generated in a case like
-                # UUIDField), but we allow the save to proceed and rely on the
-                # database to raise an IntegrityError if applicable. If
-                # constraints aren't supported by the database, there's the
-                # unavoidable risk of data corruption.
+                # saved to the database, but we allow the write to proceed and
+                # rely on the database's foreign key check (mapped to a
+                # ValidationError on the field) if the row doesn't exist.
                 if obj.id is None:
                     raise ValueError(
                         f"{operation_name}() prohibited to prevent data loss due to unsaved "
@@ -612,13 +596,12 @@ class Model(metaclass=ModelBase):
         # should always be deletable — custom querysets shape reads, not
         # internal row lifecycle operations.
         #
-        # mark_for_rollback_on_error: FK errors (RESTRICT / NO_ACTION) leave
-        # the DB transaction aborted. Mark the connection so outer atomic()
-        # blocks see the abort state even if the caller catches IntegrityError.
+        # mark_for_rollback_on_error: RESTRICT violations leave the DB
+        # transaction aborted. Mark the connection so outer atomic() blocks
+        # see the abort state even if the caller catches IntegrityError.
         with transaction.mark_for_rollback_on_error():
             count = self._model_meta.base_queryset.filter(id=self.id)._raw_delete()
         id_field = self._model_meta.get_forward_field("id")
-        assert id_field.name is not None
         setattr(self, id_field.name, None)
         # Only the id is cleared -- every other field value survives so callers
         # can still reference a deleted row (correlate it, log it, check it's
@@ -651,7 +634,7 @@ class Model(metaclass=ModelBase):
         meta = meta or self._model_meta
         return {
             field.name: Value(field.value_from_object(self), field)
-            for field in meta.local_concrete_fields
+            for field in meta.fields
             if field.name not in exclude
         }
 
@@ -669,7 +652,6 @@ class Model(metaclass=ModelBase):
         by this method will not be associated with a particular field; it will
         have a special-case association with the field defined by NON_FIELD_ERRORS.
         """
-        pass
 
     def get_constraints(self) -> list[tuple[type[Model], list[Any]]]:
         constraints: list[tuple[type[Model], list[Any]]] = [
@@ -796,9 +778,9 @@ class Model(metaclass=ModelBase):
     def _check_fields(cls) -> list[PreflightResult]:
         """Perform all field checks."""
         errors: list[PreflightResult] = []
-        for field in cls._model_meta.local_fields:
+        for field in cls._model_meta.fields:
             errors.extend(field.preflight(from_model=cls))
-        for field in cls._model_meta.local_many_to_many:
+        for field in cls._model_meta.many_to_many:
             errors.extend(field.preflight(from_model=cls))
         return errors
 
@@ -809,13 +791,16 @@ class Model(metaclass=ModelBase):
         errors: list[PreflightResult] = []
         seen_intermediary_signatures = []
 
-        fields = cls._model_meta.local_many_to_many
+        fields = cls._model_meta.many_to_many
 
-        # Skip when the target model wasn't found.
-        fields = (f for f in fields if isinstance(f.remote_field.model, ModelBase))
-
-        # Skip when the relationship model wasn't found.
-        fields = (f for f in fields if isinstance(f.remote_field.through, ModelBase))
+        # Skip when the target or relationship model wasn't found; the field's
+        # own preflight reports those.
+        fields = (
+            f
+            for f in fields
+            if not isinstance(f.remote_field.model_ref, str)
+            and not isinstance(f.remote_field.through_ref, str)
+        )
 
         for f in fields:
             signature = (
@@ -841,9 +826,7 @@ class Model(metaclass=ModelBase):
     def _check_id_field(cls) -> list[PreflightResult]:
         """Disallow user-defined fields named ``id``."""
         if any(
-            f
-            for f in cls._model_meta.local_fields
-            if f.name == "id" and not f.auto_created
+            f for f in cls._model_meta.fields if f.name == "id" and not f.auto_created
         ):
             return [
                 PreflightResult(
@@ -860,7 +843,7 @@ class Model(metaclass=ModelBase):
         errors: list[PreflightResult] = []
         used_fields = {}  # name -> field
 
-        for f in cls._model_meta.local_fields:
+        for f in cls._model_meta.fields:
             clash = used_fields.get(f.name)
             # Note that we may detect clash between user-defined non-unique
             # field "id" and automatically added unique field "id", both
@@ -888,7 +871,7 @@ class Model(metaclass=ModelBase):
         used_column_names: list[str] = []
         errors: list[PreflightResult] = []
 
-        for f in cls._model_meta.local_fields:
+        for f in cls._model_meta.fields:
             column_name = f.column
 
             # Ensure the column name is not already in use.
@@ -956,7 +939,7 @@ class Model(metaclass=ModelBase):
     @classmethod
     def _check_single_primary_key(cls) -> list[PreflightResult]:
         errors: list[PreflightResult] = []
-        if sum(1 for f in cls._model_meta.local_fields if f.primary_key) > 1:
+        if sum(1 for f in cls._model_meta.fields if f.primary_key) > 1:
             errors.append(
                 PreflightResult(
                     fix="The model cannot have more than one field with "
@@ -1007,11 +990,11 @@ class Model(metaclass=ModelBase):
             include for index in cls.model_options.indexes for include in index.include
         ]
         fields += references
-        errors.extend(cls._check_local_fields(fields, "indexes"))
+        errors.extend(cls._check_referenced_fields(fields, "indexes"))
         return errors
 
     @classmethod
-    def _check_local_fields(
+    def _check_referenced_fields(
         cls, fields: Iterable[str], option: str
     ) -> list[PreflightResult]:
         # In order to avoid hitting the relation tree prematurely, we use our
@@ -1042,15 +1025,6 @@ class Model(metaclass=ModelBase):
                             f"ManyToManyFields are not permitted in '{option}'.",
                             obj=cls,
                             id="postgres.m2m_field_in_meta_option",
-                        )
-                    )
-                elif field not in cls._model_meta.local_fields:
-                    errors.append(
-                        PreflightResult(
-                            fix=f"'{option}' refers to field '{field_name}' which is not local to model "
-                            f"'{cls.model_options.object_name}'.",
-                            obj=cls,
-                            id="postgres.non_local_field_reference",
                         )
                     )
         return errors
@@ -1100,7 +1074,11 @@ class Model(metaclass=ModelBase):
             fld = None
             for part in field.split(LOOKUP_SEP):
                 try:
-                    fld = _cls._model_meta.get_field(part)  # ty: ignore[unresolved-attribute]
+                    if _cls is None:
+                        # The previous part was not a relation, so there is
+                        # no model left to look the next part up on.
+                        raise FieldDoesNotExist(part)
+                    fld = _cls._model_meta.get_field(part)
                     if isinstance(fld, RelatedField):
                         _cls = fld.path_infos[-1].to_meta.model
                     else:
@@ -1130,9 +1108,9 @@ class Model(metaclass=ModelBase):
         meta = cls._model_meta
         valid_fields = set(
             chain.from_iterable(
-                (f.name,)
-                if not (f.auto_created and not f.concrete)
-                else (f.field.related_query_name(),)
+                (f.field.related_query_name(),)
+                if isinstance(f, ForeignObjectRel)
+                else (f.name,)
                 for f in chain(meta.fields, meta.related_objects)
             )
         )
@@ -1162,7 +1140,7 @@ class Model(metaclass=ModelBase):
         # silently truncate, so we check for names that are too long
         allowed_len = MAX_NAME_LENGTH
 
-        for f in cls._model_meta.local_fields:
+        for f in cls._model_meta.fields:
             column_name = f.column
 
             # Check if column name is too long for the database.
@@ -1176,13 +1154,13 @@ class Model(metaclass=ModelBase):
                     )
                 )
 
-        for f in cls._model_meta.local_many_to_many:
+        for f in cls._model_meta.many_to_many:
             # Skip nonexistent models.
-            if isinstance(f.remote_field.through, str):
+            if isinstance(f.remote_field.through_ref, str):
                 continue
 
             # Check if column name for the M2M field is too long for the database.
-            for m2m in f.remote_field.through._model_meta.local_fields:
+            for m2m in f.remote_field.through_ref._model_meta.fields:
                 rel_name = m2m.column
                 if rel_name is not None and len(rel_name) > allowed_len:
                     errors.append(
@@ -1255,10 +1233,8 @@ class Model(metaclass=ModelBase):
                 from plain.postgres.fields.related import ManyToManyField
                 from plain.postgres.fields.reverse_related import ForeignKeyRel
 
-                if (
-                    not isinstance(field, RelatedField)
-                    or isinstance(field, ManyToManyField)
-                    or isinstance(field, ForeignKeyRel)
+                if not isinstance(field, RelatedField) or isinstance(
+                    field, (ManyToManyField, ForeignKeyRel)
                 ):
                     continue
             except FieldDoesNotExist:
@@ -1278,7 +1254,7 @@ class Model(metaclass=ModelBase):
                         id="postgres.constraint_refers_to_joined_field",
                     )
                 )
-        errors.extend(cls._check_local_fields(fields, "constraints"))
+        errors.extend(cls._check_referenced_fields(fields, "constraints"))
         return errors
 
 

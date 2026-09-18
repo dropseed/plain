@@ -14,7 +14,6 @@ from opentelemetry.semconv.attributes.db_attributes import (
 )
 from opentelemetry.semconv.attributes.http_attributes import HTTP_REQUEST_METHOD
 from opentelemetry.semconv.attributes.url_attributes import URL_PATH
-
 from plain.cli._trace import (
     CapturedTrace,
     RawSpan,
@@ -104,17 +103,19 @@ def test_each_redirect_hop_is_analyzed_on_its_own() -> None:
     # into a 2x count that reads as a repeat nobody can fix.
     tracer = trace.get_tracer("test")
     for path in ("/old", "/new"):
-        with tracer.start_as_current_span(
-            "GET",
-            kind=trace.SpanKind.SERVER,
-            attributes={HTTP_REQUEST_METHOD: "GET", URL_PATH: path},
-        ):
-            with tracer.start_as_current_span(
+        with (
+            tracer.start_as_current_span(
+                "GET",
+                kind=trace.SpanKind.SERVER,
+                attributes={HTTP_REQUEST_METHOD: "GET", URL_PATH: path},
+            ),
+            tracer.start_as_current_span(
                 "SELECT users",
                 kind=trace.SpanKind.CLIENT,
                 attributes=_query_attributes("SELECT * FROM users"),
-            ):
-                pass
+            ),
+        ):
+            pass
 
     traces = analyze_traces(_span_exporter.get_finished_spans())
 
@@ -181,9 +182,11 @@ def test_transaction_statements_are_counted_apart_from_queries() -> None:
 @pytest.mark.usefixtures("_otel_clean")
 def test_emits_flat_raw_spans() -> None:
     tracer = trace.get_tracer("test")
-    with tracer.start_as_current_span("GET /"):
-        with tracer.start_as_current_span("render template"):
-            pass
+    with (
+        tracer.start_as_current_span("GET /"),
+        tracer.start_as_current_span("render template"),
+    ):
+        pass
 
     spans = analyze_traces(_span_exporter.get_finished_spans())[0]["spans"]
 
@@ -223,9 +226,11 @@ def test_capture_spans_isolates_other_processors() -> None:
     # capture_spans() detaches processors an installed package attached —
     # here, the test tracer's own exporter — so a captured span reaches
     # only the capture exporter, not the pre-existing one.
-    with capture_spans() as exporter:
-        with trace.get_tracer("test").start_as_current_span("inside"):
-            pass
+    with (
+        capture_spans() as exporter,
+        trace.get_tracer("test").start_as_current_span("inside"),
+    ):
+        pass
 
     assert "inside" in [s.name for s in exporter.get_finished_spans()]
     assert "inside" not in [s.name for s in _span_exporter.get_finished_spans()]

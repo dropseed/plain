@@ -1,5 +1,26 @@
 # plain-email changelog
 
+## [0.20.2](https://github.com/dropseed/plain/releases/plain-email@0.20.2) (2026-08-12)
+
+### What's changed
+
+- Preview backend `.eml` filenames are timestamped in the app's `TIME_ZONE` instead of the machine's local clock ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Email backends' `__enter__` is typed with `Self`; internal attachment-handling refactor with no behavior change ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.20.1](https://github.com/dropseed/plain/releases/plain-email@0.20.1) (2026-08-02)
+
+### What's changed
+
+- Internal type-checker annotations for the ty 0.0.63 upgrade (new MRO-based method-override diagnostics on the `SafeMIME*` classes). No behavior changes. ([9e75740b5f](https://github.com/dropseed/plain/commit/9e75740b5f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-email@0.20.0) (2026-05-19)
 
 ### What's changed

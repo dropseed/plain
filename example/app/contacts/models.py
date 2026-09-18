@@ -5,6 +5,8 @@ from datetime import datetime
 from plain import postgres
 from plain.postgres import Field, types
 
+from plain import postgres
+
 SUBJECT_GENERAL = "general"
 SUBJECT_BUG = "bug"
 SUBJECT_FEATURE = "feature"

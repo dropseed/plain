@@ -28,6 +28,7 @@ You interact with [`Request`](./request.py#Request) and [`Response`](./response.
 from plain.views import View
 from plain.http import Response
 
+
 class ExampleView(View):
     def get(self):
         # Access a request header
@@ -148,6 +149,8 @@ response = Response(
 response = Response("<h1>Hello</h1>", content_type="text/html")
 ```
 
+Statuses that never have a body (204, 304) refuse content — `Response("Deleted", status_code=204)` raises `ValueError`. `status_code` is fixed at construction (no setter), so a status/body contradiction can never be created after the fact — pass `status_code=` to the constructor (or to `TemplateView.render()`) instead of mutating a built response. HTTP clients stop reading these responses at the headers, so a body would corrupt the next response on a keep-alive connection. Return a `200` if you want the message to reach the client, or `Response(status_code=204)` with no content — bodiless responses also skip the default `Content-Type` header, since there's no representation to describe. 1xx interim statuses can't be constructed at all — those belong to the server — and an `HTTPException` subclass with an out-of-range `status_code` is rejected when the class is defined. When you're writing your own handler or middleware, `status_omits_body(status_code)`, `response_omits_body(method=..., status_code=...)`, and `content_length_forbidden(status_code)` (all importable from `plain.http`) are the shared predicates the framework itself uses for these rules.
+
 ### Response types
 
 Plain provides specialized response classes for common use cases.
@@ -191,9 +194,11 @@ return FileResponse(
 ```python
 from plain.http import StreamingResponse
 
+
 def generate_data():
     for i in range(1000):
         yield f"Line {i}\n"
+
 
 return StreamingResponse(generate_data(), content_type="text/plain")
 ```
@@ -203,9 +208,11 @@ return StreamingResponse(generate_data(), content_type="text/plain")
 ```python
 from plain.http import AsyncStreamingResponse
 
+
 async def generate_data():
     for i in range(1000):
         yield f"Line {i}\n"
+
 
 return AsyncStreamingResponse(generate_data(), content_type="text/plain")
 ```
@@ -267,7 +274,9 @@ from plain.runtime import settings
 
 if csp := settings.DEFAULT_RESPONSE_HEADERS.get("Content-Security-Policy"):
     csp = csp.format(request=self.request)
-    response.headers["Content-Security-Policy"] = f"{csp}; script-src https://cdn.example.com"
+    response.headers["Content-Security-Policy"] = (
+        f"{csp}; script-src https://cdn.example.com"
+    )
 ```
 
 ## Content Security Policy (CSP)
@@ -327,14 +336,17 @@ Create custom middleware by subclassing [`HttpMiddleware`](./middleware.py#HttpM
 ```python
 from plain.http import HttpMiddleware, Request, Response
 
+
 class TimingMiddleware(HttpMiddleware):
     def before_request(self, request: Request) -> Response | None:
         import time
+
         request.timing_start = time.time()
         return None
 
     def after_response(self, request: Request, response: Response) -> Response:
         import time
+
         duration = time.time() - request.timing_start
         response.headers["X-Request-Duration"] = f"{duration:.3f}s"
         return response
@@ -373,7 +385,7 @@ raise ForbiddenError403("Access denied")
 raise BadRequestError400("Invalid input")
 ```
 
-Additional exceptions include [`SuspiciousOperationError400`](./exceptions.py#SuspiciousOperationError400), [`TooManyFieldsSentError400`](./exceptions.py#TooManyFieldsSentError400), [`TooManyFilesSentError400`](./exceptions.py#TooManyFilesSentError400), and [`RequestDataTooBigError400`](./exceptions.py#RequestDataTooBigError400).
+Additional exceptions include [`SuspiciousOperationError400`](./exceptions.py#SuspiciousOperationError400), [`TooManyFieldsSentError400`](./exceptions.py#TooManyFieldsSentError400), [`TooManyFilesSentError400`](./exceptions.py#TooManyFilesSentError400), and [`ContentTooLargeError413`](./exceptions.py#ContentTooLargeError413).
 
 ## FAQs
 
@@ -413,7 +425,7 @@ if self.request.is_https():
 
 #### How do I handle large file uploads?
 
-Configure `DATA_UPLOAD_MAX_MEMORY_SIZE` in settings. For very large files, consider streaming the upload instead of loading it into memory.
+Uploaded files don't load into memory — multipart uploads over 2.5MB (`FILE_UPLOAD_MAX_MEMORY_SIZE`) stream to a temporary file on disk, and `request.files` hands you the result either way. Chunked uploads work too: the server receives the full body before dispatch and de-chunks it, so the app always sees a real `Content-Length`. The setting to check is `SERVER_MAX_REQUEST_BODY_SIZE` (default 10MB): requests with bodies over it get a 413, so raise it if you accept larger uploads — or better, send large files direct to object storage with presigned URLs instead of through the app server. `DATA_UPLOAD_MAX_MEMORY_SIZE` separately caps what `request.body` and non-file form fields will materialize in RAM.
 
 ## Installation
 

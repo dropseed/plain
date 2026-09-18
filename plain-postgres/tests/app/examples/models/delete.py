@@ -8,6 +8,8 @@ from plain import postgres
 from plain.postgres import Field, types
 from plain.postgres.query_utils import Q
 
+from plain import postgres
+
 # ---------------------------------------------------------------------------
 # Single-level: one parent, one child per on_delete option
 # ---------------------------------------------------------------------------
@@ -43,13 +45,6 @@ class ChildSetNull(postgres.Model):
         on_delete=postgres.SET_NULL,
         allow_null=True,
         default=None,
-    )
-
-
-@postgres.register_model
-class ChildNoAction(postgres.Model):
-    parent: Field[DeleteParent] = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.NO_ACTION
     )
 
 
@@ -126,8 +121,8 @@ class DiamondChild(postgres.Model):
 
 
 # ---------------------------------------------------------------------------
-# Circular FKs — A.partner → B, B.partner → A, both CASCADE. Relies on
-# DEFERRABLE INITIALLY DEFERRED for circular insertion and deletion.
+# Circular FKs — A.partner → B, B.partner → A, both CASCADE and nullable, so
+# the cycle can be built with create → create → update under immediate checks.
 # ---------------------------------------------------------------------------
 
 

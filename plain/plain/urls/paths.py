@@ -73,9 +73,7 @@ def _has_dot_segment(path: str) -> bool:
     Looks for `/./`, `/../`, or a trailing `/.`/`/..`. Avoids matching
     paths that just contain a dot inside a segment (e.g. `/file.txt`).
     """
-    return (
-        "/./" in path or "/../" in path or path.endswith("/.") or path.endswith("/..")
-    )
+    return "/./" in path or "/../" in path or path.endswith(("/.", "/.."))
 
 
 def _parse_path(path: str) -> ParsedPath | RedirectToCanonical | BadPath:

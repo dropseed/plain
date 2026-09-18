@@ -8,6 +8,8 @@ from plain.postgres import Field, types
 from plain.runtime import settings
 from plain.utils import timezone
 
+from plain import postgres
+
 __all__ = ["CachedItem", "CachedItemQuerySet"]
 
 

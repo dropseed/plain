@@ -225,7 +225,7 @@ def _check_lazy_references(
     # Maps common uses of lazy operations to corresponding error functions
     # defined above. If a key maps to None, no error will be produced.
     # default_error() will be used for usages that don't appear in this dict.
-    known_lazy = {
+    known_lazy: dict[tuple[str, str], Callable[..., PreflightResult] | None] = {
         ("plain.postgres.fields.related", "resolve_related_class"): field_error,
     }
 

@@ -34,6 +34,7 @@ You can restrict a view to logged-in users using [`AuthViewMixin`](./views.py#Au
 from plain.auth.views import AuthViewMixin
 from plain.views import View
 
+
 class ProfileView(AuthViewMixin, View):
     login_required = True
 

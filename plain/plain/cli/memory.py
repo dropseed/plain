@@ -45,6 +45,7 @@ def baseline() -> None:
         capture_output=True,
         text=True,
         timeout=60,
+        check=False,
     )
 
     if result.returncode != 0:
@@ -267,6 +268,7 @@ def _find_arbiter_pid() -> int | None:
             ["pgrep", "-f", "plain server"],
             capture_output=True,
             text=True,
+            check=False,
         )
         if result.returncode != 0:
             return None
@@ -282,6 +284,7 @@ def _find_arbiter_pid() -> int | None:
                 ["pgrep", "-P", str(pid)],
                 capture_output=True,
                 text=True,
+                check=False,
             )
             if children.returncode == 0 and children.stdout.strip():
                 arbiters.append(pid)
@@ -305,6 +308,7 @@ def _get_worker_pids(arbiter_pid: int) -> list[int]:
             ["pgrep", "-P", str(arbiter_pid)],
             capture_output=True,
             text=True,
+            check=False,
         )
         if result.returncode != 0:
             return []
@@ -317,6 +321,7 @@ def _get_worker_pids(arbiter_pid: int) -> list[int]:
                     ["ps", "-o", "command=", "-p", str(pid)],
                     capture_output=True,
                     text=True,
+                    check=False,
                 )
                 if "resource_tracker" not in cmdline.stdout:
                     pids.append(pid)

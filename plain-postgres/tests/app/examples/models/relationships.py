@@ -5,6 +5,8 @@ from typing import ClassVar
 from plain import postgres
 from plain.postgres import Field, types
 
+from plain import postgres
+
 
 @postgres.register_model
 class Tag(postgres.Model):

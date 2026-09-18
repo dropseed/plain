@@ -28,6 +28,8 @@ For local development, you can enable auto-reload to restart workers when code c
 plain server --reload
 ```
 
+In reload mode, a worker that fails to boot (an import error mid-edit, for example) doesn't shut the server down. It serves the traceback as a 500 response until the code changes again, then restarts with the new code. Without `--reload`, a boot failure stops the server immediately.
+
 ## Workers and threads
 
 The server uses two levels of concurrency:
@@ -41,7 +43,7 @@ Total concurrent requests = `workers × threads`. On a 4-core machine with the d
 
 **When to adjust threads:** Threads are used exclusively for running your application code (middleware and views). This means `SERVER_THREADS` directly controls how many views can execute in parallel — it's not shared with I/O operations. Increase threads if your views spend a lot of time waiting on I/O (database queries, external API calls). Decrease to 1 if you need to avoid thread-safety concerns.
 
-**Long-lived connections:** Async views (SSE, WebSocket) run on the worker's event loop instead of occupying a thread pool slot. This means long-lived connections don't reduce your capacity for regular requests.
+**Long-lived connections:** Async views (e.g. SSE) run on the worker's event loop instead of occupying a thread pool slot. This means long-lived connections don't reduce your capacity for regular requests.
 
 ```bash
 # Explicit worker count
@@ -76,17 +78,30 @@ Most options can also be configured via settings (see below). CLI arguments take
 Server behavior can be configured in your `settings.py` file. These are the defaults:
 
 ```python
-SERVER_WORKERS = 0           # 0 = auto (one per CPU core)
+SERVER_WORKERS = 0  # 0 = auto (one per CPU core)
 SERVER_THREADS = 4
 SERVER_TIMEOUT = 30
 SERVER_ACCESS_LOG = True
-SERVER_ACCESS_LOG_FIELDS = ["method", "path", "query", "status", "duration_ms", "size", "ip", "user_agent", "referer"]
+SERVER_ACCESS_LOG_FIELDS = [
+    "method",
+    "path",
+    "query",
+    "status",
+    "duration_ms",
+    "size",
+    "ip",
+    "user_agent",
+    "referer",
+]
 SERVER_GRACEFUL_TIMEOUT = 30
+SERVER_KEEPALIVE_TIMEOUT = 300  # idle connection timeout (h1 and h2)
 SERVER_SENDFILE = True
 SERVER_CONNECTIONS = 1000
-SERVER_MAX_REQUESTS = 1000   # 0 = disabled, restart worker after N requests
-SERVER_MAX_REQUESTS_JITTER = 100  # random +/- variance to stagger restarts
+SERVER_MAX_REQUESTS = 10000  # 0 = disabled, restart worker after N requests
+SERVER_MAX_REQUESTS_JITTER = 1000  # random +/- variance to stagger restarts
 ```
+
+`SERVER_KEEPALIVE_TIMEOUT` is how long an idle connection (no request in progress) stays open, for both HTTP/1.1 and HTTP/2 — in-flight requests are never affected. Keep it longer than your load balancer's connection reuse window so the balancer is always the side that closes idle connections; a server-side close races a request being written onto the connection (Heroku H13). Because idle pooled connections hold their slot for the whole window, size `SERVER_CONNECTIONS` above your balancer's total connection pool per server; a worker at the cap rejects new connections (and logs a warning).
 
 Settings can also be set via environment variables with the `PLAIN_` prefix (e.g., `PLAIN_SERVER_WORKERS=4`).
 
@@ -109,8 +124,15 @@ See the [logs docs](../logs/README.md) for details on output formats.
 ```python
 # settings.py (default)
 SERVER_ACCESS_LOG_FIELDS = [
-    "method", "path", "query", "status", "duration_ms", "size",
-    "ip", "user_agent", "referer",
+    "method",
+    "path",
+    "query",
+    "status",
+    "duration_ms",
+    "size",
+    "ip",
+    "user_agent",
+    "referer",
 ]
 ```
 
@@ -142,7 +164,7 @@ Access logging has three layers, each at the right level of abstraction:
 
 ### Worker recycling
 
-Long-running workers can accumulate memory from fragmentation, C extension leaks, or unbounded caches. By default, workers gracefully restart after 1000 requests (with +/- 100 jitter) to keep memory usage in check.
+Long-running workers can accumulate memory from fragmentation, C extension leaks, or unbounded caches. By default, workers gracefully restart after 10000 requests (with +/- 1000 jitter) as a safety net — a genuinely leaky busy app still recycles every few hours, while a small app effectively never does.
 
 When a worker reaches the limit, it stops accepting new connections and drains in-flight requests before exiting. The arbiter automatically spawns a replacement. The jitter prevents all workers from restarting at the same time in multi-worker deployments.
 
@@ -298,21 +320,24 @@ graph TD
     C -->|TLS ALPN| P{Protocol?}
     P -->|h2| H2[HTTP/2 handler]
     P -->|http/1.1| HDR[Read headers async]
-    HDR --> BODY{Body size?}
-    BODY -->|"small (≤ limit)"| PRE[Pre-buffer body async]
-    BODY -->|"large (> limit)"| BRIDGE[AsyncBridgeUnreader]
-    PRE --> PARSE[Parse request]
-    BRIDGE -->|"parse in thread pool"| PARSE
+    HDR --> PARSE[Parse request]
+    PARSE --> SINK[Ingest body via BodySink]
     H2 -->|"h2 codec (sans-I/O)"| STREAMS[Multiplexed streams]
-    STREAMS -->|per stream| TP[Thread pool]
-    PARSE --> TP
+    STREAMS -->|DATA frames| SINK
+    SINK -->|body complete| TP[Thread pool]
     TP --> MW[before_request + view + after_response]
     MW -->|write response async| EL
 ```
 
-**Request body handling:** Small request bodies (≤ `DATA_UPLOAD_MAX_MEMORY_SIZE`, default 2.5MB) are pre-buffered on the event loop before parsing. Large bodies use `AsyncBridgeUnreader` which streams data lazily from the socket — the parser runs in the thread pool and bridges back to the event loop for socket reads. This keeps memory bounded while supporting large file uploads through multipart streaming to temp files.
+**Request body handling:** Both protocols receive the entire request body on the event loop before dispatch, through one ingestion path (the body sink): bodies stay in memory up to `SERVER_BODY_MAX_MEMORY_SIZE` (default 1MB) and spool to an anonymous temp file beyond it — the file is unlinked at creation, so a killed worker can never leak spooled disk (disk is a request-path dependency: a spool write failure is a 500 for that request, nothing more). Chunked transfer encoding is decoded during ingest, and the request is handed to the app de-chunked — a real `Content-Length`, no `Transfer-Encoding` — exactly as a buffering gateway would forward it, so `Content-Length` consumers like multipart parsing behave identically for chunked and declared bodies. Because the body is fully consumed off the wire before the response, connections keep-alive after uploads of any size, request threads are held only for view time, and async views can read bodies of any size.
 
-**Async views note:** Async views that read the request body work with pre-buffered (small) requests. For large bodies on the bridge path, body reads must happen in the thread pool (sync views). If you need async views to handle large uploads, increase `DATA_UPLOAD_MAX_MEMORY_SIZE` to cover your expected body sizes.
+This is the same model as Puma, Waitress, and PHP-FPM: views never stream a request body as it arrives — dispatch starts when the body is complete. Ingest happens before the request span opens, so its cost is recorded on the span as `http.request.body.size` and `plain.request.body_ingest_seconds` — check those before blaming a view for a slow upload.
+
+**Request body limits:** Three independent bounds apply during ingest:
+
+- `SERVER_MAX_REQUEST_BODY_SIZE` (default 10MB) — per-request policy cap, rejected with a 413. A declared Content-Length over the cap is refused from the headers, before any of the body transfers (and before any `100 Continue`); bodies with no declared length are rejected the moment received bytes exceed it. This is a pre-auth allowance — what an anonymous client can make a worker receive before any app code runs — so the default covers forms, images, and documents. Raise it deliberately if the app accepts larger uploads; for genuinely large files, prefer uploading direct to object storage (presigned URLs) rather than through the app server. `None` means no per-request cap of its own — a single body is then still bounded by the in-flight budget below, answered with a 413.
+- `SERVER_MAX_INFLIGHT_BODY_SIZE` (default 1GB, `None` = unlimited) — worker-wide budget on total in-flight body bytes (memory + disk) across all connections, rejected with a 503 (with `Retry-After: 1` — this is load shedding, and the shed request is safe to retry). This bounds worst-case disk use under an upload flood; completed requests release their share.
+- `SERVER_BODY_MIN_BYTES_PER_SECOND` (default 240, `0` = disabled) — minimum transfer rate while a request body is being received, after a short grace period and sustained over a rolling window (bytes sent early can't bank unbounded credit toward later silence). Inactivity timeouts can't stop a slow-drip body (R.U.D.Y.); the throughput floor can — on HTTP/1.1 against active socket-wait time, on HTTP/2 per stream. Violations get a 408.
 
 ## Installation
 

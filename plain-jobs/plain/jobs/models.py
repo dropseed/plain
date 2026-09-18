@@ -13,13 +13,13 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import Link, SpanContext, SpanKind, TraceFlags
-
-from plain import postgres
 from plain.logs import get_framework_logger
 from plain.postgres import Field, transaction, types
 from plain.postgres.expressions import F
 from plain.runtime import settings
 from plain.utils import timezone
+
+from plain import postgres
 
 from .exceptions import DeferJob
 from .otel import (
@@ -36,8 +36,8 @@ if TYPE_CHECKING:
     from .jobs import Job
 
 __all__ = [
-    "JobRequest",
     "JobProcess",
+    "JobRequest",
     "JobResult",
     "JobResultStatuses",
     "WorkerHeartbeat",
@@ -72,13 +72,15 @@ class JobRequest(postgres.Model):
         required=False, allow_null=True, default=None
     )
     priority: Field[int] = types.SmallIntegerField(default=0)
-    source: Field[str] = types.TextField(required=False)
+    source: Field[str] = types.TextField(required=False, default="")
     queue: Field[str] = types.TextField(default="default", max_length=255)
 
     retries: Field[int] = types.SmallIntegerField(default=0)
     retry_attempt: Field[int] = types.SmallIntegerField(default=0)
 
-    concurrency_key: Field[str] = types.TextField(max_length=255, required=False)
+    concurrency_key: Field[str] = types.TextField(
+        max_length=255, required=False, default=""
+    )
 
     start_at: Field[datetime.datetime | None] = types.DateTimeField(
         required=False, allow_null=True, default=None
@@ -193,11 +195,13 @@ class JobProcess(postgres.Model):
         required=False, allow_null=True, default=None
     )
     priority: Field[int] = types.SmallIntegerField(default=0)
-    source: Field[str] = types.TextField(required=False)
+    source: Field[str] = types.TextField(required=False, default="")
     queue: Field[str] = types.TextField(default="default", max_length=255)
     retries: Field[int] = types.SmallIntegerField(default=0)
     retry_attempt: Field[int] = types.SmallIntegerField(default=0)
-    concurrency_key: Field[str] = types.TextField(max_length=255, required=False)
+    concurrency_key: Field[str] = types.TextField(
+        max_length=255, required=False, default=""
+    )
 
     # OpenTelemetry trace context
     trace_id: Field[str | None] = types.TextField(
@@ -349,7 +353,7 @@ class JobProcess(postgres.Model):
                     # unique constraint on job_process_uuid and produces a
                     # second log line. Rare; correct outcome; not worth
                     # pre-checking on every successful job.
-                    logger.exception(e)
+                    logger.exception("Job failed")
                     error_type = record_span_error(span, e)
                     metric_attributes[ERROR_TYPE] = error_type
                     return self.convert_to_result(
@@ -609,7 +613,7 @@ class JobResult(postgres.Model):
     ended_at: Field[datetime.datetime | None] = types.DateTimeField(
         required=False, allow_null=True, default=None
     )
-    error: Field[str] = types.TextField(required=False)
+    error: Field[str] = types.TextField(required=False, default="")
     status: Field[str] = types.TextField(
         max_length=20,
         choices=JobResultStatuses.choices,
@@ -625,11 +629,13 @@ class JobResult(postgres.Model):
         required=False, allow_null=True, default=None
     )
     priority: Field[int] = types.SmallIntegerField(default=0)
-    source: Field[str] = types.TextField(required=False)
+    source: Field[str] = types.TextField(required=False, default="")
     queue: Field[str] = types.TextField(default="default", max_length=255)
     retries: Field[int] = types.SmallIntegerField(default=0)
     retry_attempt: Field[int] = types.SmallIntegerField(default=0)
-    concurrency_key: Field[str] = types.TextField(max_length=255, required=False)
+    concurrency_key: Field[str] = types.TextField(
+        max_length=255, required=False, default=""
+    )
 
     # Retries
     retry_job_request_uuid: Field[UUID | None] = types.UUIDField(

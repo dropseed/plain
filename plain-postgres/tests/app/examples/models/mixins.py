@@ -5,6 +5,8 @@ from datetime import datetime
 from plain import postgres
 from plain.postgres import Field, types
 
+from plain import postgres
+
 
 class TimestampMixin:
     """Mixin that provides timestamp fields."""

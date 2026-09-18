@@ -20,6 +20,4 @@ class TargetView(View):
 
 class PathRouter(Router):
     namespace = ""
-    urls = [
-        path("target/", TargetView, name="target"),
-    ]
+    urls = (path("target/", TargetView, name="target"),)

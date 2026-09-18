@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, ClassVar
 from plain import postgres
 from plain.postgres import Field, types
 
+from plain import postgres
+
 if TYPE_CHECKING:
     from plain.oauth.models import OAuthConnection
 

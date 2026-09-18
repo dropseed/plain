@@ -144,9 +144,7 @@ class FrameOptionsAudit(Audit):
                 )
                 continue
 
-            if original_lower.startswith("'nonce-") or original_lower.startswith(
-                "'sha"
-            ):
+            if original_lower.startswith(("'nonce-", "'sha")):
                 violations.append(
                     f"contains unsupported token for frame-ancestors {stripped}"
                 )

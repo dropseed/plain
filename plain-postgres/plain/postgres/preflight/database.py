@@ -81,78 +81,59 @@ class CheckDatabaseTables(PreflightCheck):
 
 @register_check("postgres.prunable_migrations")
 class CheckPrunableMigrations(PreflightCheck):
-    """Warns about stale migration records in the database."""
+    """Reports migration records with no file on disk, and reports a database
+    the planner would refuse.
+
+    Orphan records are reported, never prescribed against: they are what
+    rollback needs, and a branch switch or a package reset leaves them behind
+    on purpose. Records a baseline retired are not orphans at all. A refusal
+    (`postgres.migration_history`) is an error: `plain postgres sync` will
+    stop at the same point, and this reports it before the release phase.
+    """
 
     def run(self) -> list[PreflightResult]:
         # Import here to avoid circular import issues
         from plain.postgres.migrations.loader import MigrationLoader
-        from plain.postgres.migrations.recorder import MigrationRecorder
 
-        errors = []
-
-        # Load migrations from disk and database
         conn = get_connection()
         loader = MigrationLoader(conn, ignore_no_migrations=True)
-        recorder = MigrationRecorder(conn)
-        recorded_migrations = recorder.applied_migrations()
+        assert loader.disk_migrations is not None
+        assert loader.applied_migrations is not None
+        recorded = loader.applied_migrations
 
-        # disk_migrations should not be None after MigrationLoader initialization,
-        # but check to satisfy type checker
-        if loader.disk_migrations is None:
-            return errors
-
-        # Find all prunable migrations (recorded but not on disk)
-        all_prunable = [
-            migration
-            for migration in recorded_migrations
-            if migration not in loader.disk_migrations
+        results = [
+            PreflightResult(fix=str(refusal), id="postgres.migration_history")
+            for refusal in loader.baseline_status.refusals
         ]
 
-        if not all_prunable:
-            return errors
+        orphans = loader.orphan_records(recorded)
+        if not orphans:
+            return results
 
-        # Separate into existing packages vs orphaned packages
         existing_packages = set(loader.migrated_packages)
-        prunable_existing: list[tuple[str, str]] = []
-        prunable_orphaned: list[tuple[str, str]] = []
+        from_existing = [m for m in orphans if m[0] in existing_packages]
+        from_removed = [m for m in orphans if m[0] not in existing_packages]
 
-        for migration in all_prunable:
-            package, name = migration
-            if package in existing_packages:
-                prunable_existing.append(migration)
-            else:
-                prunable_orphaned.append(migration)
+        def listed(migrations: list[tuple[str, str]]) -> str:
+            text = ", ".join(f"{pkg}.{name}" for pkg, name in migrations[:3])
+            if len(migrations) > 3:
+                text += f" (and {len(migrations) - 3} more)"
+            return text
 
-        # Build the warning message
-        total_count = len(all_prunable)
+        count = len(orphans)
         message_parts = [
-            f"Found {total_count} stale migration record{'s' if total_count != 1 else ''} in the database."
+            f"Found {count} migration record{'s' if count != 1 else ''} with no file on disk."
         ]
+        if from_existing:
+            message_parts.append(f"From existing packages: {listed(from_existing)}.")
+        if from_removed:
+            message_parts.append(f"From removed packages: {listed(from_removed)}.")
 
-        if prunable_existing:
-            existing_list = ", ".join(
-                f"{pkg}.{name}" for pkg, name in prunable_existing[:3]
-            )
-            if len(prunable_existing) > 3:
-                existing_list += f" (and {len(prunable_existing) - 3} more)"
-            message_parts.append(f"From existing packages: {existing_list}.")
-
-        if prunable_orphaned:
-            orphaned_list = ", ".join(
-                f"{pkg}.{name}" for pkg, name in prunable_orphaned[:3]
-            )
-            if len(prunable_orphaned) > 3:
-                orphaned_list += f" (and {len(prunable_orphaned) - 3} more)"
-            message_parts.append(f"From removed packages: {orphaned_list}.")
-
-        message_parts.append("Run 'plain migrations prune' to review and remove them.")
-
-        errors.append(
+        results.append(
             PreflightResult(
                 fix=" ".join(message_parts),
                 id="postgres.prunable_migrations",
                 warning=True,
             )
         )
-
-        return errors
+        return results

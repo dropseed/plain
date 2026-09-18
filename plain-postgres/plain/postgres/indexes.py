@@ -35,11 +35,11 @@ class Index:
         include: tuple[str, ...] | list[str] | None = None,
     ) -> None:
         if not isinstance(condition, NoneType | Q):
-            raise ValueError("Index.condition must be a Q instance.")
+            raise TypeError("Index.condition must be a Q instance.")
         if not isinstance(fields, list | tuple):
-            raise ValueError("Index.fields must be a list or tuple.")
+            raise TypeError("Index.fields must be a list or tuple.")
         if not isinstance(opclasses, list | tuple):
-            raise ValueError("Index.opclasses must be a list or tuple.")
+            raise TypeError("Index.opclasses must be a list or tuple.")
         if not expressions and not fields:
             raise ValueError(
                 "At least one field or expression is required to define an index."
@@ -61,7 +61,7 @@ class Index:
         if fields and not all(isinstance(field, str) for field in fields):
             raise ValueError("Index.fields must contain only strings with field names.")
         if not isinstance(include, NoneType | list | tuple):
-            raise ValueError("Index.include must be a list or tuple.")
+            raise TypeError("Index.include must be a list or tuple.")
         self.fields = list(fields)
         # A list of 2-tuple with the field name and ordering ('' or 'DESC').
         self.fields_orders = [
@@ -138,12 +138,12 @@ class Index:
     def __repr__(self) -> str:
         return "<{}:{}{}{}{}{}{}>".format(
             self.__class__.__qualname__,
-            "" if not self.fields else f" fields={repr(self.fields)}",
-            "" if not self.expressions else f" expressions={repr(self.expressions)}",
-            "" if not self.name else f" name={repr(self.name)}",
+            "" if not self.fields else f" fields={self.fields!r}",
+            "" if not self.expressions else f" expressions={self.expressions!r}",
+            "" if not self.name else f" name={self.name!r}",
             "" if self.condition is None else f" condition={self.condition}",
-            "" if not self.include else f" include={repr(self.include)}",
-            "" if not self.opclasses else f" opclasses={repr(self.opclasses)}",
+            "" if not self.include else f" include={self.include!r}",
+            "" if not self.opclasses else f" opclasses={self.opclasses!r}",
         )
 
     def __eq__(self, other: object) -> bool:

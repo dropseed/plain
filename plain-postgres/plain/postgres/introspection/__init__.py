@@ -20,16 +20,16 @@ from .schema import (
 )
 
 __all__ = [
+    "DEFAULT_INDEX_ACCESS_METHOD",
+    "MANAGED_CONSTRAINT_TYPES",
+    "MANAGED_INDEX_ACCESS_METHODS",
     "CheckItem",
     "CheckResult",
-    "Informational",
     "ColumnState",
     "ConType",
     "ConstraintState",
-    "DEFAULT_INDEX_ACCESS_METHOD",
     "IndexState",
-    "MANAGED_CONSTRAINT_TYPES",
-    "MANAGED_INDEX_ACCESS_METHODS",
+    "Informational",
     "TableOwner",
     "TableState",
     "build_table_owners",

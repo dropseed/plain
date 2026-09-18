@@ -7,7 +7,7 @@ from . import views
 
 class ExamplesRouter(Router):
     namespace = "examples"
-    urls = [
+    urls = (
         path(
             "forms/create",
             views.FormsExampleCreateView,
@@ -38,4 +38,4 @@ class ExamplesRouter(Router):
             views.SecretStoreCreateView,
             name="secret_store_create",
         ),
-    ]
+    )

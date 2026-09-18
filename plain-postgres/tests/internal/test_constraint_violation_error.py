@@ -8,7 +8,6 @@ from types import SimpleNamespace
 
 import pytest
 from app.examples.models.constraints import ConstraintExample
-
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import CheckConstraint, Q, UniqueConstraint
 from plain.postgres.constraints import BaseConstraint
@@ -149,7 +148,7 @@ def test_form_skips_check_constraint_over_shape_failed_field(
     class Form(ModelForm):
         class Meta:
             model = ConstraintExample
-            fields = ["name", "description"]
+            fields = ("name", "description")
 
     rf = RequestFactory()
     form = Form(request=rf.post("/x/", data={"name": "bogus", "description": "d"}))
@@ -206,7 +205,7 @@ def test_check_constraint_dict_violation_error_routes_to_field(
     class Form(ModelForm):
         class Meta:
             model = ConstraintExample
-            fields = ["name", "description"]
+            fields = ("name", "description")
 
     rf = RequestFactory()
     form = Form(request=rf.post("/x/", data={"name": "bad", "description": "d"}))
@@ -236,7 +235,7 @@ def test_check_constraint_string_violation_error_lands_on_non_field_errors(
     class Form(ModelForm):
         class Meta:
             model = ConstraintExample
-            fields = ["name", "description"]
+            fields = ("name", "description")
 
     rf = RequestFactory()
     form = Form(request=rf.post("/x/", data={"name": "bad", "description": "d"}))
@@ -298,7 +297,7 @@ def test_unique_constraint_single_field_string_routes_to_field(
     class Form(ModelForm):
         class Meta:
             model = ConstraintExample
-            fields = ["name", "description"]
+            fields = ("name", "description")
 
     rf = RequestFactory()
     form = Form(request=rf.post("/x/", data={"name": "dup", "description": "d2"}))

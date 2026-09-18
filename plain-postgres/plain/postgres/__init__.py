@@ -12,7 +12,7 @@ from .base import Model
 from .constraints import CheckConstraint, UniqueConstraint
 from .db import get_connection, use_management_connection
 from .middleware import DatabaseConnectionMiddleware
-from .deletion import CASCADE, NO_ACTION, RESTRICT, SET_NULL
+from .deletion import CASCADE, RESTRICT, SET_NULL
 from .expressions import F
 from .enums import TextChoices
 from .fields import (
@@ -57,68 +57,49 @@ from . import types
 # Advanced query-time features (aggregates, expressions, etc.) should be
 # imported from their specific modules (e.g., plain.postgres.aggregates).
 __all__ = [
-    # From constraints
-    "CheckConstraint",
-    "UniqueConstraint",
-    # From enums
-    "TextChoices",
-    # From fields
+    "CASCADE",
+    "RESTRICT",
+    "SET_NULL",
     "BigIntegerField",
     "BinaryField",
     "BooleanField",
+    "CheckConstraint",
+    "DatabaseConnectionMiddleware",
     "DateField",
     "DateTimeField",
     "DecimalField",
     "DurationField",
     "EmailField",
-    "FloatField",
-    "GenericIPAddressField",
-    "IntegerField",
-    "PrimaryKeyField",
-    "RandomStringField",
-    "SmallIntegerField",
-    "TextField",
-    "TimeField",
-    "URLField",
-    "UUIDField",
-    # From fields.json
-    "JSONField",
-    # From fields.timezones
-    "TimeZoneField",
-    # From indexes
-    "Index",
-    # From deletion
-    "CASCADE",
-    "NO_ACTION",
-    "RESTRICT",
-    "SET_NULL",
-    # From options
-    "Options",
-    # From query
-    "QuerySet",
-    # From query_utils
-    "Q",
-    # From expressions
     "F",
-    # From base
-    "Model",
     # The typed descriptor base, for annotating model fields:
     #   name: Field[str] = types.TextField()
     "Field",
-    # From fields.related
+    "FloatField",
     "ForeignKeyField",
+    "GenericIPAddressField",
+    "Index",
+    "IntegerField",
+    "JSONField",
     "ManyToManyField",
-    # From fields.reverse_descriptors
+    "Model",
+    "Options",
+    "PrimaryKeyField",
+    "Q",
+    "QuerySet",
+    "RandomStringField",
     "ReverseForeignKey",
     "ReverseManyToMany",
-    # From db
+    "SmallIntegerField",
+    "TextChoices",
+    "TextField",
+    "TimeField",
+    "TimeZoneField",
+    "URLField",
+    "UUIDField",
+    "UniqueConstraint",
     "get_connection",
-    "use_management_connection",
-    # From middleware
-    "DatabaseConnectionMiddleware",
-    # From registry
-    "register_model",
     "models_registry",
-    # Typed field imports
+    "register_model",
     "types",
+    "use_management_connection",
 ]

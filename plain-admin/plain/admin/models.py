@@ -9,6 +9,8 @@ from plain.postgres import Field, types
 if TYPE_CHECKING:
     from app.users.models import User
 
+from plain import postgres
+
 
 @postgres.register_model
 class PinnedNavItem(postgres.Model):

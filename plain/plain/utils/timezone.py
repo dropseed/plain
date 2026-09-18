@@ -8,26 +8,26 @@ import functools
 import zoneinfo
 from contextlib import ContextDecorator
 from contextvars import ContextVar
-from datetime import UTC, datetime, time, timedelta, timezone, tzinfo
+from datetime import UTC, date, datetime, time, timedelta, timezone, tzinfo
 from types import TracebackType
 
 from plain.runtime import settings
 
 __all__ = [
-    "get_fixed_timezone",
-    "get_default_timezone",
-    "get_default_timezone_name",
-    "get_current_timezone",
-    "get_current_timezone_name",
     "activate",
     "deactivate",
-    "override",
-    "localtime",
-    "now",
+    "get_current_timezone",
+    "get_current_timezone_name",
+    "get_default_timezone",
+    "get_default_timezone_name",
+    "get_fixed_timezone",
     "is_aware",
     "is_naive",
+    "localtime",
     "make_aware",
     "make_naive",
+    "now",
+    "override",
 ]
 
 
@@ -99,7 +99,7 @@ def activate(timezone: tzinfo | str) -> None:
     elif isinstance(timezone, str):
         _active.set(zoneinfo.ZoneInfo(timezone))
     else:
-        raise ValueError(f"Invalid timezone: {timezone!r}")
+        raise TypeError(f"Invalid timezone: {timezone!r}")
 
 
 def deactivate() -> None:
@@ -204,6 +204,15 @@ def is_naive(value: datetime | time) -> bool:
     value.utcoffset() implements the appropriate logic.
     """
     return value.utcoffset() is None
+
+
+def naive_datetime_from_date(value: date) -> datetime:
+    """A naive midnight datetime for `value`.
+
+    Deliberately naive: callers either localize it (form/field parsing) or are
+    doing tz-independent calendar math (timesince).
+    """
+    return datetime(value.year, value.month, value.day)  # noqa: DTZ001
 
 
 def make_aware(value: datetime, timezone: tzinfo | None = None) -> datetime:

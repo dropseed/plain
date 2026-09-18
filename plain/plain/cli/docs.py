@@ -8,6 +8,7 @@ from pathlib import Path
 import click
 
 from .llmdocs import LLMDocs
+from .runtime import without_runtime_setup
 
 # All known official Plain packages: pip name -> short description
 KNOWN_PACKAGES = {
@@ -33,7 +34,6 @@ KNOWN_PACKAGES = {
     "plain-pages": "Serve static pages, markdown, and assets",
     "plain-passwords": "Password authentication",
     "plain-pytest": "Test with pytest",
-    "plain-redirection": "URL redirection with admin and logging",
     "plain-scan": "Test for production best practices",
     "plain-sessions": "Database-backed sessions",
     "plain-start": "Bootstrap a new project from templates",
@@ -219,11 +219,11 @@ def _search_docs(doc_paths: list[Path], pattern: re.Pattern[str]) -> dict[str, s
             ):
                 results[current_section] = stripped
 
-            if pattern.search(stripped):
-                if current_section not in results:
-                    results[current_section] = stripped
-                elif _should_upgrade_preview(results[current_section], stripped):
-                    results[current_section] = stripped
+            if pattern.search(stripped) and (
+                current_section not in results
+                or _should_upgrade_preview(results[current_section], stripped)
+            ):
+                results[current_section] = stripped
     return results
 
 
@@ -306,6 +306,7 @@ def _find_section_content(doc_paths: list[Path], section_heading: str) -> str | 
     return None
 
 
+@without_runtime_setup
 @click.command()
 @click.option("--api", is_flag=True, help="Show public API surface only")
 @click.option("--list", "show_list", is_flag=True, help="List available packages")

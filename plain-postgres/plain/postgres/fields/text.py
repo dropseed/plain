@@ -3,9 +3,10 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
-from plain import validators
 from plain.preflight import PreflightResult
 from plain.validators import MaxLengthValidator
+
+from plain import validators
 
 from .base import NOT_PROVIDED, ChoicesField, ColumnField
 
@@ -37,7 +38,7 @@ class TextField[T: (str, str | None) = str](ChoicesField[T]):
         if self.max_length is not None:
             self.validators.append(MaxLengthValidator(self.max_length))
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.max_length is not None:
             kwargs["max_length"] = self.max_length
@@ -88,11 +89,11 @@ class TextField[T: (str, str | None) = str](ChoicesField[T]):
 
 
 class EmailField[T: (str, str | None) = str](TextField[T]):
-    default_validators = [validators.validate_email]
+    default_validators = (validators.validate_email,)
 
 
 class URLField[T: (str, str | None) = str](TextField[T]):
-    default_validators = [validators.URLValidator()]
+    default_validators = (validators.URLValidator(),)
 
 
 class RandomStringField[T: (str, str | None) = str](ColumnField[T]):
@@ -125,7 +126,7 @@ class RandomStringField[T: (str, str | None) = str](ColumnField[T]):
     def get_db_default_expression(self) -> RandomString:
         return self._expression
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         kwargs["length"] = self._expression.length
         return name, path, args, kwargs

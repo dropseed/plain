@@ -7,6 +7,8 @@ if TYPE_CHECKING:
     from typing import Self
 
 
+from types import TracebackType
+
 from plain.logs import get_framework_logger
 from plain.postgres.ddl import compile_database_default_sql
 from plain.postgres.dialect import build_timeout_set_clauses, quote_name
@@ -69,7 +71,12 @@ class DatabaseSchemaEditor:
             self.atomic.__enter__()
         return self
 
-    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         if self.atomic_migration:
             self.atomic.__exit__(exc_type, exc_value, traceback)
 
@@ -128,7 +135,7 @@ class DatabaseSchemaEditor:
         """Take a model and return its table definition."""
         column_sqls = []
         params = []
-        for field in model._model_meta.local_fields:
+        for field in model._model_meta.fields:
             definition, extra_params = self.column_sql(
                 model, field, include_default=field.has_persistent_column_default()
             )

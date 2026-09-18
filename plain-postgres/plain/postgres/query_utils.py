@@ -11,10 +11,9 @@ from __future__ import annotations
 import functools
 import inspect
 from collections.abc import Callable, Generator
-from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self
+from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self, TypeGuard
 
 import psycopg
-
 from plain.logs import get_framework_logger
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.exceptions import FieldError
@@ -23,8 +22,8 @@ from plain.utils import tree
 if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.fields import Field
-    from plain.postgres.fields.related import ForeignKeyField
-    from plain.postgres.fields.reverse_related import ForeignObjectRel
+    from plain.postgres.fields.related import ForeignKeyField, RelatedField
+    from plain.postgres.fields.reverse_related import ForeignKeyRel, ForeignObjectRel
     from plain.postgres.lookups import Lookup, Transform
     from plain.postgres.meta import Meta
     from plain.postgres.sql.where import WhereNode
@@ -42,7 +41,7 @@ class PathInfo(NamedTuple):
     from_meta: Meta
     to_meta: Meta
     target_field: Field
-    join_field: ForeignKeyField | ForeignObjectRel
+    join_field: ForeignKeyField | ForeignKeyRel
     m2m: bool
     direct: bool
 
@@ -202,7 +201,7 @@ class RegisterLookupMixin:
     def _get_lookup(self, lookup_name: str) -> type[Lookup | Transform] | None:
         return self.get_lookups().get(lookup_name, None)
 
-    @functools.cache
+    @functools.cache  # noqa: B019 — keyed by class; classes live for the process
     def get_class_lookups(cls: type[Self]) -> dict[str, type[Lookup | Transform]]:
         class_lookups = [
             parent.__dict__.get("class_lookups", {}) for parent in inspect.getmro(cls)
@@ -220,28 +219,24 @@ class RegisterLookupMixin:
         get_class_lookups
     )
 
-    def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
+    def get_lookup(self, lookup: str) -> type[Lookup] | None:
         from plain.postgres.lookups import Lookup
 
-        found = self._get_lookup(lookup_name)
-        if found is None:
-            # output_field is a Field which inherits from RegisterLookupMixin
-            if output_field := getattr(self, "output_field", None):
-                return output_field.get_lookup(lookup_name)
+        found = self._get_lookup(lookup)
+        # output_field is a Field which inherits from RegisterLookupMixin
+        if found is None and (output_field := getattr(self, "output_field", None)):
+            return output_field.get_lookup(lookup)
         if found is not None and not issubclass(found, Lookup):
             return None
         return found
 
-    def get_transform(
-        self, lookup_name: str
-    ) -> type[Transform] | Callable[..., Any] | None:
+    def get_transform(self, name: str) -> Callable[..., Transform] | None:
         from plain.postgres.lookups import Transform
 
-        found = self._get_lookup(lookup_name)
-        if found is None:
-            # output_field is a Field which inherits from RegisterLookupMixin
-            if output_field := getattr(self, "output_field", None):
-                return output_field.get_transform(lookup_name)
+        found = self._get_lookup(name)
+        # output_field is a Field which inherits from RegisterLookupMixin
+        if found is None and (output_field := getattr(self, "output_field", None)):
+            return output_field.get_transform(name)
         if found is not None and not issubclass(found, Transform):
             return None
         return found
@@ -336,7 +331,7 @@ def select_related_descend(
     requested: dict[str, Any] | None,
     select_mask: Any,
     reverse: bool = False,
-) -> bool:
+) -> TypeGuard[RelatedField]:
     """
     Return True if this field should be used to descend deeper for
     select_related() purposes. Used by both the query construction code
