@@ -7,11 +7,11 @@ attrs:
 ---
 <!doctype html>
 <html>
-  <body>
+    <body>
     {{ connect_pageviews(request) }}
     <form action="{{ connect_support_url('plain_sf_testid') }}" method="POST">
       {{ connect_support_fields(request) }}
-      <input name="name">
+      <input name>
       <input name="email">
       <textarea name="message"></textarea>
       <button type="submit">Send</button>

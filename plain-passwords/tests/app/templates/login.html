@@ -8,27 +8,23 @@ attrs:
   form_class: Any
 ---
 <Base>
-{% for error in form_errors(form) %}
-<p class="form-error">{{ error.message }}</p>
-{% endfor %}
-<form method="post">
+    {% for error in form_errors(form) %}
+        <p class="form-error">{{ error.message }}</p>
+    {% endfor %}
+    <form method="post">
   <p>
     <input
-      type="email"
-      name="email"
-      placeholder="Email"
-      value="{{ field_value(form, form_class.email) }}"
-      >
+        type="email"
+        name="email"
+        placeholder="Email"
+        value="{{ field_value(form, form_class.email) }}"
+    >
     {% for error in field_errors(form, form_class.email) %}
     <span class="form-error">{{ error.message }}</span>
     {% endfor %}
   </p>
   <p>
-    <input
-      type="password"
-      name="password"
-      placeholder="Password"
-      >
+    <input type="password" name="password" placeholder="Password">
     {% for error in field_errors(form, form_class.password) %}
     <span class="form-error">{{ error.message }}</span>
     {% endfor %}

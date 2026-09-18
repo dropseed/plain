@@ -37,8 +37,14 @@ pytestmark = pytest.mark.skipif(
 
 
 def _discover_templates() -> list[Path]:
+    """Every `.html` under any `templates/` directory in the checkout.
+
+    Globbing `templates/*` and keeping the directories would silently skip
+    every template sitting at the root of a `templates/` dir — `base.html`,
+    `index.html`, `404.html` — which is most of the interesting ones.
+    """
     files: list[Path] = []
-    for path in REPO_ROOT.rglob("templates/*"):
+    for path in REPO_ROOT.rglob("templates"):
         if not path.is_dir():
             continue
         files.extend(path.rglob("*.html"))

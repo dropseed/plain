@@ -175,7 +175,15 @@ def _format_root(nodes: list[Node], *, indent_size: int, width: int) -> str:
     """Format the top-level node sequence (one node per line, no indent)."""
     parts: list[str] = []
     for node in nodes:
-        if isinstance(node, TextNode) and not node.text.strip():
+        if isinstance(node, TextNode):
+            # Root-level whitespace is the formatter's to decide — the
+            # separator below supplies it. Keeping the node's own leading
+            # and trailing whitespace would let it grow by one newline on
+            # every pass, since the next pass sees what this one wrote.
+            text = node.text.strip()
+            if not text:
+                continue
+            parts.append(text)
             continue
         parts.append(_format_node(node, indent=0, indent_size=indent_size, width=width))
     return "\n".join(parts)

@@ -7,15 +7,39 @@
 # Postgres-less lint job — and it covers every shipped package, including
 # ones the example app doesn't install.
 #
-# ty resolves `app.*` in the example app's `attrs:` through the
-# `[tool.ty.environment] extra-paths` entry in the root pyproject, so this
+# Two kinds of pass:
+#
+#   1. Shipped package templates + the example app, checked together. A few
+#      package templates (`loginlink/sent`, `oauth/error`, `pages/page`)
+#      declare `components: - base`, i.e. the *host app's* base.html — the
+#      example app is what supplies it, so that's the context they're
+#      checkable in.
+#   2. Each test app's own fixtures, one pass per app. Resolution roots
+#      include the package dirs, but only the app's own files are checked:
+#      those apps ship partial `base.html`es of their own, so checking a
+#      package template against them would be asking the wrong question.
+#
+# ty resolves `app.*` in an app's `attrs:` through the
+# `[tool.ty.environment] extra-paths` entries in the root pyproject, so this
 # has to run from the repo root.
 
 cd "$(dirname "$0")/.."
 
-args=()
-for dir in */plain/*/templates example/app/templates; do
-  [ -d "$dir" ] && args+=(--template-dir "$dir")
+packages=()
+for dir in */plain/*/templates; do
+  [ -d "$dir" ] && packages+=(--template-dir "$dir")
 done
 
-uv run plain-html check --typecheck "${args[@]}" "$@"
+status=0
+
+uv run plain-html check --typecheck \
+  "${packages[@]}" --template-dir example/app/templates "$@" || status=1
+
+for app in */tests/app/templates; do
+  [ -d "$app" ] || continue
+  echo "--> $app"
+  uv run plain-html check --typecheck \
+    "${packages[@]}" --template-dir "$app" "$app" "$@" || status=1
+done
+
+exit $status

@@ -6,7 +6,9 @@ attrs:
   items: Any = ()
 ---
 <main>
-    <HtmxFragment name="main"><p>Hello {{ name }}</p></HtmxFragment>
+    <HtmxFragment name="main">
+        <p>Hello {{ name }}</p>
+    </HtmxFragment>
     {% for item in items %}
         <HtmxFragment name="{{ "item-" + str(item["id"]) }}">
             <span>{{ item["name"] }}</span>
