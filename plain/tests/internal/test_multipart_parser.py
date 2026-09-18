@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from io import BytesIO
 
-import pytest
 from plain.http import Request
 from plain.http.multipartparser import MultiPartParser, MultiPartParserError
+from plain.test import cases, raises
 from plain.utils.datastructures import MultiValueDict
 
 BOUNDARY = "TeStBoUnDaRy"
@@ -300,7 +300,7 @@ def test_quoted_boundary_parameter_is_accepted():
     assert post == {"note": ["hello"]}
 
 
-@pytest.mark.parametrize("length", [1, 201])
+@cases(1, 201)
 def test_boundary_up_to_201_characters_is_accepted(length: int):
     boundary = "a" * length
     body = (
@@ -319,32 +319,26 @@ def test_boundary_up_to_201_characters_is_accepted(length: int):
 def test_boundary_over_201_characters_is_rejected():
     boundary = "a" * 202
 
-    with pytest.raises(MultiPartParserError, match="Invalid boundary"):
+    with raises(MultiPartParserError, match="Invalid boundary"):
         _parse(b"", content_type=f"multipart/form-data; boundary={boundary}")
 
 
-@pytest.mark.parametrize(
-    "content_type",
-    [
-        "",
-        "text/plain",
-        "application/x-www-form-urlencoded",
-    ],
+@cases(
+    "",
+    "text/plain",
+    "application/x-www-form-urlencoded",
 )
 def test_non_multipart_content_type_is_rejected(content_type: str):
-    with pytest.raises(MultiPartParserError, match="Invalid Content-Type"):
+    with raises(MultiPartParserError, match="Invalid Content-Type"):
         _parse(b"", content_type=content_type)
 
 
-@pytest.mark.parametrize(
-    "content_type",
-    [
-        "multipart/form-data",
-        'multipart/form-data; boundary=""',
-    ],
+@cases(
+    "multipart/form-data",
+    'multipart/form-data; boundary=""',
 )
 def test_missing_boundary_parameter_is_rejected(content_type: str):
-    with pytest.raises(MultiPartParserError, match="Invalid boundary"):
+    with raises(MultiPartParserError, match="Invalid boundary"):
         _parse(b"", content_type=content_type)
 
 
@@ -356,7 +350,7 @@ def test_non_ascii_boundary_is_rejected_by_the_boundary_check():
     parameters, so a non-ASCII boundary never reaches it. That guard is
     unreachable from a header-derived content type.
     """
-    with pytest.raises(MultiPartParserError, match="Invalid boundary"):
+    with raises(MultiPartParserError, match="Invalid boundary"):
         _parse(b"", content_type="multipart/form-data; boundary=héllo")
 
 
@@ -377,13 +371,10 @@ def test_filename_keeps_non_ascii_characters():
     assert _file_contents(files) == {"doc": [("héllo-世界.txt", b"contents")]}
 
 
-@pytest.mark.parametrize(
-    ("sent", "expected"),
-    [
-        ("../../etc/passwd", "passwd"),
-        (r"C:\Windows\evil.exe", "evil.exe"),
-        ("plain\x00hidden.txt", "plainhidden.txt"),
-    ],
+@cases(
+    ("../../etc/passwd", "passwd"),
+    (r"C:\Windows\evil.exe", "evil.exe"),
+    ("plain\x00hidden.txt", "plainhidden.txt"),
 )
 def test_filename_is_sanitized(sent: str, expected: str):
     body = (

@@ -6,13 +6,16 @@ The guard must fork rather than let the error disable it.
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, cast
 
-import pytest
+from helpers import sandbox
 from plain.dev.postgres import guard
 from plain.dev.postgres.cluster import Cluster
 from plain.postgres.migrations.exceptions import ResetBoundaryError
+from plain.test import patch
 
 
 class FakeCluster:
@@ -37,49 +40,47 @@ class FakeCluster:
         self.recorded.append(name)
 
 
-@pytest.fixture
-def guarded(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> tuple[Path, FakeCluster]:
-    monkeypatch.setattr(guard, "checkout_id", lambda root: "/me")
-    monkeypatch.setattr(guard, "project_identity", lambda root: ("proj", None))
-    monkeypatch.setattr(
-        guard, "database_name_for_checkout", lambda project, checkout: "proj_me"
-    )
-    monkeypatch.setattr(guard, "write_pointer", lambda root, db_name: None)
-    return tmp_path, FakeCluster()
+@contextmanager
+def guarded() -> Generator[tuple[Path, FakeCluster]]:
+    """Pin down everything the guard derives from the checkout, so only the
+    pending-migration answer is in play."""
+    with (
+        sandbox() as box,
+        patch(guard, "checkout_id", lambda root: "/me"),
+        patch(guard, "project_identity", lambda root: ("proj", None)),
+        patch(guard, "database_name_for_checkout", lambda project, checkout: "proj_me"),
+        patch(guard, "write_pointer", lambda root, db_name: None),
+    ):
+        yield box.tmp_path, FakeCluster()
 
 
 def as_cluster(fake: FakeCluster) -> Cluster:
     return cast(Cluster, fake)
 
 
-def test_nothing_pending_keeps_the_shared_database(
-    guarded: tuple[Path, FakeCluster], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root, cluster = guarded
-    monkeypatch.setattr(guard, "pending_migration_count", lambda url: 0)
+def test_nothing_pending_keeps_the_shared_database() -> None:
+    with guarded() as (root, cluster):
+        with patch(guard, "pending_migration_count", lambda url: 0):
+            assert (
+                guard.guard_shared_database(
+                    root, cluster=as_cluster(cluster), db_name="shared"
+                )
+                == "shared"
+            )
+        assert cluster.forked == []
 
-    assert (
-        guard.guard_shared_database(root, cluster=as_cluster(cluster), db_name="shared")
-        == "shared"
-    )
-    assert cluster.forked == []
 
-
-def test_a_refusal_forks_instead_of_disabling_the_guard(
-    guarded: tuple[Path, FakeCluster], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root, cluster = guarded
-
+def test_a_refusal_forks_instead_of_disabling_the_guard() -> None:
     def refuse(url: str) -> int:
         raise ResetBoundaryError("examples", "0018_x", "2.0")
 
-    monkeypatch.setattr(guard, "pending_migration_count", refuse)
-
-    assert (
-        guard.guard_shared_database(root, cluster=as_cluster(cluster), db_name="shared")
-        == "proj_me"
-    )
-    assert cluster.forked == [("shared", "proj_me")]
-    assert cluster.recorded == ["proj_me"]
+    with guarded() as (root, cluster):
+        with patch(guard, "pending_migration_count", refuse):
+            assert (
+                guard.guard_shared_database(
+                    root, cluster=as_cluster(cluster), db_name="shared"
+                )
+                == "proj_me"
+            )
+        assert cluster.forked == [("shared", "proj_me")]
+        assert cluster.recorded == ["proj_me"]

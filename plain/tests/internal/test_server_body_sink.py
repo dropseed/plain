@@ -10,13 +10,13 @@ before any protocol wiring depends on them.
 
 from __future__ import annotations
 
-import pytest
 from plain.server.http.errors import ChunkedFramingError, LimitRequestBody
 from plain.server.http.sink import (
     MAX_TRAILER_SIZE,
     BodySink,
     ChunkedDecoder,
 )
+from plain.test import cases, raises
 
 # ---------------------------------------------------------------------------
 # BodySink
@@ -63,7 +63,7 @@ def test_sink_cap_allows_exactly_max_size():
 def test_sink_cap_raises_on_the_violating_feed():
     sink = BodySink(spool_size=64, max_size=100)
     sink.feed(b"x" * 100)
-    with pytest.raises(LimitRequestBody):
+    with raises(LimitRequestBody):
         sink.feed(b"x")
 
 
@@ -71,7 +71,7 @@ def test_sink_cap_counts_received_bytes_not_declared_length():
     # The cap must bind on what actually arrives — a lying Content-Length
     # can't bypass it because the sink never consults one.
     sink = BodySink(spool_size=64, max_size=100)
-    with pytest.raises(LimitRequestBody):
+    with raises(LimitRequestBody):
         sink.feed(b"x" * 101)
 
 
@@ -95,7 +95,7 @@ def test_sink_close_releases_the_stream():
     sink.feed(b"x" * 100)
     stream = sink.finish()
     sink.close()
-    with pytest.raises(ValueError, match="closed file"):
+    with raises(ValueError, match="closed file"):
         stream.read()
 
 
@@ -117,7 +117,7 @@ def test_sink_feed_after_close_is_blocked():
     # file or bypass the budget.
     sink = BodySink(spool_size=8, max_size=None)
     sink.close()
-    with pytest.raises(AssertionError):
+    with raises(AssertionError):
         sink.feed(b"x")
 
 
@@ -162,7 +162,7 @@ def _decode_all(wire: bytes, *, split: int) -> tuple[bytes, ChunkedDecoder]:
     return bytes(decoded), decoder
 
 
-@pytest.mark.parametrize("split", [1, 2, 3, 7, 64, 10_000])
+@cases(1, 2, 3, 7, 64, 10_000)
 def test_decoder_round_trips_across_any_feed_split(split: int):
     payload = _pattern(5000)
     wire = _encode_chunked(payload, 613)
@@ -173,7 +173,7 @@ def test_decoder_round_trips_across_any_feed_split(split: int):
     assert decoder.leftover == b""
 
 
-@pytest.mark.parametrize("split", [1, 5, 10_000])
+@cases(1, 5, 10_000)
 def test_decoder_captures_trailers(split: int):
     payload = _pattern(300)
     wire = _encode_chunked(payload, 100, trailers=b"X-Checksum: abc")
@@ -233,45 +233,42 @@ def test_decoder_binary_payload_with_crlf_and_fake_terminators():
 
 def test_decoder_invalid_chunk_size_raises():
     decoder = ChunkedDecoder()
-    with pytest.raises(ChunkedFramingError):
+    with raises(ChunkedFramingError):
         decoder.feed(b"zzz\r\nabc\r\n0\r\n\r\n")
 
 
 def test_decoder_negative_chunk_size_raises():
     decoder = ChunkedDecoder()
-    with pytest.raises(ChunkedFramingError):
+    with raises(ChunkedFramingError):
         decoder.feed(b"-5\r\nabc\r\n0\r\n\r\n")
 
 
-@pytest.mark.parametrize(
-    "size_line",
-    [
-        b"0x5",  # Python literal prefix
-        b"1_0",  # PEP 515 underscore
-        b"+5",  # signed
-        b" 5",  # leading space (bytes.strip would have eaten it)
-        b"\x0b0",  # vertical tab prefix (bytes.strip too)
-        b"",  # empty
-        b"5 ",  # trailing space
-    ],
+@cases(
+    b"0x5",  # Python literal prefix
+    b"1_0",  # PEP 515 underscore
+    b"+5",  # signed
+    b" 5",  # leading space (bytes.strip would have eaten it)
+    b"\x0b0",  # vertical tab prefix (bytes.strip too)
+    b"",  # empty
+    b"5 ",  # trailing space
 )
 def test_decoder_rejects_non_hexdigit_chunk_size(size_line: bytes):
     # RFC 9112 chunk-size is 1*HEXDIG. int(_, 16) is more permissive, and
     # any tolerance here is a smuggling primitive vs a strict upstream.
     decoder = ChunkedDecoder()
-    with pytest.raises(ChunkedFramingError):
+    with raises(ChunkedFramingError):
         decoder.feed(size_line + b"\r\nxxxxx\r\n0\r\n\r\n")
 
 
 def test_decoder_missing_crlf_after_chunk_data_raises():
     decoder = ChunkedDecoder()
-    with pytest.raises(ChunkedFramingError):
+    with raises(ChunkedFramingError):
         decoder.feed(b"3\r\nabcXX0\r\n\r\n")
 
 
 def test_decoder_over_long_chunk_size_line_raises():
     decoder = ChunkedDecoder()
-    with pytest.raises(ChunkedFramingError):
+    with raises(ChunkedFramingError):
         decoder.feed(b"3;" + b"x" * 9000)
 
 
@@ -279,21 +276,21 @@ def test_decoder_over_long_chunk_size_line_raises_even_when_terminated():
     # The cap must hold when the whole over-long line arrives in one feed
     # with its CRLF present — not just when it dribbles in.
     decoder = ChunkedDecoder()
-    with pytest.raises(ChunkedFramingError):
+    with raises(ChunkedFramingError):
         decoder.feed(b"3;" + b"x" * 9000 + b"\r\nabc\r\n0\r\n\r\n")
 
 
 def test_decoder_trailer_flood_raises():
     decoder = ChunkedDecoder()
     decoder.feed(b"3\r\nabc\r\n0\r\n")
-    with pytest.raises(ChunkedFramingError):
+    with raises(ChunkedFramingError):
         decoder.feed(b"X: " + b"y" * (MAX_TRAILER_SIZE + 100))
 
 
 def test_decoder_trailer_flood_raises_even_when_terminated():
     decoder = ChunkedDecoder()
     decoder.feed(b"3\r\nabc\r\n0\r\n")
-    with pytest.raises(ChunkedFramingError):
+    with raises(ChunkedFramingError):
         decoder.feed(b"X: " + b"y" * (MAX_TRAILER_SIZE + 100) + b"\r\n\r\n")
 
 
@@ -322,7 +319,7 @@ def test_decoder_many_small_chunks_in_one_feed_is_linear_time():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("split", [1, 13, 4096])
+@cases(1, 13, 4096)
 def test_chunked_ingest_through_sink_round_trips(split: int):
     payload = _pattern(50_000)
     wire = _encode_chunked(payload, 1000)
@@ -347,5 +344,5 @@ def test_chunked_ingest_enforces_cap_on_decoded_bytes():
         for i in range(0, len(wire), 100):
             sink.feed(decoder.feed(wire[i : i + 100]))
 
-    with pytest.raises(LimitRequestBody):
+    with raises(LimitRequestBody):
         ingest()

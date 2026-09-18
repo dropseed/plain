@@ -7,7 +7,6 @@ connection), so these tests observe it from the test connection via pg_locks.
 from __future__ import annotations
 
 import psycopg
-import pytest
 from plain.postgres.db import get_connection
 from plain.postgres.schema_lock import (
     SCHEMA_LOCK_KEY,
@@ -15,6 +14,7 @@ from plain.postgres.schema_lock import (
     schema_lock,
 )
 from plain.postgres.sources import build_connection_params
+from plain.test import override_settings, raises
 
 
 def _lock_holder_count() -> int:
@@ -39,7 +39,7 @@ def _lock_holder_count() -> int:
         return row[0]
 
 
-def test_lock_held_during_block_and_released_after(db):
+def test_lock_held_during_block_and_released_after():
     assert _lock_holder_count() == 0
 
     with schema_lock():
@@ -48,7 +48,7 @@ def test_lock_held_during_block_and_released_after(db):
     assert _lock_holder_count() == 0
 
 
-def test_lock_reacquirable_after_release(db):
+def test_lock_reacquirable_after_release():
     with schema_lock():
         pass
 
@@ -56,37 +56,38 @@ def test_lock_reacquirable_after_release(db):
         assert _lock_holder_count() == 1
 
 
-def test_acquisition_times_out_when_held_by_another_session(db, settings):
-    settings.POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL = 0.01
-    settings.POSTGRES_SCHEMA_LOCK_MAX_RETRIES = 3
+def test_acquisition_times_out_when_held_by_another_session():
+    with override_settings(
+        POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL=0.01,
+        POSTGRES_SCHEMA_LOCK_MAX_RETRIES=3,
+    ):
+        # Hold the lock from a separate session, like another process would.
+        params = build_connection_params(get_connection().settings_dict)
+        with psycopg.connect(**params, autocommit=True) as holder:
+            holder.execute("SELECT pg_advisory_lock(%s)", [SCHEMA_LOCK_KEY])
 
-    # Hold the lock from a separate session, like another process would.
-    params = build_connection_params(get_connection().settings_dict)
-    with psycopg.connect(**params, autocommit=True) as holder:
-        holder.execute("SELECT pg_advisory_lock(%s)", [SCHEMA_LOCK_KEY])
+            with raises(SchemaLockTimeout) as caught, schema_lock():
+                pass
 
-        with pytest.raises(SchemaLockTimeout) as exc_info, schema_lock():
-            pass
+            # The failed acquisition didn't disturb the holder.
+            assert _lock_holder_count() == 1
 
-        # The failed acquisition didn't disturb the holder.
-        assert _lock_holder_count() == 1
-
-    message = str(exc_info.value)
+    message = str(caught.exception)
     assert "3 attempt(s)" in message
     assert "pid=" in message  # identifies the holder
 
 
-def test_lock_released_when_block_raises(db):
-    with pytest.raises(RuntimeError), schema_lock():
+def test_lock_released_when_block_raises():
+    with raises(RuntimeError), schema_lock():
         raise RuntimeError("boom")
 
     assert _lock_holder_count() == 0
 
 
-def test_nested_acquisition_raises_immediately(db):
+def test_nested_acquisition_raises_immediately():
     with (
         schema_lock(),
-        pytest.raises(RuntimeError, match="not reentrant"),
+        raises(RuntimeError, match="not reentrant"),
         schema_lock(),
     ):
         pass
@@ -96,24 +97,23 @@ def test_nested_acquisition_raises_immediately(db):
         assert _lock_holder_count() == 1
 
 
-def test_invalid_retry_interval_rejected(db, settings):
+def test_invalid_retry_interval_rejected():
     from plain.exceptions import ImproperlyConfigured
 
-    settings.POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL = 0.0
-
     with (
-        pytest.raises(ImproperlyConfigured, match="must be greater than 0"),
+        override_settings(POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL=0.0),
+        raises(ImproperlyConfigured, match="must be greater than 0"),
         schema_lock(),
     ):
         pass
 
 
-def test_verify_passes_while_session_alive(db):
+def test_verify_passes_while_session_alive():
     with schema_lock() as verify:
         verify()  # no exception — session is alive, lock held
 
 
-def test_verify_raises_when_lock_session_killed(db):
+def test_verify_raises_when_lock_session_killed():
     from plain.postgres.schema_lock import SchemaLockLost
 
     with schema_lock() as verify:
@@ -135,5 +135,5 @@ def test_verify_raises_when_lock_session_killed(db):
             assert row is not None
             cursor.execute("SELECT pg_terminate_backend(%s)", [row[0]])
 
-        with pytest.raises(SchemaLockLost, match="re-run the command"):
+        with raises(SchemaLockLost, match="re-run the command"):
             verify()

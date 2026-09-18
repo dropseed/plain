@@ -17,10 +17,10 @@ from __future__ import annotations
 import asyncio
 
 import h2.errors
-import pytest
 from plain.http import Response
 from plain.runtime import settings
 from plain.server.http.sink import BodyBudget
+from plain.test import override_settings, raises
 from server_stubs import (
     BodyLengthHandler,
     chunked_request,
@@ -44,10 +44,10 @@ def test_worker_derives_thresholds_from_server_settings():
     )
 
 
-def test_worker_prebuffer_never_exceeds_policy_cap(monkeypatch):
-    monkeypatch.setattr(settings, "SERVER_MAX_REQUEST_BODY_SIZE", 1024)
-    worker = make_worker()
-    assert worker.body_max_memory_size == 1024
+def test_worker_prebuffer_never_exceeds_policy_cap():
+    with override_settings(SERVER_MAX_REQUEST_BODY_SIZE=1024):
+        worker = make_worker()
+        assert worker.body_max_memory_size == 1024
 
 
 def test_worker_wires_the_inflight_body_budget():
@@ -56,19 +56,23 @@ def test_worker_wires_the_inflight_body_budget():
     assert worker.body_budget.used == 0
 
 
-def test_worker_rejects_negative_cap(monkeypatch):
+def test_worker_rejects_negative_cap():
     from plain.exceptions import ImproperlyConfigured
 
-    monkeypatch.setattr(settings, "SERVER_MAX_REQUEST_BODY_SIZE", -1)
-    with pytest.raises(ImproperlyConfigured):
+    with (
+        override_settings(SERVER_MAX_REQUEST_BODY_SIZE=-1),
+        raises(ImproperlyConfigured),
+    ):
         make_worker()
 
 
-def test_worker_rejects_negative_inflight_budget(monkeypatch):
+def test_worker_rejects_negative_inflight_budget():
     from plain.exceptions import ImproperlyConfigured
 
-    monkeypatch.setattr(settings, "SERVER_MAX_INFLIGHT_BODY_SIZE", -1)
-    with pytest.raises(ImproperlyConfigured):
+    with (
+        override_settings(SERVER_MAX_INFLIGHT_BODY_SIZE=-1),
+        raises(ImproperlyConfigured),
+    ):
         make_worker()
 
 
