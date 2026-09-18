@@ -1009,12 +1009,12 @@ class QuerySet[T: "Model"]:
         obj = self.model(**insert_values)
         obj._prepare_related_fields_for_save(operation_name="upsert")
 
-        fields = list(meta.local_concrete_fields)
+        fields = list(meta.fields)
         if obj.id is None:
             id_field = meta.get_forward_field("id")
             fields = [f for f in fields if f is not id_field]
 
-        returning_fields = list(meta.concrete_fields)
+        returning_fields: list[Field] = list(meta.fields)
         with transaction.atomic(savepoint=False):
             rows = self._insert(
                 [obj],
