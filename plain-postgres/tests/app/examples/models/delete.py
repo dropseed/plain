@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from plain import postgres
 from plain.postgres import Field, types
 from plain.postgres.query_utils import Q
 

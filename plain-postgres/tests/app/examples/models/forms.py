@@ -4,7 +4,6 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from plain import postgres
 from plain.postgres import Field, types
 
 from plain import postgres

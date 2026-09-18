@@ -6,9 +6,10 @@ import secrets
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse, urlunparse
 
-from plain import postgres
 from plain.postgres import Field, types
 from plain.utils import timezone
+
+from plain import postgres
 
 if TYPE_CHECKING:
     from datetime import datetime

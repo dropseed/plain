@@ -24,7 +24,9 @@ class Article(postgres.Model):
     title: Field[str] = types.TextField(max_length=100)
     views: Field[int] = types.IntegerField(default=0)
     author: Field[User] = types.ForeignKeyField(User, on_delete=postgres.CASCADE)
-    published_at: Field[datetime | None] = types.DateTimeField(allow_null=True, default=None)
+    published_at: Field[datetime | None] = types.DateTimeField(
+        allow_null=True, default=None
+    )
     created_at: Field[datetime] = types.DateTimeField(create_now=True)
 ```
 

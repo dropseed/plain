@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from plain import postgres
 from plain.postgres import Field, types
 from plain.utils import timezone
 

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from app.users.models import User
-from plain import postgres
 from plain.postgres import Field, types
 from plain.urls import reverse
+
+from app.users.models import User
+from plain import postgres
 
 
 @postgres.register_model

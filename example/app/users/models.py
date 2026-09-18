@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from plain import postgres
 from plain.passwords.types import PasswordField
 from plain.postgres import Field, types
 

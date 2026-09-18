@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, ClassVar, Self
 
-from plain import postgres
 from plain.postgres import Field, types
 from plain.runtime import settings
 from plain.utils import timezone
