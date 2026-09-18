@@ -31,6 +31,7 @@ from plain.postgres.fields import (
     Field,
     PrimaryKeyField,
 )
+from plain.postgres.fields.base import ColumnField
 from plain.postgres.functions import Cast
 from plain.postgres.query_utils import Q
 from plain.postgres.sql import (
@@ -286,10 +287,10 @@ class QuerySet[T: "Model"]:
     _defer_next_filter: bool
     _deferred_filter: tuple[bool, tuple[Any, ...], dict[str, Any]] | None
     # None => plain update()/delete() returning an int rowcount.
-    # () => RETURNING every concrete column, hydrated into model instances.
+    # () => RETURNING every column, hydrated into model instances.
     # (field, ...) => RETURNING those columns, returned as dicts.
     _returning: tuple[Field, ...] | None
-    # The concrete fields to RETURN, or None for a plain write. Set once by
+    # The fields to RETURN, or None for a plain write. Set once by
     # returning() so update()/delete() don't recompute them at execute.
     _returning_fields: list[Field] | None
 
@@ -935,7 +936,7 @@ class QuerySet[T: "Model"]:
         """Capture the rows touched by the next update() or delete().
 
         With no arguments, update()/delete() return the affected rows as
-        model instances (RETURNING every concrete column). Given field
+        model instances (RETURNING every column). Given field
         references (`Model.field`), they return a list of dicts holding just
         those columns. Without returning(), update()/delete() return an int
         rowcount.
@@ -950,12 +951,12 @@ class QuerySet[T: "Model"]:
         return cast("ReturningQuerySet[T, Any]", clone)
 
     def _resolve_returning_fields(self) -> list[Field]:
-        """Validate self._returning and produce the concrete fields to RETURN."""
+        """Validate self._returning and produce the fields to RETURN."""
         object_name = self.model.model_options.object_name
         if not self._returning:
-            # No references given: RETURN every concrete column so the rows can
+            # No references given: RETURN every column so the rows can
             # be hydrated into full model instances.
-            return list(self.model._model_meta.concrete_fields)
+            return list(self.model._model_meta.fields)
         for field in self._returning:
             if isinstance(field, str):
                 raise TypeError(
@@ -973,16 +974,16 @@ class QuerySet[T: "Model"]:
                     f"{field.name} in returning() for {object_name}: it "
                     "belongs to a different model."
                 )
-            if not field.concrete:
+            if not isinstance(field, ColumnField):
                 raise FieldError(
                     f"Cannot use {object_name}.{field.name} in returning(): "
-                    "only concrete database columns can be returned."
+                    "only database columns can be returned."
                 )
         return list(self._returning)
 
     def _hydrate_returning(self, fields: list[Field], rows: list[list]) -> list[Any]:
         """Turn converted RETURNING rows into instances (no names) or dicts."""
-        field_names = cast("list[str]", [field.name for field in fields])
+        field_names = [field.name for field in fields]
         if not self._returning:
             return [self.model.from_db(field_names, row) for row in rows]
         return [dict(zip(field_names, row)) for row in rows]
