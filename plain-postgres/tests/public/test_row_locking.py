@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import pytest
 from app.examples.models.relationships import Widget
-
 from plain.postgres import transaction
 from plain.postgres.transaction import TransactionManagementError
 
