@@ -4,10 +4,14 @@ These run wherever a Postgres is configured, CI included, because they build
 their own throwaway databases on whatever cluster `POSTGRES_URL` points at.
 The role needs CREATEDB — which is the point of the module, and true of every
 development and CI Postgres.
+
+Every scratch database is named for this run (see `PREFIX`), so two suites
+sharing a cluster can't drop each other's.
 """
 
 from __future__ import annotations
 
+import secrets
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 
@@ -27,7 +31,12 @@ from plain.postgres.databases import (
 from plain.runtime import settings
 from plain.test import raises
 
-PREFIX = "plain_databases_test_"
+# Scratch databases are named per run, not per suite. A fixed prefix means two
+# runs against one cluster — a CI matrix, parallel worktrees — hand out the
+# same names, and one run's `drop_database(force=True)` destroys the other's
+# database mid-test. The token is generated once per process, and the prefix
+# still identifies anything a crashed run leaves behind.
+PREFIX = f"plain_databases_test_{secrets.token_hex(4)}_"
 
 
 def database_config() -> DatabaseConfig:
