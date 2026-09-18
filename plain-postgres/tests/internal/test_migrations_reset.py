@@ -82,7 +82,7 @@ def test_reset_of_the_examples_history(migrations_dir: Path) -> None:
 
     assert plan.baseline.name == BASELINE
     assert plan.baseline.supersedes == LEAF
-    assert plan.baseline.since == ""
+    assert plan.baseline.shipped_in == ""
     assert plan.baseline.initial is None
     assert plan.baseline.dependencies == []
     assert set(plan.baseline.retired) == {p.stem for p in REAL_EXAMPLES.glob("0*.py")}
@@ -128,7 +128,7 @@ def test_written_baseline_loads_clean_with_the_history_gone(
 
     after = loader()
     assert after.baselines["examples"].name == BASELINE
-    assert detect_model_changes(after, {"examples"}) == {}
+    assert detect_model_changes(after, package_labels={"examples"}) == {}
 
 
 def test_dependencies_come_from_what_the_baseline_references(
@@ -230,7 +230,7 @@ def test_second_reset_folds_the_previous_baseline_into_retired(
     (migrations_dir / "plaintemplates" / "0002_baseline.py").write_text(
         migration_source(operations=f"({create_model('Note')},)").replace(
             "    dependencies",
-            '    supersedes = "0001_initial"\n    retired = ()\n    since = "1.0"\n    dependencies',
+            '    supersedes = "0001_initial"\n    retired = ()\n    shipped_in = "1.0"\n    dependencies',
         )
     )
     (migrations_dir / "plaintemplates" / "0003_more.py").write_text(
@@ -253,7 +253,7 @@ def test_second_reset_refuses_while_the_first_is_unreleased(
     (migrations_dir / "plaintemplates" / "0002_baseline.py").write_text(
         migration_source(operations=f"({create_model('Note')},)").replace(
             "    dependencies",
-            '    supersedes = "0001_initial"\n    retired = ()\n    since = ""\n    dependencies',
+            '    supersedes = "0001_initial"\n    retired = ()\n    shipped_in = ""\n    dependencies',
         )
     )
     (migrations_dir / "plaintemplates" / "0003_more.py").write_text(
@@ -350,19 +350,19 @@ def examples_files(migrations_dir: Path) -> list[str]:
 def test_reset_command_writes_and_deletes_then_the_runtime_adopts(
     repo: Path, migrations_dir: Path
 ) -> None:
-    result = CliRunner().invoke(reset, ["examples", "--since", "2.0"])
+    result = CliRunner().invoke(reset, ["examples", "--shipped-in", "2.0"])
 
     assert result.exit_code == 0, result.output
     assert f"Supersedes {LEAF}" in result.output
     assert "Recover from any failure with: git checkout --" in result.output
     assert "&& rm " in result.output
     assert "Commit the new file and the deletions together" in result.output
-    assert "`since` is empty" not in result.output
+    assert "`shipped_in` is empty" not in result.output
     assert f"must have applied `examples.{LEAF}`" in result.output
     assert examples_files(migrations_dir) == [f"{BASELINE}.py"]
     source = (migrations_dir / "examples" / f"{BASELINE}.py").read_text()
     assert f"supersedes = '{LEAF}'" in source
-    assert "since = '2.0'" in source
+    assert "shipped_in = '2.0'" in source
     assert "initial = True" not in source
 
     # The test database recorded the sentinel: the runtime adopts.
@@ -394,7 +394,7 @@ def test_generated_baseline_runs_on_a_cleared_database(
     tables = connection.table_names()
     assert "examples_circa" in tables
     assert "examples_widgettag" in tables
-    assert detect_model_changes(loader(), {"examples"}) == {}
+    assert detect_model_changes(loader(), package_labels={"examples"}) == {}
 
 
 def test_dry_run_changes_nothing(repo: Path, migrations_dir: Path) -> None:
