@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.returning import ReturningEvent
-
 from plain.postgres.exceptions import FieldError
 from plain.postgres.query import ReturningQuerySet
 

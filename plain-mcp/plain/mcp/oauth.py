@@ -119,8 +119,8 @@ class MCPProtectedResourceView(View):
     in front of any MCP mount point.
     """
 
-    authorization_servers: list[str] = []
-    oauth_scopes_supported: list[str] = []
+    authorization_servers: tuple[str, ...] = ()
+    oauth_scopes_supported: tuple[str, ...] = ()
 
     def get(self) -> Response:
         resource_path = self.request.path.removeprefix(_WELL_KNOWN_PRM) or "/"

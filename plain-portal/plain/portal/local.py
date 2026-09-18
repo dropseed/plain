@@ -85,7 +85,7 @@ async def connect(
     # lifetime of the process — released automatically on exit/crash.
     # Stored at module level to prevent GC from closing the fd.
     global _lock_fd
-    _lock_fd = open(_lock_path(), "w")
+    _lock_fd = open(_lock_path(), "w")  # noqa: SIM115, ASYNC230 — held for the process lifetime
     try:
         fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:

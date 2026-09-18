@@ -1,29 +1,38 @@
 from __future__ import annotations
 
+import importlib
 import os
+import subprocess
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.runtime import common_command
 from plain.packages import packages_registry
 from plain.utils.text import Truncator
 
-from .. import migrations
 from ..db import get_connection
-from ..migrations.autodetector import MigrationAutodetector
-from ..migrations.exceptions import MigrationSchemaError
+from ..migrations.autodetector import (
+    MigrationAutodetector,
+    describe_changes,
+    detect_model_changes,
+)
+from ..migrations.exceptions import (
+    BadMigrationError,
+    MigrationSchemaError,
+    StaleMigrationRecordsError,
+)
 from ..migrations.executor import MigrationExecutor
 from ..migrations.loader import AmbiguityError, MigrationLoader
 from ..migrations.migration import Migration
-from ..migrations.optimizer import MigrationOptimizer
 from ..migrations.questioner import (
     InteractiveMigrationQuestioner,
     MigrationQuestioner,
 )
 from ..migrations.recorder import MigrationRecorder
+from ..migrations.reset import ResetPlan, plan_reset, validate_reset
 from ..migrations.state import ModelState, ProjectState
 from ..migrations.writer import MigrationWriter
 from ..registry import models_registry
@@ -373,7 +382,9 @@ def apply(
 
         if action == "apply_start":
             click.echo()  # Always add newline between migrations
-            if fake:
+            if fake and migration is not None and migration.supersedes:
+                click.secho(f"{migration} (baseline: recorded, not run)", fg="cyan")
+            elif fake:
                 click.secho(f"{migration} (faked)", fg="cyan")
             else:
                 click.secho(f"{migration}", fg="cyan")
@@ -415,7 +426,10 @@ def apply(
     executor = MigrationExecutor(get_connection(), migration_progress_callback)
 
     # Raise an error if any migrations are applied before their dependencies.
-    executor.loader.check_consistent_history(executor.connection)
+    # Faking an explicitly named migration is how that history gets repaired,
+    # so the check would only block the repair.
+    if not (fake and migration_name):
+        executor.loader.check_consistent_history(executor.connection)
 
     # Before anything else, see if there's conflicting packages and drop out
     # hard if there are any
@@ -458,14 +472,7 @@ def apply(
             raise click.ClickException(
                 f"Cannot find a migration matching '{migration_name}' from package '{package_label}'."
             )
-        target: tuple[str, str] = (package_label, migration.name)
-        if (
-            target not in executor.loader.graph.nodes
-            and target in executor.loader.replacements
-        ):
-            incomplete_migration = executor.loader.replacements[target]
-            target = incomplete_migration.replaces[-1]
-        targets = [target]
+        targets = [(package_label, migration.name)]
         target_package_labels_only = False
     elif package_label:
         targets = [
@@ -474,7 +481,23 @@ def apply(
     else:
         targets = list(executor.loader.graph.leaf_nodes())
 
-    migration_plan = executor.migration_plan(targets)
+    # A named --fake of the baseline itself is how an operator records it by
+    # hand, so that one must get past the boundary refusal that stops all else.
+    repair_baseline = (
+        (package_label, migration.name)
+        if fake and package_label and migration_name and migration.supersedes
+        else None
+    )
+    migration_plan = executor.migration_plan(targets, repair_baseline=repair_baseline)
+    if repair_baseline is not None:
+        extra = [
+            m for m in migration_plan if (m.package_label, m.name) != repair_baseline
+        ]
+        if extra:
+            raise click.ClickException(
+                f"Recording {repair_baseline[0]}.{repair_baseline[1]} by hand would also "
+                f"fake {', '.join(str(m) for m in extra)}. Apply those first, then repeat."
+            )
 
     if plan:
         if not quiet:
@@ -483,6 +506,12 @@ def apply(
                 click.echo("  No planned migration operations.")
             else:
                 for migration in migration_plan:
+                    key = (migration.package_label, migration.name)
+                    if key in executor.record_only:
+                        click.secho(
+                            f"{migration} (baseline: recorded, not run)", fg="cyan"
+                        )
+                        continue
                     click.secho(str(migration), fg="cyan")
                     for operation in migration.operations:
                         message, is_error = describe_operation(operation)
@@ -516,7 +545,9 @@ def apply(
             # Re-plan under the lock — another process may have applied some
             # or all of these migrations while we waited for it.
             executor = MigrationExecutor(get_connection(), migration_progress_callback)
-            migration_plan = executor.migration_plan(targets)
+            migration_plan = executor.migration_plan(
+                targets, repair_baseline=repair_baseline
+            )
             if not migration_plan:
                 if not quiet:
                     click.echo(
@@ -615,12 +646,8 @@ def apply(
             click.echo("No migrations to apply.")
             # If there's changes that aren't in migrations yet, tell them
             # how to fix it.
-            autodetector = MigrationAutodetector(
-                executor.loader.project_state(),
-                ProjectState.from_models_registry(models_registry),
-            )
             try:
-                changes = autodetector.changes(graph=executor.loader.graph)
+                changes = detect_model_changes(executor.loader)
             except MigrationSchemaError:
                 # A pending change can't be generated (e.g. NOT NULL without
                 # default). Surface it through `migrations create` rather than
@@ -683,8 +710,6 @@ def list_migrations(
         """
         # Load migrations from disk/DB
         loader = MigrationLoader(connection, ignore_no_migrations=True)
-        recorder = MigrationRecorder(connection)
-        recorded_migrations = recorder.applied_migrations()
 
         graph = loader.graph
         # If we were passed a list of packages, validate it
@@ -697,39 +722,33 @@ def list_migrations(
             package_names_list = sorted(loader.migrated_packages)
         # For each app, print its migrations in order from oldest (roots) to
         # newest (leaves).
+        adopt_keys = loader.baseline_status.adopt_keys
         for package_name in package_names_list:
             click.secho(package_name, fg="cyan", bold=True)
             shown = set()
             for node in graph.leaf_nodes(package_name):
                 for plan_node in graph.forwards_plan(node):
                     if plan_node not in shown and plan_node[0] == package_name:
-                        # Give it a nice title if it's a squashed one
-                        title = plan_node[1]
-                        migration_node = graph.nodes[plan_node]
-                        if migration_node and migration_node.replaces:
-                            title += (
-                                f" ({len(migration_node.replaces)} squashed migrations)"
-                            )
                         applied_migration = (
                             loader.applied_migrations.get(plan_node)
                             if loader.applied_migrations
                             else None
                         )
-                        # Mark it as applied/unapplied
-                        if applied_migration:
-                            if plan_node in recorded_migrations:
-                                output = f" [X] {title}"
-                            else:
-                                title += (
-                                    " Run `plain migrations apply` to finish recording."
-                                )
-                                output = f" [-] {title}"
-                            if verbosity >= 2 and hasattr(applied_migration, "applied"):
-                                output += f" (applied at {applied_migration.applied.strftime('%Y-%m-%d %H:%M:%S')})"
-                            click.echo(output)
-                        else:
-                            click.echo(f" [ ] {title}")
+                        marker = "X" if applied_migration else " "
+                        output = f" [{marker}] {plan_node[1]}"
+                        if plan_node in adopt_keys:
+                            output += " (baseline: will be recorded, not run)"
+                        if (
+                            applied_migration
+                            and verbosity >= 2
+                            and hasattr(applied_migration, "applied")
+                        ):
+                            output += f" (applied at {applied_migration.applied.strftime('%Y-%m-%d %H:%M:%S')})"
+                        click.echo(output)
                         shown.add(plan_node)
+            for refusal in loader.baseline_status.refusals:
+                if refusal.package_label == package_name:
+                    click.secho(f" ! {refusal}", fg="red")
             # If we didn't print anything, then a small message
             if not shown:
                 click.secho(" (no migrations)", fg="red")
@@ -791,6 +810,7 @@ def list_migrations(
 
 
 @cli.command("prune")
+@click.argument("package_label", required=False)
 @click.option(
     "--yes",
     "-y",
@@ -798,8 +818,12 @@ def list_migrations(
     help="Skip confirmation prompt.",
 )
 @database_management_command
-def prune(yes: bool) -> None:
-    """Remove stale migration records from the database"""
+def prune(package_label: str | None, yes: bool) -> None:
+    """Remove orphan migration records from the database.
+
+    With a PACKAGE_LABEL, remove every record for that package - the way to
+    let its baseline run again when the tables are gone.
+    """
     # Load migrations from disk and database
     conn = get_connection()
     loader = MigrationLoader(conn, ignore_no_migrations=True)
@@ -807,16 +831,30 @@ def prune(yes: bool) -> None:
     recorder = MigrationRecorder(conn)
     recorded_migrations = recorder.applied_migrations()
 
-    # Find all prunable migrations (recorded but not on disk)
-    all_prunable = [
-        migration
-        for migration in recorded_migrations
-        if migration not in loader.disk_migrations
-    ]
+    if package_label:
+        try:
+            packages_registry.get_package_config(package_label)
+        except LookupError as err:
+            raise click.ClickException(str(err))
+        all_prunable = [m for m in recorded_migrations if m[0] == package_label]
+    else:
+        all_prunable = loader.orphan_records(recorded_migrations)
+        # A refusal that prescribes `prune <package>` is why someone runs this.
+        for refusal in loader.baseline_status.refusals:
+            if isinstance(refusal, StaleMigrationRecordsError):
+                click.secho(f"! {refusal}", fg="red")
+        retired = [m for m in recorded_migrations if m in loader.retired_to_baseline]
+        if retired and all_prunable:
+            click.echo(
+                f"Keeping {len(retired)} record{'s' if len(retired) != 1 else ''} retired "
+                "by a baseline - they are the rollback path across the reset."
+            )
 
     if not all_prunable:
-        click.echo("No stale migration records found.")
+        click.echo("No orphan migration records found.")
         return
+
+    kind = "migration" if package_label else "orphan migration"
 
     # Separate into existing packages vs orphaned packages
     existing_packages = set(loader.migrated_packages)
@@ -837,7 +875,9 @@ def prune(yes: bool) -> None:
     # Display what was found
     if prunable_existing:
         click.secho(
-            "Stale migration records (from existing packages):",
+            f"Every record for {package_label}:"
+            if package_label
+            else "Orphan migration records (from existing packages):",
             fg="yellow",
             bold=True,
         )
@@ -865,7 +905,7 @@ def prune(yes: bool) -> None:
 
     if not yes:
         click.echo(
-            f"Found {total_count} stale migration record{'s' if total_count != 1 else ''}."
+            f"Found {total_count} {kind} record{'s' if total_count != 1 else ''}."
         )
         click.echo()
 
@@ -891,212 +931,172 @@ def prune(yes: bool) -> None:
             click.echo(" OK")
 
     click.secho(
-        f"✓ Removed {total_count} stale migration record{'s' if total_count != 1 else ''}.",
+        f"✓ Removed {total_count} {kind} record{'s' if total_count != 1 else ''}.",
         fg="green",
     )
 
 
-@cli.command("squash")
+@cli.command()
 @click.argument("package_label")
-@click.argument("start_migration_name", required=False)
-@click.argument("migration_name")
 @click.option(
-    "--no-optimize",
-    is_flag=True,
-    help="Do not try to optimize the squashed operations.",
+    "--since",
+    default="",
+    help="Version this reset ships in; named in the refusal a database that missed the leaf gets, and required before this package can be reset again.",
 )
 @click.option(
-    "--noinput",
-    "--no-input",
-    "no_input",
-    is_flag=True,
-    help="Tells Plain to NOT prompt the user for input of any kind.",
-)
-@click.option("--squashed-name", help="Sets the name of the new squashed migration.")
-@click.option(
-    "-v",
-    "--verbosity",
-    type=int,
-    default=1,
-    help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
+    "--dry-run", is_flag=True, help="Show the baseline and what would be deleted."
 )
 @database_management_command
-def squash(
-    package_label: str,
-    start_migration_name: str | None,
-    migration_name: str,
-    no_optimize: bool,
-    no_input: bool,
-    squashed_name: str | None,
-    verbosity: int,
-) -> None:
-    """Squash multiple migrations into one"""
-    interactive = not no_input
-
-    def find_migration(
-        loader: MigrationLoader, package_label: str, name: str
-    ) -> Migration:
-        try:
-            return loader.get_migration_by_prefix(package_label, name)
-        except AmbiguityError:
-            raise click.ClickException(
-                f"More than one migration matches '{name}' in package '{package_label}'. Please be more specific."
-            )
-        except KeyError:
-            raise click.ClickException(
-                f"Cannot find a migration matching '{name}' from package '{package_label}'."
-            )
-
-    # Validate package_label
+def reset(package_label: str, since: str, dry_run: bool) -> None:
+    """Replace a package's migration history with one baseline"""
     try:
         packages_registry.get_package_config(package_label)
     except LookupError as err:
         raise click.ClickException(str(err))
 
-    # Load the current graph state, check the app and migration they asked for exists
-    loader = MigrationLoader(get_connection())
-    if package_label not in loader.migrated_packages:
+    loader = MigrationLoader(None, ignore_no_migrations=True)
+
+    try:
+        pending = detect_model_changes(loader, {package_label})
+    except MigrationSchemaError as e:
+        raise click.ClickException(str(e)) from e
+    if pending:
         raise click.ClickException(
-            f"Package '{package_label}' does not have migrations (so squashmigrations on it makes no sense)"
+            f"`{package_label}` has model changes its migrations don't hold - a "
+            "baseline would fold them in and databases that adopt it would never "
+            "run them:\n  - "
+            + "\n  - ".join(describe_changes(pending))
+            + "\nRun `plain migrations create` first."
         )
 
-    migration = find_migration(loader, package_label, migration_name)
+    try:
+        plan = plan_reset(loader, package_label, since=since)
+        _require_committed(plan)
+        validate_reset(loader, plan)
+    except BadMigrationError as e:
+        raise click.ClickException(str(e)) from e
 
-    # Work out the list of predecessor migrations
-    migrations_to_squash: list[Migration] = []
-    for al, mn in loader.graph.forwards_plan((migration.package_label, migration.name)):
-        if al != migration.package_label:
-            continue
-        candidate = loader.get_migration(al, mn)
-        if candidate is None:
-            raise click.ClickException(f"Migration {mn} in package {al} is missing")
-        migrations_to_squash.append(candidate)
-
-    if start_migration_name:
-        start_migration = find_migration(loader, package_label, start_migration_name)
-        start = loader.get_migration(
-            start_migration.package_label, start_migration.name
+    writer = MigrationWriter(plan.baseline)
+    source = writer.as_string()
+    if writer.needs_manual_porting:
+        raise click.ClickException(
+            "The baseline would reference code defined inside a migration file "
+            "that this reset deletes. Move it into the app, then reset again."
         )
-        if start is None:
-            raise click.ClickException(
-                f"Cannot find migration '{start_migration.name}' in package '{package_label}'."
-            )
-        try:
-            start_index = migrations_to_squash.index(start)
-            migrations_to_squash = migrations_to_squash[start_index:]
-        except ValueError:
-            raise click.ClickException(
-                f"The migration '{start_migration}' cannot be found. Maybe it comes after "
-                f"the migration '{migration}'?\n"
-                f"Have a look at:\n"
-                f"  plain migrations list {package_label}\n"
-                f"to debug this issue."
-            )
+    baseline_path = plan.migrations_dir / writer.filename
 
-    # Tell them what we're doing and optionally ask if we should proceed
-    if verbosity > 0 or interactive:
-        click.secho("Will squash the following migrations:", fg="cyan", bold=True)
-        for migration in migrations_to_squash:
-            click.echo(f" - {migration.name}")
+    if dry_run:
+        click.echo(source)
 
-        if interactive:
-            if not click.confirm("Do you wish to proceed?"):
-                return
-
-    # Load the operations from all those migrations and concat together,
-    # along with collecting external dependencies and detecting double-squashing
-    operations = []
-    dependencies = set()
-    # We need to take all dependencies from the first migration in the list
-    # as it may be 0002 depending on 0001
-    first_migration = True
-    for smigration in migrations_to_squash:
-        if smigration.replaces:
-            raise click.ClickException(
-                "You cannot squash squashed migrations! Please transition it to a "
-                "normal migration first"
-            )
-        operations.extend(smigration.operations)
-        for dependency in smigration.dependencies:
-            if dependency[0] != smigration.package_label or first_migration:
-                dependencies.add(dependency)
-        first_migration = False
-
-    if no_optimize:
-        if verbosity > 0:
-            click.secho("(Skipping optimization.)", fg="yellow")
-        new_operations = operations
-    else:
-        if verbosity > 0:
-            click.secho("Optimizing...", fg="cyan")
-
-        optimizer = MigrationOptimizer()
-        new_operations = optimizer.optimize(operations, migration.package_label)
-
-        if verbosity > 0:
-            if len(new_operations) == len(operations):
-                click.echo("  No optimizations possible.")
-            else:
-                click.echo(
-                    f"  Optimized from {len(operations)} operations to {len(new_operations)} operations."
-                )
-
-    # Work out the value of replaces (any squashed ones we're re-squashing)
-    # need to feed their replaces into ours
-    replaces: list[tuple[str, str]] = []
-    for migration in migrations_to_squash:
-        if migration.replaces:
-            replaces.extend(migration.replaces)
-        else:
-            replaces.append((migration.package_label, migration.name))
-
-    # Make a new migration with those operations
-    subclass = type(
-        "Migration",
-        (migrations.Migration,),
-        {
-            "dependencies": dependencies,
-            "operations": new_operations,
-            "replaces": replaces,
-        },
+    click.secho(
+        f"Resetting `{package_label}`: {len(plan.delete)} migration"
+        f"{'s' if len(plan.delete) != 1 else ''} -> {plan.baseline.name}",
+        bold=True,
     )
-    if start_migration_name:
-        if squashed_name:
-            # Use the name from --squashed-name
-            prefix, _ = start_migration.name.split("_", 1)
-            name = f"{prefix}_{squashed_name}"
-        else:
-            # Generate a name
-            name = f"{start_migration.name}_squashed_{migration.name}"
-        new_migration = subclass(name, package_label)
-    else:
-        name = f"0001_{'squashed_' + migration.name if not squashed_name else squashed_name}"
-        new_migration = subclass(name, package_label)
-        new_migration.initial = True
+    click.echo(f"  Supersedes {plan.sentinel}")
+    for path in plan.delete:
+        click.echo(f"  Delete {path.name}")
 
-    # Write out the new migration file
-    writer = MigrationWriter(new_migration)
-    if os.path.exists(writer.path):
-        raise click.ClickException(
-            f"Migration {new_migration.name} already exists. Use a different name."
-        )
-    with open(writer.path, "w", encoding="utf-8") as fh:
-        fh.write(writer.as_string())
+    if dry_run:
+        click.echo("Dry run - nothing written or deleted.")
+        return
 
-    if verbosity > 0:
-        click.secho(
-            f"Created new squashed migration {writer.path}", fg="green", bold=True
-        )
-        click.echo(
-            "  You should commit this migration but leave the old ones in place;\n"
-            "  the new migration will be used for new installs. Once you are sure\n"
-            "  all instances of the codebase have applied the migrations you squashed,\n"
-            "  you can delete them."
-        )
-        if writer.needs_manual_porting:
-            click.secho("Manual porting required", fg="yellow", bold=True)
-            click.echo(
-                "  Your migrations contained functions that must be manually copied over,\n"
-                "  as we could not safely copy their implementation.\n"
-                "  See the comment at the top of the squashed migration for details."
+    click.echo(
+        "  Recover from any failure with: "
+        f"git checkout -- {plan.migrations_dir} && rm {baseline_path}"
+    )
+    baseline_path.write_text(source, encoding="utf-8")
+    for path in plan.delete:
+        path.unlink()
+    importlib.invalidate_caches()
+    try:
+        MigrationLoader(None, ignore_no_migrations=True)
+    except Exception as e:
+        # Put the history back ourselves; the operator gets the reason only.
+        baseline_path.unlink()
+        try:
+            _git(
+                ["checkout", "--", *(path.name for path in plan.delete)],
+                cwd=plan.migrations_dir,
             )
+        except BadMigrationError as restore_error:
+            raise click.ClickException(
+                f"The written baseline does not load ({e}), and restoring the "
+                f"history failed too: {restore_error}"
+            ) from e
+        raise click.ClickException(
+            f"The written baseline does not load ({e}); the history has been "
+            "restored and nothing changed."
+        ) from e
+
+    click.echo("")
+    click.secho(f"Wrote {os.path.relpath(baseline_path)}", fg="green")
+    click.echo(
+        "Commit the new file and the deletions together; other packages' "
+        "dependencies on the deleted names need no edits."
+    )
+    if not since:
+        click.echo(
+            "`since` is empty - set it in the baseline when this ships, or the "
+            "next reset of this package is refused."
+        )
+    click.echo(
+        f"Every environment must have applied `{package_label}.{plan.sentinel}` "
+        "before this ships; a database that hasn't will be refused until it does."
+    )
+
+
+def _git(args: list[str], *, cwd: Path) -> str:
+    """Run git in `cwd`, ignoring any repository the environment points at.
+
+    Git sets `GIT_DIR` (and friends) for hooks, so a command run from one
+    would otherwise answer about the hook's repository. Raises
+    `BadMigrationError` when git fails or is missing.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        return subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+            env=env,
+        ).stdout
+    except OSError as e:
+        raise BadMigrationError(
+            f"git could not be run ({e}). A reset deletes files; it only runs "
+            "where git can bring them back."
+        ) from e
+    except subprocess.CalledProcessError as e:
+        raise BadMigrationError(
+            f"git could not read {cwd} ({e.stderr.strip() or e}). A reset deletes "
+            "files; it only runs where git can bring them back."
+        ) from e
+
+
+def _require_committed(plan: ResetPlan) -> None:
+    """Every file about to go must be tracked and unchanged.
+
+    That makes the leaf a committed migration (not one created a minute ago),
+    keeps a venv's site-packages out of reach, and makes recovery from any
+    failure one git command.
+    """
+    tracked = _git(["ls-files", "--", "*.py"], cwd=plan.migrations_dir).split()
+    untracked = [path.name for path in plan.delete if path.name not in tracked]
+    if untracked:
+        raise BadMigrationError(
+            f"Not tracked by git in {plan.migrations_dir}: {', '.join(untracked)}. "
+            "Commit the history first - the leaf becomes the baseline's sentinel, "
+            "and every environment must have applied it."
+        )
+    modified = _git(
+        ["status", "--porcelain", "--untracked-files=no", "--", "*.py"],
+        cwd=plan.migrations_dir,
+    )
+    if modified.strip():
+        raise BadMigrationError(
+            f"{plan.migrations_dir} has uncommitted changes:\n{modified.rstrip()}\n"
+            "Commit them first - the leaf migration becomes the baseline's "
+            "sentinel, and every environment must have applied it."
+        )

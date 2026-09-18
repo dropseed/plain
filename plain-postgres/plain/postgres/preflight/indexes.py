@@ -147,7 +147,7 @@ class CheckMissingFKIndexes(PreflightCheck):
         for model in _get_app_models():
             covered_fields = _fk_covered_field_names(model)
 
-            for field in model._model_meta.local_fields:
+            for field in model._model_meta.fields:
                 if (
                     isinstance(field, ForeignKeyField)
                     and not field.primary_key

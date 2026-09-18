@@ -129,8 +129,8 @@ class MigrationWriter:
     def as_string(self) -> str:
         """Return a string of the file contents."""
         items = {
-            "replaces_str": "",
             "initial_str": "",
+            "baseline_str": "",
         }
 
         imports = set()
@@ -174,11 +174,6 @@ class MigrationWriter:
                 "then update the\n# RunPython operations to refer to the local "
                 "versions:\n# {}"
             ).format("\n# ".join(sorted(migration_imports)))
-        # If there's a replaces, make a string for it
-        if self.migration.replaces:
-            items["replaces_str"] = (
-                f"\n    replaces = {self.serialize(self.migration.replaces)[0]}\n"
-            )
         # Hinting that goes into comment
         if self.include_header:
             items["migration_header"] = MIGRATION_HEADER_TEMPLATE % {
@@ -190,6 +185,12 @@ class MigrationWriter:
 
         if self.migration.initial:
             items["initial_str"] = "\n    initial = True\n"
+        if self.migration.supersedes:
+            items["baseline_str"] = (
+                f"\n    supersedes = {self.serialize(self.migration.supersedes)[0]}"
+                f"\n    retired = {self.serialize(tuple(self.migration.retired))[0]}"
+                f"\n    since = {self.serialize(self.migration.since)[0]}\n"
+            )
 
         return MIGRATION_TEMPLATE % items
 
@@ -284,12 +285,12 @@ MIGRATION_TEMPLATE = """\
 %(migration_header)s%(imports)s
 
 class Migration(migrations.Migration):
-%(replaces_str)s%(initial_str)s
-    dependencies = [
+%(initial_str)s%(baseline_str)s
+    dependencies = (
 %(dependencies)s\
-    ]
+    )
 
-    operations = [
+    operations = (
 %(operations)s\
-    ]
+    )
 """

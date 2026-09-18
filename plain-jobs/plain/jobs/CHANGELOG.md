@@ -1,5 +1,39 @@
 # plain-jobs changelog
 
+## [0.57.3](https://github.com/dropseed/plain/releases/plain-jobs@0.57.3) (2026-08-21)
+
+### What's changed
+
+- Worker error logs are now written inside the one-off CONSUMER span that carries the same failure, so the log record and the exception span share trace and span ids. Previously a claim, heartbeat, or job-process failure exported a span _and_ a span-less error log describing the same event, reporting it twice with no link between them ([4b8bd51127](https://github.com/dropseed/plain/commit/4b8bd51127))
+- A failed `JobProcess` lookup, middleware that won't import or construct, and errors escaping `run()` are all covered by a single CONSUMER error span in `process_job`'s catch-all, replacing the narrower span around the row lookup alone ([4b8bd51127](https://github.com/dropseed/plain/commit/4b8bd51127))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.57.2](https://github.com/dropseed/plain/releases/plain-jobs@0.57.2) (2026-08-12)
+
+### What's changed
+
+- Worker and job error logs use descriptive messages ("Job failed", "Worker heartbeat failed", "Failed to claim job", …) instead of the bare exception as the message — tracebacks are unchanged ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `Schedule` components raise `TypeError` (was `ValueError`) when given something other than an int or str, and comparing a schedule component against an unrelated object returns `False` instead of raising ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Admin viewset attributes declared as tuples ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- If log-based alerting matches on worker error message text, update patterns for the new messages
+
+## [0.57.1](https://github.com/dropseed/plain/releases/plain-jobs@0.57.1) (2026-08-02)
+
+### What's changed
+
+- The optional text fields on `JobRequest`, `JobProcess`, and `JobResult` (`source`, `concurrency_key`, `error`) now declare `default=""` explicitly, matching the plain-postgres 0.113.0 optional-string idiom (`required=False, default=""`). The column `DEFAULT`s are applied by convergence on the next `plain postgres sync` — no migration needed. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+- The admin retry action now passes an explicit `status_code=302` to `RedirectResponse`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.57.0](https://github.com/dropseed/plain/releases/plain-jobs@0.57.0) (2026-07-15)
 
 ### What's changed

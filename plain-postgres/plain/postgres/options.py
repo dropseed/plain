@@ -13,6 +13,15 @@ if TYPE_CHECKING:
     from plain.postgres.indexes import Index
 
 
+def default_db_table(package_label: str, model_name: str) -> str:
+    """The table a model gets when it doesn't set `db_table` itself."""
+    return truncate_name(f"{package_label}_{model_name.lower()}", MAX_NAME_LENGTH)
+
+
+# Model options convergence owns; never serialized into migrations.
+CONVERGENCE_OPTIONS = ("indexes", "constraints", "storage_parameters")
+
+
 class Options:
     """
     Model options descriptor and container.
@@ -114,10 +123,7 @@ class Options:
         # Set db_table
         db_table = self._config.get("db_table")
         if db_table is None:
-            instance.db_table = truncate_name(
-                f"{instance.package_label}_{model.__name__.lower()}",
-                MAX_NAME_LENGTH,
-            )
+            instance.db_table = default_db_table(instance.package_label, model.__name__)
         else:
             instance.db_table = db_table
 
@@ -178,7 +184,7 @@ class Options:
         """
         options = {}
         for name in self._provided_options:
-            if name in ("indexes", "constraints", "storage_parameters"):
+            if name in CONVERGENCE_OPTIONS:
                 continue
             options[name] = getattr(self, name)
         return options

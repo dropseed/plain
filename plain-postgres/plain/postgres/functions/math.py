@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from plain.postgres.expressions import Func
 from plain.postgres.fields import Field
@@ -9,9 +9,6 @@ from plain.postgres.functions.mixins import (
     NumericOutputFieldMixin,
 )
 from plain.postgres.lookups import Transform
-
-if TYPE_CHECKING:
-    pass
 
 
 class Abs(Transform):

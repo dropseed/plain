@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 from plain.admin.dates import DatetimeRangeAliases
 from plain.postgres.aggregates import Count
@@ -33,17 +33,17 @@ class TrendCard(ChartCard):
     model = None
     datetime_field = None
     group_field: str | None = None
-    group_labels: dict[str, str] | None = None
+    group_labels: ClassVar[dict[str, str] | None] = None
     # CSS color values resolved by charts.js. `var(--chart-N)` reads the
     # admin's chart palette so charts retheme automatically (incl. dark mode).
-    default_group_colors: list[str] = [
+    default_group_colors: tuple[str, ...] = (
         "var(--chart-1)",
         "var(--chart-2)",
         "var(--chart-3)",
         "var(--chart-4)",
         "var(--chart-5)",
-    ]
-    group_colors: dict[str, str] | None = None
+    )
+    group_colors: ClassVar[dict[str, str] | None] = None
     aggregates: tuple[Literal["sum", "avg", "max"], ...] = ("sum",)
     default_filter = DatetimeRangeAliases.SINCE_30_DAYS_AGO
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import datetime
 
 import pytest
-
 from plain.admin.dates import DatetimeRange, DatetimeRangeAliases
 
 

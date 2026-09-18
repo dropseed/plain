@@ -8,11 +8,11 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
-
-import pytest
 from plain.runtime import settings as plain_settings
 from plain.runtime import setup
 from plain.test.otel import install_test_meter, install_test_tracer
+
+import pytest
 
 from .browser import TestBrowser
 

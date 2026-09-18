@@ -5,7 +5,6 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
-
 from plain.utils.version import compare_versions, parse_version
 
 from .output import style_markdown
@@ -31,7 +30,7 @@ def changelog(
     if spec.origin:
         package_path = Path(spec.origin).resolve().parent
     elif spec.submodule_search_locations:
-        package_path = Path(list(spec.submodule_search_locations)[0]).resolve()
+        package_path = Path(next(iter(spec.submodule_search_locations))).resolve()
     else:
         raise click.ClickException(f"Package {package_label} not found")
 

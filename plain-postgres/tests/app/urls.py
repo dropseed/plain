@@ -1,5 +1,4 @@
 from app.examples.urls import ExamplesRouter
-
 from plain.urls import Router, include, path
 from plain.views import View
 
@@ -16,8 +15,8 @@ class LogoutView(View):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("examples", ExamplesRouter),
         path("login", LoginView, name="login"),
         path("logout", LogoutView, name="logout"),
-    ]
+    )

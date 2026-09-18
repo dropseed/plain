@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from itertools import chain
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from plain.exceptions import (
     NON_FIELD_ERRORS,
@@ -20,17 +20,18 @@ from plain.forms.forms import BaseForm, DeclarativeFieldsMetaclass
 from plain.postgres.exceptions import FieldError
 from plain.postgres.fields import ChoicesField
 from plain.postgres.fields.base import ColumnField, DefaultableField
+from plain.postgres.fields.binary import BinaryField
 
 if TYPE_CHECKING:
     from plain.postgres.fields import Field as ModelField
 
 __all__ = [
-    "ModelForm",
     "BaseModelForm",
-    "model_to_dict",
-    "fields_for_model",
     "ModelChoiceField",
+    "ModelForm",
     "ModelMultipleChoiceField",
+    "fields_for_model",
+    "model_to_dict",
 ]
 
 
@@ -102,7 +103,7 @@ def model_to_dict(
 
     meta = instance._model_meta
     data = {}
-    for f in chain(meta.concrete_fields, meta.many_to_many):
+    for f in chain(meta.fields, meta.many_to_many):
         if fields is not None and f.name not in fields:
             continue
         value = f.value_from_object(instance)
@@ -137,9 +138,7 @@ def fields_for_model(
     ignored = []
     meta = model._model_meta
 
-    for f in sorted(
-        chain(meta.concrete_fields, meta.many_to_many), key=lambda f: f.name
-    ):
+    for f in sorted(chain(meta.fields, meta.many_to_many), key=lambda f: f.name):
         if fields is not None and f.name not in fields:
             continue
 
@@ -284,18 +283,13 @@ class BaseModelForm(BaseForm):
             field = f.name
             # Exclude fields that aren't on the form. The developer may be
             # adding these values to the model after form validation.
-            if field not in self.fields:
-                exclude.add(f.name)
-
-            # Don't perform model validation on fields that were defined
-            # manually on the form and excluded via the ModelForm's Meta
-            # class. See #12901.
-            elif self._meta.fields and field not in self._meta.fields:
-                exclude.add(f.name)
-
-            # Exclude fields that failed form validation. There's no need for
-            # the model fields to validate them as well.
-            elif self._errors and field in self._errors:
+            if (
+                field not in self.fields
+                or self._meta.fields
+                and field not in self._meta.fields
+                or self._errors
+                and field in self._errors
+            ):
                 exclude.add(f.name)
 
             # Exclude empty fields that are not required by the form, if the
@@ -474,7 +468,7 @@ class ModelChoiceField(ChoiceField):
 
     # This class is a subclass of ChoiceField for purity, but it doesn't
     # actually use any of ChoiceField's implementation.
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid_choice": "Select a valid choice. That choice is not one of the available choices.",
     }
     iterator = ModelChoiceIterator
@@ -568,7 +562,7 @@ class ModelChoiceField(ChoiceField):
 class ModelMultipleChoiceField(ModelChoiceField):
     """A MultipleChoiceField whose choices are a model QuerySet."""
 
-    default_error_messages = {
+    default_error_messages: ClassVar = {
         "invalid_list": "Enter a list of values.",
         "invalid_choice": "Select a valid choice. %(value)s is not one of the available choices.",
         "invalid_id_value": "'%(id)s' is not a valid value.",
@@ -683,6 +677,9 @@ def modelfield_to_formfield(
         isinstance(modelfield, DefaultableField)
         and modelfield.has_default()
         and not auto_filled
+        # BinaryField's bytes default doesn't round-trip through a text
+        # input — rendering it would show the literal "b''".
+        and not isinstance(modelfield, BinaryField)
     ):
         defaults["initial"] = modelfield.get_default()
 
@@ -719,7 +716,6 @@ def modelfield_to_formfield(
 
     # Avoid a circular import
     from plain import postgres
-    from plain.postgres.fields.encrypted import EncryptedJSONField, EncryptedTextField
 
     # Primary key fields aren't rendered by default
     if isinstance(modelfield, postgres.PrimaryKeyField):
@@ -741,16 +737,6 @@ def modelfield_to_formfield(
             decimal_places=modelfield.decimal_places,
             **defaults,
         )
-
-    if isinstance(modelfield, EncryptedJSONField):
-        return fields.JSONField(
-            encoder=modelfield.encoder, decoder=modelfield.decoder, **defaults
-        )
-
-    if isinstance(modelfield, EncryptedTextField):
-        if modelfield.allow_null:
-            defaults["empty_value"] = None
-        return fields.TextField(max_length=modelfield.max_length, **defaults)
 
     if isinstance(modelfield, postgres.TextField):
         # Passing max_length to fields.TextField means that the value's length

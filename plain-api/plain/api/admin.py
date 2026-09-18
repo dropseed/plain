@@ -16,15 +16,15 @@ class APIKeyViewset(AdminViewset):
         model = APIKey
         title = "API keys"
         description = "Keys used to authenticate API requests."
-        fields = [
+        fields = (
             "name",
             "uuid",
             "api_version",
             "created_at__date",
             "last_used_at__date",
             "expires_at__date",
-        ]
-        search_fields = ["name", "uuid"]
+        )
+        search_fields = ("name", "uuid")
 
     class DetailView(AdminModelDetailView):
         model = APIKey

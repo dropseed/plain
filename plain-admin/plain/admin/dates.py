@@ -7,7 +7,7 @@ from enum import Enum
 
 from plain.utils import timezone
 
-__all__ = ["DatetimeRangeAliases", "DatetimeRange"]
+__all__ = ["DatetimeRange", "DatetimeRangeAliases"]
 
 
 class DatetimeRangeAliases(Enum):
@@ -204,7 +204,7 @@ class DatetimeRange:
         """Yields each day in the range (inclusive of end date)."""
         return iter(
             self.start.date() + datetime.timedelta(days=i)
-            for i in range(0, self.total_days() + 1)
+            for i in range(self.total_days() + 1)
         )
 
     def iter_weeks(self) -> Iterator[datetime.datetime]:

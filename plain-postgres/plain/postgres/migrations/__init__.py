@@ -17,24 +17,19 @@ from .operations import (
 from .state import StateModelsRegistry
 
 __all__ = [
-    # Migration class
-    "Migration",
-    # Model operations
-    "CreateModel",
-    "DeleteModel",
-    "AlterModelTable",
-    "RenameModel",
-    "AlterModelOptions",
-    # Field operations
     "AddField",
-    "RemoveField",
     "AlterField",
-    "RenameField",
-    # Special operations
-    "SeparateDatabaseAndState",
-    "RunSQL",
-    "RunPython",
-    # Type hints for RunPython functions
+    "AlterModelOptions",
+    "AlterModelTable",
+    "CreateModel",
     "DatabaseSchemaEditor",
+    "DeleteModel",
+    "Migration",
+    "RemoveField",
+    "RenameField",
+    "RenameModel",
+    "RunPython",
+    "RunSQL",
+    "SeparateDatabaseAndState",
     "StateModelsRegistry",
 ]

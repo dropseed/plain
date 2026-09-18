@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from plain import postgres
 from plain.passwords.types import PasswordField
 from plain.postgres import types
+
+from plain import postgres
 
 
 @postgres.register_model

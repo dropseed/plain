@@ -13,7 +13,7 @@ import difflib
 import functools
 import sys
 from collections import Counter
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Iterator as TypingIterator
 from functools import cached_property
 from itertools import chain, count, product
@@ -30,7 +30,6 @@ from typing import (
 )
 
 import psycopg
-
 from plain.postgres.aggregates import Count
 from plain.postgres.constants import LOOKUP_SEP, OnConflict
 from plain.postgres.db import get_connection
@@ -76,12 +75,12 @@ if TYPE_CHECKING:
     )
 
 __all__ = [
+    "AggregateQuery",
+    "DeleteQuery",
+    "InsertQuery",
     "Query",
     "RawQuery",
-    "DeleteQuery",
     "UpdateQuery",
-    "InsertQuery",
-    "AggregateQuery",
 ]
 
 
@@ -145,7 +144,7 @@ class RawQuery:
         return f"<{self.__class__.__name__}: {self}>"
 
     @property
-    def params_type(self) -> type[dict] | type[tuple] | None:
+    def params_type(self) -> type[dict | tuple] | None:
         if self.params is None:
             return None
         return dict if isinstance(self.params, Mapping) else tuple
@@ -551,9 +550,7 @@ class Query(BaseExpression):
         if not (q.distinct and q.is_sliced):
             if q.group_by is True:
                 assert self.model is not None, "GROUP BY requires a model"
-                q.add_fields(
-                    (f.name for f in self.model._model_meta.concrete_fields), False
-                )
+                q.add_fields((f.name for f in self.model._model_meta.fields), False)
                 # Disable GROUP BY aliases to avoid orphaning references to the
                 # SELECT clause which is about to be cleared.
                 q.set_group_by(allow_aliases=False)
@@ -692,7 +689,7 @@ class Query(BaseExpression):
         # loaded. If a relational field is encountered it gets added to the
         # mask for it be considered if `select_related` and the cycle continues
         # by recursively calling this function.
-        for field in meta.concrete_fields:
+        for field in meta.fields:
             field_mask = mask.pop(field.name, None)
             if field_mask is None:
                 select_mask.setdefault(field, {})
@@ -1151,7 +1148,7 @@ class Query(BaseExpression):
                 return expression_lookups, (), expression
         assert self.model is not None, "Field lookups require a model"
         meta = self.model._model_meta
-        _, field, _, lookup_parts = self.names_to_path(lookup_splitted, meta)
+        _, _field, _, lookup_parts = self.names_to_path(lookup_splitted, meta)
         field_parts = lookup_splitted[0 : len(lookup_splitted) - len(lookup_parts)]
         if len(lookup_parts) > 1 and not field_parts:
             raise FieldError(
@@ -1168,11 +1165,12 @@ class Query(BaseExpression):
         """
         from plain.postgres import Model
 
-        if isinstance(value, Model):
-            if not check_rel_lookup_compatibility(value._model_meta.model, meta, field):
-                raise ValueError(
-                    f'Cannot query "{value}": Must be "{meta.model.model_options.object_name}" instance.'
-                )
+        if isinstance(value, Model) and not check_rel_lookup_compatibility(
+            value._model_meta.model, meta, field
+        ):
+            raise ValueError(
+                f'Cannot query "{value}": Must be "{meta.model.model_options.object_name}" instance.'
+            )
 
     def check_related_objects(
         self, field: RelatedField | ForeignObjectRel, value: Any, meta: Meta
@@ -1648,7 +1646,7 @@ class Query(BaseExpression):
         last_field_exception = None
         for pivot in range(len(names), 0, -1):
             try:
-                path, final_field, targets, rest = self.names_to_path(
+                path, final_field, targets, _rest = self.names_to_path(
                     names[:pivot],
                     meta,
                     allow_many,
@@ -2002,7 +2000,7 @@ class Query(BaseExpression):
                 join_info = self.setup_joins(
                     name.split(LOOKUP_SEP), meta, alias, allow_many=allow_m2m
                 )
-                targets, final_alias, joins = self.trim_joins(
+                targets, final_alias, _joins = self.trim_joins(
                     join_info.targets,
                     join_info.joins,
                     join_info.path,
@@ -2035,7 +2033,7 @@ class Query(BaseExpression):
                     )
                 )
 
-    def add_ordering(self, *ordering: str | BaseExpression) -> None:
+    def add_ordering(self, *ordering: str | ResolvableExpression) -> None:
         """
         Add items from the 'ordering' sequence to the query's "order by"
         clause. These items are either field names (not column names) --
@@ -2232,15 +2230,13 @@ class Query(BaseExpression):
             selected = frozenset(field_names + annotation_names)
         else:
             assert self.model is not None, "Default values query requires a model"
-            field_names = [f.name for f in self.model._model_meta.concrete_fields]
+            field_names = [f.name for f in self.model._model_meta.fields]
             selected = frozenset(field_names)
         # Selected annotations must be known before setting the GROUP BY
         # clause.
         if self.group_by is True:
             assert self.model is not None, "GROUP BY True requires a model"
-            self.add_fields(
-                (f.name for f in self.model._model_meta.concrete_fields), False
-            )
+            self.add_fields((f.name for f in self.model._model_meta.fields), False)
             # Disable GROUP BY aliases to avoid orphaning references to the
             # SELECT clause which is about to be cleared.
             self.set_group_by(allow_aliases=False)
@@ -2568,7 +2564,7 @@ class UpdateQuery(Query):
             values_seq.append((field, val))
         return self.add_update_fields(values_seq)
 
-    def add_update_fields(self, values_seq: list[tuple[Any, Any]]) -> None:
+    def add_update_fields(self, values_seq: Sequence[tuple[Any, Any]]) -> None:
         """
         Append a sequence of (field, value) pairs to the internal list that
         will be used to generate the UPDATE query.
@@ -2607,13 +2603,13 @@ class InsertQuery(Query):
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.fields: list[Field] = []
+        self.fields: Sequence[Field] = []
         self.objs: list[Any] = []
         self.on_conflict = on_conflict
         self.update_fields: list[Field] = update_fields or []
         self.unique_fields: list[Field] = unique_fields or []
 
-    def insert_values(self, fields: list[Any], objs: list[Any]) -> None:
+    def insert_values(self, fields: Sequence[Any], objs: list[Any]) -> None:
         self.fields = fields
         self.objs = objs
 

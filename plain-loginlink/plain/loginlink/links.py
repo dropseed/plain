@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from app.users.models import User
-
 from plain.signing import BadSignature, SignatureExpired
 from plain.urls import reverse
 
