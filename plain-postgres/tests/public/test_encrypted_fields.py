@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import assert_type
+
 import pytest
 from app.examples.models.encrypted import SecretStore
 from plain.postgres.exceptions import FieldError
@@ -9,6 +11,7 @@ from plain.postgres.fields.encrypted import (
     _encrypt,
     _get_fernet,
 )
+from plain.postgres.query_utils import Q
 
 
 class TestEncryptDecryptFunctions:
@@ -186,6 +189,59 @@ class TestTypedQueryMethodsBlocked:
         blocks them — matching ciphertext by substring is meaningless."""
         with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
             getattr(SecretStore.api_key, method)("x")
+
+    def test_every_blocked_method_is_rejected_statically(self):
+        """Pin the block from the type checker's side, not just the runtime's.
+
+        Each `ty: ignore[invalid-argument-type]` below asserts that the call
+        is a type error: ty reports an unused suppression as an error of its
+        own, so if any of these parameters ever widens away from `Never`,
+        `./scripts/type-check plain-postgres` fails here. That matters because
+        the `ty: ignore[invalid-method-override]` on EncryptedTextField is
+        class-wide and would otherwise hide a block that stopped blocking.
+
+        The same calls are asserted to raise, so the runtime and the type
+        checker are pinned to each other in one place.
+        """
+        with pytest.raises(TypeError):
+            SecretStore.api_key.equals("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.not_equal("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.gt("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.gte("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.lt("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.lte("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.is_in(["x"])  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.contains("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.icontains("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.startswith("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.endswith("x")  # ty: ignore[invalid-argument-type]
+
+    def test_is_null_survives_the_block_statically(self):
+        """The one condition that stays open must keep its real signature -
+        no ignore marker here, so a `Never` creeping onto is_null breaks the
+        build."""
+        assert_type(SecretStore.api_key.is_null(), Q)
+        assert_type(SecretStore.api_key.is_null(False), Q)
+
+    @pytest.mark.parametrize(
+        "method", ["equals", "not_equal", "gt", "gte", "lt", "lte", "is_in"]
+    )
+    def test_json_field_comparison_raises(self, method):
+        """EncryptedJSONField carries the mixin's block too. Only the runtime
+        side is assertable here - the model annotates `config` as `dict | None`,
+        so class access doesn't type as the field."""
+        with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
+            getattr(SecretStore.config, method)("x")
 
     def test_is_null_returns_correct_lookup(self):
         """is_null is the one comparison that makes sense on ciphertext."""
