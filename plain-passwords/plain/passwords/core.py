@@ -8,6 +8,7 @@ from app.users.models import User
 from plain.email import TemplateEmail
 from plain.exceptions import ValidationError
 from plain.forms import Error
+from plain.postgres.fields.base import ColumnField
 
 from .hashers import check_password, hash_password
 from .utils import unicode_ci_compare
@@ -39,9 +40,13 @@ def get_password_errors(
     rule failed — or an empty list when the password is acceptable. The
     caller passes `field` to attach the errors to a form field.
     """
+    password_field = user._model_meta.get_forward_field("password")
+    if not isinstance(password_field, ColumnField):
+        raise TypeError(f"{type(user).__name__}.password must be a column field")
+
     try:
         # Clean it as if it were being assigned to the model field directly.
-        user._model_meta.get_field("password").clean(password, user)
+        password_field.clean(password, user)
     except ValidationError as e:
         errors: list[Error] = []
         for leaf in e.error_list:
