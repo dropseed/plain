@@ -687,10 +687,13 @@ class DefaultableField[T](ColumnField[T]):
 
     non_migration_attrs = (*ColumnField.non_migration_attrs, "default")
 
-    # Subclasses whose __init__ deliberately doesn't take default=
-    # (EncryptedJSONField) set this False so callers like the autodetector's
-    # error guidance don't suggest a kwarg that would raise.
-    accepts_default = True
+    # Whether this field can carry a *persistent* column DEFAULT via default=.
+    # Subclasses that can't (EncryptedJSONField) set this False so callers like
+    # the autodetector's error guidance don't suggest a kwarg that would raise.
+    # Note this is only about persistent defaults: a field with this False can
+    # still accept `default=None`, which stores nothing (see
+    # validate_none_only_default).
+    accepts_persistent_default = True
 
     # Subclasses set this when their only expressible column DEFAULT is the
     # class's `_default_empty_value` ("" / b"").

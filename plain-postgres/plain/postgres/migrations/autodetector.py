@@ -778,7 +778,7 @@ class MigrationAutodetector:
                 f"— convergence applies NOT NULL on the next sync:\n"
                 f"       uv run plain migrations create --empty --name backfill_{field_name}"
             )
-            if isinstance(field, DefaultableField) and field.accepts_default:
+            if isinstance(field, DefaultableField) and field.accepts_persistent_default:
                 if field.only_empty_default:
                     # get_default() returns the field's empty value here — the
                     # one default these fields accept.

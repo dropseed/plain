@@ -257,12 +257,11 @@ class EncryptedJSONField(EncryptedFieldMixin, JSONField):
 
     db_type_sql = "text"
 
-    # No *persistent* default kwarg: this drives the autodetector's backfill
-    # guidance, which is only reached for non-nullable fields, where `None`
-    # could never backfill anyway. `default=None` below is not a persistent
-    # default (has_persistent_literal_default() stays False), so the flag and
-    # the kwarg are consistent.
-    accepts_default = False
+    # Ciphertext is non-deterministic, so there is no literal to put in the
+    # column. This drives the autodetector's backfill guidance, which is only
+    # reached for non-nullable fields -- where `None` could never backfill
+    # anyway, so the `default=None` accepted below doesn't contradict it.
+    accepts_persistent_default = False
 
     def __init__(
         self,

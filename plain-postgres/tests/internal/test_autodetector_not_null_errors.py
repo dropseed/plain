@@ -109,8 +109,8 @@ def test_backfill_error_placeholder_is_not_executable() -> None:
     [
         # Not a DefaultableField at all.
         types.DateTimeField(),
-        # A DefaultableField whose __init__ deliberately takes no default=
-        # (accepts_default=False).
+        # A DefaultableField that can carry no persistent column DEFAULT
+        # (accepts_persistent_default=False).
         types.EncryptedJSONField(),
     ],
     ids=["datetime", "encrypted-json"],
