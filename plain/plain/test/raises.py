@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from types import TracebackType
+from typing import Self
 
 __all__ = ["raises"]
 
@@ -36,7 +37,7 @@ class raises:
         self.match = match
         self.exception: BaseException | None = None
 
-    def __enter__(self) -> raises:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(

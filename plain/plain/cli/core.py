@@ -147,7 +147,13 @@ class PlainCommandCollection(click.CommandCollection):
         self._setup_attempted = True
 
         try:
-            plain.runtime.setup()
+            try:
+                plain.runtime.setup()
+            except plain.runtime.SetupError:
+                # Already set up — the CLI was invoked in-process by something
+                # that runs setup() itself (a test run, `plain check`). The
+                # registry can still load.
+                pass
             self._registry_group = CLIRegistryGroup()
             # Add registry group to sources
             self.sources.insert(0, self._registry_group)

@@ -27,7 +27,7 @@ from plain.test.decorators import (
 
 from .assertions import rewrite_asserts
 
-__all__ = ["CollectedTest", "collect_tests", "CollectionError"]
+__all__ = ["CollectedTest", "CollectionError", "collect_tests"]
 
 _SKIP_DIR_NAMES = {"__pycache__", "node_modules"}
 
@@ -112,11 +112,7 @@ def collect_tests(
 def _matches_target(name: str, target: str) -> bool:
     """Whether a test name matches a `::`-target: exact, a case of it, or a
     test within the targeted class."""
-    return (
-        name == target
-        or name.startswith(f"{target}[")
-        or name.startswith(f"{target}::")
-    )
+    return name == target or name.startswith((f"{target}[", f"{target}::"))
 
 
 def _find_test_files(directory: Path, *, skip_dir_names: set[str]) -> list[Path]:
@@ -248,7 +244,7 @@ def _import_test_module(path: Path, *, root: Path) -> types.ModuleType:
         module = types.ModuleType(module_name)
         module.__file__ = str(path)
         sys.modules[module_name] = module
-        exec(code, module.__dict__)
+        exec(code, module.__dict__)  # noqa: S102 — running test files is the job
     except Exception as e:
         sys.modules.pop(module_name, None)
         raise CollectionError(path, e) from e

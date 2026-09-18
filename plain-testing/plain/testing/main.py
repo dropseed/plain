@@ -28,6 +28,10 @@ def main(
     # Tests run with PLAIN_ENV=test so the dotenv ladder picks `.env.test*`
     # and skips `.env.local` for determinism.
     os.environ.setdefault("PLAIN_ENV", "test")
+    # Marks the process as a test run for code that behaves differently under
+    # one — CLI color, for instance, which would otherwise add escape codes to
+    # output a test is asserting on.
+    os.environ["PLAIN_TEST_RUNNING"] = "1"
     _load_dotenv()
 
     import plain.runtime

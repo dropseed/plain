@@ -8,6 +8,7 @@ import asyncio
 import inspect
 import time
 import traceback
+from collections.abc import Callable
 from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,7 +58,7 @@ def run_tests(
     *,
     lifecycles: list[TestLifecycle],
     fail_fast: bool = False,
-    on_result=None,
+    on_result: Callable[[TestResult], None] | None = None,
 ) -> TestRun:
     run_start = time.monotonic()
     results: list[TestResult] = []

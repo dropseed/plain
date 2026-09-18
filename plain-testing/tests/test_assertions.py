@@ -8,7 +8,7 @@ def run_rewritten(source: str) -> None:
     tree = ast.parse(source)
     tree = rewrite_asserts(tree)
     code = compile(tree, "<test>", "exec", dont_inherit=True)
-    exec(code, {})
+    exec(code, {})  # noqa: S102 — the rewritten tree is the thing under test
 
 
 def test_compare_failure_shows_both_sides():

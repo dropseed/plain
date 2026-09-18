@@ -21,7 +21,7 @@ The `plain` package includes everything you need to start handling web requests 
 - [preflight](./preflight/README.md) - Preflight checks for your app.
 - [runtime](./runtime/README.md) - Runtime settings and configuration.
 - [templates](./templates/README.md) - Jinja2 templates and rendering.
-- [test](./test/README.md) - Test utilities and fixtures.
+- [test](./test/README.md) - Test client and authoring vocabulary.
 - [urls](./urls/README.md) - URL routing and request dispatching.
 - [views](./views/README.md) - Class-based views and request handlers.
 

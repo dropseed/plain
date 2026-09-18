@@ -16,8 +16,6 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
-from psycopg import pq
-
 from plain.test import TestLifecycle
 
 from .. import transaction
@@ -70,27 +68,13 @@ class PostgresTestLifecycle(TestLifecycle):
             yield
         finally:
             with suppress_db_tracing():
+                # Constraints are never deferred (foreign keys are NOT
+                # DEFERRABLE), so there is nothing to check before rolling
+                # back — the database has already rejected any violation.
                 conn = get_connection()
-                try:
-                    # PostgreSQL can defer constraint checks. Skip when the
-                    # connection is already in an aborted-transaction state
-                    # (e.g. the test raised a DB error) — further commands
-                    # would just raise InFailedSqlTransaction.
-                    if (
-                        not conn.needs_rollback
-                        and conn.connection is not None
-                        and conn.connection.info.transaction_status
-                        != pq.TransactionStatus.INERROR
-                    ):
-                        conn.check_constraints()
-                finally:
-                    # A deferred-constraint violation raising above must not
-                    # skip the rollback — the next test would otherwise run
-                    # inside this test's still-open transaction.
-                    conn.set_rollback(True)
-                    atomic.__exit__(None, None, None)
-
-                    conn.close()
+                conn.set_rollback(True)
+                atomic.__exit__(None, None, None)
+                conn.close()
 
     def _run_in_isolated_database(self, test: CollectedTest) -> Generator[None]:
         test_name = test.id.rpartition("::")[2]

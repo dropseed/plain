@@ -274,7 +274,7 @@ Two flags control how much of the trace you see:
 - `--trace` — the complete query list plus the full span tree.
 - `--json` — response metadata and the complete trace as JSON, with no response body. This is the form to pipe into other tools.
 
-Trace capture needs the OpenTelemetry SDK, which ships with [plain.connect](../../../plain-connect/plain/connect/README.md) and [plain.pytest](../../../plain-pytest/plain/pytest/README.md). Without it the command still works and says the trace was skipped.
+Trace capture needs the OpenTelemetry SDK, which ships with [plain.connect](../../../plain-connect/plain/connect/README.md) and [plain.testing](../../../plain-testing/plain/testing/README.md). Without it the command still works and says the trace was skipped.
 
 ### `plain memory`
 
