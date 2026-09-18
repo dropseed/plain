@@ -4,7 +4,7 @@ The loader only observes records; the planner decides run / adopt / refuse
 and marks a baseline to adopt as a record-only plan entry; migrate() records
 it without running it. These tests stage each row of that table against the
 real test database, where `examples` has its full history recorded and
-`plaintemplates` has no migrations at all.
+`html` has no migrations at all.
 """
 
 from __future__ import annotations
@@ -100,7 +100,7 @@ def column_exists(table: str, column: str) -> bool:
 
 @pytest.fixture
 def migrations_dir(temp_migrations: Callable[..., Path], db: None) -> Path:
-    return temp_migrations("examples", "plaintemplates")
+    return temp_migrations("examples", "html")
 
 
 def test_sentinel_recorded_adopts_with_one_record_and_no_ddl(
@@ -141,7 +141,7 @@ def test_a_real_migration_after_a_pending_baseline_runs(migrations_dir: Path) ->
 def test_fresh_package_runs_the_baseline(migrations_dir: Path) -> None:
     write_baseline(
         migrations_dir,
-        "plaintemplates",
+        "html",
         "0001_baseline",
         supersedes="0000_gone",
         model="Thing",
@@ -151,8 +151,8 @@ def test_fresh_package_runs_the_baseline(migrations_dir: Path) -> None:
     result = CliRunner().invoke(apply, ["--no-input"])
 
     assert result.exit_code == 0, result.output
-    assert "0001_baseline" in recorded("plaintemplates")
-    assert "plaintemplates_thing" in get_connection().table_names()
+    assert "0001_baseline" in recorded("html")
+    assert "html_thing" in get_connection().table_names()
     assert "recorded, not run" not in result.output  # it ran
 
 
@@ -186,10 +186,10 @@ def test_refusal_wins_over_history_validation(migrations_dir: Path) -> None:
     write_baseline(migrations_dir)
     recorder = MigrationRecorder(get_connection())
     recorder.record_unapplied("examples", SENTINEL)
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(dependencies=(("examples", "0001_initial"),))
     )
-    recorder.record_applied("plaintemplates", "0001_initial")
+    recorder.record_applied("html", "0001_initial")
 
     result = CliRunner().invoke(apply, ["--no-input"])
 
@@ -252,10 +252,10 @@ def test_records_without_tables_refuses(migrations_dir: Path) -> None:
 def test_targeted_apply_leaves_other_packages_alone(migrations_dir: Path) -> None:
     write_baseline(migrations_dir)  # examples has a pending adoption
 
-    check = CliRunner().invoke(apply, ["plaintemplates", "--check", "--no-input"])
+    check = CliRunner().invoke(apply, ["html", "--check", "--no-input"])
     assert check.exit_code == 0, check.output
 
-    result = CliRunner().invoke(apply, ["plaintemplates", "--no-input"])
+    result = CliRunner().invoke(apply, ["html", "--no-input"])
     assert result.exit_code == 0, result.output
     assert "0019_baseline" not in recorded("examples")
 
@@ -396,21 +396,19 @@ def test_writer_serializes_a_baseline() -> None:
 
 
 def test_fake_repair_is_scoped_to_the_named_package(migrations_dir: Path) -> None:
-    """Faking plaintemplates' own migration must not wave through a refusal
-    in examples, even though plaintemplates depends on it."""
+    """Faking html' own migration must not wave through a refusal
+    in examples, even though html depends on it."""
     write_baseline(migrations_dir)
     MigrationRecorder(get_connection()).record_unapplied("examples", SENTINEL)
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(dependencies=(("examples", "0001_initial"),))
     )
 
-    result = CliRunner().invoke(
-        apply, ["plaintemplates", "0001_initial", "--fake", "--no-input"]
-    )
+    result = CliRunner().invoke(apply, ["html", "0001_initial", "--fake", "--no-input"])
 
     assert result.exit_code != 0
     assert "Upgrade through" in result.output
-    assert "0001_initial" not in recorded("plaintemplates")
+    assert "0001_initial" not in recorded("html")
 
 
 def test_whole_plan_fake_advances_state_between_migrations(
@@ -418,24 +416,24 @@ def test_whole_plan_fake_advances_state_between_migrations(
 ) -> None:
     """--fake records without DDL; the second migration's state_forwards
     needs the model the first one declared."""
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(
             dependencies=(),
             operations='(migrations.CreateModel(name="Thing", fields=[("id", postgres.PrimaryKeyField())]),)',
         )
     )
-    (migrations_dir / "plaintemplates" / "0002_color.py").write_text(
+    (migrations_dir / "html" / "0002_color.py").write_text(
         migration_source(
-            dependencies=(("plaintemplates", "0001_initial"),),
+            dependencies=(("html", "0001_initial"),),
             operations='(migrations.AddField(model_name="thing", name="color", field=postgres.TextField(default="")),)',
         )
     )
 
-    result = CliRunner().invoke(apply, ["plaintemplates", "--fake", "--no-input"])
+    result = CliRunner().invoke(apply, ["html", "--fake", "--no-input"])
 
     assert result.exit_code == 0, result.output
-    assert recorded("plaintemplates") == ["0001_initial", "0002_color"]
-    assert "plaintemplates_thing" not in get_connection().table_names()
+    assert recorded("html") == ["0001_initial", "0002_color"]
+    assert "html_thing" not in get_connection().table_names()
 
 
 def test_recorded_dependent_in_another_package_references_the_baseline_model(
@@ -445,7 +443,7 @@ def test_recorded_dependent_in_another_package_references_the_baseline_model(
     users.User while users' baseline was still pending, and building project
     state blew up before the baseline's state ops ran."""
     write_baseline(migrations_dir)
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(
             dependencies=(("examples", SENTINEL),),
             operations=(
@@ -456,7 +454,7 @@ def test_recorded_dependent_in_another_package_references_the_baseline_model(
             ),
         )
     )
-    MigrationRecorder(get_connection()).record_applied("plaintemplates", "0001_initial")
+    MigrationRecorder(get_connection()).record_applied("html", "0001_initial")
 
     result = CliRunner().invoke(apply, ["--no-input"])
 
@@ -476,12 +474,12 @@ def test_fake_repair_with_a_cross_package_fk_dependent(migrations_dir: Path) -> 
     write_baseline(migrations_dir)
     recorder = MigrationRecorder(get_connection())
     recorder.record_unapplied("examples", SENTINEL)
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(
             dependencies=(("examples", SENTINEL),), operations=FK_DEPENDENT
         )
     )
-    recorder.record_applied("plaintemplates", "0001_initial")
+    recorder.record_applied("html", "0001_initial")
 
     result = CliRunner().invoke(
         apply, ["examples", "0019_baseline", "--fake", "--no-input"]
@@ -522,10 +520,10 @@ def test_no_records_but_tables_refuses_with_a_choice(migrations_dir: Path) -> No
     recorder = MigrationRecorder(get_connection())
     for name in recorded("examples"):
         recorder.record_unapplied("examples", name)
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(dependencies=(("examples", SENTINEL),))
     )
-    recorder.record_applied("plaintemplates", "0001_initial")
+    recorder.record_applied("html", "0001_initial")
 
     result = CliRunner().invoke(apply, ["--no-input"])
 
@@ -566,12 +564,12 @@ def test_prune_remedy_with_a_recorded_fk_dependent(migrations_dir: Path) -> None
     state (the walk-through's failure on `notes` -> `users.User`)."""
     write_baseline(migrations_dir)
     recorder = MigrationRecorder(get_connection())
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(
             dependencies=(("examples", SENTINEL),), operations=FK_DEPENDENT
         )
     )
-    recorder.record_applied("plaintemplates", "0001_initial")
+    recorder.record_applied("html", "0001_initial")
     with get_connection().cursor() as cursor:
         for table in get_connection().table_names(cursor):
             if table.startswith("examples_"):
@@ -598,7 +596,7 @@ def test_fresh_baseline_with_an_fk_to_an_unapplied_migration(
             operations='(migrations.CreateModel(name="Gadget", fields=[("id", postgres.PrimaryKeyField())]),)',
         )
     )
-    (migrations_dir / "plaintemplates" / "0001_baseline.py").write_text("""\
+    (migrations_dir / "html" / "0001_baseline.py").write_text("""\
 from plain import postgres
 from plain.postgres import migrations
 
@@ -623,8 +621,8 @@ class Migration(migrations.Migration):
 
     assert result.exit_code == 0, result.output
     assert "0019_gadget" in recorded("examples")
-    assert recorded("plaintemplates") == ["0001_baseline"]
-    assert "plaintemplates_note" in get_connection().table_names()
+    assert recorded("html") == ["0001_baseline"]
+    assert "html_note" in get_connection().table_names()
 
 
 def test_adopted_baseline_with_an_fk_to_an_unapplied_migration(
@@ -633,7 +631,7 @@ def test_adopted_baseline_with_an_fk_to_an_unapplied_migration(
     """Adoption is record-only, but the baseline's state must still be built
     at its own turn - after the migration it depends on has run - not
     preloaded before anything runs."""
-    (migrations_dir / "plaintemplates" / "0001_gadget.py").write_text(
+    (migrations_dir / "html" / "0001_gadget.py").write_text(
         migration_source(
             dependencies=(),
             operations='(migrations.CreateModel(name="Gadget", fields=[("id", postgres.PrimaryKeyField())]),)',
@@ -648,13 +646,13 @@ class Migration(migrations.Migration):
     supersedes = {SENTINEL!r}
     retired = {tuple(recorded("examples"))!r}
     since = "2.0"
-    dependencies = (("plaintemplates", "0001_gadget"),)
+    dependencies = (("html", "0001_gadget"),)
     operations = (
         migrations.CreateModel(
             name={EXISTING_MODEL!r},
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("gadget", postgres.ForeignKeyField(to="plaintemplates.gadget", on_delete=postgres.CASCADE)),
+                ("gadget", postgres.ForeignKeyField(to="html.gadget", on_delete=postgres.CASCADE)),
             ],
         ),
     )
@@ -663,20 +661,20 @@ class Migration(migrations.Migration):
     result = CliRunner().invoke(apply, ["--no-input"])
 
     assert result.exit_code == 0, result.output
-    assert recorded("plaintemplates") == ["0001_gadget"]
+    assert recorded("html") == ["0001_gadget"]
     assert "0019_baseline" in recorded("examples")
 
 
 def test_fake_repair_refuses_to_fake_anything_but_the_baseline(
     migrations_dir: Path,
 ) -> None:
-    (migrations_dir / "plaintemplates" / "0001_gadget.py").write_text(
+    (migrations_dir / "html" / "0001_gadget.py").write_text(
         migration_source(
             dependencies=(),
             operations='(migrations.CreateModel(name="Gadget", fields=[("id", postgres.PrimaryKeyField())]),)',
         )
     )
-    write_baseline(migrations_dir, dependencies='(("plaintemplates", "0001_gadget"),)')
+    write_baseline(migrations_dir, dependencies='(("html", "0001_gadget"),)')
     MigrationRecorder(get_connection()).record_unapplied("examples", SENTINEL)
 
     result = CliRunner().invoke(
@@ -684,8 +682,8 @@ def test_fake_repair_refuses_to_fake_anything_but_the_baseline(
     )
 
     assert result.exit_code != 0
-    assert "would also fake plaintemplates.0001_gadget" in result.output
-    assert recorded("plaintemplates") == []
+    assert "would also fake html.0001_gadget" in result.output
+    assert recorded("html") == []
     assert "0019_baseline" not in recorded("examples")
 
 

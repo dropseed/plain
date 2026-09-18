@@ -55,7 +55,7 @@ def create_model(name: str, extra_fields: str = "") -> str:
 
 @pytest.fixture
 def migrations_dir(temp_migrations: Callable[..., Path], db: None) -> Path:
-    root = temp_migrations("examples", "plaintemplates")
+    root = temp_migrations("examples", "html")
     for path in REAL_EXAMPLES.glob("0*.py"):
         shutil.copy(path, root / "examples" / path.name)
     return root
@@ -127,7 +127,7 @@ def test_dependencies_come_from_what_the_baseline_references(
     the leaf for no reason. The baseline's FK now points at Tag - Feature
     renamed in 0014 - so it depends on 0014: enough for a fresh database,
     and not the dead pin."""
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(
             dependencies=(("examples", "0005_feature_carfeature_car_features"),),
             operations="("
@@ -138,22 +138,22 @@ def test_dependencies_come_from_what_the_baseline_references(
             + ",)",
         )
     )
-    (migrations_dir / "plaintemplates" / "0002_noop.py").write_text(
+    (migrations_dir / "html" / "0002_noop.py").write_text(
         migration_source(
-            dependencies=(("plaintemplates", "0001_initial"), ("examples", LEAF)),
+            dependencies=(("html", "0001_initial"), ("examples", LEAF)),
         )
     )
-    # The rename came after Note existed: replay 0014 after plaintemplates.0001.
+    # The rename came after Note existed: replay 0014 after html.0001.
     rename = next((migrations_dir / "examples").glob("0014_*.py"))
     rename.write_text(
         rename.read_text().replace(
             "    dependencies = (",
-            '    dependencies = (\n        ("plaintemplates", "0001_initial"),',
+            '    dependencies = (\n        ("html", "0001_initial"),',
             1,
         )
     )
 
-    plan = plan_reset(loader(), "plaintemplates")
+    plan = plan_reset(loader(), "html")
 
     assert plan.baseline.dependencies == [
         ("examples", "0014_widget_rename_feature_tag_remove_carfeature_car_and_more")
@@ -173,7 +173,7 @@ NOOP = "\n\ndef noop(models, schema_editor):\n    pass\n"
     [
         (
             f"({create_model('Note')}, migrations.RunPython(noop),)",
-            "plaintemplates.0001_initial: Raw Python operation (operation 1)",
+            "html.0001_initial: Raw Python operation (operation 1)",
         ),
         (
             f"({create_model('Note')}, migrations.SeparateDatabaseAndState(database_operations=[migrations.RunSQL('select 1')]),)",
@@ -189,26 +189,26 @@ NOOP = "\n\ndef noop(models, schema_editor):\n    pass\n"
 def test_unregenerable_operations_refuse(
     migrations_dir: Path, operations_source: str, refused: str
 ) -> None:
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(operations=operations_source, prelude=NOOP)
     )
 
     with pytest.raises(BadMigrationError) as excinfo:
-        plan_reset(loader(), "plaintemplates")
+        plan_reset(loader(), "html")
 
     assert refused in str(excinfo.value)
     assert "skip_on_reset=True" in str(excinfo.value)
 
 
 def test_skipped_operations_are_left_out(migrations_dir: Path) -> None:
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(
             operations=f"({create_model('Note')}, migrations.RunPython(noop, skip_on_reset=True), migrations.RunSQL('select 1', skip_on_reset=True),)",
             prelude=NOOP,
         )
     )
 
-    plan = plan_reset(loader(), "plaintemplates")
+    plan = plan_reset(loader(), "html")
 
     assert [type(op) for op in plan.baseline.operations] == [operations.CreateModel]
 
@@ -216,20 +216,20 @@ def test_skipped_operations_are_left_out(migrations_dir: Path) -> None:
 def test_second_reset_folds_the_previous_baseline_into_retired(
     migrations_dir: Path,
 ) -> None:
-    (migrations_dir / "plaintemplates" / "0002_baseline.py").write_text(
+    (migrations_dir / "html" / "0002_baseline.py").write_text(
         migration_source(operations=f"({create_model('Note')},)").replace(
             "    dependencies",
             '    supersedes = "0001_initial"\n    retired = ()\n    since = "1.0"\n    dependencies',
         )
     )
-    (migrations_dir / "plaintemplates" / "0003_more.py").write_text(
+    (migrations_dir / "html" / "0003_more.py").write_text(
         migration_source(
-            dependencies=(("plaintemplates", "0002_baseline"),),
+            dependencies=(("html", "0002_baseline"),),
             operations=f"({create_model('Other')},)",
         )
     )
 
-    plan = plan_reset(loader(), "plaintemplates")
+    plan = plan_reset(loader(), "html")
 
     assert plan.baseline.name == "0004_baseline"
     assert plan.baseline.supersedes == "0003_more"
@@ -239,66 +239,63 @@ def test_second_reset_folds_the_previous_baseline_into_retired(
 def test_second_reset_refuses_while_the_first_is_unreleased(
     migrations_dir: Path,
 ) -> None:
-    (migrations_dir / "plaintemplates" / "0002_baseline.py").write_text(
+    (migrations_dir / "html" / "0002_baseline.py").write_text(
         migration_source(operations=f"({create_model('Note')},)").replace(
             "    dependencies",
             '    supersedes = "0001_initial"\n    retired = ()\n    since = ""\n    dependencies',
         )
     )
-    (migrations_dir / "plaintemplates" / "0003_more.py").write_text(
-        migration_source(dependencies=(("plaintemplates", "0002_baseline"),))
+    (migrations_dir / "html" / "0003_more.py").write_text(
+        migration_source(dependencies=(("html", "0002_baseline"),))
     )
 
     with pytest.raises(BadMigrationError, match="no release has shipped"):
-        plan_reset(loader(), "plaintemplates")
+        plan_reset(loader(), "html")
 
 
 def test_first_reset_cycle_is_refused_before_anything_changes(
     migrations_dir: Path,
 ) -> None:
-    """`examples` pinned an early `plaintemplates` migration; the model the
+    """`examples` pinned an early `html` migration; the model the
     baseline needs is created after that pin. The only root the graph can
     give the baseline closes a cycle, and validation says so."""
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(operations=f"({create_model('Note')},)")
     )
     (migrations_dir / "examples" / "0019_gadget.py").write_text(
         migration_source(
-            dependencies=(("examples", LEAF), ("plaintemplates", "0001_initial")),
+            dependencies=(("examples", LEAF), ("html", "0001_initial")),
             operations=f"({create_model('Gadget')},)",
         )
     )
-    (migrations_dir / "plaintemplates" / "0002_note_gadget.py").write_text(
+    (migrations_dir / "html" / "0002_note_gadget.py").write_text(
         migration_source(
             dependencies=(
-                ("plaintemplates", "0001_initial"),
+                ("html", "0001_initial"),
                 ("examples", "0019_gadget"),
             ),
             operations='(migrations.AddField(model_name="note", name="gadget", field=postgres.ForeignKeyField(to="examples.gadget", on_delete=postgres.CASCADE, allow_null=True)),)',
         )
     )
-    before = sorted(p.name for p in (migrations_dir / "plaintemplates").glob("0*.py"))
+    before = sorted(p.name for p in (migrations_dir / "html").glob("0*.py"))
 
     current = loader()
-    plan = plan_reset(current, "plaintemplates")
+    plan = plan_reset(current, "html")
     assert plan.baseline.dependencies == [("examples", "0019_gadget")]
     with pytest.raises(BadMigrationError) as excinfo:
         validate_reset(current, plan)
     # The cycle, reported from whichever node the search entered it.
     assert "examples.0019_gadget" in str(excinfo.value)
-    assert "plaintemplates.0003_baseline" in str(excinfo.value)
+    assert "html.0003_baseline" in str(excinfo.value)
 
-    assert (
-        sorted(p.name for p in (migrations_dir / "plaintemplates").glob("0*.py"))
-        == before
-    )
+    assert sorted(p.name for p in (migrations_dir / "html").glob("0*.py")) == before
     # The caller's loader still holds its own, un-rewritten graph.
-    assert ("plaintemplates", "0002_note_gadget") in current.graph.nodes
+    assert ("html", "0002_note_gadget") in current.graph.nodes
 
 
 def test_nothing_to_reset(migrations_dir: Path) -> None:
     with pytest.raises(BadMigrationError, match="no migrations to reset"):
-        plan_reset(loader(), "plaintemplates")
+        plan_reset(loader(), "html")
 
 
 def test_two_leaves_refuse(migrations_dir: Path) -> None:
@@ -441,13 +438,13 @@ def test_pending_model_changes_refuse(migrations_dir: Path) -> None:
 
 
 def test_code_defined_in_a_deleted_migration_is_flagged(migrations_dir: Path) -> None:
-    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+    (migrations_dir / "html" / "0001_initial.py").write_text(
         migration_source(
             operations=f"({create_model('Note', ', ("label", LabelField(max_length=10))')},)",
             prelude="\n\nclass LabelField(postgres.TextField):\n    pass\n",
         )
     )
-    plan = plan_reset(loader(), "plaintemplates")
+    plan = plan_reset(loader(), "html")
     writer = MigrationWriter(plan.baseline)
     writer.as_string()
     assert writer.needs_manual_porting
