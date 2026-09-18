@@ -8,12 +8,17 @@ stays independent of any app's view layer. Covers what only this layer proves:
 
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from typing import assert_type
+from uuid import UUID
+
 import pytest
 from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.forms import FormsExample
 from app.examples.models.relationships import Tag, Widget, WidgetTag
+from plain.forms import Field, field_value, types
 from plain.forms import fields as form_fields
-from plain.forms import types
 from plain.postgres.forms import (
     ModelChoiceField,
     ModelForm,
@@ -289,3 +294,54 @@ class TestModelDerivation:
 
         with pytest.raises(TypeError, match="more than one model"):
             MixedForm.model()
+
+
+class TypingForm(ModelForm):
+    """Fixture for the `assert_type` checks below."""
+
+    name = model_field(FormsExample.name)
+    count = model_field(FormsExample.count)
+    ratio = model_field(FormsExample.ratio)
+    amount = model_field(FormsExample.amount)
+    is_active = model_field(FormsExample.is_active)
+    event_date = model_field(FormsExample.event_date)
+    event_datetime = model_field(FormsExample.event_datetime)
+    duration = model_field(FormsExample.duration)
+    external_id = model_field(FormsExample.external_id)
+    note = model_field(FormsExample.note)
+
+
+class TestModelFieldTyping:
+    """`model_field(Model.column)` must carry the column's *value* type, not
+    the column object's. The regression it guards: an overload binding the
+    type variable to `Model.name` itself typed `result.name` as `TextField[str]`
+    rather than `str`, so nothing downstream type-checked. `assert_type` is
+    verified by ty over the test suite; at runtime it is a no-op.
+    """
+
+    def test_a_validated_result_is_typed_by_column(self, db):
+        result = TypingForm.validate({})
+        if not result:
+            return
+        assert_type(result.name, str)
+        assert_type(result.count, int)
+        assert_type(result.ratio, float)
+        assert_type(result.amount, Decimal)
+        assert_type(result.is_active, bool)
+        assert_type(result.event_date, date)
+        assert_type(result.event_datetime, datetime)
+        assert_type(result.duration, timedelta)
+        assert_type(result.external_id, UUID)
+
+    def test_a_nullable_column_keeps_its_none(self, db):
+        result = TypingForm.validate({})
+        if not result:
+            return
+        assert_type(result.note, str | None)
+
+    def test_the_class_attribute_is_the_typed_field_reference(self):
+        assert_type(TypingForm.name, Field[str])
+        assert_type(TypingForm.count, Field[int])
+        assert_type(field_value(TypingForm.validate({}), TypingForm.count), int | None)
+        assert_type(TypingForm.name.required, bool)
+        assert_type(TypingForm.name.html_id, str)
