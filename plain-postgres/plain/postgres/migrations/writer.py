@@ -10,7 +10,6 @@ from plain.postgres import migrations
 from plain.postgres.migrations.loader import MigrationLoader
 from plain.postgres.migrations.serializer import serializer_factory
 from plain.runtime import __version__
-from plain.utils.inspect import get_func_args
 from plain.utils.module_loading import module_dir
 from plain.utils.timezone import now
 
@@ -22,9 +21,12 @@ class OperationWriter:
         self.indentation = indentation
 
     def serialize(self) -> tuple[str, set[str]]:
-        def _write(_arg_name: str, _arg_value: Any) -> None:
-            if _arg_name in self.operation.serialization_expand_args and isinstance(
-                _arg_value, list | tuple | dict
+        def _write(_arg_name: str | None, _arg_value: Any) -> None:
+            prefix = f"{_arg_name}=" if _arg_name is not None else ""
+            if (
+                _arg_name is not None
+                and _arg_name in self.operation.serialization_expand_args
+                and isinstance(_arg_value, list | tuple | dict)
             ):
                 if isinstance(_arg_value, dict):
                     self.feed(f"{_arg_name}={{")
@@ -61,19 +63,18 @@ class OperationWriter:
                     self.feed("],")
             else:
                 arg_string, arg_imports = MigrationWriter.serialize(_arg_value)
-                args = arg_string.splitlines()
-                if len(args) > 1:
-                    self.feed(f"{_arg_name}={args[0]}")
-                    for arg in args[1:-1]:
-                        self.feed(arg)
-                    self.feed(f"{args[-1]},")
+                lines = arg_string.splitlines()
+                if len(lines) > 1:
+                    self.feed(f"{prefix}{lines[0]}")
+                    for line in lines[1:-1]:
+                        self.feed(line)
+                    self.feed(f"{lines[-1]},")
                 else:
-                    self.feed(f"{_arg_name}={arg_string},")
+                    self.feed(f"{prefix}{arg_string},")
                 imports.update(arg_imports)
 
         imports = set()
         name, args, kwargs = self.operation.deconstruct()
-        operation_args = get_func_args(self.operation.__init__)
 
         # See if this operation is in plain.postgres.migrations. If it is,
         # We can just use the fact we already have that imported,
@@ -86,17 +87,12 @@ class OperationWriter:
 
         self.indent()
 
-        for i, arg in enumerate(args):
-            arg_value = arg
-            arg_name = operation_args[i]
+        # `deconstruct()` is the contract for what to write: positional
+        # arguments as given, then every keyword argument in its order.
+        for arg_value in args:
+            _write(None, arg_value)
+        for arg_name, arg_value in kwargs.items():
             _write(arg_name, arg_value)
-
-        i = len(args)
-        # Only iterate over remaining arguments
-        for arg_name in operation_args[i:]:
-            if arg_name in kwargs:  # Don't sort to maintain signature order
-                arg_value = kwargs[arg_name]
-                _write(arg_name, arg_value)
 
         self.unindent()
         self.feed("),")
@@ -189,7 +185,7 @@ class MigrationWriter:
             items["baseline_str"] = (
                 f"\n    supersedes = {self.serialize(self.migration.supersedes)[0]}"
                 f"\n    retired = {self.serialize(tuple(self.migration.retired))[0]}"
-                f"\n    since = {self.serialize(self.migration.since)[0]}\n"
+                f"\n    shipped_in = {self.serialize(self.migration.shipped_in)[0]}\n"
             )
 
         return MIGRATION_TEMPLATE % items

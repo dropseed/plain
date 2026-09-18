@@ -81,7 +81,9 @@ def classify_baselines(
         assert baseline.supersedes is not None
         if (package_label, baseline.supersedes) not in applied:
             status.refusals.append(
-                ResetBoundaryError(package_label, baseline.supersedes, baseline.since)
+                ResetBoundaryError(
+                    package_label, baseline.supersedes, baseline.shipped_in
+                )
             )
             continue
 

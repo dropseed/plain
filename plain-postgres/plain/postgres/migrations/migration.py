@@ -41,13 +41,14 @@ class Migration:
     # names the one deleted migration whose record proves a database is caught
     # up: a database that has it adopts the baseline with a single record write;
     # one that doesn't is refused. `retired` lists every deleted name so that a
-    # dependency on any of them resolves to the baseline. `since` is the release
-    # that shipped the reset, for messages. `plain migrations reset` writes the
-    # baseline; `since` comes from its `--since`, or is filled in when the
-    # package is released.
+    # dependency on any of them resolves to the baseline. `shipped_in` is the
+    # release that shipped the reset: named when a database that missed it is
+    # refused, and empty until it ships - a baseline nothing shipped must not be
+    # superseded. `plain migrations reset` writes the baseline; `shipped_in`
+    # comes from its `--shipped-in`, or is filled in when the package is released.
     supersedes: str | None = None
     retired: Sequence[str] = ()
-    since: str = ""
+    shipped_in: str = ""
 
     # Is this an initial migration? Initial migrations are skipped on
     # --fake-initial if the table or fields already exist. If None, check if
