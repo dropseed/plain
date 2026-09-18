@@ -705,8 +705,8 @@ class QuerySet[T: "Model"]:
 
         if not update_fields:
             raise ValueError("bulk_upsert() requires update_fields.")
-        if any(not f.concrete for f in update_fields):
-            raise ValueError("bulk_upsert() update_fields must be concrete fields.")
+        if any(not isinstance(f, ColumnField) for f in update_fields):
+            raise ValueError("bulk_upsert() update_fields must be database columns.")
         if any(f.primary_key for f in update_fields):
             raise ValueError("bulk_upsert() cannot update primary key fields.")
         overlap = {f.name for f in update_fields} & {f.name for f in unique_fields}
@@ -769,7 +769,7 @@ class QuerySet[T: "Model"]:
         # Include the PK column only when it is itself the conflict key;
         # otherwise let Postgres generate the identity value.
         pk_is_unique = any(f.primary_key for f in unique_fields)
-        fields = meta.concrete_fields
+        fields = meta.fields
         if not pk_is_unique:
             fields = [f for f in fields if not isinstance(f, PrimaryKeyField)]
 
