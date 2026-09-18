@@ -21,6 +21,7 @@ Control flow is `{% %}` block tags — a visibly separate layer from HTML. Block
 - `{% if expr %}` / `{% elif expr %}` / `{% else %}` / `{% endif %}` — conditional chain.
 - `{% for clause %}` / `{% endfor %}` — loop. Clause is a Python comprehension clause: one `for` plus any number of `if` filters (`{% for x in xs if x.visible %}`). Tuple unpacking works (`{% for (i, x) in enumerate(xs) %}`). Multiple `for` clauses are disallowed — nest a second `{% for %}`. There is no `{% empty %}` / `for`-`else`; render the empty case with `{% if not items %}`.
 - `{% slot "name" %}` / `{% endslot %}` — caller-side, routes content to a component's named slot.
+- `{% fragment expr %}` / `{% endfragment %}` — names a region. Renders inline as usual; `render(..., fragment="name")` renders the whole template and returns only that region. Name is matched as `str(...)`, so a loop can compute one per row; first occurrence wins; unknown name raises `FragmentNotFound`.
 - `{# comment #}` — dropped from output (unlike `<!-- -->`, which is rendered).
 - A **tag straddle** (`{% if %}<div>{% endif %}…</div>`) is a compile error — each branch must be balanced HTML. Vary the whole element with two branches, or extract a component.
 - `{% %}` cannot appear inside a start tag. Conditional attributes use an expression value: `disabled="{{ is_disabled }}"` (a falsy value omits the attribute).

@@ -40,6 +40,7 @@ from .parser import (
     ExprNode,
     ForClause,
     ForNode,
+    FragmentNode,
     HtmlCommentNode,
     IfBranch,
     IfNode,
@@ -211,6 +212,10 @@ def _format_node(node: Node, *, indent: int, indent_size: int, width: int) -> st
             )
         case SlotNode():
             return _format_slot(
+                node, indent=indent, indent_size=indent_size, width=width
+            )
+        case FragmentNode():
+            return _format_fragment(
                 node, indent=indent, indent_size=indent_size, width=width
             )
         case _:
@@ -400,6 +405,21 @@ def _format_for(node: ForNode, *, indent: int, indent_size: int, width: int) -> 
 def _format_slot(node: SlotNode, *, indent: int, indent_size: int, width: int) -> str:
     header = '{% slot "' + node.name + '" %}'
     footer = "{% endslot %}"
+    return _format_simple_block(
+        header,
+        footer,
+        node.children,
+        indent=indent,
+        indent_size=indent_size,
+        width=width,
+    )
+
+
+def _format_fragment(
+    node: FragmentNode, *, indent: int, indent_size: int, width: int
+) -> str:
+    header = "{% fragment " + node.name_code + " %}"
+    footer = "{% endfragment %}"
     return _format_simple_block(
         header,
         footer,

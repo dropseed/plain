@@ -9,6 +9,7 @@
     - [`{% if %}` / `{% elif %}` / `{% else %}`](#if--elif--else)
     - [`{% for %}`](#for)
     - [`{% slot %}`](#slot)
+    - [`{% fragment %}`](#fragment)
     - [`{# comment #}`](#comment)
     - [`{% raw %}`](#raw)
 - [Components](#components)
@@ -134,7 +135,7 @@ To emit a literal `{{`, `{%`, or `{#`, wrap the region in [`{% raw %}`](#raw).
 
 Blocks are `{% ... %}` tags that wrap the content they affect. They control rendering rather than emitting HTML, and they read as a layer visibly separate from the surrounding markup.
 
-The blocks are `{% if %}` / `{% elif %}` / `{% else %}`, `{% for %}`, `{% slot %}`, `{# comment #}`, and `{% raw %}`.
+The blocks are `{% if %}` / `{% elif %}` / `{% else %}`, `{% for %}`, `{% slot %}`, `{% fragment %}`, `{# comment #}`, and `{% raw %}`.
 
 Blocks are **HTML-aware**: each block — and each branch of an `{% if %}` chain — must contain a balanced HTML fragment. An element opened inside a block must be closed inside the same block. A _tag straddle_ like this is a compile error:
 
@@ -231,6 +232,41 @@ Multiple `for` clauses in one tag (`{% for x in xs for y in ys %}`) are a compil
 ```
 
 The slot name is a literal quoted string — slot names are static. A `{% slot %}` block can wrap one or more elements. Content not wrapped in a `{% slot %}` block falls through to the component's default slot. See [Slots](#slots) for the full picture.
+
+### `{% fragment %}`
+
+`{% fragment name %}...{% endfragment %}` names a region of the template so it can be rendered on its own:
+
+```html
+<section class="stats">
+  {% fragment "stats" %}
+  <p>{{ count }} open</p>
+  {% endfragment %}
+</section>
+```
+
+A normal render emits the block inline, like any other content. Passing `fragment=` returns just that block's output:
+
+```python
+Template("dashboard").render(context)  # the whole page
+Template("dashboard").render(context, fragment="stats")  # '<p>3 open</p>'
+```
+
+The rule is **render everything, return one region**. Asking for a fragment still executes the whole template — every loop iterates, every branch decides, every component renders — and the named block's output is what comes back. That is what lets a fragment inside a `{% for %}` see its own iteration:
+
+```html
+{% for item in items %}
+<li>{% fragment "item-" + str(item.id) %}{{ item.name }}{% endfragment %}</li>
+{% endfor %}
+```
+
+`render(..., fragment="item-2")` returns that item's markup, with `item` bound to the row it came from. Nothing has to be hoisted into a separate template to be re-renderable.
+
+The name is an ordinary expression, and it's matched as `str(name)` — fragment names usually arrive over HTTP, where everything is a string. If the same name is produced more than once, the first occurrence wins. Fragments nest: rendering the outer one includes the inner one's output inline, and the inner one is still addressable on its own.
+
+Asking for a name the render didn't produce raises `FragmentNotFound`, naming the template and what it did produce.
+
+This is the primitive [`plain.htmx`](/plain-htmx/plain/htmx/README.md#template-fragments) builds its `HtmxFragment` component on.
 
 ### `{# comment #}`
 

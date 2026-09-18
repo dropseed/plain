@@ -31,7 +31,12 @@ class Template:
         self.name = name
         self.path: Path = find_template(name)
 
-    def render(self, context: dict) -> str:
+    def render(self, context: dict, *, fragment: str | None = None) -> str:
+        """Render the template, or just one of its `{% fragment %}` blocks.
+
+        `fragment` renders the whole template as usual and returns only
+        that block's output — see `plain.html.render`.
+        """
         with tracer.start_as_current_span(
             f"render {self.name}",
             kind=trace.SpanKind.INTERNAL,
@@ -41,4 +46,4 @@ class Template:
                 "template.engine": "plain.html",
             },
         ):
-            return render(self.path, context)
+            return render(self.path, context, fragment=fragment)

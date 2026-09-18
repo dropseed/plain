@@ -3,7 +3,7 @@
 **Integrate HTMX with templates and views.**
 
 - [Overview](#overview)
-- [Fragment wrappers](#fragment-wrappers)
+- [Template fragments](#template-fragments)
 - [View actions](#view-actions)
 - [Dedicated templates](#dedicated-templates)
 - [FAQs](#faqs)
@@ -51,35 +51,16 @@ slots:
 </html>
 ```
 
-## Fragment wrappers
+## Template fragments
 
-A fragment wrapper is a `<div>` that carries a `plain-hx-fragment` name plus the standard HTMX swap/target attributes. Any `hx-get`/`hx-post` element inside it sends its request to the current URL and targets the wrapper for the swap. The cleanest way to reuse that markup is a small component:
-
-```html
-<!-- components/HtmxFragment.html -->
----
-attrs:
-  name: str
-slots:
-  default: required
----
-<div
-    plain-hx-fragment="{{ name }}"
-    hx-swap="innerHTML"
-    hx-target="this"
-    hx-indicator="this"
-    id="{{ "plain-hx-fragment-" + name }}"
->{{ children }}</div>
-```
-
-Use it to wrap the part of a page you want to re-render:
+A **fragment** is a named region of a page that can be re-rendered on its own. Wrap it in the `HtmxFragment` component that ships with this package:
 
 ```html
 <!-- detail.html -->
 ---
 components:
   - base as Base
-  - components/HtmxFragment
+  - htmx/HtmxFragment
 attrs:
   pullrequest: Any
 ---
@@ -91,9 +72,63 @@ attrs:
 </Base>
 ```
 
-There is no URL on the `hx-post` attribute — by default HTMX sends the request to the current URL for the page, which is what you want when re-rendering part of the current page. The view handles the action (see [View actions](#view-actions) below) and returns markup that HTMX swaps into the wrapper.
+The component renders a `<div>` carrying the fragment's name plus the standard swap/target attributes, and marks its contents as a [`{% fragment %}`](/plain-html/plain/html/README.md#fragment) block:
 
-> **Note:** the old Jinja `{% htmxfragment %}` tag — which extracted and returned _only_ the named fragment's subtree server-side — is not available in `plain.html`. Today an `HTMXView` action re-renders and returns the whole template. To swap just a region, give that region its own URL/template (see [Dedicated templates](#dedicated-templates)) so the response is scoped to the part you want, and point `hx-target` at the wrapper.
+```html
+<div plain-hx-fragment="pullrequest" hx-swap="innerHTML" hx-target="this" hx-indicator="this" id="plain-hx-fragment-pullrequest">
+    <p>State: open</p>
+    <button hx-post plain-hx-action="merge">Merge</button>
+</div>
+```
+
+There is no URL on the `hx-post` attribute — HTMX sends the request to the current URL, which is what you want when re-rendering part of the current page. `plainhtmx.js` adds a `Plain-HX-Fragment` header naming the enclosing fragment, and [`HTMXView`](./views.py#HTMXView) renders the page and returns **only that fragment's contents** — exactly what `hx-swap="innerHTML"` puts back inside the wrapper.
+
+The template still renders in full to produce that response. That is deliberate: a fragment inside a `{% for %}` sees the same scope it sees on a full page render, so nothing has to be restructured to be re-renderable.
+
+### Fragments in loops
+
+Fragment names must be unique on a page. Inside a loop, compute one per item:
+
+```html
+{% for item in items %}
+    <HtmxFragment name="{{ "item-" + str(item.id) }}">
+        <p>{{ item.name }}</p>
+        <button hx-post plain-hx-action="toggle">Toggle</button>
+    </HtmxFragment>
+{% endfor %}
+```
+
+The view needs no special handling — just make sure its context still includes the full list so the loop can run during the fragment render:
+
+```python
+class ItemListView(HTMXView):
+    template_name = "items.html"
+
+    def get_template_context(self):
+        context = super().get_template_context()
+        context["items"] = Item.query.all()
+        return context
+
+    def htmx_post_toggle(self):
+        # Handle the action — the fragment is re-rendered automatically.
+        return None
+```
+
+### Fragments without the component
+
+`{% fragment %}` is a `plain.html` block, not an HTMX feature — reach for it directly when you want a named region without this package's wrapper markup:
+
+```html
+<section>
+    {% fragment "stats" %}
+    <p>{{ count }} open</p>
+    {% endfragment %}
+</section>
+```
+
+Render just that region with `Template("page").render(context, fragment="stats")`.
+
+> **Note:** the Jinja tag's `lazy=True` option is not available. It relied on the fragment body being a deferred callable; component slot content renders eagerly in the caller's scope, so marking one "lazy" wouldn't actually defer any work. Give a lazily-loaded region its own URL and view instead — see [Dedicated templates](#dedicated-templates).
 
 ## View actions
 
@@ -109,7 +144,7 @@ In your template, use the `plain-hx-action` attribute to name the action:
 ---
 components:
   - base as Base
-  - components/HtmxFragment
+  - htmx/HtmxFragment
 attrs:
   pullrequest: Any
 ---
@@ -414,7 +449,7 @@ imports:
   - from datetime import datetime
 components:
   - base as Base
-  - components/HtmxFragment
+  - htmx/HtmxFragment
 ---
 <Base>
     <HtmxFragment name="content">

@@ -228,7 +228,13 @@ class _Builder:
             self._lines.append(self._ind() + "_unused = None")
         elif keyword == "endfor":
             self._indent = max(1, self._indent - 1)
-        # `slot` / `endslot` open no new expression scope — skip.
+        elif keyword == "fragment":
+            # The name is an ordinary expression; the block opens no new
+            # scope, so nothing else to synthesize.
+            # Any value works as a name — it goes through `str()` — so
+            # this only proves the expression resolves.
+            self._emit_expr(rest, tok.offset, kind="fragment-name")
+        # `slot` / `endslot` / `endfragment` open no new expression scope.
 
     def _emit_attr_expressions(self, attr: Attribute, tag_offset: int) -> None:
         """Check every `{expr}` inside an ordinary attribute value."""

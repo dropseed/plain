@@ -46,14 +46,35 @@ caller owns per-item markup). This is the real feature gap. Ship repeatable
 
 ## Static/dynamic compiled representation
 
-The architectural bet, deferred until there's a consumer. The compiler emits
-a flat `render() -> str`; HEEx instead keeps a tree of _static_ segments and
-_dynamic_ holes. That split is the single primitive behind efficient
-partial re-render and minimal-diff updates — the thing a serious hypermedia
-layer in `plain-htmx` would want. Not worth building speculatively. The
-current block syntax is already compatible with it; the one footgun to avoid
-is relying on walrus (`:=`) bindings inside `{{ }}`, which would defeat
-per-expression change tracking the way loose variables do in HEEx.
+The architectural bet, and now the **optimization path** rather than the
+enabling one. `{% fragment %}` ships the capability: a named region renders
+on its own by rendering the whole template and keeping one region. That is
+correct and it makes scope inside loops and conditionals behave exactly as
+it does on a full render — but it does pay for the whole page to return one
+part of it.
+
+The compiler emits a flat `render() -> str`; HEEx instead keeps a tree of
+_static_ segments and _dynamic_ holes. That split is the single primitive
+behind skipping the work outside the requested fragment, and behind
+minimal-diff updates. Worth building when a page's full render cost shows
+up in fragment latency — not before. The current block syntax is already
+compatible with it; the one footgun to avoid is relying on walrus (`:=`)
+bindings inside `{{ }}`, which would defeat per-expression change tracking
+the way loose variables do in HEEx.
+
+Deferred fragment bodies belong in the same piece of work. The Jinja tag's
+`lazy=True` skipped rendering a fragment's body on the initial page load and
+fetched it over HTMX; that needs the body to be a deferred callable, which a
+flat emit and eagerly-rendered component slots can't express.
+
+## `{% let %}` bindings
+
+Not planned. The spec's rule is that branching logic lives in Python, and
+the one case that pushed back — the admin list's 3-state sort header —
+turned out to belong in a view helper that hands the template one object per
+column. If a second real case appears that _can't_ be solved by moving the
+computation into the view, revisit: a single-binding, block-scoped
+`{% let name = expr %}` with no reassignment is the shape to consider.
 
 # Lint tiers
 

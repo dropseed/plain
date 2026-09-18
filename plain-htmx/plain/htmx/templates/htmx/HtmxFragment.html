@@ -1,0 +1,22 @@
+---
+attrs:
+  name: str
+slots:
+  default: required
+---
+{# Wraps a region of a page so HTMX can re-request just that region.
+
+   The `{% fragment %}` block sits *inside* the wrapper, so a fragment
+   request returns the div's contents — which is what `hx-swap="innerHTML"`
+   swaps back in. An `hx-get`/`hx-post` element inside this div needs no
+   URL: HTMX sends it to the current page, and `plainhtmx.js` adds the
+   enclosing `plain-hx-fragment` name as the `Plain-HX-Fragment` header. #}
+<div
+    plain-hx-fragment="{{ name }}"
+    hx-swap="innerHTML"
+    hx-target="this"
+    hx-indicator="this"
+    id="{{ "plain-hx-fragment-" + name }}"
+>
+    {% fragment name %}{{ children }}{% endfragment %}
+</div>

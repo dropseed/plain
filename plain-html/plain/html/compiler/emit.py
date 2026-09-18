@@ -30,6 +30,7 @@ from ..parser import (
     ElementNode,
     ExprNode,
     ForNode,
+    FragmentNode,
     HtmlCommentNode,
     IfNode,
     Node,
@@ -100,6 +101,10 @@ class _Emit:
     include_renders: dict[int, str] = field(default_factory=dict)
     current_offset: int = 0
     _acc_counter: int = 0
+    _frag_counter: int = 0
+    # Literal `{% fragment %}` names seen while emitting — used only for
+    # the "no such fragment" error message.
+    fragment_names: list[str] = field(default_factory=list)
     # When False (text mode — Markdown bodies), text-position expressions
     # emit `to_text(...)` instead of `escape_html(...)`: the output isn't
     # HTML, so escaping would corrupt it.
@@ -147,6 +152,16 @@ class _Emit:
 
     def rewrite_expr(self, code: str) -> str:
         return rewrite_expression(code, locals_outer=self.known_locals())
+
+    def fresh_frag(self) -> tuple[str, str]:
+        """Allocate fresh accumulator var names for a `{% fragment %}` body.
+
+        Same shape as `fresh_acc`, separate counter so the generated
+        names read as what they are.
+        """
+        idx = self._frag_counter
+        self._frag_counter += 1
+        return f"_frag_acc_{idx}", f"_frag_val_{idx}"
 
     def fresh_acc(self) -> tuple[str, str]:
         """Allocate fresh accumulator var names for a slot sub-buffer.
@@ -298,6 +313,7 @@ def emit_module(
     header.append("Markup = _mark_safe = mark_safe")
     header.append("")
     header.append(f"__template_source__ = {source_label!r}")
+    header.append(f"__template_fragments__ = {tuple(e.fragment_names)!r}")
     header.append("")
 
     if imports:
@@ -309,7 +325,7 @@ def emit_module(
     # boundary so layouts and components see `request`, `DEBUG`, etc. without
     # the caller having to repass them. `_root_ctx=None` at the top-level call
     # means "this is the entry render; _ctx is the root."
-    sig_params = ["*", "_root_ctx=None"]
+    sig_params = ["*", "_root_ctx=None", "_frag_capture=None"]
     for name in promoted_attrs:
         sig_params.append(f"{name}={attr_defaults.get(name, 'None')}")
     for name in promoted_slots:
@@ -436,6 +452,8 @@ def _emit_node(node: Node, e: _Emit) -> None:
                 _emit_if(node, e)
             case ForNode():
                 _emit_for(node, e)
+            case FragmentNode():
+                _emit_fragment(node, e)
             case SlotNode():
                 raise CompileError(
                     "`{% slot %}` can only appear as a direct child of a component tag"
@@ -481,6 +499,42 @@ def _emit_for(node: ForNode, e: _Emit) -> None:
         _emit_block_children(node.children, e)
     e.pop_locals()
     e.block_end()
+
+
+def _emit_fragment(node: FragmentNode, e: _Emit) -> None:
+    """Emit a `{% fragment %}` block: render inline *and* capture.
+
+    The body renders into its own accumulator, which is then both
+    recorded in `_frag_capture` (when the caller asked for a fragment)
+    and appended to the surrounding buffer. Rendering everything and
+    keeping one region is what makes a fragment inside a `{% for %}` or
+    an `{% if %}` see exactly the scope it sees on a full render.
+    """
+    acc_var, value_var = e.fresh_frag()
+    name_expr = e.rewrite_expr(node.name_code)
+
+    try:
+        literal = ast.literal_eval(node.name_code)
+    except (ValueError, SyntaxError):
+        pass
+    else:
+        if isinstance(literal, str):
+            e.fragment_names.append(literal)
+
+    e.line(f"{acc_var} = []")
+    saved = e.target_list
+    e.target_list = acc_var
+    _emit_block_children(node.children, e)
+    e._flush()
+    e.target_list = saved
+
+    e.line(f"{value_var} = ''.join({acc_var})")
+    e.block_start("if _frag_capture is not None:")
+    # First writer wins, matching what a short-circuiting implementation
+    # would return when one name is emitted more than once.
+    e.line(f"_frag_capture.setdefault(str({name_expr}), {value_var})")
+    e.block_end()
+    e.expr_frag(value_var)
 
 
 def _emit_element(node: ElementNode, e: _Emit) -> None:
@@ -552,7 +606,7 @@ def _emit_static_include(node: ElementNode, e: _Emit) -> None:
     for name, var in named_vars.items():
         _emit_kw(name, var)
 
-    parts = ["_root_ctx=_root_ctx", *direct]
+    parts = ["_root_ctx=_root_ctx", "_frag_capture=_frag_capture", *direct]
     if dict_items:
         parts.append("**{" + ", ".join(dict_items) + "}")
 

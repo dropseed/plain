@@ -35,7 +35,15 @@ from .. import _cache
 from .. import frontmatter as fm
 from ..components import parse_components
 from ..loader import find_template
-from ..parser import ElementNode, ForNode, IfNode, Node, SlotNode, parse
+from ..parser import (
+    ElementNode,
+    ForNode,
+    FragmentNode,
+    IfNode,
+    Node,
+    SlotNode,
+    parse,
+)
 from ..positions import body_offset, offset_to_line_col
 from ..tokenizer import tokenize, tokenize_text
 from . import CompileError
@@ -341,8 +349,9 @@ def _load_cached_code(path: Path) -> CodeType:
 def _walk_includes(nodes: list[Node]) -> Iterator[ElementNode]:
     """Yield every component-tag ElementNode (`include_path` set), in tree order.
 
-    Descends into `{% if %}` / `{% for %}` / `{% slot %}` blocks so a
-    component tag nested inside control flow is still found.
+    Descends into `{% if %}` / `{% for %}` / `{% slot %}` /
+    `{% fragment %}` blocks so a component tag nested inside control flow
+    is still found.
     """
     for node in nodes:
         if isinstance(node, ElementNode):
@@ -352,5 +361,5 @@ def _walk_includes(nodes: list[Node]) -> Iterator[ElementNode]:
         elif isinstance(node, IfNode):
             for branch in node.branches:
                 yield from _walk_includes(branch.children)
-        elif isinstance(node, ForNode | SlotNode):
+        elif isinstance(node, ForNode | SlotNode | FragmentNode):
             yield from _walk_includes(node.children)

@@ -2,7 +2,7 @@
 
 Consumes the tokenizer's flat stream and produces a tree of nodes.
 Control flow lives in `{% %}` block tags, which become `IfNode`,
-`ForNode`, and `SlotNode` tree nodes.
+`ForNode`, `SlotNode`, and `FragmentNode` tree nodes.
 
 The builder is **HTML-aware**: a block branch must contain balanced
 HTML. An element opened inside a branch must be closed inside the same
@@ -102,6 +102,22 @@ class SlotNode:
 
 
 @dataclass
+class FragmentNode:
+    """A `{% fragment expr %} … {% endfragment %}` block.
+
+    The body renders inline like any other content; it is *also*
+    captured under `str(expr)` so `render(..., fragment=name)` can
+    return just this region. `name_code` is the raw Python source of the
+    name expression — usually a string literal, but a loop can compute
+    one per iteration.
+    """
+
+    name_code: str
+    children: list = field(default_factory=list)
+    offset: int = 0
+
+
+@dataclass
 class TextNode:
     text: str
     offset: int = 0
@@ -144,6 +160,7 @@ Node = (
     | IfNode
     | ForNode
     | SlotNode
+    | FragmentNode
     | TextNode
     | ExprNode
     | RawNode
@@ -157,7 +174,7 @@ Node = (
 class _Frame:
     """One open scope on the parse stack — an element or a `{% %}` block."""
 
-    kind: str  # "element" | "if" | "for" | "slot"
+    kind: str  # "element" | "if" | "for" | "slot" | "fragment"
     children: list[Node]
     element: ElementNode | None = None
     if_node: IfNode | None = None
@@ -300,6 +317,20 @@ def _handle_block(tok: BlockToken, stack: list[_Frame], root: list[Node]) -> Non
     elif kind == "endslot":
         _expect_block_close(stack, "slot", tok)
         stack.pop()
+    elif kind == "fragment":
+        fragment_node = FragmentNode(name_code=arg, offset=tok.offset)
+        append(fragment_node)
+        stack.append(
+            _Frame(
+                "fragment",
+                fragment_node.children,
+                label="fragment",
+                offset=tok.offset,
+            )
+        )
+    elif kind == "endfragment":
+        _expect_block_close(stack, "fragment", tok)
+        stack.pop()
 
 
 def _expect_block_close(stack: list[_Frame], kind: str, tok: BlockToken) -> None:
@@ -330,13 +361,13 @@ def _classify_block(content: str, offset: int) -> tuple[str, str]:
     parts = stripped.split(None, 1)
     keyword = parts[0]
     rest = parts[1].strip() if len(parts) > 1 else ""
-    if keyword in ("else", "endif", "endfor", "endslot"):
+    if keyword in ("else", "endif", "endfor", "endslot", "endfragment"):
         if rest:
             raise ParseError(
                 f"`{{% {keyword} %}}` takes no arguments at offset {offset}"
             )
         return keyword, ""
-    if keyword in ("if", "elif", "for", "slot"):
+    if keyword in ("if", "elif", "for", "slot", "fragment"):
         if not rest:
             raise ParseError(
                 f"`{{% {keyword} %}}` requires an argument at offset {offset}"

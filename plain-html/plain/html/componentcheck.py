@@ -29,6 +29,7 @@ from .parser import (
     DoctypeNode,
     ElementNode,
     ForNode,
+    FragmentNode,
     HtmlCommentNode,
     IfNode,
     Node,
@@ -126,7 +127,7 @@ def check_component_slots(
             elif isinstance(node, IfNode):
                 for branch in node.branches:
                     visit(branch.children)
-            elif isinstance(node, ForNode | SlotNode):
+            elif isinstance(node, ForNode | SlotNode | FragmentNode):
                 visit(node.children)
 
     visit(nodes)
