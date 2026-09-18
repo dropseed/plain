@@ -10,8 +10,6 @@ from collections.abc import Generator
 import keyring
 import keyring.backend
 
-_MISSING = object()
-
 
 class InMemoryKeyring(keyring.backend.KeyringBackend):
     name = "in-memory"
@@ -40,9 +38,9 @@ def isolated_cloud_env() -> Generator[InMemoryKeyring]:
     install an in-memory keyring backend so tests don't touch the real OS
     keyring or the developer's actual home directory."""
     with tempfile.TemporaryDirectory() as tmp:
-        original_home = os.environ.get("HOME", _MISSING)
-        original_token = os.environ.pop("PLAIN_CLOUD_TOKEN", _MISSING)
-        original_api_url = os.environ.pop("PLAIN_CLOUD_API_URL", _MISSING)
+        original_home = os.environ.get("HOME")
+        original_token = os.environ.pop("PLAIN_CLOUD_TOKEN", None)
+        original_api_url = os.environ.pop("PLAIN_CLOUD_API_URL", None)
         os.environ["HOME"] = tmp
 
         backend = InMemoryKeyring()
@@ -52,11 +50,13 @@ def isolated_cloud_env() -> Generator[InMemoryKeyring]:
             yield backend
         finally:
             keyring.set_keyring(previous_keyring)
-            if original_home is _MISSING:
+            # An env var is never legitimately None, so None is the
+            # "wasn't set" marker and narrows the restore to str.
+            if original_home is None:
                 del os.environ["HOME"]
             else:
                 os.environ["HOME"] = original_home
-            if original_token is not _MISSING:
+            if original_token is not None:
                 os.environ["PLAIN_CLOUD_TOKEN"] = original_token
-            if original_api_url is not _MISSING:
+            if original_api_url is not None:
                 os.environ["PLAIN_CLOUD_API_URL"] = original_api_url
