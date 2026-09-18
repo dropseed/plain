@@ -108,7 +108,7 @@ def test_disabled_flag_raises_when_debug():
         FlagModel.query.filter(name="StrictFlag").update(enabled=False)
 
         with raises(FlagDisabled):
-            StrictFlag().value
+            StrictFlag().value  # noqa: B018 — the property access is the assertion
 
 
 def test_flag_is_truthy_and_supports_membership():

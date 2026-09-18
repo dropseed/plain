@@ -130,9 +130,25 @@ class ExampleDetailView(DetailView):
 
 The single object is exposed in templates as `object`; list views expose `objects`. Set `context_object_name` for a more descriptive name.
 
+`ListView` paginates when you set `page_size`. The page number comes from the `?page` query param (invalid values fall back to the first or last page), `objects` becomes the current `Page` — iterate it exactly like the full list — and `page_obj` is available for rendering pagination controls (`None` when pagination is off):
+
+```python
+from plain.templates.views import ListView
+
+
+class ExampleListView(ListView):
+    template_name = "list.html"
+    page_size = 30
+
+    def get_objects(self):
+        return MyObjectClass.query.order_by("-created_at")
+```
+
+Override `get_page_size()` to compute the page size per request. A paginated queryset needs a deterministic order (an `order_by()` or a model default) — unordered results can shift between pages. An empty `Page` is falsy, so check `{% if page_obj is not none %}` to test whether pagination is on.
+
 ## Error views
 
-`TemplateView` overrides `handle_exception` to render `{status}.html` for any exception that escapes the handler — `404.html` for `NotFoundError404`, `500.html` for unhandled errors, etc. The context is `{request, status_code, exception, DEBUG}`. On `TemplateFileMissing` the view returns a plain-text status response (`404 Not Found`, `500 Internal Server Error`); on any other render failure it logs and returns a bare-status `Response` so `_respond_to_exception` can still attach `response.exception` for observability.
+`TemplateView` overrides `handle_exception` to render `{status}.html` for any exception that escapes the handler — `404.html` for `NotFoundError404`, `500.html` for unhandled errors, etc. The context is `{request, status_code, exception, DEBUG}`. Bodiless statuses (204, 304) skip the template entirely — those responses can't carry a body, so a `304.html` is never rendered. On `TemplateFileMissing` the view returns a plain-text status response (`404 Not Found`, `500 Internal Server Error`); on any other render failure it logs and returns a bare-status `Response` so `_respond_to_exception` can still attach `response.exception` for observability.
 
 Plain core's exception handler — the one that catches pre-view failures like URL resolution and middleware errors — returns plain text. To get a styled 404 for unmatched URLs, mount [`NotFoundView`](./views.py#NotFoundView) as the last route:
 
@@ -140,11 +156,12 @@ Plain core's exception handler — the one that catches pre-view failures like U
 from plain.templates.views import NotFoundView
 from plain.urls import Router, path
 
+
 class AppRouter(Router):
-    urls = [
+    urls = (
         # ... your routes ...
         path("<path:_>", NotFoundView),
-    ]
+    )
 ```
 
 `NotFoundView.before_request` raises `NotFoundError404` before method dispatch, so every HTTP method produces a 404 instead of a 405.
@@ -167,7 +184,9 @@ class ProductView(TemplateView):
     def get_template_context(self):
         context = super().get_template_context()
         context["product"] = Product.objects.get(id=self.url_kwargs["id"])
-        context["related_products"] = Product.objects.filter(category=context["product"].category)[:5]
+        context["related_products"] = Product.objects.filter(
+            category=context["product"].category
+        )[:5]
         return context
 ```
 
@@ -192,7 +211,7 @@ class ProductView(TemplateView):
         return self.render(product=Product.query.get(id=self.url_kwargs["id"]))
 ```
 
-`render(**context)` layers `context` over `get_template_context()`, so the base context (`request`, `DEBUG`, `template_names`) and anything the view's `get_template_context()` adds are still present.
+`render(**context)` layers `context` over `get_template_context()`, so the base context (`request`, `DEBUG`, `template_names`) and anything the view's `get_template_context()` adds are still present. Pass `status_code=` to render at a non-200 status (a form's 422, say) — response statuses are fixed at construction, so this replaces mutating `response.status_code` afterwards.
 
 ## Built-in globals
 
@@ -313,10 +332,12 @@ You can render templates outside of views using the [`Template`](./core.py#Templ
 ```python
 from plain.templates import Template
 
-html = Template("email/welcome.html").render({
-    "user_name": "Alice",
-    "activation_url": "https://example.com/activate/abc123",
-})
+html = Template("email/welcome.html").render(
+    {
+        "user_name": "Alice",
+        "activation_url": "https://example.com/activate/abc123",
+    }
+)
 ```
 
 If the template file doesn't exist, a [`TemplateFileMissing`](./core.py#TemplateFileMissing) exception is raised.

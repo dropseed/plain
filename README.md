@@ -33,6 +33,7 @@ from plain import postgres
 from plain.postgres import types
 from plain.passwords.models import PasswordField
 
+
 @postgres.register_model
 class User(postgres.Model):
     email: str = types.EmailField()
@@ -57,11 +58,10 @@ URLs use a `Router` class:
 from plain.urls import Router, path
 from . import views
 
+
 class UsersRouter(Router):
     namespace = "users"
-    urls = [
-        path("<int:pk>/", views.UserDetail),
-    ]
+    urls = (path("<int:pk>/", views.UserDetail),)
 ```
 
 Views are class-based:
@@ -70,6 +70,7 @@ Views are class-based:
 # app/users/views.py
 from plain.views import DetailView
 from .models import User
+
 
 class UserDetail(DetailView):
     template_name = "users/detail.html"
@@ -148,7 +149,6 @@ plain docs --search "queryset"         # search across all packages
 - [plain.jobs](https://plainframework.com/docs/plain-jobs/plain/jobs/) — background jobs
 - [plain.email](https://plainframework.com/docs/plain-email/plain/email/) — sending email
 - [plain.cache](https://plainframework.com/docs/plain-cache/plain/cache/) — caching layer
-- [plain.redirection](https://plainframework.com/docs/plain-redirection/plain/redirection/) — URL redirects
 - [plain.vendor](https://plainframework.com/docs/plain-vendor/plain/vendor/) — vendored dependencies
 
 **Frontend:**

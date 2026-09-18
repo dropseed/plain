@@ -22,7 +22,6 @@ from contextlib import contextmanager
 
 from clients import error_client
 from opentelemetry.semconv.attributes import url_attributes
-
 from plain.runtime import settings
 from plain.test import Client
 from plain.test.otel import install_test_tracer

@@ -10,7 +10,6 @@ from __future__ import annotations
 from datetime import timedelta
 
 from app.users.models import User
-
 from plain.oauth.exceptions import OAuthUserAlreadyExistsError
 from plain.oauth.models import OAuthConnection
 from plain.oauth.providers import OAuthToken, OAuthUser

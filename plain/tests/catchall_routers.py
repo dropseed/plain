@@ -18,15 +18,15 @@ class _NotFoundView(View):
 
 class CatchallRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("login/", _LoginView, name="login"),
         path("<path:_>", _NotFoundView),
-    ]
+    )
 
 
 class _CatchallOnlyRouter(Router):
     namespace = ""
-    urls = [path("<path:_>", _NotFoundView)]
+    urls = (path("<path:_>", _NotFoundView),)
 
 
 class IncludedCatchallRouter(Router):
@@ -35,7 +35,7 @@ class IncludedCatchallRouter(Router):
     """
 
     namespace = ""
-    urls = [
+    urls = (
         path("login/", _LoginView, name="login"),
         include("", _CatchallOnlyRouter),
-    ]
+    )

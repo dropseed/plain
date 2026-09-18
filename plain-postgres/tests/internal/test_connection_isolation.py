@@ -18,14 +18,11 @@ import contextvars
 import threading
 
 from helpers import clean_connection
-
 from plain.postgres.db import _db_conn, has_connection
 
 
 class FakeConn:
     """Lightweight stand-in for DatabaseConnection to test storage isolation."""
-
-    pass
 
 
 def _store_fake() -> FakeConn:

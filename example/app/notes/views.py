@@ -4,6 +4,7 @@ from typing import Any
 
 from plain.auth.views import AuthView
 from plain.forms import BaseForm
+from plain.postgres import QuerySet
 from plain.templates.views import (
     CreateView,
     DeleteView,
@@ -21,9 +22,12 @@ class NoteListView(AuthView, ListView):
     template_name = "notes/list.html"
     context_object_name = "notes"
     login_required = True
+    page_size = 20
 
-    def get_objects(self) -> list[Note]:
-        return list(Note.query.filter(author=self.user))
+    def get_objects(self) -> QuerySet[Note]:
+        # Ordering comes from Note.model_options (-created_at), so
+        # pagination is deterministic.
+        return Note.query.filter(author=self.user)
 
 
 class NoteDetailView(AuthView, DetailView):

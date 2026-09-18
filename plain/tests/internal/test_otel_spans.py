@@ -5,7 +5,6 @@ import concurrent.futures
 
 from clients import error_client
 from opentelemetry import trace
-
 from plain.internal.handlers.base import BaseHandler
 from plain.runtime import settings
 from plain.test import Client, RequestFactory

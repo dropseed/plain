@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import timedelta
 
 from oauth_helpers import issue_token_pair, make_public_app, make_user
-
 from plain.oauthserver.chores import ClearExpiredOAuthTokens
 from plain.oauthserver.models import (
     AccessToken,

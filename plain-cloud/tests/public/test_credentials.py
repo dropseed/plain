@@ -5,7 +5,6 @@ import os
 import keyring
 from helpers import isolated_cloud_env
 from keyring.backends.fail import Keyring as FailKeyring
-
 from plain.cloud.credentials import (
     DEFAULT_API_URL,
     SERVICE,

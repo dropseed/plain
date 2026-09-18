@@ -2,13 +2,10 @@ import os
 import sys
 
 import click
-
-from plain.cli import register_cli
 from plain.cli.runtime import common_command
 
 
 @common_command
-@register_cli("test")
 @click.command(
     context_settings={
         "ignore_unknown_options": True,

@@ -10,7 +10,6 @@ earlier writes and run commit hooks. This pins the mechanism -- the connection's
 from __future__ import annotations
 
 import psycopg
-
 from plain.cache import cache
 from plain.postgres import get_connection
 from plain.test import raises

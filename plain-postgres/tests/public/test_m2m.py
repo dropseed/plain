@@ -8,10 +8,10 @@ unique constraint that produces a realistic ValidationError on duplicate create.
 from typing import cast
 
 from app.examples.models.relationships import Tag, Widget, WidgetTag
-
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import transaction
 from plain.postgres.fields.related import ManyToManyField
+from plain.postgres.test import capture_queries
 from plain.test import raises
 
 
@@ -21,9 +21,8 @@ def test_create_unique_constraint():
     # No pre-check: the duplicate is rejected by the database and mapped to a
     # ValidationError. Wrap in atomic() so the savepoint rolls back and the
     # transaction stays usable for the count() below.
-    with raises(ValidationError) as e:
-        with transaction.atomic():
-            Widget.query.create(name="Toyota", size="Tundra")
+    with raises(ValidationError) as e, transaction.atomic():
+        Widget.query.create(name="Toyota", size="Tundra")
 
     assert e.exception.messages == ["A widget with this name and size already exists."]
     assert NON_FIELD_ERRORS in e.exception.error_dict
@@ -144,3 +143,40 @@ def test_many_to_many_through_model():
     through_instance = through_instances.first()
     assert through_instance is not None
     assert through_instance.tag == gps
+
+
+def test_many_to_many_prefetch_related():
+    """prefetch_related on a forward M2M batches the related rows into one
+    query and assigns each set to the right instance.
+
+    Correct per-instance assignment depends on the prefetch query exposing the
+    through-table FK column so the loader can match secondary rows back to the
+    primary that owns them. That value is added by an annotation on the
+    prefetch queryset, so this test guards that mechanism.
+    """
+    tesla = Widget.query.create(name="Tesla", size="Model 3")
+    toyota = Widget.query.create(name="Toyota", size="Camry")
+    Widget.query.create(name="Honda", size="Civic")  # no tags
+
+    gps = Tag.query.create(name="GPS")
+    sunroof = Tag.query.create(name="Sunroof")
+    leather = Tag.query.create(name="Leather Seats")
+
+    tesla.tags.add(gps, sunroof)
+    toyota.tags.add(leather)
+
+    with capture_queries() as queries:
+        widgets = {
+            w.name: w for w in Widget.query.prefetch_related("tags").order_by("id")
+        }
+        prefetched = {
+            name: {t.name for t in w.tags.query.all()} for name, w in widgets.items()
+        }
+
+    # One query for widgets, one for the batched tags — no per-widget query.
+    assert len(queries) == 2
+
+    # Each widget gets its own tags, not another widget's.
+    assert prefetched["Tesla"] == {"GPS", "Sunroof"}
+    assert prefetched["Toyota"] == {"Leather Seats"}
+    assert prefetched["Honda"] == set()

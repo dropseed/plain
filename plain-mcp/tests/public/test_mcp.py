@@ -2,10 +2,21 @@ from __future__ import annotations
 
 import enum
 import json
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 from plain.mcp import MCPResource, MCPTool, MCPToolError, MCPView
+from plain.mcp.views import (
+    META_CLIENT_CAPABILITIES,
+    META_CLIENT_INFO,
+    META_PROTOCOL_VERSION,
+    META_SERVER_INFO,
+    PROTOCOL_VERSION,
+)
 from plain.test import RequestFactory, patch, raises
+
+# Dispatch and result shapes live here; the transport around them — headers,
+# `_meta` validation, HTTP status codes — is tested in test_http.py, where a
+# real request exists to carry them.
 
 
 class _Mode(enum.StrEnum):
@@ -16,29 +27,22 @@ class _Mode(enum.StrEnum):
     SLOW = "slow"
 
 
-def _make_request(
-    method: str, params: dict[str, Any] | None = None, msg_id: int = 1
-) -> str:
-    return json.dumps(
-        {
-            "jsonrpc": "2.0",
-            "id": msg_id,
-            "method": method,
-            "params": params or {},
-        }
-    )
-
-
 def _instantiate(cls: type[MCPView]) -> MCPView:
     """Build an MCPView instance with a stub request for unit tests."""
     request = RequestFactory().post("/mcp", body=b"", content_type="application/json")
     return cls(request=request)
 
 
-def _call(mcp: MCPView, *args: Any, **kwargs: Any) -> dict[str, Any]:
-    response = mcp.handle_message(*args, **kwargs)
-    assert response is not None
-    return response
+def _call(
+    mcp: MCPView, method: str, params: dict[str, Any] | None = None, msg_id: int = 1
+) -> dict[str, Any]:
+    """Dispatch one request, the way `post()` does once it has validated it."""
+    return mcp.handle_message(
+        msg_id=msg_id,
+        method=method,
+        params=params or {},
+        handler=mcp.get_rpc_handler(method),
+    )
 
 
 class TestMCPProtocol:
@@ -48,65 +52,187 @@ class TestMCPProtocol:
 
         return _instantiate(_TestMCP)
 
-    def test_initialize(self) -> None:
-        response = _call(self._mcp(), _make_request("initialize"))
+    def test_server_discover(self) -> None:
+        response = _call(self._mcp(), "server/discover")
         assert response["jsonrpc"] == "2.0"
         assert response["id"] == 1
-        assert "protocolVersion" in response["result"]
-        assert response["result"]["serverInfo"]["name"] == "test"
+        assert response["result"]["supportedVersions"] == [PROTOCOL_VERSION]
+        assert response["result"]["capabilities"] == {}
+        # `instructions` is optional — omitted when the view sets none.
+        assert "instructions" not in response["result"]
 
-    def test_ping(self) -> None:
-        response = _call(self._mcp(), _make_request("ping"))
-        assert response["result"] == {}
+    def test_server_discover_includes_instructions_when_set(self) -> None:
+        class GuidedMCP(MCPView):
+            name = "guided"
+            instructions = "Search before you write."
 
-    def test_unknown_method(self) -> None:
-        response = _call(self._mcp(), _make_request("bogus/method"))
-        assert response["error"]["code"] == -32601
+        response = _call(_instantiate(GuidedMCP), "server/discover")
+        assert response["result"]["instructions"] == "Search before you write."
 
-    def test_underscore_method_name_rejected(self) -> None:
-        """`tools_list` must not collide with the `tools/list` → `rpc_tools_list` dispatch.
-
-        JSON-RPC method names in MCP use `/` as the separator, so an
-        underscore in a raw method name is never valid — rejecting it
-        keeps the `/` → `_` rewrite collision-free.
-        """
-        response = _call(self._mcp(), _make_request("tools_list"))
-        assert response["error"]["code"] == -32601
-
-    def test_parse_error(self) -> None:
-        response = _call(self._mcp(), b"not json")
-        assert response["error"]["code"] == -32700
-
-    def test_missing_jsonrpc_version_rejected(self) -> None:
-        msg = json.dumps({"id": 1, "method": "ping", "params": {}})
-        response = _call(self._mcp(), msg)
-        assert response["error"]["code"] == -32600
-        assert response["id"] == 1
-
-    def test_wrong_jsonrpc_version_rejected(self) -> None:
-        msg = json.dumps({"jsonrpc": "1.0", "id": 1, "method": "ping", "params": {}})
-        response = _call(self._mcp(), msg)
-        assert response["error"]["code"] == -32600
-
-    def test_array_params_rejected(self) -> None:
-        msg = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping", "params": []})
-        response = _call(self._mcp(), msg)
-        assert response["error"]["code"] == -32602
-
-    def test_null_params_treated_as_empty(self) -> None:
-        msg = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping", "params": None})
-        response = _call(self._mcp(), msg)
-        assert response["result"] == {}
-
-    def test_notification_returns_none(self) -> None:
-        msg = json.dumps(
-            {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}
+    def test_client_identity_read_from_meta(self) -> None:
+        # There's no handshake, so each request's `_meta` is what tells the
+        # view who is calling; tools read it back through `self.mcp`.
+        mcp = self._mcp()
+        version = mcp.load_client_identity(
+            {
+                "_meta": {
+                    META_PROTOCOL_VERSION: PROTOCOL_VERSION,
+                    META_CLIENT_CAPABILITIES: {"elicitation": {}},
+                    META_CLIENT_INFO: {"name": "acme-client", "version": "3.1"},
+                }
+            }
         )
-        assert self._mcp().handle_message(msg) is None
+        assert version == PROTOCOL_VERSION
+        assert mcp.client_info == {"name": "acme-client", "version": "3.1"}
+        assert mcp.client_capabilities == {"elicitation": {}}
 
     def test_tools_list_empty(self) -> None:
-        response = _call(self._mcp(), _make_request("tools/list"))
+        response = _call(self._mcp(), "tools/list")
         assert response["result"]["tools"] == []
+
+
+class TestRequiredClientCapabilities:
+    """A tool that needs something back from the client can't run for a client
+    that never offered it — that's a protocol mismatch, not a tool failure."""
+
+    def _mcp(self) -> MCPView:
+        class Summarize(MCPTool):
+            """Ask the client's model to summarize something."""
+
+            required_client_capabilities: ClassVar = {"sampling": {}}
+
+            def run(self) -> str:
+                return "summarized"
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = (Summarize,)
+
+        return _instantiate(MyMCP)
+
+    def test_missing_capability_is_a_jsonrpc_error(self) -> None:
+        mcp = self._mcp()
+        mcp.client_capabilities = {}
+        response = _call(mcp, "tools/call", {"name": "Summarize", "arguments": {}})
+        # Not an `isError` result — the call never reached the tool.
+        assert "result" not in response
+        assert response["error"]["code"] == -32021
+        assert response["error"]["data"] == {"requiredCapabilities": {"sampling": {}}}
+        assert "Summarize" in response["error"]["message"]
+
+    def test_declared_capability_lets_the_tool_run(self) -> None:
+        mcp = self._mcp()
+        mcp.client_capabilities = {"sampling": {}}
+        response = _call(mcp, "tools/call", {"name": "Summarize", "arguments": {}})
+        assert response["result"]["content"][0]["text"] == "summarized"
+
+    def test_only_the_missing_capabilities_are_reported(self) -> None:
+        class Fancy(MCPTool):
+            required_client_capabilities: ClassVar = {"sampling": {}, "elicitation": {}}
+
+            def run(self) -> str:
+                return "ok"
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = (Fancy,)
+
+        mcp = _instantiate(MyMCP)
+        mcp.client_capabilities = {"sampling": {}}
+        response = _call(mcp, "tools/call", {"name": "Fancy", "arguments": {}})
+        assert response["error"]["data"] == {
+            "requiredCapabilities": {"elicitation": {}}
+        }
+
+    def test_tools_without_requirements_are_unaffected(self) -> None:
+        class Plain(MCPTool):
+            def run(self) -> str:
+                return "ok"
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = (Plain,)
+
+        mcp = _instantiate(MyMCP)
+        mcp.client_capabilities = {}
+        response = _call(mcp, "tools/call", {"name": "Plain", "arguments": {}})
+        assert response["result"]["content"][0]["text"] == "ok"
+
+
+class TestResultStamping:
+    """Fields the spec requires on every result, added centrally so custom
+    `rpc_` handlers get them too."""
+
+    def _mcp(self) -> MCPView:
+        class Note(MCPResource):
+            uri = "notes://one"
+            mime_type = "text/plain"
+
+            def read(self) -> str:
+                return "hello"
+
+        class Echo(MCPTool):
+            def run(self) -> str:
+                return "hi"
+
+        class _TestMCP(MCPView):
+            name = "test"
+            version = "9.9"
+            tools = (Echo,)
+            resources = (Note,)
+
+            def rpc_prompts_list(self, params: dict[str, Any]) -> dict[str, Any]:
+                return {"prompts": []}
+
+        return _instantiate(_TestMCP)
+
+    def test_result_type_stamped(self) -> None:
+        result = _call(self._mcp(), "tools/list")["result"]
+        assert result["resultType"] == "complete"
+
+    def test_server_info_stamped_into_result_meta(self) -> None:
+        result = _call(self._mcp(), "tools/list")["result"]
+        assert result["_meta"][META_SERVER_INFO] == {"name": "test", "version": "9.9"}
+
+    def test_list_and_read_results_carry_cache_hints(self) -> None:
+        for method, params in (
+            ("server/discover", None),
+            ("tools/list", None),
+            ("resources/list", None),
+            ("resources/templates/list", None),
+            ("resources/read", {"uri": "notes://one"}),
+        ):
+            result = _call(self._mcp(), method, params)["result"]
+            assert result["ttlMs"] == 0, method
+            assert result["cacheScope"] == "private", method
+
+    def test_custom_rpc_list_handler_gets_cache_hints(self) -> None:
+        # `prompts/list` is implemented by the subclass, not plain.mcp — the
+        # stamping is central, so it lands there too.
+        result = _call(self._mcp(), "prompts/list")["result"]
+        assert result["ttlMs"] == 0
+        assert result["cacheScope"] == "private"
+        assert result["resultType"] == "complete"
+
+    def test_tools_call_result_has_no_cache_hints(self) -> None:
+        # A tool call isn't a cacheable result — only lists and reads are.
+        result = _call(self._mcp(), "tools/call", {"name": "Echo", "arguments": {}})[
+            "result"
+        ]
+        assert "ttlMs" not in result
+        assert "cacheScope" not in result
+        assert result["resultType"] == "complete"
+
+    def test_handler_can_override_the_defaults(self) -> None:
+        class PublicMCP(MCPView):
+            name = "public"
+
+            def rpc_tools_list(self, params: dict[str, Any]) -> dict[str, Any]:
+                return {"tools": [], "ttlMs": 60_000, "cacheScope": "public"}
+
+        result = _call(_instantiate(PublicMCP), "tools/list")["result"]
+        assert result["ttlMs"] == 60_000
+        assert result["cacheScope"] == "public"
 
 
 class TestToolRegistration:
@@ -122,10 +248,10 @@ class TestToolRegistration:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Greet]
+            tools = (Greet,)
 
         mcp = _instantiate(MyMCP)
-        response = _call(mcp, _make_request("tools/list"))
+        response = _call(mcp, "tools/list")
         tools = response["result"]["tools"]
         assert len(tools) == 1
         assert tools[0]["name"] == "Greet"
@@ -137,18 +263,16 @@ class TestToolRegistration:
         class ListThings(MCPTool):
             """List things."""
 
-            annotations = {"readOnlyHint": True}
+            annotations: ClassVar = {"readOnlyHint": True}
 
             def run(self) -> str:
                 return "ok"
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [ListThings]
+            tools = (ListThings,)
 
-        tools = _call(_instantiate(MyMCP), _make_request("tools/list"))["result"][
-            "tools"
-        ]
+        tools = _call(_instantiate(MyMCP), "tools/list")["result"]["tools"]
         assert tools[0]["annotations"] == {"readOnlyHint": True}
 
     def test_tool_without_annotations_omits_key(self) -> None:
@@ -160,11 +284,9 @@ class TestToolRegistration:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [DoThing]
+            tools = (DoThing,)
 
-        tools = _call(_instantiate(MyMCP), _make_request("tools/list"))["result"][
-            "tools"
-        ]
+        tools = _call(_instantiate(MyMCP), "tools/list")["result"]["tools"]
         assert "annotations" not in tools[0]
 
     def test_tool_annotations_pass_through_unknown_keys(self) -> None:
@@ -173,18 +295,16 @@ class TestToolRegistration:
         class Future(MCPTool):
             """A tool using a not-yet-modeled hint."""
 
-            annotations = {"readOnlyHint": True, "sensitiveHint": True}
+            annotations: ClassVar = {"readOnlyHint": True, "sensitiveHint": True}
 
             def run(self) -> str:
                 return "ok"
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Future]
+            tools = (Future,)
 
-        tools = _call(_instantiate(MyMCP), _make_request("tools/list"))["result"][
-            "tools"
-        ]
+        tools = _call(_instantiate(MyMCP), "tools/list")["result"]["tools"]
         assert tools[0]["annotations"] == {
             "readOnlyHint": True,
             "sensitiveHint": True,
@@ -194,7 +314,7 @@ class TestToolRegistration:
         # A base tool's annotations are inherited by subclasses via normal
         # class-attribute inheritance — no special handling.
         class ReadTool(MCPTool):
-            annotations = {"readOnlyHint": True}
+            annotations: ClassVar = {"readOnlyHint": True}
 
         class ListThings(ReadTool):
             """List things."""
@@ -204,11 +324,9 @@ class TestToolRegistration:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [ListThings]
+            tools = (ListThings,)
 
-        tools = _call(_instantiate(MyMCP), _make_request("tools/list"))["result"][
-            "tools"
-        ]
+        tools = _call(_instantiate(MyMCP), "tools/list")["result"]["tools"]
         assert tools[0]["annotations"] == {"readOnlyHint": True}
 
     def test_register_classmethod(self) -> None:
@@ -227,7 +345,7 @@ class TestToolRegistration:
         MyMCP.register_tool(ExtTool)
 
         mcp = _instantiate(MyMCP)
-        response = _call(mcp, _make_request("tools/list"))
+        response = _call(mcp, "tools/list")
         names = [t["name"] for t in response["result"]["tools"]]
         assert names == ["ExtTool"]
 
@@ -247,8 +365,8 @@ class TestToolRegistration:
         admin = _instantiate(AdminMCP)
         app = _instantiate(AppMCP)
 
-        assert len(_call(admin, _make_request("tools/list"))["result"]["tools"]) == 1
-        assert len(_call(app, _make_request("tools/list"))["result"]["tools"]) == 0
+        assert len(_call(admin, "tools/list")["result"]["tools"]) == 1
+        assert len(_call(app, "tools/list")["result"]["tools"]) == 0
 
 
 class TestToolExecution:
@@ -263,12 +381,13 @@ class TestToolExecution:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Add]
+            tools = (Add,)
 
         mcp = _instantiate(MyMCP)
         response = _call(
             mcp,
-            _make_request("tools/call", {"name": "Add", "arguments": {"a": 2, "b": 3}}),
+            "tools/call",
+            {"name": "Add", "arguments": {"a": 2, "b": 3}},
         )
         assert response["result"]["content"][0]["text"] == "5"
 
@@ -279,7 +398,8 @@ class TestToolExecution:
         mcp = _instantiate(MyMCP)
         response = _call(
             mcp,
-            _make_request("tools/call", {"name": "nonexistent", "arguments": {}}),
+            "tools/call",
+            {"name": "nonexistent", "arguments": {}},
         )
         assert response["result"]["isError"] is True
         assert "nonexistent" in response["result"]["content"][0]["text"]
@@ -295,15 +415,13 @@ class TestToolExecution:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Add]
+            tools = (Add,)
 
         mcp = _instantiate(MyMCP)
         response = _call(
             mcp,
-            _make_request(
-                "tools/call",
-                {"name": "Add", "arguments": {"a": 1, "wrong_param": 2}},
-            ),
+            "tools/call",
+            {"name": "Add", "arguments": {"a": 1, "wrong_param": 2}},
         )
         assert response["result"]["isError"] is True
         assert "Invalid arguments" in response["result"]["content"][0]["text"]
@@ -315,12 +433,13 @@ class TestToolExecution:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [BadTool]
+            tools = (BadTool,)
 
         mcp = _instantiate(MyMCP)
         response = _call(
             mcp,
-            _make_request("tools/call", {"name": "BadTool", "arguments": {}}),
+            "tools/call",
+            {"name": "BadTool", "arguments": {}},
         )
         assert response["result"]["isError"] is True
         assert response["result"]["content"][0]["text"] == "Tool execution failed"
@@ -332,7 +451,7 @@ class TestToolExecution:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [PickyTool]
+            tools = (PickyTool,)
 
         import plain.mcp.views as mcp_views
 
@@ -341,7 +460,8 @@ class TestToolExecution:
             mcp = _instantiate(MyMCP)
             response = _call(
                 mcp,
-                _make_request("tools/call", {"name": "PickyTool", "arguments": {}}),
+                "tools/call",
+                {"name": "PickyTool", "arguments": {}},
             )
         # Expected failure: the caller sees the message via isError, and it is
         # NOT logged as a server exception (unlike an unexpected error).
@@ -356,12 +476,13 @@ class TestToolExecution:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Reflect]
+            tools = (Reflect,)
 
         mcp = _instantiate(MyMCP)
         response = _call(
             mcp,
-            _make_request("tools/call", {"name": "Reflect", "arguments": {}}),
+            "tools/call",
+            {"name": "Reflect", "arguments": {}},
         )
         assert response["result"]["content"][0]["text"] == "MyMCP"
 
@@ -382,7 +503,7 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Add]
+            tools = (Add,)
 
         return MyMCP
 
@@ -398,7 +519,7 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Greet]
+            tools = (Greet,)
 
         return MyMCP
 
@@ -411,9 +532,8 @@ class TestArgumentValidation:
         with patch(mcp_views, "log_exception", lambda *a, **k: logged.append(a)):
             response = _call(
                 _instantiate(self._add_mcp()),
-                _make_request(
-                    "tools/call", {"name": "Add", "arguments": {"a": "x", "b": 3}}
-                ),
+                "tools/call",
+                {"name": "Add", "arguments": {"a": "x", "b": 3}},
             )
         assert response["result"]["isError"] is True
         assert "'a' must be an integer" in response["result"]["content"][0]["text"]
@@ -424,9 +544,8 @@ class TestArgumentValidation:
         # JSON `true` is a boolean, not an integer — reject it.
         response = _call(
             _instantiate(self._add_mcp()),
-            _make_request(
-                "tools/call", {"name": "Add", "arguments": {"a": True, "b": 3}}
-            ),
+            "tools/call",
+            {"name": "Add", "arguments": {"a": True, "b": 3}},
         )
         assert response["result"]["isError"] is True
         assert "'a' must be an integer" in response["result"]["content"][0]["text"]
@@ -434,7 +553,8 @@ class TestArgumentValidation:
     def test_missing_required_argument(self) -> None:
         response = _call(
             _instantiate(self._add_mcp()),
-            _make_request("tools/call", {"name": "Add", "arguments": {"a": 1}}),
+            "tools/call",
+            {"name": "Add", "arguments": {"a": 1}},
         )
         assert response["result"]["isError"] is True
         assert (
@@ -451,13 +571,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [SetStatus]
+            tools = (SetStatus,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request(
-                "tools/call", {"name": "SetStatus", "arguments": {"status": "bogus"}}
-            ),
+            "tools/call",
+            {"name": "SetStatus", "arguments": {"status": "bogus"}},
         )
         assert response["result"]["isError"] is True
         text = response["result"]["content"][0]["text"]
@@ -466,7 +585,8 @@ class TestArgumentValidation:
     def test_optional_accepts_null(self) -> None:
         response = _call(
             _instantiate(self._greet_mcp()),
-            _make_request("tools/call", {"name": "Greet", "arguments": {"who": None}}),
+            "tools/call",
+            {"name": "Greet", "arguments": {"who": None}},
         )
         assert "isError" not in response["result"]
         assert response["result"]["content"][0]["text"] == "Hello, None"
@@ -474,7 +594,8 @@ class TestArgumentValidation:
     def test_optional_rejects_wrong_type_with_null_branch(self) -> None:
         response = _call(
             _instantiate(self._greet_mcp()),
-            _make_request("tools/call", {"name": "Greet", "arguments": {"who": 5}}),
+            "tools/call",
+            {"name": "Greet", "arguments": {"who": 5}},
         )
         assert response["result"]["isError"] is True
         assert (
@@ -491,13 +612,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Sum]
+            tools = (Sum,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request(
-                "tools/call", {"name": "Sum", "arguments": {"ids": [1, "two", 3]}}
-            ),
+            "tools/call",
+            {"name": "Sum", "arguments": {"ids": [1, "two", 3]}},
         )
         assert response["result"]["isError"] is True
         assert "'ids[1]' must be an integer" in response["result"]["content"][0]["text"]
@@ -512,13 +632,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Store]
+            tools = (Store,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request(
-                "tools/call", {"name": "Store", "arguments": {"payload": "nope"}}
-            ),
+            "tools/call",
+            {"name": "Store", "arguments": {"payload": "nope"}},
         )
         assert response["result"]["isError"] is True
         assert "'payload' must be an object" in response["result"]["content"][0]["text"]
@@ -527,7 +646,7 @@ class TestArgumentValidation:
         # Unannotated params advertise a permissive schema, so a non-string
         # argument the tool wants must not be rejected by validation.
         class Store(MCPTool):
-            def __init__(self, data):  # noqa: ANN001
+            def __init__(self, data):
                 self.data = data
 
             def run(self) -> dict:
@@ -535,13 +654,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Store]
+            tools = (Store,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request(
-                "tools/call", {"name": "Store", "arguments": {"data": {"k": "v"}}}
-            ),
+            "tools/call",
+            {"name": "Store", "arguments": {"data": {"k": "v"}}},
         )
         assert "isError" not in response["result"]
 
@@ -556,13 +674,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [SetLevel]
+            tools = (SetLevel,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request(
-                "tools/call", {"name": "SetLevel", "arguments": {"level": True}}
-            ),
+            "tools/call",
+            {"name": "SetLevel", "arguments": {"level": True}},
         )
         assert response["result"]["isError"] is True
         assert "'level' must be one of" in response["result"]["content"][0]["text"]
@@ -580,7 +697,7 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [SetMode]
+            tools = (SetMode,)
 
         # Guard against the silent-permissive fallback: the schema must really
         # carry the enum, otherwise this test proves nothing.
@@ -589,9 +706,8 @@ class TestArgumentValidation:
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request(
-                "tools/call", {"name": "SetMode", "arguments": {"mode": "fast"}}
-            ),
+            "tools/call",
+            {"name": "SetMode", "arguments": {"mode": "fast"}},
         )
         assert "isError" not in response["result"]
         assert response["result"]["content"][0]["text"] == "fast"
@@ -608,13 +724,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [SetLevel]
+            tools = (SetLevel,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request(
-                "tools/call", {"name": "SetLevel", "arguments": {"level": 1.0}}
-            ),
+            "tools/call",
+            {"name": "SetLevel", "arguments": {"level": 1.0}},
         )
         assert "isError" not in response["result"]
 
@@ -622,7 +737,7 @@ class TestArgumentValidation:
         # A hand-written schema with a non-list `enum` must degrade permissively,
         # not crash validation into a server error.
         class Custom(MCPTool):
-            input_schema = {
+            input_schema: ClassVar = {
                 "type": "object",
                 "properties": {"x": {"enum": 5}},  # malformed: enum must be a list
             }
@@ -635,11 +750,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Custom]
+            tools = (Custom,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("tools/call", {"name": "Custom", "arguments": {"x": 1}}),
+            "tools/call",
+            {"name": "Custom", "arguments": {"x": 1}},
         )
         assert "isError" not in response["result"]
         assert response["result"]["content"][0]["text"] == "1"
@@ -649,7 +765,7 @@ class TestArgumentValidation:
         # produce a clean tool error via _describe_type, not crash it into a
         # logged INTERNAL_ERROR.
         class Custom(MCPTool):
-            input_schema = {
+            input_schema: ClassVar = {
                 "type": "object",
                 "properties": {"x": {"type": "integer", "enum": 99}},
             }
@@ -662,18 +778,19 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Custom]
+            tools = (Custom,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("tools/call", {"name": "Custom", "arguments": {"x": "abc"}}),
+            "tools/call",
+            {"name": "Custom", "arguments": {"x": "abc"}},
         )
         assert response["result"]["isError"] is True
         assert "'x' must be an integer" in response["result"]["content"][0]["text"]
 
     def test_malformed_anyof_schema_is_permissive(self) -> None:
         class Custom(MCPTool):
-            input_schema = {
+            input_schema: ClassVar = {
                 "type": "object",
                 "properties": {"x": {"anyOf": 5}},  # malformed: anyOf must be a list
             }
@@ -686,11 +803,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Custom]
+            tools = (Custom,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("tools/call", {"name": "Custom", "arguments": {"x": 1}}),
+            "tools/call",
+            {"name": "Custom", "arguments": {"x": 1}},
         )
         assert "isError" not in response["result"]
 
@@ -706,11 +824,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Weird]
+            tools = (Weird,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("tools/call", {"name": "Weird", "arguments": {"x": 1}}),
+            "tools/call",
+            {"name": "Weird", "arguments": {"x": 1}},
         )
         assert "isError" not in response["result"]
         assert response["result"]["content"][0]["text"] == "1"
@@ -719,9 +838,8 @@ class TestArgumentValidation:
         # `5.0` is a valid integer per JSON Schema 2020-12.
         response = _call(
             _instantiate(self._add_mcp()),
-            _make_request(
-                "tools/call", {"name": "Add", "arguments": {"a": 5.0, "b": 3}}
-            ),
+            "tools/call",
+            {"name": "Add", "arguments": {"a": 5.0, "b": 3}},
         )
         assert "isError" not in response["result"]
         assert response["result"]["content"][0]["text"] == "8.0"
@@ -729,9 +847,8 @@ class TestArgumentValidation:
     def test_non_integral_float_rejected_for_integer(self) -> None:
         response = _call(
             _instantiate(self._add_mcp()),
-            _make_request(
-                "tools/call", {"name": "Add", "arguments": {"a": 5.5, "b": 3}}
-            ),
+            "tools/call",
+            {"name": "Add", "arguments": {"a": 5.5, "b": 3}},
         )
         assert response["result"]["isError"] is True
         assert "'a' must be an integer" in response["result"]["content"][0]["text"]
@@ -741,10 +858,8 @@ class TestArgumentValidation:
         # on unmodeled props, so the extra is caught by the __init__ TypeError.
         response = _call(
             _instantiate(self._add_mcp()),
-            _make_request(
-                "tools/call",
-                {"name": "Add", "arguments": {"a": 1, "b": 2, "extra": 3}},
-            ),
+            "tools/call",
+            {"name": "Add", "arguments": {"a": 1, "b": 2, "extra": 3}},
         )
         assert response["result"]["isError"] is True
         text = response["result"]["content"][0]["text"]
@@ -761,13 +876,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Sum]
+            tools = (Sum,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request(
-                "tools/call", {"name": "Sum", "arguments": {"ids": ["a", 1, "b"]}}
-            ),
+            "tools/call",
+            {"name": "Sum", "arguments": {"ids": ["a", 1, "b"]}},
         )
         assert response["result"]["isError"] is True
         text = response["result"]["content"][0]["text"]
@@ -778,7 +892,7 @@ class TestArgumentValidation:
         # A hand-written input_schema with a shorthand (non-dict) property value
         # must not crash validation into a server error — stay permissive.
         class Custom(MCPTool):
-            input_schema = {
+            input_schema: ClassVar = {
                 "type": "object",
                 "properties": {"q": "string"},  # malformed: should be a dict
             }
@@ -791,11 +905,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Custom]
+            tools = (Custom,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("tools/call", {"name": "Custom", "arguments": {"q": "hi"}}),
+            "tools/call",
+            {"name": "Custom", "arguments": {"q": "hi"}},
         )
         assert "isError" not in response["result"]
         assert response["result"]["content"][0]["text"] == "hi"
@@ -805,7 +920,7 @@ class TestArgumentValidation:
         # (`oneOf`) must not be falsely rejected — we validate what we can and
         # pass the rest through to `run()`.
         class Custom(MCPTool):
-            input_schema = {
+            input_schema: ClassVar = {
                 "type": "object",
                 "properties": {"value": {"oneOf": [{"type": "string"}]}},
             }
@@ -818,11 +933,12 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Custom]
+            tools = (Custom,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("tools/call", {"name": "Custom", "arguments": {"value": 42}}),
+            "tools/call",
+            {"name": "Custom", "arguments": {"value": 42}},
         )
         assert "isError" not in response["result"]
         assert response["result"]["content"][0]["text"] == "42"
@@ -832,7 +948,7 @@ class TestArgumentValidation:
         # `kwargs` param must not be advertised as a required property, or
         # validation would reject every real call.
         class Flexible(MCPTool):
-            def __init__(self, **kwargs):  # noqa: ANN003
+            def __init__(self, **kwargs):
                 self.kwargs = kwargs
 
             def run(self) -> dict:
@@ -840,7 +956,7 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Flexible]
+            tools = (Flexible,)
 
         assert Flexible.input_schema is not None
         assert Flexible.input_schema["properties"] == {}
@@ -848,13 +964,14 @@ class TestArgumentValidation:
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("tools/call", {"name": "Flexible", "arguments": {"foo": 1}}),
+            "tools/call",
+            {"name": "Flexible", "arguments": {"foo": 1}},
         )
         assert "isError" not in response["result"]
 
     def test_named_plus_var_keyword_validates_named_only(self) -> None:
         class Flexible(MCPTool):
-            def __init__(self, name: str, **extra):  # noqa: ANN003
+            def __init__(self, name: str, **extra):
                 self.name = name
                 self.extra = extra
 
@@ -863,7 +980,7 @@ class TestArgumentValidation:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Flexible]
+            tools = (Flexible,)
 
         schema = Flexible.input_schema
         assert schema is not None
@@ -873,24 +990,24 @@ class TestArgumentValidation:
         # Wrong-typed named arg still rejected...
         bad = _call(
             _instantiate(MyMCP),
-            _make_request("tools/call", {"name": "Flexible", "arguments": {"name": 5}}),
+            "tools/call",
+            {"name": "Flexible", "arguments": {"name": 5}},
         )
         assert bad["result"]["isError"] is True
 
         # ...but a named arg plus arbitrary extras passes.
         ok = _call(
             _instantiate(MyMCP),
-            _make_request(
-                "tools/call",
-                {"name": "Flexible", "arguments": {"name": "x", "y": 2}},
-            ),
+            "tools/call",
+            {"name": "Flexible", "arguments": {"name": "x", "y": 2}},
         )
         assert "isError" not in ok["result"]
 
     def test_non_object_arguments_rejected(self) -> None:
         response = _call(
             _instantiate(self._add_mcp()),
-            _make_request("tools/call", {"name": "Add", "arguments": [1, 2]}),
+            "tools/call",
+            {"name": "Add", "arguments": [1, 2]},
         )
         assert response["result"]["isError"] is True
         assert "must be an object" in response["result"]["content"][0]["text"]
@@ -909,10 +1026,10 @@ class TestToolMetadata:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Greet]
+            tools = (Greet,)
 
         mcp = _instantiate(MyMCP)
-        tools = _call(mcp, _make_request("tools/list"))["result"]["tools"]
+        tools = _call(mcp, "tools/list")["result"]["tools"]
         assert tools[0]["name"] == "Greet"
 
     def test_tool_explicit_name_and_description(self) -> None:
@@ -928,10 +1045,10 @@ class TestToolMetadata:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Greet]
+            tools = (Greet,)
 
         mcp = _instantiate(MyMCP)
-        tools = _call(mcp, _make_request("tools/list"))["result"]["tools"]
+        tools = _call(mcp, "tools/list")["result"]["tools"]
         assert tools[0]["name"] == "say_hello"
         assert tools[0]["description"] == "Greet a user by name."
 
@@ -944,10 +1061,10 @@ class TestToolMetadata:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [WhoAmI]
+            tools = (WhoAmI,)
 
         mcp = _instantiate(MyMCP)
-        tools = _call(mcp, _make_request("tools/list"))["result"]["tools"]
+        tools = _call(mcp, "tools/list")["result"]["tools"]
         assert tools[0]["inputSchema"]["properties"] == {}
 
 
@@ -968,28 +1085,26 @@ class TestToolAuthorization:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [DeleteUser]
+            tools = (DeleteUser,)
 
         mcp = _instantiate(MyMCP)
         # No user → hidden
-        assert _call(mcp, _make_request("tools/list"))["result"]["tools"] == []
+        assert _call(mcp, "tools/list")["result"]["tools"] == []
         # Call also rejected
         response = _call(
             mcp,
-            _make_request(
-                "tools/call", {"name": "DeleteUser", "arguments": {"user_id": 1}}
-            ),
+            "tools/call",
+            {"name": "DeleteUser", "arguments": {"user_id": 1}},
         )
         assert response["result"]["isError"] is True
 
         # With admin → visible and callable
         mcp.user = {"is_admin": True}  # ty: ignore[unresolved-attribute]
-        assert len(_call(mcp, _make_request("tools/list"))["result"]["tools"]) == 1
+        assert len(_call(mcp, "tools/list")["result"]["tools"]) == 1
         response = _call(
             mcp,
-            _make_request(
-                "tools/call", {"name": "DeleteUser", "arguments": {"user_id": 1}}
-            ),
+            "tools/call",
+            {"name": "DeleteUser", "arguments": {"user_id": 1}},
         )
         assert response["result"]["content"][0]["text"] == "deleted 1"
 
@@ -1002,13 +1117,13 @@ class TestToolAuthorization:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [PublicTool]
+            tools = (PublicTool,)
 
             def get_tools(self):
                 return []  # lock everything down
 
         mcp = _instantiate(MyMCP)
-        assert _call(mcp, _make_request("tools/list"))["result"]["tools"] == []
+        assert _call(mcp, "tools/list")["result"]["tools"] == []
 
 
 class TestSchemaGeneration:
@@ -1022,7 +1137,7 @@ class TestSchemaGeneration:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Fn]
+            tools = (Fn,)
 
         schema = _instantiate(MyMCP).tools[0].input_schema
         assert schema is not None
@@ -1041,7 +1156,7 @@ class TestSchemaGeneration:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Fn]
+            tools = (Fn,)
 
         schema = _instantiate(MyMCP).tools[0].input_schema
         assert schema is not None
@@ -1060,7 +1175,7 @@ class TestSchemaGeneration:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Fn]
+            tools = (Fn,)
 
         schema = _instantiate(MyMCP).tools[0].input_schema
         assert schema is not None
@@ -1078,7 +1193,7 @@ class TestSchemaGeneration:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Fn]
+            tools = (Fn,)
 
         schema = _instantiate(MyMCP).tools[0].input_schema
         assert schema is not None
@@ -1097,7 +1212,7 @@ class TestSchemaGeneration:
         """
 
         class Fn(MCPTool):
-            def __init__(self, thing):  # noqa: ANN001
+            def __init__(self, thing):
                 pass
 
             def run(self) -> str:
@@ -1105,7 +1220,7 @@ class TestSchemaGeneration:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Fn]
+            tools = (Fn,)
 
         schema = _instantiate(MyMCP).tools[0].input_schema
         assert schema is not None
@@ -1117,7 +1232,7 @@ class TestDescription:
     def _tool(self, cls: type[MCPTool]) -> type[MCPTool]:
         class MyMCP(MCPView):
             name = "test"
-            tools = [cls]
+            tools = (cls,)
 
         return _instantiate(MyMCP).tools[0]
 
@@ -1178,16 +1293,13 @@ class TestResources:
                 def read(self) -> str:
                     return "1.0"
 
-            resources = [Version]
+            resources = (Version,)
 
-        empty = _call(_instantiate(EmptyMCP), _make_request("initialize"))
-        populated = _call(_instantiate(WithResources), _make_request("initialize"))
+        empty = _call(_instantiate(EmptyMCP), "server/discover")
+        populated = _call(_instantiate(WithResources), "server/discover")
 
         assert "resources" not in empty["result"]["capabilities"]
-        assert populated["result"]["capabilities"]["resources"] == {
-            "subscribe": False,
-            "listChanged": False,
-        }
+        assert populated["result"]["capabilities"]["resources"] == {}
 
     def test_resources_list(self) -> None:
         class Version(MCPResource):
@@ -1201,9 +1313,9 @@ class TestResources:
 
         class MyMCP(MCPView):
             name = "test"
-            resources = [Version]
+            resources = (Version,)
 
-        response = _call(_instantiate(MyMCP), _make_request("resources/list"))
+        response = _call(_instantiate(MyMCP), "resources/list")
         assert response["result"]["resources"] == [
             {
                 "uri": "config://version",
@@ -1223,11 +1335,12 @@ class TestResources:
 
         class MyMCP(MCPView):
             name = "test"
-            resources = [Version]
+            resources = (Version,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("resources/read", {"uri": "config://version"}),
+            "resources/read",
+            {"uri": "config://version"},
         )
         assert response["result"]["contents"] == [
             {"uri": "config://version", "mimeType": "text/plain", "text": "1.0"}
@@ -1243,11 +1356,12 @@ class TestResources:
 
         class MyMCP(MCPView):
             name = "test"
-            resources = [Logo]
+            resources = (Logo,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("resources/read", {"uri": "img://logo"}),
+            "resources/read",
+            {"uri": "img://logo"},
         )
         entry = response["result"]["contents"][0]
         assert entry["mimeType"] == "image/png"
@@ -1260,7 +1374,7 @@ class TestResources:
         class MyMCP(MCPView):
             name = "test"
 
-        response = _call(_instantiate(MyMCP), _make_request("resources/read"))
+        response = _call(_instantiate(MyMCP), "resources/read")
         assert response["error"]["code"] == -32602
         assert "Missing uri" in response["error"]["message"]
 
@@ -1270,10 +1384,14 @@ class TestResources:
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("resources/read", {"uri": "nope://nothing"}),
+            "resources/read",
+            {"uri": "nope://nothing"},
         )
         assert response["error"]["code"] == -32602
         assert "Unknown resource" in response["error"]["message"]
+        # SEP-2164: echo the URI so the client doesn't parse it back out of
+        # the message.
+        assert response["error"]["data"] == {"uri": "nope://nothing"}
 
     def test_allowed_for_filters_list_and_hides_from_read(self) -> None:
         class Hidden(MCPResource):
@@ -1289,13 +1407,13 @@ class TestResources:
 
         class MyMCP(MCPView):
             name = "test"
-            resources = [Hidden]
+            resources = (Hidden,)
 
         mcp = _instantiate(MyMCP)
-        listed = _call(mcp, _make_request("resources/list"))
+        listed = _call(mcp, "resources/list")
         assert listed["result"]["resources"] == []
 
-        read = _call(mcp, _make_request("resources/read", {"uri": "secret://data"}))
+        read = _call(mcp, "resources/read", {"uri": "secret://data"})
         # Same error as unknown URI — existence not leaked.
         assert read["error"]["code"] == -32602
         assert "Unknown resource" in read["error"]["message"]
@@ -1350,9 +1468,9 @@ class TestResourceTemplates:
 
         class MyMCP(MCPView):
             name = "test"
-            resources = [Order]
+            resources = (Order,)
 
-        response = _call(_instantiate(MyMCP), _make_request("resources/templates/list"))
+        response = _call(_instantiate(MyMCP), "resources/templates/list")
         assert response["result"]["resourceTemplates"] == [
             {
                 "uriTemplate": "orders://{order_id}",
@@ -1375,9 +1493,9 @@ class TestResourceTemplates:
 
         class MyMCP(MCPView):
             name = "test"
-            resources = [Tpl]
+            resources = (Tpl,)
 
-        response = _call(_instantiate(MyMCP), _make_request("resources/list"))
+        response = _call(_instantiate(MyMCP), "resources/list")
         assert response["result"]["resources"] == []
 
     def test_read_template_resource_coerces_int(self) -> None:
@@ -1393,11 +1511,12 @@ class TestResourceTemplates:
 
         class MyMCP(MCPView):
             name = "test"
-            resources = [Order]
+            resources = (Order,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("resources/read", {"uri": "orders://42"}),
+            "resources/read",
+            {"uri": "orders://42"},
         )
         assert response["result"]["contents"][0]["text"] == "42:int"
 
@@ -1414,11 +1533,12 @@ class TestResourceTemplates:
 
         class MyMCP(MCPView):
             name = "test"
-            resources = [Thing]
+            resources = (Thing,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("resources/read", {"uri": "things://hello"}),
+            "resources/read",
+            {"uri": "things://hello"},
         )
         assert response["result"]["contents"][0]["text"] == "hello"
 
@@ -1435,11 +1555,12 @@ class TestResourceTemplates:
 
         class MyMCP(MCPView):
             name = "test"
-            resources = [Thing]
+            resources = (Thing,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("resources/read", {"uri": "x://a/b"}),
+            "resources/read",
+            {"uri": "x://a/b"},
         )
         assert response["error"]["code"] == -32602
 
@@ -1456,11 +1577,12 @@ class TestResourceTemplates:
 
         class MyMCP(MCPView):
             name = "test"
-            resources = [Order]
+            resources = (Order,)
 
         response = _call(
             _instantiate(MyMCP),
-            _make_request("resources/read", {"uri": "orders://notanumber"}),
+            "resources/read",
+            {"uri": "orders://notanumber"},
         )
         assert response["error"]["code"] == -32602
 
@@ -1480,7 +1602,8 @@ class TestToolContentTypes:
     def _call_tool(self, mcp_cls: type[MCPView], tool_name: str) -> dict:
         return _call(
             _instantiate(mcp_cls),
-            _make_request("tools/call", {"name": tool_name, "arguments": {}}),
+            "tools/call",
+            {"name": tool_name, "arguments": {}},
         )
 
     def test_image_dict_auto_encodes_bytes(self) -> None:
@@ -1494,7 +1617,7 @@ class TestToolContentTypes:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Screenshot]
+            tools = (Screenshot,)
 
         response = self._call_tool(MyMCP, "Screenshot")
         content = response["result"]["content"]
@@ -1512,7 +1635,7 @@ class TestToolContentTypes:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Beep]
+            tools = (Beep,)
 
         response = self._call_tool(MyMCP, "Beep")
         assert response["result"]["content"][0]["type"] == "audio"
@@ -1531,7 +1654,7 @@ class TestToolContentTypes:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Embed]
+            tools = (Embed,)
 
         response = self._call_tool(MyMCP, "Embed")
         assert response["result"]["content"][0] == {
@@ -1557,7 +1680,7 @@ class TestToolContentTypes:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Embed]
+            tools = (Embed,)
 
         response = self._call_tool(MyMCP, "Embed")
         resource = response["result"]["content"][0]["resource"]
@@ -1575,7 +1698,7 @@ class TestToolContentTypes:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [Mixed]
+            tools = (Mixed,)
 
         response = self._call_tool(MyMCP, "Mixed")
         content = response["result"]["content"]
@@ -1590,7 +1713,7 @@ class TestToolContentTypes:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [StringTool]
+            tools = (StringTool,)
 
         response = self._call_tool(MyMCP, "StringTool")
         assert response["result"]["content"] == [
@@ -1604,7 +1727,7 @@ class TestToolContentTypes:
 
         class MyMCP(MCPView):
             name = "test"
-            tools = [GetData]
+            tools = (GetData,)
 
         response = self._call_tool(MyMCP, "GetData")
         assert response["result"]["content"][0]["type"] == "text"

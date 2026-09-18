@@ -499,9 +499,9 @@ A brand-new Plain project has meaningful checks on day one, with zero test files
 
 The system is split across three layers, and the split is what keeps a dev-only package from leaking into production code:
 
-**`plain.test` (core — always installed).** The authoring vocabulary: everything a test file imports. `Client` (redesigned as part of this — see [The test client](#the-test-client)), plus `raises`, the metadata decorators (`cases`, `skip`, `tag`, `timeout`), the framework-generic context helpers (`override_settings`, `freeze_time`, `patch`, `capture_spans`, `capture_metrics`), and the `TestLifecycle` protocol. Package-specific helpers are deliberately *not* here — they live in each package's own `plain.<package>.test`. These are small, dependency-light functions and context managers — none of them need the engine to exist. Keeping them in core means app code, package code, and type checkers never depend on a dev package, and `plain.test` remains the single import home you already know. It's also load-bearing outside of tests — `plain request` is built on `Client` — so it couldn't move to a dev-only package even if we wanted it to.
+**`plain.test` (core — always installed).** The authoring vocabulary: everything a test file imports. `Client` (redesigned as part of this — see [The test client](#the-test-client)), plus `raises`, the metadata decorators (`cases`, `skip`, `tag`, `timeout`), the framework-generic context helpers (`override_settings`, `freeze_time`, `patch`, `capture_spans`, `capture_metrics`), and the `TestLifecycle` protocol. Package-specific helpers are deliberately _not_ here — they live in each package's own `plain.<package>.test`. These are small, dependency-light functions and context managers — none of them need the engine to exist. Keeping them in core means app code, package code, and type checkers never depend on a dev package, and `plain.test` remains the single import home you already know. It's also load-bearing outside of tests — `plain request` is built on `Client` — so it couldn't move to a dev-only package even if we wanted it to.
 
-**`plain.testing` (this package — a dev dependency).** The engine: the `plain test` CLI, collection, assertion rewriting, execution and parallelism, flake classification, reporting (`--json`, route coverage, `--changed`), the browser wrapper, and the built-in suite. Nothing in your application imports from it; it imports *you*.
+**`plain.testing` (this package — a dev dependency).** The engine: the `plain test` CLI, collection, assertion rewriting, execution and parallelism, flake classification, reporting (`--json`, route coverage, `--changed`), the browser wrapper, and the built-in suite. Nothing in your application imports from it; it imports _you_.
 
 The line between the two is simple: **if a test file imports it, it lives in core; if it runs test files, it lives here.** Growth is one-way — the vocabulary in `plain.test` expands over time, and nothing that's there today (`Client`, `RequestFactory`, the OTel test installers) moves into the engine.
 
@@ -515,8 +515,8 @@ postgres = "plain.postgres.test.lifecycle:PostgresTestLifecycle"
 
 ```python
 class TestLifecycle:  # protocol, defined in plain.test
-    def setup_worker(self): ...      # once per worker process
-    def around_test(self, test): ... # context manager around each test
+    def setup_worker(self): ...  # once per worker process
+    def around_test(self, test): ...  # context manager around each test
     def teardown_worker(self): ...
 ```
 
@@ -535,23 +535,23 @@ Since entry points are just strings in `pyproject.toml`, a package like `plain-p
 
 This is Plain's test runner — there's exactly one, and upgrading an existing project (which will have used pytest via the retired `plain.pytest` package) is a one-time, automated migration. Test bodies survive untouched — bare `assert` and `Client` are the same. What changes is the machinery around them:
 
-| pytest | plain.testing |
-| --- | --- |
-| `def test_x(db):` | `def test_x():` — database lifecycle is automatic |
-| `settings` fixture | `with override_settings(...)` |
-| `pytest.raises(...)` | `plain.test.raises(...)` |
-| `pytest.mark.parametrize` | `@cases(...)` |
-| `pytest.mark.skip` / custom marks | `@skip(...)` / `@tag(...)` |
-| `monkeypatch` | `with patch(...)` |
-| `otel_spans` / `otel_metrics` fixtures | `capture_spans()` / `capture_metrics()` |
-| `conftest.py` fixtures | helper functions you import |
-| `pytest-xdist` (`-n auto`) | built in |
-| `pytest-asyncio` | built in |
-| `pytest-randomly` | `--shuffle` |
-| `pytest-timeout` | `--timeout` / `@timeout` |
-| `pytest-rerunfailures` | flake classification (flaky stays red) |
-| `freezegun` / `time-machine` | `freeze_time()` |
-| `pytest-playwright` + `testbrowser` fixture | `testbrowser()` context manager |
+| pytest                                      | plain.testing                                     |
+| ------------------------------------------- | ------------------------------------------------- |
+| `def test_x(db):`                           | `def test_x():` — database lifecycle is automatic |
+| `settings` fixture                          | `with override_settings(...)`                     |
+| `pytest.raises(...)`                        | `plain.test.raises(...)`                          |
+| `pytest.mark.parametrize`                   | `@cases(...)`                                     |
+| `pytest.mark.skip` / custom marks           | `@skip(...)` / `@tag(...)`                        |
+| `monkeypatch`                               | `with patch(...)`                                 |
+| `otel_spans` / `otel_metrics` fixtures      | `capture_spans()` / `capture_metrics()`           |
+| `conftest.py` fixtures                      | helper functions you import                       |
+| `pytest-xdist` (`-n auto`)                  | built in                                          |
+| `pytest-asyncio`                            | built in                                          |
+| `pytest-randomly`                           | `--shuffle`                                       |
+| `pytest-timeout`                            | `--timeout` / `@timeout`                          |
+| `pytest-rerunfailures`                      | flake classification (flaky stays red)            |
+| `freezegun` / `time-machine`                | `freeze_time()`                                   |
+| `pytest-playwright` + `testbrowser` fixture | `testbrowser()` context manager                   |
 
 The rewrites are mechanical, and the `/plain-upgrade` agent handles them. Anything it can't map — an un-absorbed pytest plugin, an unusual fixture — it reports instead of silently dropping.
 

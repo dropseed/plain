@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import functools
+import itertools
 import re
 from graphlib import TopologicalSorter
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.fields import Field
-from plain.postgres.fields.base import ColumnField
+from plain.postgres.fields.base import ColumnField, DefaultableField
 from plain.postgres.fields.related import ManyToManyField, RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.migrations import operations
@@ -23,6 +24,7 @@ from plain.postgres.migrations.utils import (
 
 if TYPE_CHECKING:
     from plain.postgres.migrations.graph import MigrationGraph
+    from plain.postgres.migrations.loader import MigrationLoader
     from plain.postgres.migrations.operations.base import Operation
     from plain.postgres.migrations.state import ProjectState
 
@@ -92,42 +94,7 @@ class MigrationAutodetector:
         return changes
 
     def deep_deconstruct(self, obj: Any) -> Any:
-        """
-        Recursive deconstruction for a field and its arguments.
-        Used for full comparison for rename/alter; sometimes a single-level
-        deconstruction will not compare correctly.
-        """
-        if isinstance(obj, list):
-            return [self.deep_deconstruct(value) for value in obj]
-        elif isinstance(obj, tuple):
-            return tuple(self.deep_deconstruct(value) for value in obj)
-        elif isinstance(obj, dict):
-            return {key: self.deep_deconstruct(value) for key, value in obj.items()}
-        elif isinstance(obj, functools.partial):
-            return (
-                obj.func,
-                self.deep_deconstruct(obj.args),
-                self.deep_deconstruct(obj.keywords),
-            )
-        elif isinstance(obj, COMPILED_REGEX_TYPE):
-            return RegexObject(obj)
-        elif isinstance(obj, type):
-            # If this is a type that implements 'deconstruct' as an instance method,
-            # avoid treating this as being deconstructible itself - see #22951
-            return obj
-        elif hasattr(obj, "deconstruct"):
-            deconstructed = obj.deconstruct()
-            if isinstance(obj, Field):
-                # we have a field which also returns a name
-                deconstructed = deconstructed[1:]
-            path, args, kwargs = deconstructed
-            return (
-                path,
-                [self.deep_deconstruct(value) for value in args],
-                {key: self.deep_deconstruct(value) for key, value in kwargs.items()},
-            )
-        else:
-            return obj
+        return deep_deconstruct(obj)
 
     def only_relation_agnostic_fields(self, fields: dict[str, Field]) -> list[Any]:
         """
@@ -138,7 +105,7 @@ class MigrationAutodetector:
         fields_def = []
         for name, field in sorted(fields.items()):
             deconstruction = self.deep_deconstruct(field)
-            if isinstance(field, RelatedField) and field.remote_field.model:
+            if isinstance(field, RelatedField) and field.remote_field.model_ref:
                 deconstruction[2].pop("to", None)
             fields_def.append(deconstruction)
         return fields_def
@@ -172,11 +139,11 @@ class MigrationAutodetector:
         # Prepare some old/new state and model lists, ignoring unmigrated packages.
         self.old_model_keys = set()
         self.new_model_keys = set()
-        for (package_label, model_name), model_state in self.from_state.models.items():
+        for package_label, model_name in self.from_state.models:
             if package_label not in self.from_state.real_packages:
                 self.old_model_keys.add((package_label, model_name))
 
-        for (package_label, model_name), model_state in self.to_state.models.items():
+        for package_label, model_name in self.to_state.models:
             if package_label not in self.from_state.real_packages or (
                 convert_packages and package_label in convert_packages
             ):
@@ -243,11 +210,9 @@ class MigrationAutodetector:
             )
             old_model_state = self.from_state.models[package_label, old_model_name]
             for field_name, field in old_model_state.fields.items():
-                if hasattr(field, "remote_field") and getattr(
-                    field.remote_field, "through", None
-                ):
+                if isinstance(field, ManyToManyField):
                     through_key = resolve_relation(
-                        field.remote_field.through,  # ty: ignore[unresolved-attribute]
+                        field.remote_field.through_ref,
                         package_label,
                         model_name,
                     )
@@ -379,8 +344,8 @@ class MigrationAutodetector:
     def _optimize_migrations(self) -> None:
         # Add in internal dependencies among the migrations
         for package_label, migrations in self.migrations.items():
-            for m1, m2 in zip(migrations, migrations[1:]):
-                m2.dependencies.append((package_label, m1.name))
+            for m1, m2 in itertools.pairwise(migrations):
+                m2.dependencies = [*m2.dependencies, (package_label, m1.name)]
 
         # De-dupe dependencies
         for migrations in self.migrations.values():
@@ -479,49 +444,44 @@ class MigrationAutodetector:
                     rem_model_fields_def = self.only_relation_agnostic_fields(
                         rem_model_state.fields
                     )
-                    if model_fields_def == rem_model_fields_def:
-                        if self.questioner.ask_rename_model(
-                            rem_model_state, model_state
-                        ):
-                            dependencies = []
-                            fields = list(model_state.fields.values()) + [
-                                field.remote_field
-                                for relations in self.to_state.relations[
-                                    package_label, model_name
-                                ].values()
-                                for field in relations.values()
-                                if isinstance(field, RelatedField)
-                            ]
-                            for field in fields:
-                                if isinstance(field, RelatedField):
-                                    dependencies.extend(
-                                        self._get_dependencies_for_foreign_key(
-                                            package_label,
-                                            model_name,
-                                            field,
-                                            self.to_state,
-                                        )
+                    if model_fields_def == rem_model_fields_def and (
+                        self.questioner.ask_rename_model(rem_model_state, model_state)
+                    ):
+                        dependencies = []
+                        fields = list(model_state.fields.values()) + [
+                            field.remote_field
+                            for relations in self.to_state.relations[
+                                package_label, model_name
+                            ].values()
+                            for field in relations.values()
+                            if isinstance(field, RelatedField)
+                        ]
+                        for field in fields:
+                            if isinstance(field, RelatedField):
+                                dependencies.extend(
+                                    self._get_dependencies_for_foreign_key(
+                                        package_label,
+                                        model_name,
+                                        field,
+                                        self.to_state,
                                     )
-                            self.add_operation(
-                                package_label,
-                                operations.RenameModel(
-                                    old_name=rem_model_state.name,
-                                    new_name=model_state.name,
-                                ),
-                                dependencies=dependencies,
-                            )
-                            self.renamed_models[package_label, model_name] = (
-                                rem_model_name
-                            )
-                            renamed_models_rel_key = f"{rem_model_state.package_label}.{rem_model_state.name_lower}"
-                            self.renamed_models_rel[renamed_models_rel_key] = (
-                                f"{model_state.package_label}.{model_state.name_lower}"
-                            )
-                            self.old_model_keys.remove(
-                                (rem_package_label, rem_model_name)
-                            )
-                            self.old_model_keys.add((package_label, model_name))
-                            break
+                                )
+                        self.add_operation(
+                            package_label,
+                            operations.RenameModel(
+                                old_name=rem_model_state.name,
+                                new_name=model_state.name,
+                            ),
+                            dependencies=dependencies,
+                        )
+                        self.renamed_models[package_label, model_name] = rem_model_name
+                        renamed_models_rel_key = f"{rem_model_state.package_label}.{rem_model_state.name_lower}"
+                        self.renamed_models_rel[renamed_models_rel_key] = (
+                            f"{model_state.package_label}.{model_state.name_lower}"
+                        )
+                        self.old_model_keys.remove((rem_package_label, rem_model_name))
+                        self.old_model_keys.add((package_label, model_name))
+                        break
 
     def generate_created_models(self) -> None:
         """
@@ -541,7 +501,7 @@ class MigrationAutodetector:
             related_fields = {}
             for field_name, field in model_state.fields.items():
                 if isinstance(field, RelatedField):
-                    if field.remote_field.model:
+                    if field.remote_field.model_ref:
                         related_fields[field_name] = field
                     if isinstance(field.remote_field, ManyToManyRel):
                         related_fields[field_name] = field
@@ -643,7 +603,7 @@ class MigrationAutodetector:
             related_fields = {}
             for field_name, field in model_state.fields.items():
                 if isinstance(field, RelatedField):
-                    if field.remote_field.model:
+                    if field.remote_field.model_ref:
                         related_fields[field_name] = field
                     if isinstance(field.remote_field, ManyToManyRel):
                         related_fields[field_name] = field
@@ -724,36 +684,35 @@ class MigrationAutodetector:
                     if (
                         isinstance(field, RelatedField)
                         and field.remote_field
-                        and field.remote_field.model
+                        and field.remote_field.model_ref
                         and "to" in old_field_dec[2]
                     ):
                         old_rel_to = old_field_dec[2]["to"]
                         if old_rel_to in self.renamed_models_rel:
                             old_field_dec[2]["to"] = self.renamed_models_rel[old_rel_to]
                     old_field.set_attributes_from_name(rem_field_name)
-                    if old_field_dec == field_dec:
-                        if self.questioner.ask_rename(
-                            model_name, rem_field_name, field_name, field
-                        ):
-                            self.renamed_operations.append(
-                                (
-                                    rem_package_label,
-                                    rem_model_name,
-                                    rem_field_name,
-                                    package_label,
-                                    model_name,
-                                    field,
-                                    field_name,
-                                )
+                    if old_field_dec == field_dec and self.questioner.ask_rename(
+                        model_name, rem_field_name, field_name, field
+                    ):
+                        self.renamed_operations.append(
+                            (
+                                rem_package_label,
+                                rem_model_name,
+                                rem_field_name,
+                                package_label,
+                                model_name,
+                                field,
+                                field_name,
                             )
-                            old_field_keys.remove(
-                                (rem_package_label, rem_model_name, rem_field_name)
-                            )
-                            old_field_keys.add((package_label, model_name, field_name))
-                            self.renamed_fields[
-                                package_label, model_name, field_name
-                            ] = rem_field_name
-                            break
+                        )
+                        old_field_keys.remove(
+                            (rem_package_label, rem_model_name, rem_field_name)
+                        )
+                        old_field_keys.add((package_label, model_name, field_name))
+                        self.renamed_fields[package_label, model_name, field_name] = (
+                            rem_field_name
+                        )
+                        break
 
     def generate_renamed_fields(self) -> None:
         """Generate RenameField operations."""
@@ -795,7 +754,7 @@ class MigrationAutodetector:
             (package_label, model_name, field_name, False)
         ]
         # Fields that are foreignkeys/m2ms depend on stuff.
-        if isinstance(field, RelatedField) and field.remote_field.model:
+        if isinstance(field, RelatedField) and field.remote_field.model_ref:
             dependencies.extend(
                 self._get_dependencies_for_foreign_key(
                     package_label,
@@ -810,26 +769,36 @@ class MigrationAutodetector:
         can_add_without_backfill = (
             isinstance(field, ManyToManyField)
             or field.has_persistent_column_default()
-            or (
-                isinstance(field, ColumnField)
-                and (
-                    field.allow_null
-                    or (not field.required and field.empty_strings_allowed)
-                )
-            )
+            or (isinstance(field, ColumnField) and field.allow_null)
         )
         if not can_add_without_backfill:
-            raise MigrationSchemaError(
-                f"Cannot add non-nullable field '{model_name}.{field_name}' "
-                f"without a default. Existing rows have no value for this "
-                f"column.\n\n"
-                f"Choose one:\n"
-                f"  1. Declare a default on the field in models.py, e.g.\n"
-                f'       {field_name}: str = types.TextField(default="...")\n'
-                f"  2. Add the field with allow_null=True, scaffold a data "
+            backfill_remedy = (
+                f"Add the field with allow_null=True, scaffold a data "
                 f"migration to populate existing rows, then remove allow_null=True "
                 f"— convergence applies NOT NULL on the next sync:\n"
                 f"       uv run plain migrations create --empty --name backfill_{field_name}"
+            )
+            if isinstance(field, DefaultableField) and field.accepts_default:
+                if field.only_empty_default:
+                    # get_default() returns the field's empty value here — the
+                    # one default these fields accept.
+                    example_kwargs = f"required=False, default={field.get_default()!r}"
+                else:
+                    # `<value>` can't be copied verbatim — `default=...` could
+                    # be, and Ellipsis is a real (wrong) Python value.
+                    example_kwargs = "default=<value>"
+                remedy_text = (
+                    f"Choose one:\n"
+                    f"  1. Declare a default on the field in models.py, e.g.\n"
+                    f"       {field_name} = types.{type(field).__name__}({example_kwargs})\n"
+                    f"  2. {backfill_remedy}"
+                )
+            else:
+                remedy_text = f"Fix: {backfill_remedy}"
+            raise MigrationSchemaError(
+                f"Cannot add non-nullable field '{model_name}.{field_name}' "
+                f"without a default. Existing rows have no value for this "
+                f"column.\n\n{remedy_text}"
             )
         self.add_operation(
             package_label,
@@ -883,16 +852,16 @@ class MigrationAutodetector:
             dependencies: list[tuple[str, str, str | None, bool | str]] = []
             # Implement any model renames on relations; these are handled by RenameModel
             # so we need to exclude them from the comparison
-            if hasattr(new_field, "remote_field") and getattr(
-                new_field.remote_field, "model", None
-            ):
+            if isinstance(new_field, RelatedField):
                 rename_key = resolve_relation(
-                    new_field.remote_field.model,  # ty: ignore[unresolved-attribute]
+                    new_field.remote_field.model_ref,
                     package_label,
                     model_name,
                 )
-                if rename_key in self.renamed_models:
-                    new_field.remote_field.model = old_field.remote_field.model  # ty: ignore[unresolved-attribute]
+                if rename_key in self.renamed_models and isinstance(
+                    old_field, RelatedField
+                ):
+                    new_field.remote_field.model_ref = old_field.remote_field.model_ref
                 dependencies.extend(
                     self._get_dependencies_for_foreign_key(
                         package_label,
@@ -901,16 +870,18 @@ class MigrationAutodetector:
                         self.to_state,
                     )
                 )
-            if hasattr(new_field, "remote_field") and getattr(
-                new_field.remote_field, "through", None
-            ):
+            if isinstance(new_field, ManyToManyField):
                 rename_key = resolve_relation(
-                    new_field.remote_field.through,  # ty: ignore[unresolved-attribute]
+                    new_field.remote_field.through_ref,
                     package_label,
                     model_name,
                 )
-                if rename_key in self.renamed_models:
-                    new_field.remote_field.through = old_field.remote_field.through  # ty: ignore[unresolved-attribute]
+                if rename_key in self.renamed_models and isinstance(
+                    old_field, ManyToManyField
+                ):
+                    new_field.remote_field.through_ref = (
+                        old_field.remote_field.through_ref
+                    )
             old_field_dec = self.deep_deconstruct(old_field)
             new_field_dec = self.deep_deconstruct(new_field)
             # Exclude non_migration_attrs (allow_null, default, on_delete, choices,
@@ -966,8 +937,8 @@ class MigrationAutodetector:
         try:
             old_udt = old_field.unqualified_db_type()
             new_udt = new_field.unqualified_db_type()
-        except ValueError:
-            # ForeignKeyField.target_field raises ValueError when the target
+        except TypeError:
+            # ForeignKeyField.target_field raises TypeError when the target
             # model is a string ref that hasn't been resolved on the state
             # instance. Let the AlterField through — the schema editor will
             # surface any mismatch at apply time.
@@ -999,7 +970,7 @@ class MigrationAutodetector:
     ) -> list[tuple[str, str, str | None, bool | str]]:
         remote_field_model = None
         if isinstance(field, RelatedField):
-            remote_field_model = field.remote_field.model
+            remote_field_model = field.remote_field.model_ref
         else:
             relations = project_state.relations[package_label, model_name]
             for (remote_package_label, remote_model_name), fields in relations.items():
@@ -1022,7 +993,7 @@ class MigrationAutodetector:
             field.remote_field, ManyToManyRel
         ):
             through_package_label, through_object_name = resolve_relation(
-                field.remote_field.through,
+                field.remote_field.through_ref,
                 package_label,
                 model_name,
             )
@@ -1120,7 +1091,7 @@ class MigrationAutodetector:
             # Name each migration
             for i, migration in enumerate(migrations):
                 if i == 0 and app_leaf:
-                    migration.dependencies.append(app_leaf)
+                    migration.dependencies = [*migration.dependencies, app_leaf]
                 new_name_parts = ["%04i" % next_number]  # noqa: UP031
                 if migration_name:
                     new_name_parts.append(migration_name)
@@ -1178,12 +1149,107 @@ class MigrationAutodetector:
     def parse_number(cls, name: str) -> int | None:
         """
         Given a migration name, try to extract a number from the beginning of
-        it. For a squashed migration such as '0001_squashed_0004…', return the
-        second number. If no number is found, return None.
+        it. If no number is found, return None.
         """
-        if squashed_match := re.search(r".*_squashed_(\d+)", name):
-            return int(squashed_match[1])
         match = re.match(r"^\d+", name)
         if match:
             return int(match[0])
         return None
+
+
+def deep_deconstruct(obj: Any) -> Any:
+    """
+    Recursive deconstruction for a field and its arguments.
+    Used for full comparison for rename/alter; sometimes a single-level
+    deconstruction will not compare correctly.
+    """
+    if isinstance(obj, list):
+        return [deep_deconstruct(value) for value in obj]
+    elif isinstance(obj, tuple):
+        return tuple(deep_deconstruct(value) for value in obj)
+    elif isinstance(obj, dict):
+        return {key: deep_deconstruct(value) for key, value in obj.items()}
+    elif isinstance(obj, functools.partial):
+        return (
+            obj.func,
+            deep_deconstruct(obj.args),
+            deep_deconstruct(obj.keywords),
+        )
+    elif isinstance(obj, COMPILED_REGEX_TYPE):
+        return RegexObject(obj)
+    elif isinstance(obj, type):
+        # If this is a type that implements 'deconstruct' as an instance method,
+        # avoid treating this as being deconstructible itself - see #22951
+        return obj
+    elif hasattr(obj, "deconstruct"):
+        deconstructed = obj.deconstruct()
+        if isinstance(obj, Field):
+            # we have a field which also returns a name
+            deconstructed = deconstructed[1:]
+        path, args, kwargs = deconstructed
+        return (
+            path,
+            [deep_deconstruct(value) for value in args],
+            {key: deep_deconstruct(value) for key, value in kwargs.items()},
+        )
+    else:
+        return obj
+
+
+def detect_model_changes(
+    loader: MigrationLoader, package_labels: set[str] | None = None
+) -> dict[str, list[Migration]]:
+    """The migrations `plain migrations create` would write right now.
+
+    Empty when the models and the migration history agree. `apply` uses it to
+    warn, `reset` to refuse: a model change the history doesn't hold would be
+    folded into the baseline and never reach a database that adopts it.
+    """
+    from plain.postgres.migrations.state import ProjectState
+    from plain.postgres.registry import models_registry
+
+    autodetector = MigrationAutodetector(
+        loader.project_state(),
+        ProjectState.from_models_registry(models_registry),
+    )
+    return autodetector.changes(
+        graph=loader.graph,
+        trim_to_packages=package_labels,
+        convert_packages=package_labels,
+    )
+
+
+def describe_changes(changes: dict[str, list[Migration]]) -> list[str]:
+    return [
+        operation.describe()
+        for migrations in changes.values()
+        for migration in migrations
+        for operation in migration.operations
+    ]
+
+
+def package_creation_operations(
+    state: ProjectState, package_label: str
+) -> list[Operation]:
+    """`package_label`'s models in `state` as the operations that create them.
+
+    The autodetector from "everything but this package" to "everything" adds
+    exactly this package's models - ordered, with the field of a circular FK
+    split into an `AddField` after both `CreateModel`s. Its migration
+    chopping and dependency bookkeeping are the caller's to discard.
+    """
+    without_package = state.clone()
+    for label, model_name in list(without_package.models):
+        if label == package_label:
+            without_package.remove_model(label, model_name)
+    generated = MigrationAutodetector(without_package, state)._detect_changes()
+    if not set(generated) <= {package_label}:
+        raise ValueError(
+            f"Regenerating `{package_label}` produced operations for "
+            f"{sorted(set(generated) - {package_label})}"
+        )
+    return [
+        operation
+        for migration in generated.get(package_label, [])
+        for operation in migration.operations
+    ]

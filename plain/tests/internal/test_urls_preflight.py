@@ -89,10 +89,10 @@ def test_duplicate_namespace_among_includes_raises():
 
     class _ParentRouter(Router):
         namespace = ""
-        urls = [
+        urls = (
             include("a/", _ChildRouter),
             include("b/", _ChildRouter),
-        ]
+        )
 
     from plain.urls.resolvers import URLResolver
     from plain.urls.segments import _route_to_segments
@@ -110,18 +110,18 @@ def test_duplicate_namespace_through_unnamespaced_include_raises():
 
     class _Inner(Router):
         namespace = "shared"
-        urls = [path("home/", _View, name="home")]
+        urls = (path("home/", _View, name="home"),)
 
     class _UnnamespacedMiddle(Router):
         namespace = ""
-        urls = [include("inner/", _Inner)]
+        urls = (include("inner/", _Inner),)
 
     class _ParentRouter(Router):
         namespace = ""
-        urls = [
+        urls = (
             include("a/", _UnnamespacedMiddle),
             include("b/", _Inner),
-        ]
+        )
 
     from plain.urls.resolvers import URLResolver
     from plain.urls.segments import _route_to_segments
@@ -135,15 +135,15 @@ def test_duplicate_namespace_through_unnamespaced_include_raises():
 def test_distinct_namespaces_silent():
     class _ChildA(Router):
         namespace = "alpha"
-        urls = [path("home/", _View, name="home")]
+        urls = (path("home/", _View, name="home"),)
 
     class _ChildB(Router):
         namespace = "beta"
-        urls = [path("home/", _View, name="home")]
+        urls = (path("home/", _View, name="home"),)
 
     class _ParentRouter(Router):
         namespace = ""
-        urls = [include("a/", _ChildA), include("b/", _ChildB)]
+        urls = (include("a/", _ChildA), include("b/", _ChildB))
 
     from plain.urls.resolvers import URLResolver
     from plain.urls.segments import _route_to_segments

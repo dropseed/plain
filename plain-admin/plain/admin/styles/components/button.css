@@ -29,64 +29,94 @@
     border-radius: var(--radius-button);
     /* default size */
     @apply gap-2 h-9 px-4 py-2;
-    &:has(>svg) { @apply px-3; }
+    &:has(> svg) {
+      @apply px-3;
+    }
 
     &.admin-btn-sm {
       @apply gap-1.5 h-8 px-3 py-0;
-      &:has(>svg) { @apply px-2.5; }
+      &:has(> svg) {
+        @apply px-2.5;
+      }
     }
     &.admin-btn-lg {
       @apply h-10 px-6 py-2;
-      &:has(>svg) { @apply px-4; }
+      &:has(> svg) {
+        @apply px-4;
+      }
     }
 
-    &.admin-btn-icon       { @apply size-9 p-0; }
-    &.admin-btn-sm.admin-btn-icon { @apply size-8; }
-    &.admin-btn-lg.admin-btn-icon { @apply size-10; }
+    &.admin-btn-icon {
+      @apply size-9 p-0;
+    }
+    &.admin-btn-sm.admin-btn-icon {
+      @apply size-8;
+    }
+    &.admin-btn-lg.admin-btn-icon {
+      @apply size-10;
+    }
   }
 
   .admin-btn-primary {
     @apply bg-admin-primary text-admin-primary-foreground shadow-xs hover:bg-admin-primary/90;
-    &[aria-pressed='true'] { @apply bg-admin-primary/90; }
+    &[aria-pressed="true"] {
+      @apply bg-admin-primary/90;
+    }
   }
   .admin-btn-secondary {
     @apply bg-admin-secondary text-admin-secondary-foreground shadow-xs;
     &:hover,
-    &[aria-pressed='true'] { @apply bg-admin-secondary/80; }
+    &[aria-pressed="true"] {
+      @apply bg-admin-secondary/80;
+    }
   }
   .admin-btn-outline {
     @apply border bg-transparent shadow-xs;
     &:hover,
-    &[aria-pressed='true'] { @apply bg-admin-accent text-admin-accent-foreground dark:bg-admin-accent/50; }
+    &[aria-pressed="true"] {
+      @apply bg-admin-accent text-admin-accent-foreground dark:bg-admin-accent/50;
+    }
   }
   .admin-btn-ghost {
     &:hover,
-    &[aria-pressed='true'] { @apply bg-admin-accent text-admin-accent-foreground dark:bg-admin-accent/50; }
+    &[aria-pressed="true"] {
+      @apply bg-admin-accent text-admin-accent-foreground dark:bg-admin-accent/50;
+    }
   }
   .admin-btn-link {
     @apply text-admin-primary underline-offset-4;
     &:hover,
-    &[aria-pressed='true'] { @apply hover:underline; }
+    &[aria-pressed="true"] {
+      @apply hover:underline;
+    }
   }
   .admin-btn-success {
     @apply bg-admin-success text-admin-success-foreground shadow-xs focus-visible:ring-admin-success/20 dark:focus-visible:ring-admin-success/40 dark:bg-admin-success/70;
     &:hover,
-    &[aria-pressed='true'] { @apply bg-admin-success/90 dark:bg-admin-success/60; }
+    &[aria-pressed="true"] {
+      @apply bg-admin-success/90 dark:bg-admin-success/60;
+    }
   }
   .admin-btn-warning {
     @apply bg-admin-warning text-admin-warning-foreground shadow-xs focus-visible:ring-admin-warning/20 dark:focus-visible:ring-admin-warning/40 dark:bg-admin-warning/70;
     &:hover,
-    &[aria-pressed='true'] { @apply bg-admin-warning/90 dark:bg-admin-warning/60; }
+    &[aria-pressed="true"] {
+      @apply bg-admin-warning/90 dark:bg-admin-warning/60;
+    }
   }
   .admin-btn-danger {
     @apply bg-admin-danger text-admin-danger-foreground shadow-xs focus-visible:ring-admin-danger/20 dark:focus-visible:ring-admin-danger/40 dark:bg-admin-danger/70;
     &:hover,
-    &[aria-pressed='true'] { @apply bg-admin-danger/90 dark:bg-admin-danger/60; }
+    &[aria-pressed="true"] {
+      @apply bg-admin-danger/90 dark:bg-admin-danger/60;
+    }
   }
   .admin-btn-info {
     @apply bg-admin-info text-admin-info-foreground shadow-xs focus-visible:ring-admin-info/20 dark:focus-visible:ring-admin-info/40 dark:bg-admin-info/70;
     &:hover,
-    &[aria-pressed='true'] { @apply bg-admin-info/90 dark:bg-admin-info/60; }
+    &[aria-pressed="true"] {
+      @apply bg-admin-info/90 dark:bg-admin-info/60;
+    }
   }
 }
 
@@ -101,11 +131,11 @@
       @apply relative z-10;
     }
 
-    > hr[role='separator'] {
+    > hr[role="separator"] {
       @apply w-0 h-auto self-stretch border border-admin-input shrink-0 m-0;
     }
 
-    &:not([data-orientation='vertical']) {
+    &:not([data-orientation="vertical"]) {
       > *:not(:first-child),
       > :is(.admin-dropdown-menu, .admin-popover, .admin-select):not(:first-child) > button {
         @apply rounded-l-none border-l-0;
@@ -115,10 +145,10 @@
         @apply rounded-r-none;
       }
     }
-    &[data-orientation='vertical'] {
+    &[data-orientation="vertical"] {
       @apply flex-col;
 
-      > hr[role='separator'] {
+      > hr[role="separator"] {
         @apply w-auto h-px;
       }
 

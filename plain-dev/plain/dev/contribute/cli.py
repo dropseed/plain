@@ -3,7 +3,6 @@ import sys
 from pathlib import Path
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.runtime import without_runtime_setup
 
@@ -24,13 +23,15 @@ def cli(packages: tuple[str, ...], repo: str, reset: bool, all_packages: bool) -
 
     if reset:
         click.secho("Undoing any changes to pyproject.toml and uv.lock", bold=True)
-        result = subprocess.run(["git", "checkout", "pyproject.toml", "uv.lock"])
+        result = subprocess.run(
+            ["git", "checkout", "pyproject.toml", "uv.lock"], check=False
+        )
         if result.returncode:
             click.secho("Failed to checkout pyproject.toml and uv.lock", fg="red")
             sys.exit(result.returncode)
 
         click.secho("Running uv sync", bold=True)
-        result = subprocess.run(["uv", "sync", "--reinstall"])
+        result = subprocess.run(["uv", "sync", "--reinstall"], check=False)
         if result.returncode:
             click.secho("Failed to sync", fg="red")
             sys.exit(result.returncode)
@@ -101,13 +102,17 @@ def cli(packages: tuple[str, ...], repo: str, reset: bool, all_packages: bool) -
             raise click.UsageError(f"Unknown package {package}")
 
     if plain_packages:
-        result = subprocess.run(["uv", "add", "--editable", "--dev"] + plain_packages)
+        result = subprocess.run(
+            ["uv", "add", "--editable", "--dev"] + plain_packages, check=False
+        )
         if result.returncode:
             click.secho("Failed to link plain packages", fg="red")
             sys.exit(result.returncode)
 
     if plainx_packages:
-        result = subprocess.run(["uv", "add", "--editable", "--dev"] + plainx_packages)
+        result = subprocess.run(
+            ["uv", "add", "--editable", "--dev"] + plainx_packages, check=False
+        )
         if result.returncode:
             click.secho("Failed to link plainx packages", fg="red")
             sys.exit(result.returncode)

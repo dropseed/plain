@@ -85,7 +85,9 @@ def test_disabled_flag_emits_disabled_reason_with_key() -> None:
 
     with (
         capture_spans() as otel_spans,
-        override_settings(DEBUG=False),  # disabled flags raise in DEBUG; we want the log path
+        override_settings(
+            DEBUG=False
+        ),  # disabled flags raise in DEBUG; we want the log path
     ):
         assert _KeyedFlag().value is None
 

@@ -1,5 +1,54 @@
 # plain-code changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-code@0.24.0) (2026-08-12)
+
+### What's changed
+
+- Ruff is now a bounded dependency (`ruff>=0.16.2,<0.17`), so every checkout and app on the same plain.code release lints with the same ruff version and rule set ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- The bundled config now deliberately tracks ruff's default rules (which expanded significantly in ruff 0.16) instead of pinning a small explicit list. A short, documented ignore list remains: `ISC001` (formatter conflict), `B009`/`B010` (getattr/setattr with literal names is how dynamic-attribute code stays visible to the type checker), and `BLE001`/`S110`/`S112` (broad catches at error boundaries are design, not accidents) ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- Upgrading will move you to ruff 0.16 and its expanded default rule set, so `plain fix` / `plain code check` will likely surface new findings in your code without you changing anything. Run `plain fix` first — many are auto-fixable (import grouping, `__all__` sorting, simplifications) — then address the rest: prefer tuples for declarative class attributes and `ClassVar[...]` for mutable dict class attributes (`RUF012`), and timezone-aware datetimes (`DTZ*`)
+- Ruff may also flag now-unused `# noqa` comments (`RUF100`) — safe to delete
+
+## [0.23.1](https://github.com/dropseed/plain/releases/plain-code@0.23.1) (2026-08-07)
+
+### What's changed
+
+- `oxlint` and `oxfmt` are now invoked with `--no-error-on-unmatched-pattern`, so `plain code check` and `plain code fix` no longer fail in a project with no JS/TS files — the normal state for a Python-only app. Previously only oxfmt's exact "Expected at least one target file" stderr text was special-cased into a success, which left oxlint failing the same empty-project case. ([31180b789a](https://github.com/dropseed/plain/commit/31180b789a))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-code@0.23.0) (2026-08-02)
+
+### What's changed
+
+- **Oxc 1.75.0 is now the minimum supported version**, enforced before install and before every invocation. A `pyproject.toml` pinned below the minimum is rejected with a clear error (`run \`plain code update\``) instead of installing successfully and then dying with an unhandled error on the first lint. ([92792ca396](https://github.com/dropseed/plain/commit/92792ca396), [3796cf6854](https://github.com/dropseed/plain/commit/3796cf6854))
+- Ignore patterns are now passed on the command line instead of via shipped config files (`oxlint_defaults.json` / `oxfmt_defaults.json`, both removed — config-file `ignorePatterns` only match files under the config's own directory, which never matched the project's). The list is also trimmed to committed third-party code (`**/vendor/**`, `**/*.min.*`) — `node_modules`, `.venv`, `htmlcov`, and `.pytest_cache` are already gitignored and both tools honor `.gitignore` on their own. ([3796cf6854](https://github.com/dropseed/plain/commit/3796cf6854), [f9a6fe43f9](https://github.com/dropseed/plain/commit/f9a6fe43f9))
+- oxfmt's "No config found, using defaults" nudge is suppressed — no config file is passed on purpose, and projects can still add their own `.oxfmtrc.json`. ([b40819d36f](https://github.com/dropseed/plain/commit/b40819d36f))
+
+### Upgrade instructions
+
+- If your project pins an Oxc version below 1.75.0 in `pyproject.toml`, run `uv run plain code update` to move to the latest version.
+
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-code@0.22.0) (2026-07-22)
+
+### What's changed
+
+- Oxc binaries (`oxlint`, `oxfmt`) are now downloaded to the machine-level cache at `~/.cache/plain/oxc/<version>/` instead of the per-checkout `.plain/` directory, so every checkout and worktree on the machine shares one download. Because the path is version-addressed, projects pinned to different Oxc versions coexist without re-downloading on every switch. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The `.plain/oxc.version` sidecar lockfile is gone — the version in the cache path is the state, and `OxcTool.needs_update()` was removed along with it. `plain code install`, `check`, and `fix` now simply install when a binary for the configured version isn't present. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- `plain code install` now also verifies `oxfmt` is present, not just `oxlint` — previously a missing or partially installed `oxfmt` could go unnoticed. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- Downloads extract to a temporary file and are atomically moved into place, so two checkouts installing at the same time can't leave a truncated or corrupted binary behind. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- Running Oxc with no version configured in `pyproject.toml` now raises a clear error pointing at `plain code install` instead of failing on a missing binary path. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+
+### Upgrade instructions
+
+- No changes required — the new binaries download on the next `plain code check`/`fix`/`install`. If you want the disk back, the stale `oxlint`, `oxfmt`, and `oxc.version` files left in each checkout's `.plain/` can be deleted.
+- If you called `OxcTool.needs_update()` or `OxcTool.standalone_path` directly, use `is_installed()` and `binary_path(version)` instead.
+
 ## [0.21.8](https://github.com/dropseed/plain/releases/plain-code@0.21.8) (2026-07-15)
 
 ### What's changed

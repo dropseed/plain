@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 
 from app.users.models import User
-
 from plain.email.test import outbox
 from plain.test import Client
 

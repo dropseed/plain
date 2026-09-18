@@ -20,8 +20,16 @@
     @apply bg-admin-success rounded-full;
   }
 
-  .admin-progress[data-status="warning"]::-webkit-progress-value { @apply bg-admin-warning; }
-  .admin-progress[data-status="warning"]::-moz-progress-bar { @apply bg-admin-warning; }
-  .admin-progress[data-status="error"]::-webkit-progress-value { @apply bg-admin-danger; }
-  .admin-progress[data-status="error"]::-moz-progress-bar { @apply bg-admin-danger; }
+  .admin-progress[data-status="warning"]::-webkit-progress-value {
+    @apply bg-admin-warning;
+  }
+  .admin-progress[data-status="warning"]::-moz-progress-bar {
+    @apply bg-admin-warning;
+  }
+  .admin-progress[data-status="error"]::-webkit-progress-value {
+    @apply bg-admin-danger;
+  }
+  .admin-progress[data-status="error"]::-moz-progress-bar {
+    @apply bg-admin-danger;
+  }
 }

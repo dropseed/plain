@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from plain.auth.views import AuthView
 from plain.http import ForbiddenError403
+from plain.postgres.exceptions import FieldDoesNotExist
 from plain.preflight import get_check_counts
 from plain.runtime import settings
 from plain.templates.views import TemplateView
@@ -58,9 +59,9 @@ class AdminView(AuthView, TemplateView):
     nav_section = ""
     nav_icon = ""  # Bootstrap Icons name (e.g., "cart", "person", "flag")
 
-    links: dict[str, str] = {}
-    extra_links: dict[str, str] = {}
-    field_templates: dict[str, str] = {}
+    links: ClassVar[dict[str, str]] = {}
+    extra_links: ClassVar[dict[str, str]] = {}
+    field_templates: ClassVar[dict[str, str]] = {}
 
     parent_view_class: AdminView | None = None
 
@@ -68,7 +69,17 @@ class AdminView(AuthView, TemplateView):
     viewset: type[AdminViewset] | None = None
 
     template_name = "admin/page.html"
-    cards: list[Card] = []
+    cards: tuple[Card, ...] = ()
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        # Declarative attributes are tuples; converge legacy list declarations
+        # so the get_* accessors can safely return them as-is (a shared list
+        # would be silently mutable through an append-style override).
+        for attr in ("cards", "fields", "search_fields", "actions", "filters"):
+            value = cls.__dict__.get(attr)
+            if isinstance(value, list):
+                setattr(cls, attr, tuple(value))
 
     def before_request(self) -> None:
         super().before_request()
@@ -168,8 +179,8 @@ class AdminView(AuthView, TemplateView):
     def get_extra_links(self) -> dict[str, str]:
         return self.extra_links.copy()
 
-    def get_cards(self) -> list[Card]:
-        return self.cards.copy()
+    def get_cards(self) -> tuple[Card, ...]:
+        return self.cards
 
     def get_field_value(self, obj: Any, field: str) -> Any:
         try:
@@ -214,7 +225,8 @@ class AdminView(AuthView, TemplateView):
             field_obj = obj._model_meta.get_field(field)
             field_type = type(field_obj).__name__
             templates.append(f"admin/values/{field_type}.html")
-        except Exception:
+        except (AttributeError, FieldDoesNotExist):
+            # Not a model instance, or not a database field on it.
             pass
 
         # By value type (walk MRO for parent classes)

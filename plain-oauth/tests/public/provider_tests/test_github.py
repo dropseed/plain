@@ -1,8 +1,7 @@
-from providers.github import GitHubOAuthProvider
-
 from plain.auth.requests import get_request_user
 from plain.oauth.providers import OAuthToken, OAuthUser
 from plain.test import Client, override_settings
+from providers.github import GitHubOAuthProvider
 
 
 class DummyGitHubOAuthProvider(GitHubOAuthProvider):

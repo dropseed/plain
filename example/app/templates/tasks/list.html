@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import back_link %}
+{% from "_macros.html" import back_link, pagination %}
 
 {% block title %}Tasks{% endblock %}
 
@@ -39,6 +39,8 @@
         </li>
         {% endfor %}
     </ul>
+
+    {{ pagination(page_obj) }}
     {% else %}
     <p class="mt-6 text-sm text-muted">
         No tasks yet — start with <a class="body-link" href="{{ url('tasks:seed') }}">seeding</a>, then create one.

@@ -1,9 +1,9 @@
 """Pin the schema-editor behavior for persistent literal `default=` values.
 
 Literal (non-callable, non-None) defaults are inlined into CREATE TABLE and
-kept on ADD COLUMN. Callable defaults, `update_now` auto-fills, and the
-synthesized empty-string default for `required=False` text fields must
-continue to use the transient ADD+DROP path. Nullability and column DEFAULT
+kept on ADD COLUMN. There is no implicit DDL synthesis: a field without a
+declared default gets no DEFAULT clause at all (backfill intent must be
+explicit via `default=` or `allow_null=True`). Nullability and column DEFAULT
 changes on existing columns are convergence-managed — the schema editor
 short-circuits on allow_null and default differences.
 """
@@ -11,11 +11,10 @@ short-circuits on allow_null and default differences.
 from __future__ import annotations
 
 from app.examples.models.defaults import DefaultsExample
-
 from plain.postgres import fields as plain_fields
-from plain.postgres import get_connection
+from plain.postgres import get_connection, types
 from plain.postgres.test import isolated_db
-from plain.test import raises
+from plain.test import cases, raises
 
 
 def test_create_table_inlines_literal_default():
@@ -65,6 +64,39 @@ def test_add_field_without_default_emits_no_default_clause():
     assert "drop default" not in joined
 
 
+@cases(
+    (types.EncryptedTextField(required=False, default=""), ""),
+    (types.BinaryField(required=False, default=b""), b""),
+)
+def test_add_only_empty_default_field_backfills_populated_table(field, expected):
+    """The whole point of the empty default: ADD COLUMN succeeds on a table
+    that already has rows (the empty value is expressible as a literal —
+    encrypted stores '' as plaintext), existing rows read back empty, and the
+    DEFAULT persists."""
+    DefaultsExample.query.create(name="existing")
+
+    field.set_attributes_from_name("added_column")
+
+    connection = get_connection()
+    with connection.schema_editor(atomic=False) as editor:
+        editor.add_field(DefaultsExample, field)
+
+    joined = " ".join(editor.executed_sql).lower()
+    # Spaces matter: bare "default" would match the table name
+    # ("examples_defaultsexample") and never fail.
+    assert " default " in joined
+    assert "drop default" not in joined
+
+    table = DefaultsExample.model_options.db_table
+    with connection.cursor() as cursor:
+        cursor.execute(f'SELECT "added_column" FROM "{table}"')
+        rows = cursor.fetchall()
+    value = rows[0][0]
+    if isinstance(value, memoryview):
+        value = bytes(value)
+    assert value == expected
+
+
 def test_alter_field_nullable_to_not_null_is_migration_no_op():
     """allow_null is in non_migration_attrs — the schema editor emits nothing for a
     nullable→NOT NULL transition. Convergence owns the CHECK NOT VALID +
@@ -101,7 +133,7 @@ def test_alter_field_default_only_change_is_migration_no_op():
     """Changing only ``default=`` on an already-NOT-NULL column emits nothing
     from the schema editor — ``default`` is in ``non_migration_attrs``, so the
     migration path short-circuits. Convergence's ``_compare_column_default``
-    detects CHANGED drift and applies ``SetColumnDefaultFix`` on the next sync
+    detects CHANGED drift and applies ``SetColumnDefaultCorrection`` on the next sync
     (covered by ``test_detects_changed_literal_default``)."""
     old_field = plain_fields.TextField(max_length=20, default="active")
     old_field.set_attributes_from_name("role")
@@ -154,11 +186,10 @@ def test_special_char_string_default_round_trip():
     → pg_get_expr → normalize the model side → compare. Otherwise every
     sync would flag CHANGED for safe-but-ugly inputs."""
     from convergence_helpers import column_default_sql, execute
-
     from plain.postgres.convergence.analysis import _normalize_default_expr
     from plain.postgres.ddl import compile_literal_default_sql
 
-    cases = [
+    values = [
         "O'Reilly",  # single quote — psycopg escapes by doubling
         "line1\nline2",  # newline — standard strings carry it literally
         "tab\there",  # tab
@@ -167,7 +198,7 @@ def test_special_char_string_default_round_trip():
         "",  # empty string
     ]
 
-    for value in cases:
+    for value in values:
         field = plain_fields.TextField(max_length=100, default=value)
         field.set_attributes_from_name("status")
 
@@ -201,7 +232,6 @@ def test_jsonb_default_no_drift_when_keys_reordered():
     every sync of a JSONField default whose author rearranged keys would
     report spurious CHANGED."""
     from convergence_helpers import execute
-
     from plain.postgres import JSONField
     from plain.postgres.convergence.analysis import _compare_column_default
     from plain.postgres.introspection import ColumnState, introspect_table
@@ -253,7 +283,6 @@ def test_jsonb_default_drift_when_values_differ():
     must still report CHANGED. Pins the negative case so the fallback
     can't drift into a "never reports JSONField drift" bug."""
     from convergence_helpers import execute
-
     from plain.postgres import JSONField
     from plain.postgres.convergence.analysis import (
         ColumnDefaultDrift,

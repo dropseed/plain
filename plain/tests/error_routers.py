@@ -1,6 +1,6 @@
 """Minimal error-raising views for plain core tests.
 
-The template-using error fixtures (and the `{status}.html` rendering
+The template-using error views (and the `{status}.html` rendering
 integration tests) live in plain-templates. This module keeps only what
 plain core needs: a plain `View` that raises a 500 so OTel exception
 recording can be exercised without depending on the templates package.
@@ -25,7 +25,7 @@ class PlainViewRaises500(View):
 
 class ErrorRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("plain-404/", PlainViewRaises404, name="plain-404"),
         path("plain-500/", PlainViewRaises500, name="plain-500"),
-    ]
+    )

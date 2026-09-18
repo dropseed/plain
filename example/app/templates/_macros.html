@@ -54,3 +54,21 @@
     <a href="{{ href }}" class="back-link">← {{ label }}</a>
 </div>
 {% endmacro %}
+
+{% macro pagination(page_obj) %}
+{% if page_obj is not none and page_obj.paginator.num_pages > 1 %}
+<div class="mt-6 flex items-center justify-between text-sm text-muted">
+    {% if page_obj.has_previous() %}
+    <a class="body-link" href="?page={{ page_obj.previous_page_number() }}">← Previous</a>
+    {% else %}
+    <span class="opacity-40">← Previous</span>
+    {% endif %}
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next() %}
+    <a class="body-link" href="?page={{ page_obj.next_page_number() }}">Next →</a>
+    {% else %}
+    <span class="opacity-40">Next →</span>
+    {% endif %}
+</div>
+{% endif %}
+{% endmacro %}

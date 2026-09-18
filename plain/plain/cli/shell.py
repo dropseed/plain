@@ -7,7 +7,6 @@ import traceback
 import types
 
 import click
-
 from plain.cli.runtime import common_command
 
 _STARTUP = os.path.join(os.path.dirname(__file__), "startup.py")
@@ -26,7 +25,7 @@ def _run_source(source: str, filename: str, argv0: str) -> None:
     module = types.ModuleType("__main__")
     sys.modules["__main__"] = module
     try:
-        exec(compile(source, filename, "exec"), module.__dict__)
+        exec(compile(source, filename, "exec"), module.__dict__)  # noqa: S102 — running user-supplied code is this command's purpose
     except Exception as e:
         # Drop this function's frame so the traceback starts at the user's
         # code, like `python -c`.
@@ -58,6 +57,7 @@ def _run_repl(interface: str | None) -> None:
     result = subprocess.run(
         _INTERFACES[interface],
         env={**os.environ, "PYTHONSTARTUP": _STARTUP},
+        check=False,
     )
     if result.returncode:
         sys.exit(result.returncode)

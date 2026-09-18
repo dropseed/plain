@@ -1,5 +1,43 @@
 # plain-loginlink changelog
 
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.22.0) (2026-09-04)
+
+### What's changed
+
+- Link expiration is now a `link_expires_in` class attribute on `LoginLinkForm` instead of an `expires_in` argument to `maybe_send_link()`. Overriding a method just to change a number meant a `super()` call whose only job was passing one value through; the attribute says the same thing where you'd look for it ([927bcd11ed](https://github.com/dropseed/plain/commit/927bcd11ed))
+- The README now documents that login links are **not** single-use — a link works every time it is clicked until it expires, and the expiration window is the security boundary. Consuming a link on first request breaks with corporate mail scanners (Safe Links, Mimecast, Barracuda), which fetch URLs in incoming email and would spend the link before the recipient ever clicks it. The new FAQ entry explains the tradeoff and points at `plain.signing` for building a genuinely single-use flow ([927bcd11ed](https://github.com/dropseed/plain/commit/927bcd11ed))
+
+### Upgrade instructions
+
+- If you overrode `maybe_send_link()` only to change `expires_in`, replace it with the class attribute:
+
+    ```python
+    class CustomLoginLinkForm(LoginLinkForm):
+        link_expires_in = 60 * 15  # 15 minutes
+    ```
+
+- If you call `maybe_send_link()` directly, drop the `expires_in` argument — it no longer accepts one.
+
+## [0.21.9](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.9) (2026-08-12)
+
+### What's changed
+
+- `urls` declared as a tuple; internal lint cleanups ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.21.8](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.8) (2026-08-02)
+
+### What's changed
+
+- Login-link redirects now pass an explicit `status_code=302` to `RedirectResponse`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.7](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.7) (2026-07-15)
 
 ### What's changed

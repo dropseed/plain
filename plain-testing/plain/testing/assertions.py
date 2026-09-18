@@ -16,7 +16,7 @@ import ast
 import reprlib
 from typing import Any
 
-__all__ = ["rewrite_asserts", "format_compare", "format_truth"]
+__all__ = ["format_compare", "format_truth", "rewrite_asserts"]
 
 # Names injected into rewritten test modules. Unique and greppable.
 _FORMAT_COMPARE = "__plain_testing_format_compare__"

@@ -9,11 +9,11 @@ from plain.packages import packages_registry
 from plain.postgres.migrations.graph import MigrationGraph
 from plain.postgres.migrations.recorder import MigrationRecorder
 
+from .baselines import BaselineStatus, classify_baselines
 from .exceptions import (
     AmbiguityError,
     BadMigrationError,
     InconsistentMigrationHistory,
-    NodeNotFoundError,
 )
 
 if TYPE_CHECKING:
@@ -35,17 +35,6 @@ class MigrationLoader:
     read the Python files, looking for a class called Migration, which should
     inherit from plain.postgres.migrations.Migration. See
     plain.postgres.migrations.migration for what that looks like.
-
-    Some migrations will be marked as "replacing" another set of migrations.
-    These are loaded into a separate set of migrations away from the main ones.
-    If all the migrations they replace are either unapplied or missing from
-    disk, then they are injected into the main set, replacing the named migrations.
-    Any dependency pointers to the replaced migrations are re-pointed to the
-    new migration.
-
-    This does mean that this class MUST also talk to the database as well as
-    to disk, but this is probably fine. We're already not just operating
-    in memory.
     """
 
     def __init__(
@@ -53,17 +42,20 @@ class MigrationLoader:
         connection: DatabaseConnection | None,
         load: bool = True,
         ignore_no_migrations: bool = False,
-        replace_migrations: bool = True,
     ):
         self.connection = connection
         self.disk_migrations: dict[tuple[str, str], Migration] | None = None
         self.applied_migrations: dict[tuple[str, str], Any] | None = None
         self.ignore_no_migrations = ignore_no_migrations
-        self.replace_migrations = replace_migrations
         self.unmigrated_packages: set[str]
         self.migrated_packages: set[str]
         self.graph: MigrationGraph
-        self.replacements: dict[tuple[str, str], Migration]
+        # What the planner should do with each baseline, from the records
+        # observed in build_graph(). Empty without a connection.
+        self.baseline_status: BaselineStatus = BaselineStatus()
+        # One baseline per package, and every retired name it stands for.
+        self.baselines: dict[str, Migration] = {}
+        self.retired_to_baseline: dict[tuple[str, str], tuple[str, str]] = {}
         if load:
             self.build_graph()
 
@@ -144,12 +136,70 @@ class MigrationLoader:
                     raise BadMigrationError(
                         f"Migration {migration_name} in app {package_config.package_label} has no Migration class"
                     )
+                if getattr(migration_module.Migration, "replaces", None):
+                    label = package_config.package_label
+                    raise BadMigrationError(
+                        f"Migration {label}.{migration_name} declares `replaces`, which Plain no longer supports.\n"
+                        "To get the codebase and every database back to ordinary records, in order:\n"
+                        f"  1. Delete the `replaces = ...` line from {migration_module.__file__}.\n"
+                        "  2. Delete any migration file it replaced that is still on disk (otherwise the package has two leaves),\n"
+                        f'     and repoint any `dependencies` entry that names a deleted migration to ("{label}", "{migration_name}").\n'
+                        "  3. On each database that already applied every replaced migration (check with `plain migrations list`),\n"
+                        f"     record this one without running it: plain migrations apply {label} {migration_name} --fake\n"
+                        "     A fresh database runs `plain migrations apply` without --fake. A database that applied only some\n"
+                        "     of the replaced migrations must finish them on the previous release first.\n"
+                        "  4. On each database: plain migrations prune\n"
+                        "Do steps 3 and 4 on staging and production before their next deploy."
+                    )
                 self.disk_migrations[package_config.package_label, migration_name] = (
                     migration_module.Migration(
                         migration_name,
                         package_config.package_label,
                     )
                 )
+
+    def register_baselines(self) -> None:
+        """One baseline per package; every name it retired resolves to it."""
+        assert self.disk_migrations is not None
+        for (label, name), migration in self.disk_migrations.items():
+            if not migration.supersedes:
+                if migration.retired or migration.since:
+                    raise BadMigrationError(
+                        f"Migration {label}.{name} sets `retired`/`since` but no `supersedes`; "
+                        "a baseline names the one migration it supersedes."
+                    )
+                continue
+            if label in self.baselines:
+                raise BadMigrationError(
+                    f"Package {label} has two baseline migrations "
+                    f"({self.baselines[label].name} and {name}); a package can have one."
+                )
+            retired_names = [*migration.retired, migration.supersedes]
+            if name in retired_names:
+                raise BadMigrationError(
+                    f"Baseline {label}.{name} reuses a retired name. A database that "
+                    "recorded the old migration would look like it adopted the "
+                    "baseline; name it past the old leaf instead."
+                )
+            for retired in retired_names:
+                if (label, retired) in self.disk_migrations:
+                    raise BadMigrationError(
+                        f"Baseline {label}.{name} retires {retired}, but that migration "
+                        "is still on disk. A baseline stands in for deleted history; "
+                        "delete the files it replaces."
+                    )
+            for dependency in migration.dependencies:
+                if dependency == (label, name) or (
+                    dependency[0] == label and dependency[1] in retired_names
+                ):
+                    raise BadMigrationError(
+                        f"Baseline {label}.{name} depends on {dependency[1]}, which it "
+                        "retires. A baseline is its package's root; it depends on other "
+                        "packages only."
+                    )
+            self.baselines[label] = migration
+            for retired in retired_names:
+                self.retired_to_baseline[label, retired] = (label, name)
 
     def get_migration(self, package_label: str, name_prefix: str) -> Migration | None:
         """Return the named migration or raise NodeNotFoundError."""
@@ -242,83 +292,57 @@ class MigrationLoader:
         You'll need to rebuild the graph if you apply migrations. This isn't
         usually a problem as generally migration stuff runs in a one-shot process.
         """
-        # Load disk data
         self.load_disk()
         assert self.disk_migrations is not None  # load_disk() ensures this
+        self.build_graph_from(self.disk_migrations)
+
+    def build_graph_from(
+        self, disk_migrations: dict[tuple[str, str], Migration]
+    ) -> None:
+        """Build the graph over the given migrations instead of what is on disk.
+
+        `build_graph()` passes what `load_disk()` found; `plain migrations
+        reset` passes what the disk *would* hold after a reset, so every check
+        here - baseline registration, dependency normalization, consistency,
+        cycles - runs on the candidate before a file is touched. Dependency
+        normalization rewrites the migrations it is given.
+        """
+        self.disk_migrations = disk_migrations
+        self.baselines = {}
+        self.retired_to_baseline = {}
+        self.register_baselines()
         # Load database data
         if self.connection is None:
             self.applied_migrations = {}
         else:
             recorder = MigrationRecorder(self.connection)
             self.applied_migrations = recorder.applied_migrations()
+        # A dependency on a migration a baseline retired points at the baseline.
+        # Done once here so every reader of `dependencies` sees the same graph.
+        for migration in (
+            self.disk_migrations.values() if self.retired_to_baseline else ()
+        ):
+            migration.dependencies = [
+                self.retired_to_baseline.get(parent, parent)
+                for parent in migration.dependencies
+            ]
         # To start, populate the migration graph with nodes for ALL migrations
-        # and their dependencies. Also make note of replacing migrations at this step.
+        # and their dependencies.
         self.graph = MigrationGraph()
-        self.replacements = {}
         for key, migration in self.disk_migrations.items():
             self.graph.add_node(key, migration)
-            # Replacing migrations.
-            if migration.replaces:
-                self.replacements[key] = migration
         for key, migration in self.disk_migrations.items():
             # Internal (same app) dependencies.
             self.add_internal_dependencies(key, migration)
         # Add external dependencies now that the internal ones have been resolved.
         for key, migration in self.disk_migrations.items():
             self.add_external_dependencies(key, migration)
-        # Carry out replacements where possible and if enabled.
-        if self.replace_migrations:
-            for key, migration in self.replacements.items():
-                # Get applied status of each of this migration's replacement
-                # targets.
-                applied_statuses = [
-                    (target in self.applied_migrations) for target in migration.replaces
-                ]
-                # The replacing migration is only marked as applied if all of
-                # its replacement targets are.
-                if all(applied_statuses):
-                    self.applied_migrations[key] = migration
-                else:
-                    self.applied_migrations.pop(key, None)
-                # A replacing migration can be used if either all or none of
-                # its replacement targets have been applied.
-                if all(applied_statuses) or (not any(applied_statuses)):
-                    self.graph.remove_replaced_nodes(key, migration.replaces)
-                else:
-                    # This replacing migration cannot be used because it is
-                    # partially applied. Remove it from the graph and remap
-                    # dependencies to it (#25945).
-                    self.graph.remove_replacement_node(key, migration.replaces)
-        # Ensure the graph is consistent.
-        try:
-            self.graph.validate_consistency()
-        except NodeNotFoundError as exc:
-            # Check if the missing node could have been replaced by any squash
-            # migration but wasn't because the squash migration was partially
-            # applied before. In that case raise a more understandable exception
-            # (#23556).
-            # Get reverse replacements.
-            reverse_replacements = {}
-            for key, migration in self.replacements.items():
-                for replaced in migration.replaces:
-                    reverse_replacements.setdefault(replaced, set()).add(key)
-            # Try to reraise exception with more detail.
-            if exc.node in reverse_replacements:
-                candidates = reverse_replacements.get(exc.node, set())
-                is_replaced = any(
-                    candidate in self.graph.nodes for candidate in candidates
-                )
-                if not is_replaced:
-                    tries = ", ".join("{}.{}".format(*c) for c in candidates)
-                    raise NodeNotFoundError(
-                        f"Migration {exc.origin} depends on nonexistent node ('{exc.node[0]}', '{exc.node[1]}'). "
-                        f"Plain tried to replace migration {exc.node[0]}.{exc.node[1]} with any of [{tries}] "
-                        "but wasn't able to because some of the replaced migrations "
-                        "are already applied.",
-                        exc.node,
-                    ) from exc
-            raise
+        self.graph.validate_consistency()
         self.graph.ensure_not_cyclic()
+        if self.connection is not None and self.baselines:
+            self.baseline_status = classify_baselines(
+                self, self.applied_migrations, self.connection
+            )
 
     def check_consistent_history(self, connection: DatabaseConnection) -> None:
         """
@@ -333,18 +357,32 @@ class MigrationLoader:
                 continue
             for parent in self.graph.node_map[migration].parents:
                 if parent not in applied:
-                    # Skip unapplied squashed migrations that have all of their
-                    # `replaces` applied.
-                    # Use parent.key for dict lookup (Node.__eq__ allows `in` check)
-                    if parent.key in self.replacements:
-                        if all(
-                            m in applied for m in self.replacements[parent.key].replaces
-                        ):
-                            continue
+                    # An unrecorded baseline is the planner's: it classifies every
+                    # state a package can be in (adopt, run, or refuse with a
+                    # message that says why), so this is not an inconsistency.
+                    baseline = self.baselines.get(parent.key[0])
+                    if baseline is not None and baseline.name == parent.key[1]:
+                        continue
                     raise InconsistentMigrationHistory(
                         f"Migration {migration[0]}.{migration[1]} is applied before its dependency "
                         f"{parent[0]}.{parent[1]} on the database."
                     )
+
+    def orphan_records(
+        self, applied: dict[tuple[str, str], Any]
+    ) -> list[tuple[str, str]]:
+        """Recorded migrations with no file on disk that no baseline retired.
+
+        The one definition every reader of "stale record" shares: prune,
+        preflight, and plain-dev's branch-switch check. Retired records are
+        deliberately excluded - they are what rollback across a reset needs.
+        """
+        assert self.disk_migrations is not None
+        return [
+            key
+            for key in applied
+            if key not in self.disk_migrations and key not in self.retired_to_baseline
+        ]
 
     def detect_conflicts(self) -> dict[str, list[str]]:
         """

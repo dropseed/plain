@@ -18,9 +18,8 @@ import concurrent.futures
 from contextlib import contextmanager
 from unittest.mock import patch
 
-from helpers import clean_connection
-
 import plain.postgres.middleware
+from helpers import clean_connection
 from plain.http import Response, StreamingResponse
 from plain.internal.handlers.base import BaseHandler
 from plain.postgres.connection import DatabaseConnection
@@ -91,12 +90,12 @@ class StreamingDBQueryView(View):
 
 class TestRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("db-query", DBQueryView, name="db_query"),
         path("async-db-query", AsyncDBQueryView, name="async_db_query"),
         path("sse-db-query", DBQuerySSEView, name="sse_db_query"),
         path("streaming-db-query", StreamingDBQueryView, name="streaming_db_query"),
-    ]
+    )
 
 
 _tracking_seen: list[int | None] = []
@@ -326,41 +325,43 @@ class TestStreamingResponseCleanup:
                 "plain.postgres.DatabaseConnectionMiddleware",
                 *settings.MIDDLEWARE,
             ]
-            with override_settings(MIDDLEWARE=middleware):
-                with patch.object(
+            with (
+                override_settings(MIDDLEWARE=middleware),
+                patch.object(
                     plain.postgres.middleware,
                     "return_database_connection",
                     tracking_return,
-                ):
-                    handler = BaseHandler()
-                    handler.load_middleware()
-                    request = RequestFactory().get("/streaming-db-query")
+                ),
+            ):
+                handler = BaseHandler()
+                handler.load_middleware()
+                request = RequestFactory().get("/streaming-db-query")
 
-                    async def run() -> Response:
-                        with concurrent.futures.ThreadPoolExecutor(
-                            max_workers=2
-                        ) as executor:
-                            return await handler.handle(request, executor)
+                async def run() -> Response:
+                    with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=2
+                    ) as executor:
+                        return await handler.handle(request, executor)
 
-                    response = asyncio.run(run())
-                    assert response.status_code == 200
-                    assert isinstance(response, StreamingResponse)
+                response = asyncio.run(run())
+                assert response.status_code == 200
+                assert isinstance(response, StreamingResponse)
 
-                    # Streaming path: no close at after_response time.
-                    assert calls == []
+                # Streaming path: no close at after_response time.
+                assert calls == []
 
-                    # Drain the body and close — that fires the resource closer.
-                    body = b"".join(response)
-                    assert body == b"streaming-chunk"
-                    response.close()
+                # Drain the body and close — that fires the resource closer.
+                body = b"".join(response)
+                assert body == b"streaming-chunk"
+                response.close()
 
-                    # The closer ran exactly once and received the wrapper
-                    # captured during after_response.
-                    assert len(calls) == 1
-                    captured = calls[0]
-                    assert captured is not None, (
-                        "Middleware failed to capture the wrapper at append time"
-                    )
-                    assert captured.connection is None, (
-                        "Captured wrapper's psycopg connection should be returned"
-                    )
+                # The closer ran exactly once and received the wrapper
+                # captured during after_response.
+                assert len(calls) == 1
+                captured = calls[0]
+                assert captured is not None, (
+                    "Middleware failed to capture the wrapper at append time"
+                )
+                assert captured.connection is None, (
+                    "Captured wrapper's psycopg connection should be returned"
+                )

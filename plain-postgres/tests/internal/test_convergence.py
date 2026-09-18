@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from app.examples.models.relationships import Widget, WidgetTag
 from convergence_helpers import constraint_exists, create_invalid_index, execute
-
 from plain.postgres import CheckConstraint, Index, Q, get_connection
 from plain.postgres.convergence import (
     PlanItem,
     analyze_model,
-    can_auto_fix,
+    can_auto_correct,
     execute_plan,
     plan_convergence,
     plan_model_convergence,
@@ -22,14 +21,14 @@ from plain.postgres.convergence.analysis import (
     IndexRenameDrift,
     IndexUndeclaredDrift,
 )
-from plain.postgres.convergence.fixes import (
-    AddConstraintFix,
-    CreateIndexFix,
-    DropConstraintFix,
-    DropIndexFix,
-    RebuildIndexFix,
-    RenameIndexFix,
-    ValidateConstraintFix,
+from plain.postgres.convergence.corrections import (
+    AddConstraintCorrection,
+    CreateIndexCorrection,
+    DropConstraintCorrection,
+    DropIndexCorrection,
+    RebuildIndexCorrection,
+    RenameIndexCorrection,
+    ValidateConstraintCorrection,
 )
 from plain.postgres.functions.text import Upper
 from plain.postgres.test import isolated_db
@@ -77,37 +76,51 @@ class TestPassOrdering:
             )
 
             items = plan_convergence().executable()
-            fix_types = [type(item.fix) for item in items]
+            correction_types = [type(item.correction) for item in items]
 
-            # All six fix types should be present
-            assert RebuildIndexFix in fix_types
-            assert CreateIndexFix in fix_types
-            assert AddConstraintFix in fix_types
-            assert ValidateConstraintFix in fix_types
-            assert DropConstraintFix in fix_types
-            assert DropIndexFix in fix_types
+            # All six correction types should be present
+            assert RebuildIndexCorrection in correction_types
+            assert CreateIndexCorrection in correction_types
+            assert AddConstraintCorrection in correction_types
+            assert ValidateConstraintCorrection in correction_types
+            assert DropConstraintCorrection in correction_types
+            assert DropIndexCorrection in correction_types
 
             # Verify full pass ordering
             rebuild_idx = max(
-                i for i, t in enumerate(fix_types) if t is RebuildIndexFix
+                i for i, t in enumerate(correction_types) if t is RebuildIndexCorrection
             )
-            create_idx = max(i for i, t in enumerate(fix_types) if t is CreateIndexFix)
+            create_idx = max(
+                i for i, t in enumerate(correction_types) if t is CreateIndexCorrection
+            )
             add_con_max = max(
-                i for i, t in enumerate(fix_types) if t is AddConstraintFix
+                i
+                for i, t in enumerate(correction_types)
+                if t is AddConstraintCorrection
             )
             validate_min = min(
-                i for i, t in enumerate(fix_types) if t is ValidateConstraintFix
+                i
+                for i, t in enumerate(correction_types)
+                if t is ValidateConstraintCorrection
             )
             validate_max = max(
-                i for i, t in enumerate(fix_types) if t is ValidateConstraintFix
+                i
+                for i, t in enumerate(correction_types)
+                if t is ValidateConstraintCorrection
             )
             drop_con_min = min(
-                i for i, t in enumerate(fix_types) if t is DropConstraintFix
+                i
+                for i, t in enumerate(correction_types)
+                if t is DropConstraintCorrection
             )
             drop_con_max = max(
-                i for i, t in enumerate(fix_types) if t is DropConstraintFix
+                i
+                for i, t in enumerate(correction_types)
+                if t is DropConstraintCorrection
             )
-            drop_idx = min(i for i, t in enumerate(fix_types) if t is DropIndexFix)
+            drop_idx = min(
+                i for i, t in enumerate(correction_types) if t is DropIndexCorrection
+            )
 
             assert rebuild_idx < create_idx
             assert create_idx < add_con_max
@@ -119,26 +132,28 @@ class TestPassOrdering:
 class TestFixFailureRecovery:
     @isolated_db
     def test_failed_fix_continues(self):
-        """A failed fix rolls back, and the next fix still succeeds."""
+        """A failed correction rolls back, and the next correction still succeeds."""
         # Add a real constraint to drop
         execute(
             'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_real_check" CHECK ("id" >= 0)'
         )
         assert constraint_exists("examples_widget", "examples_widget_real_check")
 
-        fixes = [
+        plan_items = [
             # This one will fail — constraint doesn't exist
-            DropConstraintFix(table="examples_widget", name="nonexistent_constraint"),
+            DropConstraintCorrection(
+                table="examples_widget", name="nonexistent_constraint"
+            ),
             # This one should still succeed
-            DropConstraintFix(
+            DropConstraintCorrection(
                 table="examples_widget", name="examples_widget_real_check"
             ),
         ]
 
         results = []
-        for fix in fixes:
+        for correction in plan_items:
             try:
-                fix.apply()
+                correction.apply()
                 results.append("ok")
             except Exception:
                 results.append("failed")
@@ -396,7 +411,7 @@ class TestAnalyzeModel:
 
             assert isinstance(items, list)
             assert len(items) == 1
-            assert isinstance(items[0].fix, CreateIndexFix)
+            assert isinstance(items[0].correction, CreateIndexCorrection)
 
     def test_issue_count(self):
         """ModelAnalysis.issue_count counts issues correctly."""
@@ -441,7 +456,7 @@ class TestDriftPolicy:
                 items = plan_model_convergence(conn, cursor, Widget).executable()
 
             assert len(items) == 1
-            assert isinstance(items[0].fix, CreateIndexFix)
+            assert isinstance(items[0].correction, CreateIndexCorrection)
             assert items[0].blocks_sync is False
 
     def test_constraint_add_blocks_sync(self):
@@ -462,7 +477,7 @@ class TestDriftPolicy:
                 items = plan_model_convergence(conn, cursor, Widget).executable()
 
             assert len(items) == 1
-            assert isinstance(items[0].fix, AddConstraintFix)
+            assert isinstance(items[0].correction, AddConstraintCorrection)
             assert items[0].blocks_sync is True
 
     def test_constraint_validate_blocks_sync(self):
@@ -487,7 +502,7 @@ class TestDriftPolicy:
                 items = plan_model_convergence(conn, cursor, Widget).executable()
 
             assert len(items) == 1
-            assert isinstance(items[0].fix, ValidateConstraintFix)
+            assert isinstance(items[0].correction, ValidateConstraintCorrection)
             assert items[0].blocks_sync is True
 
     def test_rename_does_not_block_sync(self):
@@ -509,7 +524,7 @@ class TestDriftPolicy:
                 items = plan_model_convergence(conn, cursor, Widget).executable()
 
             assert len(items) == 1
-            assert isinstance(items[0].fix, RenameIndexFix)
+            assert isinstance(items[0].correction, RenameIndexCorrection)
             assert items[0].blocks_sync is False
 
     def test_undeclared_constraint_included_in_plan(self):
@@ -520,7 +535,11 @@ class TestDriftPolicy:
 
         plan = plan_convergence()
         items = plan.executable()
-        drops = [item for item in items if isinstance(item.fix, DropConstraintFix)]
+        drops = [
+            item
+            for item in items
+            if isinstance(item.correction, DropConstraintCorrection)
+        ]
         assert len(drops) == 1
         assert drops[0].blocks_sync is True
 
@@ -532,34 +551,36 @@ class TestDriftPolicy:
 
         plan = plan_convergence()
         items = plan.executable()
-        drops = [item for item in items if isinstance(item.fix, DropIndexFix)]
+        drops = [
+            item for item in items if isinstance(item.correction, DropIndexCorrection)
+        ]
         assert len(drops) == 1
         assert drops[0].blocks_sync is False
 
-    def test_can_auto_fix_for_missing(self):
-        """can_auto_fix returns True for missing indexes and constraints."""
+    def test_can_auto_correct_for_missing(self):
+        """can_auto_correct returns True for missing indexes and constraints."""
         idx = Index(fields=["name"], name="examples_widget_name_idx")
-        assert can_auto_fix(
+        assert can_auto_correct(
             IndexModelDrift(table="t", index=idx, model=Widget, kind=DriftKind.MISSING)
         )
         constraint = CheckConstraint(
             check=Q(id__gte=0), name="examples_widget_id_check"
         )
-        assert can_auto_fix(
+        assert can_auto_correct(
             ConstraintModelDrift(
                 table="t", constraint=constraint, model=Widget, kind=DriftKind.MISSING
             )
         )
 
-    def test_can_auto_fix_false_for_changed_constraint(self):
-        """can_auto_fix returns False for changed constraint definitions."""
+    def test_can_auto_correct_false_for_changed_constraint(self):
+        """can_auto_correct returns False for changed constraint definitions."""
         constraint = CheckConstraint(
             check=Q(id__gte=0), name="examples_widget_id_check"
         )
         drift = ConstraintModelDrift(
             table="t", constraint=constraint, model=Widget, kind=DriftKind.CHANGED
         )
-        assert not can_auto_fix(drift)
+        assert not can_auto_correct(drift)
 
 
 class TestConvergencePlan:
@@ -571,7 +592,9 @@ class TestConvergencePlan:
 
         plan = plan_convergence()
         items = plan.executable()
-        drops = [item for item in items if isinstance(item.fix, DropIndexFix)]
+        drops = [
+            item for item in items if isinstance(item.correction, DropIndexCorrection)
+        ]
         assert len(drops) == 1
 
     def test_has_work_includes_undeclared(self):
@@ -584,7 +607,7 @@ class TestConvergencePlan:
         assert plan.has_work()
 
     def test_has_work_counts_forward_fixes(self):
-        """has_work() sees forward fixes."""
+        """has_work() sees forward plan_items."""
         with patch(
             Widget.model_options,
             "indexes",
@@ -620,7 +643,7 @@ class TestConvergencePlan:
             assert len(plan.blocked) == 1
             assert isinstance(plan.blocked[0].drift, ConstraintDrift)
             assert plan.blocked[0].drift.kind == DriftKind.CHANGED
-            assert plan.blocked[0].fix is None
+            assert plan.blocked[0].correction is None
             assert plan.blocked[0].guidance is not None
 
 
@@ -629,12 +652,14 @@ class TestExecutePlan:
     def test_collects_results(self):
         """execute_plan() collects SQL from successful items."""
         execute('CREATE INDEX "examples_widget_temp_idx" ON "examples_widget" ("name")')
-        fix = DropIndexFix(table="examples_widget", name="examples_widget_temp_idx")
+        correction = DropIndexCorrection(
+            table="examples_widget", name="examples_widget_temp_idx"
+        )
         drift = IndexUndeclaredDrift(
             table="examples_widget",
             name="examples_widget_temp_idx",
         )
-        item = PlanItem(drift=drift, fix=fix, blocks_sync=False)
+        item = PlanItem(drift=drift, correction=correction, blocks_sync=False)
 
         result = execute_plan([item])
 
@@ -648,11 +673,13 @@ class TestExecutePlan:
     @isolated_db
     def test_handles_failure(self):
         """execute_plan() captures errors without raising."""
-        fix = DropConstraintFix(table="examples_widget", name="nonexistent")
+        correction = DropConstraintCorrection(
+            table="examples_widget", name="nonexistent"
+        )
         drift = ConstraintNameDrift(
             kind=DriftKind.UNDECLARED, table="examples_widget", name="nonexistent"
         )
-        item = PlanItem(drift=drift, fix=fix)
+        item = PlanItem(drift=drift, correction=correction)
 
         result = execute_plan([item])
 
@@ -675,7 +702,9 @@ class TestExecutePlan:
                     table="examples_widget",
                     name="nonexistent",
                 ),
-                fix=DropConstraintFix(table="examples_widget", name="nonexistent"),
+                correction=DropConstraintCorrection(
+                    table="examples_widget", name="nonexistent"
+                ),
             ),
             PlanItem(
                 drift=ConstraintNameDrift(
@@ -683,7 +712,7 @@ class TestExecutePlan:
                     table="examples_widget",
                     name="examples_widget_real_check",
                 ),
-                fix=DropConstraintFix(
+                correction=DropConstraintCorrection(
                     table="examples_widget", name="examples_widget_real_check"
                 ),
             ),
@@ -709,7 +738,9 @@ class TestExecutePlan:
                     table="examples_widget",
                     name="nonexistent",
                 ),
-                fix=DropConstraintFix(table="examples_widget", name="nonexistent"),
+                correction=DropConstraintCorrection(
+                    table="examples_widget", name="nonexistent"
+                ),
             ),
             PlanItem(
                 drift=ConstraintNameDrift(
@@ -717,7 +748,7 @@ class TestExecutePlan:
                     table="examples_widget",
                     name="examples_widget_real_check",
                 ),
-                fix=DropConstraintFix(
+                correction=DropConstraintCorrection(
                     table="examples_widget", name="examples_widget_real_check"
                 ),
             ),
@@ -729,14 +760,16 @@ class TestExecutePlan:
 
     @isolated_db
     def test_result_item_reference(self):
-        """FixResult.item references the PlanItem."""
+        """CorrectionResult.item references the PlanItem."""
         execute('CREATE INDEX "examples_widget_temp_idx" ON "examples_widget" ("name")')
-        fix = DropIndexFix(table="examples_widget", name="examples_widget_temp_idx")
+        correction = DropIndexCorrection(
+            table="examples_widget", name="examples_widget_temp_idx"
+        )
         drift = IndexUndeclaredDrift(
             table="examples_widget",
             name="examples_widget_temp_idx",
         )
-        item = PlanItem(drift=drift, fix=fix, blocks_sync=False)
+        item = PlanItem(drift=drift, correction=correction, blocks_sync=False)
 
         result = execute_plan([item])
 
@@ -748,12 +781,14 @@ class TestSyncPolicy:
 
     @isolated_db
     def test_blocking_failure_fails_sync(self):
-        """A failed constraint fix (blocks_sync=True) makes ok_for_sync False."""
-        fix = DropConstraintFix(table="examples_widget", name="nonexistent")
+        """A failed constraint correction (blocks_sync=True) makes ok_for_sync False."""
+        correction = DropConstraintCorrection(
+            table="examples_widget", name="nonexistent"
+        )
         drift = ConstraintNameDrift(
             kind=DriftKind.UNDECLARED, table="examples_widget", name="nonexistent"
         )
-        item = PlanItem(drift=drift, fix=fix, blocks_sync=True)
+        item = PlanItem(drift=drift, correction=correction, blocks_sync=True)
 
         result = execute_plan([item])
 
@@ -764,19 +799,19 @@ class TestSyncPolicy:
 
     @isolated_db
     def test_non_blocking_failure_passes_sync(self):
-        """A failed index fix (blocks_sync=False) keeps ok_for_sync True."""
-        fix = CreateIndexFix(
+        """A failed index correction (blocks_sync=False) keeps ok_for_sync True."""
+        correction = CreateIndexCorrection(
             table="examples_widget",
             index=Index(fields=["name"], name="examples_widget_will_fail_idx"),
             model=Widget,
         )
         drift = IndexModelDrift(
             table="examples_widget",
-            index=fix.index,
+            index=correction.index,
             model=Widget,
             kind=DriftKind.MISSING,
         )
-        item = PlanItem(drift=drift, fix=fix, blocks_sync=False)
+        item = PlanItem(drift=drift, correction=correction, blocks_sync=False)
 
         # Create it first so the CONCURRENTLY create will fail (duplicate)
         execute(
@@ -807,7 +842,9 @@ class TestSyncPolicy:
                     model=Widget,
                     kind=DriftKind.MISSING,
                 ),
-                fix=CreateIndexFix(table="examples_widget", index=index, model=Widget),
+                correction=CreateIndexCorrection(
+                    table="examples_widget", index=index, model=Widget
+                ),
                 blocks_sync=False,
             ),
             # Blocking: will fail (nonexistent constraint)
@@ -817,7 +854,9 @@ class TestSyncPolicy:
                     table="examples_widget",
                     name="nonexistent",
                 ),
-                fix=DropConstraintFix(table="examples_widget", name="nonexistent"),
+                correction=DropConstraintCorrection(
+                    table="examples_widget", name="nonexistent"
+                ),
                 blocks_sync=True,
             ),
         ]
@@ -835,13 +874,15 @@ class TestSyncPolicy:
         execute(
             'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_temp" CHECK ("id" >= 0)'
         )
-        fix = DropConstraintFix(table="examples_widget", name="examples_widget_temp")
+        correction = DropConstraintCorrection(
+            table="examples_widget", name="examples_widget_temp"
+        )
         drift = ConstraintNameDrift(
             kind=DriftKind.UNDECLARED,
             table="examples_widget",
             name="examples_widget_temp",
         )
-        item = PlanItem(drift=drift, fix=fix)
+        item = PlanItem(drift=drift, correction=correction)
 
         result = execute_plan([item])
 

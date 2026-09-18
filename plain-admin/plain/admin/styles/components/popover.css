@@ -16,38 +16,38 @@
     position-area: bottom span-right;
     position-try-fallbacks: flip-block, flip-inline;
     margin: 0.25rem 0;
-    &[data-align='center'] {
+    &[data-align="center"] {
       position-area: bottom;
     }
-    &[data-align='end'] {
+    &[data-align="end"] {
       position-area: bottom span-left;
     }
-    &[data-side='top'] {
+    &[data-side="top"] {
       position-area: top span-right;
-      &[data-align='center'] {
+      &[data-align="center"] {
         position-area: top;
       }
-      &[data-align='end'] {
+      &[data-align="end"] {
         position-area: top span-left;
       }
     }
-    &[data-side='left'] {
+    &[data-side="left"] {
       position-area: left span-bottom;
       margin: 0 0.25rem;
-      &[data-align='center'] {
+      &[data-align="center"] {
         position-area: left;
       }
-      &[data-align='end'] {
+      &[data-align="end"] {
         position-area: left span-top;
       }
     }
-    &[data-side='right'] {
+    &[data-side="right"] {
       position-area: right span-bottom;
       margin: 0 0.25rem;
-      &[data-align='center'] {
+      &[data-align="center"] {
         position-area: right;
       }
-      &[data-align='end'] {
+      &[data-align="end"] {
         position-area: right span-top;
       }
     }

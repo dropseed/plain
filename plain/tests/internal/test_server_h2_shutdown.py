@@ -14,17 +14,12 @@ The TLS/ALPN socket-level contract is covered by tools/h2-shutdown-test.
 from __future__ import annotations
 
 import asyncio
-import socket
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-import h2.config
-import h2.connection
 import h2.errors
 import h2.events
-
 from plain.http import Response
-from plain.server.http.h2 import async_handle_h2_connection
+from server_stubs import h2_connect
 
 
 class _Handler:
@@ -39,101 +34,9 @@ class _Handler:
         return Response(b"ok", content_type="text/plain")
 
 
-class _H2Client:
-    """Client half of the connection: real h2 state machine over streams."""
-
-    def __init__(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ) -> None:
-        self.reader = reader
-        self.writer = writer
-        self.conn = h2.connection.H2Connection(
-            config=h2.config.H2Configuration(client_side=True)
-        )
-        self.events: list[h2.events.Event] = []
-        self.eof = False
-
-    async def flush(self) -> None:
-        data = self.conn.data_to_send()
-        if data:
-            self.writer.write(data)
-            await self.writer.drain()
-
-    async def start(self) -> None:
-        self.conn.initiate_connection()
-        await self.flush()
-
-    async def request(self, stream_id: int, path: str = "/") -> None:
-        self.conn.send_headers(
-            stream_id,
-            [
-                (":method", "GET"),
-                (":path", path),
-                (":scheme", "http"),
-                (":authority", "testserver"),
-            ],
-            end_stream=True,
-        )
-        await self.flush()
-
-    async def wait_for(
-        self, predicate: Any, *, timeout: float = 5.0
-    ) -> h2.events.Event:
-        """Read frames until an event matching predicate arrives."""
-        for event in self.events:
-            if predicate(event):
-                return event
-        deadline = asyncio.get_running_loop().time() + timeout
-        while True:
-            remaining = deadline - asyncio.get_running_loop().time()
-            assert remaining > 0, f"timed out waiting; saw {self.events}"
-            data = await asyncio.wait_for(self.reader.read(65535), timeout=remaining)
-            if not data:
-                self.eof = True
-                raise AssertionError(f"connection closed; saw {self.events}")
-            new = self.conn.receive_data(data)
-            self.events.extend(new)
-            await self.flush()  # acks (SETTINGS, etc.)
-            for event in new:
-                if predicate(event):
-                    return event
-
-    async def wait_for_eof(self, *, timeout: float = 5.0) -> None:
-        deadline = asyncio.get_running_loop().time() + timeout
-        while not self.eof:
-            remaining = deadline - asyncio.get_running_loop().time()
-            assert remaining > 0, "timed out waiting for connection close"
-            data = await asyncio.wait_for(self.reader.read(65535), timeout=remaining)
-            if not data:
-                self.eof = True
-                break
-            self.events.extend(self.conn.receive_data(data))
-
-
-async def _connect(
-    handler: _Handler, shutdown_event: asyncio.Event
-) -> tuple[_H2Client, asyncio.Task[None], ThreadPoolExecutor]:
-    server_sock, client_sock = socket.socketpair()
-    server_reader, server_writer = await asyncio.open_connection(sock=server_sock)
-    client_reader, client_writer = await asyncio.open_connection(sock=client_sock)
-
-    executor = ThreadPoolExecutor(max_workers=1)
-    server_task = asyncio.get_running_loop().create_task(
-        async_handle_h2_connection(
-            server_reader,
-            server_writer,
-            ("127.0.0.1", 12345),
-            ("127.0.0.1", 80),
-            handler,
-            False,
-            executor,
-            shutdown_event=shutdown_event,
-        )
-    )
-
-    client = _H2Client(client_reader, client_writer)
-    await client.start()
-    return client, server_task, executor
+# The h2 socketpair harness (H2Client / h2_connect) lives in server_stubs
+# and is shared with test_server_body_limits.
+_connect = h2_connect
 
 
 def test_idle_h2_connection_closes_promptly_on_shutdown() -> None:
@@ -158,6 +61,83 @@ def test_idle_h2_connection_closes_promptly_on_shutdown() -> None:
             )
             await client.wait_for_eof(timeout=3.0)
             await asyncio.wait_for(server_task, timeout=3.0)
+        finally:
+            server_task.cancel()
+            executor.shutdown(wait=False)
+
+    asyncio.run(scenario())
+
+
+def test_inflight_stream_survives_keepalive_timeout() -> None:
+    # SERVER_KEEPALIVE_TIMEOUT applies between requests — a stream whose
+    # view is still running while the client sends no frames (slow view,
+    # SSE with a quiet client) must not be GOAWAY'd when the idle wait
+    # times out.
+    async def scenario() -> None:
+        shutdown_event = asyncio.Event()
+        handler = _Handler()
+        handler.release.clear()  # hold the stream open in the view
+        client, server_task, executor = await _connect(
+            handler, shutdown_event, keepalive_timeout=0.2
+        )
+        try:
+            await client.request(1)
+            await asyncio.sleep(0.7)  # several keepalive timeouts pass
+
+            handler.release.set()
+            response = await client.wait_for(
+                lambda e: isinstance(e, h2.events.ResponseReceived) and e.stream_id == 1
+            )
+            assert isinstance(response, h2.events.ResponseReceived)
+            assert dict(response.headers or [])[b":status"] == b"200"
+        finally:
+            server_task.cancel()
+            executor.shutdown(wait=False)
+
+    asyncio.run(scenario())
+
+
+def test_idle_clock_restarts_when_stream_finishes() -> None:
+    # The idle clock measures time since in-flight work ended, not since
+    # the last inbound frame: a response that takes most of the keepalive
+    # window must not leave the connection with only the window's
+    # remainder of idle reuse (the premature close races the next pooled
+    # request).
+    async def scenario() -> None:
+        shutdown_event = asyncio.Event()
+        handler = _Handler()
+        client, server_task, executor = await _connect(
+            handler, shutdown_event, keepalive_timeout=1.0
+        )
+        try:
+            # A first request/response drains the connection-setup acks,
+            # so the held stream's HEADERS below are the genuinely last
+            # inbound frames before the idle window.
+            await client.request(1)
+            await client.wait_for(
+                lambda e: isinstance(e, h2.events.StreamEnded) and e.stream_id == 1
+            )
+
+            # Hold the view for most of the keepalive window, then let
+            # the response go out.
+            handler.release.clear()
+            await client.request(3)
+            await asyncio.sleep(0.7)
+            handler.release.set()
+            await client.wait_for(
+                lambda e: isinstance(e, h2.events.StreamEnded) and e.stream_id == 3
+            )
+
+            # Idle past the original window's remainder (0.3s), but well
+            # inside a fresh window counted from the stream's completion.
+            await asyncio.sleep(0.6)
+
+            await client.request(5)
+            response = await client.wait_for(
+                lambda e: isinstance(e, h2.events.ResponseReceived) and e.stream_id == 5
+            )
+            assert isinstance(response, h2.events.ResponseReceived)
+            assert dict(response.headers or [])[b":status"] == b"200"
         finally:
             server_task.cancel()
             executor.shutdown(wait=False)

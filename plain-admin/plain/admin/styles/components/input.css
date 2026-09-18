@@ -1,31 +1,45 @@
 /* Input */
 @layer components {
-  :is(.form, .admin-field) input[type='text']:not(:is(.admin-select [data-popover] > header input[role='combobox'], .command > header input, .admin-dialog > * > header input)),
-  :is(.form, .admin-field) input[type='email'],
-  :is(.form, .admin-field) input[type='password'],
-  :is(.form, .admin-field) input[type='number'],
-  :is(.form, .admin-field) input[type='file'],
-  :is(.form, .admin-field) input[type='tel'],
-  :is(.form, .admin-field) input[type='url'],
-  :is(.form, .admin-field) input[type='search']:not(:is(.admin-select [data-popover] > header input[role='combobox'], .command > header input, .admin-dialog > * > header input)),
-  :is(.form, .admin-field) input[type='date'],
-  :is(.form, .admin-field) input[type='datetime-local'],
-  :is(.form, .admin-field) input[type='month'],
-  :is(.form, .admin-field) input[type='week'],
-  :is(.form, .admin-field) input[type='time'],
-  .admin-input[type='text'],
-  .admin-input[type='email'],
-  .admin-input[type='password'],
-  .admin-input[type='number'],
-  .admin-input[type='file'],
-  .admin-input[type='tel'],
-  .admin-input[type='url'],
-  .admin-input[type='search'],
-  .admin-input[type='date'],
-  .admin-input[type='datetime-local'],
-  .admin-input[type='month'],
-  .admin-input[type='week'],
-  .admin-input[type='time'] {
+  :is(.form, .admin-field)
+    input[type="text"]:not(
+      :is(
+        .admin-select [data-popover] > header input[role="combobox"],
+        .command > header input,
+        .admin-dialog > * > header input
+      )
+    ),
+  :is(.form, .admin-field) input[type="email"],
+  :is(.form, .admin-field) input[type="password"],
+  :is(.form, .admin-field) input[type="number"],
+  :is(.form, .admin-field) input[type="file"],
+  :is(.form, .admin-field) input[type="tel"],
+  :is(.form, .admin-field) input[type="url"],
+  :is(.form, .admin-field)
+    input[type="search"]:not(
+      :is(
+        .admin-select [data-popover] > header input[role="combobox"],
+        .command > header input,
+        .admin-dialog > * > header input
+      )
+    ),
+  :is(.form, .admin-field) input[type="date"],
+  :is(.form, .admin-field) input[type="datetime-local"],
+  :is(.form, .admin-field) input[type="month"],
+  :is(.form, .admin-field) input[type="week"],
+  :is(.form, .admin-field) input[type="time"],
+  .admin-input[type="text"],
+  .admin-input[type="email"],
+  .admin-input[type="password"],
+  .admin-input[type="number"],
+  .admin-input[type="file"],
+  .admin-input[type="tel"],
+  .admin-input[type="url"],
+  .admin-input[type="search"],
+  .admin-input[type="date"],
+  .admin-input[type="datetime-local"],
+  .admin-input[type="month"],
+  .admin-input[type="week"],
+  .admin-input[type="time"] {
     @apply focus-control appearance-none file:text-admin-foreground placeholder:text-admin-muted-foreground selection:bg-admin-primary selection:text-admin-primary-foreground dark:bg-admin-input/30 border-admin-input flex h-9 w-full min-w-0 border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm;
     border-radius: var(--radius-input);
   }

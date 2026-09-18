@@ -54,7 +54,9 @@ response = client.get("/search/", query_params={"q": "hello"})
 Send a form:
 
 ```python
-response = client.post("/submit/", form_data={"name": "Alice", "email": "alice@example.com"})
+response = client.post(
+    "/submit/", form_data={"name": "Alice", "email": "alice@example.com"}
+)
 ```
 
 Send JSON — the value is serialized for you:
@@ -66,7 +68,9 @@ response = client.post("/api/users/", json_data={"name": "Alice"})
 Send file uploads alongside form fields:
 
 ```python
-response = client.post("/upload/", form_data={"title": "Report"}, files={"file": file_obj})
+response = client.post(
+    "/upload/", form_data={"title": "Report"}, files={"file": file_obj}
+)
 ```
 
 Send a raw body with an explicit content type:
@@ -81,6 +85,7 @@ The client supports all standard HTTP methods: `get`, `post`, `put`, `patch`, `d
 
 ```python
 response = client.put("/api/users/1/", json_data={"name": "Bob"})
+response = client.patch("/api/users/1/", json_data={"name": "Bob"})
 response = client.delete("/api/users/1/")
 ```
 

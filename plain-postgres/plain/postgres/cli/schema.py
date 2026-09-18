@@ -6,7 +6,7 @@ import sys
 import click
 
 from ..convergence.analysis import ModelAnalysis, analyze_model
-from ..convergence.planning import can_auto_fix
+from ..convergence.planning import can_auto_correct
 from ..db import get_connection
 from ..introspection import MANAGED_CONSTRAINT_TYPES, get_unknown_tables
 from ..registry import models_registry
@@ -21,8 +21,8 @@ def _err(msg: str) -> None:
     click.secho(f"  ✗ {msg}", fg="red")
 
 
-def _fixable(msg: str) -> None:
-    click.secho(f"  ~ {msg} (auto-fix)", fg="yellow")
+def _correctable(msg: str) -> None:
+    click.secho(f"  ~ {msg} (auto-correct)", fg="yellow")
 
 
 def _unmanaged(type_label: str) -> None:
@@ -57,8 +57,8 @@ def _render_model(analysis: ModelAnalysis) -> None:
 
         click.echo(f"  {col_display:30s}  {' '.join(type_parts)}", nl=False)
 
-        if col.issue and col.drifts and all(can_auto_fix(d) for d in col.drifts):
-            _fixable(col.issue)
+        if col.issue and col.drifts and all(can_auto_correct(d) for d in col.drifts):
+            _correctable(col.issue)
         elif col.issue:
             _err(col.issue)
         else:
@@ -75,8 +75,8 @@ def _render_model(analysis: ModelAnalysis) -> None:
 
         if idx.access_method:
             _unmanaged(idx.access_method)
-        elif idx.issue and idx.drift and can_auto_fix(idx.drift):
-            _fixable(idx.issue)
+        elif idx.issue and idx.drift and can_auto_correct(idx.drift):
+            _correctable(idx.issue)
         elif idx.issue:
             _err(idx.issue)
         else:
@@ -98,8 +98,8 @@ def _render_model(analysis: ModelAnalysis) -> None:
 
         if con.constraint_type not in MANAGED_CONSTRAINT_TYPES:
             _unmanaged(con.constraint_type.label)
-        elif con.issue and con.drift and can_auto_fix(con.drift):
-            _fixable(con.issue)
+        elif con.issue and con.drift and can_auto_correct(con.drift):
+            _correctable(con.issue)
         elif con.issue:
             _err(con.issue)
         else:

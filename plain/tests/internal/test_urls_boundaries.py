@@ -10,7 +10,7 @@ structurally by segment-based matching (not by string concatenation),
 so `/adminhome` collisions are impossible regardless of how the user
 spells the route.
 
-The `boundary_client` fixture installs `URLS_TRAILING_SLASH=True` so
+The `boundary_client` helper installs `URLS_TRAILING_SLASH=True` so
 the slashed routes in `boundary_routers.py` keep their canonical
 slashed form.
 """
@@ -48,7 +48,7 @@ def test_include_without_trailing_slash_resolves():
     """`include("admin-boundary", ...)` — no-slash include still resolves
     its slashed children correctly. Include slash is irrelevant — the
     child route's own slash form (set by `URLS_TRAILING_SLASH=True` in
-    this fixture) drives the canonical URL.
+    this helper) drives the canonical URL.
     """
     with boundary_client() as client:
         response = client.get("/admin-boundary/home/")

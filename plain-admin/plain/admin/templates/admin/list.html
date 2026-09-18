@@ -15,12 +15,12 @@
         {% if table_style == "preview" %}
             <div class="text-sm font-medium text-admin-foreground/80 mb-2">{{ title }}</div>
         {% else %}
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground group-data-[selecting]:hidden">{{ page.paginator.count }} result{{ page.paginator.count|pluralize }}</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground group-data-[selecting]:hidden">{{ page_obj.paginator.count }} result{{ page_obj.paginator.count|pluralize }}</h3>
 
             {% if actions %}
             <span data-selection-summary class="text-sm text-admin-muted-foreground hidden group-data-[selecting]:inline"></span>
 
-            <form method="POST" data-actions-form data-total-count="{{ page.paginator.count }}">
+            <form method="POST" data-actions-form data-total-count="{{ page_obj.paginator.count }}">
                 <div class="admin-dropdown-menu">
                     <button
                         type="button"
@@ -54,8 +54,8 @@
                 <input type="hidden" name="action_name" value="" />
             </form>
 
-            {% if page.has_other_pages() %}
-            <button type="button" data-action-select-all class="hidden admin-btn admin-btn-sm admin-btn-link">Select all {{ page.paginator.count }}</button>
+            {% if page_obj.has_other_pages() %}
+            <button type="button" data-action-select-all class="hidden admin-btn admin-btn-sm admin-btn-link">Select all {{ page_obj.paginator.count }}</button>
             {% endif %}
 
             <button type="button" data-action-clear class="hidden group-data-[selecting]:inline-flex admin-btn admin-btn-sm admin-btn-ghost">Clear</button>
@@ -64,7 +64,7 @@
     </div>
     <div class="flex space-x-2">
         {% if table_style == "preview" %}
-        <a class="text-sm" href="{{ request.path }}{% if search_query %}?search={{ search_query }}{% endif %}">View {{ page.paginator.count }} result{{ "s" if page.paginator.count != 1 else "" }}</a>
+        <a class="text-sm" href="{{ request.path }}{% if search_query %}?search={{ search_query }}{% endif %}">View {{ page_obj.paginator.count }} result{{ "s" if page_obj.paginator.count != 1 else "" }}</a>
         {% else %}
         <form method="GET" class="inline-flex space-x-2">
             {% if filter_names %}
@@ -223,26 +223,26 @@
 </div>
 {% endif %}
 
-{% if table_style != "preview" and page.has_other_pages() %}
+{% if table_style != "preview" and page_obj.has_other_pages() %}
 <footer class="mt-4 sticky bottom-0 [body[data-toolbar-fullbar]_&]:pb-12 bg-admin-background/95 backdrop-blur-sm border-t border-admin-border pt-4 pb-3">
     <div class="flex items-center justify-between text-sm">
         <span class="text-admin-muted-foreground">
-            Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results, {{ page.paginator.per_page }} per page)
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} results, {{ page_obj.paginator.per_page }} per page)
         </span>
         <div class="flex items-center gap-2">
-            {% if page.has_previous() %}
-            <a data-merge-params href="?page={{ page.previous_page_number() }}" class="admin-btn admin-btn-sm admin-btn-outline">&lt;</a>
+            {% if page_obj.has_previous() %}
+            <a data-merge-params href="?page={{ page_obj.previous_page_number() }}" class="admin-btn admin-btn-sm admin-btn-outline">&lt;</a>
             {% endif %}
             {# submitFormClean merges this onto the current URL, so search/filter/sort carry over without hidden inputs. #}
             <form data-autosubmit method="GET">
                 <select name="page" class="admin-select admin-select-sm w-auto">
-                {% for page_num in page.paginator.page_range %}
-                    <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>
+                {% for page_num in page_obj.paginator.page_range %}
+                    <option value="{{ page_num }}" {% if page_num == page_obj.number %}selected{% endif %}>Page {{ page_num }}</option>
                 {% endfor %}
                 </select>
             </form>
-            {% if page.has_next() %}
-            <a data-merge-params href="?page={{ page.next_page_number() }}" class="admin-btn admin-btn-sm admin-btn-outline">&gt;</a>
+            {% if page_obj.has_next() %}
+            <a data-merge-params href="?page={{ page_obj.next_page_number() }}" class="admin-btn admin-btn-sm admin-btn-outline">&gt;</a>
             {% endif %}
         </div>
     </div>

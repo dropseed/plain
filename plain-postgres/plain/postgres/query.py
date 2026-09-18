@@ -12,9 +12,8 @@ from functools import cached_property
 from itertools import islice
 from typing import TYPE_CHECKING, Any, Never, Self, overload
 
-import psycopg
-
 import plain.runtime
+import psycopg
 from plain.exceptions import ValidationError
 from plain.postgres import transaction
 from plain.postgres.constants import LOOKUP_SEP, OnConflict
@@ -33,12 +32,11 @@ from plain.postgres.fields import (
     PrimaryKeyField,
 )
 from plain.postgres.functions import Cast
-from plain.postgres.query_utils import FilteredRelation, Q
+from plain.postgres.query_utils import Q
 from plain.postgres.sql import (
     AND,
     CURSOR,
     OR,
-    XOR,
     DeleteQuery,
     InsertQuery,
     Query,
@@ -49,7 +47,7 @@ from plain.postgres.utils import resolve_callables
 from plain.utils.functional import partition
 
 # Re-exports for public API
-__all__ = ["F", "Q", "QuerySet", "RawQuerySet", "Prefetch", "FilteredRelation"]
+__all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet"]
 
 if TYPE_CHECKING:
     from plain.postgres import Model
@@ -194,9 +192,7 @@ class ValuesIterable(BaseIterable):
         query = queryset.sql_query
         compiler = query.get_compiler()
 
-        # extra(select=...) cols are always at the start of the row.
         names = [
-            *query.extra_select,
             *query.values_select,
             *query.annotation_select,
         ]
@@ -217,9 +213,7 @@ class ValuesListIterable(BaseIterable):
         compiler = query.get_compiler()
 
         if queryset._fields:
-            # extra(select=...) cols are always at the start of the row.
             names = [
-                *query.extra_select,
                 *query.values_select,
                 *query.annotation_select,
             ]
@@ -294,7 +288,6 @@ class QuerySet[T: "Model"]:
 
     def __init__(self):
         """Minimal init for descriptor mode. Use from_model() to create instances."""
-        pass
 
     @classmethod
     def from_model(cls, model: type[T], query: Query | None = None) -> Self:
@@ -505,26 +498,6 @@ class QuerySet[T: "Model"]:
         combined.sql_query.combine(other.sql_query, OR)
         return combined
 
-    def __xor__(self, other: QuerySet[T]) -> QuerySet[T]:
-        self._merge_sanity_check(other)
-        if isinstance(self, EmptyQuerySet):
-            return other
-        if isinstance(other, EmptyQuerySet):
-            return self
-        query = (
-            self
-            if self.sql_query.can_filter()
-            else self.model._model_meta.base_queryset.filter(id__in=self.values("id"))
-        )
-        combined = query._chain()
-        combined._merge_known_related_objects(other)
-        if not other.sql_query.can_filter():
-            other = other.model._model_meta.base_queryset.filter(
-                id__in=other.values("id")
-            )
-        combined.sql_query.combine(other.sql_query, XOR)
-        return combined
-
     ####################################
     # METHODS THAT DO DATABASE QUERIES #
     ####################################
@@ -578,7 +551,7 @@ class QuerySet[T: "Model"]:
             # can't be set automatically or AttributeError if it isn't an
             # attribute.
             try:
-                arg.default_alias
+                arg.default_alias  # noqa: B018 — probe; raises for complex aggregates
             except (AttributeError, TypeError):
                 raise TypeError("Complex aggregates require an alias")
             kwargs[arg.default_alias] = arg
@@ -665,14 +638,12 @@ class QuerySet[T: "Model"]:
                 raise ValueError(
                     "Unique fields that can trigger the upsert must be provided."
                 )
-            # Updating primary keys and non-concrete fields is forbidden.
+            # Updating primary keys and many-to-many fields is forbidden.
             from plain.postgres.fields.related import ManyToManyField
 
-            if any(
-                not f.concrete or isinstance(f, ManyToManyField) for f in update_fields
-            ):
+            if any(isinstance(f, ManyToManyField) for f in update_fields):
                 raise ValueError(
-                    "bulk_create() can only be used with concrete fields in "
+                    "bulk_create() cannot be used with many-to-many fields in "
                     "update_fields."
                 )
             if any(f.primary_key for f in update_fields):
@@ -682,12 +653,9 @@ class QuerySet[T: "Model"]:
             if unique_fields:
                 from plain.postgres.fields.related import ManyToManyField
 
-                if any(
-                    not f.concrete or isinstance(f, ManyToManyField)
-                    for f in unique_fields
-                ):
+                if any(isinstance(f, ManyToManyField) for f in unique_fields):
                     raise ValueError(
-                        "bulk_create() can only be used with concrete fields "
+                        "bulk_create() cannot be used with many-to-many fields "
                         "in unique_fields."
                     )
             return OnConflict.UPDATE
@@ -728,7 +696,7 @@ class QuerySet[T: "Model"]:
             update_fields_objs,
             unique_fields_objs,
         )
-        fields = meta.concrete_fields
+        fields = meta.fields
         self._prepare_for_bulk_create(objs)
         with transaction.atomic(savepoint=False):
             objs_with_id, objs_without_id = partition(lambda o: o.id is None, objs)
@@ -745,7 +713,6 @@ class QuerySet[T: "Model"]:
                 for obj_with_id, results in zip(objs_with_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
                         if field != id_field:
-                            assert field.name is not None
                             setattr(obj_with_id, field.name, result)
                 for obj_with_id in objs_with_id:
                     obj_with_id._state.adding = False
@@ -763,7 +730,6 @@ class QuerySet[T: "Model"]:
                     assert len(returned_columns) == len(objs_without_id)
                 for obj_without_id, results in zip(objs_without_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
-                        assert field.name is not None
                         setattr(obj_without_id, field.name, result)
                     obj_without_id._state.adding = False
 
@@ -787,8 +753,8 @@ class QuerySet[T: "Model"]:
         ]
         from plain.postgres.fields.related import ManyToManyField
 
-        if any(not f.concrete or isinstance(f, ManyToManyField) for f in fields_list):
-            raise ValueError("bulk_update() can only be used with concrete fields.")
+        if any(isinstance(f, ManyToManyField) for f in fields_list):
+            raise ValueError("bulk_update() cannot be used with many-to-many fields.")
         if any(f.primary_key for f in fields_list):
             raise ValueError("bulk_update() cannot be used with primary key fields.")
         if not objs_tuple:
@@ -818,7 +784,6 @@ class QuerySet[T: "Model"]:
                 case_statement = Case(*when_statements, output_field=field)
                 # PostgreSQL requires casted CASE in updates
                 case_statement = Cast(case_statement, output_field=field)
-                assert field.name is not None
                 update_kwargs[field.name] = case_statement
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
@@ -891,14 +856,14 @@ class QuerySet[T: "Model"]:
                 setattr(obj, k, v)
 
             update_fields = set(update_defaults)
-            concrete_field_names = self.model._model_meta._non_pk_concrete_field_names
-            # update_fields does not support non-concrete fields.
-            if concrete_field_names.issuperset(update_fields):
+            field_names = self.model._model_meta._non_pk_field_names
+            # update_fields only supports column-backed fields.
+            if field_names.issuperset(update_fields):
                 # Add fields which are set on pre_save(), e.g. update_now fields.
                 # This is to maintain backward compatibility as these fields
                 # are not updated unless explicitly specified in the
                 # update_fields list.
-                for field in self.model._model_meta.local_concrete_fields:
+                for field in self.model._model_meta.fields:
                     if not (
                         field.primary_key or field.__class__.pre_save is Field.pre_save
                     ):
@@ -968,9 +933,9 @@ class QuerySet[T: "Model"]:
         del_query.sql_query.select_related = False
         del_query.sql_query.clear_ordering(force=True)
 
-        # FK errors (RESTRICT / NO_ACTION) leave the DB transaction aborted.
-        # Mark the connection so outer atomic() blocks see the abort state
-        # even if the caller catches IntegrityError themselves.
+        # RESTRICT violations leave the DB transaction aborted. Mark the
+        # connection so outer atomic() blocks see the abort state even if the
+        # caller catches IntegrityError themselves.
         with transaction.mark_for_rollback_on_error():
             count = del_query._raw_delete()
 
@@ -1028,7 +993,7 @@ class QuerySet[T: "Model"]:
         self._result_cache = None
         return rows
 
-    def _update(self, values: list[tuple[Field, Any]]) -> int:
+    def _update(self, values: Sequence[tuple[Field, Any]]) -> int:
         """
         A version of update() that accepts field objects instead of field names.
         Used primarily for model saving and not intended for use by general
@@ -1241,18 +1206,6 @@ class QuerySet[T: "Model"]:
         if lookups == (None,):
             clone._prefetch_related_lookups = ()
         else:
-            for lookup in lookups:
-                lookup_str: str
-                if isinstance(lookup, Prefetch):
-                    lookup_str = lookup.prefetch_to
-                else:
-                    assert isinstance(lookup, str)
-                    lookup_str = lookup
-                lookup_str = lookup_str.split(LOOKUP_SEP, 1)[0]
-                if lookup_str in self.sql_query._filtered_relations:
-                    raise ValueError(
-                        "prefetch_related() is not supported with FilteredRelation."
-                    )
             clone._prefetch_related_lookups = clone._prefetch_related_lookups + lookups
         return clone
 
@@ -1261,17 +1214,6 @@ class QuerySet[T: "Model"]:
         Return a query set in which the returned objects have been annotated
         with extra data or aggregations.
         """
-        return self._annotate(args, kwargs, select=True)
-
-    def alias(self, *args: Any, **kwargs: Any) -> Self:
-        """
-        Return a query set with added aliases for extra data or aggregations.
-        """
-        return self._annotate(args, kwargs, select=False)
-
-    def _annotate(
-        self, args: tuple[Any, ...], kwargs: dict[str, Any], select: bool = True
-    ) -> Self:
         self._validate_values_are_expressions(
             args + tuple(kwargs.values()), method_name="annotate"
         )
@@ -1299,14 +1241,7 @@ class QuerySet[T: "Model"]:
                 raise ValueError(
                     f"The annotation '{alias}' conflicts with a field on the model."
                 )
-            if isinstance(annotation, FilteredRelation):
-                clone.sql_query.add_filtered_relation(annotation, alias)
-            else:
-                clone.sql_query.add_annotation(
-                    annotation,
-                    alias,
-                    select=select,
-                )
+            clone.sql_query.add_annotation(annotation, alias)
         for alias, annotation in clone.sql_query.annotations.items():
             if alias in annotations and annotation.contains_aggregate:
                 if clone._fields is None:
@@ -1317,7 +1252,7 @@ class QuerySet[T: "Model"]:
 
         return clone
 
-    def order_by(self, *field_names: str) -> Self:
+    def order_by(self, *field_names: str | ResolvableExpression) -> Self:
         """Return a new QuerySet instance with the ordering changed."""
         if self.sql_query.is_sliced:
             raise TypeError("Cannot reorder a query once a slice has been taken.")
@@ -1337,29 +1272,6 @@ class QuerySet[T: "Model"]:
         obj = self._chain()
         obj.sql_query.add_distinct_fields(*field_names)
         return obj
-
-    def extra(
-        self,
-        select: dict[str, str] | None = None,
-        where: list[str] | None = None,
-        params: list[Any] | None = None,
-        tables: list[str] | None = None,
-        order_by: list[str] | None = None,
-        select_params: list[Any] | None = None,
-    ) -> QuerySet[T]:
-        """Add extra SQL fragments to the query."""
-        if self.sql_query.is_sliced:
-            raise TypeError("Cannot change a query once a slice has been taken.")
-        clone = self._chain()
-        clone.sql_query.add_extra(
-            select or {},
-            select_params,
-            where or [],
-            params or [],
-            tables or [],
-            tuple(order_by) if order_by else (),
-        )
-        return clone
 
     def reverse(self) -> QuerySet[T]:
         """Reverse the ordering of the QuerySet."""
@@ -1397,10 +1309,6 @@ class QuerySet[T: "Model"]:
             # Can only pass None to defer(), not only(), as the rest option.
             # That won't stop people trying to do this, so let's be explicit.
             raise TypeError("Cannot pass None as an argument to only().")
-        for field in fields:
-            field = field.split(LOOKUP_SEP, 1)[0]
-            if field in self.sql_query._filtered_relations:
-                raise ValueError("only() is not supported with FilteredRelation.")
         clone = self._chain()
         clone.sql_query.add_immediate_loading(set(fields))
         return clone
@@ -1417,19 +1325,17 @@ class QuerySet[T: "Model"]:
         """
         if isinstance(self, EmptyQuerySet):
             return True
-        if self.sql_query.extra_order_by or self.sql_query.order_by:
-            return True
-        elif (
-            self.sql_query.default_ordering
-            and self.sql_query.model
-            and self.sql_query.model._model_meta.ordering  # ty: ignore[unresolved-attribute]
-            and
-            # A default ordering doesn't affect GROUP BY queries.
-            not self.sql_query.group_by
-        ):
-            return True
-        else:
-            return False
+        return bool(
+            self.sql_query.order_by
+            or (
+                self.sql_query.default_ordering
+                and self.sql_query.model
+                and self.sql_query.model.model_options.ordering
+                and
+                # A default ordering doesn't affect GROUP BY queries.
+                not self.sql_query.group_by
+            )
+        )
 
     ###################
     # PRIVATE METHODS #
@@ -1438,7 +1344,7 @@ class QuerySet[T: "Model"]:
     def _insert(
         self,
         objs: list[T],
-        fields: list[Field],
+        fields: Sequence[Field],
         returning_fields: list[Field] | None = None,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
@@ -1461,7 +1367,7 @@ class QuerySet[T: "Model"]:
     def _batched_insert(
         self,
         objs: list[T],
-        fields: list[Field],
+        fields: Sequence[Field],
         batch_size: int | None,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
@@ -1554,7 +1460,6 @@ class QuerySet[T: "Model"]:
         """Check that two QuerySet classes may be merged."""
         if self._fields is not None and (
             set(self.sql_query.values_select) != set(other.sql_query.values_select)
-            or set(self.sql_query.extra_select) != set(other.sql_query.extra_select)
             or set(self.sql_query.annotation_select)
             != set(other.sql_query.annotation_select)
         ):

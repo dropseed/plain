@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from app.users.models import User
 from helpers import make_admin_client
-
 from plain.test import Client
 
 LIST_URL = "/admin/p/user"

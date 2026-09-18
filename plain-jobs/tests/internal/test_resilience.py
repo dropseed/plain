@@ -356,9 +356,14 @@ def test_register_heartbeat_creates_row() -> None:
 
 
 def test_maybe_heartbeat_updates_timestamp() -> None:
-    with _worker() as worker, override_settings(JOBS_HEARTBEAT_INTERVAL=0):  # always tick
+    with (
+        _worker() as worker,
+        override_settings(JOBS_HEARTBEAT_INTERVAL=0),
+    ):  # always tick
         worker.register_heartbeat()
-        initial = WorkerHeartbeat.query.get(worker_id=worker.worker_id).last_heartbeat_at
+        initial = WorkerHeartbeat.query.get(
+            worker_id=worker.worker_id
+        ).last_heartbeat_at
 
         worker.maybe_heartbeat()
 
@@ -493,7 +498,10 @@ def test_dispatch_aborted_hooks_ticks_heartbeat_between_hooks() -> None:
     a peer's rescue tick can't false-positive this worker as stale.
     """
     _aborted_calls.clear()
-    with _worker() as worker, override_settings(JOBS_HEARTBEAT_INTERVAL=0):  # tick on every call
+    with (
+        _worker() as worker,
+        override_settings(JOBS_HEARTBEAT_INTERVAL=0),
+    ):  # tick on every call
         worker.register_heartbeat()
 
         # Build three real JobResults to dispatch.
@@ -504,14 +512,18 @@ def test_dispatch_aborted_hooks_ticks_heartbeat_between_hooks() -> None:
                 jp.convert_to_result(status=JobResultStatuses.LOST, fire_hook=False)
             )
 
-        initial_at = WorkerHeartbeat.query.get(worker_id=worker.worker_id).last_heartbeat_at
+        initial_at = WorkerHeartbeat.query.get(
+            worker_id=worker.worker_id
+        ).last_heartbeat_at
 
         worker._dispatch_aborted_hooks(results)
 
         # All hooks fired.
         assert len(_aborted_calls) == 3
         # Heartbeat got refreshed during dispatch.
-        bumped_at = WorkerHeartbeat.query.get(worker_id=worker.worker_id).last_heartbeat_at
+        bumped_at = WorkerHeartbeat.query.get(
+            worker_id=worker.worker_id
+        ).last_heartbeat_at
         assert bumped_at > initial_at
 
 

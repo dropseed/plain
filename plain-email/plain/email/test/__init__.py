@@ -18,4 +18,4 @@ from plain.email.backends.locmem import outbox
 
 from .lifecycle import EmailTestLifecycle
 
-__all__ = ["outbox", "EmailTestLifecycle"]
+__all__ = ["EmailTestLifecycle", "outbox"]

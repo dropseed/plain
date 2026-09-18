@@ -4,7 +4,7 @@ import collections
 import json
 import re
 from collections.abc import Generator, Iterable, Sequence
-from functools import cached_property, partial
+from functools import cached_property
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -22,9 +22,9 @@ from plain.postgres.dialect import (
 )
 from plain.postgres.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.postgres.expressions import (
+    BaseExpression,
     F,
     OrderBy,
-    RawSQL,
     Ref,
     ResolvableExpression,
     Value,
@@ -50,7 +50,6 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
-    from plain.postgres.expressions import BaseExpression
     from plain.postgres.sql.query import AggregateQuery, InsertQuery
 
 # Type aliases for SQL compilation results
@@ -242,8 +241,7 @@ class SQLCompiler:
                 if not is_ref:
                     expressions.extend(expr.get_group_by_cols())
         having_group_by = self.having.get_group_by_cols() if self.having else []
-        for expr in having_group_by:
-            expressions.append(expr)
+        expressions.extend(having_group_by)
         result = []
         seen = set()
         expressions = self.collapse_group_by(expressions, having_group_by)
@@ -314,10 +312,6 @@ class SQLCompiler:
         klass_info = None
         annotations = {}
         select_idx = 0
-        for alias, (sql, params) in self.query.extra_select.items():
-            annotations[alias] = select_idx
-            select.append((RawSQL(sql, params), alias))
-            select_idx += 1
         assert not (self.query.select and self.query.default_cols)
         select_mask = self.query.get_select_mask()
         if self.query.default_cols:
@@ -371,11 +365,7 @@ class SQLCompiler:
         return ret, klass_info, annotations  # ty: ignore[invalid-return-type] (heterogeneous klass_info dict)
 
     def _order_by_pairs(self) -> Generator[tuple[OrderBy, bool]]:
-        if self.query.extra_order_by:
-            ordering = self.query.extra_order_by
-        elif not self.query.default_ordering:
-            ordering = self.query.order_by
-        elif self.query.order_by:
+        if not self.query.default_ordering or self.query.order_by:
             ordering = self.query.order_by
         elif (
             self.query.model
@@ -448,45 +438,15 @@ class SQLCompiler:
                 yield OrderBy(expr, descending=descending), False
                 continue
 
-            if "." in field:
-                # This came in through an extra(order_by=...) addition. Pass it
-                # on verbatim.
-                table, col = col.split(".", 1)
-                yield (
-                    OrderBy(
-                        RawSQL(f"{self.quote_name_unless_alias(table)}.{col}", []),
-                        descending=descending,
-                    ),
-                    False,
-                )
-                continue
-
-            if self.query.extra and col in self.query.extra:
-                if col in self.query.extra_select:
-                    yield (
-                        OrderBy(
-                            Ref(col, RawSQL(*self.query.extra[col])),
-                            descending=descending,
-                        ),
-                        True,
-                    )
-                else:
-                    yield (
-                        OrderBy(RawSQL(*self.query.extra[col]), descending=descending),
-                        False,
-                    )
-            else:
-                # 'col' is of the form 'field' or 'field1__field2' or
-                # '-field1__field2__field', etc.
-                assert self.query.model is not None, (
-                    "Ordering by fields requires a model"
-                )
-                meta = self.query.model._model_meta
-                yield from self.find_ordering_name(
-                    field,
-                    meta,
-                    default_order=default_order,
-                )
+            # 'col' is of the form 'field' or 'field1__field2' or
+            # '-field1__field2__field', etc.
+            assert self.query.model is not None, "Ordering by fields requires a model"
+            meta = self.query.model._model_meta
+            yield from self.find_ordering_name(
+                field,
+                meta,
+                default_order=default_order,
+            )
 
     def get_order_by(self) -> list[tuple[Any, tuple[str, tuple, bool]]]:
         """
@@ -534,13 +494,8 @@ class SQLCompiler:
         """
         if name in self.quote_cache:
             return self.quote_cache[name]
-        if (
-            (name in self.query.alias_map and name not in self.query.table_map)
-            or name in self.query.extra_select
-            or (
-                self.query.external_aliases.get(name)
-                and name not in self.query.table_map
-            )
+        if (name in self.query.alias_map and name not in self.query.table_map) or (
+            self.query.external_aliases.get(name) and name not in self.query.table_map
         ):
             self.quote_cache[name] = name
             return name
@@ -831,7 +786,7 @@ class SQLCompiler:
             opts = self.query.model._model_meta
         start_alias = start_alias or self.query.get_initial_alias()
 
-        for field in opts.concrete_fields:
+        for field in opts.fields:
             if select_mask and field not in select_mask:
                 continue
             result.append(field.get_col(start_alias))
@@ -976,25 +931,10 @@ class SQLCompiler:
         for alias in tuple(self.query.alias_map):
             if not self.query.alias_refcount[alias]:
                 continue
-            try:
-                from_clause = self.query.alias_map[alias]
-            except KeyError:
-                # Extra tables can end up in self.tables, but not in the
-                # alias_map if they aren't in a join. That's OK. We skip them.
-                continue
+            from_clause = self.query.alias_map[alias]
             clause_sql, clause_params = self.compile(from_clause)
             result.append(clause_sql)
             params.extend(clause_params)
-        for t in self.query.extra_tables:
-            alias, _ = self.query.table_alias(t)
-            # Only add the alias if it's not already present (the table_alias()
-            # call increments the refcount, so an alias refcount of one means
-            # this is the only reference).
-            if (
-                alias not in self.query.alias_map
-                or self.query.alias_refcount[alias] == 1
-            ):
-                result.append(f", {self.quote_name_unless_alias(alias)}")
         return result, params
 
     def get_related_selections(
@@ -1039,9 +979,7 @@ class SQLCompiler:
                 for f in opts.related_objects
                 if f.field.primary_key
             )
-            return chain(
-                direct_choices, reverse_choices, self.query._filtered_relations
-            )
+            return chain(direct_choices, reverse_choices)
 
         # Setup for the case when only particular related fields should be
         # included in the related selection.
@@ -1062,17 +1000,16 @@ class SQLCompiler:
             if restricted:
                 assert requested is not None
                 next = requested.get(f.name, {})
-                if not isinstance(f, RelatedField):
-                    # If a non-related field is used like a relation,
-                    # or if a single non-relational field is given.
-                    if next or f.name in requested:
-                        raise FieldError(
-                            "Non-relational field given in select_related: '{}'. "
-                            "Choices are: {}".format(
-                                f.name,
-                                ", ".join(_get_field_choices()) or "(none)",
-                            )
+                # If a non-related field is used like a relation,
+                # or if a single non-relational field is given.
+                if not isinstance(f, RelatedField) and (next or f.name in requested):
+                    raise FieldError(
+                        "Non-relational field given in select_related: '{}'. "
+                        "Choices are: {}".format(
+                            f.name,
+                            ", ".join(_get_field_choices()) or "(none)",
                         )
+                    )
             else:
                 next = None
 
@@ -1170,63 +1107,7 @@ class SQLCompiler:
                 )
                 get_related_klass_infos(klass_info, next_klass_infos)
 
-            def local_setter(final_field: Any, obj: Any, from_obj: Any) -> None:
-                # Set a reverse fk object when relation is non-empty.
-                if from_obj:
-                    final_field.remote_field.set_cached_value(from_obj, obj)
-
-            def local_setter_noop(obj: Any, from_obj: Any) -> None:
-                pass
-
-            def remote_setter(name: str, obj: Any, from_obj: Any) -> None:
-                setattr(from_obj, name, obj)
-
             assert requested is not None
-            for name in list(requested):
-                # Filtered relations work only on the topmost level.
-                if cur_depth > 1:
-                    break
-                if name in self.query._filtered_relations:
-                    fields_found.add(name)
-                    final_field, _, join_opts, joins, _, _ = self.query.setup_joins(
-                        [name], opts, root_alias
-                    )
-                    model = join_opts.model
-                    alias = joins[-1]
-                    klass_info: dict[str, Any] = {
-                        "model": model,
-                        "field": final_field,
-                        "reverse": True,
-                        "local_setter": (
-                            partial(local_setter, final_field)
-                            if len(joins) <= 2
-                            else local_setter_noop
-                        ),
-                        "remote_setter": partial(remote_setter, name),
-                    }
-                    related_klass_infos.append(klass_info)
-                    select_fields = []
-                    field_select_mask = select_mask.get((name, final_field)) or {}
-                    columns = self.get_default_columns(
-                        field_select_mask,
-                        start_alias=alias,
-                        opts=model._model_meta,
-                    )
-                    for col in columns:
-                        select_fields.append(len(select))
-                        select.append((col, None))
-                    klass_info["select_fields"] = select_fields
-                    next_requested = requested.get(name, {})
-                    next_klass_infos = self.get_related_selections(
-                        select,
-                        field_select_mask,
-                        opts=model._model_meta,
-                        root_alias=alias,
-                        cur_depth=cur_depth + 1,
-                        requested=next_requested,
-                        restricted=restricted,
-                    )
-                    get_related_klass_infos(klass_info, next_klass_infos)
             fields_not_found = set(requested).difference(fields_found)
             if fields_not_found:
                 invalid_fields = (f"'{s}'" for s in fields_not_found)
@@ -1258,28 +1139,29 @@ class SQLCompiler:
                     return self.select[select_index][0]
             return None
 
-        def _get_field_choices() -> Generator[str]:
+        def _get_field_choices(root_klass_info: dict[str, Any]) -> Generator[str]:
             """Yield all allowed field paths in breadth-first search order."""
-            queue = collections.deque([(None, self.klass_info)])
+            yield "self"
+
+            queue: collections.deque[tuple[list[str], dict[str, Any]]] = (
+                collections.deque(
+                    ([], related_klass_info)
+                    for related_klass_info in root_klass_info.get(
+                        "related_klass_infos", []
+                    )
+                )
+            )
             while queue:
                 parent_path, klass_info = queue.popleft()
-                if parent_path is None:
-                    path = []
-                    yield "self"
-                else:
-                    assert klass_info is not None  # Only first iteration has None
-                    field = klass_info["field"]
-                    if klass_info["reverse"]:
-                        field = field.remote_field
-                    path = parent_path + [field.name]
-                    yield LOOKUP_SEP.join(path)
-                if klass_info is not None:
-                    queue.extend(
-                        (path, related_klass_info)
-                        for related_klass_info in klass_info.get(
-                            "related_klass_infos", []
-                        )
-                    )
+                field = klass_info["field"]
+                if klass_info["reverse"]:
+                    field = field.remote_field
+                path = parent_path + [field.name]
+                yield LOOKUP_SEP.join(path)
+                queue.extend(
+                    (path, related_klass_info)
+                    for related_klass_info in klass_info.get("related_klass_infos", [])
+                )
 
         if not self.klass_info:
             return []
@@ -1316,7 +1198,7 @@ class SQLCompiler:
                 "Only relational fields followed in the query are allowed. "
                 "Choices are: {}.".format(
                     ", ".join(invalid_names),
-                    ", ".join(_get_field_choices()),
+                    ", ".join(_get_field_choices(self.klass_info)),
                 )
             )
         return result
@@ -1505,7 +1387,7 @@ class SQLInsertCompiler(SQLCompiler):
         return field.pre_save(obj, add=True)
 
     def assemble_as_sql(
-        self, fields: list[Any], value_rows: list[list[Any]]
+        self, fields: Sequence[Any], value_rows: list[list[Any]]
     ) -> tuple[Any, list[list[Any]]]:
         """
         Take a sequence of N fields and a sequence of M rows of values, and
@@ -1586,13 +1468,11 @@ class SQLInsertCompiler(SQLCompiler):
             params = param_rows
             if conflict_suffix_sql:
                 result.append(conflict_suffix_sql)
-            # Skip empty r_sql in case returning_cols returns an empty string.
-            returning_cols = return_insert_columns(self.returning_fields)
-            if returning_cols:
-                r_sql, self.returning_params = returning_cols
-                if r_sql:
-                    result.append(r_sql)
-                    params += [list(self.returning_params)]
+            # Skip appending the RETURNING clause if it's an empty string.
+            r_sql, self.returning_params = return_insert_columns(self.returning_fields)
+            if r_sql:
+                result.append(r_sql)
+                params += [list(self.returning_params)]
             return [(" ".join(result), tuple(chain.from_iterable(params)))]
 
         # Bulk insert without returning fields
@@ -1771,7 +1651,6 @@ class SQLUpdateCompiler(SQLCompiler):
         query = self.query.chain(klass=Query)
         query.select_related = False
         query.clear_ordering(force=True)
-        query.extra = {}
         query.select = ()
         query.add_fields(["id"])
         super().pre_sql_setup()

@@ -61,7 +61,7 @@ class Manager:
         self._processes = {}
 
         self._terminating = False
-        self._terminate_start = datetime.datetime.min
+        self._terminate_start = datetime.datetime.min  # noqa: DTZ901 — poncho's clock is consistently naive
         self._killed = False
 
     def add_process(
@@ -122,7 +122,7 @@ class Manager:
         signal.signal(signal.SIGTERM, _terminate)
         signal.signal(signal.SIGINT, _terminate)
 
-        for name in self._processes.keys():
+        for name in self._processes:
             self._start_process(name)
 
         exit = False

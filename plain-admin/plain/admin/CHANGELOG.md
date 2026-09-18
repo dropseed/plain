@@ -1,5 +1,66 @@
 # plain-admin changelog
 
+## [0.86.2](https://github.com/dropseed/plain/releases/plain-admin@0.86.2) (2026-09-04)
+
+### What's changed
+
+- `AdminModelListView` looks up the primary key field with `get_forward_field("id")` instead of `get_field("id")`, so the `to_python()` call that coerces incoming ids is statically known to exist rather than suppressed with a type-checker ignore ([d9406dfc6f](https://github.com/dropseed/plain/commit/d9406dfc6f))
+- `AdminModelDetailView.get_fields()` dropped its `if f.concrete` filter, following the removal of `Field.concrete` in plain-postgres. `get_fields()` returns forward fields only, and `concrete` was `True` for all of them, so the displayed fields are unchanged ([af56244677](https://github.com/dropseed/plain/commit/af56244677))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.86.1](https://github.com/dropseed/plain/releases/plain-admin@0.86.1) (2026-09-04)
+
+### What's changed
+
+- Internal type annotations only — a `type: ignore` dropped from `Card.get_filters()` and an explicit `list[type[View]]` annotation in `AdminViewset`, from the ruff 0.16.4 / ty 0.0.74 upgrade. No runtime behavior changed ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.86.0](https://github.com/dropseed/plain/releases/plain-admin@0.86.0) (2026-08-12)
+
+### What's changed
+
+- Declarative view and card attributes are now tuple-typed: `fields`, `search_fields`, `actions`, `filters`, `queryset_order`, `cards`, and table card `headers`/`rows`/`footers`. List declarations still work — they're converted to tuples at class-definition time — but fail type checking ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `filters` on `AdminModelListView` is now explicitly typed as `tuple[str, ...] | dict[str, Q]`, documenting the existing dict-based auto-filtering support ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- The `get_fields()`/`get_actions()`/`get_filter_names()`/`get_cards()` (and table card) accessors return tuples directly instead of defensive list copies ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `get_field_value()` no longer swallows arbitrary exceptions when resolving choice display values — only a missing field or a does-not-exist race (e.g. a deferred field refreshed against a concurrently deleted row) falls back to the raw value; other errors now surface ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- The built-in demo chart uses the app's `TIME_ZONE` for its date labels ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- Convert admin viewset list attributes to tuples: `fields = ("id", "name")`, `actions = ("Delete",)`, etc. — required for type checking, though lists keep working at runtime
+- If you override `get_fields()` (or the other accessors) with an append-style pattern, rebuild the tuple instead: `return (*super().get_fields(), "extra")`
+
+## [0.85.1](https://github.com/dropseed/plain/releases/plain-admin@0.85.1) (2026-08-02)
+
+### What's changed
+
+- Internal `RedirectResponse` calls now pass an explicit `status_code=302`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+- Shipped admin stylesheets were reformatted by the oxc 1.75.0 upgrade (oxfmt now formats CSS) — no visual changes. ([1415312278](https://github.com/dropseed/plain/commit/1415312278))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.85.0](https://github.com/dropseed/plain/releases/plain-admin@0.85.0) (2026-07-21)
+
+### What's changed
+
+- **`AdminListView` is now built on `ListView` from `plain.templates`** (requires `plain-templates>=0.5.0`), so it uses the framework's pagination instead of its own. The list objects come from a `get_objects()` method, and `page_size` is resolved through `get_page_size()`. ([497df7c2cf](https://github.com/dropseed/plain/commit/497df7c2cf))
+- **The list template context renamed `page` to `page_obj` and dropped `paginator`.** Reach the paginator through `page_obj.paginator`. `objects` still holds the current page, unchanged. ([497df7c2cf](https://github.com/dropseed/plain/commit/497df7c2cf))
+- **An invalid `?page_size=` no longer 500s.** A non-integer or non-positive value now falls back to the view's `page_size` instead of raising. ([497df7c2cf](https://github.com/dropseed/plain/commit/497df7c2cf))
+- An empty global-search preview fragment returns its `204` before rendering the template rather than after, so no wasted render. ([497df7c2cf](https://github.com/dropseed/plain/commit/497df7c2cf))
+
+### Upgrade instructions
+
+- If you override an admin list template (or `admin/list.html` itself), rename `page` to `page_obj` and replace `paginator` with `page_obj.paginator`.
+- If you set `self.objects` inside a `get_template_context()` override, move that logic into `get_objects()` — `objects` is now a cached property computed from it.
+
 ## [0.84.0](https://github.com/dropseed/plain/releases/plain-admin@0.84.0) (2026-07-15)
 
 ### What's changed

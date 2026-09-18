@@ -57,8 +57,12 @@ def install_test_meter() -> InMemoryMetricReader:
     global _metric_reader
     if _metric_reader is None:
         from opentelemetry import metrics
-        from opentelemetry.sdk.metrics import Counter, Histogram, UpDownCounter
-        from opentelemetry.sdk.metrics import MeterProvider
+        from opentelemetry.sdk.metrics import (
+            Counter,
+            Histogram,
+            MeterProvider,
+            UpDownCounter,
+        )
         from opentelemetry.sdk.metrics.export import (
             AggregationTemporality,
             InMemoryMetricReader,

@@ -15,22 +15,19 @@ def test_raises_match():
 
 
 def test_raises_match_failure():
-    with raises(AssertionError):
-        with raises(ValueError, match="unrelated"):
-            raise ValueError("a bad thing")
+    with raises(AssertionError), raises(ValueError, match="unrelated"):
+        raise ValueError("a bad thing")
 
 
 def test_raises_reports_missing_exception():
-    with raises(AssertionError) as caught:
-        with raises(ValueError):
-            pass
+    with raises(AssertionError) as caught, raises(ValueError):
+        pass
     assert "ValueError was not raised" in str(caught.exception)
 
 
 def test_raises_lets_unexpected_exceptions_propagate():
-    with raises(KeyError):
-        with raises(ValueError):
-            raise KeyError("different")
+    with raises(KeyError), raises(ValueError):
+        raise KeyError("different")
 
 
 class Thing:

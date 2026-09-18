@@ -7,8 +7,6 @@ import threading
 import time
 
 from helpers import clean_connection
-from psycopg_pool import PoolTimeout
-
 from plain.postgres.db import (
     _db_conn,
     get_connection,
@@ -16,6 +14,7 @@ from plain.postgres.db import (
 )
 from plain.postgres.sources import runtime_pool_source
 from plain.test import override_settings, raises
+from psycopg_pool import PoolTimeout
 
 
 class TestPoolCheckoutReturn:

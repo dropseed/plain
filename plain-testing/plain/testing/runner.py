@@ -16,7 +16,7 @@ from plain.test.lifecycle import TestLifecycle
 
 from .collection import CollectedTest
 
-__all__ = ["TestRun", "TestResult", "run_tests"]
+__all__ = ["TestResult", "TestRun", "run_tests"]
 
 _INTERNAL_DIR = str(Path(__file__).parent)
 

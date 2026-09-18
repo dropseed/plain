@@ -16,25 +16,23 @@ from plain.postgres.sql.query import (
     RawQuery,
     UpdateQuery,
 )
-from plain.postgres.sql.where import AND, OR, XOR
+from plain.postgres.sql.where import AND, OR
 
 __all__ = [
-    "Query",
-    "RawQuery",
+    "AND",
+    "CURSOR",
+    "GET_ITERATOR_CHUNK_SIZE",
+    "INNER",
+    "LOUTER",
+    "MULTI",
+    "NO_RESULTS",
+    "OR",
+    "ORDER_DIR",
+    "SINGLE",
     "AggregateQuery",
     "DeleteQuery",
     "InsertQuery",
+    "Query",
+    "RawQuery",
     "UpdateQuery",
-    "AND",
-    "OR",
-    "XOR",
-    # Constants
-    "GET_ITERATOR_CHUNK_SIZE",
-    "MULTI",
-    "SINGLE",
-    "CURSOR",
-    "NO_RESULTS",
-    "ORDER_DIR",
-    "INNER",
-    "LOUTER",
 ]

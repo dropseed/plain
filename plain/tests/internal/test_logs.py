@@ -25,10 +25,8 @@ def cleanup_loggers(func):
             return func(*args, **kwargs)
         finally:
             for logger_name in list(logging.root.manager.loggerDict.keys()):
-                if (
-                    logger_name == "test"
-                    or logger_name.startswith("test.")
-                    or logger_name.startswith("plain.test")
+                if logger_name == "test" or logger_name.startswith(
+                    ("test.", "plain.test")
                 ):
                     del logging.root.manager.loggerDict[logger_name]
 
@@ -252,7 +250,9 @@ class TestPlainLogger:
         try:
             raise ValueError("Test exception")
         except ValueError:
-            logger.error("Error occurred", exc_info=True, context={"user_id": 123})
+            logger.error(  # noqa: G201 — exc_info=True handling is what this test covers
+                "Error occurred", exc_info=True, context={"user_id": 123}
+            )
 
         output = stream.getvalue()
         json_line = output.split("\n")[0]

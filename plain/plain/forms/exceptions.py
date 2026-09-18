@@ -9,6 +9,6 @@ class FormFieldMissingError(BadRequestError400):
 
 
 __all__ = [
-    "ValidationError",
     "FormFieldMissingError",
+    "ValidationError",
 ]

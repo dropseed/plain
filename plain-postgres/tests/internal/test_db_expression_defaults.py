@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import datetime
 import uuid
+from typing import ClassVar
 
 from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
-
 from plain.postgres import get_connection
 from plain.postgres.fields import DATABASE_DEFAULT
 from plain.postgres.functions import GenRandomUUID, Now
@@ -211,7 +211,7 @@ def test_alter_field_is_no_op_for_default_only_expression_change():
 def test_alter_field_nullable_to_not_null_with_expression_default_is_migration_no_op():
     """A nullable→NOT NULL transition on a column that already carries an
     expression DEFAULT is a schema-editor no-op. Convergence owns the
-    NullabilityDrift (SetNotNullFix blocks if NULL rows exist)."""
+    NullabilityDrift (SetNotNullCorrection blocks if NULL rows exist)."""
     from plain.postgres import fields as plain_fields
 
     connection = get_connection()
@@ -352,15 +352,19 @@ def test_construct_instance_preserves_db_default_on_blank_submission():
     # Minimal stand-in: construct_instance only reads `cleaned_data`, `data`,
     # `files`, and `form[name].field.empty_values` + `add_prefix`.
     class _FormField:
-        empty_values = [None, "", [], (), {}]
+        empty_values = (None, "", [], (), {})
 
     class _Bound:
         field = _FormField()
 
     class _Form:
-        cleaned_data = {"name": "from-form", "db_uuid": None, "created_at": None}
-        data = {"name": "from-form", "db_uuid": "", "created_at": ""}
-        files: dict = {}
+        cleaned_data: ClassVar = {
+            "name": "from-form",
+            "db_uuid": None,
+            "created_at": None,
+        }
+        data: ClassVar = {"name": "from-form", "db_uuid": "", "created_at": ""}
+        files: ClassVar[dict] = {}
 
         def add_prefix(self, name: str) -> str:
             return name
@@ -446,7 +450,9 @@ def test_datetime_default_kwarg_rejected_at_signature():
     from plain.postgres import fields as plain_fields
 
     with raises(TypeError, match="unexpected keyword argument 'default'"):
-        plain_fields.DateTimeField(default=datetime.datetime(2020, 1, 1))  # ty: ignore[unknown-argument]
+        plain_fields.DateTimeField(
+            default=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC)  # ty: ignore[unknown-argument]
+        )
 
 
 def test_get_db_default_expression_returns_now_when_create_now():

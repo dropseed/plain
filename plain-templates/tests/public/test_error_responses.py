@@ -11,32 +11,8 @@ default. For URL-resolution failures (no view ever runs), mount
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-
-from plain.runtime import settings
-from plain.test import Client, patch
-from plain.urls.resolvers import _get_cached_resolver
-
-
-@contextmanager
-def _error_client():
-    """Client routed to the error-raising views in `error_routers.py`."""
-    original = settings.URLS_ROUTER
-    original_debug = settings.DEBUG
-    settings.URLS_ROUTER = "error_routers.ErrorRouter"
-    settings.DEBUG = False
-    _get_cached_resolver.cache_clear()
-    try:
-        client = Client(raise_request_exception=False)
-        # Middleware chain was built on init with the old router; rebuild it
-        # after the settings swap.
-        client.handler._middleware_chain = None
-        client.handler.load_middleware()
-        yield client
-    finally:
-        settings.URLS_ROUTER = original
-        settings.DEBUG = original_debug
-        _get_cached_resolver.cache_clear()
+from clients import error_client as _error_client
+from plain.test import patch
 
 
 class TestPlainViewFallsThroughToText:
@@ -125,7 +101,7 @@ class TestRenderFailureFallsBackToText:
         original_render = Template.render
 
         def boom_on_500(self, context=None):
-            if self.template_name == "500.html":
+            if self.filename == "500.html":
                 raise RuntimeError("render blew up")
             return original_render(self, context or {})
 

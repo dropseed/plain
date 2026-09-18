@@ -10,7 +10,6 @@ from pathlib import Path
 import httpx
 from click.testing import CliRunner
 from helpers import isolated_cloud_env
-
 from plain.cloud import cli as cli_module
 from plain.cloud.cli import cli
 from plain.cloud.client import Client
@@ -55,7 +54,9 @@ def test_whoami_without_login_exits_with_error():
 def test_login_validates_token_and_persists():
     with isolated_cloud_env() as fake_keyring:
         runner = make_runner()
-        with mock_api(lambda req: httpx.Response(200, json={"email": "user@example.com"})):
+        with mock_api(
+            lambda req: httpx.Response(200, json={"email": "user@example.com"})
+        ):
             result = runner.invoke(
                 cli,
                 ["login", "--api-url", "https://example.com", "--token", "good-token"],

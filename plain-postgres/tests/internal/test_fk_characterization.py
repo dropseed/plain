@@ -9,7 +9,6 @@ tests.
 from __future__ import annotations
 
 from app.examples.models.delete import ChildCascade, CircA, DeleteParent
-
 from plain.postgres.exceptions import FieldDoesNotExist, FieldError
 from plain.test import raises
 

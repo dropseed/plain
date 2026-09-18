@@ -5,6 +5,9 @@ requires-python = ">=3.13"
 
 [dependency-groups]
 dev = [
+  # Optional runtime dep of plain-api's --validate; hoisted so ty resolves its
+  # imports in every dev/CI environment.
+  "openapi-spec-validator>=0.7.1",
   "plain",
   "plain-admin",
   "plain-api",
@@ -28,7 +31,6 @@ dev = [
   "plain-oauthserver",
   "plain-pages",
   "plain-passwords",
-  "plain-redirection",
   "plain-scan",
   "plain-sessions",
   "plain-tailwind",
@@ -37,10 +39,20 @@ dev = [
   "plain-toolbar",
   "plain-tunnel",
   "plain-vendor",
+  # Workspace member, but only reachable through the optional `import plainx`
+  # plugin discovery in plain/cli/agent.py; listed here so ty resolves it in
+  # every dev/CI environment rather than only where a previous
+  # `uv sync --all-packages` happened to leave it installed.
+  "plainx-dev",
   # Type checking and better dev experience
-  "ty>=0.0.59",
+  "ty>=0.0.80",
   "psycopg[binary]>=3.2.12",
 ]
+
+[tool.uv]
+# The workspace root is not a package. Without this, `uv sync` installs it
+# through the legacy setuptools fallback and litters build/ and *.egg-info.
+package = false
 
 [tool.uv.sources]
 "plain" = { workspace = true }
@@ -66,7 +78,6 @@ dev = [
 "plain-oauthserver" = { workspace = true }
 "plain-pages" = { workspace = true }
 "plain-passwords" = { workspace = true }
-"plain-redirection" = { workspace = true }
 "plain-scan" = { workspace = true }
 "plain-sessions" = { workspace = true }
 "plain-tailwind" = { workspace = true }
@@ -87,7 +98,7 @@ members = [
 ]
 
 [tool.plain.code.oxc]
-version = "1.50.0"
+version = "1.75.0"
 
 [tool.plain.code.annotations]
 exclude = ["example", "scratch", "scripts"]

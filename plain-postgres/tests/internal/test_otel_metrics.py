@@ -8,17 +8,16 @@ from __future__ import annotations
 
 import concurrent.futures
 import threading
-from typing import Any
+from typing import Any, ClassVar
 
 from opentelemetry.trace import NoOpTracer
-from psycopg_pool import PoolTimeout
-
 from plain.postgres import otel as postgres_otel
 from plain.postgres.db import get_connection
 from plain.postgres.otel import register_pool_observables
 from plain.postgres.sources import runtime_pool_source
 from plain.test import capture_metrics, capture_spans, override_settings, patch, raises
 from plain.test.otel import install_test_meter
+from psycopg_pool import PoolTimeout
 
 # Pool observables were registered against the proxy meter at package
 # `ready()`; ensure the real MeterProvider is installed and rebind so
@@ -44,6 +43,25 @@ class TestQuerySpanAttributes:
         assert "server.port" in attrs
         assert attrs["server.port"] == attrs.get("network.peer.port")
 
+    def test_query_spans_carry_the_attributes_trace_readers_rely_on(self) -> None:
+        # `plain request` groups statements by `db.query.text`, splits
+        # transaction bookkeeping out by `db.operation.name`, and classifies
+        # call sites by `code.file.path`. It cannot import this package to
+        # check, so pin the keys here — dropping one silently costs it query
+        # grouping or call sites with nothing failing on that side.
+        with capture_spans() as otel_spans:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT 1")
+
+        spans = [s for s in otel_spans.get_finished_spans() if s.name == "SELECT"]
+        assert spans, "no SELECT span captured"
+        attrs = spans[-1].attributes
+        assert attrs is not None
+        assert attrs["db.query.text"] == "SELECT 1"
+        assert attrs["db.operation.name"] == "SELECT"
+        assert str(attrs["code.file.path"]).endswith(".py")
+
     def test_not_recording_skips_stack_walk(self) -> None:
         # Cheap attributes still build unconditionally (attribute-aware
         # samplers see them at span creation), but the per-query stack walk
@@ -55,14 +73,14 @@ class TestQuerySpanAttributes:
             return {}
 
         class StubDb:
-            settings_dict: dict[str, Any] = {}
+            settings_dict: ClassVar[dict[str, Any]] = {}
 
         with (
             patch(postgres_otel, "_get_code_attributes", counting_code_attributes),
             patch(postgres_otel, "tracer", NoOpTracer()),
+            postgres_otel.db_span(StubDb(), "SELECT 1") as span,  # ty: ignore[invalid-argument-type]
         ):
-            with postgres_otel.db_span(StubDb(), "SELECT 1") as span:  # ty: ignore[invalid-argument-type]
-                pass
+            pass
 
         assert span is not None
         assert not span.is_recording()

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import psycopg
 from app.examples.models.defaults import DefaultsExample
-
 from plain.postgres import get_connection
 from plain.test import raises
 
@@ -135,12 +134,14 @@ def test_raw_insert_uses_persisted_literal_default():
 
 def test_raw_insert_fails_when_required_column_has_no_default():
     """Columns without a literal/expression default still require a value."""
-    with raises(psycopg.errors.NotNullViolation):
-        with get_connection().cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO examples_defaultsexample (priority)
-                VALUES (%s)
-                """,
-                [1],
-            )
+    with (
+        raises(psycopg.errors.NotNullViolation),
+        get_connection().cursor() as cursor,
+    ):
+        cursor.execute(
+            """
+            INSERT INTO examples_defaultsexample (priority)
+            VALUES (%s)
+            """,
+            [1],
+        )

@@ -10,7 +10,6 @@ from oauth_helpers import (
     make_public_app,
     make_user,
 )
-
 from plain.oauthserver import validate_access_token
 from plain.oauthserver.models import AuthorizationCode
 from plain.test import Client

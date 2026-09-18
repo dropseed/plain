@@ -7,7 +7,6 @@ from convergence_helpers import (
     index_exists,
     index_is_valid,
 )
-
 from plain.postgres import Index, Q, get_connection
 from plain.postgres.convergence import (
     ReadOnlyConnectionError,
@@ -21,11 +20,11 @@ from plain.postgres.convergence.analysis import (
     IndexUndeclaredDrift,
     analyze_model,
 )
-from plain.postgres.convergence.fixes import (
-    CreateIndexFix,
-    DropIndexFix,
-    RebuildIndexFix,
-    RenameIndexFix,
+from plain.postgres.convergence.corrections import (
+    CreateIndexCorrection,
+    DropIndexCorrection,
+    RebuildIndexCorrection,
+    RenameIndexCorrection,
 )
 from plain.postgres.db import read_only
 from plain.postgres.functions.text import Upper
@@ -72,8 +71,8 @@ class TestUnmanagedIndexTypes:
             items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
         assert not any(
-            isinstance(item.fix, DropIndexFix)
-            and item.fix.name == "examples_indexexample_name_hash_idx"
+            isinstance(item.correction, DropIndexCorrection)
+            and item.correction.name == "examples_indexexample_name_hash_idx"
             for item in items
         )
 
@@ -127,7 +126,7 @@ class TestUnmanagedIndexTypes:
             assert conflict.issue is not None
             assert "name conflict" in conflict.issue
             assert "hash" in conflict.issue
-            assert conflict.drift is None  # no auto-fix
+            assert conflict.drift is None  # no auto-correction
 
 
 class TestDescendingIndexNoDrift:
@@ -179,11 +178,15 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             index_items = [
-                item for item in items if isinstance(item.fix, CreateIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, CreateIndexCorrection)
             ]
             assert len(index_items) == 1
-            assert isinstance(index_items[0].fix, CreateIndexFix)
-            assert index_items[0].fix.index.name == "examples_indexexample_name_idx"
+            assert isinstance(index_items[0].correction, CreateIndexCorrection)
+            assert (
+                index_items[0].correction.index.name == "examples_indexexample_name_idx"
+            )
 
     def test_detects_extra_index(self):
         """An index in the DB not declared on the model is auto-dropped."""
@@ -196,15 +199,17 @@ class TestDetectIndexFixes:
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
-        index_items = [item for item in items if isinstance(item.fix, DropIndexFix)]
+        index_items = [
+            item for item in items if isinstance(item.correction, DropIndexCorrection)
+        ]
         assert len(index_items) == 1
-        fix = index_items[0].fix
-        assert isinstance(fix, DropIndexFix)
-        assert fix.name == "examples_indexexample_extra_idx"
+        correction = index_items[0].correction
+        assert isinstance(correction, DropIndexCorrection)
+        assert correction.name == "examples_indexexample_extra_idx"
 
     @isolated_db
     def test_detects_invalid_index(self):
-        """An INVALID index matching a model index produces a RebuildIndexFix."""
+        """An INVALID index matching a model index produces a RebuildIndexCorrection."""
         with patch(
             IndexExample.model_options,
             "indexes",
@@ -227,15 +232,17 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_idx"
 
     def test_detects_index_definition_changed(self):
-        """An index with the same name but different columns produces a RebuildIndexFix."""
+        """An index with the same name but different columns produces a RebuildIndexCorrection."""
         # Model declares index on "name" field
         with patch(
             IndexExample.model_options,
@@ -256,12 +263,14 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_idx"
 
     def test_detects_index_sort_order_changed(self):
         """An index whose model declaration is DESC but the live index is
@@ -285,11 +294,16 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            assert isinstance(rebuild_items[0].fix, RebuildIndexFix)
-            assert rebuild_items[0].fix.index.name == "examples_indexexample_name_idx"
+            assert isinstance(rebuild_items[0].correction, RebuildIndexCorrection)
+            assert (
+                rebuild_items[0].correction.index.name
+                == "examples_indexexample_name_idx"
+            )
 
     def test_detects_partial_index_predicate_with_paren_in_literal(self):
         """Partial-index predicates whose string literal contains parentheses
@@ -319,7 +333,9 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
 
@@ -350,7 +366,9 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
 
@@ -383,15 +401,17 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_idx"
 
     def test_detects_expression_index_definition_changed(self):
-        """An expression index with the same name but different expression produces a RebuildIndexFix."""
+        """An expression index with the same name but different expression produces a RebuildIndexCorrection."""
         # Model declares UPPER(name)
         with patch(
             IndexExample.model_options,
@@ -412,12 +432,14 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_expr_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_expr_idx"
 
     def test_detects_expression_index_sort_order_change(self):
         """An expression index with the same expression but different sort
@@ -445,7 +467,9 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
 
@@ -478,7 +502,9 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
 
@@ -553,12 +579,14 @@ class TestDetectIndexFixes:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_opclass_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_opclass_idx"
 
     def test_no_false_positive_for_matching_opclass_index(self):
         """An index whose model and DB both declare the same non-default
@@ -594,7 +622,7 @@ class TestDetectIndexFixes:
             assert matching.issue is None
 
     def test_detects_partial_index_condition_changed(self):
-        """A partial index with same name/columns but different WHERE produces a RebuildIndexFix."""
+        """A partial index with same name/columns but different WHERE produces a RebuildIndexCorrection."""
         with patch(
             IndexExample.model_options,
             "indexes",
@@ -618,12 +646,14 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
 
             rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
+                item
+                for item in items
+                if isinstance(item.correction, RebuildIndexCorrection)
             ]
             assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_indexexample_name_partial_idx"
+            correction = rebuild_items[0].correction
+            assert isinstance(correction, RebuildIndexCorrection)
+            assert correction.index.name == "examples_indexexample_name_partial_idx"
 
     def test_no_false_positive_for_matching_partial_index(self):
         """A partial index with matching name, columns, and condition produces no issues."""
@@ -848,7 +878,7 @@ class TestDetectIndexFixes:
 class TestApplyIndexFixes:
     @isolated_db
     def test_create_index(self):
-        """CreateIndexFix creates an index using CONCURRENTLY."""
+        """CreateIndexCorrection creates an index using CONCURRENTLY."""
         index = Index(fields=["name"], name="examples_indexexample_name_idx")
         with patch(
             IndexExample.model_options,
@@ -857,34 +887,34 @@ class TestApplyIndexFixes:
         ):
             assert not index_exists("examples_indexexample_name_idx")
 
-            fix = CreateIndexFix(
+            correction = CreateIndexCorrection(
                 table="examples_indexexample", index=index, model=IndexExample
             )
-            sql = fix.apply()
+            sql = correction.apply()
 
             assert "CONCURRENTLY" in sql
             assert index_exists("examples_indexexample_name_idx")
 
     @isolated_db
     def test_drop_index(self):
-        """DropIndexFix drops an index using CONCURRENTLY."""
+        """DropIndexCorrection drops an index using CONCURRENTLY."""
         execute(
             'CREATE INDEX "examples_indexexample_temp_idx"'
             ' ON "examples_indexexample" ("name")'
         )
         assert index_exists("examples_indexexample_temp_idx")
 
-        fix = DropIndexFix(
+        correction = DropIndexCorrection(
             table="examples_indexexample", name="examples_indexexample_temp_idx"
         )
-        sql = fix.apply()
+        sql = correction.apply()
 
         assert "CONCURRENTLY" in sql
         assert not index_exists("examples_indexexample_temp_idx")
 
     @isolated_db
     def test_rebuild_invalid_index(self):
-        """RebuildIndexFix drops an INVALID index and recreates it."""
+        """RebuildIndexCorrection drops an INVALID index and recreates it."""
         index = Index(fields=["name"], name="examples_indexexample_name_idx")
         with patch(
             IndexExample.model_options,
@@ -900,12 +930,12 @@ class TestApplyIndexFixes:
             assert index_exists("examples_indexexample_name_idx")
             assert not index_is_valid("examples_indexexample_name_idx")
 
-            fix = RebuildIndexFix(
+            correction = RebuildIndexCorrection(
                 table="examples_indexexample",
                 index=index,
                 model=IndexExample,
             )
-            sql = fix.apply()
+            sql = correction.apply()
 
             assert "DROP" in sql
             assert "CONCURRENTLY" in sql
@@ -916,19 +946,19 @@ class TestApplyIndexFixes:
 class TestApplyRenameIndex:
     @isolated_db
     def test_rename_index(self):
-        """RenameIndexFix renames using ALTER INDEX ... RENAME TO."""
+        """RenameIndexCorrection renames using ALTER INDEX ... RENAME TO."""
         execute(
             'CREATE INDEX "examples_indexexample_old_idx"'
             ' ON "examples_indexexample" ("name")'
         )
         assert index_exists("examples_indexexample_old_idx")
 
-        fix = RenameIndexFix(
+        correction = RenameIndexCorrection(
             table="examples_indexexample",
             old_name="examples_indexexample_old_idx",
             new_name="examples_indexexample_new_idx",
         )
-        sql = fix.apply()
+        sql = correction.apply()
 
         assert "RENAME TO" in sql
         assert not index_exists("examples_indexexample_old_idx")
@@ -956,9 +986,9 @@ class TestApplyRenameIndex:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, IndexExample).executable()
             assert len(items) == 1
-            assert isinstance(items[0].fix, RenameIndexFix)
+            assert isinstance(items[0].correction, RenameIndexCorrection)
 
-            items[0].fix.apply()
+            items[0].correction.apply()
             assert index_exists("examples_indexexample_name_new_idx")
             assert not index_exists("examples_indexexample_name_old_idx")
 
@@ -990,10 +1020,12 @@ class TestReadOnlyConnection:
                 ' ON "examples_indexexample" ("name")'
             )
             conn = get_connection()
-            with read_only():
-                with raises(
+            with (
+                read_only(),
+                raises(
                     ReadOnlyConnectionError,
                     match="requires write access",
-                ):
-                    with conn.cursor() as cursor:
-                        analyze_model(conn, cursor, IndexExample)
+                ),
+                conn.cursor() as cursor,
+            ):
+                analyze_model(conn, cursor, IndexExample)

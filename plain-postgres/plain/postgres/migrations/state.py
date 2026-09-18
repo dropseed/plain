@@ -6,14 +6,16 @@ from contextlib import contextmanager
 from functools import cached_property, partial
 from typing import TYPE_CHECKING, Any, cast
 
-from plain import postgres
 from plain.packages import packages_registry
 from plain.postgres.exceptions import FieldDoesNotExist
 from plain.postgres.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT, RelatedField
+from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.meta import Meta
 from plain.postgres.migrations.utils import field_is_referenced, get_references
 from plain.postgres.registry import ModelsRegistry
 from plain.postgres.registry import models_registry as global_models
+
+from plain import postgres
 
 from .exceptions import InvalidBasesError
 from .utils import resolve_relation
@@ -47,12 +49,11 @@ def _get_related_models(m: type[postgres.Model]) -> list[type[postgres.Model]]:
     ]
     from plain.postgres.fields.reverse_related import ForeignObjectRel
 
-    related_fields_models = set()
     for f in m._model_meta.get_fields(include_reverse=True):
-        if isinstance(f, RelatedField | ForeignObjectRel) and not isinstance(
-            f.related_model, str
-        ):
-            related_fields_models.add(f.model)
+        if isinstance(f, RelatedField):
+            if not isinstance(f.remote_field.model_ref, str):
+                related_models.append(f.remote_field.model_ref)
+        elif isinstance(f, ForeignObjectRel):
             related_models.append(f.related_model)
     return related_models
 
@@ -169,12 +170,12 @@ class ProjectState:
             if reference.to:
                 changed_field = field.clone()
                 assert changed_field.remote_field is not None
-                changed_field.remote_field.model = new_remote_model  # ty: ignore[invalid-assignment]
+                changed_field.remote_field.model_ref = new_remote_model
             if reference.through:
                 if changed_field is None:
                     changed_field = field.clone()
-                assert changed_field.remote_field is not None
-                changed_field.remote_field.through = new_remote_model  # ty: ignore[unresolved-attribute]
+                assert isinstance(changed_field.remote_field, ManyToManyRel)
+                changed_field.remote_field.through_ref = new_remote_model
             if changed_field:
                 model_state.fields[name] = changed_field
                 to_reload.add((model_state.package_label, model_state.name_lower))
@@ -327,10 +328,10 @@ class ProjectState:
         direct_related_models = set()
         for field in model_state.fields.values():
             if isinstance(field, RelatedField):
-                if field.remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT:
+                if field.remote_field.model_ref == RECURSIVE_RELATIONSHIP_CONSTANT:
                     continue
                 rel_package_label, rel_model_name = _get_package_label_and_model_name(
-                    field.related_model,
+                    field.remote_field.model_ref,
                     package_label,
                 )
                 direct_related_models.add((rel_package_label, rel_model_name.lower()))
@@ -433,24 +434,28 @@ class ProjectState:
     ) -> None:
         # Only process fields that have relations
         if not isinstance(field, RelatedField):
-            return None
+            return
         remote_field = field.remote_field
         if not remote_field:
-            return None
+            return
         if concretes is None:
             concretes = self._get_concrete_models_mapping()
 
         self.update_model_field_relation(
-            remote_field.model,
+            remote_field.model_ref,
             model_key,
             field_name,
             field,
             concretes,
         )
 
-        through = getattr(remote_field, "through", None)
+        through = (
+            remote_field.through_ref
+            if isinstance(remote_field, ManyToManyRel)
+            else None
+        )
         if not through:
-            return None
+            return
         self.update_model_field_relation(
             through, model_key, field_name, field, concretes
         )
@@ -482,7 +487,7 @@ class ProjectState:
 
     def _get_concrete_models_mapping(self) -> dict[tuple[str, str], tuple[str, str]]:
         concrete_models_mapping = {}
-        for model_key, model_state in self.models.items():
+        for model_key in self.models:
             concrete_models_mapping[model_key] = model_key
         return concrete_models_mapping
 
@@ -573,7 +578,7 @@ class StateModelsRegistry(ModelsRegistry):
         # decrease by at least one, meaning there's a base dependency loop/
         # missing base.
         if not model_states:
-            return None
+            return
         # Prevent that all model caches are expired for each render.
         with self.bulk_update():
             unrendered_models = model_states
@@ -637,26 +642,26 @@ class ModelState:
         self.fields: dict[str, Field] = dict(fields)
         self.options = options or {}
         self.bases = bases or (postgres.Model,)
-        for name, field in self.fields.items():
+        for field_name, field in self.fields.items():
             # Sanity-check that fields are NOT already bound to a model.
             if hasattr(field, "model"):
                 raise ValueError(
-                    f'ModelState.fields cannot be bound to a model - "{name}" is.'
+                    f'ModelState.fields cannot be bound to a model - "{field_name}" is.'
                 )
             # Sanity-check that relation fields are NOT referring to a model class.
-            if isinstance(field, RelatedField) and hasattr(
-                field.related_model, "_model_meta"
+            if isinstance(field, RelatedField) and not isinstance(
+                field.remote_field.model_ref, str
             ):
-                raise ValueError(
+                raise TypeError(
                     f'ModelState.fields cannot refer to a model class - "{name}.to" does. '
                     "Use a string reference instead."
                 )
             from plain.postgres.fields.related import ManyToManyField
 
-            if isinstance(field, ManyToManyField) and hasattr(
-                field.remote_field.through, "_model_meta"
+            if isinstance(field, ManyToManyField) and not isinstance(
+                field.remote_field.through_ref, str
             ):
-                raise ValueError(
+                raise TypeError(
                     f'ModelState.fields cannot refer to a model class - "{name}.through" '
                     "does. Use a string reference instead."
                 )
@@ -675,7 +680,7 @@ class ModelState:
         """Given a model, return a ModelState representing it."""
         # Deconstruct the fields
         fields = []
-        for field in model._model_meta.local_fields:
+        for field in model._model_meta.fields:
             if getattr(field, "remote_field", None) and exclude_rels:
                 continue
             name = field.name
@@ -687,7 +692,7 @@ class ModelState:
                     f"Couldn't reconstruct field {name} on {model.model_options.label}: {e}"
                 )
         if not exclude_rels:
-            for field in model._model_meta.local_many_to_many:
+            for field in model._model_meta.many_to_many:
                 name = field.name
                 assert name is not None
                 try:
@@ -698,10 +703,7 @@ class ModelState:
                     )
 
         def flatten_bases(model: type[postgres.Model]) -> list[type[postgres.Model]]:
-            bases = []
-            for base in model.__bases__:
-                bases.append(base)
-            return bases  # ty: ignore[invalid-return-type] (__bases__ widens to list[type])
+            return list(model.__bases__)  # ty: ignore[invalid-return-type] (__bases__ widens to list[type])
 
         # We can't rely on __mro__ directly because we only want to flatten
         # abstract models and not the whole tree. However by recursing on

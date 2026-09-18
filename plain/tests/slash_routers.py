@@ -1,6 +1,6 @@
 """Minimal URL routes for exercising trailing-slash behavior.
 
-The fixture sets `URLS_TRAILING_SLASH=True`; routes that want to keep
+The helper sets `URLS_TRAILING_SLASH=True`; routes that want to keep
 the no-slash form (regardless of the global setting) declare it with
 `force_trailing_slash=False`.
 """
@@ -55,7 +55,7 @@ class DocsView(View):
 
 class SlashRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("with-slash", WithSlashView, name="with-slash"),
         path(
             "without-slash",
@@ -87,4 +87,4 @@ class SlashRouter(Router):
             name="docs-noslash",
             force_trailing_slash=False,
         ),
-    ]
+    )

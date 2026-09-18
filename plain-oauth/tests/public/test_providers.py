@@ -1,7 +1,6 @@
 import datetime
 
 from app.users.models import User
-
 from plain.auth.requests import get_request_user
 from plain.oauth.models import OAuthConnection
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser

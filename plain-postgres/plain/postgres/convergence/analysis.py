@@ -19,11 +19,8 @@ from ..ddl import (
     compile_expression_sql,
     compile_index_expressions_sql,
     compile_literal_default_sql,
-    deferrable_sql,
 )
-from ..deletion import sql_on_delete
 from ..dialect import quote_name
-from ..fields.base import ColumnField
 from ..fields.related import ForeignKeyField
 from ..indexes import Index
 from ..introspection import (
@@ -55,6 +52,7 @@ class DriftKind(StrEnum):
     RENAMED = "renamed"
     UNDECLARED = "undeclared"
     UNVALIDATED = "unvalidated"
+    DEFERRABLE = "deferrable"
 
 
 @dataclass
@@ -164,7 +162,7 @@ class ForeignKeyMissingDrift:
     column: str
     target_table: str
     target_column: str
-    on_delete_clause: str = ""  # SQL clause to emit, e.g. " ON DELETE CASCADE"
+    on_delete_clause: str  # SQL clause to emit, e.g. " ON DELETE CASCADE"
 
     kind: ClassVar[DriftKind] = DriftKind.MISSING
 
@@ -186,7 +184,7 @@ class ForeignKeyChangedDrift:
     target_column: str
     actual_action: str  # current DB confdeltype
     expected_action: str  # expected confdeltype
-    on_delete_clause: str = ""
+    on_delete_clause: str
 
     kind: ClassVar[DriftKind] = DriftKind.CHANGED
 
@@ -198,20 +196,44 @@ class ForeignKeyChangedDrift:
 
 
 @dataclass
+class ForeignKeyRenameDrift:
+    """An FK constraint whose DB name differs from the generated name. Unlike
+    a unique/check rename this blocks sync: the write path maps a violation
+    back to the field by the generated name."""
+
+    table: str
+    old_name: str
+    new_name: str
+
+    kind: ClassVar[DriftKind] = DriftKind.RENAMED
+
+    def describe(self) -> str:
+        return f"{self.table}: FK {self.old_name} → {self.new_name}"
+
+
+@dataclass
 class ForeignKeyNameDrift:
-    """An existing FK constraint to validate (UNVALIDATED) or drop (UNDECLARED)."""
+    """An existing FK constraint to validate (UNVALIDATED), drop (UNDECLARED),
+    or make NOT DEFERRABLE (DEFERRABLE — Plain checks every FK immediately)."""
 
     table: str
     name: str
-    kind: Literal[DriftKind.UNVALIDATED, DriftKind.UNDECLARED]
+    kind: Literal[DriftKind.UNVALIDATED, DriftKind.UNDECLARED, DriftKind.DEFERRABLE]
 
     def describe(self) -> str:
         if self.kind is DriftKind.UNVALIDATED:
             return f"{self.table}: FK {self.name} NOT VALID"
+        if self.kind is DriftKind.DEFERRABLE:
+            return f"{self.table}: FK {self.name} DEFERRABLE"
         return f"{self.table}: FK {self.name} not declared"
 
 
-ForeignKeyDrift = ForeignKeyMissingDrift | ForeignKeyChangedDrift | ForeignKeyNameDrift
+ForeignKeyDrift = (
+    ForeignKeyMissingDrift
+    | ForeignKeyChangedDrift
+    | ForeignKeyRenameDrift
+    | ForeignKeyNameDrift
+)
 
 
 @dataclass
@@ -220,7 +242,7 @@ class ColumnShouldBeNotNullDrift:
 
     table: str
     column: str
-    has_null_rows: bool = False  # existing NULL rows block an auto-fix
+    has_null_rows: bool = False  # existing NULL rows block an auto-correction
 
     def describe(self) -> str:
         if self.has_null_rows:
@@ -563,9 +585,7 @@ def _compare_columns(
     statuses: list[ColumnStatus] = []
     expected_col_names: set[str] = set()
 
-    for f in model._model_meta.local_fields:
-        if not isinstance(f, ColumnField):
-            continue
+    for f in model._model_meta.fields:
         db_type = f.db_type()
         if db_type is None:
             continue
@@ -612,8 +632,6 @@ def _compare_columns(
         if f.primary_key:
             pk_suffix = f.db_type_suffix() or ""
 
-        # Fields reached via local_fields are always contributed (name set).
-        assert f.name is not None
         statuses.append(
             ColumnStatus(
                 name=f.column,
@@ -1166,11 +1184,11 @@ def _compare_check_constraints(
             )
 
     # Build set of framework-owned temp NOT NULL check names so leftover
-    # artifacts from a partially-completed SetNotNullFix are silently
+    # artifacts from a partially-completed SetNotNullCorrection are silently
     # ignored rather than surfaced as undeclared user constraints.
     internal_checks = {
         generate_notnull_check_name(table, f.column)
-        for f in model._model_meta.local_fields
+        for f in model._model_meta.fields
         if f.db_type() is not None
     }
 
@@ -1193,6 +1211,22 @@ def _compare_check_constraints(
     return statuses
 
 
+def _fk_status(
+    name: str,
+    column: str,
+    *,
+    issue: str | None,
+    drift: ForeignKeyDrift | None,
+) -> ConstraintStatus:
+    return ConstraintStatus(
+        name=name,
+        constraint_type=ConType.FOREIGN_KEY,
+        fields=[column],
+        issue=issue,
+        drift=drift,
+    )
+
+
 def _compare_foreign_keys(
     model: type[Model], db: TableState, table: str
 ) -> list[ConstraintStatus]:
@@ -1203,29 +1237,15 @@ def _compare_foreign_keys(
         if v.constraint_type == ConType.FOREIGN_KEY
     }
 
-    # Build expected FKs from model fields.
-    # Key: shape (column, target_table, target_column)
-    # Value: (field_name, constraint_name, expected_on_delete_clause, expected_confdeltype)
-    expected_fks: dict[tuple[str, str, str], tuple[str, str, str, str]] = {}
-    for f in model._model_meta.local_fields:
+    # Expected FKs from model fields, keyed by shape (column, target_table,
+    # target_column) — the DB-side identity, since names can lag a rename.
+    expected_fks: dict[tuple[str, str, str], ForeignKeyField] = {}
+    for f in model._model_meta.fields:
         if isinstance(f, ForeignKeyField):
-            # Contributed fields always have a name; never silently exclude an
-            # FK from expected_fks (that would flag a live constraint UNDECLARED).
-            assert f.name is not None
             to_table = f.target_field.model.model_options.db_table
-            to_column = f.target_field.column
-            constraint_name = generate_fk_constraint_name(
-                table, f.column, to_table, to_column
-            )
-            on_delete_clause, confdeltype = sql_on_delete(f.remote_field.on_delete)
-            expected_fks[(f.column, to_table, to_column)] = (
-                f.name,
-                constraint_name,
-                on_delete_clause,
-                confdeltype,
-            )
+            expected_fks[(f.column, to_table, f.target_field.column)] = f
 
-    # Build actual FKs from DB: shape → (constraint_name, ConstraintState)
+    # Actual FKs from DB: shape → (constraint_name, ConstraintState)
     actual_fk_by_shape: dict[tuple[str, str, str], tuple[str, ConstraintState]] = {}
     for name, cs in actual.items():
         if cs.target_table and cs.target_column and cs.columns:
@@ -1235,61 +1255,19 @@ def _compare_foreign_keys(
             )
 
     matched_fk_names: set[str] = set()
-    for key, (
-        field_name,
-        constraint_name,
-        on_delete_clause,
-        expected_action,
-    ) in expected_fks.items():
-        if match := actual_fk_by_shape.get(key):
-            actual_name, cs = match
-            matched_fk_names.add(actual_name)
+    for key, f in expected_fks.items():
+        col, to_table, to_column = key
+        # Contributed fields always have a name; never silently exclude an
+        # FK from expected_fks (that would flag a live constraint UNDECLARED).
+        assert f.name is not None
+        constraint_name = f.db_constraint_name()
+        on_delete = f.remote_field.on_delete
 
-            issue: str | None = None
-            drift: ForeignKeyDrift | None = None
-
-            # on_delete action mismatch — drop + re-add with new clause
-            if (
-                cs.on_delete_action is not None
-                and cs.on_delete_action != expected_action
-            ):
-                issue = (
-                    f"on_delete action differs "
-                    f"({cs.on_delete_action!r} → {expected_action!r})"
-                )
-                col, to_table, to_column = key
-                drift = ForeignKeyChangedDrift(
-                    table=table,
-                    name=actual_name,
-                    column=col,
-                    target_table=to_table,
-                    target_column=to_column,
-                    on_delete_clause=on_delete_clause,
-                    actual_action=cs.on_delete_action,
-                    expected_action=expected_action,
-                )
-            elif not cs.validated:
-                issue = "NOT VALID — needs validation"
-                drift = ForeignKeyNameDrift(
-                    table=table,
-                    name=actual_name,
-                    kind=DriftKind.UNVALIDATED,
-                )
-
+        match = actual_fk_by_shape.get(key)
+        if match is None:
             statuses.append(
                 ConstraintStatus(
-                    name=actual_name,
-                    constraint_type=ConType.FOREIGN_KEY,
-                    fields=[key[0]],
-                    issue=issue,
-                    drift=drift,
-                )
-            )
-        else:
-            col, to_table, to_column = key
-            statuses.append(
-                ConstraintStatus(
-                    name=f"{field_name} → {to_table}.{to_column}",
+                    name=f"{f.name} → {to_table}.{to_column}",
                     constraint_type=ConType.FOREIGN_KEY,
                     fields=[col],
                     issue="missing from database",
@@ -1299,10 +1277,91 @@ def _compare_foreign_keys(
                         column=col,
                         target_table=to_table,
                         target_column=to_column,
-                        on_delete_clause=on_delete_clause,
+                        on_delete_clause=on_delete.sql_clause,
                     ),
                 )
             )
+            continue
+
+        actual_name, cs = match
+        matched_fk_names.add(actual_name)
+
+        renamed = actual_name != constraint_name
+        if renamed:
+            # RenameField/RenameModel leave the constraint under its old
+            # name, and the write path maps a violation back to the field by
+            # the generated name. The rename correction runs in an earlier
+            # pass, so the drifts below address the constraint by its new
+            # name.
+            statuses.append(
+                _fk_status(
+                    constraint_name,
+                    col,
+                    issue=f"rename from {actual_name}",
+                    drift=ForeignKeyRenameDrift(
+                        table=table, old_name=actual_name, new_name=constraint_name
+                    ),
+                )
+            )
+            actual_name = constraint_name
+
+        if (
+            cs.on_delete_action is not None
+            and cs.on_delete_action != on_delete.confdeltype
+        ):
+            # on_delete action mismatch — drop + re-add with new clause.
+            # The re-added constraint is NOT DEFERRABLE and gets validated,
+            # so this covers the other two cases as well.
+            statuses.append(
+                _fk_status(
+                    actual_name,
+                    col,
+                    issue=(
+                        f"on_delete action differs "
+                        f"({cs.on_delete_action!r} → {on_delete.confdeltype!r})"
+                    ),
+                    drift=ForeignKeyChangedDrift(
+                        table=table,
+                        name=actual_name,
+                        column=col,
+                        target_table=to_table,
+                        target_column=to_column,
+                        on_delete_clause=on_delete.sql_clause,
+                        actual_action=cs.on_delete_action,
+                        expected_action=on_delete.confdeltype,
+                    ),
+                )
+            )
+            continue
+
+        # Deferrable and NOT VALID are independent — report both so one
+        # converge pass fixes both.
+        if cs.deferrable:
+            # Older Plain releases created every FK DEFERRABLE INITIALLY
+            # DEFERRED. Flipping it is a catalog-only ALTER CONSTRAINT.
+            statuses.append(
+                _fk_status(
+                    actual_name,
+                    col,
+                    issue="DEFERRABLE — Plain FKs are NOT DEFERRABLE",
+                    drift=ForeignKeyNameDrift(
+                        table=table, name=actual_name, kind=DriftKind.DEFERRABLE
+                    ),
+                )
+            )
+        if not cs.validated:
+            statuses.append(
+                _fk_status(
+                    actual_name,
+                    col,
+                    issue="NOT VALID — needs validation",
+                    drift=ForeignKeyNameDrift(
+                        table=table, name=actual_name, kind=DriftKind.UNVALIDATED
+                    ),
+                )
+            )
+        if not renamed and not cs.deferrable and cs.validated:
+            statuses.append(_fk_status(actual_name, col, issue=None, drift=None))
 
     for name in sorted(actual.keys() - matched_fk_names):
         cs = actual[name]
@@ -1326,27 +1385,12 @@ def _compare_foreign_keys(
 def generate_notnull_check_name(table: str, column: str) -> str:
     """Generate a hashed name for the temporary NOT NULL check constraint.
 
-    Used by SetNotNullFix for the CHECK NOT VALID → VALIDATE → SET NOT NULL
+    Used by SetNotNullCorrection for the CHECK NOT VALID → VALIDATE → SET NOT NULL
     pattern, and by analysis to recognize (and ignore) leftover temp checks.
     """
     from ..utils import generate_identifier_name
 
     return generate_identifier_name(table, [column], "_notnull")
-
-
-def generate_fk_constraint_name(
-    table: str, column: str, target_table: str, target_column: str
-) -> str:
-    """Generate a deterministic FK constraint name.
-
-    Uses the same naming algorithm as the schema editor so that
-    convergence-created FKs match migration-created ones.
-    """
-    from ..utils import generate_identifier_name, split_identifier
-
-    _, target_table_name = split_identifier(target_table)
-    suffix = f"_fk_{target_table_name}_{target_column}"
-    return generate_identifier_name(table, [column], suffix)
 
 
 def _detect_unique_renames(
@@ -1894,8 +1938,8 @@ def _get_expected_unique_definition(
     prints it.
 
     PostgreSQL only stores field-based unique constraints (with optional
-    INCLUDE and DEFERRABLE) in pg_constraint. Expression-based, conditional,
-    and opclass constraints remain as indexes only — those are compared via
+    INCLUDE) in pg_constraint. Expression-based, conditional, and opclass
+    constraints remain as indexes only — those are compared via
     the index-definition path.
     """
     columns_sql = ", ".join(
@@ -1903,6 +1947,5 @@ def _get_expected_unique_definition(
         for f in constraint.fields
     )
     include_sql = build_include_sql(model, constraint.include)
-    defer_sql = deferrable_sql(constraint.deferrable)
-    clause = f"UNIQUE ({columns_sql}){include_sql}{defer_sql}"
+    clause = f"UNIQUE ({columns_sql}){include_sql}"
     return _normalize_constraint_def(cursor, model, clause)

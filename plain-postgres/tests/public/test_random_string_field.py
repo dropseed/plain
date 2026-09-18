@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from app.examples.models.defaults import DBDefaultsExample
-
 from plain.postgres import RandomStringField, get_connection
 from plain.postgres.functions.random import RandomString
 from plain.test import raises

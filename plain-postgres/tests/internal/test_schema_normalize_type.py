@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from plain.postgres import fields
+from plain.postgres.fields.encrypted import EncryptedJSONField, EncryptedTextField
 from plain.postgres.fields.json import JSONField
 from plain.test import cases
 
@@ -72,6 +73,12 @@ def test_db_type_uses_canonical_form(field_class: type, expected_sql: str) -> No
     (fields.DurationField, "interval"),
     (fields.BinaryField, "bytea"),
     (fields.PrimaryKeyField, "bigint"),
+    # Always text regardless of max_length — ciphertext outgrows the
+    # plaintext limit.
+    (EncryptedTextField, "text"),
+    # text, NOT the jsonb it would inherit from JSONField — the column
+    # holds ciphertext.
+    (EncryptedJSONField, "text"),
 )
 def test_specific_type_matches_canonical(field_class: type, expected: str) -> None:
     f = field_class()

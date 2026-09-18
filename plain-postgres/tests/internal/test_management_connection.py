@@ -40,10 +40,12 @@ def test_context_manager_uses_management_url_when_set():
 
     import psycopg
 
-    with override_settings(POSTGRES_MANAGEMENT_URL=build_database_url(parts)):
-        with raises(psycopg.OperationalError):
-            with use_management_connection() as conn:
-                conn.ensure_connection()
+    with (
+        override_settings(POSTGRES_MANAGEMENT_URL=build_database_url(parts)),
+        raises(psycopg.OperationalError),
+        use_management_connection() as conn,
+    ):
+        conn.ensure_connection()
 
 
 @isolated_db

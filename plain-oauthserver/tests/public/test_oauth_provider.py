@@ -11,7 +11,6 @@ from oauth_helpers import (
     make_public_app,
     make_user,
 )
-
 from plain.oauthserver.models import (
     AccessToken,
     AuthorizationCode,
@@ -39,6 +38,16 @@ def _make_auth_code(application, user, code_challenge, *, redirect_uri=REDIRECT_
 
 
 class TestMetadata:
+    def test_spec_exact_path_with_trailing_slash_setting(self):
+        """RFC 8414 clients construct /.well-known/oauth-authorization-server
+        exactly (no trailing slash) and may not follow redirects — the metadata
+        must serve 200 there even when URLS_TRAILING_SLASH=True.
+        """
+        with override_settings(URLS_TRAILING_SLASH=True):
+            response = Client().get("/.well-known/oauth-authorization-server")
+            assert response.status_code == 200
+            assert response.json_data["issuer"]
+
     def test_metadata_document(self):
         data = Client().get("/.well-known/oauth-authorization-server").json_data
         assert data["response_types_supported"] == ["code"]

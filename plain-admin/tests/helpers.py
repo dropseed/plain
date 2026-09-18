@@ -1,5 +1,4 @@
 from app.users.models import User
-
 from plain.test import Client
 
 

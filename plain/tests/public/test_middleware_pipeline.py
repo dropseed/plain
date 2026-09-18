@@ -9,7 +9,6 @@ the interaction between builtin and user-defined middleware.
 from __future__ import annotations
 
 from middleware_helpers import call_log
-
 from plain.runtime import settings
 from plain.test import Client
 
