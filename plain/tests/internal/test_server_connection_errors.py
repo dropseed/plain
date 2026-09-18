@@ -14,11 +14,10 @@ import asyncio
 import logging
 import socket
 
-from log_helpers import capture_logs
 from plain.http import Response
 from plain.server.connection import Connection
 from plain.server.http import h1
-from plain.test import patch
+from plain.test import capture_logs, patch
 from server_stubs import ResponseHandler, make_worker
 
 _GET = b"GET / HTTP/1.1\r\nHost: testserver\r\n\r\n"

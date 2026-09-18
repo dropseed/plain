@@ -9,42 +9,18 @@ from contextlib import contextmanager
 
 from plain.http import Response
 from plain.internal.handlers.exception import response_for_exception
-from plain.test import RequestFactory, patch, raises
+from plain.test import CapturedLogs, RequestFactory, capture_logs, patch, raises
 from plain.views import View
-
-
-class _ListHandler(logging.Handler):
-    """Captures records into a list regardless of logger propagation.
-
-    `configure_logging` sets `propagate=False` on `plain` loggers, so a
-    root-attached handler would never see these records — attach directly
-    to the logger instead.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(level=logging.DEBUG)
-        self.records: list[logging.LogRecord] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self.records.append(record)
 
 
 @contextmanager
 def request_log():
-    logger = logging.getLogger("plain.request")
-    handler = _ListHandler()
-    previous_level = logger.level
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-    try:
-        yield handler
-    finally:
-        logger.removeHandler(handler)
-        logger.setLevel(previous_level)
+    with capture_logs("plain.request") as logs:
+        yield logs
 
 
-def _has_server_error(handler: _ListHandler) -> bool:
-    return any("Server error" in r.getMessage() for r in handler.records)
+def _has_server_error(logs: CapturedLogs) -> bool:
+    return any("Server error" in message for message in logs.messages)
 
 
 class TestAfterResponseChaining:
@@ -260,22 +236,14 @@ class TestHandleExceptionLogging:
         from plain.http import SuspiciousOperationError400
         from plain.logs import log_exception
 
-        security_logger = logging.getLogger("plain.security")
-        handler = _ListHandler()
-        previous_level = security_logger.level
-        security_logger.addHandler(handler)
-        security_logger.setLevel(logging.DEBUG)
-        try:
+        with capture_logs("plain.security") as logs:
             log_exception(
                 RequestFactory().get("/api/app/config"),
                 SuspiciousOperationError400("CSRF rejected"),
             )
-        finally:
-            security_logger.removeHandler(handler)
-            security_logger.setLevel(previous_level)
 
-        assert len(handler.records) == 1
-        record = handler.records[0]
+        assert len(logs) == 1
+        record = logs[0]
         assert record.levelno == logging.WARNING
         assert record.exc_info is None
         assert record.name == "plain.security.SuspiciousOperationError400"

@@ -23,7 +23,7 @@ from contextlib import contextmanager
 from clients import error_client
 from opentelemetry.semconv.attributes import url_attributes
 from plain.runtime import settings
-from plain.test import Client
+from plain.test import Client, capture_logs
 from plain.test.otel import install_test_tracer
 from plain.urls.resolvers import _get_cached_resolver
 
@@ -81,28 +81,10 @@ def test_exception_log_records_request_path():
     Step #3 will redefine `request.path` as the normalized canonical path
     (and add `request.raw_path` for the original); both observability sites
     automatically pick up the new value because they already share a source.
-
-    Attach via the canonical `logging.getLogger("plain.request")` lookup —
-    the framework fetches its logger the same way each request, so any
-    handler attached here reliably catches its records.
     """
-    import logging
+    with capture_logs("plain.request") as logs, error_client() as client:
+        client.get("/plain-500/")
 
-    records: list[logging.LogRecord] = []
-
-    class _Capture(logging.Handler):
-        def emit(self, record: logging.LogRecord) -> None:
-            records.append(record)
-
-    handler = _Capture(level=logging.ERROR)
-    request_logger = logging.getLogger("plain.request")
-    request_logger.addHandler(handler)
-    try:
-        with error_client() as client:
-            client.get("/plain-500/")
-    finally:
-        request_logger.removeHandler(handler)
-
-    server_errors = [r for r in records if r.getMessage() == "Server error"]
+    server_errors = [r for r in logs if r.getMessage() == "Server error"]
     assert server_errors, "Expected a 'Server error' log record from plain.request"
     assert getattr(server_errors[-1], "path") == "/plain-500/"

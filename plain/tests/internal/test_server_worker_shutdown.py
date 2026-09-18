@@ -23,6 +23,7 @@ import socket
 import time
 
 from plain.server.workers.worker import Worker
+from plain.test import capture_logs
 from server_stubs import StubHeartbeat, make_worker
 
 
@@ -33,23 +34,13 @@ class _Listener:
         self.sock: socket.socket | None = socket.create_server(("127.0.0.1", 0))
 
 
-class _CaptureHandler(logging.Handler):
-    def __init__(self) -> None:
-        super().__init__()
-        self.records: list[logging.LogRecord] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self.records.append(record)
-
-
 def test_signal_exit_mid_iteration_shuts_down_cleanly() -> None:
     listener = _Listener()
     worker = make_worker(sockets=[listener])
 
-    capture = _CaptureHandler()
     logger = logging.getLogger("test.server.worker.shutdown")
-    logger.addHandler(capture)
-    logger.setLevel(logging.DEBUG)
+    # The worker's own log lands nowhere else — this test reads it, it isn't
+    # output.
     logger.propagate = False
     worker.log = logger
 
@@ -62,16 +53,17 @@ def test_signal_exit_mid_iteration_shuts_down_cleanly() -> None:
     # run() installs process-level handlers for these; restore them so the
     # test doesn't leak signal state into the rest of the suite.
     saved = {s: signal.getsignal(s) for s in (signal.SIGABRT, signal.SIGWINCH)}
-    try:
-        asyncio.run(worker.run())
-    finally:
-        for sig, handler in saved.items():
-            signal.signal(sig, handler)
-        assert listener.sock is not None
-        listener.sock.close()
+    with capture_logs("test.server.worker.shutdown") as logs:
+        try:
+            asyncio.run(worker.run())
+        finally:
+            for sig, handler in saved.items():
+                signal.signal(sig, handler)
+            assert listener.sock is not None
+            listener.sock.close()
 
     assert worker.alive is False
-    errors = [r for r in capture.records if r.levelno >= logging.ERROR]
+    errors = [r for r in logs if r.levelno >= logging.ERROR]
     assert errors == [], [r.getMessage() for r in errors]
 
 

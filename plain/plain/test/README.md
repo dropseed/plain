@@ -16,6 +16,7 @@
 - [Test metadata](#test-metadata)
 - [Overriding context](#overriding-context)
 - [Capturing OpenTelemetry signals](#capturing-opentelemetry-signals)
+- [Capturing log records](#capturing-log-records)
 - [RequestFactory](#requestfactory)
 - [Test lifecycles](#test-lifecycles)
 - [FAQs](#faqs)
@@ -250,6 +251,40 @@ def test_homepage_span():
 ```
 
 [`capture_spans`](./otel.py#capture_spans) yields the spans emitted during the block (`.get_finished_spans()`, `.find(kind=..., name=...)`). [`capture_metrics`](./otel.py#capture_metrics) yields the metrics — `.points(name)` returns every data point recorded for a metric, `.collect()` forces observable callbacks, `.clear()` forgets what's been captured so far.
+
+## Capturing log records
+
+```python
+from plain.test import Client, capture_logs
+
+
+def test_server_error_is_logged():
+    with capture_logs() as logs:
+        Client(raise_request_exception=False).get("/broken/")
+
+    assert "Server error" in logs.messages
+    assert logs[0].path == "/broken/"
+```
+
+[`capture_logs`](./logs.py#capture_logs) yields the records emitted during the block. It behaves like a list of `logging.LogRecord`, plus `.messages` for the formatted messages. Structured context passed as `context={...}` lands on the record as ordinary attributes, so `logs[0].path` reads it back.
+
+With no arguments it captures the whole `plain` and `app` trees; name loggers to narrow it (`capture_logs("plain.jobs")`). Plain's loggers don't propagate to the root logger, so attaching a handler there would see nothing — this attaches to the named loggers directly, lowers their level for the block, and restores everything on exit.
+
+`.span_context_for(message)` returns the OpenTelemetry span context that was current when that record was emitted. That's the check behind "this exception log landed _inside_ its error span" — a record emitted with no span current exports with empty trace/span ids, and the one failure gets reported twice downstream (the span's exception event plus an orphaned error log):
+
+```python
+from plain.test import capture_logs, capture_spans
+
+
+def test_claim_failure_log_is_correlated():
+    with capture_spans() as spans, capture_logs("plain.jobs") as logs:
+        run_the_failing_claim()
+
+    span = spans.find(name="claim job")
+    assert logs.span_context_for("Failed to claim job").trace_id == (
+        span.context.trace_id
+    )
+```
 
 ## RequestFactory
 

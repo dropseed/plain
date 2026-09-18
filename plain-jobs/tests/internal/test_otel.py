@@ -8,19 +8,24 @@ hottest user-facing path.
 
 from __future__ import annotations
 
-import logging
 import threading
 import time
 import uuid
-from collections.abc import Generator
 from contextlib import contextmanager
 
 from opentelemetry.metrics import CallbackOptions
-from opentelemetry.trace import SpanContext, SpanKind, StatusCode, get_current_span
+from opentelemetry.trace import SpanKind, StatusCode, get_current_span
 from plain.jobs import Job, otel
 from plain.jobs.registry import register_job
 from plain.jobs.workers import Worker
-from plain.test import capture_metrics, capture_spans, override_settings, patch, raises
+from plain.test import (
+    capture_logs,
+    capture_metrics,
+    capture_spans,
+    override_settings,
+    patch,
+    raises,
+)
 
 
 class _NoopJob(Job):
@@ -46,39 +51,6 @@ class _ExclusiveJob(Job):
 
     def should_enqueue(self, concurrency_key: str) -> bool:
         return False
-
-
-class _SpanContextCapturingHandler(logging.Handler):
-    """Captures the active span context at emit time — the ambient context the
-    OTel LoggingHandler reads to stamp trace/span ids onto exported records.
-    A record emitted with no span current would export with empty ids and
-    double-report its failure alongside the span's exception event."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.emitted: list[tuple[logging.LogRecord, SpanContext]] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self.emitted.append((record, get_current_span().get_span_context()))
-
-    def span_context_for(self, message: str) -> SpanContext:
-        [context] = [
-            ctx for record, ctx in self.emitted if record.getMessage() == message
-        ]
-        return context
-
-
-@contextmanager
-def capture_jobs_log_contexts() -> Generator[_SpanContextCapturingHandler]:
-    """Attach a handler to the `plain.jobs` logger that records the span
-    context current at each emit, for the duration of the block."""
-    handler = _SpanContextCapturingHandler()
-    jobs_logger = logging.getLogger("plain.jobs")
-    jobs_logger.addHandler(handler)
-    try:
-        yield handler
-    finally:
-        jobs_logger.removeHandler(handler)
 
 
 def test_error_consumer_span_is_current_for_the_paired_log() -> None:
@@ -227,7 +199,7 @@ def test_process_job_emits_consumer_span_when_lookup_fails() -> None:
 
     with (
         capture_spans() as otel_spans,
-        capture_jobs_log_contexts() as jobs_log_contexts,
+        capture_logs("plain.jobs") as jobs_logs,
     ):
         # A random UUID won't match any row — JobProcess.query.get raises
         # DoesNotExist, which is the simplest way to exercise the
@@ -246,7 +218,7 @@ def test_process_job_emits_consumer_span_when_lookup_fails() -> None:
         assert exception_events
 
         assert span.context is not None
-        log_context = jobs_log_contexts.span_context_for("Job process errored")
+        log_context = jobs_logs.span_context_for("Job process errored")
         assert log_context.trace_id == span.context.trace_id
         assert log_context.span_id == span.context.span_id
 
@@ -374,7 +346,7 @@ def test_worker_loop_claim_failure_emits_error_span_and_continues() -> None:
 
     with (
         capture_spans() as otel_spans,
-        capture_jobs_log_contexts() as jobs_log_contexts,
+        capture_logs("plain.jobs") as jobs_logs,
         patch(JobRequestQuerySet, "ready_to_run", boom),
         patch(time, "sleep", lambda seconds: None),
     ):
@@ -394,7 +366,7 @@ def test_worker_loop_claim_failure_emits_error_span_and_continues() -> None:
         assert exception_events
 
         assert span.context is not None
-        log_context = jobs_log_contexts.span_context_for("Failed to claim job")
+        log_context = jobs_logs.span_context_for("Failed to claim job")
         assert log_context.trace_id == span.context.trace_id
         assert log_context.span_id == span.context.span_id
 
@@ -413,7 +385,7 @@ def test_heartbeat_failure_emits_error_span_with_correlated_log() -> None:
 
     with (
         capture_spans() as otel_spans,
-        capture_jobs_log_contexts() as jobs_log_contexts,
+        capture_logs("plain.jobs") as jobs_logs,
     ):
         # Must NOT raise — heartbeat failures are non-fatal by design.
         worker.maybe_heartbeat()
@@ -431,7 +403,7 @@ def test_heartbeat_failure_emits_error_span_with_correlated_log() -> None:
         assert [e for e in span.events if e.name == "exception"]
 
         assert span.context is not None
-        log_context = jobs_log_contexts.span_context_for("Worker heartbeat failed")
+        log_context = jobs_logs.span_context_for("Worker heartbeat failed")
         assert log_context.trace_id == span.context.trace_id
         assert log_context.span_id == span.context.span_id
 

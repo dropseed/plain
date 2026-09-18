@@ -1,4 +1,4 @@
-"""Shared request builders and log capture for the HTTP-level MCP tests.
+"""Shared request builders for the HTTP-level MCP tests.
 
 Every 2026-07-28 request restates its protocol version and client
 capabilities in `params._meta`, and mirrors its method (and target) into
@@ -9,9 +9,6 @@ need that envelope, so it's assembled once here.
 from __future__ import annotations
 
 import json
-import logging
-from collections.abc import Generator
-from contextlib import contextmanager
 from typing import Any
 
 from plain.mcp import MCPView
@@ -124,34 +121,3 @@ def bare_post(
         content_type="application/json",
         headers=headers or {},
     )
-
-
-class ListHandler(logging.Handler):
-    """Captures records into a list regardless of logger propagation.
-
-    A root-attached handler isn't enough: `configure_logging` sets
-    `propagate=False` on `plain` loggers, so once another test has called
-    it, records never reach anything attached above them.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(level=logging.DEBUG)
-        self.records: list[logging.LogRecord] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self.records.append(record)
-
-
-@contextmanager
-def capture_logs(logger_name: str) -> Generator[ListHandler]:
-    """The log records emitted on `logger_name` during the block."""
-    logger = logging.getLogger(logger_name)
-    handler = ListHandler()
-    previous_level = logger.level
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-    try:
-        yield handler
-    finally:
-        logger.removeHandler(handler)
-        logger.setLevel(previous_level)

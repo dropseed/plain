@@ -14,19 +14,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from helpers import ListHandler, bare_post, capture_logs, mcp_post, mcp_post_raw
+from helpers import bare_post, mcp_post, mcp_post_raw
 from opentelemetry import trace
 from plain.mcp.exceptions import INVALID_PARAMS, METHOD_NOT_FOUND
 from plain.mcp.views import META_PROTOCOL_VERSION, PROTOCOL_VERSION
-from plain.test import capture_spans
+from plain.test import CapturedLogs, capture_logs, capture_spans
 
 
-def _rejects(handler: ListHandler) -> list[dict[str, Any]]:
+def _rejects(logs: CapturedLogs) -> list[dict[str, Any]]:
     """The reject records' fields — `extra` lands as LogRecord attributes,
     so the record `__dict__` is where the structured context lives."""
-    return [
-        r.__dict__ for r in handler.records if r.getMessage() == "MCP request rejected"
-    ]
+    return [r.__dict__ for r in logs if r.getMessage() == "MCP request rejected"]
 
 
 def _request_span(spans, path: str = "/mcp"):
