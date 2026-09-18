@@ -1132,7 +1132,7 @@ except ValidationError:
     ...  # report it — the transaction is still usable
 ```
 
-Forms are the exception: a `ModelForm` pre-checks constraints explicitly (a `validate_constraints()` call in its `_post_clean`) so it can surface every violation at once, then writes via `form.create()`/`form.update()` with validation already done. A direct `create()`/`update()` reports the first violation Postgres hits.
+A `ModelForm` is no exception — it validates shape and never writes, so the constraint is still enforced when `create_from()`/`update_from()` writes the row. Call `validate_constraints()` yourself before the write if you want every violation surfaced at once; otherwise `create()`/`update()` reports the first violation Postgres hits.
 
 This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to, and so does a `delete()` blocked by `RESTRICT` children. If you retry on a unique conflict, catch both:
 
@@ -1167,7 +1167,7 @@ class User(postgres.Model):
     )
 ```
 
-Constraints are checked by `validate_constraints()` — run by a `ModelForm` (and any explicit `validate_constraints()` call), but **not** by `full_clean()` (which validates shape only) or a direct `create()`/`update()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
+Constraints are checked by an explicit `validate_constraints()` call, but **not** by `full_clean()` (which validates shape only) or a direct `create()`/`update()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
 
 ```python
 # Simple message — lands on NON_FIELD_ERRORS
@@ -1308,8 +1308,8 @@ result = UserForm.validate(request.form_data)
 if not result:
     ...  # re-render with result.errors
 
-user = create_from(User, result)     # insert a new row
-update_from(existing_user, result)   # write onto an existing row
+user = create_from(User, result)  # insert a new row
+update_from(existing_user, result)  # write onto an existing row
 ```
 
 Pass columns the form doesn't carry as keyword arguments — `create_from(User, result, team=team)`. See [`plain.forms`](../../../plain/plain/forms/README.md) for the full reference.

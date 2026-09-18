@@ -14,7 +14,7 @@ Plain is a Python web framework.
 - **Painfully obvious over clever** — blatant clarity, even if it means more code. You should _see_ what is happening, not have to deduce it.
 - **Write code meant to be read** — clear names, natural flow, obvious structure. The next person reading it should understand it immediately.
 - **Simplify to the present need** — if it feels overcomplicated, it is. Get right to the heart of the issue.
-- **Declarative class attributes are tuples** — `urls` on a `Router`, `fields`/`search_fields`/`actions`/`filters`/`cards` on admin views, `fields` in a form `Meta`. They're read-once config, and the framework types them as tuples, so a list fails type checking. Write `("id",)` for a single element, not `("id")`.
+- **Declarative class attributes are tuples** — `urls` on a `Router`, `fields`/`search_fields`/`actions`/`filters`/`cards` on admin views. They're read-once config, and the framework types them as tuples, so a list fails type checking. Write `("id",)` for a single element, not `("id")`.
 
 ## Settings
 
