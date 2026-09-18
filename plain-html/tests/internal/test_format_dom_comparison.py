@@ -68,7 +68,7 @@ def test_dom_equivalence(path: Path) -> None:
     try:
         formatted = format_source(source)
     except (TokenizeError, ParseError) as e:
-        pytest.xfail(f"engine cannot parse {path.name}: {e}")  # ty: ignore[too-many-positional-arguments]
+        pytest.xfail(f"engine cannot parse {path.name}: {e}")
 
     src_body = _mask(source[body_offset(source) :])
     fmt_body = _mask(formatted[body_offset(formatted) :])

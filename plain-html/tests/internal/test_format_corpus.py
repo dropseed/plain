@@ -60,7 +60,7 @@ def test_template_formats_idempotently(path: Path) -> None:
         once = format_source(source)
         twice = format_source(once)
     except (TokenizeError, ParseError) as e:
-        pytest.xfail(f"engine cannot parse {path.name}: {e}")  # ty: ignore[too-many-positional-arguments]
+        pytest.xfail(f"engine cannot parse {path.name}: {e}")
 
     assert once == twice, f"format is not idempotent for {path}"
 
@@ -74,7 +74,7 @@ def test_template_preserves_expression_bytes(path: Path) -> None:
         out = format_source(source)
         formatted_tokens = tokenize(_body(out))
     except (TokenizeError, ParseError) as e:
-        pytest.xfail(f"engine cannot parse {path.name}: {e}")  # ty: ignore[too-many-positional-arguments]
+        pytest.xfail(f"engine cannot parse {path.name}: {e}")
 
     original_exprs = _expr_bytes(original_tokens)
     formatted_exprs = _expr_bytes(formatted_tokens)
