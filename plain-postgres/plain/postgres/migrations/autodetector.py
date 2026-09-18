@@ -24,6 +24,7 @@ from plain.postgres.migrations.utils import (
 
 if TYPE_CHECKING:
     from plain.postgres.migrations.graph import MigrationGraph
+    from plain.postgres.migrations.loader import MigrationLoader
     from plain.postgres.migrations.operations.base import Operation
     from plain.postgres.migrations.state import ProjectState
 
@@ -93,42 +94,7 @@ class MigrationAutodetector:
         return changes
 
     def deep_deconstruct(self, obj: Any) -> Any:
-        """
-        Recursive deconstruction for a field and its arguments.
-        Used for full comparison for rename/alter; sometimes a single-level
-        deconstruction will not compare correctly.
-        """
-        if isinstance(obj, list):
-            return [self.deep_deconstruct(value) for value in obj]
-        elif isinstance(obj, tuple):
-            return tuple(self.deep_deconstruct(value) for value in obj)
-        elif isinstance(obj, dict):
-            return {key: self.deep_deconstruct(value) for key, value in obj.items()}
-        elif isinstance(obj, functools.partial):
-            return (
-                obj.func,
-                self.deep_deconstruct(obj.args),
-                self.deep_deconstruct(obj.keywords),
-            )
-        elif isinstance(obj, COMPILED_REGEX_TYPE):
-            return RegexObject(obj)
-        elif isinstance(obj, type):
-            # If this is a type that implements 'deconstruct' as an instance method,
-            # avoid treating this as being deconstructible itself - see #22951
-            return obj
-        elif hasattr(obj, "deconstruct"):
-            deconstructed = obj.deconstruct()
-            if isinstance(obj, Field):
-                # we have a field which also returns a name
-                deconstructed = deconstructed[1:]
-            path, args, kwargs = deconstructed
-            return (
-                path,
-                [self.deep_deconstruct(value) for value in args],
-                {key: self.deep_deconstruct(value) for key, value in kwargs.items()},
-            )
-        else:
-            return obj
+        return deep_deconstruct(obj)
 
     def only_relation_agnostic_fields(self, fields: dict[str, Field]) -> list[Any]:
         """
@@ -1189,3 +1155,101 @@ class MigrationAutodetector:
         if match:
             return int(match[0])
         return None
+
+
+def deep_deconstruct(obj: Any) -> Any:
+    """
+    Recursive deconstruction for a field and its arguments.
+    Used for full comparison for rename/alter; sometimes a single-level
+    deconstruction will not compare correctly.
+    """
+    if isinstance(obj, list):
+        return [deep_deconstruct(value) for value in obj]
+    elif isinstance(obj, tuple):
+        return tuple(deep_deconstruct(value) for value in obj)
+    elif isinstance(obj, dict):
+        return {key: deep_deconstruct(value) for key, value in obj.items()}
+    elif isinstance(obj, functools.partial):
+        return (
+            obj.func,
+            deep_deconstruct(obj.args),
+            deep_deconstruct(obj.keywords),
+        )
+    elif isinstance(obj, COMPILED_REGEX_TYPE):
+        return RegexObject(obj)
+    elif isinstance(obj, type):
+        # If this is a type that implements 'deconstruct' as an instance method,
+        # avoid treating this as being deconstructible itself - see #22951
+        return obj
+    elif hasattr(obj, "deconstruct"):
+        deconstructed = obj.deconstruct()
+        if isinstance(obj, Field):
+            # we have a field which also returns a name
+            deconstructed = deconstructed[1:]
+        path, args, kwargs = deconstructed
+        return (
+            path,
+            [deep_deconstruct(value) for value in args],
+            {key: deep_deconstruct(value) for key, value in kwargs.items()},
+        )
+    else:
+        return obj
+
+
+def detect_model_changes(
+    loader: MigrationLoader, package_labels: set[str] | None = None
+) -> dict[str, list[Migration]]:
+    """The migrations `plain migrations create` would write right now.
+
+    Empty when the models and the migration history agree. `apply` uses it to
+    warn, `reset` to refuse: a model change the history doesn't hold would be
+    folded into the baseline and never reach a database that adopts it.
+    """
+    from plain.postgres.migrations.state import ProjectState
+    from plain.postgres.registry import models_registry
+
+    autodetector = MigrationAutodetector(
+        loader.project_state(),
+        ProjectState.from_models_registry(models_registry),
+    )
+    return autodetector.changes(
+        graph=loader.graph,
+        trim_to_packages=package_labels,
+        convert_packages=package_labels,
+    )
+
+
+def describe_changes(changes: dict[str, list[Migration]]) -> list[str]:
+    return [
+        operation.describe()
+        for migrations in changes.values()
+        for migration in migrations
+        for operation in migration.operations
+    ]
+
+
+def package_creation_operations(
+    state: ProjectState, package_label: str
+) -> list[Operation]:
+    """`package_label`'s models in `state` as the operations that create them.
+
+    The autodetector from "everything but this package" to "everything" adds
+    exactly this package's models - ordered, with the field of a circular FK
+    split into an `AddField` after both `CreateModel`s. Its migration
+    chopping and dependency bookkeeping are the caller's to discard.
+    """
+    without_package = state.clone()
+    for label, model_name in list(without_package.models):
+        if label == package_label:
+            without_package.remove_model(label, model_name)
+    generated = MigrationAutodetector(without_package, state)._detect_changes()
+    if not set(generated) <= {package_label}:
+        raise ValueError(
+            f"Regenerating `{package_label}` produced operations for "
+            f"{sorted(set(generated) - {package_label})}"
+        )
+    return [
+        operation
+        for migration in generated.get(package_label, [])
+        for operation in migration.operations
+    ]

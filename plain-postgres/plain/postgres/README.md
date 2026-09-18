@@ -599,6 +599,7 @@ Shared commands (apply equally to structural and data migrations):
 | `plain migrations list`            | View migration status by package                                  |
 | `plain migrations prune`           | Remove orphan migration records                                   |
 | `plain migrations prune <package>` | Remove every record for one package (lets its baseline run again) |
+| `plain migrations reset <package>` | Replace the package's history with one baseline                   |
 
 #### Development workflow
 
@@ -621,14 +622,14 @@ A package whose migration history has been reset ships one **baseline** migratio
 
 ```python
 class Migration(migrations.Migration):
-    supersedes = "0008_add_widgets"  # the last deleted migration; its record proves a database is caught up
+    supersedes = "0008_add_widgets"  # the sentinel: the last deleted migration; its record proves a database is caught up
     retired = (
         "0001_initial",
         ...,
         "0008_add_widgets",
     )  # every deleted name, so dependencies on them still resolve
     since = "0.61"  # the release that shipped the reset, for messages
-    dependencies = (("users", "__first__"),)
+    dependencies = (("users", "0001_initial"),)
     operations = (migrations.CreateModel(...), ...)
 ```
 
@@ -647,20 +648,32 @@ What `plain postgres sync` (or `plain migrations apply`) does with it depends on
 
 #### Resetting migrations
 
-Once **every environment** has applied a package's migrations, its history can be collapsed into one baseline. Nothing about this touches `plainmigrations` by hand, and nothing prunes: existing databases adopt the baseline with one record, the retired records stay as the rollback path, and a database that somehow missed the last migration is refused with instructions instead of drifting.
+Once **every environment** has applied a package's migrations, its history can be collapsed into one baseline:
 
-1. Confirm every environment is at the leaf (`plain migrations list` there).
-2. Note the leaf's name and every migration file's name in the package.
-3. Write the baseline **before deleting anything**, numbered past the old leaf (`0019_baseline.py` after `0018_…`): `supersedes` is the old leaf, `retired` is every name from step 2, `since` is the release this ships in, and its `operations` are the package's schema as it stands - the initial migration's `CreateModel`s with every later field folded in. (Until `plain migrations reset` generates this, it is written by hand.) Nothing loads until step 4 - the loader refuses a baseline whose retired files are still on disk.
-4. Delete the old migration files. Other packages that depended on a deleted name now resolve to the baseline; nothing else needs editing.
-5. `plain migrations apply --plan` locally shows it as `(baseline: recorded, not run)`; `plain postgres sync` records it.
-6. Commit and deploy. Every environment's `plain postgres sync` records it the same way; a fresh database runs it. Do not add a `prune` step.
+```bash
+plain migrations reset <package>
+```
 
-**Things to keep in mind:**
+The command writes `NNNN_baseline.py` past the current leaf (the package's newest migration) — the package's schema as `CreateModel`s, `supersedes` set to the leaf, `retired` set to every deleted name — and deletes the old files. Commit the new file and the deletions together. Existing databases adopt it with one record on their next `plain postgres sync`; the retired records stay as the rollback path; a fresh database runs it. Other packages' migrations that depended on a deleted name resolve to the baseline; nothing there needs rewriting. Do not add a `prune` step. Before it touches anything it checks, in this order:
 
-- Other packages' migrations that depended on a retired name resolve to the baseline automatically. Nothing needs rewriting.
-- Data migrations (`RunPython`) in the deleted history are gone, which is fine on databases that ran them and means a fresh database doesn't get their effects - move anything a fresh install needs into the baseline or a seed.
-- If CI runs `migrations create --check` or `migrations apply --check`, the reset must be merged and deployed before those checks pass in other branches.
+- The models agree with the history (`plain migrations create` would write nothing). A change the history doesn't hold would be folded into the baseline, and databases that adopt it would never run it.
+- The package ends in a single leaf, and no earlier baseline is waiting unreleased (see second resets below).
+- The deleted history holds nothing a fresh database would miss. `RunPython`, `RunSQL`, any custom operation, and anything on the database side of `SeparateDatabaseAndState` are listed and refused until each carries `skip_on_reset=True` — "a fresh database can do without this." If it can't (a seed, an extension), move the effect somewhere a fresh database does get it, then mark it.
+- The migrations directory is committed — tracked, unmodified, inside a git repository (so an installed package in site-packages cannot be reset; the check applies to `--dry-run` too). The leaf becomes the baseline's sentinel, so it cannot be something you created a minute ago, and if anything goes wrong the output has already printed the one line that puts it back: `git checkout -- <migrations dir> && rm <the new baseline>`.
+- The result loads: dependencies on retired names resolve, the graph has no cycle, the baseline reproduces the models exactly.
+- Nothing the baseline needs is defined inside a migration file. A custom field class or callable written in the history disappears with it; move it into the app first.
+
+Options:
+
+- `--released-at <git ref>` — the leaf must exist at that ref with the same dependencies and operations (a tag for a shipped package, a deployed commit for an app). No ref can prove a database applied it; the command prints the obligation either way: every environment must have applied the leaf before this ships, and one that hasn't is refused until it does.
+- `--since <version>` — the release this reset ships in, named in that refusal, and required before the package can be reset again. Plain's own packages leave it empty and fill it in at release time (a repository test enforces it, and the package's `plain.postgres` minimum is raised to the first release that understands baselines); an app should pass the version or deploy this ships in.
+- `--dry-run` — print the baseline and the deletion list, write nothing.
+
+**Dependencies.** The baseline depends on each other package its models reference, at the earliest migration of that package where the referenced models exist — and on nothing else. A package that another package pinned early _and_ whose models now point back at that package cannot get a single root: the graph would be a cycle, and the command refuses with it. That is a limit of migration graphs, not of the command; nothing to do with a second package fixes it.
+
+**Support boundaries.** Adoption checks that the sentinel is recorded and the tables exist, not columns; editing history behind a released leaf is outside what any check can catch. A data migration in _another_ package that read this package's historical state (a field the baseline no longer has) keeps loading but can fail on a fresh database; the command cannot see it.
+
+**Second reset.** Run it again later and the previous baseline joins `retired`. It refuses while the previous baseline's `since` is empty: nothing shipped it yet, so superseding its name would strand every database still at the original sentinel — once that baseline has shipped everywhere, set its `since` to the version that shipped it and reset again; otherwise restore the history and reset once.
 
 ### Data migrations
 
@@ -682,6 +695,8 @@ def forwards(models, schema_editor):
 ```
 
 For large tables, chunk the work (e.g. by ID range) and commit between batches so no single transaction holds locks for too long.
+
+When the package's history is later collapsed (see [Resetting migrations](#resetting-migrations)), `plain migrations reset` refuses while any `RunPython`/`RunSQL` is unmarked. Pass `skip_on_reset=True` once a fresh database can do without its effect; if it can't, move the effect into a seed first.
 
 See [Structural migrations](#structural-migrations) for shared commands (`apply`, `list`, `prune`).
 

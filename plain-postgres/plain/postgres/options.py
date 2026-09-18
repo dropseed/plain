@@ -18,6 +18,10 @@ def default_db_table(package_label: str, model_name: str) -> str:
     return truncate_name(f"{package_label}_{model_name.lower()}", MAX_NAME_LENGTH)
 
 
+# Model options convergence owns; never serialized into migrations.
+CONVERGENCE_OPTIONS = ("indexes", "constraints", "storage_parameters")
+
+
 class Options:
     """
     Model options descriptor and container.
@@ -180,7 +184,7 @@ class Options:
         """
         options = {}
         for name in self._provided_options:
-            if name in ("indexes", "constraints", "storage_parameters"):
+            if name in CONVERGENCE_OPTIONS:
                 continue
             options[name] = getattr(self, name)
         return options

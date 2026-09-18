@@ -27,6 +27,9 @@ def temp_migrations(
     root.mkdir()
     (root / "__init__.py").write_text("")
     monkeypatch.syspath_prepend(str(tmp_path))
+    # A test may rewrite a file in place within one second; a cached .pyc is
+    # keyed on whole-second mtime and size and would be served stale.
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
     original = MigrationLoader.migrations_module
     redirected: set[str] = set()
 

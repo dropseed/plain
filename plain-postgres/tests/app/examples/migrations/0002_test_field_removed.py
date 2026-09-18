@@ -21,7 +21,8 @@ class Migration(migrations.Migration):
             name="uuid",
             field=postgres.UUIDField(allow_null=True),
         ),
-        migrations.RunPython(set_uuids),
+        # A scaffold field removed below; nothing a fresh database needs.
+        migrations.RunPython(set_uuids, skip_on_reset=True),
         migrations.RemoveField(
             model_name="car",
             name="uuid",

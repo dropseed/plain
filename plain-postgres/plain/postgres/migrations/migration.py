@@ -42,8 +42,9 @@ class Migration:
     # up: a database that has it adopts the baseline with a single record write;
     # one that doesn't is refused. `retired` lists every deleted name so that a
     # dependency on any of them resolves to the baseline. `since` is the release
-    # that shipped the reset, for messages. Written by hand today; the reset
-    # command that will generate it is next.
+    # that shipped the reset, for messages. `plain migrations reset` writes the
+    # baseline; `since` comes from its `--since`, or is filled in when the
+    # package is released.
     supersedes: str | None = None
     retired: Sequence[str] = ()
     since: str = ""

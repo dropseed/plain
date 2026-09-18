@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import importlib.util
 import os
+import subprocess
 import sys
+import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import click
@@ -11,8 +15,17 @@ from plain.packages import packages_registry
 from plain.utils.text import Truncator
 
 from ..db import get_connection
-from ..migrations.autodetector import MigrationAutodetector
-from ..migrations.exceptions import MigrationSchemaError, StaleMigrationRecordsError
+from ..migrations.autodetector import (
+    MigrationAutodetector,
+    deep_deconstruct,
+    describe_changes,
+    detect_model_changes,
+)
+from ..migrations.exceptions import (
+    BadMigrationError,
+    MigrationSchemaError,
+    StaleMigrationRecordsError,
+)
 from ..migrations.executor import MigrationExecutor
 from ..migrations.loader import AmbiguityError, MigrationLoader
 from ..migrations.migration import Migration
@@ -21,6 +34,7 @@ from ..migrations.questioner import (
     MigrationQuestioner,
 )
 from ..migrations.recorder import MigrationRecorder
+from ..migrations.reset import ResetPlan, plan_reset, validate_reset
 from ..migrations.state import ModelState, ProjectState
 from ..migrations.writer import MigrationWriter
 from ..registry import models_registry
@@ -634,12 +648,8 @@ def apply(
             click.echo("No migrations to apply.")
             # If there's changes that aren't in migrations yet, tell them
             # how to fix it.
-            autodetector = MigrationAutodetector(
-                executor.loader.project_state(),
-                ProjectState.from_models_registry(models_registry),
-            )
             try:
-                changes = autodetector.changes(graph=executor.loader.graph)
+                changes = detect_model_changes(executor.loader)
             except MigrationSchemaError:
                 # A pending change can't be generated (e.g. NOT NULL without
                 # default). Surface it through `migrations create` rather than
@@ -926,3 +936,249 @@ def prune(package_label: str | None, yes: bool) -> None:
         f"✓ Removed {total_count} {kind} record{'s' if total_count != 1 else ''}.",
         fg="green",
     )
+
+
+@cli.command()
+@click.argument("package_label")
+@click.option(
+    "--since",
+    default="",
+    help="Version this reset ships in; named in the refusal a database that missed the leaf gets, and required before this package can be reset again.",
+)
+@click.option(
+    "--released-at",
+    "released_at",
+    default="",
+    help="A git ref (tag, commit) at which the leaf migration must already exist with the same dependencies and operations.",
+)
+@click.option(
+    "--dry-run", is_flag=True, help="Show the baseline and what would be deleted."
+)
+@database_management_command
+def reset(package_label: str, since: str, released_at: str, dry_run: bool) -> None:
+    """Replace a package's migration history with one baseline"""
+    try:
+        packages_registry.get_package_config(package_label)
+    except LookupError as err:
+        raise click.ClickException(str(err))
+
+    loader = MigrationLoader(None, ignore_no_migrations=True)
+
+    try:
+        pending = detect_model_changes(loader, {package_label})
+    except MigrationSchemaError as e:
+        raise click.ClickException(str(e)) from e
+    if pending:
+        raise click.ClickException(
+            f"`{package_label}` has model changes its migrations don't hold - a "
+            "baseline would fold them in and databases that adopt it would never "
+            "run them:\n  - "
+            + "\n  - ".join(describe_changes(pending))
+            + "\nRun `plain migrations create` first."
+        )
+
+    try:
+        plan = plan_reset(loader, package_label, since=since)
+        _require_committed(plan)
+        if released_at:
+            _require_released(loader, plan, ref=released_at)
+        validate_reset(loader, plan)
+    except BadMigrationError as e:
+        raise click.ClickException(str(e)) from e
+
+    writer = MigrationWriter(plan.baseline)
+    source = writer.as_string()
+    if writer.needs_manual_porting:
+        raise click.ClickException(
+            "The baseline would reference code defined inside a migration file "
+            "that this reset deletes. Move it into the app, then reset again."
+        )
+    baseline_path = plan.migrations_dir / writer.filename
+
+    if dry_run:
+        click.echo(source)
+
+    click.secho(
+        f"Resetting `{package_label}`: {len(plan.delete)} migration"
+        f"{'s' if len(plan.delete) != 1 else ''} -> {plan.baseline.name}",
+        bold=True,
+    )
+    click.echo(f"  Supersedes {plan.sentinel}")
+    for path in plan.delete:
+        click.echo(f"  Delete {path.name}")
+
+    if dry_run:
+        click.echo("Dry run - nothing written or deleted.")
+        return
+
+    click.echo(
+        "  Recover from any failure with: "
+        f"git checkout -- {plan.migrations_dir} && rm {baseline_path}"
+    )
+    baseline_path.write_text(source, encoding="utf-8")
+    for path in plan.delete:
+        path.unlink()
+    importlib.invalidate_caches()
+    try:
+        MigrationLoader(None, ignore_no_migrations=True)
+    except Exception as e:
+        # Put the history back ourselves; the operator gets the reason only.
+        baseline_path.unlink()
+        try:
+            _git(
+                ["checkout", "--", *(path.name for path in plan.delete)],
+                cwd=plan.migrations_dir,
+            )
+        except BadMigrationError as restore_error:
+            raise click.ClickException(
+                f"The written baseline does not load ({e}), and restoring the "
+                f"history failed too: {restore_error}"
+            ) from e
+        raise click.ClickException(
+            f"The written baseline does not load ({e}); the history has been "
+            "restored and nothing changed."
+        ) from e
+
+    click.echo("")
+    click.secho(f"Wrote {os.path.relpath(baseline_path)}", fg="green")
+    click.echo(
+        "Commit the new file and the deletions together; other packages' "
+        "dependencies on the deleted names need no edits."
+    )
+    if not since:
+        click.echo(
+            "`since` is empty - set it in the baseline when this ships, or the "
+            "next reset of this package is refused."
+        )
+    click.echo(
+        f"Every environment must have applied `{package_label}.{plan.sentinel}` "
+        "before this ships; a database that hasn't will be refused until it does."
+    )
+
+
+def _git(args: list[str], *, cwd: Path) -> str:
+    """Run git in `cwd`, ignoring any repository the environment points at.
+
+    Git sets `GIT_DIR` (and friends) for hooks, so a command run from one
+    would otherwise answer about the hook's repository. Raises
+    `BadMigrationError` when git fails or is missing.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        return subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+            env=env,
+        ).stdout
+    except OSError as e:
+        raise BadMigrationError(
+            f"git could not be run ({e}). A reset deletes files; it only runs "
+            "where git can bring them back."
+        ) from e
+    except subprocess.CalledProcessError as e:
+        raise BadMigrationError(
+            f"git could not read {cwd} ({e.stderr.strip() or e}). A reset deletes "
+            "files; it only runs where git can bring them back."
+        ) from e
+
+
+def _require_committed(plan: ResetPlan) -> None:
+    """Every file about to go must be tracked and unchanged.
+
+    That makes the leaf a committed migration (not one created a minute ago),
+    keeps a venv's site-packages out of reach, and makes recovery from any
+    failure one git command.
+    """
+    tracked = _git(["ls-files", "--", "*.py"], cwd=plan.migrations_dir).split()
+    untracked = [path.name for path in plan.delete if path.name not in tracked]
+    if untracked:
+        raise BadMigrationError(
+            f"Not tracked by git in {plan.migrations_dir}: {', '.join(untracked)}. "
+            "Commit the history first - the leaf becomes the baseline's sentinel, "
+            "and every environment must have applied it."
+        )
+    modified = _git(
+        ["status", "--porcelain", "--untracked-files=no", "--", "*.py"],
+        cwd=plan.migrations_dir,
+    )
+    if modified.strip():
+        raise BadMigrationError(
+            f"{plan.migrations_dir} has uncommitted changes:\n{modified.rstrip()}\n"
+            "Commit them first - the leaf migration becomes the baseline's "
+            "sentinel, and every environment must have applied it."
+        )
+
+
+def _require_released(loader: MigrationLoader, plan: ResetPlan, *, ref: str) -> None:
+    """The leaf must exist at `ref` with the same dependencies and operations."""
+    assert loader.disk_migrations is not None
+    leaf = loader.disk_migrations[plan.package_label, plan.sentinel]
+    leaf_file = f"{plan.sentinel}.py"
+    try:
+        _git(
+            ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
+            cwd=plan.migrations_dir,
+        )
+    except BadMigrationError:
+        raise BadMigrationError(f"No such git ref: {ref}") from None
+    repo_path = _git(
+        ["ls-files", "--full-name", "--", leaf_file], cwd=plan.migrations_dir
+    ).strip()
+    try:
+        shown = _git(["show", f"{ref}:{repo_path}"], cwd=plan.migrations_dir)
+    except BadMigrationError:
+        raise BadMigrationError(
+            f"`{plan.package_label}.{plan.sentinel}` does not exist at {ref}. The "
+            "sentinel must be a migration that already existed at the ref you name."
+        ) from None
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            released_path = Path(tmp) / leaf_file
+            released_path.write_text(shown, encoding="utf-8")
+            spec = importlib.util.spec_from_file_location(
+                f"released_{plan.sentinel}", released_path
+            )
+            assert spec is not None
+            assert spec.loader is not None
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        released = module.Migration(plan.sentinel, plan.package_label)
+    except Exception as e:
+        raise BadMigrationError(
+            f"`{plan.package_label}.{plan.sentinel}` at {ref} cannot be loaded "
+            f"({e}); it cannot be compared with the leaf."
+        ) from e
+
+    def comparable(value: Any) -> Any:
+        # A function defined in the migration file is a different object in
+        # the released copy; compare what it does, not which one it is.
+        # `skip_on_reset` is a note to this command, not a change in what the
+        # migration did.
+        if isinstance(value, list | tuple):
+            return type(value)(comparable(v) for v in value)
+        if isinstance(value, dict):
+            return {k: comparable(v) for k, v in value.items() if k != "skip_on_reset"}
+        if callable(value) and hasattr(value, "__code__"):
+            return (
+                value.__qualname__,
+                value.__code__.co_code,
+                value.__code__.co_consts,
+            )
+        return value
+
+    def shape(migration: Migration) -> Any:
+        return comparable(
+            (
+                sorted(type(migration).dependencies),
+                [deep_deconstruct(op.deconstruct()) for op in migration.operations],
+            )
+        )
+
+    if shape(released) != shape(leaf):
+        raise BadMigrationError(
+            f"`{plan.package_label}.{plan.sentinel}` differs from the one at {ref}. "
+            "The sentinel must be the migration those environments applied."
+        )

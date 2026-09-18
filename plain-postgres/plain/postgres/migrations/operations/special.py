@@ -75,12 +75,12 @@ class RunSQL(Operation):
         | tuple[str | tuple[str, list[Any]], ...],
         *,
         state_operations: list[Operation] | None = None,
-        elidable: bool = False,
+        skip_on_reset: bool = False,
         no_timeout: bool = False,
     ) -> None:
         self.sql = sql
         self.state_operations = state_operations or []
-        self.elidable = elidable
+        self.skip_on_reset = skip_on_reset
         # Opt-out of the per-statement SET LOCAL lock_timeout/statement_timeout
         # that migrations apply by default. Use for long-running data
         # migrations (batched backfills) or for user-authored DDL that needs
@@ -96,6 +96,8 @@ class RunSQL(Operation):
             kwargs["state_operations"] = self.state_operations
         if self.no_timeout:
             kwargs["no_timeout"] = self.no_timeout
+        if self.skip_on_reset:
+            kwargs["skip_on_reset"] = True
         return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
@@ -152,14 +154,14 @@ class RunPython(Operation):
         code: Callable[..., Any],
         *,
         atomic: bool | None = None,
-        elidable: bool = False,
+        skip_on_reset: bool = False,
     ) -> None:
         self.atomic = atomic
         # Forwards code
         if not callable(code):
             raise TypeError("RunPython must be supplied with a callable")
         self.code = code
-        self.elidable = elidable
+        self.skip_on_reset = skip_on_reset
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
@@ -167,6 +169,8 @@ class RunPython(Operation):
         }
         if self.atomic is not None:
             kwargs["atomic"] = self.atomic
+        if self.skip_on_reset:
+            kwargs["skip_on_reset"] = True
         return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: Any) -> None:

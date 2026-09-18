@@ -99,3 +99,4 @@ Run `uv run plain docs postgres` for check details, thresholds, and production u
 - Use `model_options = postgres.Options(...)` not `class Meta`
 - Never format raw SQL strings — always use parameterized queries
 - Migrations are forward-only — no reverse migrations. `RunPython` takes a single callable (no `reverse_code` or `noop`). The callable signature is `fn(models, schema_editor)`, not `fn(apps, schema_editor)`
+- No `squashmigrations`; collapse a package's history with `plain migrations reset <package>`. `RunPython`/`RunSQL` take `skip_on_reset=True` (Django's `elidable`)

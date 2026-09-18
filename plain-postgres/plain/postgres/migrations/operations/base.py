@@ -36,8 +36,12 @@ class Operation:
     # None means "no preference" — RunPython uses this to defer to migration.atomic.
     atomic: bool | None = False
 
-    # Should this operation be considered safe to elide and optimize across?
-    elidable = False
+    # "A fresh database can do without this operation's effect." A reset
+    # (`plain migrations reset`) deletes the whole history and regenerates the
+    # schema from the models; it refuses while any operation it cannot
+    # regenerate is unmarked. RunPython and RunSQL take it as a keyword
+    # argument; a custom operation sets it on the class.
+    skip_on_reset = False
 
     serialization_expand_args: tuple[str, ...] = ()
 
@@ -126,10 +130,6 @@ class Operation:
         replaced with or a boolean that indicates whether or not the specified
         operation can be optimized across.
         """
-        if self.elidable:
-            return [operation]
-        elif operation.elidable:
-            return [self]
         return False
 
     def __repr__(self) -> str:

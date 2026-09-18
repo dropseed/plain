@@ -53,6 +53,9 @@ class MigrationLoader:
         # What the planner should do with each baseline, from the records
         # observed in build_graph(). Empty without a connection.
         self.baseline_status: BaselineStatus = BaselineStatus()
+        # One baseline per package, and every retired name it stands for.
+        self.baselines: dict[str, Migration] = {}
+        self.retired_to_baseline: dict[tuple[str, str], tuple[str, str]] = {}
         if load:
             self.build_graph()
 
@@ -76,9 +79,6 @@ class MigrationLoader:
         self.disk_migrations = {}
         self.unmigrated_packages = set()
         self.migrated_packages = set()
-        # One baseline per package, and every retired name it stands for.
-        self.baselines: dict[str, Migration] = {}
-        self.retired_to_baseline: dict[tuple[str, str], tuple[str, str]] = {}
         for package_config in packages_registry.get_package_configs():
             # Get the migrations module directory
             module_name, explicit = self.migrations_module(package_config.package_label)
@@ -157,7 +157,6 @@ class MigrationLoader:
                         package_config.package_label,
                     )
                 )
-        self.register_baselines()
 
     def register_baselines(self) -> None:
         """One baseline per package; every name it retired resolves to it."""
@@ -293,9 +292,25 @@ class MigrationLoader:
         You'll need to rebuild the graph if you apply migrations. This isn't
         usually a problem as generally migration stuff runs in a one-shot process.
         """
-        # Load disk data
         self.load_disk()
         assert self.disk_migrations is not None  # load_disk() ensures this
+        self.build_graph_from(self.disk_migrations)
+
+    def build_graph_from(
+        self, disk_migrations: dict[tuple[str, str], Migration]
+    ) -> None:
+        """Build the graph over the given migrations instead of what is on disk.
+
+        `build_graph()` passes what `load_disk()` found; `plain migrations
+        reset` passes what the disk *would* hold after a reset, so every check
+        here - baseline registration, dependency normalization, consistency,
+        cycles - runs on the candidate before a file is touched. Dependency
+        normalization rewrites the migrations it is given.
+        """
+        self.disk_migrations = disk_migrations
+        self.baselines = {}
+        self.retired_to_baseline = {}
+        self.register_baselines()
         # Load database data
         if self.connection is None:
             self.applied_migrations = {}
