@@ -8,8 +8,11 @@ hottest user-facing path.
 
 from __future__ import annotations
 
+import logging
 import threading
+import time
 import uuid
+from collections.abc import Generator
 
 import pytest
 from opentelemetry.metrics import CallbackOptions
@@ -17,8 +20,7 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
-from opentelemetry.trace import SpanKind
-
+from opentelemetry.trace import SpanContext, SpanKind, StatusCode, get_current_span
 from plain.jobs import Job, otel
 from plain.jobs.registry import register_job
 from plain.jobs.workers import Worker
@@ -47,6 +49,62 @@ class _ExclusiveJob(Job):
 
     def should_enqueue(self, concurrency_key: str) -> bool:
         return False
+
+
+class _SpanContextCapturingHandler(logging.Handler):
+    """Captures the active span context at emit time — the ambient context the
+    OTel LoggingHandler reads to stamp trace/span ids onto exported records.
+    A record emitted with no span current would export with empty ids and
+    double-report its failure alongside the span's exception event."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.emitted: list[tuple[logging.LogRecord, SpanContext]] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.emitted.append((record, get_current_span().get_span_context()))
+
+    def span_context_for(self, message: str) -> SpanContext:
+        [context] = [
+            ctx for record, ctx in self.emitted if record.getMessage() == message
+        ]
+        return context
+
+
+@pytest.fixture
+def jobs_log_contexts() -> Generator[_SpanContextCapturingHandler]:
+    handler = _SpanContextCapturingHandler()
+    jobs_logger = logging.getLogger("plain.jobs")
+    jobs_logger.addHandler(handler)
+    try:
+        yield handler
+    finally:
+        jobs_logger.removeHandler(handler)
+
+
+def test_error_consumer_span_is_current_for_the_paired_log(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """error_consumer_span keeps its span current while the body runs, so the
+    paired logger.exception record picks up the span's trace/span ids —
+    otherwise the record exports span-less and the one failure gets reported
+    twice downstream (span exception event + orphan error log)."""
+    from plain.jobs.otel import error_consumer_span
+
+    with error_consumer_span(name="claim job", exc=RuntimeError("boom")):
+        ambient_context = get_current_span().get_span_context()
+
+    assert ambient_context.is_valid
+    [span] = otel_spans.get_finished_spans()
+    assert span.name == "claim job"
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    assert [e for e in span.events if e.name == "exception"]
+    assert span.context is not None
+    assert ambient_context.trace_id == span.context.trace_id
+    assert ambient_context.span_id == span.context.span_id
 
 
 @pytest.mark.usefixtures("db")
@@ -85,7 +143,6 @@ def test_failed_enqueue_marks_producer_span_as_errored(
     """A failing enqueue's PRODUCER span carries the canonical failure signal:
     status=ERROR plus error.type. Don't branch on exception.escaped — it's
     deprecated upstream and unreliable in the Python SDK."""
-    from opentelemetry.trace import StatusCode
 
     def _boom(*args, **kwargs):
         raise RuntimeError("create failed")
@@ -119,8 +176,6 @@ def test_failing_job_marks_consumer_span_as_errored(
     status=ERROR plus error.type. The exception is caught inside the span's
     with-block by JobProcess.run, so only the manual record_span_error event
     fires."""
-    from opentelemetry.trace import StatusCode
-
     request = _BoomJob().run_in_worker()
     assert request is not None
     process = request.convert_to_job_process(worker_id=uuid.uuid4())
@@ -171,14 +226,14 @@ def test_enqueue_failure_records_error_type_on_metric(
 @pytest.mark.usefixtures("db")
 def test_process_job_emits_consumer_span_when_lookup_fails(
     otel_spans: InMemorySpanExporter,
+    jobs_log_contexts: _SpanContextCapturingHandler,
 ) -> None:
     """JobProcess.run() creates the CONSUMER span — but `process_job` does the
     JobProcess row lookup first. A DB transient on that lookup leaves only a
     CLIENT span, which entry-span filtering correctly excludes. The fallback
     CONSUMER span at the top of process_job ensures lookup failures still
-    surface."""
-    from opentelemetry.trace import StatusCode
-
+    surface, and the `Job process errored` record is logged inside it so the
+    two report as one failure."""
     from plain.jobs.workers import process_job
 
     # A random UUID won't match any row — JobProcess.query.get raises
@@ -197,14 +252,23 @@ def test_process_job_emits_consumer_span_when_lookup_fails(
     exception_events = [e for e in span.events if e.name == "exception"]
     assert exception_events
 
+    assert span.context is not None
+    log_context = jobs_log_contexts.span_context_for("Job process errored")
+    assert log_context.trace_id == span.context.trace_id
+    assert log_context.span_id == span.context.span_id
+
 
 # --- Worker run-loop span -----------------------------------------------
 
 
-def _build_worker_for_loop_test() -> Worker:
+def _build_worker_for_loop_test(
+    *, stub_maintenance: bool = True, heartbeat_due: bool = False
+) -> Worker:
     """Construct a Worker bypassing __init__ so `_run_loop` can run a single
-    iteration without a real ProcessPoolExecutor. Tests override the maintenance
-    methods to control when the loop exits."""
+    iteration without a real ProcessPoolExecutor. Maintenance baselines start
+    fresh (nothing due); pass heartbeat_due=True to make the tick open the
+    `worker loop` span and run maintenance.
+    """
     worker = Worker.__new__(Worker)
     worker.queues = ["default"]
     worker._is_shutting_down = False
@@ -213,24 +277,31 @@ def _build_worker_for_loop_test() -> Worker:
     worker._inflight_lock = threading.Lock()
     worker.max_processes = 1
     worker.max_pending_per_process = 1
-    worker.maybe_heartbeat = lambda: None
-    worker.maybe_log_stats = lambda: None
-    worker.maybe_check_job_results = lambda: None
-    worker.maybe_schedule_jobs = lambda: None
+    worker.stats_every = None
+    worker.jobs_schedule = []
+    worker.worker_id = uuid.uuid4()
+    now = time.time()
+    worker._heartbeat_at = 0.0 if heartbeat_due else now
+    worker._stats_logged_at = now
+    worker._job_results_checked_at = now
+    worker._jobs_schedule_checked_at = now
+    if stub_maintenance:
+        worker.maybe_heartbeat = lambda: None  # ty: ignore[invalid-assignment]
+        worker.maybe_log_stats = lambda: None  # ty: ignore[invalid-assignment]
+        worker.maybe_check_job_results = lambda: None  # ty: ignore[invalid-assignment]
+        worker.maybe_schedule_jobs = lambda: None  # ty: ignore[invalid-assignment]
     return worker
 
 
 @pytest.mark.usefixtures("db")
-def test_worker_loop_emits_consumer_span_per_iteration(
+def test_worker_loop_emits_consumer_span_when_maintenance_due(
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    """Each worker loop iteration wraps the maintenance work in a `worker loop`
-    CONSUMER span — the worker is consuming a recurring maintenance schedule,
-    so its failures belong in the canonical entry-span error filter (SERVER /
+    """A tick with maintenance due wraps the work in a `worker loop` CONSUMER
+    span — the worker is consuming a recurring maintenance schedule, so its
+    failures belong in the canonical entry-span error filter (SERVER /
     CONSUMER / PRODUCER) alongside chores and jobs."""
-    from opentelemetry.trace import StatusCode
-
-    worker = _build_worker_for_loop_test()
+    worker = _build_worker_for_loop_test(heartbeat_due=True)
 
     def shutdown_during_heartbeat() -> None:
         worker._is_shutting_down = True
@@ -246,6 +317,25 @@ def test_worker_loop_emits_consumer_span_per_iteration(
 
 
 @pytest.mark.usefixtures("db")
+def test_worker_loop_idle_tick_emits_no_spans(
+    otel_spans: InMemorySpanExporter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A fully-idle tick — no maintenance due, empty job poll — exports
+    nothing: no `worker loop` span, and no CLIENT spans from the poll query
+    or its transaction. This is the invariant that keeps idle workers from
+    flooding trace search with single-span root traces."""
+    worker = _build_worker_for_loop_test(stub_maintenance=False)
+
+    def shutdown_instead_of_sleeping(seconds: float) -> None:
+        worker._is_shutting_down = True
+
+    monkeypatch.setattr("plain.jobs.workers.time.sleep", shutdown_instead_of_sleeping)
+    worker._run_loop()
+
+    assert otel_spans.get_finished_spans() == ()
+
+
+@pytest.mark.usefixtures("db")
 def test_worker_loop_records_error_when_maintenance_fails(
     otel_spans: InMemorySpanExporter,
 ) -> None:
@@ -253,9 +343,7 @@ def test_worker_loop_records_error_when_maintenance_fails(
     failure signal (status=ERROR + error.type) on the `worker loop` span. This
     is the path that previously swallowed DB transients like the production
     `psycopg.OperationalError` we saw escaping `rescue_job_results`."""
-    from opentelemetry.trace import StatusCode
-
-    worker = _build_worker_for_loop_test()
+    worker = _build_worker_for_loop_test(heartbeat_due=True)
 
     def boom_then_shutdown() -> None:
         worker._is_shutting_down = True
@@ -273,6 +361,165 @@ def test_worker_loop_records_error_when_maintenance_fails(
     assert span.attributes["error.type"] == "RuntimeError"
     exception_events = [e for e in span.events if e.name == "exception"]
     assert exception_events
+
+
+@pytest.mark.usefixtures("db")
+def test_worker_loop_claim_failure_emits_error_span_and_continues(
+    otel_spans: InMemorySpanExporter,
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_log_contexts: _SpanContextCapturingHandler,
+) -> None:
+    """A transient DB failure while claiming a job must not kill the worker.
+    The loop catches it, emits a one-off `claim job` CONSUMER error span
+    (the claim's own CLIENT spans are suppressed, so there is no other entry
+    span to carry the failure) with the `Failed to claim job` record logged
+    inside it, and keeps running."""
+    from plain.jobs.models import JobRequestQuerySet
+
+    worker = _build_worker_for_loop_test()
+
+    def boom(self) -> None:
+        worker._is_shutting_down = True
+        raise RuntimeError("db transient")
+
+    monkeypatch.setattr(JobRequestQuerySet, "ready_to_run", boom)
+    monkeypatch.setattr("plain.jobs.workers.time.sleep", lambda seconds: None)
+    # Must NOT raise — this used to propagate and crash the worker process.
+    worker._run_loop()
+
+    claim_spans = [s for s in otel_spans.get_finished_spans() if s.name == "claim job"]
+    assert len(claim_spans) == 1
+    span = claim_spans[0]
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    exception_events = [e for e in span.events if e.name == "exception"]
+    assert exception_events
+
+    assert span.context is not None
+    log_context = jobs_log_contexts.span_context_for("Failed to claim job")
+    assert log_context.trace_id == span.context.trace_id
+    assert log_context.span_id == span.context.span_id
+
+
+def test_heartbeat_failure_emits_error_span_with_correlated_log(
+    otel_spans: InMemorySpanExporter,
+    jobs_log_contexts: _SpanContextCapturingHandler,
+) -> None:
+    """A heartbeat write failure is swallowed by maybe_heartbeat, so its only
+    OTel trace is the one-off `worker heartbeat` CONSUMER span — and the
+    `Worker heartbeat failed` record must be logged inside that span so it
+    carries the span's trace/span ids."""
+    worker = _build_worker_for_loop_test(stub_maintenance=False, heartbeat_due=True)
+
+    def boom() -> None:
+        raise RuntimeError("db transient")
+
+    worker._refresh_heartbeat = boom  # ty: ignore[invalid-assignment]
+    # Must NOT raise — heartbeat failures are non-fatal by design.
+    worker.maybe_heartbeat()
+
+    assert worker._heartbeat_registered is False
+    spans = [s for s in otel_spans.get_finished_spans() if s.name == "worker heartbeat"]
+    assert len(spans) == 1
+    span = spans[0]
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    assert [e for e in span.events if e.name == "exception"]
+
+    assert span.context is not None
+    log_context = jobs_log_contexts.span_context_for("Worker heartbeat failed")
+    assert log_context.trace_id == span.context.trace_id
+    assert log_context.span_id == span.context.span_id
+
+
+def test_maintenance_due_covers_every_task() -> None:
+    """Each maintenance task's due-predicate must independently trigger
+    `_maintenance_due` — its OR-list gates whether the worker loop span (and
+    the maybe_* calls behind it) run at all, so a predicate dropped from the
+    list silently starves that task onto other tasks' cadences."""
+    worker = _build_worker_for_loop_test()
+    assert not worker._maintenance_due()
+
+    worker._heartbeat_at = 0.0
+    assert worker._maintenance_due()
+    worker._heartbeat_at = time.time()
+
+    worker.stats_every = 60
+    worker._stats_logged_at = 0.0
+    assert worker._maintenance_due()
+    worker.stats_every = None
+    worker._stats_logged_at = time.time()
+
+    worker._job_results_checked_at = 0.0
+    assert worker._maintenance_due()
+    worker._job_results_checked_at = time.time()
+
+    worker.jobs_schedule = [object()]  # Non-empty is all _schedule_due reads.
+    worker._jobs_schedule_checked_at = 0.0
+    assert worker._maintenance_due()
+
+
+@pytest.mark.usefixtures("db")
+def test_future_finished_callback_emits_no_spans(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """The done-callback runs on the executor's callback thread with no entry
+    span — its bookkeeping queries (an orphan check on every completed job)
+    must not export as single-span root traces."""
+    from concurrent.futures import Future
+
+    from plain.jobs.workers import future_finished_callback
+
+    future: Future = Future()
+    future.set_result(None)
+    future_finished_callback(str(uuid.uuid4()), future)
+
+    assert otel_spans.get_finished_spans() == ()
+
+
+@register_job
+class _AbortedHookQueryJob(Job):
+    """on_aborted runs a DB query — used to pin that the hook executes
+    outside the done-callback's tracing suppression."""
+
+    def run(self) -> None:
+        pass
+
+    def on_aborted(self, result) -> None:
+        from plain.jobs.models import JobResult
+
+        JobResult.query.count()
+
+
+@pytest.mark.usefixtures("db")
+def test_on_aborted_hook_runs_outside_suppression(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """The done-callback suppresses framework bookkeeping queries, but
+    Job.on_aborted is user code — its DB spans (and query metrics) must
+    still export."""
+    from concurrent.futures import Future
+
+    from plain.jobs.workers import future_finished_callback
+
+    request = _AbortedHookQueryJob().run_in_worker()
+    assert request is not None
+    process = request.convert_to_job_process(worker_id=uuid.uuid4())
+
+    future: Future = Future()
+    future.cancel()
+    otel_spans.clear()  # Isolate the callback from the enqueue/claim spans.
+
+    future_finished_callback(str(process.uuid), future)
+
+    span_names = [s.name for s in otel_spans.get_finished_spans()]
+    # Framework bookkeeping (row lookup, conversion) stays suppressed — the
+    # only exported spans are from the user hook's query.
+    assert span_names == ["SELECT plainjobs_jobresult"]
 
 
 # --- Worker-state observable gauges -------------------------------------
@@ -295,7 +542,7 @@ class _WorkerStub(Worker):
 
     def __init__(self, queues: list[str], num_processes: int = 0) -> None:
         self.queues = queues
-        self.executor = _StubExecutor(num_processes)  # type: ignore[assignment]
+        self.executor = _StubExecutor(num_processes)
 
 
 @pytest.fixture
@@ -342,6 +589,32 @@ def test_gauges_return_empty_when_no_active_metrics() -> None:
             assert list(callback(CallbackOptions())) == []
     finally:
         otel.WorkerMetrics._current = saved
+
+
+# Every @_gauge_db_queries-decorated callback. Shared by the tests that pin
+# that decorator's behavior so a new DB-backed gauge can't be added to one
+# invariant but not the other.
+_DB_GAUGE_CALLBACKS = (
+    otel.WorkerMetrics._gauge_queue_depth,
+    otel.WorkerMetrics._gauge_queue_oldest_age,
+    otel.WorkerMetrics._gauge_queue_scheduled,
+    otel.WorkerMetrics._gauge_running,
+    otel.WorkerMetrics._gauge_workers,
+)
+
+
+@pytest.mark.usefixtures("db")
+def test_gauge_callbacks_emit_no_spans(
+    metrics, otel_spans: InMemorySpanExporter
+) -> None:
+    """Gauge callbacks run on the metric-reader thread with no entry span
+    active — their DB queries must not export as single-span root traces."""
+    metrics(_WorkerStub(queues=["default"]))
+
+    for callback in _DB_GAUGE_CALLBACKS:
+        list(callback(CallbackOptions()))
+
+    assert otel_spans.get_finished_spans() == ()
 
 
 @pytest.mark.usefixtures("db")
@@ -638,7 +911,7 @@ def test_running_counts_started_jobprocess_rows_by_queue(metrics) -> None:
 @pytest.mark.usefixtures("db")
 def test_db_gauge_callbacks_release_their_connection(metrics, monkeypatch) -> None:
     """Each DB-touching gauge callback returns its pooled connection when it
-    finishes (see `_release_db_connection` for why this matters)."""
+    finishes (see `_gauge_db_queries` for why this matters)."""
     released = 0
 
     def _counting_release(*args, **kwargs) -> None:
@@ -648,14 +921,7 @@ def test_db_gauge_callbacks_release_their_connection(metrics, monkeypatch) -> No
     monkeypatch.setattr(otel, "return_database_connection", _counting_release)
 
     metrics(_WorkerStub(queues=["default"]))
-    db_callbacks = (
-        otel.WorkerMetrics._gauge_queue_depth,
-        otel.WorkerMetrics._gauge_queue_oldest_age,
-        otel.WorkerMetrics._gauge_queue_scheduled,
-        otel.WorkerMetrics._gauge_running,
-        otel.WorkerMetrics._gauge_workers,
-    )
-    for callback in db_callbacks:
+    for callback in _DB_GAUGE_CALLBACKS:
         list(callback(CallbackOptions()))
 
-    assert released == len(db_callbacks)
+    assert released == len(_DB_GAUGE_CALLBACKS)

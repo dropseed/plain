@@ -9,7 +9,6 @@ from jinja2.environment import Environment
 from jinja2.ext import Extension
 from jinja2.parser import Parser
 from jinja2.runtime import Context
-
 from plain.templates import register_template_extension
 from plain.utils.safestring import SafeString, mark_safe
 
@@ -36,7 +35,7 @@ def Element(ctx: Context, _element_name: str, **kwargs: Any) -> SafeString:
 
 @register_template_extension
 class ElementsExtension(Extension):
-    tags = {"use_elements"}
+    tags = {"use_elements"}  # noqa: RUF012 — jinja2 types `tags` as an instance attribute; ClassVar here fails ty's LSP check
 
     def __init__(self, env: Environment):
         super().__init__(env)
@@ -44,6 +43,14 @@ class ElementsExtension(Extension):
         env.globals["Element"] = Element  # ty: ignore[invalid-assignment]
 
         self._CAP_TAG = r"(?:[a-z_]+\.)?[A-Z][A-Za-z0-9_]*"
+
+        # Jinja comments may mention capitalized tags as documentation —
+        # mask them out before scanning so they're not treated as elements.
+        self._COMMENT = re.compile(
+            re.escape(env.comment_start_string)
+            + r"[\s\S]*?"
+            + re.escape(env.comment_end_string)
+        )
 
         self._SELF = re.compile(
             rf"<(?P<name>{self._CAP_TAG})(?P<attrs>(?:\s+(?:[^/>]|/(?!>))*?)?)/>"
@@ -73,6 +80,16 @@ class ElementsExtension(Extension):
         if not contents:
             return contents
 
+        # Stash Jinja comments so capitalized tags inside them aren't
+        # mistaken for elements, then restore them before returning.
+        comments: list[str] = []
+
+        def stash_comment(m: re.Match) -> str:
+            comments.append(m.group(0))
+            return f"\x00element_comment_{len(comments) - 1}\x00"
+
+        contents = self._COMMENT.sub(stash_comment, contents)
+
         def repl_self(m: re.Match) -> str:
             return self.convert_element(m.group("name"), m.group("attrs") or "", "")
 
@@ -94,6 +111,13 @@ class ElementsExtension(Extension):
         if matches := re.search(rf"<{self._CAP_TAG}", contents):
             raise ValueError(
                 f"Found unmatched capitalized tag in template: {matches.group(0)}"
+            )
+
+        if comments:
+            contents = re.sub(
+                r"\x00element_comment_(\d+)\x00",
+                lambda m: comments[int(m.group(1))],
+                contents,
             )
 
         return contents

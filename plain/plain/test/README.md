@@ -71,8 +71,12 @@ response = client.post(
 The client supports all standard HTTP methods: `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, and `trace`.
 
 ```python
-response = client.put("/api/users/1/", data={"name": "Bob"}, content_type="application/json")
-response = client.patch("/api/users/1/", data={"name": "Bob"}, content_type="application/json")
+response = client.put(
+    "/api/users/1/", data={"name": "Bob"}, content_type="application/json"
+)
+response = client.patch(
+    "/api/users/1/", data={"name": "Bob"}, content_type="application/json"
+)
 response = client.delete("/api/users/1/")
 ```
 
@@ -177,6 +181,7 @@ from plain.test import Client
 from plain.test.otel import install_test_tracer
 
 exporter = install_test_tracer()
+
 
 def test_homepage_span():
     exporter.clear()

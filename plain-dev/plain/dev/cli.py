@@ -2,10 +2,8 @@ import os
 import subprocess
 import sys
 from importlib.metadata import entry_points
-from importlib.util import find_spec
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.runtime import common_command
 from plain.runtime import PLAIN_TEMP_PATH
@@ -192,7 +190,7 @@ def logs(follow: bool, pid: int | None, path: bool, services: bool) -> None:
         return
 
     if follow:
-        subprocess.run(["tail", "-f", str(log_path)])
+        subprocess.run(["tail", "-f", str(log_path)], check=False)
     else:
         with log_path.open() as f:
             click.echo(f.read())
@@ -213,9 +211,3 @@ def entrypoint(show_list: bool, entrypoint: str | None) -> None:
             click.echo(entry_point.name)
         elif entrypoint == entry_point.name:
             entry_point.load()()
-
-
-if find_spec("plain.postgres"):
-    from .backups.cli import cli as backups_cli
-
-    cli.add_command(backups_cli)

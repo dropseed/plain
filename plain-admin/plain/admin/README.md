@@ -61,15 +61,13 @@ class UserForm(ModelForm):
 class UserAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = User
-        fields = [
+        fields = (
             "id",
             "email",
             "created_at__date",
-        ]
-        queryset_order = ["-created_at"]
-        search_fields = [
-            "email",
-        ]
+        )
+        queryset_order = ("-created_at",)
+        search_fields = ("email",)
 
     class DetailView(AdminModelDetailView):
         model = User
@@ -99,13 +97,13 @@ For working with database models, use the model-specific view classes. These han
 class ProductAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = Product
-        fields = ["id", "name", "price", "created_at"]
-        queryset_order = ["-created_at"]
-        search_fields = ["name", "description"]
+        fields = ("id", "name", "price", "created_at")
+        queryset_order = ("-created_at",)
+        search_fields = ("name", "description")
 
     class DetailView(AdminModelDetailView):
         model = Product
-        fields = ["id", "name", "description", "price", "created_at", "updated_at"]
+        fields = ("id", "name", "description", "price", "created_at", "updated_at")
 
     class CreateView(AdminModelCreateView):
         model = Product
@@ -141,7 +139,7 @@ class ExternalAPIAdmin(AdminViewset):
         title = "External Items"
         nav_section = "Integrations"
         path = "external-items/"
-        fields = ["id", "name", "status"]
+        fields = ("id", "name", "status")
 
         def get_initial_objects(self):
             # Fetch from an external API, file, or any data source
@@ -156,7 +154,7 @@ Views appear in the admin sidebar based on their `nav_section` and `nav_title` a
 class ListView(AdminModelListView):
     model = Order
     nav_section = "Sales"  # Groups this view under "Sales" in the sidebar
-    nav_title = "Orders"   # Display name (defaults to model name)
+    nav_title = "Orders"  # Display name (defaults to model name)
     nav_icon = "shopping-cart"  # Icon for the section
 ```
 
@@ -219,6 +217,7 @@ class UsersCard(Card):
 
     def get_metric(self):
         from app.users.models import User
+
         return User.query.count()
 
     def get_link(self):
@@ -230,7 +229,7 @@ class DashboardView(AdminView):
     title = "Dashboard"
     path = "dashboard/"
     nav_section = ""
-    cards = [UsersCard]
+    cards = (UsersCard,)
 ```
 
 Card sizes control how much horizontal space they occupy in a four-column grid:
@@ -382,11 +381,12 @@ On `AdminModelListView`, filters can be defined as a `dict[str, Q]` mapping filt
 ```python
 from plain.postgres import Q
 
+
 @register_viewset
 class UserAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = User
-        fields = ["id", "email", "created_at__date"]
+        fields = ("id", "email", "created_at__date")
         filters = {
             "Active": Q(is_active=True),
             "Inactive": Q(is_active=False),
@@ -414,8 +414,8 @@ For filters that need custom logic (e.g., annotations), use a `list[str]` and ov
 class UserAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = User
-        fields = ["id", "email", "created_at__date"]
-        filters = ["Active users", "Inactive users"]
+        fields = ("id", "email", "created_at__date")
+        filters = ("Active users", "Inactive users")
 
         def filter_queryset(self, queryset):
             if self.filter == "Active users":
@@ -432,24 +432,22 @@ List views support bulk actions on selected items. Define actions as a list of a
 ```python
 class ListView(AdminModelListView):
     model = User
-    fields = ["id", "email", "is_active"]
-    actions = ["Activate", "Deactivate", "Delete selected"]
+    fields = ("id", "email", "is_active")
+    actions = ("Activate", "Deactivate", "Delete selected")
 
-    def perform_action(self, action, target_ids):
-        users = User.query.filter(id__in=target_ids)
-
+    def perform_action(self, action, objects):
         if action == "Activate":
-            users.update(is_active=True)
+            objects.update(is_active=True)
         elif action == "Deactivate":
-            users.update(is_active=False)
+            objects.update(is_active=False)
         elif action == "Delete selected":
-            users.delete()
+            objects.delete()
 
         # Return None to redirect back to the list, or return a Response
         return None
 ```
 
-The `target_ids` parameter contains the IDs of selected items. Users can select individual items or use "Select all" to target the entire filtered queryset.
+The `objects` parameter is the set of selected items, already narrowed to the current filtered view. On a model list it's a queryset, so you can run set-based `.update()`/`.delete()` directly without re-querying — and "Select all N" scales, because the whole page's worth of ids never has to be materialized. Users can select individual rows, use the header checkbox to select the whole current page, or click "Select all N" to target the entire filtered queryset across every page. Choosing an action from the **Actions** dropdown confirms before submitting.
 
 ## Toolbar
 
@@ -494,6 +492,7 @@ The impersonate URLs are included automatically with the admin router. You can c
 
 ```python
 from plain.admin.impersonate import get_request_impersonator
+
 
 def my_view(request):
     impersonator = get_request_impersonator(request)
@@ -668,19 +667,19 @@ directly for copy-pasteable markup if you can't open the running admin
 lives one file per primitive in
 [`styles/components/`](./styles/components/).
 
-| Pattern           | Class(es)                                                                                                                                                            |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Buttons           | Compose `.admin-btn` with one of `.admin-btn-primary` / `.admin-btn-secondary` / `.admin-btn-outline` / `.admin-btn-ghost` / `.admin-btn-link`                       |
-| Sizes / icon-only | Stack `.admin-btn-sm` or `.admin-btn-lg`; add `.admin-btn-icon` for a square icon-only button (e.g. `class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost"`) |
-| Status buttons    | `.admin-btn-success`, `.admin-btn-warning`, `.admin-btn-danger`, `.admin-btn-info` (solid fill + paired fg)                                                          |
-| Badges            | Compose `.admin-badge` with one of `.admin-badge-primary` / `.admin-badge-secondary` / `.admin-badge-outline`                                                        |
-| Status badges     | Stack `.admin-badge-success`, `.admin-badge-warning`, `.admin-badge-danger`, `.admin-badge-info` (translucent fill + saturated text)                                 |
-| Alerts            | Compose `.admin-alert` (neutral surface) with `.admin-alert-success` / `.admin-alert-warning` / `.admin-alert-danger` / `.admin-alert-info` for tone                 |
-| Cards             | `.admin-card` — visual shell only (bg + border + radius); compose layout/padding inline (e.g. `class="admin-card flex flex-col gap-6 p-6"`)                          |
-| Form inputs       | `.admin-input`, `.admin-textarea`, `.admin-select` — opt in via class; pair with `-sm` for compact rows                                                              |
-| Dialogs           | `<dialog class="admin-dialog">` opened via `<button command="show-modal" commandfor="…">`                                                                            |
-| Tabs              | `.admin-tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                                                                                                     |
-| Dropdowns         | `.admin-dropdown-menu` wrapping a `<button>` + sibling `[data-popover]` with `[role="menu"]`                                                                         |
+| Pattern           | Class(es)                                                                                                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Buttons           | Compose `.admin-btn` with one of `.admin-btn-primary` / `.admin-btn-secondary` / `.admin-btn-outline` / `.admin-btn-ghost` / `.admin-btn-link`                                                  |
+| Sizes / icon-only | Stack `.admin-btn-sm` or `.admin-btn-lg`; add `.admin-btn-icon` for a square icon-only button (e.g. `class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost"`)                            |
+| Status buttons    | `.admin-btn-success`, `.admin-btn-warning`, `.admin-btn-danger`, `.admin-btn-info` (solid fill + paired fg)                                                                                     |
+| Badges            | Compose `.admin-badge` with one of `.admin-badge-primary` / `.admin-badge-secondary` / `.admin-badge-outline`                                                                                   |
+| Status badges     | Stack `.admin-badge-success`, `.admin-badge-warning`, `.admin-badge-danger`, `.admin-badge-info` (translucent fill + saturated text)                                                            |
+| Alerts            | Compose `.admin-alert` (neutral surface) with `.admin-alert-success` / `.admin-alert-warning` / `.admin-alert-danger` / `.admin-alert-info` for tone                                            |
+| Cards             | `.admin-card` — visual shell only (bg + border + radius); compose layout/padding inline (e.g. `class="admin-card flex flex-col gap-6 p-6"`)                                                     |
+| Form inputs       | `.admin-input`, `.admin-textarea`, `.admin-select` — opt in via class; pair with `-sm` for compact rows                                                                                         |
+| Dialogs           | `<dialog class="admin-dialog">` opened via `<button command="show-modal" commandfor="…">`                                                                                                       |
+| Tabs              | `.admin-tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                                                                                                                                |
+| Dropdowns         | `.admin-dropdown-menu` wrapping a `<button>` + sibling `[data-popover]` (carries `popover="manual"`, opens in the top layer so it's never clipped by a table/overflow box) with `[role="menu"]` |
 
 When writing custom admin templates, prefer the design tokens over hardcoded
 colors so dark mode and theme overrides work automatically:
@@ -811,6 +810,7 @@ if TYPE_CHECKING:
 
     from app.users.models import User
 
+
 def ADMIN_HAS_PERMISSION(view_cls: type[AdminView], user: User) -> bool:
     """Allow superusers to access all views, restrict others from package views."""
     if user.is_superuser:
@@ -926,12 +926,12 @@ from . import views
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("admin/", AdminRouter),
         path("login/", views.LoginView, name="login"),
         path("logout/", views.LogoutView, name="logout"),
         # other urls...
-    ]
+    )
 ```
 
 Create your first admin viewset for your User model:
@@ -953,8 +953,8 @@ class UserAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = User
         nav_section = "Users"
-        fields = ["id", "email", "is_admin", "created_at"]
-        search_fields = ["email"]
+        fields = ("id", "email", "is_admin", "created_at")
+        search_fields = ("email",)
 
     class DetailView(AdminModelDetailView):
         model = User

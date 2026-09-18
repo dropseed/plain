@@ -16,12 +16,15 @@ from __future__ import annotations
 #     4. Read body bytes (async, based on Content-Length or chunked)
 #     5. Dispatch view (thread pool for sync, event loop for async)
 #     6. Write response (async)
-#   Keepalive waits use asyncio.wait_for with a timeout.
+#   Keepalive waits race the next request against worker shutdown
+#   (see h1.handle_connection).
 import asyncio
+import errno
 import logging
 import os
 import random
 import signal
+import ssl
 import sys
 import time
 from collections.abc import Sequence
@@ -29,6 +32,7 @@ from concurrent.futures import ThreadPoolExecutor
 from types import FrameType
 from typing import TYPE_CHECKING, Any
 
+from plain.exceptions import ImproperlyConfigured
 from plain.internal.reloader import Reloader
 from plain.logs import get_framework_logger
 
@@ -36,6 +40,7 @@ from .. import sock, util
 from ..connection import Connection
 from ..http import h1
 from ..http.h2 import async_handle_h2_connection
+from ..http.sink import BodyBudget
 from .workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
@@ -50,6 +55,17 @@ SIGNALS = [
     signal.SIGWINCH,
 ]
 
+# Slice of SERVER_GRACEFUL_TIMEOUT reserved for cancelling leftover
+# connection tasks and tearing down after the drain wait, so a
+# SIGTERM-initiated shutdown finishes before the arbiter's SIGKILL lands.
+DRAIN_TEARDOWN_MARGIN = 2.0
+
+# Ceiling on how long a connection may spend reading its final request
+# once shutdown starts (see drain_read_deadline). Without a bound, a
+# client trickling bytes (each recv resets the per-recv timeout) could
+# pin its connection task for the whole graceful window.
+DRAIN_READ_TIMEOUT = 5.0
+
 
 def check_worker_config(threads: int, connections: int, log: logging.Logger) -> None:
     max_keepalived = connections - threads
@@ -61,6 +77,22 @@ def check_worker_config(threads: int, connections: int, log: logging.Logger) -> 
         )
 
 
+# Socket errnos that mean "the client's side of the connection is gone"
+# without mapping to a ConnectionError subclass — ENOTCONN from a
+# torn-down transport, ESHUTDOWN after half-close, ETIMEDOUT when TCP
+# gives up retransmitting to a dead peer. EBADF is deliberately NOT
+# here: peer disconnects surface as ConnectionError, so EBADF means a
+# server-side bug (double close, write after teardown) that must stay
+# loud.
+_CLIENT_SOCKET_ERRNOS = frozenset({errno.ENOTCONN, errno.ESHUTDOWN, errno.ETIMEDOUT})
+
+
+def _is_client_socket_noise(exc: OSError) -> bool:
+    if isinstance(exc, (ConnectionError, ssl.SSLError)):
+        return True
+    return exc.errno in _CLIENT_SOCKET_ERRNOS
+
+
 class Worker:
     def __init__(
         self,
@@ -68,7 +100,7 @@ class Worker:
         ppid: int,
         sockets: Sequence[sock.BaseSocket],
         app: ServerApplication,
-        timeout: int | float,
+        timeout: float,
         heartbeat: WorkerHeartbeat,
         handler: Any,
     ):
@@ -90,13 +122,91 @@ class Worker:
 
         self.max_connections: int = settings.SERVER_CONNECTIONS
         self.max_keepalived: int = self.max_connections - self.app.threads
-        self.max_body: int = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or (10 * 1024 * 1024)
+        # Server-edge policy cap on request body size (413 above it).
+        # Only None means unlimited — a negative value would silently
+        # reject every body instead of reporting the bad config.
+        self.max_request_body: int | None = settings.SERVER_MAX_REQUEST_BODY_SIZE
+        if self.max_request_body is not None and self.max_request_body < 0:
+            raise ImproperlyConfigured(
+                f"SERVER_MAX_REQUEST_BODY_SIZE must be non-negative or None "
+                f"(got {self.max_request_body})."
+            )
+        # Worker-wide in-flight body budget (503 past it) — bounds total
+        # memory + spooled disk across every connection's uploads.
+        self.max_inflight_body: int | None = settings.SERVER_MAX_INFLIGHT_BODY_SIZE
+        if self.max_inflight_body is not None and self.max_inflight_body < 0:
+            raise ImproperlyConfigured(
+                f"SERVER_MAX_INFLIGHT_BODY_SIZE must be non-negative or None "
+                f"(got {self.max_inflight_body})."
+            )
+        self.body_budget = BodyBudget(self.max_inflight_body)
+        if self.max_request_body is None:
+            # No policy cap: the in-flight budget still floors any
+            # single body, so the oversized request draws its own 413
+            # instead of an innocent concurrent request tripping the
+            # budget 503. Resolved once here so both protocols agree.
+            self.max_request_body = self.max_inflight_body
+        # RAM-vs-disk spool threshold for body ingest. Never above the
+        # policy cap — a body small enough to stay in memory must also
+        # be small enough to accept.
+        memory_size = settings.SERVER_BODY_MAX_MEMORY_SIZE
+        if memory_size <= 0:
+            # Belt to the preflight check's braces — env vars bypass
+            # settings.py review, and BodySink needs a positive spool
+            # threshold.
+            raise ImproperlyConfigured(
+                f"SERVER_BODY_MAX_MEMORY_SIZE must be positive (got {memory_size})."
+            )
+        self.body_max_memory_size: int = memory_size
+        if self.max_request_body is not None:
+            # Floored at 1: a zero cap rejects every non-empty body
+            # before the spool matters, but SpooledTemporaryFile(0)
+            # disables rollover (unbounded RAM), so never hand the sink 0.
+            self.body_max_memory_size = max(
+                1, min(self.body_max_memory_size, self.max_request_body)
+            )
+        # Slow-drip (R.U.D.Y.) defense — see SERVER_BODY_MIN_BYTES_PER_SECOND.
+        self.body_min_rate: int = settings.SERVER_BODY_MIN_BYTES_PER_SECOND
+        if self.body_min_rate < 0:
+            raise ImproperlyConfigured(
+                f"SERVER_BODY_MIN_BYTES_PER_SECOND must be non-negative "
+                f"(got {self.body_min_rate})."
+            )
+        self.keepalive_timeout: float = settings.SERVER_KEEPALIVE_TIMEOUT
+        if self.keepalive_timeout <= 0:
+            # Belt to the preflight check's braces — env vars bypass
+            # settings.py review, and a non-positive value would close
+            # every connection before it serves a single request.
+            raise ImproperlyConfigured(
+                f"SERVER_KEEPALIVE_TIMEOUT must be positive "
+                f"(got {self.keepalive_timeout})."
+            )
         healthcheck_path = settings.HEALTHCHECK_PATH
         self.healthcheck_path_bytes: bytes = (
             healthcheck_path.encode("ascii") if healthcheck_path else b""
         )
         self.nr_conns: int = 0
+        # Event loop for run(), published so the Reloader thread can hand
+        # _begin_drain to it. None until run() starts.
+        self._loop: asyncio.AbstractEventLoop | None = None
+        # Throttle so hitting the connection cap logs a warning at most
+        # once a minute, not once per rejected connection (rejections
+        # arrive at connection rate exactly when the worker is
+        # saturated).
+        self._capacity_warned_at: float = float("-inf")
+        # Absolute time.monotonic() deadline for post-shutdown reads,
+        # published when shutdown starts (None while alive). Connection
+        # loops read it live via h1._recv_timeout, so it also bounds
+        # requests that were already mid-read when the signal landed.
+        self.drain_read_deadline: float | None = None
         self._connection_tasks: set[asyncio.Task] = set()
+        self._servers: list[asyncio.Server] = []
+        self._notify_during_drain = True
+        # Set (on the event loop) when shutdown starts — H2 connections
+        # watch this to refuse new streams and drain; h1 keepalive waits
+        # watch it to collapse their idle window (h1 responses gate on
+        # alive).
+        self.shutdown_event: asyncio.Event = asyncio.Event()
         # Worker-level H2 stream budget — limits total in-flight H2 streams
         # across all connections to avoid overwhelming the thread pool.
         self._h2_stream_budget: asyncio.Semaphore = asyncio.Semaphore(
@@ -118,13 +228,16 @@ class Worker:
     def _count_request(self) -> None:
         """Increment the request counter and signal for replacement if the limit is reached."""
         self.total_requests += 1
-        if self.max_requests and self.total_requests >= self.max_requests:
-            if not self.heartbeat.is_retiring():
-                self.heartbeat.set_retiring()
-                self.log.info(
-                    "Worker reached max requests, requesting replacement",
-                    extra={"max_requests": self.max_requests},
-                )
+        if (
+            self.max_requests
+            and self.total_requests >= self.max_requests
+            and not self.heartbeat.is_retiring()
+        ):
+            self.heartbeat.set_retiring()
+            self.log.info(
+                "Worker reached max requests, requesting replacement",
+                extra={"max_requests": self.max_requests},
+            )
 
     def notify(self) -> None:
         self.heartbeat.notify()
@@ -165,9 +278,20 @@ class Worker:
 
             def changed(fname: str) -> None:
                 self.log.debug("Server worker reloading", extra={"modified": fname})
-                self.alive = False
-                time.sleep(0.1)
-                sys.exit(0)
+                # Runs on the Reloader thread — hand the drain to the
+                # event loop so shutdown_event is set alongside alive and
+                # idle connections collapse their waits immediately.
+                # Falls back to the alive flag if the loop isn't up yet
+                # or is already closed (post-drain save storm) — an
+                # unguarded RuntimeError here would kill the watcher
+                # thread. (sys.exit() here would only end the watcher
+                # thread, not the process.)
+                try:
+                    if self._loop is None:
+                        raise RuntimeError("Event loop not running")
+                    self._loop.call_soon_threadsafe(self._begin_drain)
+                except RuntimeError:
+                    self.alive = False
 
             self.reloader = Reloader(callback=changed, watch_html=True)
 
@@ -176,10 +300,16 @@ class Worker:
 
         # Enter main run loop
         self.booted = True
-        asyncio.run(self.run())
+        try:
+            asyncio.run(self.run())
+        finally:
+            # The loop is closed — stop the reloader callback from
+            # scheduling onto it.
+            self._loop = None
 
     async def run(self) -> None:
         loop = asyncio.get_running_loop()
+        self._loop = loop
 
         # Enable asyncio debug mode in development to detect blocking calls
         # in async views. Logs a warning when a callback takes > 0.1s.
@@ -189,13 +319,39 @@ class Worker:
             loop.set_debug(True)
             loop.slow_callback_duration = 0.1
 
+        # Port scans and TCP health checks (load balancers, `nc -z`) abort
+        # mid-TLS-handshake constantly — asyncio logs each one as an error
+        # with a traceback. Routine connection noise, not application errors.
+        def _accept_error_handler(
+            loop: asyncio.AbstractEventLoop, context: dict[str, Any]
+        ) -> None:
+            if context.get(
+                "message"
+            ) == "Error on transport creation for incoming connection" and isinstance(
+                context.get("exception"),
+                ConnectionResetError
+                | ConnectionAbortedError  # handshake timeout on 3.13+
+                | BrokenPipeError
+                | ssl.SSLError
+                | TimeoutError,
+            ):
+                self.log.debug(
+                    "Connection aborted during accept/TLS handshake",
+                    extra={"error": repr(context.get("exception"))},
+                )
+                return
+            loop.default_exception_handler(context)
+
+        loop.set_exception_handler(_accept_error_handler)
+
         # Signal handlers
         loop.add_signal_handler(signal.SIGTERM, self._signal_exit)
         loop.add_signal_handler(signal.SIGINT, self._signal_quit)
         loop.add_signal_handler(signal.SIGQUIT, self._signal_quit)
         loop.add_signal_handler(signal.SIGUSR1, self._handle_memory_signal)
-        # SIGABRT/SIGWINCH use signal.signal() because they need the
-        # (sig, frame) signature and call sys.exit() directly
+        # SIGABRT/SIGWINCH use signal.signal() because they take the
+        # (sig, frame) signature; handle_abort also exits the process
+        # directly (handle_winch just ignores the signal)
         signal.signal(signal.SIGABRT, self.handle_abort)
         signal.signal(signal.SIGWINCH, self.handle_winch)
         signal.siginterrupt(signal.SIGTERM, False)
@@ -212,8 +368,6 @@ class Worker:
         )
 
         # Start servers (one per listener socket)
-        self._servers: list[asyncio.Server] = []
-        servers = self._servers
         for listener in self.sockets:
             assert listener.sock is not None, "Listener socket is closed"
             listener.sock.setblocking(False)
@@ -223,9 +377,11 @@ class Worker:
                 ssl=ssl_ctx,
                 ssl_handshake_timeout=10 if ssl_ctx else None,
             )
-            servers.append(server)
+            self._servers.append(server)
 
-        # Heartbeat loop
+        # Heartbeat loop. _signal_exit can close self._servers between any
+        # two awaits in this body (see its comment) — per-tick checks on
+        # server state would false-positive during shutdown.
         while self.alive:
             self.notify()
             if not self.is_parent_alive():
@@ -246,21 +402,24 @@ class Worker:
                     "Thread pool stalled, stopping heartbeat to trigger restart",
                     extra={"timeout": self.timeout},
                 )
+                self._notify_during_drain = False
                 break
 
-            # Surface server crashes
-            for server in servers:
-                if not server.is_serving():
-                    self.log.error("Server stopped serving unexpectedly")
-                    self.alive = False
-                    break
-
             await asyncio.sleep(1.0)
+
+        # Any loop exit means shutdown — the break paths (parent death,
+        # stalled thread pool) leave alive True, but connection handling
+        # gates on this state: h1 stops taking keep-alive requests once
+        # alive is False (requests parsed from here on respond with
+        # Connection: close; responses already dispatched still go out
+        # keep-alive), and h2 connections watch shutdown_event to refuse
+        # new streams and drain.
+        self._begin_drain()
 
         # Stop accepting new connections (don't await wait_closed() —
         # it blocks until all connection tasks finish, bypassing
         # _graceful_shutdown's timeout enforcement)
-        for server in servers:
+        for server in self._servers:
             server.close()
 
         await self._graceful_shutdown()
@@ -273,7 +432,16 @@ class Worker:
         # accepted (and TLS-negotiated for SSL) by the time we get here,
         # so queuing behind a semaphore would just waste resources.
         if self._capacity_semaphore.locked():
-            self.log.debug("Connection rejected: at capacity")
+            # Idle keep-alive connections hold slots for
+            # SERVER_KEEPALIVE_TIMEOUT, so hitting the cap should be
+            # diagnosable from logs rather than a mystery bare close.
+            now = time.monotonic()
+            if now - self._capacity_warned_at >= 60:
+                self._capacity_warned_at = now
+                self.log.warning(
+                    "Worker at connection capacity, rejecting new connections",
+                    extra={"max_connections": self.max_connections},
+                )
             writer.close()
             await writer.wait_closed()
             return
@@ -292,13 +460,56 @@ class Worker:
         task.add_done_callback(self._connection_tasks.discard)
 
         try:
-            await self._handle_connection(conn)
-        except ConnectionError:
-            pass
+            await self._serve_connection(conn)
         finally:
             self._capacity_semaphore.release()
             self.nr_conns -= 1
             conn.close()
+
+    async def _serve_connection(self, conn: Connection) -> None:
+        """_handle_connection wrapped in the connection-level error triage.
+
+        The single triage point for ALPN/TLS setup and both protocol
+        handlers — h1/h2 raise out to here.
+        """
+        try:
+            await self._handle_connection(conn)
+        except OSError as e:
+            if not _is_client_socket_noise(e):
+                # Server-side OSErrors (ENOSPC from a body spool, EMFILE)
+                # and non-socket TimeoutErrors are real problems — treat
+                # them like any unexpected bug.
+                self.log.exception(
+                    "Unexpected connection error",
+                    extra={
+                        "client": conn.client,
+                        "protocol": "h2" if conn.is_h2 else "http/1.1",
+                    },
+                )
+                return
+            # Client-side socket/TLS noise — the client's side of the
+            # story, not an application error.
+            self.log.debug(
+                "Connection closed",
+                extra={
+                    "client": conn.client,
+                    "protocol": "h2" if conn.is_h2 else "http/1.1",
+                    "error": str(e),
+                },
+            )
+        except Exception:
+            # Last-resort catch (covering ALPN/TLS setup and both
+            # protocol handlers) so a bug is logged by plain itself with
+            # its traceback instead of escaping into asyncio's default
+            # exception handler. CancelledError from shutdown teardown
+            # still propagates.
+            self.log.exception(
+                "Unexpected connection error",
+                extra={
+                    "client": conn.client,
+                    "protocol": "h2" if conn.is_h2 else "http/1.1",
+                },
+            )
 
     async def _handle_connection(self, conn: Connection) -> None:
         if conn.is_ssl:
@@ -317,6 +528,12 @@ class Worker:
                     self.tpool,
                     stream_budget=self._h2_stream_budget,
                     on_stream_complete=self._count_request,
+                    shutdown_event=self.shutdown_event,
+                    keepalive_timeout=self.keepalive_timeout,
+                    max_request_body=self.max_request_body,
+                    body_budget=self.body_budget,
+                    spool_size=self.body_max_memory_size,
+                    body_min_rate=self.body_min_rate,
                 )
                 return
 
@@ -329,7 +546,42 @@ class Worker:
             from plain.runtime import settings
 
             timeout = settings.SERVER_GRACEFUL_TIMEOUT
-            _, pending = await asyncio.wait(self._connection_tasks, timeout=timeout)
+            # The margin is capped at half the window so deliberately
+            # short graceful timeouts still get a real drain.
+            margin = min(DRAIN_TEARDOWN_MARGIN, timeout / 2)
+
+            deadline = time.monotonic() + timeout
+            pending = set(self._connection_tasks)
+            while pending:
+                # When this shutdown ends in SIGKILL, the arbiter
+                # publishes its kill time on the heartbeat — cap the
+                # drain so the cancellation and teardown below still run
+                # before it lands. Re-read every slice: a deploy can
+                # catch a worker that is already draining (e.g.
+                # retiring). Retirement SIGTERMs have no SIGKILL
+                # follower, publish nothing, and keep the full window.
+                kill_deadline = self.heartbeat.kill_deadline()
+                if kill_deadline:
+                    deadline = min(deadline, kill_deadline - margin)
+                    # Tighten in-flight reads to match: a read latched a
+                    # longer drain deadline at shutdown start would else
+                    # outlive this nearer kill time and die by cancellation
+                    # (an RST) instead of finishing with Connection: close.
+                    if self.drain_read_deadline is not None:
+                        self.drain_read_deadline = min(
+                            self.drain_read_deadline, deadline
+                        )
+
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                # Keep the heartbeat fresh while draining so the arbiter
+                # doesn't murder a worker that's shutting down normally.
+                # (The stalled-pool exit skips this — it stopped
+                # heartbeating on purpose to get killed and replaced.)
+                if self._notify_during_drain:
+                    self.notify()
+                _, pending = await asyncio.wait(pending, timeout=min(1.0, remaining))
             for task in pending:
                 task.cancel()
             if pending:
@@ -337,22 +589,60 @@ class Worker:
 
         self.tpool.shutdown(wait=False)
 
-    def _signal_exit(self) -> None:
+    def _begin_drain(self) -> None:
+        """Enter graceful shutdown: flip alive, publish the drain state.
+
+        Publishing drain_read_deadline here (not later in run()) means
+        in-flight reads are bounded from the instant shutdown starts —
+        otherwise a SIGTERM landing while the heartbeat loop is parked
+        leaves alive False but the deadline None, and a final-request read
+        runs unbounded until _graceful_shutdown cancels it (an RST to the
+        client). Idempotent: the first call wins the deadline.
+        """
+        if self.drain_read_deadline is not None:
+            self.alive = False
+            self.shutdown_event.set()
+            return
         self.alive = False
+        self.shutdown_event.set()
+
+        # Derive the read budget from the graceful window (and the
+        # arbiter's SIGKILL time when one is published) so a final-request
+        # read never outlives the drain and dies by cancellation.
+        from plain.runtime import settings
+
+        read_budget = min(DRAIN_READ_TIMEOUT, settings.SERVER_GRACEFUL_TIMEOUT / 4)
+        kill_deadline = self.heartbeat.kill_deadline()
+        if kill_deadline:
+            read_budget = min(
+                read_budget,
+                max(0.0, kill_deadline - DRAIN_TEARDOWN_MARGIN - time.monotonic()),
+            )
+        self.drain_read_deadline = time.monotonic() + read_budget
+
+    def _signal_exit(self) -> None:
+        self._begin_drain()
         # Immediately stop accepting new connections so requests
         # don't land on a worker that's about to exit (H13 prevention).
-        for server in getattr(self, "_servers", ()):
+        # This runs as an event-loop callback, so the heartbeat loop in
+        # run() can resume mid-iteration and observe these servers already
+        # closed — per-tick checks on server state would false-positive here.
+        for server in self._servers:
             server.close()
 
     def _signal_quit(self) -> None:
         # Hard stop — the arbiter uses SIGQUIT for immediate termination.
-        # Intentionally bypasses _graceful_shutdown.
+        # Intentionally bypasses _graceful_shutdown. The event is set
+        # alongside alive to keep the contract that alive=False implies
+        # shutdown_event is set (connection loops watch the event).
         self.alive = False
+        self.shutdown_event.set()
         self.tpool.shutdown(wait=False, cancel_futures=True)
         sys.exit(0)
 
     def handle_abort(self, sig: int, frame: FrameType | None) -> None:
         self.alive = False
+        self.shutdown_event.set()
         self.tpool.shutdown(wait=False, cancel_futures=True)
         sys.exit(1)
 

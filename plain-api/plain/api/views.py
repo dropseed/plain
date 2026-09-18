@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from functools import cached_property
 from http.client import responses as http_status_phrases
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from plain.exceptions import ValidationError
 from plain.http import (
@@ -9,6 +9,8 @@ from plain.http import (
     JsonResponse,
     NotFoundError404,
     Response,
+    status_for_exception,
+    status_omits_body,
 )
 from plain.utils import timezone
 from plain.utils.cache import patch_cache_control
@@ -90,7 +92,7 @@ class APIKeyView(View[APIResult]):
     # Picked up by the OpenAPI generator: each entry is added to
     # `components.securitySchemes` and required on every operation served by
     # this view. Subclasses can override to declare a different scheme.
-    openapi_security_schemes: dict[str, dict[str, Any]] = {
+    openapi_security_schemes: ClassVar[dict[str, dict[str, Any]]] = {
         "BearerAuth": {
             "type": "http",
             "scheme": "bearer",
@@ -193,8 +195,25 @@ class APIView(View[APIResult]):
                     "Tuple response must be of length 2 (status_code, data)"
                 )
             status_code, result = cast(tuple[int, dict[str, Any] | list[Any]], result)
+            if status_code is None:
+                # Old contract: None meant JsonResponse's default 200.
+                status_code = 200
 
         if isinstance(result, dict | list):
+            # The isinstance guard keeps a non-int status (str, etc.) out
+            # of the predicate — Response construction below remains the
+            # single validator for type and range.
+            if isinstance(status_code, int) and status_omits_body(status_code):
+                # A bodiless status can't carry JSON — `return 204, {}`
+                # sends an empty 204; anything else is a contradiction.
+                if result:
+                    raise ValueError(
+                        f"A {status_code} response cannot include data — "
+                        f"return a 200 with the data, or just Response(status_code={status_code})."
+                    )
+                # No Content-Type either — there is no representation to
+                # describe (and nothing for version transforms to touch).
+                return Response(status_code=status_code)
             return JsonResponse(result, status_code=status_code)
 
         raise TypeError(f"Unexpected APIView return type: {type(result).__name__}")
@@ -214,12 +233,14 @@ class APIView(View[APIResult]):
                 errors=errors,
             )
         if isinstance(exc, HTTPException):
-            error_id = _STATUS_ERROR_IDS.get(exc.status_code, "http_error")
+            # Clamped: a poked-in out-of-range status must not crash the
+            # error renderer (subclass definitions are validated already).
+            status_code = status_for_exception(exc)
+            error_id = _STATUS_ERROR_IDS.get(status_code, "http_error")
             return _error_response(
                 error_id=error_id,
-                message=str(exc)
-                or http_status_phrases.get(exc.status_code, "HTTP error"),
-                status_code=exc.status_code,
+                message=str(exc) or http_status_phrases.get(status_code, "HTTP error"),
+                status_code=status_code,
             )
         return _error_response(
             error_id="server_error",

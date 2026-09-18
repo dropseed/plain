@@ -2,7 +2,7 @@
   "mcpServers": {
     "plain-example": {
       "type": "http",
-      "url": "https://plain-example.plaintunnel.com/mcp/",
+      "url": "https://plain-example.plaintunnel.com/mcp",
       "headers": {
         "Authorization": "Bearer local-dev-only"
       }

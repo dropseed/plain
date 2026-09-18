@@ -516,7 +516,7 @@ class UUIDField(Field[uuid.UUID]):
         if isinstance(value, uuid.UUID):
             return value
         try:
-            return uuid.UUID(str(value))
+            return uuid.UUID(str(value).strip())
         except (AttributeError, ValueError):
             raise ValidationError("Enter a valid UUID.", code="invalid")
 

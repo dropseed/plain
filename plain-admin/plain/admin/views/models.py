@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from plain import postgres
+from plain.exceptions import ValidationError
 from plain.postgres import Q
-from plain.postgres.exceptions import FieldDoesNotExist
+from plain.postgres.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from plain.postgres.fields.related_managers import BaseRelatedManager
+
+from plain import postgres
 
 from ..utils import camelcase_to_title
 from .objects import (
@@ -42,9 +44,13 @@ class AdminModelListView(AdminListView):
 
     model: type[postgres.Model]
 
-    fields: list = ["id"]
-    queryset_order = []
-    search_fields: list = ["id"]
+    fields: tuple[str, ...] = ("id",)
+    queryset_order: tuple[str, ...] = ()
+    search_fields: tuple[str, ...] = ("id",)
+
+    # Filters can also be a dict mapping a filter name to a Q object,
+    # which filters the queryset automatically.
+    filters: tuple[str, ...] | dict[str, Q] = ()
 
     def get_title(self) -> str:
         if title := super().get_title():
@@ -76,11 +82,11 @@ class AdminModelListView(AdminListView):
         """Override this to customize the base queryset (e.g., add annotations)."""
         return self.model.query.all()
 
-    def get_filter_names(self) -> list[str]:
-        """Return filter names. Supports both list[str] and dict[str, Q] formats."""
+    def get_filter_names(self) -> tuple[str, ...]:
+        """Return filter names. Supports both tuple[str, ...] and dict[str, Q] formats."""
         filters = self.filters
         if isinstance(filters, dict):
-            return list(filters.keys())
+            return tuple(filters.keys())
         return super().get_filter_names()
 
     def filter_objects(
@@ -117,6 +123,24 @@ class AdminModelListView(AdminListView):
                 filters |= Q(**{f"{field}__icontains": search})  # ty: ignore[invalid-argument-type]
             return queryset.filter(filters)
         return queryset
+
+    def select_objects_by_id(
+        self, objects: postgres.QuerySet | list[Any], ids: list[str]
+    ) -> postgres.QuerySet | list[Any]:
+        if isinstance(objects, list):
+            return super().select_objects_by_id(objects, ids)
+        # get_object_id() returns the primary key, so we match on it and keep
+        # the queryset lazy. Coerce each id through the pk field and drop the
+        # ones it rejects, so a stale or malformed id is ignored (per the base
+        # contract) rather than raising.
+        pk_field = self.model._model_meta.get_forward_field("id")
+        valid_ids = []
+        for raw_id in ids:
+            try:
+                valid_ids.append(pk_field.to_python(raw_id))
+            except ValidationError:
+                continue
+        return objects.filter(id__in=valid_ids)
 
     def order_objects(
         self, objects: postgres.QuerySet | list[Any]
@@ -169,7 +193,10 @@ class AdminModelListView(AdminListView):
                     field_obj = obj._model_meta.get_field(field)
                     if hasattr(field_obj, "flatchoices") and field_obj.flatchoices:
                         return obj.get_field_display(field)
-                except Exception:
+                except (FieldDoesNotExist, ObjectDoesNotExist):
+                    # ObjectDoesNotExist: get_field_display can refresh a
+                    # deferred field, racing a concurrent delete — fall back
+                    # to the raw value.
                     pass
 
             return value
@@ -200,11 +227,11 @@ class AdminModelDetailView(AdminDetailView):
 
         return f"{cls.model.model_options.model_name}/<int:id>/"
 
-    def get_fields(self) -> list[str]:
+    def get_fields(self) -> tuple[str, ...]:
         if fields := super().get_fields():
             return fields
 
-        return [f.name for f in self.object._model_meta.get_fields() if f.concrete]
+        return tuple(f.name for f in self.object._model_meta.get_fields())
 
     def get_field_value(self, obj: Any, field: str) -> Any:
         try:
@@ -219,7 +246,10 @@ class AdminModelDetailView(AdminDetailView):
                     field_obj = obj._model_meta.get_field(field)
                     if hasattr(field_obj, "flatchoices") and field_obj.flatchoices:
                         return obj.get_field_display(field)
-                except Exception:
+                except (FieldDoesNotExist, ObjectDoesNotExist):
+                    # ObjectDoesNotExist: get_field_display can refresh a
+                    # deferred field, racing a concurrent delete — fall back
+                    # to the raw value.
                     pass
 
             return value

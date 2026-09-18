@@ -23,7 +23,7 @@ from plain.utils.http import content_disposition_header, http_date
 from plain.utils.regex_helper import _lazy_re_compile
 
 _charset_from_content_type_re = _lazy_re_compile(
-    r";\s*charset=(?P<charset>[^\s;]+)", re.I
+    r";\s*charset=(?P<charset>[^\s;]+)", re.IGNORECASE
 )
 
 
@@ -75,7 +75,9 @@ class ResponseHeaders(CaseInsensitiveMapping):
             if mime_encode:
                 value = Header(value, "utf-8", maxlinelen=sys.maxsize).encode()
             else:
-                if hasattr(e, "reason") and isinstance(e.reason, str):
+                if isinstance(
+                    e, UnicodeDecodeError | UnicodeEncodeError | UnicodeTranslateError
+                ):
                     e.reason += f", HTTP response headers must be in {charset} format"
                 raise
         return value
@@ -103,10 +105,48 @@ class BadHeaderError(ValueError):
     pass
 
 
+# Distinguishes "subclass declared status_code = None" (invalid, rejected)
+# from "subclass declared nothing".
+_NOT_DECLARED: Any = object()
+
 # Private sentinel streaming subclasses pass to skip bytes-body setup in
-# Response.__init__. Using a dedicated object (not None) keeps Response(None)
-# working as before — it goes through the content setter and becomes b"None".
+# Response.__init__ entirely — their `content` property raises, so the
+# setter (and _container) must never be touched. A dedicated object, not
+# None: an explicit None is a real value meaning "no body".
 _NO_CONTENT: Any = object()
+
+
+def is_valid_status_code(status_code: object) -> bool:
+    """True for an int in the constructible range (bools excluded)."""
+    return (
+        isinstance(status_code, int)
+        and not isinstance(status_code, bool)
+        and 200 <= status_code <= 599
+    )
+
+
+def status_omits_body(status_code: int | None) -> bool:
+    """True for statuses whose responses never have a body (RFC 9110).
+
+    A client stops reading a 1xx/204/304 response at the header block,
+    so any body bytes written after it would be parsed as the start of
+    the NEXT response on a keep-alive connection. The single definition
+    shared by Response construction, the test client, and the server's
+    h1/h2 writers. (The 1xx arm is a wire-level backstop: 1xx is
+    unrepresentable on a Response — rejected at construction, and
+    status_code has no setter.)
+    """
+    return status_code is not None and (status_code < 200 or status_code in (204, 304))
+
+
+def response_omits_body(*, method: str | None, status_code: int | None) -> bool:
+    """True when a response sends only headers: HEAD, or a bodiless status."""
+    return method == "HEAD" or status_omits_body(status_code)
+
+
+def content_length_forbidden(status_code: int | None) -> bool:
+    """RFC 9110 8.6: 1xx and 204 must not carry Content-Length; 304 may."""
+    return status_omits_body(status_code) and status_code != 304
 
 
 class Response:
@@ -118,12 +158,42 @@ class Response:
     middleware with `Response` to cover all response shapes.
     """
 
-    status_code = 200
     streaming = False
+    _default_status_code = 200
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        super().__init_subclass__(**kwargs)
+        declared = cls.__dict__.get("status_code", _NOT_DECLARED)
+        if declared is _NOT_DECLARED or isinstance(declared, property):
+            return
+        # Declarative subclasses write `status_code = 304`. Left as a
+        # plain class attribute it would shadow the validating property
+        # below, so validate it at the line that wrote it and fold it
+        # into the default the property serves.
+        if not is_valid_status_code(declared):
+            raise ValueError(
+                f"{cls.__name__}.status_code must be an integer from "
+                f"200 to 599, got {declared!r}."
+            )
+        delattr(cls, "status_code")
+        cls._default_status_code = declared
+
+    @property
+    def status_code(self) -> int:
+        """Fixed at construction — there is deliberately no setter.
+
+        Status is part of a response's identity: headers defaulting,
+        the bodiless rules (RFC 9110), transports, and caches all read
+        it as a settled fact. Pass `status_code=` to the constructor
+        (`TemplateView.render()` takes it too) instead of mutating a
+        built response — assignment fails the type check and raises
+        AttributeError at runtime.
+        """
+        return self._status_code
 
     def __init__(
         self,
-        content: bytes | str | Iterator[bytes] = b"",
+        content: bytes | str | Iterator[bytes] | None = b"",
         *,
         content_type: str | None = None,
         status_code: int | None = None,
@@ -133,10 +203,41 @@ class Response:
     ):
         self.headers = ResponseHeaders(headers)
         self._charset = charset
+        # Materialized on every instance so copies (e.g. the test
+        # client's) never depend on class lookup. The class default was
+        # validated at definition; an argument is validated here — the
+        # only door, since status_code has no setter.
+        if status_code is None:
+            self._status_code = self._default_status_code
+        else:
+            try:
+                status_code = int(status_code)
+            except (ValueError, TypeError):
+                raise TypeError("HTTP status code must be an integer.")
+            if not is_valid_status_code(status_code):
+                raise ValueError(
+                    "HTTP status code must be an integer from 200 to 599 "
+                    "(1xx interim responses are sent by the server, not "
+                    "application code)."
+                )
+            self._status_code = status_code
+        if content is _NO_CONTENT and status_omits_body(self._status_code):
+            # Streaming subclasses pass the sentinel. Refusing here —
+            # before the iterator is ever assigned — means the caller
+            # keeps ownership of it and nothing needs closing.
+            raise ValueError(
+                f"A {self._status_code} response cannot have a body — "
+                "it can't be a streaming response."
+            )
         if "Content-Type" not in self.headers:
-            if content_type is None:
+            # A bodiless status (204/304) gets no default Content-Type:
+            # there is no representation to describe, and on a 304 caches
+            # update stored representation headers from the response
+            # (RFC 9110 15.4.5). An explicit content_type is respected.
+            if content_type is None and not status_omits_body(self.status_code):
                 content_type = f"text/html; charset={self.charset}"
-            self.headers["Content-Type"] = content_type
+            if content_type is not None:
+                self.headers["Content-Type"] = content_type
         elif content_type:
             raise ValueError(
                 "'headers' must not contain 'Content-Type' when the "
@@ -145,14 +246,6 @@ class Response:
         self._resource_closers = []
         self.cookies = SimpleCookie()
         self.closed = False
-        if status_code is not None:
-            try:
-                self.status_code = int(status_code)
-            except (ValueError, TypeError):
-                raise TypeError("HTTP status code must be an integer.")
-
-            if not 100 <= self.status_code <= 599:
-                raise ValueError("HTTP status code must be an integer from 100 to 599.")
         self._reason_phrase = reason
         # Exception that caused this response, if any (primarily for 500 errors)
         self.exception: Exception | None = None
@@ -179,13 +272,14 @@ class Response:
             return self._charset
         # The Content-Type header may not yet be set, because the charset is
         # being inserted *into* it.
-        if content_type := self.headers.get("Content-Type"):
-            if matched := _charset_from_content_type_re.search(content_type):
-                # Extract the charset and strip its double quotes.
-                # Note that having parsed it from the Content-Type, we don't
-                # store it back into the _charset for later intentionally, to
-                # allow for the Content-Type to be switched again later.
-                return matched["charset"].replace('"', "")
+        if (content_type := self.headers.get("Content-Type")) and (
+            matched := _charset_from_content_type_re.search(content_type)
+        ):
+            # Extract the charset and strip its double quotes.
+            # Note that having parsed it from the Content-Type, we don't
+            # store it back into the _charset for later intentionally, to
+            # allow for the Content-Type to be switched again later.
+            return matched["charset"].replace('"', "")
         return "utf-8"
 
     @charset.setter
@@ -204,7 +298,7 @@ class Response:
         self,
         key: str,
         value: str = "",
-        max_age: int | float | datetime.timedelta | None = None,
+        max_age: float | datetime.timedelta | None = None,
         expires: str | datetime.datetime | None = None,
         path: str | None = "/",
         domain: str | None = None,
@@ -340,7 +434,7 @@ class Response:
         return b"".join(self._container)
 
     @content.setter
-    def content(self, value: bytes | str | Iterator[bytes]) -> None:
+    def content(self, value: bytes | str | Iterator[bytes] | None) -> None:
         # Consume iterators upon assignment to allow repeated iteration.
         if hasattr(value, "__iter__") and not isinstance(
             value, bytes | memoryview | str
@@ -351,8 +445,16 @@ class Response:
                     value.close()  # ty: ignore[call-non-callable]
                 except Exception:
                     pass
+        elif value is None:
+            # An explicit None means "no body".
+            content = b""
         else:
             content = self.make_bytes(value)
+        if content and status_omits_body(self.status_code):
+            raise ValueError(
+                f"A {self.status_code} response cannot have a body — "
+                "send the content with a 200, or drop it."
+            )
         self._container = [content]
 
     def __iter__(self) -> Iterator[bytes]:
@@ -455,6 +557,26 @@ class AsyncStreamingResponse(Response):
             "`streaming_content` instead."
         )
 
+    def _to_buffered_response(self, body: bytes) -> Response:
+        """Materialize the streamed body into a plain Response.
+
+        Used by the test client after collecting the stream. The body
+        routes through the constructor (and its validation), then the
+        rest of the instance state — including anything app code set on
+        the response — transfers wholesale, so tests assert against the
+        same object shape production sends. `closed` deliberately starts
+        fresh, and the resource closers move over.
+        """
+        response = Response(body, status_code=self.status_code)
+        state = {
+            k: v
+            for k, v in self.__dict__.items()
+            if k not in ("_async_iterator", "closed", "_container", "_status_code")
+        }
+        response.__dict__.update(state)
+        self._resource_closers = []
+        return response
+
     def __iter__(self) -> Iterator[bytes]:
         raise TypeError(
             f"{self.__class__.__name__} is async — use `async for` / `__aiter__` instead."
@@ -493,14 +615,24 @@ class FileResponse(StreamingResponse):
         self.as_attachment = as_attachment
         self.filename = filename
         self._no_explicit_content_type = content_type is None
-        super().__init__(
-            streaming_content,
-            content_type=content_type,
-            status_code=status_code,
-            reason=reason,
-            charset=charset,
-            headers=headers,
-        )
+        try:
+            super().__init__(
+                streaming_content,
+                content_type=content_type,
+                status_code=status_code,
+                reason=reason,
+                charset=charset,
+                headers=headers,
+            )
+        except ValueError:
+            # Unlike a generic iterator (which stays the caller's on a
+            # bodiless rejection), FileResponse owns the file handle it
+            # was given — the idiomatic call is FileResponse(open(p)),
+            # which leaves the caller nothing to close.
+            close = getattr(streaming_content, "close", None)
+            if callable(close):
+                close()
+            raise
 
     def _set_streaming_content(self, value: Any) -> None:
         if not hasattr(value, "read"):
@@ -530,11 +662,9 @@ class FileResponse(StreamingResponse):
                 filelike.seek(0, io.SEEK_END)
                 self.headers["Content-Length"] = str(filelike.tell() - initial_position)
                 filelike.seek(initial_position)
-            elif hasattr(filelike, "getbuffer") and callable(
-                getattr(filelike, "getbuffer")
-            ):
+            elif callable(getbuffer := getattr(filelike, "getbuffer", None)):
                 self.headers["Content-Length"] = str(
-                    filelike.getbuffer().nbytes - filelike.tell()  # ty: ignore[call-non-callable]
+                    getbuffer().nbytes - filelike.tell()
                 )
             elif os.path.exists(filename):
                 self.headers["Content-Length"] = str(
@@ -573,6 +703,10 @@ class FileResponse(StreamingResponse):
             self.headers["Content-Disposition"] = content_disposition
 
 
+# A URI scheme per RFC 3986: a letter, then letters, digits, "+", "-", ".".
+_SCHEME_PREFIX_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9+.\-]*:")
+
+
 def _is_external_url(url: str) -> bool:
     """Check if a URL would redirect to an external host."""
     if not url:
@@ -583,24 +717,22 @@ def _is_external_url(url: str) -> bool:
     # so \\ and /\ are equivalent to //
     if url[:2].replace("\\", "/") == "//":
         return True
-    colon_pos = url.find("://")
-    if colon_pos > 0 and url[:colon_pos].isalpha():
-        return True
-    return False
+    # Any scheme sends the browser off this origin, with or without "//"
+    # after it. Browsers normalize "http:/evil.com" (a single slash) to
+    # "http://evil.com", so matching on "://" alone lets that through.
+    return _SCHEME_PREFIX_RE.match(url) is not None
 
 
 class RedirectResponse(Response):
     """HTTP redirect response"""
 
-    status_code = 302
-
     def __init__(
         self,
         redirect_to: str,
         *,
+        status_code: int,
         allow_external: bool = False,
         content_type: str | None = None,
-        status_code: int | None = None,
         reason: str | None = None,
         charset: str | None = None,
         headers: dict[str, Any] | None = None,
@@ -619,6 +751,11 @@ class RedirectResponse(Response):
             charset=charset,
             headers=headers,
         )
+        if not 300 <= self.status_code <= 399:
+            raise ValueError(
+                "RedirectResponse status_code must be a 3xx redirect status, "
+                f"got {self.status_code}."
+            )
         self.headers["Location"] = iri_to_uri(redirect_to) or ""
 
     @property
@@ -638,7 +775,11 @@ class RedirectResponse(Response):
 
 
 class NotModifiedResponse(Response):
-    """HTTP 304 response"""
+    """HTTP 304 response — headers only, no Content-Type (the base class
+    skips the default for bodiless statuses).
+
+    The constructor is pinned: no content/content_type/status_code
+    parameters, so this class always means exactly "bodiless 304"."""
 
     status_code = 304
 
@@ -654,15 +795,6 @@ class NotModifiedResponse(Response):
             charset=charset,
             headers=headers,
         )
-        del self.headers["content-type"]
-
-    @Response.content.setter
-    def content(self, value: bytes | str | Iterator[bytes]) -> None:
-        if value:
-            raise AttributeError(
-                "You cannot set content to a 304 (Not Modified) response"
-            )
-        self._container = []
 
 
 class NotAllowedResponse(Response):

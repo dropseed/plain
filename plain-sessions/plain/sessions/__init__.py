@@ -7,7 +7,7 @@ from .exceptions import SessionNotAvailable
 from .requests import get_request_session
 
 __all__ = [
-    "SessionStore",
     "SessionNotAvailable",
+    "SessionStore",
     "get_request_session",
 ]

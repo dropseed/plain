@@ -41,7 +41,6 @@ class ForeignObjectRel(FieldCacheMixin):
 
     # Field flags
     auto_created = True
-    concrete = False
 
     # Reverse relations are always nullable (Plain can't enforce that a
     # foreign key on the related model points to this model).
@@ -49,9 +48,11 @@ class ForeignObjectRel(FieldCacheMixin):
     empty_strings_allowed = False
 
     # Type annotations for instance attributes
-    model: type[Model]
-    field: RelatedField
     on_delete: OnDelete | None
+    # The target model as given to the field: a "package.Model" string (or
+    # "self") until lazy_related_operation resolves it to the class. Read
+    # `model` for the resolved class.
+    model_ref: str | type[Model]
 
     def __init__(
         self,
@@ -61,10 +62,12 @@ class ForeignObjectRel(FieldCacheMixin):
         related_query_name: str | None = None,
         on_delete: OnDelete | None = None,
     ):
-        self.field = field  # ty: ignore[invalid-assignment]
-        # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
-        # (see related.py:250 where field.remote_field.model is overwritten)
-        self.model = to  # ty: ignore[invalid-assignment]
+        # Annotated here rather than as a class-body attribute: RelatedField
+        # is itself a descriptor, so a class-body `field: RelatedField` would
+        # route every `self.field` read through its __get__. ForeignKeyRel
+        # and ManyToManyRel below narrow this further, the same way.
+        self.field: RelatedField = field
+        self.model_ref = to
         self.related_query_name = related_query_name
         self.on_delete = on_delete
 
@@ -74,6 +77,18 @@ class ForeignObjectRel(FieldCacheMixin):
     # __init__ as the field doesn't have its model yet. Calling these methods
     # before field.contribute_to_class() has been called will result in
     # AttributeError
+    @property
+    def model(self) -> type[Model]:
+        """The resolved target model class."""
+        # Deliberately not AttributeError: getattr(rel, "model", None) and
+        # hasattr() would swallow that and silently report "no model".
+        if isinstance(self.model_ref, str):
+            raise TypeError(
+                f"Related model {self.model_ref!r} for {self.field!r} has not been "
+                "resolved yet; use model_ref to read the unresolved reference."
+            )
+        return self.model_ref
+
     @cached_property
     def name(self) -> str:
         return self.field.related_query_name()
@@ -100,8 +115,8 @@ class ForeignObjectRel(FieldCacheMixin):
             )
         return self.field.model
 
-    def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
-        return self.field.get_lookup(lookup_name)
+    def get_lookup(self, lookup: str) -> type[Lookup] | None:
+        return self.field.get_lookup(lookup)
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__}: {self.related_model.model_options.package_label}.{self.related_model.model_options.model_name}>"
@@ -110,7 +125,7 @@ class ForeignObjectRel(FieldCacheMixin):
     def identity(self) -> tuple[Any, ...]:
         return (
             self.field,
-            self.model,
+            self.model_ref,
             self.related_query_name,
             self.on_delete,
             self.symmetrical,
@@ -136,18 +151,9 @@ class ForeignObjectRel(FieldCacheMixin):
         state.pop("path_infos", None)
         return state
 
-    def get_joining_columns(self) -> tuple[str, str]:
-        return self.field.get_joining_columns(reverse_join=True)
-
-    def get_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
-        if filtered_relation:
-            return self.field.get_reverse_path_info(filtered_relation)
-        else:
-            return self.field.reverse_path_infos
-
     @cached_property
     def path_infos(self) -> list[PathInfo]:
-        return self.get_path_info()
+        return self.field.reverse_path_infos
 
     def get_cache_name(self) -> str:
         """
@@ -170,7 +176,6 @@ class ForeignKeyRel(ForeignObjectRel):
     """
 
     # Type annotations for instance attributes
-    field: ForeignKeyField
     on_delete: OnDelete  # narrowed: FK rel always has a concrete action
 
     def __init__(
@@ -187,11 +192,18 @@ class ForeignKeyRel(ForeignObjectRel):
             related_query_name=related_query_name,
             on_delete=on_delete,
         )
+        # Narrows self.field from RelatedField to ForeignKeyField (see
+        # ForeignObjectRel.__init__ for why this can't be a class-body
+        # annotation).
+        self.field: ForeignKeyField
 
     def __getstate__(self) -> dict[str, Any]:
         state = super().__getstate__()
         state.pop("related_model", None)
         return state
+
+    def get_joining_columns(self) -> tuple[str, str]:
+        return self.field.get_joining_columns(reverse_join=True)
 
 
 class ManyToManyRel(ForeignObjectRel):
@@ -203,9 +215,10 @@ class ManyToManyRel(ForeignObjectRel):
     """
 
     # Type annotations for instance attributes
-    field: ManyToManyField
-    through: type[Model]
     through_fields: tuple[str, str] | None
+    # The intermediary model as given to the field; a string until
+    # lazy_related_operation resolves it. Read `through` for the class.
+    through_ref: str | type[Model]
 
     def __init__(
         self,
@@ -222,10 +235,12 @@ class ManyToManyRel(ForeignObjectRel):
             to=to,
             related_query_name=related_query_name,
         )
+        # Narrows self.field from RelatedField to ManyToManyField (see
+        # ForeignObjectRel.__init__ for why this can't be a class-body
+        # annotation).
+        self.field: ManyToManyField
 
-        # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
-        # (see related.py:1143 where field.remote_field.through is overwritten)
-        self.through = through  # ty: ignore[invalid-assignment]
+        self.through_ref = through
         self.through_fields = through_fields
 
         self.symmetrical = symmetrical
@@ -233,6 +248,17 @@ class ManyToManyRel(ForeignObjectRel):
     @property
     def identity(self) -> tuple[Any, ...]:
         return super().identity + (
-            self.through,
+            self.through_ref,
             make_hashable(self.through_fields),
         )
+
+    @property
+    def through(self) -> type[Model]:
+        """The resolved intermediary model class."""
+        # Deliberately not AttributeError, for the same reason as `model`.
+        if isinstance(self.through_ref, str):
+            raise TypeError(
+                f"Through model {self.through_ref!r} for {self.field!r} has not been "
+                "resolved yet; use through_ref to read the unresolved reference."
+            )
+        return self.through_ref

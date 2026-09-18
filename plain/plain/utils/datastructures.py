@@ -3,10 +3,7 @@ from __future__ import annotations
 import builtins
 import copy
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from typing import Any, TypeVar
-
-_KT = TypeVar("_KT")
-_VT = TypeVar("_VT")
+from typing import Any, Self
 
 
 class OrderedSet:
@@ -124,15 +121,15 @@ class MultiValueDict(dict[str, list[Any]]):
             self.setlist(k, v)
         self.__dict__.update(obj_dict)
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: object, default: Any = None) -> Any:
         """
         Return the last data value for the passed key. If key doesn't exist
         or value is an empty list, return `default`.
         """
-        try:
-            val = self[key]
-        except KeyError:
+        list_ = super().get(key)
+        if not list_:
             return default
+        val = list_[-1]
         if val == []:
             return default
         return val
@@ -234,7 +231,7 @@ class MultiValueDict(dict[str, list[Any]]):
         return {key: self[key] for key in self}
 
 
-class ImmutableList(tuple):
+class ImmutableList[T](tuple[T, ...]):
     """
     A tuple-like object that raises useful errors when it is asked to mutate.
 
@@ -254,7 +251,7 @@ class ImmutableList(tuple):
         *args: Any,
         warning: str = "ImmutableList object is immutable.",
         **kwargs: Any,
-    ) -> ImmutableList:
+    ) -> Self:
         self = tuple.__new__(cls, *args, **kwargs)
         self.warning = warning
         return self
@@ -374,7 +371,7 @@ class CaseInsensitiveMapping(Mapping[str, Any]):
                     "2 is required."
                 )
             if not isinstance(elem[0], str):
-                raise ValueError(
+                raise TypeError(
                     f"Element key {elem[0]!r} invalid, only strings are allowed"
                 )
             yield elem

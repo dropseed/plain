@@ -5,6 +5,8 @@ paths:
 
 # README Guidelines
 
+Package READMEs are the primary documentation — rendered on the website, PyPI, and GitHub, and served to AI via `plain docs`. Write them for humans first.
+
 Edit the README inside the package (e.g., `plain-api/plain/api/README.md`), not the top-level symlink.
 
 See `plain-jobs/plain/jobs/README.md` as a good example.
@@ -39,3 +41,4 @@ See `plain-jobs/plain/jobs/README.md` as a good example.
 - Keep paragraphs short, put takeaways up front
 - Use bullets and tables, bold important text
 - Keep sentences simple and unambiguous
+- Keep each `##` section self-contained — `plain docs --search` prints sections on their own, so one that only makes sense in order is useless out of context

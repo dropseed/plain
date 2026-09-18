@@ -14,21 +14,17 @@ from .reverse import (
 from .routers import Router, include, path
 
 __all__ = [
-    # Routing
-    "Router",
-    "include",
-    "path",
-    # Reversing
-    "reverse",
-    "reverse_lazy",
-    "reverse_absolute",
-    "absolute_url",
-    # Resolving
-    "URLPattern",
-    "URLResolver",
-    "ResolverMatch",
-    "get_resolver",
-    # Exceptions
     "NoReverseMatch",
     "Resolver404",
+    "ResolverMatch",
+    "Router",
+    "URLPattern",
+    "URLResolver",
+    "absolute_url",
+    "get_resolver",
+    "include",
+    "path",
+    "reverse",
+    "reverse_absolute",
+    "reverse_lazy",
 ]

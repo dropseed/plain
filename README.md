@@ -33,6 +33,7 @@ from plain import postgres
 from plain.postgres import types
 from plain.passwords.models import PasswordField
 
+
 @postgres.register_model
 class User(postgres.Model):
     email: str = types.EmailField()
@@ -57,11 +58,10 @@ URLs use a `Router` class:
 from plain.urls import Router, path
 from . import views
 
+
 class UsersRouter(Router):
     namespace = "users"
-    urls = [
-        path("<int:pk>/", views.UserDetail),
-    ]
+    urls = (path("<int:pk>/", views.UserDetail),)
 ```
 
 Views are class-based:
@@ -70,6 +70,7 @@ Views are class-based:
 # app/users/views.py
 from plain.views import DetailView
 from .models import User
+
 
 class UserDetail(DetailView):
     template_name = "users/detail.html"
@@ -99,7 +100,7 @@ Python where you want it, JS where you need it.
 - **Templates:** Jinja2
 - **Frontend:** htmx, Tailwind CSS
 - **Python tooling:** uv (packages), ruff (lint/format), ty (type checking)
-- **JavaScript tooling:** oxc (lint/format), esbuild (bundling)
+- **JavaScript tooling:** oxc (lint/format)
 - **Testing:** pytest
 
 Models declare fields as annotated attributes, and that typing carries through views, forms, and URLs. `plain check` runs `ty` on every pass — what your IDE shows, CI enforces, and agents read from the same signatures.
@@ -148,7 +149,6 @@ plain docs --search "queryset"         # search across all packages
 - [plain.jobs](https://plainframework.com/docs/plain-jobs/plain/jobs/) — background jobs
 - [plain.email](https://plainframework.com/docs/plain-email/plain/email/) — sending email
 - [plain.cache](https://plainframework.com/docs/plain-cache/plain/cache/) — caching layer
-- [plain.redirection](https://plainframework.com/docs/plain-redirection/plain/redirection/) — URL redirects
 - [plain.vendor](https://plainframework.com/docs/plain-vendor/plain/vendor/) — vendored dependencies
 
 **Frontend:**
@@ -157,7 +157,6 @@ plain docs --search "queryset"         # search across all packages
 - [plain.tailwind](https://plainframework.com/docs/plain-tailwind/plain/tailwind/) — CSS framework
 - [plain.elements](https://plainframework.com/docs/plain-elements/plain/elements/) — HTML components
 - [plain.pages](https://plainframework.com/docs/plain-pages/plain/pages/) — static pages
-- [plain.esbuild](https://plainframework.com/docs/plain-esbuild/plain/esbuild/) — JS bundling
 
 **Development:**
 

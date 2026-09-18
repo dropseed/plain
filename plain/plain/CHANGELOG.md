@@ -1,5 +1,252 @@
 # plain changelog
 
+## [0.163.0](https://github.com/dropseed/plain/releases/plain@0.163.0) (2026-09-04)
+
+### What's changed
+
+- `forms.UUIDField` no longer subclasses `TextField`. It was inheriting a string pipeline it didn't want — `to_python()` had to run the parent's string coercion first and then re-parse the result, and the field advertised `max_length`, `min_length`, `strip`, and `empty_value` options that don't mean anything for a UUID. It now extends `Field` directly and parses in one step: `uuid.UUID` values pass through, empty values return `None`, and anything else is stringified, stripped, and handed to `uuid.UUID()`. Validation behavior is unchanged — surrounding whitespace is still tolerated and a bad value still raises "Enter a valid UUID." ([f00e707ed0](https://github.com/dropseed/plain/commit/f00e707ed0))
+- `MultiPartParser` closes upload handler files via `getattr(handler, "file", None)` instead of `hasattr` plus an unchecked attribute read. Same behavior, but the read is now narrowed rather than suppressed with a type-checker ignore ([d9406dfc6f](https://github.com/dropseed/plain/commit/d9406dfc6f))
+
+### Upgrade instructions
+
+- If you passed `max_length`, `min_length`, `strip`, or `empty_value` to `forms.UUIDField`, drop them — they were inherited from `TextField` and never affected UUID parsing. Any other use of `forms.UUIDField` needs no changes.
+
+## [0.162.0](https://github.com/dropseed/plain/releases/plain@0.162.0) (2026-09-04)
+
+### What's changed
+
+- `plain agent`, `plain docs`, `plain install`, and `plain utils` no longer run `plain.runtime.setup()`. None of them read settings or models, and they're exactly the commands you reach for when the app won't load — installing a package, reading docs about the error, wiring up agent rules. They now work in a broken app, and in a directory that isn't a Plain app at all ([28eeef062e](https://github.com/dropseed/plain/commit/28eeef062e))
+- `plain --help` still lists the built-in commands when the app fails to load. Previously any setup exception exited 1, so the app's own failure hid the help output from the person trying to fix it. Loading the app for a help listing now warns — `App and package commands are missing — the app failed to load: ...` — instead of exiting, and the app and package commands are simply absent from the listing ([e4f3897984](https://github.com/dropseed/plain/commit/e4f3897984))
+- A CLI app-load failure now names the command that needed the app — "Error loading the app, which `plain shell` needs: ..." — and prints the traceback on stderr alongside the error line instead of stdout, so it stays with the error when output is piped or redirected. A command name that isn't a built-in could still be an app or package command, so an unknown name reports the app's load failure rather than "no such command" ([e1d1f50faa](https://github.com/dropseed/plain/commit/e1d1f50faa))
+- `RedirectResponse` now rejects any scheme-prefixed URL, not just ones containing `://`. Browsers normalize `http:/evil.com` (single slash) and `http:evil.com` (no slashes) to `http://evil.com`, so the old `://` check let those through as internal redirects; `javascript:`, `data:`, and schemes with non-alphabetic characters like `view-source:` were also missed. Internal URLs that merely contain a colon — `/orders/2024-01-01:summary`, `?next=...`, `#section:one` — are still allowed, since a URI scheme has to start the string and start with a letter ([95655ebfd5](https://github.com/dropseed/plain/commit/95655ebfd5))
+- `ImmutableList` is now generic — `ImmutableList[T]` subscripts to the element type instead of erasing to `tuple` ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+- `Client.cookies` and `RequestFactory.cookies` are typed as `SimpleCookie` rather than `SimpleCookie[str]`, matching what the stdlib actually parameterizes ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+- `View._dispatch_handler_async` accepts a handler returning the view's `HandlerResult` instead of a bare `Response`, so async handlers on a `View[T]` type-check ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+
+### Upgrade instructions
+
+- If you relied on `RedirectResponse` accepting a scheme-prefixed URL as internal (for example redirecting to `mailto:` or a custom app scheme), pass `allow_external=True` explicitly.
+
+## [0.161.0](https://github.com/dropseed/plain/releases/plain@0.161.0) (2026-09-02)
+
+### What's changed
+
+- New `plain.cli` entry point group: a package can now contribute a top-level `plain` command that runs _without_ `plain.runtime.setup()`. `register_cli` commands are imported by setup itself, so they can't help when setting up the app is the thing that fails — an entry point can. Built-in command names always win, and an entry point is imported only when one of its commands is actually asked for, so an installed package costs nothing until it's used. This is what `plain env` (from `plain.dev`) uses, since you run it exactly when a missing encryption key stops the app from loading ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- `PLAIN_ENV` no longer trips the `settings.unused_env_vars` preflight check. It's set by the CLI to pick `.env.<env>` files, not a setting, so it was being reported as a typo'd `PLAIN_`-prefixed setting ([88ec31376c](https://github.com/dropseed/plain/commit/88ec31376c))
+- `plain.redirection` is gone from the package listings in the README, `plain docs`, and the agent rules — the package itself has been removed. Its logging half (`RedirectLog`, `NotFoundLog`) is redundant now that traces answer "what's 404ing" from SERVER spans, and the redirect half is thin next to `plain.pages` `.redirect` files ([72acbd1cea](https://github.com/dropseed/plain/commit/72acbd1cea))
+
+### Upgrade instructions
+
+- If you had `plain.redirection` installed, remove `"plain.redirection"` from `INSTALLED_PACKAGES` and drop the `plain-redirection` dependency. Move any database-managed redirects to `plain.pages` `.redirect` files, and use traces (SERVER spans) for 404 and redirect visibility.
+- Otherwise, no changes required.
+
+## [0.160.0](https://github.com/dropseed/plain/releases/plain@0.160.0) (2026-08-21)
+
+### What's changed
+
+- `Response.status_code` is now read-only. Status is part of a response's identity — header defaulting, the bodiless rules, transports, and caches all read it as a settled fact — so it's fixed at construction and there is deliberately no setter. Pass `status_code=` to the constructor (or to `TemplateView.render()`); assigning to a built response now fails the type check and raises `AttributeError` at runtime ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- Statuses that never have a body refuse one by construction: `Response("Deleted", status_code=204)` raises `ValueError`, and a streaming response can't be given a bodiless status at all. A client stops reading a 204/304 at the header block, so body bytes written after it are parsed as the start of the _next_ response on a keep-alive connection — a response-splitting bug that used to be silently constructible ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43), [4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- 1xx interim statuses can no longer be constructed on a `Response` — those belong to the server, not application code. The accepted range is now 200–599 (was 100–599) ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- An `HTTPException` subclass whose `status_code` is out of range (or isn't an int) is now rejected when the class is defined, so a bad status fails at import instead of crashing an error renderer at request time ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- Bodiless responses no longer get a default `Content-Type` — there's no representation to describe, and on a 304 caches update stored representation headers from the response (RFC 9110 15.4.5). `Content-Length` is likewise never added to a 1xx/204/304 ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4), [20ef4b19ba](https://github.com/dropseed/plain/commit/20ef4b19ba))
+- `HEAD` requests are now bodiless everywhere the server can answer one, not just through the normal view path: h1 error responses, the 431 for oversized headers, the healthcheck endpoint, and the boot-failure page all send the header block alone (with the `Content-Length` a GET would have had, per RFC 9110 9.3.2) ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43), [20ef4b19ba](https://github.com/dropseed/plain/commit/20ef4b19ba))
+- HTTP/2 responses to a HEAD stream, and 204/304 responses on any stream, now send headers with `END_STREAM` and no DATA frames. Body bytes on those streams are malformed per RFC 9113 8.1.1 and a strict h2 client treats them as a connection-level protocol error that kills every stream on the connection ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43), [20ef4b19ba](https://github.com/dropseed/plain/commit/20ef4b19ba))
+- A `HEAD` request to an async streaming view (SSE) no longer consumes the stream. Previously the server iterated a generator that may never terminate just to throw the bytes away — the request would hang ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43))
+- New predicates exported from `plain.http` — `status_omits_body()`, `response_omits_body()`, `content_length_forbidden()`, and `status_for_exception()` — the single shared definitions the framework itself uses, for writing your own handlers and middleware ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43), [4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- Fixed a `RuntimeError` when a request body stalls mid-transfer: the error path re-read the connection while a cancelled read still held the `StreamReader` ([d7d07b727b](https://github.com/dropseed/plain/commit/d7d07b727b))
+- Unexpected connection-level errors in the HTTP/1.1 and HTTP/2 handlers are now caught and logged by Plain with their traceback, instead of escaping into asyncio's default exception handler where they landed on an unconfigured logger and never reached exception tracking. Genuine client-side socket and TLS noise is separated out and logged at debug ([9211e67612](https://github.com/dropseed/plain/commit/9211e67612))
+- The test client now mirrors the server's framing rules: `HEAD`/204/304 bodies and forbidden `Content-Length` headers are stripped the same way, async streams aren't consumed for bodiless responses, and assigning to a response attribute through the client wrapper behaves exactly as it does on the raw response ([5ef5e65b43](https://github.com/dropseed/plain/commit/5ef5e65b43), [4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- Dead WebSocket scaffolding is gone from the server's response writer — `Connection: upgrade` is no longer special-cased, and hop-by-hop headers are always dropped as the server's to frame ([20ef4b19ba](https://github.com/dropseed/plain/commit/20ef4b19ba))
+- `FileResponse` closes the file handle it was given if construction is rejected, since the idiomatic `FileResponse(open(path))` leaves the caller nothing to close ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+- A 413 for an oversized declared body now reaches the access log with its parsed request instead of a blank entry ([20ef4b19ba](https://github.com/dropseed/plain/commit/20ef4b19ba))
+
+### Upgrade instructions
+
+- Replace every `response.status_code = X` with a construction-time status: `Response(content, status_code=X)`, or `self.render(status_code=X)` in a `TemplateView`. This is the most likely place your code breaks — the type checker will find these for you.
+- `Response(content, status_code=204)` and `Response(content, status_code=304)` now raise `ValueError`. If the message needs to reach the client, return a 200; otherwise use `Response(status_code=204)` with no content.
+- `Response(status_code=1xx)` now raises `ValueError`. Interim responses are the server's to send.
+- If you subclass `HTTPException`, make sure `status_code` is an int from 200 to 599 — an invalid one now raises at class definition.
+- `NotModifiedResponse` no longer accepts `content`, `content_type`, or `status_code`; it always means exactly "bodiless 304".
+- If you defined a custom `head()` on a `ServerSentEventsView` subclass, remove it — bodiless HEAD handling is now built in.
+- 204 and 304 responses no longer carry a default `Content-Type` or a `Content-Length`. Update tests that assert on those headers.
+
+## [0.159.0](https://github.com/dropseed/plain/releases/plain@0.159.0) (2026-08-17)
+
+### What's changed
+
+- The server's request-body handling was rewritten around a unified body sink: both HTTP/1.1 and HTTP/2 now receive the entire request body on the event loop before dispatching to the view, holding it in memory up to a threshold and spooling to an anonymous temp file beyond it (unlinked at creation, so a killed worker can't leak spooled disk). This is the same model as Puma and Waitress, and it means request threads are held only for view time (a slow upload no longer pins a thread for the duration of the transfer), connections stay keep-alive after uploads of any size (previously forced `Connection: close`), and async views can read bodies of any size ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- New `SERVER_MAX_REQUEST_BODY_SIZE` setting (default 10MB): the per-request body cap, answered with a 413. A declared `Content-Length` over the cap is refused from the headers before any of the body transfers; bodies without a declared length are rejected the moment received bytes exceed it. This is a pre-auth allowance sized for forms, images, and documents — raise it for larger uploads, or send large files direct to object storage with presigned URLs ([c34fee2fb5](https://github.com/dropseed/plain/commit/c34fee2fb5), [9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- New `SERVER_BODY_MAX_MEMORY_SIZE` setting (default 1MB): the RAM-vs-disk spool threshold during ingest — purely a buffering knob, independent of the policy cap ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- New `SERVER_MAX_INFLIGHT_BODY_SIZE` setting (default 1GB): a worker-wide budget on total in-flight request-body bytes (memory + disk) across all connections. Exhaustion load-sheds with a 503 and `Retry-After: 1` ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- New `SERVER_BODY_MIN_BYTES_PER_SECOND` setting (default 240): a minimum transfer rate for request bodies, enforced after a grace period and sustained over a rolling window, answering violations with a 408. Inactivity timeouts can't stop a slow-drip body (R.U.D.Y.-style attacks); a throughput floor can ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- `ContentTooLargeError413` replaces `RequestDataTooBigError400`: an over-limit request body is now answered with the semantically correct 413 (Content Too Large) instead of a 400, at both the server edge and the app layer (`DATA_UPLOAD_MAX_MEMORY_SIZE`) ([c34fee2fb5](https://github.com/dropseed/plain/commit/c34fee2fb5))
+- Chunked (`Transfer-Encoding: chunked`) requests are de-chunked before dispatch: the app sees a real `Content-Length` and no `Transfer-Encoding` header, exactly as a buffering gateway would forward them. This also fixes chunked multipart uploads, which previously parsed silently as an empty form ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- The request's OpenTelemetry span now records what receiving the body cost — `http.request.body.size` and `plain.request.body_ingest_seconds` — since ingest happens before the span opens and a slow upload would otherwise look like a fast view ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- Upload throughput improved substantially: a large HTTP/1.1 body was buffered with quadratic copying (a 25MB upload burned ~24s of CPU), and the rewrite's zero-copy chunked decoding improved things further — 50MB declared uploads went from ~270ms to ~124ms, 20MB chunked from ~72ms to ~53ms ([252ad64106](https://github.com/dropseed/plain/commit/252ad64106), [9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- Chunked framing is parsed strictly per RFC 9112 (`1*HEXDIG` chunk sizes, whitespace tolerated only before chunk extensions), closing request-smuggling disagreements with stricter upstreams; `Expect` is honored as a comma-separated list; and a stray CRLF between keep-alive requests is tolerated per RFC 9112 §2.2 ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+- A new preflight check validates that the body-size settings compose (memory threshold vs cap, cap vs in-flight budget) ([9524de4e54](https://github.com/dropseed/plain/commit/9524de4e54))
+
+### Upgrade instructions
+
+- If your app accepts uploads larger than 10MB, set `SERVER_MAX_REQUEST_BODY_SIZE` (or the `PLAIN_SERVER_MAX_REQUEST_BODY_SIZE` env var) above your largest expected request body — HTTP/1.1 uploads previously had no server-level cap, so a working large-upload flow can start returning 413s under the new default. For genuinely large files, prefer presigned direct-to-storage uploads over raising the cap.
+- If you import or catch `RequestDataTooBigError400`, rename it to `ContentTooLargeError413` (exported from `plain.http`). Clients now receive a 413 instead of a 400 for over-limit bodies, so update any client-side or test expectations on that status code.
+- If you have log alert rules targeting the `plain.security.RequestDataTooBigError400` logger, update them to `plain.security.ContentTooLargeError413` — oversized-body rejections still log to the `plain.security.*` namespace.
+
+## [0.158.0](https://github.com/dropseed/plain/releases/plain@0.158.0) (2026-08-12)
+
+### What's changed
+
+- New `SERVER_KEEPALIVE_TIMEOUT` setting (default `300` seconds) controls how long an idle connection — no request in progress — stays open, for both HTTP/1.1 and HTTP/2. Previously the HTTP/1.1 server closed idle keep-alive connections after a hardcoded 2 seconds, while fronting routers and load balancers (Heroku's router, ALBs) pool connections to the server and reuse them for minutes — so the server was constantly closing connections the router might be writing a request onto in the same instant, and that request was lost (Heroku H13 "Connection closed without response" / H18). The server's idle timeout must exceed the balancer's connection-reuse window so the balancer is always the side that closes an idle connection; the new default follows the same guidance AWS documents for ALBs. HTTP/2's previously hardcoded 300-second idle timeout now uses the same setting. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- The idle wait now also covers a connection's first request, so a pooled connection that a router pre-establishes but hasn't used yet gets the same window instead of being closed after ~2 seconds — the same close race, just on request #1. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- Worker shutdown collapses idle keep-alive waits to a short grace window instead of letting them pin the drain: a request already arriving on a pooled connection when `SIGTERM` lands is still read and served with `Connection: close`, and idle connections close within a couple of seconds, so recycles and deploys drain as fast as before. Dev-server reloads now drain through the same path as `SIGTERM`. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- The HTTP/2 idle timeout only applies between requests, never to in-flight work: a slow view or SSE stream with a frame-quiet client is no longer torn down when the idle window expires, and the idle clock restarts when a stream finishes rather than at the last received frame — so a long response no longer eats its connection's idle reuse window. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- A new preflight check (`server.keepalive_timeout`) and a worker boot check reject non-positive `SERVER_KEEPALIVE_TIMEOUT` values, which would otherwise close connections that were promised keep-alive. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- A worker that hits `SERVER_CONNECTIONS` now logs a warning (throttled to once a minute) when it rejects new connections, since idle pooled connections hold capacity slots for the keep-alive window — size `SERVER_CONNECTIONS` above your load balancer's connection pool per server. ([0c9c957a91](https://github.com/dropseed/plain/commit/0c9c957a91))
+- `SERVER_MAX_REQUESTS` default raised from `1000` to `10000` (jitter `100` → `1000`). Count-based worker recycling at 1000 requests is minute-scale churn on busy apps that buys nothing when workers aren't leaking; 10000 keeps the memory-leak safety net — a genuinely leaky busy app still recycles every few hours — without constantly restarting healthy workers. ([4c5710aefa](https://github.com/dropseed/plain/commit/4c5710aefa))
+
+### Upgrade instructions
+
+- No changes required. If you run the server behind a load balancer with an idle/reuse window longer than 5 minutes, set `SERVER_KEEPALIVE_TIMEOUT` above it. If you relied on the previous aggressive worker recycling, set `SERVER_MAX_REQUESTS = 1000` explicitly.
+
+## [0.157.0](https://github.com/dropseed/plain/releases/plain@0.157.0) (2026-08-12)
+
+### What's changed
+
+- `Router.urls` is now typed as a tuple (`tuple[URLPattern | URLResolver, ...]`), and `include()` takes a tuple of url patterns or a `Router` class. Lists still work at runtime — the resolver normalizes them — but they now fail type checking ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Added `plain.utils.timezone.naive_datetime_from_date()` for converting a `date` to a naive midnight `datetime` ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Form field `default_validators` is now a tuple and `default_error_messages` is annotated `ClassVar`; `URLValidator.schemes` and `EmailValidator.domain_allowlist` are tuples ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `timezone.activate()` raises `TypeError` (was `ValueError`) when given something other than a `tzinfo` or string ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Fixed a `ValidationError` bug where nested errors in a list could read `error_list` off the wrong object due to a shadowed loop variable ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- The HTTP server measures request timing with timezone-aware UTC datetimes (also faster than naive `now()`) ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `plain create` scaffolds new packages with a tuple `urls` declaration ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Lint-driven cleanups across the CLI, forms, http, and server internals from adopting ruff 0.16's default rules — no behavior changes ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- Change `urls = [...]` to `urls = (...)` in your `Router` classes (including nested `include("...", [...])` lists). Runtime behavior is unchanged, but `plain check` will fail type checking until converted. Remember the trailing comma for a single entry: `urls = (path("", HomeView),)`
+- If you catch `ValueError` from `timezone.activate()` for invalid timezone types, catch `TypeError` instead
+
+## [0.156.2](https://github.com/dropseed/plain/releases/plain@0.156.2) (2026-08-11)
+
+### What's changed
+
+- The HTTP/1.1 server no longer drops a request that arrives on an established keep-alive connection just as a worker begins shutting down. The keep-alive loop gated on the worker's `alive` flag at the top of each iteration, so when a worker was recycled (on `max_requests`, or a deploy's `SIGTERM`) a request already in flight on a pooled connection — such as one Heroku's router holds open to the dyno — was left unread and the socket was closed on it. Behind a router that surfaces as an H13 "Connection closed without response", one per worker recycle under sustained traffic (e.g. webhook deliveries). Such a request is now read and served with `Connection: close`, and the loop exits based on how the response was actually framed rather than on the `alive` flag, so the socket is never closed on a client that was just told the connection would stay open. ([2236aaff23](https://github.com/dropseed/plain/commit/2236aaff23))
+- Reads on a draining worker are now time-bounded. Once shutdown starts, each connection gets a deadline (derived from `SERVER_GRACEFUL_TIMEOUT` and the arbiter's kill deadline) to finish reading its final request, so a slow or trickling client can't pin a draining worker open, and a read can't outlive the graceful window and be cancelled mid-flight — which the client would see as a connection reset — instead of getting a clean `Connection: close`. ([2236aaff23](https://github.com/dropseed/plain/commit/2236aaff23))
+- Request-body framing is hardened: a request pipelined behind another is answered with `Connection: close` for the client to retry on a fresh connection rather than being silently dropped or mis-framed, `Transfer-Encoding` validation is deferred to the single authoritative parser (so `identity`/compressed codings are handled and unsupported ones return `501 Not Implemented`), and a malformed (e.g. negative) chunk size can no longer spin a worker's event loop. ([2236aaff23](https://github.com/dropseed/plain/commit/2236aaff23))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.156.1](https://github.com/dropseed/plain/releases/plain@0.156.1) (2026-08-10)
+
+### What's changed
+
+- Fixed a `NameError` on every multipart upload large enough to spill to disk. `TemporaryUploadedFile.__init__` wrapped its temp file in `cast(IO[Any], ...)`, but `IO` and `Any` are imported only under `TYPE_CHECKING` — and `from __future__ import annotations` defers annotations, not ordinary expressions, so `cast()`'s first argument was evaluated at runtime and raised. Uploads under `FILE_UPLOAD_MAX_MEMORY_SIZE` (2.5 MB) are served by the in-memory handler and never reached this path. The `cast` is gone rather than moved to a runtime import. ([46b01da294](https://github.com/dropseed/plain/commit/46b01da294))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.156.0](https://github.com/dropseed/plain/releases/plain@0.156.0) (2026-08-03)
+
+### What's changed
+
+- In reload mode (`plain server --reload`), a worker that fails to boot no longer takes the server down with it. Any failure across the boot sequence — `plain.runtime.setup()`, access log configuration, loading the request handler, or constructing the worker — is now caught, and the process stays alive serving that traceback as a `500` on the same listener sockets. It recycles for a fresh boot attempt when the reloader sees a file change, after 60 seconds, or if the arbiter goes away. Previously only a `SyntaxError` raised while loading the handler was tolerated; everything else exited with a boot-error code that halted the arbiter and the whole dev stack. Without `--reload`, a boot failure still stops the server immediately. ([79bbcbd428](https://github.com/dropseed/plain/commit/79bbcbd428))
+- The boot failure response is now content-negotiated. Browsers (any request whose `Accept` header includes `text/html`) get an HTML page with a two-second meta refresh, so the tab reloads itself into the working app once the fix lands; curl and other non-browser clients still get the plain-text traceback. ([42b86cf78d](https://github.com/dropseed/plain/commit/42b86cf78d))
+- Removed `AppImportError` and the `APP_LOAD_ERROR` exit code from `plain.server.errors`, and `make_fail_handler()` from `plain.server.util` — all superseded by the new boot failure server. ([79bbcbd428](https://github.com/dropseed/plain/commit/79bbcbd428))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.155.0](https://github.com/dropseed/plain/releases/plain@0.155.0) (2026-08-02)
+
+### What's changed
+
+- `RedirectResponse` now requires an explicit `status_code` keyword argument — the implicit `302` default is gone, and the value must be a 3xx status (a `ValueError` is raised otherwise). The http README documents when to pick `301`, `302`, `303`, `307`, or `308`. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+- New `plain.utils.version` module with `parse_version()` and `compare_versions()` — the lenient version parser that previously lived inside `plain.cli.changelog` is now a shared utility (also used by `plain.code` to enforce tool minimum versions). ([92792ca396](https://github.com/dropseed/plain/commit/92792ca396))
+- The agents README now shows what a package rule body should look like (one-line reminders ending in a docs pointer) and advises keeping each piece of guidance in exactly one scoped rule. ([5db071a6e9](https://github.com/dropseed/plain/commit/5db071a6e9))
+
+### Upgrade instructions
+
+- Add an explicit `status_code` to every `RedirectResponse(...)` call. Use `status_code=302` to keep the previous default behavior, or pick a more specific redirect status: `301` (moved permanently), `303` (see other), `307` (temporary, preserves method), `308` (permanent, preserves method).
+
+## [0.154.0](https://github.com/dropseed/plain/releases/plain@0.154.0) (2026-07-22)
+
+### What's changed
+
+- New `PLAIN_CACHE_PATH` export from `plain.runtime` — a machine-level cache directory shared across projects and checkouts, intended for downloaded binaries and other reusable artifacts. Like `APP_PATH` and `PLAIN_TEMP_PATH`, it's available without calling `setup()`. It defaults to `$XDG_CACHE_HOME/plain` (or `~/.cache/plain`) and can be overridden with the `PLAIN_CACHE_PATH` environment variable. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+- The runtime docs now spell out the split between the two paths: `PLAIN_TEMP_PATH` (`.plain`) is disposable per-checkout state and should never be shared or symlinked between checkouts, while `PLAIN_CACHE_PATH` is shared machine-wide. ([0cc0500f63](https://github.com/dropseed/plain/commit/0cc0500f63))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.153.0](https://github.com/dropseed/plain/releases/plain@0.153.0) (2026-07-21)
+
+### What's changed
+
+- `plain request` trace output has been reworked to report rather than diagnose. The automatic N+1/issue detection is gone — every distinct statement is now listed with its execution count, total duration (slowest first), and the call sites that issued it, leaving the judgment about what's a problem to the reader. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- A followed redirect chain now produces one trace block per request hop (labeled with method, path, and query string) instead of a single merged summary that could double-count once-per-request queries. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- New `--trace` flag for `plain request` shows the full detail in text output: the complete uncapped query list plus an indented span tree. Without it, the summary caps the query list but always keeps repeated statements visible. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- Transaction-control statements (savepoint bookkeeping, etc.) are now counted separately from queries instead of cluttering the query list. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- A request that raises now still reports its captured trace — in text output the Trace section renders before exiting, and in `--json` the command emits `{"error": ..., "traces": [...]}` on stdout with exit code 1, with `analysis.exceptions` carrying the stacktrace. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- The `--json` shape changed: the `trace` object is now `traces`, a list with one entry per request, each carrying `name`, `request_id` (matching `response.request_id` for the hop that rendered), `analysis`, and `spans`. `analysis.issues` and `analysis.duplicate_query_count` were replaced by `analysis.exceptions` and `analysis.transaction_count`, and a `trace_note` key explains a missing or empty `traces`. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+- `plain request` is now documented in the CLI README, and piping its output (`| head`) no longer produces a BrokenPipeError traceback. ([f7f66b870f](https://github.com/dropseed/plain/commit/f7f66b870f))
+
+### Upgrade instructions
+
+- If you have scripts or agents parsing `plain request --json` output: read `traces` (a list, one entry per request) instead of `trace`, use `analysis.exceptions` instead of filtering `analysis.issues`, and detect repeats yourself via each query's `count` instead of `analysis.duplicate_query_count`. Check `trace_note` before indexing into `traces`, and note that a failed request now exits 1 with `{"error", "traces"}` and no `response` key.
+
+## [0.152.0](https://github.com/dropseed/plain/releases/plain@0.152.0) (2026-07-15)
+
+### What's changed
+
+- **`plain run` has been removed.** One-off code now runs through `plain shell` — either `plain shell -c "..."` or piped stdin (`cat script.py | plain shell`) — which executes it as the `__main__` module with clean, `python -c`–style tracebacks. For a standalone script file, call `plain.runtime.setup()` yourself at the top of the script and run it with `python`. The interactive REPL enrichment (banner, `SHELL_IMPORT`) continues to apply only to interactive sessions. ([7e55115d82](https://github.com/dropseed/plain/commit/7e55115d82))
+- Worker shutdown now drains in-flight connections gracefully instead of cutting them off. HTTP/1 keep-alive connections stop accepting new keep-alive requests once shutdown begins (responding `Connection: close`) across every shutdown path, and HTTP/2 connections drain by refusing new streams with `REFUSED_STREAM` (safe for clients to retry), letting dispatched streams finish, then closing with `GOAWAY`. ([b7187f56fb](https://github.com/dropseed/plain/commit/b7187f56fb), [5ebd413253](https://github.com/dropseed/plain/commit/5ebd413253))
+- The worker drain now shares one monotonic clock with the arbiter and caps itself against the arbiter's published SIGKILL deadline, so teardown reliably finishes before the process is force-killed. Connection teardown (GOAWAY flush, TLS `close_notify`, transport close) is fully time-bounded, so a slow or unresponsive peer can't stall shutdown. ([0a0ddb0ac6](https://github.com/dropseed/plain/commit/0a0ddb0ac6), [c0b7ce91e3](https://github.com/dropseed/plain/commit/c0b7ce91e3), [67520992e0](https://github.com/dropseed/plain/commit/67520992e0), [8efdc43c3a](https://github.com/dropseed/plain/commit/8efdc43c3a))
+- Connections aborted mid-TLS-handshake (port scans, load-balancer health checks) are now logged at debug instead of surfacing as errors with tracebacks. ([5a14c74223](https://github.com/dropseed/plain/commit/5a14c74223))
+- Removed a false-positive "Server stopped serving unexpectedly" error that the worker heartbeat could log during normal shutdown. ([c90350fdad](https://github.com/dropseed/plain/commit/c90350fdad))
+
+### Upgrade instructions
+
+- Replace any `plain run script.py` usage. For a quick one-off, pipe it into `plain shell` (`plain shell -c "..."` or `cat script.py | plain shell`). For a script file you keep, add `import plain.runtime; plain.runtime.setup()` at the top and run it with `python script.py`, or register it as a CLI command.
+
+## [0.151.2](https://github.com/dropseed/plain/releases/plain@0.151.2) (2026-07-10)
+
+### What's changed
+
+- Fixed the `plain preflight` summary counting a check as a warning when all of its issues were silenced — a fully-silenced check now counts as neither a warning nor an error. The CLI summary and the cached check counts (used by `plain check`) now share the same tally logic, so the two can no longer disagree. ([abe4ffcae7](https://github.com/dropseed/plain/commit/abe4ffcae7))
+- The shipped agents rule for OTel instrumentation now documents the quieter worker tracing behavior from plain-jobs 0.56.1 (idle ticks emit no spans; claim/heartbeat failures get one-off error spans). ([0560eb69b8](https://github.com/dropseed/plain/commit/0560eb69b8))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.151.1](https://github.com/dropseed/plain/releases/plain@0.151.1) (2026-06-26)
+
+### What's changed
+
+- `plain check` now surfaces preflight warnings instead of hiding them: a passing run shows a warning count (e.g. duplicate indexes) and a failing run prints preflight's full report. ([8f0b014276](https://github.com/dropseed/plain/commit/8f0b014276))
+- Removed the `plain.esbuild` entry from the package list in the docs now that the package is retired. ([c6b3c7efc9](https://github.com/dropseed/plain/commit/c6b3c7efc9))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.151.0](https://github.com/dropseed/plain/releases/plain@0.151.0) (2026-06-22)
+
+### What's changed
+
+- `patch_cache_control()` now takes explicit keyword-only directives instead of `**kwargs`, covering the full standard set (`max_age`, `s_maxage`, `stale_while_revalidate`, `stale_if_error`, `no_cache`, `no_store`, `no_transform`, `must_revalidate`, `proxy_revalidate`, `must_understand`, `public`, `private`, `immutable`). Unknown directive names now raise `TypeError` instead of being silently emitted, and `max_age` is coerced to an `int`. ([b100fa67](https://github.com/dropseed/plain/commit/b100fa67))
+- `plain request` now handles streaming/file responses (such as assets) instead of failing on their unreadable body — it summarizes them from the `Content-Type`/`Content-Length` headers, and a `--contains`/`--not-contains` check against a streaming response is reported as a failure rather than silently passing. ([f1860e1d](https://github.com/dropseed/plain/commit/f1860e1d))
+- Removed the dead `_to_tuple()` cache helper. ([3a54e8aa](https://github.com/dropseed/plain/commit/3a54e8aa))
+
+### Upgrade instructions
+
+- If you call `patch_cache_control()` with non-standard directive names, set those headers another way — the standard directives are unchanged (e.g. `patch_cache_control(response, max_age=60, no_cache=True)`). Otherwise no changes required.
+
 ## [0.150.0](https://github.com/dropseed/plain/releases/plain@0.150.0) (2026-06-09)
 
 ### What's changed
@@ -1469,6 +1716,7 @@
             "Content-Security-Policy": f"script-src 'self' 'nonce-{nonce}'",
         }
 
+
     # After:
     DEFAULT_RESPONSE_HEADERS = {
         "Content-Security-Policy": "script-src 'self' 'nonce-{request.csp_nonce}'",
@@ -1549,8 +1797,10 @@
             response = self.get_response(request)
             return response
 
+
     # After:
     from plain.http import HttpMiddleware
+
 
     class MyMiddleware(HttpMiddleware):
         def process_request(self, request):
@@ -1602,8 +1852,10 @@
         """Description"""
         return "Done!"
 
+
     # After:
     from plain.chores import Chore, register_chore
+
 
     @register_chore
     class ChoreName(Chore):

@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import click
-
 import plain.runtime
 
 
@@ -38,9 +37,9 @@ from . import views
 
 class {package_name.capitalize()}Router(Router):
     namespace = f"{package_name}"
-    urls = [
+    urls = (
         # path("", views.IndexView, name="index"),
-    ]
+    )
 """
         )
 

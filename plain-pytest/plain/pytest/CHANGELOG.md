@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.19.1](https://github.com/dropseed/plain/releases/plain-pytest@0.19.1) (2026-08-12)
+
+### What's changed
+
+- Internal lint cleanups — no behavior changes ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-pytest@0.19.0) (2026-05-21)
 
 ### What's changed

@@ -230,6 +230,8 @@ The worker integrates with OpenTelemetry for distributed tracing. Spans are crea
 
 Jobs are linked to the originating trace context, allowing you to follow jobs initiated from web requests.
 
+Worker housekeeping is deliberately untraced: the idle job poll, the claim transaction, heartbeat writes, and the gauge queries emit no spans, so an idle worker exports no traces at all. Worker-side failures (a failing claim or heartbeat) still surface as one-off `claim job` / `worker heartbeat` error spans.
+
 Messaging metrics:
 
 - `messaging.client.sent.messages` — counter incremented for each enqueue
@@ -282,6 +284,7 @@ Set a `concurrency_key` to automatically enforce uniqueness - only one job with 
 ```python
 from plain.jobs import Job, register_job
 
+
 @register_job
 class ProcessUserJob(Job):
     def __init__(self, user_id):
@@ -293,9 +296,12 @@ class ProcessUserJob(Job):
     def run(self):
         process_user(self.user_id)
 
+
 # Usage
 ProcessUserJob(123).run_in_worker()  # Enqueued
-ProcessUserJob(123).run_in_worker()  # Returns None (blocked - job already pending/processing)
+ProcessUserJob(
+    123
+).run_in_worker()  # Returns None (blocked - job already pending/processing)
 ```
 
 Alternatively, pass `concurrency_key` as a parameter to `run_in_worker()` instead of overriding the method.
@@ -368,6 +374,7 @@ class WelcomeUserJob(Job):
 
     def run(self):
         send_welcome_email(self.user)
+
 
 # Good — check before acting
 @register_job

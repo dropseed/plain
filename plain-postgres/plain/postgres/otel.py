@@ -16,10 +16,9 @@ from opentelemetry.semconv.metrics.db_metrics import DB_CLIENT_OPERATION_DURATIO
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Span
-    from psycopg import Connection as PsycopgConnection
-
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.sources import PoolSource
+    from psycopg import Connection as PsycopgConnection
 
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_CLIENT_CONNECTION_POOL_NAME,
@@ -64,9 +63,12 @@ from opentelemetry.semconv.attributes.server_attributes import (
     SERVER_PORT,
 )
 from opentelemetry.trace import SpanKind
-
 from plain.runtime import settings
 from plain.utils.otel import format_exception_type
+
+# The public API of this module — everything else is instrumentation
+# internals wired up by plain.postgres itself.
+__all__ = ["suppress_db_tracing"]
 
 # Use a stable string key so OpenTelemetry context APIs receive the expected type.
 _SUPPRESS_KEY = "plain.postgres.suppress_db_tracing"
@@ -406,9 +408,7 @@ def _is_internal_frame(frame: traceback.FrameSummary) -> bool:
         return True
     if "/plain/postgres/" in filepath:
         return True
-    if filepath.endswith("contextlib.py"):
-        return True
-    return False
+    return filepath.endswith("contextlib.py")
 
 
 def _get_code_attributes() -> dict[str, Any]:

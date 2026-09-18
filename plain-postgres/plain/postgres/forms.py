@@ -328,7 +328,7 @@ def _apply_result[T: Model](
     columns = {
         f.name: f
         for f in chain(
-            instance._model_meta.concrete_fields,
+            instance._model_meta.fields,
             instance._model_meta.many_to_many,
         )
     }

@@ -85,6 +85,8 @@ Example: if `plain-auth` is being released because it adapted to `plain` 0.113.0
 
 Only update constraints when there's an actual compatibility requirement — don't add minimums for packages whose changes are independent. Use the commit analysis from Phase 3 to determine this.
 
+A package shipping its first baseline migration (a file with `supersedes = ...`, written by `plain migrations reset`) is this case: set its `plain.postgres` minimum to the first plain-postgres release that understands baselines, and set the baseline's empty `since` to the package's new version (`plain-postgres/tests/internal/test_shipped_baselines.py` fails CI while `since` is empty). Release `plain-postgres` before, or in the same batch as, that package.
+
 ### Phase 4: Generate Release Notes
 
 Apply maximum reasoning effort to this phase — `ultrathink` while reading each diff and writing its notes. Release notes are user-facing and can't be quietly revised after publishing, so accuracy and completeness matter more than speed here.

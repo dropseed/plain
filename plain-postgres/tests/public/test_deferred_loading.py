@@ -9,20 +9,6 @@ from __future__ import annotations
 
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 
-from plain.postgres.db import get_connection
-
-
-def _count_queries(fn):
-    conn = get_connection()
-    previous = conn.force_debug_cursor
-    conn.force_debug_cursor = True
-    conn.queries_log.clear()
-    try:
-        result = fn()
-        return result, len(conn.queries_log)
-    finally:
-        conn.force_debug_cursor = previous
-
 
 def test_only_defers_unlisted_fields(db):
     Widget.query.create(name="W", size="L")
@@ -43,11 +29,12 @@ def test_deferred_field_loads_correct_value(db):
     assert widget.size == "L"
 
 
-def test_listed_field_is_available_without_a_query(db):
+def test_listed_field_is_available_without_a_query(db, capture_queries):
     Widget.query.create(name="W", size="L")
     widget = Widget.query.only("id", "name").get()
-    _, queries = _count_queries(lambda: widget.name)
-    assert queries == 0
+    with capture_queries() as queries:
+        _ = widget.name
+    assert len(queries) == 0
 
 
 def test_refresh_from_db_reloads_values(db):
@@ -57,20 +44,22 @@ def test_refresh_from_db_reloads_values(db):
     assert widget.name == "changed"
 
 
-def test_deferred_field_access_query_count(db):
+def test_deferred_field_access_query_count(db, capture_queries):
     # WAS: each deferred field loaded in its own query (two fields = two
     # queries). NOW: the first deferred access hydrates every still-missing
     # field, so the second field needs no further query.
     Widget.query.create(name="W", size="L")
     widget = Widget.query.only("id").get()
 
-    _, first = _count_queries(lambda: widget.name)
-    assert first == 1
-    _, second = _count_queries(lambda: widget.size)
-    assert second == 0
+    with capture_queries() as first:
+        _ = widget.name
+    assert len(first) == 1
+    with capture_queries() as second:
+        _ = widget.size
+    assert len(second) == 0
 
 
-def test_deferred_fk_column_loads_only_the_fk(db):
+def test_deferred_fk_column_loads_only_the_fk(db, capture_queries):
     # The foreign key descriptor is the partial-related-instance fast path:
     # hydrating other deferred columns just to materialize a related-object
     # handle would defeat the optimization. So accessing a deferred FK loads
@@ -84,8 +73,9 @@ def test_deferred_fk_column_loads_only_the_fk(db):
     assert widget_tag.get_deferred_fields() == {"widget", "tag"}
 
     # Accessing the deferred FK loads exactly one column (the FK column).
-    _, queries = _count_queries(lambda: widget_tag.widget)
-    assert queries == 1
+    with capture_queries() as queries:
+        _ = widget_tag.widget
+    assert len(queries) == 1
     # The other deferred FK column is still deferred -- not hydrated as a
     # side effect of the first FK access.
     assert "tag" in widget_tag.get_deferred_fields()

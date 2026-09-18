@@ -6,6 +6,7 @@ from plain.auth.views import AuthView
 from plain.forms import Form, Invalid
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
+from plain.postgres import QuerySet
 from plain.postgres.forms import create_from, update_from
 from plain.templates.views import DetailView, ListView, TemplateView
 from plain.urls import reverse
@@ -19,12 +20,15 @@ class TaskListView(AuthView, ListView):
     template_name = "tasks/list.html"
     context_object_name = "tasks"
     login_required = True
+    page_size = 20
 
-    def get_objects(self) -> list[Task]:
-        return list(
+    def get_objects(self) -> QuerySet[Task]:
+        # Ordering comes from Task.model_options (is_complete, -created_at),
+        # so pagination is deterministic.
+        return (
             Task.query.filter(owner=self.user)
             .select_related("project")
-            .prefetch_related("tags")[:100]
+            .prefetch_related("tags")
         )
 
 
@@ -136,4 +140,4 @@ class TaskSeedView(AuthView, View):
         if not Tag.query.filter(owner=self.user).exists():
             for n in ("urgent", "later", "fun"):
                 Tag.query.create(owner=self.user, name=n)
-        return RedirectResponse(reverse("tasks:list"))
+        return RedirectResponse(reverse("tasks:list"), status_code=302)

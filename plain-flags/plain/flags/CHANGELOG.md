@@ -1,5 +1,35 @@
 # plain-flags changelog
 
+## [0.37.2](https://github.com/dropseed/plain/releases/plain-flags@0.37.2) (2026-08-12)
+
+### What's changed
+
+- Admin viewset attributes declared as tuples; internal lint cleanups ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.37.1](https://github.com/dropseed/plain/releases/plain-flags@0.37.1) (2026-08-02)
+
+### What's changed
+
+- `Flag.description` now declares `default=""` explicitly, matching the plain-postgres 0.113.0 optional-string idiom (`required=False, default=""`). The column `DEFAULT` is applied by convergence on the next `plain postgres sync` — no migration needed. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.37.0](https://github.com/dropseed/plain/releases/plain-flags@0.37.0) (2026-06-22)
+
+### What's changed
+
+- Collapsed the migration history into a single fresh `0001_initial`. The database schema is unchanged — only the migration files were squashed. ([802f2d87](https://github.com/dropseed/plain/commit/802f2d87))
+
+### Upgrade instructions
+
+- Run `plain migrations prune` after upgrading to clear the now-orphaned history records for this package's old migrations. No SQL runs — it only cleans up migration-history records and is safe and idempotent. If `migrations prune` is already part of your deploy steps, no action is needed.
+
 ## [0.36.7](https://github.com/dropseed/plain/releases/plain-flags@0.36.7) (2026-05-25)
 
 ### What's changed

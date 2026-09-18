@@ -5,7 +5,7 @@ import itertools
 import math
 from collections.abc import Sequence
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 from plain.postgres.dialect import (
     OPERATORS,
@@ -187,7 +187,7 @@ class Lookup(Expression):
         reuse: Any = None,
         summarize: bool = False,
         for_save: bool = False,
-    ) -> Lookup:
+    ) -> Self:
         c = self.copy()
         c.is_summary = summarize
         c.lhs = self.lhs.resolve_expression(
@@ -308,10 +308,12 @@ class FieldGetDbPrepValueIterableMixin(FieldGetDbPrepValueMixin):
                 # An expression will be handled by the database but can coexist
                 # alongside real values.
                 pass
-            elif self.prepare_rhs:
-                if output_field := getattr(self.lhs, "output_field", None):
-                    if get_prep_value := getattr(output_field, "get_prep_value", None):
-                        rhs_value = get_prep_value(rhs_value)
+            elif (
+                self.prepare_rhs
+                and (output_field := getattr(self.lhs, "output_field", None))
+                and (get_prep_value := getattr(output_field, "get_prep_value", None))
+            ):
+                rhs_value = get_prep_value(rhs_value)
             prepared_values.append(rhs_value)
         return prepared_values
 
@@ -618,7 +620,7 @@ class IsNull(BuiltinLookup):
         self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         if not isinstance(self.rhs, bool):
-            raise ValueError(
+            raise TypeError(
                 "The QuerySet value for an isnull lookup must be True or False."
             )
         sql, params = self.process_lhs(compiler, connection)

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import hmac
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from app.users.models import User
-
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthView
@@ -49,7 +48,7 @@ class PasswordForgotView(TemplateView):
                 "id": user.id,
                 "email": user.email,
                 "password": user.password,  # Hashed password
-                "timestamp": datetime.now().timestamp(),  # Makes each token unique
+                "timestamp": datetime.now(UTC).timestamp(),  # Makes each token unique
             },
             compress=True,
         )
@@ -69,7 +68,7 @@ class PasswordForgotView(TemplateView):
         send_password_reset(
             email=result.email, generate_reset_url=self.generate_password_reset_url
         )
-        return RedirectResponse(self.success_url or "/")
+        return RedirectResponse(self.success_url or "/", status_code=302)
 
 
 class PasswordResetView(AuthView, TemplateView):
@@ -126,13 +125,13 @@ class PasswordResetView(AuthView, TemplateView):
     def get(self) -> Response:
         # Redirect if the user is already logged in
         if self.user:
-            return RedirectResponse(self.success_url or "/")
+            return RedirectResponse(self.success_url or "/", status_code=302)
 
         # Tokens arrive as a GET parameter; stash in the session and redirect
         # to a token-free URL so the token can't leak via the Referer header.
         if token := self.request.query_params.get("token", ""):
             self.session[self._reset_token_session_key] = token
-            response = RedirectResponse(self.request.path)
+            response = RedirectResponse(self.request.path, status_code=302)
             add_never_cache_headers(response)
             return response
 
@@ -154,7 +153,7 @@ class PasswordResetView(AuthView, TemplateView):
             )
         set_user_password(user, result.new_password1)
         del self.session[self._reset_token_session_key]
-        return RedirectResponse(self.success_url or "/")
+        return RedirectResponse(self.success_url or "/", status_code=302)
 
 
 class PasswordChangeView(AuthView, TemplateView):
@@ -201,7 +200,7 @@ class PasswordChangeView(AuthView, TemplateView):
         # Updating the password logs out all other sessions for the user
         # except the current one.
         update_session_auth_hash(self.request, user)
-        return RedirectResponse(self.success_url or "/")
+        return RedirectResponse(self.success_url or "/", status_code=302)
 
 
 class PasswordLoginView(AuthView, TemplateView):
@@ -211,7 +210,7 @@ class PasswordLoginView(AuthView, TemplateView):
     def get(self) -> Response:
         # Redirect if the user is already logged in
         if self.user:
-            return RedirectResponse(self.success_url)
+            return RedirectResponse(self.success_url, status_code=302)
         return self.render_form(self.form_class)
 
     def post(self) -> Response:
@@ -234,7 +233,7 @@ class PasswordLoginView(AuthView, TemplateView):
                 ),
             )
         auth_login(self.request, user)
-        return RedirectResponse(self.success_url)
+        return RedirectResponse(self.success_url, status_code=302)
 
 
 class PasswordSignupView(TemplateView):
@@ -251,4 +250,4 @@ class PasswordSignupView(TemplateView):
         create_from(User, result)
         # To sign the new user in immediately, capture create_from()'s
         # return value and pass it to auth_login(self.request, user).
-        return RedirectResponse(self.success_url)
+        return RedirectResponse(self.success_url, status_code=302)

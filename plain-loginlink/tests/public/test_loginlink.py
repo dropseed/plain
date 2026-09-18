@@ -12,7 +12,6 @@ import re
 from urllib.parse import urlsplit
 
 from app.users.models import User
-
 from plain.loginlink.links import generate_link_url
 from plain.test import Client, RequestFactory
 
@@ -60,6 +59,63 @@ class TestRequestLink:
         assert response.status_code == 302
         assert response.url == "/loginlink/sent"
         assert len(mailoutbox) == 0
+
+
+class TestLinkExpiration:
+    def test_form_link_expires_in_is_honored(self, db, mailoutbox):
+        """A form's `link_expires_in` sets the window on the links it sends."""
+        User.query.create(email="shortlived@example.com")
+        client = Client()
+
+        client.post(
+            "/login-already-expired",
+            data={"email": "shortlived@example.com", "next": ""},
+        )
+
+        response = client.get(token_path(mailoutbox[0]), follow=True)
+
+        assert "Link Expired" in response.content.decode()
+        assert not is_logged_in(client)
+
+
+class TestAlreadyLoggedIn:
+    def test_login_page_redirects_home(self, db):
+        client = Client()
+        client.force_login(User.query.create(email="repeat@example.com"))
+
+        response = client.get("/login")
+
+        assert response.status_code == 302
+        assert response.url == "/"
+
+    def test_login_page_redirects_to_next(self, db):
+        client = Client()
+        client.force_login(User.query.create(email="repeat@example.com"))
+
+        response = client.get("/login?next=/whoami")
+
+        assert response.status_code == 302
+        assert response.url == "/whoami"
+
+    def test_empty_next_redirects_home(self, db):
+        client = Client()
+        client.force_login(User.query.create(email="repeat@example.com"))
+
+        response = client.get("/login?next=")
+
+        # An empty Location header would redirect the browser back to
+        # the login page in a loop.
+        assert response.status_code == 302
+        assert response.url == "/"
+
+    def test_external_next_redirects_home(self, db):
+        client = Client()
+        client.force_login(User.query.create(email="repeat@example.com"))
+
+        response = client.get("/login?next=https://evil.com")
+
+        assert response.status_code == 302
+        assert response.url == "/"
 
 
 class TestFollowLink:

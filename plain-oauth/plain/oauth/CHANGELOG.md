@@ -1,5 +1,59 @@
 # plain-oauth changelog
 
+## [0.50.4](https://github.com/dropseed/plain/releases/plain-oauth@0.50.4) (2026-08-21)
+
+### What's changed
+
+- The OAuth error page renders at its 400 status directly via `self.render(status_code=400)`, instead of rendering a 200 and mutating the status afterwards — response statuses are now fixed at construction ([4775fe60d4](https://github.com/dropseed/plain/commit/4775fe60d4))
+
+### Upgrade instructions
+
+- No changes required.
+- Requires `plain.templates>=0.6.0`.
+
+## [0.50.3](https://github.com/dropseed/plain/releases/plain-oauth@0.50.3) (2026-08-12)
+
+### What's changed
+
+- Provider examples raise `OAuthError` with a clear message when no verified/confirmed primary email is available, instead of leaking an `IndexError`/`StopIteration` ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `urls` and admin viewset attributes declared as tuples; internal cleanups ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- If you based a provider on the GitHub/Bitbucket examples, consider adopting the explicit missing-email `OAuthError` handling
+
+## [0.50.2](https://github.com/dropseed/plain/releases/plain-oauth@0.50.2) (2026-08-02)
+
+### What's changed
+
+- `OAuthConnection.refresh_token` now declares `default=""` explicitly — plain-postgres 0.113.0 lets `EncryptedTextField` accept exactly the empty string as a default (stored as plaintext `''`). The column `DEFAULT` is applied by convergence on the next `plain postgres sync` — no migration needed. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+- Login and provider redirects now pass an explicit `status_code=302` to `RedirectResponse`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.50.1](https://github.com/dropseed/plain/releases/plain-oauth@0.50.1) (2026-07-15)
+
+### What's changed
+
+- Security: the OAuth **connect** and **disconnect** views now require an authenticated user (`login_required = True`), and disconnect is scoped to the requesting user — so a request can no longer delete another user's connection by supplying their `provider_user_id`. ([f8a8491e85](https://github.com/dropseed/plain/commit/f8a8491e85))
+- Migrated the provider examples and README from `requests` to `httpx`, and dropped `requests` from the runtime dependencies. The base provider makes no HTTP calls of its own; only the provider examples do. ([17570d71cf](https://github.com/dropseed/plain/commit/17570d71cf))
+
+### Upgrade instructions
+
+- No changes required. If your own OAuth provider subclasses relied on `requests` being installed transitively via `plain.oauth`, add `httpx` (or `requests`) to your own dependencies.
+
+## [0.50.0](https://github.com/dropseed/plain/releases/plain-oauth@0.50.0) (2026-06-22)
+
+### What's changed
+
+- Collapsed the migration history into a single fresh `0001_initial`. The database schema is unchanged — only the migration files were squashed. ([802f2d87](https://github.com/dropseed/plain/commit/802f2d87))
+
+### Upgrade instructions
+
+- Run `plain migrations prune` after upgrading to clear the now-orphaned history records for this package's old migrations. No SQL runs — it only cleans up migration-history records and is safe and idempotent. If `migrations prune` is already part of your deploy steps, no action is needed.
+
 ## [0.49.8](https://github.com/dropseed/plain/releases/plain-oauth@0.49.8) (2026-06-03)
 
 ### What's changed

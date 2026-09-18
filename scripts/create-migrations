@@ -2,7 +2,7 @@
 
 # Makemigrations requires a database connection to check migration history consistency.
 
-source scripts/start-postgres plain_example
+source scripts/start-postgres
 
 cd example
 uv run plain migrations create "$@"

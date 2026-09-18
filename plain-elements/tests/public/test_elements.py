@@ -1,5 +1,4 @@
 from jinja2 import DictLoader, Environment
-
 from plain.elements.templates import ElementsExtension  # adjust import
 
 
@@ -128,6 +127,22 @@ def test_element_as_attr():
     )
     out = env.get_template("index.html").render().strip()
     assert out == "WRAP[Yo!]"
+
+
+def test_capitalized_tags_in_comments_ignored():
+    """Capitalized tags inside Jinja comments aren't treated as elements."""
+    env = _make_env(
+        {
+            "index.html": (
+                "{% use_elements %}"
+                "{# see the <Dialog> elements below, e.g. <MyElement /> #}"
+                '<MyElement foo="bar" />'
+            ),
+            "elements/MyElement.html": "Hello {{ foo }}",
+        }
+    )
+    out = env.get_template("index.html").render().strip()
+    assert out == "Hello bar"
 
 
 def test_element_child_variable():

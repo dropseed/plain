@@ -4,7 +4,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
-from plain.http import AsyncStreamingResponse, Response
+from plain.http import AsyncStreamingResponse
 
 from .base import View
 
@@ -28,16 +28,10 @@ class ServerSentEventsView(View):
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    def head(self) -> Response:
-        return Response(
-            content_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-        )
-
     async def stream(self) -> AsyncIterator[ServerSentEvent]:
         """Override this to yield ServerSentEvent instances."""
         raise NotImplementedError(f"{self.__class__.__name__} must implement stream()")
-        yield  # noqa: RET503 — unreachable, marks this as an async generator
+        yield
 
     async def _format_events(self) -> AsyncIterator[str]:
         async for event in self.stream():

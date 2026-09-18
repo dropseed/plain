@@ -1,0 +1,6 @@
+[[scopes]]
+name = "code"
+paths = ["**/*", "!**/tests/**/*"]
+reviewers = ["davegaeddert"]
+require = 1
+author_value = 1

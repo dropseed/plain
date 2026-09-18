@@ -12,9 +12,8 @@
 # pylint: disable=super-init-not-called
 
 
-# Exit codes used by workers to communicate failure reason to the arbiter.
+# Exit code used by workers to communicate a boot failure to the arbiter.
 WORKER_BOOT_ERROR = 3
-APP_LOAD_ERROR = 4
 
 
 # we inherit from BaseException here to make sure to not be caught
@@ -30,7 +29,3 @@ class HaltServer(BaseException):
 
 class ConfigError(Exception):
     """Exception raised on config error"""
-
-
-class AppImportError(Exception):
-    """Exception raised when loading an application"""

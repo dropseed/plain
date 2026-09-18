@@ -1,13 +1,17 @@
 {% use_elements %}
-{# Macro for rendering a menu section (App or Packages) #}
-{# Parameters: sections (dict), header_label (string), pinned_slugs (set), slug (string) #}
+{# Macro for rendering a menu section. #}
+{# Parameters: sections (dict), group_label (string|None), pinned_slugs (set), slug (string) #}
+{# group_label is unset for the app's own sections (the primary, everyday
+   content, shown with no header) and set for the framework tooling group,
+   which is separated below a divider and labeled by function (e.g. "System"). #}
 
 {% if sections %}
-<div class="menu-section data-[header=packages]:pt-3 data-[header=packages]:mt-3" data-header="{{ header_label|lower }}">
-    <div class="relative flex items-center px-1.5 pt-1 pb-2">
-        <span class="text-[10px] font-medium text-admin-muted-foreground/80 uppercase tracking-widest">{{ header_label }}</span>
-        <div class="flex-1 ml-2.5 h-px bg-gradient-to-r from-stone-200 to-transparent"></div>
+<div class="menu-section data-[header=system]:mt-3 data-[header=system]:pt-3 data-[header=system]:border-t data-[header=system]:border-admin-border" data-header="{{ group_label|lower if group_label else 'app' }}">
+    {% if group_label %}
+    <div class="px-1.5 pt-1 pb-1">
+        <span class="text-[13px] font-semibold text-admin-foreground/70">{{ group_label }}</span>
     </div>
+    {% endif %}
     {% for section, views in sections.items() %}
     {% if section %}
     <div class="mt-4 mb-1.5 px-1.5 menu-subsection" data-section="{{ section|lower }}">

@@ -11,6 +11,19 @@ _APP_ASSETS_DIR = APP_PATH / "assets"
 
 _SKIP_ASSETS = (".DS_Store", ".gitignore")
 
+# A top-level `src/` in any asset dir holds build inputs — a build tool's entry
+# points and the modules they import. They are consumed by the build, never served.
+_BUILD_INPUT_DIR = "src"
+
+# A top-level `dist/` holds build output that is already content-hashed by the
+# build tool. Plain serves it immutable without re-fingerprinting (skips its md5).
+_BUILD_OUTPUT_DIR = "dist"
+
+
+def is_build_output(url_path: str) -> bool:
+    """Whether a url_path lives under the top-level `dist/` build-output dir."""
+    return url_path.startswith(_BUILD_OUTPUT_DIR + os.sep)
+
 
 class Asset:
     def __init__(self, *, url_path: str, absolute_path: str):
@@ -28,7 +41,13 @@ def _iter_assets() -> Iterator[Asset]:
     """
 
     def __iter_assets_dir(path: str | Path) -> Iterator[tuple[str, str]]:
-        for root, _, files in os.walk(path):
+        at_root = True
+        for root, dirs, files in os.walk(path):
+            if at_root:
+                # Prune the top-level `src/` build-input dir — only here at the
+                # root (os.walk yields it first), never a nested `foo/src/`.
+                dirs[:] = [d for d in dirs if d != _BUILD_INPUT_DIR]
+                at_root = False
             for f in files:
                 if f in _SKIP_ASSETS:
                     continue

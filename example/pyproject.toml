@@ -14,7 +14,6 @@ dependencies = [
   "plain-code",
   "plain-dev",
   "plain-elements",
-  "plain-esbuild",
   "plain-flags",
   "plain-htmx",
   "plain-jobs",
@@ -27,7 +26,6 @@ dependencies = [
   "plain-pages",
   "plain-passwords",
   "plain-pytest",
-  "plain-redirection",
   "plain-scan",
   "plain-sessions",
   "plain-tailwind",
@@ -45,4 +43,4 @@ tunnel = { cmd = "plain tunnel $DEV_URL --subdomain plain-example --quiet" }
 worker = { cmd = "plain jobs worker --stats-every 300" }
 
 [tool.plain.code.oxc]
-version = "1.51.0"
+version = "1.75.0"

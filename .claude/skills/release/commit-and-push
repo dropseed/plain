@@ -26,6 +26,11 @@ def run(cmd: list[str], cwd: Path | None = None, check: bool = True) -> subproce
     print(f"  $ {' '.join(cmd)}")
     result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
     if check and result.returncode != 0:
+        # Print stdout too — helper scripts like add-hunks report their failure
+        # there, so stderr alone can be empty and hide the real cause.
+        if result.stdout.strip():
+            for line in result.stdout.strip().split('\n'):
+                print(f"    {line}")
         print(f"Error: {result.stderr.strip()}")
         sys.exit(1)
     if result.stdout.strip():

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import pytest
+from typing import Any
 
+import pytest
 from plain.postgres import types
 from plain.postgres.migrations.autodetector import MigrationAutodetector
 from plain.postgres.migrations.exceptions import MigrationSchemaError
@@ -15,7 +16,8 @@ def _state_with(model_state: ModelState) -> ProjectState:
     return state
 
 
-def test_add_not_null_field_without_default_raises() -> None:
+def _added_field_changes(field: Any) -> dict[str, Any]:
+    """Autodetect adding `field` to a model whose table may already have rows."""
     from_model = ModelState(
         package_label="examples",
         name="Thing",
@@ -26,62 +28,103 @@ def test_add_not_null_field_without_default_raises() -> None:
         name="Thing",
         fields=[
             ("name", types.TextField(max_length=100)),
-            ("status", types.TextField(max_length=50)),
+            ("added", field),
         ],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
+    return autodetector._detect_changes()
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        types.TextField(max_length=50),
+        types.TextField(max_length=50, required=False),
+        types.EncryptedTextField(required=False),
+        types.BinaryField(required=False),
+    ],
+    ids=["text", "optional-text", "encrypted", "binary"],
+)
+def test_add_not_null_field_without_default_raises(field: Any) -> None:
+    """NOT NULL + no declared default can't backfill existing rows. required=False
+    alone is not enough — its Python-side empty-value fill is invisible to the
+    schema layer."""
     with pytest.raises(MigrationSchemaError) as exc:
-        autodetector._detect_changes()
+        _added_field_changes(field)
     msg = str(exc.value)
-    assert "thing.status" in msg.lower()
+    assert "thing.added" in msg.lower()
     assert "default" in msg.lower()
 
 
-def test_add_not_null_field_with_default_succeeds() -> None:
-    from_model = ModelState(
-        package_label="examples",
-        name="Thing",
-        fields=[("name", types.TextField(max_length=100))],
-    )
-    to_model = ModelState(
-        package_label="examples",
-        name="Thing",
-        fields=[
-            ("name", types.TextField(max_length=100)),
-            ("status", types.TextField(max_length=50, default="active")),
-        ],
-    )
-    autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
-    changes = autodetector._detect_changes()
-    assert "examples" in changes
+@pytest.mark.parametrize(
+    "field",
+    [
+        types.TextField(max_length=50, default="active"),
+        types.TextField(max_length=50, required=False, default=""),
+        types.EncryptedTextField(required=False, default=""),
+        types.BinaryField(required=False, default=b""),
+        types.TextField(max_length=50, allow_null=True, required=False),
+    ],
+    ids=[
+        "text-default",
+        "optional-text-empty",
+        "encrypted-empty",
+        "binary-empty",
+        "nullable",
+    ],
+)
+def test_add_field_with_backfill_succeeds(field: Any) -> None:
+    """A declared default (persistent column DEFAULT) or allow_null=True gives
+    existing rows a value, so the AddField is generated."""
+    changes = _added_field_changes(field)
     operations = [
         op for migration in changes["examples"] for op in migration.operations
     ]
     assert any(
-        op.__class__.__name__ == "AddField" and op.name == "status" for op in operations
+        op.__class__.__name__ == "AddField" and op.name == "added" for op in operations
     )
 
 
-def test_add_nullable_field_without_default_succeeds() -> None:
-    from_model = ModelState(
-        package_label="examples",
-        name="Thing",
-        fields=[("name", types.TextField(max_length=100))],
-    )
-    to_model = ModelState(
-        package_label="examples",
-        name="Thing",
-        fields=[
-            ("name", types.TextField(max_length=100)),
-            (
-                "status",
-                types.TextField(max_length=50, allow_null=True, required=False),
-            ),
-        ],
-    )
-    autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
-    changes = autodetector._detect_changes()
-    assert "examples" in changes
+def test_backfill_error_suggests_the_empty_default_spelling() -> None:
+    """For empty-only-default fields the remedy must render the exact working
+    declaration — not echo something the user already wrote."""
+    with pytest.raises(MigrationSchemaError) as exc:
+        _added_field_changes(types.EncryptedTextField())
+    msg = str(exc.value)
+    assert "types.EncryptedTextField(required=False, default='')" in msg
+    assert "Choose one:" in msg
+
+
+def test_backfill_error_placeholder_is_not_executable() -> None:
+    """The general example must say default=<value>, not default=... —
+    Ellipsis is valid Python, so a literally-copied `default=...` would
+    construct and then persist garbage (e.g. str(Ellipsis) on a TextField)."""
+    with pytest.raises(MigrationSchemaError) as exc:
+        _added_field_changes(types.IntegerField())
+    assert "types.IntegerField(default=<value>)" in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        # Not a DefaultableField at all.
+        types.DateTimeField(),
+        # A DefaultableField whose __init__ deliberately takes no default=
+        # (accepts_default=False).
+        types.EncryptedJSONField(),
+    ],
+    ids=["datetime", "encrypted-json"],
+)
+def test_backfill_error_omits_default_remedy_for_non_defaultable_fields(
+    field: Any,
+) -> None:
+    """Fields with no default= kwarg get only the allow_null remedy —
+    suggesting a default would be advice that raises."""
+    with pytest.raises(MigrationSchemaError) as exc:
+        _added_field_changes(field)
+    msg = str(exc.value)
+    assert "Fix:" in msg
+    assert "Declare a default" not in msg
 
 
 def test_create_model_with_not_null_field_no_default_succeeds() -> None:
@@ -131,7 +174,7 @@ def test_alter_nullable_to_not_null_is_autodetector_no_op() -> None:
 def test_alter_nullable_to_not_null_with_default_is_autodetector_no_op() -> None:
     """Declaring a default alongside NOT NULL still emits no migration — both
     allow_null and default are non_migration_attrs. Convergence applies the DEFAULT
-    and SetNotNullFix on the next sync."""
+    and SetNotNullCorrection on the next sync."""
     from_model = ModelState(
         package_label="examples",
         name="Thing",

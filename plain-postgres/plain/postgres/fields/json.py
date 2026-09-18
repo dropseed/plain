@@ -4,7 +4,6 @@ import json
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
-from plain import exceptions
 from plain.postgres import expressions, lookups
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import adapt_json_value
@@ -16,6 +15,8 @@ from plain.postgres.lookups import (
     OperatorLookup,
     Transform,
 )
+
+from plain import exceptions
 
 from .base import DefaultableField
 
@@ -53,7 +54,7 @@ class JSONField(DefaultableField):
             validators=validators,
         )
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.encoder is not None:
             kwargs["encoder"] = self.encoder
@@ -83,6 +84,15 @@ class JSONField(DefaultableField):
             value = value.value
         elif hasattr(value, "as_sql"):
             return value
+        return self.adapt_json_db_value(value)
+
+    def adapt_json_db_value(self, value: Any) -> Any:
+        """Adapt a plain JSON value for this field's column — the one step
+        subclasses with a different column type (EncryptedJSONField) replace.
+
+        May receive None (get_db_prep_save short-circuits it, but other
+        get_db_prep_value callers don't): here it adapts to jsonb null;
+        EncryptedJSONField maps it to SQL NULL."""
         return adapt_json_value(value, self.encoder)
 
     def get_db_prep_save(self, value: Any, connection: DatabaseConnection) -> Any:
@@ -90,14 +100,12 @@ class JSONField(DefaultableField):
             return value
         return self.get_db_prep_value(value, connection)
 
-    def get_transform(
-        self, lookup_name: str
-    ) -> type[Transform] | Callable[..., Any] | None:
+    def get_transform(self, name: str) -> Callable[..., Transform] | None:
         # Always returns a transform (never None in practice)
-        transform = super().get_transform(lookup_name)
+        transform = super().get_transform(name)
         if transform:
             return transform
-        return KeyTransformFactory(lookup_name)
+        return KeyTransformFactory(name)
 
     def validate(self, value: Any, model_instance: Any) -> None:
         super().validate(value, model_instance)

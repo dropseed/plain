@@ -1,3 +1,4 @@
+import os
 import platform
 import shutil
 import subprocess
@@ -7,15 +8,14 @@ import urllib.request
 from pathlib import Path
 
 import click
+from plain.runtime import PLAIN_CACHE_PATH
 
 
 class MkcertManager:
     def __init__(self) -> None:
         self.mkcert_bin: str | None = None
 
-    def setup_mkcert(
-        self, install_path: Path, *, force_reinstall: bool = False
-    ) -> None:
+    def setup_mkcert(self, *, force_reinstall: bool = False) -> None:
         """Set up mkcert by checking if it's installed or downloading the binary and installing the local CA."""
         if mkcert_path := shutil.which("mkcert"):
             self.mkcert_bin = mkcert_path
@@ -24,7 +24,8 @@ class MkcertManager:
                 self.install_ca()
             return
 
-        # mkcert not found system-wide, download to install_path
+        # mkcert not found system-wide, download to the machine-level cache
+        install_path = PLAIN_CACHE_PATH / "mkcert"
         install_path.mkdir(parents=True, exist_ok=True)
         binary_path = install_path / "mkcert"
 
@@ -67,8 +68,17 @@ class MkcertManager:
 
         mkcert_url = f"https://dl.filippo.io/mkcert/latest?for={os_name}/{arch}"
         click.secho(f"Downloading mkcert from {mkcert_url}...", bold=True)
-        urllib.request.urlretrieve(mkcert_url, dest)
-        dest.chmod(0o755)
+
+        # Download to a temp file first, then atomically move it into place
+        # (the cache is machine-shared, and an interrupted download must not
+        # leave a partial binary behind at the final path).
+        tmp_path = dest.parent / f".download-{os.getpid()}"
+        try:
+            urllib.request.urlretrieve(mkcert_url, tmp_path)
+            tmp_path.chmod(0o755)
+            os.replace(tmp_path, dest)
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
     def _get_ca_root(self) -> Path | None:
         """Get the mkcert CAROOT directory."""
@@ -78,6 +88,7 @@ class MkcertManager:
             [self.mkcert_bin, "-CAROOT"],
             capture_output=True,
             text=True,
+            check=False,
         )
         if result.returncode == 0:
             return Path(result.stdout.strip())
@@ -102,7 +113,7 @@ class MkcertManager:
             return
 
         # Don't capture output so user can see messages and respond to password prompts
-        result = subprocess.run([self.mkcert_bin, "-install"])
+        result = subprocess.run([self.mkcert_bin, "-install"], check=False)
 
         if result.returncode != 0:
             click.secho("Failed to install mkcert CA", fg="red")
@@ -117,11 +128,15 @@ class MkcertManager:
         update_interval = 60 * 24 * 3600  # 60 days in seconds
 
         # Check if the certs exist and if the timestamp is recent enough
-        if not force_regenerate:
-            if cert_path.exists() and key_path.exists() and timestamp_path.exists():
-                last_updated = timestamp_path.stat().st_mtime
-                if time.time() - last_updated < update_interval:
-                    return cert_path, key_path
+        if (
+            not force_regenerate
+            and cert_path.exists()
+            and key_path.exists()
+            and timestamp_path.exists()
+        ):
+            last_updated = timestamp_path.stat().st_mtime
+            if time.time() - last_updated < update_interval:
+                return cert_path, key_path
 
         storage_path.mkdir(parents=True, exist_ok=True)
 

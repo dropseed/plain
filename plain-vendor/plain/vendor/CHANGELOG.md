@@ -1,5 +1,25 @@
 # plain-vendor changelog
 
+## [0.11.8](https://github.com/dropseed/plain/releases/plain-vendor@0.11.8) (2026-08-12)
+
+### What's changed
+
+- CLI exits via `sys.exit()`; internal lint cleanups ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.11.7](https://github.com/dropseed/plain/releases/plain-vendor@0.11.7) (2026-07-15)
+
+### What's changed
+
+- Migrated dependency downloading from `requests` to `httpx` (redirects followed, sourcemap fetch included). `requests` is no longer a dependency. ([17570d71cf](https://github.com/dropseed/plain/commit/17570d71cf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.11.6](https://github.com/dropseed/plain/releases/plain-vendor@0.11.6) (2026-05-12)
 
 ### What's changed
