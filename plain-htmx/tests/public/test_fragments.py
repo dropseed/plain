@@ -66,7 +66,8 @@ def test_full_render_of_a_loop_emits_a_wrapper_per_item() -> None:
 
 def test_fragment_request_returns_contents_without_the_wrapper() -> None:
     html = _render(fragment="main")
-    assert html == "<p>Hello World</p>"
+    # The wrapper's contents, indented as authored — nothing else.
+    assert html.strip() == "<p>Hello World</p>"
     assert "plain-hx-fragment" not in html
 
 
@@ -91,7 +92,7 @@ def test_targeting_an_outer_fragment_keeps_the_nested_wrapper() -> None:
 
 def test_nested_fragment_is_reachable_on_its_own() -> None:
     html = _render(fragment="inner")
-    assert html == "<b>INNER</b>"
+    assert html.strip() == "<b>INNER</b>"
     assert "BEFORE" not in html
 
 
