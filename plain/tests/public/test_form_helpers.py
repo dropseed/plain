@@ -8,7 +8,6 @@ reads each field through these helpers. Each takes a field reference
 from __future__ import annotations
 
 import pytest
-
 from plain.forms import (
     Form,
     Invalid,

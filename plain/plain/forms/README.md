@@ -38,9 +38,9 @@ class ContactForm(Form):
 ```python
 result = ContactForm.validate(request.form_data)
 if not result:
-    ...                  # result is Invalid — handle the errors
-result.email             # str — every field cleaned and typed
-result.message           # str
+    ...  # result is Invalid — handle the errors
+result.email  # str — every field cleaned and typed
+result.message  # str
 ```
 
 `validate()` **never raises** on bad input. A `Form` instance is truthy and `Invalid` is falsy, so `if not result:` branches to the failure case and otherwise leaves you the validated instance directly — no `cleaned_data` dict, no `.is_valid()` call.
@@ -58,7 +58,7 @@ result = ContactForm.validate(data)
 if not result:
     for error in result.errors:
         print(error.field, error.code, error.message)
-    print(result.raw)        # the original submitted input
+    print(result.raw)  # the original submitted input
 ```
 
 `Invalid.errors` is one flat list of [`Error`](./result.py#Error). Each `Error` carries:
@@ -85,7 +85,11 @@ class SignupForm(Form):
 
     def check(self):
         if self.password != self.password_confirm:
-            return [Error("Passwords do not match.", code="mismatch", field="password_confirm")]
+            return [
+                Error(
+                    "Passwords do not match.", code="mismatch", field="password_confirm"
+                )
+            ]
         return None
 ```
 
@@ -163,7 +167,9 @@ priority = types.ChoiceField(choices=PRIORITY_CHOICES)
 A Python `Enum` works as `choices` too. **[`TypedChoiceField`](./fields.py#TypedChoiceField)** coerces the validated value with a `coerce` callable, and **[`MultipleChoiceField`](./fields.py#MultipleChoiceField)** cleans to a `list`.
 
 ```python
-year = types.TypedChoiceField(choices=[(str(y), str(y)) for y in range(2020, 2030)], coerce=int)
+year = types.TypedChoiceField(
+    choices=[(str(y), str(y)) for y in range(2020, 2030)], coerce=int
+)
 tags = types.MultipleChoiceField(choices=[("a", "A"), ("b", "B")])
 ```
 
@@ -215,8 +221,8 @@ class ContactView(TemplateView):
 `self.render_form(form_class, result=None, *, values=None, errors=None, **context)` passes both `form_class` and `form` into the template context. Three modes:
 
 ```python
-self.render_form(ContactForm)                              # blank — shows each field's initial
-self.render_form(ContactForm, result)                      # a failed validate() — values + errors
+self.render_form(ContactForm)  # blank — shows each field's initial
+self.render_form(ContactForm, result)  # a failed validate() — values + errors
 self.render_form(ContactForm, values={"email": user.email})  # pre-filled
 ```
 
@@ -252,9 +258,9 @@ The helpers are typed through the field reference — `field_value(form, Contact
 `validate()` takes any dict, so one form class serves an HTML page and a JSON API:
 
 ```python
-ContactForm.validate(request.form_data)                  # an HTML form POST
-ContactForm.validate(request.json_data)                  # a JSON request body
-ContactForm.validate(payload)                            # a job argument, a test
+ContactForm.validate(request.form_data)  # an HTML form POST
+ContactForm.validate(request.json_data)  # a JSON request body
+ContactForm.validate(payload)  # a job argument, a test
 ContactForm.validate(request.form_data, files=request.files)  # with file uploads
 ```
 
@@ -269,7 +275,9 @@ from plain.http import JsonResponse
 def post(self):
     result = ContactForm.validate(self.request.json_data)
     if not result:
-        return JsonResponse({"errors": [asdict(e) for e in result.errors]}, status_code=400)
+        return JsonResponse(
+            {"errors": [asdict(e) for e in result.errors]}, status_code=400
+        )
     send_contact_email(result.email, result.message)
     return JsonResponse({"ok": True})
 ```
@@ -308,7 +316,7 @@ class NoteForm(ModelForm):
 Set `required=False`. The cleaned value becomes `None` when the field is absent, and the type reflects it.
 
 ```python
-notes = types.TextField(required=False)   # result.notes is str | None
+notes = types.TextField(required=False)  # result.notes is str | None
 ```
 
 #### How do I pre-populate a form?

@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import pytest
-
 from plain.exceptions import ValidationError
 from plain.forms import Error, Form, types
 
@@ -124,7 +123,6 @@ class TestCheck:
 
             def check(self):
                 ran.append(True)
-                return None
 
         F.validate({"x": "not-a-number"})
         assert ran == []

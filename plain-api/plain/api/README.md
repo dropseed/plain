@@ -395,9 +395,7 @@ class TeamAccountAPIView(BaseAPIView):
             }
 
         update_from(self.team_account, result)
-        return TeamAccountSchema.from_team_account(
-            self.team_account, self.request
-        )
+        return TeamAccountSchema.from_team_account(self.team_account, self.request)
 
     @cached_property
     def team_account(self):

@@ -4,7 +4,6 @@ from collections.abc import Callable, Generator
 from typing import Any
 
 from app.users.models import User
-
 from plain.email import TemplateEmail
 from plain.exceptions import ValidationError
 from plain.forms import Error

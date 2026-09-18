@@ -12,7 +12,6 @@ import pytest
 from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.forms import FormsExample
 from app.examples.models.relationships import Tag, Widget, WidgetTag
-
 from plain.forms import fields as form_fields
 from plain.forms import types
 from plain.postgres.forms import (

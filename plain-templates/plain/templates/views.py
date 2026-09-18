@@ -281,8 +281,8 @@ class ListView(TemplateView, ABC):
 
 
 __all__ = [
-    "TemplateView",
-    "NotFoundView",
     "DetailView",
     "ListView",
+    "NotFoundView",
+    "TemplateView",
 ]
