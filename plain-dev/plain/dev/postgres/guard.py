@@ -29,7 +29,7 @@ from .identity import (
     write_pointer,
 )
 from .resolve import is_managed, open_cluster, write_cached_url
-from .schema_state import pending_migration_count
+from .schema_state import pending_migrations
 
 
 def guard_shared_database(
@@ -50,15 +50,21 @@ def guard_shared_database(
     # Shared means the metadata names a *different* checkout as the owner.
     if not owner or owner == current:
         return db_name
-    if pending_migration_count(cluster.url(db_name)) == 0:
-        return db_name  # shared, but nothing divergent to apply
+    # Lazy, like every plain.postgres import here: plain-dev doesn't depend on it.
+    from plain.postgres.migrations.exceptions import MigrationHistoryError
+
+    try:
+        if pending_migrations(cluster.url(db_name)).total == 0:
+            return db_name  # shared, but nothing divergent to apply
+    except MigrationHistoryError:
+        pass  # the code has moved past this database: divergent, fork it
 
     project_name, _ = project_identity(project_root)
     fork_name = database_name_for_checkout(project_name, checkout=project_root)
 
     click.secho(
         f"⚠ Database {db_name!r} is shared (owned by {owner}) and this branch "
-        f"adds migrations it doesn't have — forking so the shared database "
+        f"has migrations it hasn't applied — forking so the shared database "
         f"isn't changed for everyone using it.",
         fg="yellow",
     )

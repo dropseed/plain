@@ -13,7 +13,7 @@ from plain.postgres.sql.constants import INNER, LOUTER
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.fields.related import ForeignKeyField
-    from plain.postgres.fields.reverse_related import ForeignObjectRel
+    from plain.postgres.fields.reverse_related import ForeignKeyRel
     from plain.postgres.sql.compiler import SQLCompiler
 
 
@@ -61,7 +61,7 @@ class Join:
         parent_alias: str,
         table_alias: str,
         join_type: str,
-        join_field: ForeignKeyField | ForeignObjectRel,
+        join_field: ForeignKeyField | ForeignKeyRel,
         nullable: bool,
     ) -> None:
         # Join table
@@ -74,7 +74,7 @@ class Join:
         # The (lhs_col, rhs_col) pair for the JOIN's ON clause. A relation joins
         # on a single column pair.
         self.join_col = join_field.get_joining_columns()
-        # Along which field (or ForeignObjectRel in the reverse join case)
+        # Along which field (or ForeignKeyRel in the reverse join case)
         self.join_field = join_field
         # Is this join nullabled?
         self.nullable = nullable

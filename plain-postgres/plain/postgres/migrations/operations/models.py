@@ -3,11 +3,12 @@ from __future__ import annotations
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain import postgres
 from plain.postgres.base import ModelBase
 from plain.postgres.migrations.operations.base import Operation
 from plain.postgres.migrations.state import ModelState
 from plain.postgres.migrations.utils import field_references, resolve_relation
+
+from plain import postgres
 
 from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameField
 
@@ -52,7 +53,7 @@ class ModelOperation(Operation):
 class CreateModel(ModelOperation):
     """Create a model's table."""
 
-    serialization_expand_args = ["fields", "options"]
+    serialization_expand_args = ("fields", "options")
 
     def __init__(
         self,
@@ -371,7 +372,7 @@ class ModelOptionOperation(ModelOperation):
         self, operation: Operation, package_label: str
     ) -> bool | list[Operation]:
         # Use tuple syntax because self.__class__ is not compatible with union syntax in isinstance
-        if isinstance(operation, (self.__class__, DeleteModel)) and (  # noqa: UP038
+        if isinstance(operation, (self.__class__, DeleteModel)) and (
             self.name_lower == operation.name_lower
         ):
             return [operation]
@@ -431,9 +432,7 @@ class AlterModelOptions(ModelOptionOperation):
     """
 
     # Model options we want to compare and preserve in an AlterModelOptions op
-    ALTER_OPTION_KEYS = [
-        "ordering",
-    ]
+    ALTER_OPTION_KEYS = ("ordering",)
 
     def __init__(self, name: str, options: dict[str, Any]) -> None:
         self.options = options

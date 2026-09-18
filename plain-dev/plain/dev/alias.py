@@ -5,7 +5,6 @@ from functools import cached_property
 from pathlib import Path
 
 import click
-
 from plain.runtime import PLAIN_CACHE_PATH
 
 
@@ -74,7 +73,7 @@ class AliasManager:
                 timeout=2,
             )
             return result.returncode == 0
-        except (subprocess.TimeoutExpired, Exception):
+        except Exception:
             return False
 
     def _add_alias_to_shell(self) -> bool:

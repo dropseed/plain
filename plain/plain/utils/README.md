@@ -132,7 +132,7 @@ from plain.utils.text import Truncator
 
 text = "This is a long piece of text that needs to be shortened."
 Truncator(text).chars(20)  # "This is a long pie..."
-Truncator(text).words(5)   # "This is a long piece..."
+Truncator(text).words(5)  # "This is a long piece..."
 
 # Truncate HTML while preserving valid structure
 html = "<p>This is <strong>bold</strong> text.</p>"
@@ -224,7 +224,9 @@ Parse date and time strings into Python objects.
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time, parse_duration
 
 parse_date("2024-01-15")  # datetime.date(2024, 1, 15)
-parse_datetime("2024-01-15T10:30:00Z")  # datetime.datetime(2024, 1, 15, 10, 30, tzinfo=UTC)
+parse_datetime(
+    "2024-01-15T10:30:00Z"
+)  # datetime.datetime(2024, 1, 15, 10, 30, tzinfo=UTC)
 parse_time("10:30:00")  # datetime.time(10, 30)
 parse_duration("1 02:30:00")  # datetime.timedelta(days=1, hours=2, minutes=30)
 ```

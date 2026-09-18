@@ -2,7 +2,6 @@ import datetime
 
 import pytest
 from app.users.models import User
-
 from plain.oauth.models import OAuthConnection
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 from plain.test import Client

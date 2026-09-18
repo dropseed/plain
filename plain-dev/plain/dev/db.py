@@ -11,7 +11,6 @@ import json as json_lib
 from pathlib import Path
 
 import click
-
 from plain.cli import register_cli
 from plain.runtime import APP_PATH
 
@@ -40,7 +39,7 @@ from .postgres.resolve import (
     open_cluster,
     write_cached_url,
 )
-from .postgres.schema_state import pending_migration_count
+from .postgres.schema_state import pending_migrations
 from .state import checkout_id, find_project_root
 
 
@@ -121,6 +120,18 @@ def status(as_json: bool) -> None:
         else None
     )
 
+    pending = None
+    migrations_error: str | None = None
+    if exists:
+        from plain.postgres.migrations.exceptions import MigrationsError
+
+        try:
+            pending = pending_migrations(cluster.url(db_name))
+        except (MigrationsError, ImportError, SyntaxError) as e:
+            # The planner refused the database, the files don't form a graph,
+            # or one doesn't import: report it, this command only reports.
+            migrations_error = str(e)
+
     # The container/image/volume only exist for the docker backend; a local
     # Postgres has none of them.
     container = cluster.server.container
@@ -143,9 +154,9 @@ def status(as_json: bool) -> None:
                     "size_bytes": database.size_bytes if database else None,
                     "branch": database.branch if database else None,
                     "created_via": database.created_via if database else None,
-                    "pending_migrations": pending_migration_count(cluster.url(db_name))
-                    if exists
-                    else None,
+                    "pending_migrations": pending.total if pending else None,
+                    "pending_baselines": pending.record if pending else None,
+                    "migrations_error": migrations_error,
                     "container": container,
                     "image": image,
                     "volume": volume,
@@ -166,12 +177,15 @@ def status(as_json: bool) -> None:
         if database.branch:
             click.echo(f"Branch:    {database.branch}")
 
-    if exists:
-        pending = pending_migration_count(cluster.url(db_name))
-        if pending:
-            click.secho(
-                f"Pending:   {pending} migration(s) not yet applied", fg="yellow"
-            )
+    if migrations_error:
+        click.secho(f"Error:     {migrations_error}", fg="red")
+    elif pending and pending.total:
+        parts = []
+        if pending.run:
+            parts.append(f"{pending.run} migration(s) not yet applied")
+        if pending.record:
+            parts.append(f"{pending.record} baseline(s) to record")
+        click.secho(f"Pending:   {', '.join(parts)}", fg="yellow")
 
     if container:
         click.echo(f"Container: {container}")
@@ -196,7 +210,7 @@ def url() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
 def list_(as_json: bool) -> None:
     """List this project's databases."""
-    project_root, cluster, project_name, current = _open()
+    _project_root, cluster, project_name, current = _open()
     databases = cluster.list_databases(project_name)
 
     if as_json:
@@ -397,7 +411,7 @@ def clean(yes: bool) -> None:
     is a reason to correct the metadata, not to reclaim the disk. A test
     database can never be the project main — the `test_` prefix rules it out.
     """
-    project_root, cluster, project_name, current = _open()
+    _project_root, cluster, project_name, current = _open()
 
     databases = cluster.list_databases(project_name)
     orphans: list[DevDatabase] = [

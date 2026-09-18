@@ -39,7 +39,11 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
 - A new worktree's database is forked from the project's main database **with
   its data** — don't re-seed by hand, and don't tell users to.
 - `plain db status --json` before diagnosing anything database-shaped: database,
-  server, size, branch, and pending migration count. `plain db list --json` for
+  server, size, branch, and pending migration count (`pending_baselines` is
+  the part that is a record-only adoption) - or, when the migration planner
+  refuses the database or a migration file won't load, `migrations_error`
+  with both counts `null`.
+  `plain db list --json` for
   every database in the project and which checkout owns it.
 - `plain postgres shell` for a psql prompt on the active database; it accepts
   piped SQL, so `echo 'select ...' | plain postgres shell` is the way to inspect
@@ -56,5 +60,14 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
   copying or symlinking a working tree can't make two checkouts share a
   database or a dev slot. Change the database with `plain db use`, not by
   editing files. `.plain/` keeps only artifacts: logs, compiled assets, certs.
+
+## Encrypted `.env` values
+
+- Never write a plaintext secret into a committed `.env*` file. Add or rotate one
+  with `plain env set KEY VALUE` (or `plain env set KEY < file` for multi-line
+  values), which encrypts it with the project's `DEV_ENV_KEY`.
+- `plain env get KEY` reveals a secret — run it only when the task genuinely
+  needs the plaintext. Never print `DEV_ENV_KEY` or dump the environment
+  (`env`, `printenv`, `os.environ`).
 
 Run `uv run plain docs dev` for the full picture.

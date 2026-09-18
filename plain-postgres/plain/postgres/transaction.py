@@ -2,17 +2,15 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from contextlib import ContextDecorator, contextmanager
+from types import TracebackType
 from typing import Any
 
 import psycopg
-
 from plain.postgres.db import get_connection
 
 
 class TransactionManagementError(psycopg.ProgrammingError):
     """Transaction management is used improperly."""
-
-    pass
 
 
 @contextmanager
@@ -133,7 +131,7 @@ class Atomic(ContextDecorator):
         self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        traceback: Any,
+        traceback: TracebackType | None,
     ) -> None:
         conn = get_connection()
         if conn.in_atomic_block:

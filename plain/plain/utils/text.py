@@ -8,9 +8,9 @@ from plain.utils.functional import SimpleLazyObject, keep_lazy_text, lazy
 from plain.utils.regex_helper import _lazy_re_compile
 
 # Set up regular expressions
-_re_words = _lazy_re_compile(r"<[^>]+?>|([^<>\s]+)", re.S)
-_re_chars = _lazy_re_compile(r"<[^>]+?>|(.)", re.S)
-_re_tag = _lazy_re_compile(r"<(/)?(\S+?)(?:(\s*/)|\s.*?)?>", re.S)
+_re_words = _lazy_re_compile(r"<[^>]+?>|([^<>\s]+)", re.DOTALL)
+_re_chars = _lazy_re_compile(r"<[^>]+?>|(.)", re.DOTALL)
+_re_tag = _lazy_re_compile(r"<(/)?(\S+?)(?:(\s*/)|\s.*?)?>", re.DOTALL)
 
 
 class Truncator(SimpleLazyObject):

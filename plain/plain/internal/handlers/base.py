@@ -12,6 +12,7 @@ from urllib.parse import quote
 
 from opentelemetry import context, metrics, trace
 from opentelemetry.semconv._incubating.attributes.http_attributes import (
+    HTTP_REQUEST_BODY_SIZE,
     HTTP_RESPONSE_BODY_SIZE,
 )
 from opentelemetry.semconv.attributes import (
@@ -24,7 +25,6 @@ from opentelemetry.semconv.attributes import (
     user_agent_attributes,
 )
 from opentelemetry.semconv.metrics.http_metrics import HTTP_SERVER_REQUEST_DURATION
-
 from plain.http import RedirectResponse
 from plain.runtime import settings
 from plain.urls import get_resolver
@@ -154,6 +154,15 @@ class BaseHandler:
 
         if user_agent := request.headers.get("User-Agent"):
             span_attributes[user_agent_attributes.USER_AGENT_ORIGINAL] = user_agent
+
+        # The body is fully received before dispatch, so this span opens
+        # after ingest — record what receiving the body cost, or a slow
+        # upload reads as a fast view with unhappy users.
+        if request._body_ingest_seconds is not None:
+            span_attributes[HTTP_REQUEST_BODY_SIZE] = request.content_length
+            span_attributes["plain.request.body_ingest_seconds"] = round(
+                request._body_ingest_seconds, 6
+            )
 
         # Start with just the method; updated to "{method} {route}" after
         # URL resolution in _resolve_request. Avoids high-cardinality span

@@ -6,7 +6,7 @@ responses as `APIError` with the server's message when available.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Self
 
 import click
 import httpx
@@ -48,10 +48,10 @@ class Client:
             transport=transport,
         )
 
-    def __enter__(self) -> Client:
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *exc: Any) -> None:
+    def __exit__(self, *exc: object) -> None:
         self._client.close()
 
     def get(self, path: str, **kwargs: Any) -> Any:

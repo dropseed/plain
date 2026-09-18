@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.migrations.utils import get_migration_name_timestamp
@@ -23,25 +23,32 @@ class Migration:
      - operations: A list of Operation instances, probably from
        plain.postgres.migrations.operations
      - dependencies: A list of tuples of (app_path, migration_name)
-     - replaces: A list of migration_names
 
     Note that all migrations come out of migrations and into the Loader or
     Graph as instances, having been initialized with their app label and name.
     """
 
+    # Declared as tuples in migration files; __init__ copies each into a
+    # list on the instance because the autodetector mutates its copies.
+
     # Operations to apply during this migration, in order.
-    operations: list[Any] = []
+    operations: Sequence[Any] = ()
 
-    # Other migrations that should be run before this migration.
-    # Should be a list of (app, migration_name).
-    dependencies: list[tuple[str, str]] = []
+    # (package_label, migration_name) pairs to run before this migration.
+    dependencies: Sequence[tuple[str, str]] = ()
 
-    # Migration names in this app that this migration replaces. If this is
-    # non-empty, this migration will only be applied if all these migrations
-    # are not applied.
-    # Note: Despite the comment saying "migration names", this is actually a list of tuples
-    # (app_label, migration_name) as used throughout the codebase.
-    replaces: list[tuple[str, str]] = []
+    # A baseline stands in for a package's deleted migration history. `supersedes`
+    # names the one deleted migration whose record proves a database is caught
+    # up: a database that has it adopts the baseline with a single record write;
+    # one that doesn't is refused. `retired` lists every deleted name so that a
+    # dependency on any of them resolves to the baseline. `shipped_in` is the
+    # release that shipped the reset: named when a database that missed it is
+    # refused, and empty until it ships - a baseline nothing shipped must not be
+    # superseded. `plain migrations reset` writes the baseline; `shipped_in`
+    # comes from its `--shipped-in`, or is filled in when the package is released.
+    supersedes: str | None = None
+    retired: Sequence[str] = ()
+    shipped_in: str = ""
 
     # Is this an initial migration? Initial migrations are skipped on
     # --fake-initial if the table or fields already exist. If None, check if
@@ -59,7 +66,6 @@ class Migration:
         # Copy dependencies & other attrs as we might mutate them at runtime
         self.operations = list(self.__class__.operations)
         self.dependencies = list(self.__class__.dependencies)
-        self.replaces = list(self.__class__.replaces)
 
     def __eq__(self, other: object) -> bool:
         return (

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
 from conftest_convergence import column_default_sql, execute
-
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
     analyze_model,

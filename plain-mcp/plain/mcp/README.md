@@ -3,6 +3,8 @@
 **Expose your Plain app to AI clients as an MCP server over HTTP.**
 
 - [Overview](#overview)
+- [Requests and results](#requests-and-results)
+    - [Discovery](#discovery)
 - [Tools](#tools)
 - [Resources](#resources)
 - [Naming](#naming)
@@ -15,6 +17,7 @@
     - [Public endpoints](#public-endpoints)
 - [Filtering tools per request](#filtering-tools-per-request)
 - [Custom JSON-RPC methods](#custom-json-rpc-methods)
+- [Spec coverage](#spec-coverage)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -54,14 +57,93 @@ from plain.urls import Router, path
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
-        path("mcp/", AppMCP, name="mcp"),
-    ]
+    urls = (path("mcp/", AppMCP, name="mcp"),)
 ```
 
-AI clients connect to `https://yourapp.com/mcp` using the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http).
+AI clients connect to `https://yourapp.com/mcp` using the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports#streamable-http).
 
 `name` is required. `version` defaults to `settings.VERSION` (from your `pyproject.toml`). Auth and authorization are covered below.
+
+## Requests and results
+
+MCP `2026-07-28` is **stateless** — no handshake, no sessions, no server-to-client stream. Every POST carries one self-describing JSON-RPC request, so the client restates who it is on each call, in `params._meta`:
+
+| `params._meta` key                           | Required | Value                           |
+| -------------------------------------------- | -------- | ------------------------------- |
+| `io.modelcontextprotocol/protocolVersion`    | yes      | `"2026-07-28"`                  |
+| `io.modelcontextprotocol/clientCapabilities` | yes      | object                          |
+| `io.modelcontextprotocol/clientInfo`         | no       | `{"name": ..., "version": ...}` |
+
+The routing-relevant parts are mirrored into headers, so infrastructure in front of your app can route and authorize a call without parsing the body. This guarantee holds on the modern path only — classic requests (see [FAQs](#faqs)) aren't required to send these headers, and extra headers are spec-legal for any client (claude.ai's connector proxy sends `Mcp-Method` on classic requests) — so infrastructure keying on them must treat them as advisory and fall back to "inspect the body":
+
+| Header                 | Required                                      | Must equal          |
+| ---------------------- | --------------------------------------------- | ------------------- |
+| `MCP-Protocol-Version` | every request                                 | the `_meta` version |
+| `Mcp-Method`           | every request                                 | the body's `method` |
+| `Mcp-Name`             | `tools/call`, `prompts/get`, `resources/read` | the body's target   |
+
+Whether the method exists is settled first: an unknown one is a `-32601` at HTTP **404**, which is how a client tells a real MCP endpoint apart from a URL that isn't there. A method the spec has since removed (`initialize`, `ping`, `logging/setLevel`) answers the same way, naming the version this server speaks. A request that doesn't restate its protocol version in `params._meta` never enters this ladder — unless its `MCP-Protocol-Version` header explicitly names `2026-07-28`, the client's own declaration that it speaks this revision. Otherwise it's a classic client, served by the compatibility branch (see [FAQs](#faqs)), whatever other headers it carries. A notification (no `id`) gets a bare `202` and skips everything below.
+
+A request for a method that does exist is then validated in this order — say what you are, then agree with yourself, then name a version we have:
+
+| Rung            | Failure                              | Error    | Status |
+| --------------- | ------------------------------------ | -------- | ------ |
+| `_meta` present | a required key is missing            | `-32602` | 400    |
+| headers agree   | a header is missing or disagrees     | `-32020` | 400    |
+| version spoken  | the version named isn't `2026-07-28` | `-32022` | 400    |
+
+A client that contradicts itself is told that before it's told its version is unsupported — the two call for different fixes.
+
+Every JSON-RPC error code maps to one HTTP status, wherever the error came from — the ladder above or your own handler. The exception is an internal error (`-32603`), which stays at 200 with the error in the body: a bug on our side isn't a malformed request.
+
+An exception that escapes the view entirely — raised in `before_request`, or an `HTTPException` from your own code — never reaches that table. It's translated separately, HTTP status first, and the JSON-RPC code follows from the status: 500 for anything unhandled (so `-32603` does also appear at 500), 401 for `MCPUnauthorized`, and the status itself as the code for everything else.
+
+MCP clients handle all of this — you only assemble it by hand when poking at your own server:
+
+```bash
+curl -X POST https://myapp.com/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'MCP-Protocol-Version: 2026-07-28' \
+  -H 'Mcp-Method: tools/list' \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/list",
+    "params": {"_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {}
+    }}
+  }'
+```
+
+`self.client_info` and `self.client_capabilities` hold what the caller sent — readable from a tool through `self.mcp`.
+
+**Results are stamped for you**, including results from your own `rpc_` methods:
+
+- `resultType: "complete"`
+- `_meta` carrying `io.modelcontextprotocol/serverInfo` (this server's `name` and `version`)
+- `ttlMs: 0` and `cacheScope: "private"` on list and read results — `server/discover`, `tools/list`, `prompts/list`, `resources/list`, `resources/templates/list`, `resources/read`
+
+The cache defaults assume the worst because listings are filtered per authenticated user by `allowed_for()`. A handler that returns its own `ttlMs` / `cacheScope` (or `resultType`) keeps them.
+
+Both tables are class attributes you can extend. Add your own `rpc_` list method to `cacheable_result_methods` to have its results stamped with cache hints, and add a method that names a target to `name_header_params` (mapping the method to the body param the header mirrors) to have `Mcp-Name` checked for it:
+
+```python
+class AppMCP(MCPView):
+    name = "myapp"
+    cacheable_result_methods = MCPView.cacheable_result_methods | {"widgets/list"}
+    name_header_params = MCPView.name_header_params | {"widgets/get": "id"}
+```
+
+### Discovery
+
+Clients start at `server/discover`, which reports the protocol versions this server speaks, its capabilities, and — when you set it — `instructions`: free-form guidance for the model driving the server.
+
+```python
+class AppMCP(MCPView):
+    name = "myapp"
+    instructions = "Search for an order before creating one. Order IDs are numeric."
+```
+
+Capabilities are derived from what you registered (`tools` and `resources`); override [`get_capabilities()`](./views.py#MCPView) to advertise more.
 
 ## Tools
 
@@ -99,17 +181,14 @@ class ListMyNotes(AppTool):
     """List notes owned by the caller."""
 
     def run(self) -> list[dict]:
-        return list(
-            Note.query.filter(author=self.mcp.user).values("id", "title")
-        )
+        return list(Note.query.filter(author=self.mcp.user).values("id", "title"))
 
 
 class AppMCP(OAuthResourceServer, MCPView):
     name = "myapp"
     tools = [ListMyNotes]
 
-    def authenticate_token(self, token: str) -> TokenInfo | None:
-        ...
+    def authenticate_token(self, token: str) -> TokenInfo | None: ...
 ```
 
 The `mcp: AppMCP` annotation is a forward reference (resolved lazily), so this natural order just works — base tool and tools first, then the view with `tools = [...]`. A tool that needs nothing view-specific stays bare — `class Greet(MCPTool)` — and `self.mcp` is the base `MCPView` (request, no user).
@@ -133,6 +212,15 @@ class GetOrder(MCPTool):
         return {"id": order.id, "status": order.status}
 ```
 
+**Requiring something from the client.** A tool that calls back to the caller — asking its model to sample, or the user to fill something in — can't run for a client that doesn't offer that. Declare it with `required_client_capabilities` (in MCP's `ClientCapabilities` shape) and a client that didn't announce it gets a JSON-RPC `-32021` naming exactly what's missing, instead of a confusing tool failure:
+
+```python
+class Summarize(MCPTool):
+    """Summarize a document using the client's model."""
+
+    required_client_capabilities = {"sampling": {}}
+```
+
 **Shared state.** Tool instances are short-lived — one per MCP request. Don't use `__init__` for heavy setup; stash lookups in modules or on the MCP class.
 
 **Return types.** `run()` returns get converted to MCP content blocks:
@@ -142,7 +230,7 @@ class GetOrder(MCPTool):
 - **a list of such dicts** → those blocks, in order (mixed content)
 - **any other `dict`/`list`** → one text block with the value JSON-serialized
 
-The dict shape matches the MCP spec wire format directly — you can copy from the [MCP docs](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#tool-result) and return it. `bytes` in `data` (image/audio) or `resource.blob` (embedded resource) are base64-encoded automatically, so you don't touch base64 yourself:
+The dict shape matches the MCP spec wire format directly — you can copy from the [MCP docs](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#tool-result) and return it. `bytes` in `data` (image/audio) or `resource.blob` (embedded resource) are base64-encoded automatically, so you don't touch base64 yourself:
 
 ```python
 class Screenshot(MCPTool):
@@ -163,7 +251,7 @@ Returning a non-content dict like `{"id": 1, "name": "Alice"}` JSON-serializes i
 
 ### Tool annotations
 
-Tools can advertise [MCP annotations](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#tool-annotations) — hints the client uses to present and gate them — by setting `annotations` to a dict in MCP wire format:
+Tools can advertise [MCP annotations](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#tool-annotations) — hints the client uses to present and gate them — by setting `annotations` to a dict in MCP wire format:
 
 ```python
 class ListOrders(MCPTool):
@@ -298,10 +386,10 @@ class StaffMCP(MCPView, AuthView):
 
 ```python
 # app/urls.py
-urls = [
+urls = (
     path("api/mcp", AppMCP, name="app_mcp"),
     path("staff/mcp", StaffMCP, name="staff_mcp"),
-]
+)
 ```
 
 ## Attaching tools to a shared MCP
@@ -320,8 +408,7 @@ class FlagStatus(MCPTool):
     def __init__(self, name: str):
         self.name = name
 
-    def run(self) -> dict:
-        ...
+    def run(self) -> dict: ...
 
 
 AdminMCP.register_tool(FlagStatus)
@@ -436,14 +523,14 @@ class AppMCPMetadata(MCPProtectedResourceView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("mcp", AppMCP, name="mcp"),
         path(
             ".well-known/oauth-protected-resource/mcp",
             AppMCPMetadata,
             name="mcp_prm",
         ),
-    ]
+    )
 ```
 
 `authorization_servers` defaults to this app's origin, so the same-app case (above) needs nothing set. Override it only when an external IdP issues the tokens.
@@ -489,8 +576,7 @@ class DeleteUser(AdminTool):
     def __init__(self, user_id: int):
         self.user_id = user_id
 
-    def run(self) -> str:
-        ...
+    def run(self) -> str: ...
 ```
 
 Tools that return `False` from `allowed_for()` are hidden from `tools/list` and rejected from `tools/call` as "unknown tool" — existence isn't leaked. Same for resources and `resources/read`.
@@ -515,15 +601,21 @@ class AppMCP(MCPView, AuthView):
 
 ## Custom JSON-RPC methods
 
-`plain.mcp` ships `tools/*` and `resources/*` with first-class classes. Everything else in the MCP spec — prompts, logging, completions, sampling — you implement directly on your `MCPView` subclass by defining a method named `rpc_<method>`. Slashes in the JSON-RPC method become underscores.
+`plain.mcp` ships `server/discover`, `tools/*`, and `resources/*` with first-class classes. Everything else in the MCP spec — prompts, completions, sampling — you implement directly on your `MCPView` subclass by defining a method named `rpc_<method>`. Slashes in the JSON-RPC method become underscores.
 
 The pattern:
 
-1. Write an `rpc_<method>` method that takes a `params` dict and returns the response dict (as defined by the [MCP spec](https://modelcontextprotocol.io/specification/2025-11-25/server) for that method)
+1. Write an `rpc_<method>` method that takes a `params` dict and returns the response dict (as defined by the [MCP spec](https://modelcontextprotocol.io/specification/2026-07-28/server) for that method)
 2. Advertise the capability in `get_capabilities()` so clients know to call it
 3. Raise `MCPInvalidParams` for bad caller input; anything else becomes a generic `INTERNAL_ERROR` with the exception logged server-side
 
-`MCPInvalidParams` is the error channel for these custom `rpc_*` handlers (and `resources/read`). Tools are different: a tool's `run()` reports failures in its _result_ via `isError`, so raise [`MCPToolError`](./exceptions.py#MCPToolError) there instead — see [Tools → Signaling errors](#tools).
+`MCPInvalidParams` is the error channel for these custom `rpc_*` handlers (and `resources/read`). It becomes a `-32602` at HTTP 400, and takes an optional `data` payload so the client doesn't have to parse your message to learn what was wrong:
+
+```python
+raise MCPInvalidParams(f"Unknown widget: {widget_id}", data={"widgetId": widget_id})
+```
+
+Tools are different: a tool's `run()` reports failures in its _result_ via `isError` (still HTTP 200 — the call succeeded, the work didn't), so raise [`MCPToolError`](./exceptions.py#MCPToolError) there instead — see [Tools → Signaling errors](#tools).
 
 ### Example: prompts
 
@@ -595,25 +687,53 @@ class AppMCP(MCPView):
 
     def get_capabilities(self):
         caps = super().get_capabilities()
-        caps["prompts"] = {"listChanged": False}
+        caps["prompts"] = {}
         return caps
 ```
 
-The same pattern works for any capability. `rpc_logging_setLevel`, `rpc_completion_complete`, etc. — consult the MCP spec for the method name and response shape.
+The same pattern works for any capability. `rpc_completion_complete`, `rpc_prompts_get`, etc. — consult the MCP spec for the method name and response shape. Your handler returns just the result dict; `resultType`, `serverInfo`, and (for `*/list` and `resources/read` methods) `ttlMs` / `cacheScope` are stamped on automatically — see [Requests and results](#requests-and-results).
 
 ### Overriding built-ins
 
-The shipped handlers (`rpc_initialize`, `rpc_ping`, `rpc_tools_list`, `rpc_tools_call`, `rpc_resources_list`, `rpc_resources_templates_list`, `rpc_resources_read`) use the same dispatch — override them on your subclass if you need to change the defaults.
+The shipped handlers (`rpc_server_discover`, `rpc_tools_list`, `rpc_tools_call`, `rpc_resources_list`, `rpc_resources_templates_list`, `rpc_resources_read`) use the same dispatch — override them on your subclass if you need to change the defaults.
+
+## Spec coverage
+
+Where `plain.mcp` stands on each feature of the [MCP `2026-07-28` spec](https://modelcontextprotocol.io/specification/2026-07-28). **Built in** means the framework handles it; **build it yourself** means the spec method is yours to implement on the documented [`rpc_` extension point](#custom-json-rpc-methods); **not supported** means there's no way to do it today.
+
+| Spec feature                                                       | Support           | How                                                                                               |
+| ------------------------------------------------------------------ | ----------------- | ------------------------------------------------------------------------------------------------- |
+| Stateless Streamable HTTP (`_meta`, headers, validation ladder)    | built in          | [Requests and results](#requests-and-results)                                                     |
+| `server/discover`                                                  | built in          | [Discovery](#discovery) — `instructions`, `get_capabilities()`                                    |
+| Tools (`tools/list`, `tools/call`)                                 | built in          | [`MCPTool`](#tools) — schema derivation, validation, `isError`, `annotations`                     |
+| Required client capabilities (`-32021`)                            | built in          | `MCPTool.required_client_capabilities`                                                            |
+| Resources (`resources/list`, `templates/list`, `read`)             | built in          | [`MCPResource`](#resources) — static URIs and templates                                           |
+| Result stamping (`resultType`, `serverInfo`, `ttlMs`/`cacheScope`) | built in          | [Requests and results](#requests-and-results) — handler-set values win                            |
+| OAuth resource server (RFC 9728)                                   | built in          | [`OAuthResourceServer`](#oauth-for-mcp-clients), `MCPProtectedResourceView`                       |
+| Per-request authorization                                          | built in          | `allowed_for()`, [`get_tools()`/`get_resources()`](#filtering-tools-per-request)                  |
+| Prompts (`prompts/list`, `prompts/get`)                            | build it yourself | [`rpc_` methods](#custom-json-rpc-methods) — complete example there                               |
+| Completions (`completion/complete`)                                | build it yourself | same `rpc_` pattern                                                                               |
+| Any other spec or custom method                                    | build it yourself | `rpc_<method>` + `get_capabilities()` + the two [class-attribute tables](#requests-and-results)   |
+| MRTR (`input_required` — sampling, elicitation, roots)             | not supported     | tools always return complete results                                                              |
+| Subscriptions (`subscriptions/listen`, change notifications)       | not supported     | see [FAQs](#faqs) — clients re-read instead                                                       |
+| Progress notifications / SSE response streams                      | not supported     | every response is a single JSON object (spec-permitted)                                           |
+| Tasks extension                                                    | not supported     | not in the official SDK yet either                                                                |
+| `Mcp-Param-*` headers (`x-mcp-header`)                             | not supported     | no tool API to declare them, so clients never send them                                           |
+| Classic protocol versions (`2025-03-26` … `2025-11-25`)            | built in          | sessionless compatibility branch — `initialize`/`ping` answered, same handlers; see [FAQs](#faqs) |
+
+The conformance suite baseline at [`tests/conformance/expected-failures.yml`](../../tests/conformance/expected-failures.yml) is the machine-checked version of the "not supported" rows — it fails the build if reality drifts from this table in either direction.
 
 ## FAQs
 
 #### What MCP protocol version is supported?
 
-The `2025-11-25` version of the MCP specification, using the Streamable HTTP transport. The older SSE transport is not supported.
+Natively, the `2026-07-28` version of the MCP specification, using the Streamable HTTP transport — the revision that made MCP stateless, so there's no session or SSE machinery to keep alive.
+
+The classic revisions (`2025-03-26`, `2025-06-18`, `2025-11-25`) are also served, through a compatibility branch for clients that still open with `initialize` — claude.ai's connector proxy among them. A request that doesn't restate its protocol version in `params._meta` is a classic request unless its `MCP-Protocol-Version` header names `2026-07-28` itself. No other header fact participates: unrecognized headers are spec-legal for any client, SDK, or middlebox (claude.ai's proxy sends `Mcp-Method` alongside fully conformant `2025-11-25` traffic), so their presence is not evidence of a revision. A classic request gets `initialize`/`ping` answered, the same tool and resource handlers, and its JSON-RPC errors in the body at HTTP 200. The branch stays stateless the whole way — both allowances are in the classic spec itself: no `Mcp-Session-Id` is issued (the client proceeds sessionless) and the GET stream is declined with a `405`. Two consequences: capabilities a classic client declares at `initialize` aren't retained, so tools with `required_client_capabilities` refuse classic clients; and JSON-RPC batch arrays (part of the transport in `2025-03-26` only, removed in `2025-06-18`) are rejected with `-32600` — the SDKs never sent them by default. The branch goes away once the clients that matter speak `2026-07-28`.
 
 #### Are resource subscriptions supported?
 
-No. `resources/subscribe` and `resources/unsubscribe` require a long-lived server-to-client stream (for pushing `notifications/resources/updated`) and cross-worker fan-out of change events — neither is implemented yet. Clients that need fresh data should re-read the resource. The capabilities advertised to clients reflect this (`resources.subscribe: false`).
+No. `resources/subscribe` and `resources/unsubscribe` require a long-lived server-to-client stream (for pushing `notifications/resources/updated`) and cross-worker fan-out of change events — neither is implemented, and a stateless server has no stream to push down. Clients that need fresh data re-read the resource; the `ttlMs: 0` stamped on read results tells them not to cache it.
 
 #### How does auto-discovery work?
 
@@ -621,7 +741,7 @@ On startup, `plain.mcp` imports `mcp` modules from installed packages (similar t
 
 #### Do I need to handle CSRF?
 
-No. Non-browser clients (like AI assistants) don't send `Origin` or `Sec-Fetch-Site` headers, so Plain's CSRF protection skips them automatically.
+No. Non-browser clients (like AI assistants) don't send `Origin` or `Sec-Fetch-Site` headers, so Plain's CSRF protection skips them automatically. Don't add your MCP path to `CSRF_EXEMPT_PATHS`, though — for a session-authenticated MCP view, that CSRF check is what blocks cross-site tool invocation from a browser, and classic requests carry no custom headers that would otherwise force a CORS preflight.
 
 #### Why are arguments on `__init__` instead of `run()`?
 

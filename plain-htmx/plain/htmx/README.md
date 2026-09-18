@@ -121,6 +121,7 @@ This pairs nicely with passing a callable function or method as a context variab
 ```python
 def fetch_items():
     import time
+
     time.sleep(2)
     return ["foo", "bar", "baz"]
 
@@ -245,7 +246,7 @@ This can be a matter of preference, but typically you may end up building out an
 You can also handle HTMX requests without a specific action by just implementing the HTTP method:
 
 ```python
-from plain.http import HttpResponse
+from plain.http import Response
 
 
 class PullRequestDetailView(HTMXView, DetailView):
@@ -257,7 +258,7 @@ class PullRequestDetailView(HTMXView, DetailView):
         self.object.delete()
 
         # Tell HTMX to do a client-side redirect when it receives the response
-        response = HttpResponse(status_code=204)
+        response = Response(status_code=204)
         response.headers["HX-Redirect"] = "/"
         return response
 ```
@@ -316,13 +317,14 @@ _If_ you need a URL to render an individual item, you can simply include the sam
 default_namespace = "pullrequests"
 
 urlpatterns = [
-  path("<uuid:uuid>/", views.PullRequestDetailView, name="detail"),
+    path("<uuid:uuid>/", views.PullRequestDetailView, name="detail"),
 ]
+
 
 # views.py
 class PullRequestDetailView(HTMXView, DetailView):
-  def htmx_post_update(self):
-      self.object.update()
+    def htmx_post_update(self):
+        self.object.update()
 ```
 
 ## FAQs

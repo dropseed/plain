@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Mapping
+from typing import Any
 
 from opentelemetry import _logs, metrics, trace
 from opentelemetry._logs._internal import ProxyLoggerProvider
@@ -19,10 +21,10 @@ from opentelemetry.sdk.metrics.export import (
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider, sampling
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.semconv.attributes import service_attributes
-
+from opentelemetry.semconv.attributes import exception_attributes, service_attributes
 from plain.packages import PackageConfig, register_config
 from plain.runtime import settings
+from plain.utils.otel import format_exception_type
 
 
 class _ExporterLoopFilter(logging.Filter):
@@ -49,9 +51,38 @@ class _ExporterLoopFilter(logging.Filter):
         name = record.name
         if name == "opentelemetry" or name.startswith("opentelemetry."):
             return False
-        if threading.current_thread().name.startswith("Otel"):
-            return False
-        return True
+        return not threading.current_thread().name.startswith("Otel")
+
+
+class _QualifiedExceptionTypeLoggingHandler(LoggingHandler):
+    """LoggingHandler that writes module-qualified `exception.type` values.
+
+    The stock handler stamps log records with the bare exception class
+    `__name__`, while the span SDK's `record_exception` writes the
+    module-qualified name — giving the same exception class two different
+    identities across signals. Match the span convention via
+    `format_exception_type` (builtins stay bare) so log- and span-reported
+    exceptions agree.
+
+    `_get_attributes` is a private SDK staticmethod — the internal
+    `test_log_exception_type` tests exercise the full emit path, so an
+    SDK release that changes its shape fails CI instead of silently
+    killing log export.
+    """
+
+    @staticmethod
+    def _get_attributes(record: logging.LogRecord) -> Mapping[str, Any]:
+        attributes = LoggingHandler._get_attributes(record)
+        if record.exc_info:
+            exc = record.exc_info[1]
+            if isinstance(exc, BaseException):
+                # Copied only on this branch — the parent annotates its
+                # return as an immutable Mapping.
+                attributes = {
+                    **attributes,
+                    exception_attributes.EXCEPTION_TYPE: format_exception_type(exc),
+                }
+        return attributes
 
 
 @register_config
@@ -148,11 +179,12 @@ class Config(PackageConfig):
             # Accept either a level name ("INFO") or an int (20).
             raw_level = settings.CONNECT_LOG_LEVEL
             if isinstance(raw_level, str):
-                log_level = logging.getLevelName(raw_level.upper())
-                if not isinstance(log_level, int):
+                level_names = logging.getLevelNamesMapping()
+                if raw_level.upper() not in level_names:
                     raise ValueError(
                         f"CONNECT_LOG_LEVEL={raw_level!r} is not a valid logging level."
                     )
+                log_level = level_names[raw_level.upper()]
             else:
                 log_level = int(raw_level)
 
@@ -168,7 +200,9 @@ class Config(PackageConfig):
             )
             _logs.set_logger_provider(logger_provider)
 
-            handler = LoggingHandler(level=log_level, logger_provider=logger_provider)
+            handler = _QualifiedExceptionTypeLoggingHandler(
+                level=log_level, logger_provider=logger_provider
+            )
             # Filter on the handler (not the loggers) so OTLP exporter and
             # HTTP-client diagnostics still reach the app's console/file
             # handlers — we only stop them from being re-exported, which

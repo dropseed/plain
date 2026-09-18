@@ -83,7 +83,8 @@ class URLResolver:
         self.raw_route = raw_route
         self.router = router
         self.namespace = router.namespace
-        self.url_patterns = router.urls
+        # Normalize so a legacy list-valued `urls` still ends up a tuple.
+        self.url_patterns = tuple(router.urls)
 
         # Eager merge: each child URLResolver already built its own dicts
         # during its own __init__. The URL graph is a DAG constructed
@@ -95,7 +96,7 @@ class URLResolver:
 
     def __repr__(self) -> str:
         return (
-            f"<{self.__class__.__name__} {repr(self.router)} "
+            f"<{self.__class__.__name__} {self.router!r} "
             f"({self.namespace}) '{self.raw_route}'>"
         )
 

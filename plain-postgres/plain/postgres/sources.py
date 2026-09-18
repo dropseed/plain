@@ -11,8 +11,6 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 import psycopg
-from psycopg_pool import ConnectionPool, PoolTimeout
-
 from plain.exceptions import ImproperlyConfigured
 from plain.logs import get_framework_logger
 from plain.postgres.adapters import get_adapters_template
@@ -24,6 +22,7 @@ from plain.postgres.otel import (
     record_connection_timeout,
 )
 from plain.runtime import settings as plain_settings
+from psycopg_pool import ConnectionPool, PoolTimeout
 
 logger = get_framework_logger()
 

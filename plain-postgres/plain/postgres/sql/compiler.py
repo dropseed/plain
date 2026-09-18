@@ -22,6 +22,7 @@ from plain.postgres.dialect import (
 )
 from plain.postgres.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.postgres.expressions import (
+    BaseExpression,
     F,
     OrderBy,
     Ref,
@@ -49,7 +50,6 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
-    from plain.postgres.expressions import BaseExpression
     from plain.postgres.sql.query import AggregateQuery, InsertQuery
 
 # Type aliases for SQL compilation results
@@ -241,8 +241,7 @@ class SQLCompiler:
                 if not is_ref:
                     expressions.extend(expr.get_group_by_cols())
         having_group_by = self.having.get_group_by_cols() if self.having else []
-        for expr in having_group_by:
-            expressions.append(expr)
+        expressions.extend(having_group_by)
         result = []
         seen = set()
         expressions = self.collapse_group_by(expressions, having_group_by)
@@ -787,7 +786,7 @@ class SQLCompiler:
             opts = self.query.model._model_meta
         start_alias = start_alias or self.query.get_initial_alias()
 
-        for field in opts.concrete_fields:
+        for field in opts.fields:
             if select_mask and field not in select_mask:
                 continue
             result.append(field.get_col(start_alias))
@@ -1001,17 +1000,16 @@ class SQLCompiler:
             if restricted:
                 assert requested is not None
                 next = requested.get(f.name, {})
-                if not isinstance(f, RelatedField):
-                    # If a non-related field is used like a relation,
-                    # or if a single non-relational field is given.
-                    if next or f.name in requested:
-                        raise FieldError(
-                            "Non-relational field given in select_related: '{}'. "
-                            "Choices are: {}".format(
-                                f.name,
-                                ", ".join(_get_field_choices()) or "(none)",
-                            )
+                # If a non-related field is used like a relation,
+                # or if a single non-relational field is given.
+                if not isinstance(f, RelatedField) and (next or f.name in requested):
+                    raise FieldError(
+                        "Non-relational field given in select_related: '{}'. "
+                        "Choices are: {}".format(
+                            f.name,
+                            ", ".join(_get_field_choices()) or "(none)",
                         )
+                    )
             else:
                 next = None
 
@@ -1389,7 +1387,7 @@ class SQLInsertCompiler(SQLCompiler):
         return field.pre_save(obj, add=True)
 
     def assemble_as_sql(
-        self, fields: list[Any], value_rows: list[list[Any]]
+        self, fields: Sequence[Any], value_rows: list[list[Any]]
     ) -> tuple[Any, list[list[Any]]]:
         """
         Take a sequence of N fields and a sequence of M rows of values, and
@@ -1470,13 +1468,11 @@ class SQLInsertCompiler(SQLCompiler):
             params = param_rows
             if conflict_suffix_sql:
                 result.append(conflict_suffix_sql)
-            # Skip empty r_sql in case returning_cols returns an empty string.
-            returning_cols = return_insert_columns(self.returning_fields)
-            if returning_cols:
-                r_sql, self.returning_params = returning_cols
-                if r_sql:
-                    result.append(r_sql)
-                    params += [list(self.returning_params)]
+            # Skip appending the RETURNING clause if it's an empty string.
+            r_sql, self.returning_params = return_insert_columns(self.returning_fields)
+            if r_sql:
+                result.append(r_sql)
+                params += [list(self.returning_params)]
             return [(" ".join(result), tuple(chain.from_iterable(params)))]
 
         # Bulk insert without returning fields

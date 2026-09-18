@@ -17,6 +17,7 @@ import socket
 
 from plain.server.connection import Connection
 from plain.server.http.h1 import extract_request_path, handle_connection
+from plain.server.http.sink import BodyBudget
 
 # ---------------------------------------------------------------------------
 # Minimal worker stub — just the attributes handle_connection reads.
@@ -30,7 +31,13 @@ class _StubWorker:
             healthcheck_path.encode("ascii") if healthcheck_path else b""
         )
         self.alive = True
-        self.max_body = 10 * 1024 * 1024
+        self.shutdown_event = asyncio.Event()
+        self.keepalive_timeout = 300
+        self.drain_read_deadline: float | None = None
+        self.body_max_memory_size = 10 * 1024 * 1024
+        self.max_request_body: int | None = None
+        self.body_min_rate = 0
+        self.body_budget = BodyBudget(None)
         self.nr_conns = 0
         self.max_keepalived = 10
         self.log = logging.getLogger("test")
@@ -38,6 +45,9 @@ class _StubWorker:
         self.timeout = 5
         self.app = _StubApp()
         self.handler = None
+
+    def _count_request(self) -> None:
+        pass
 
 
 # ---------------------------------------------------------------------------

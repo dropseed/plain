@@ -8,10 +8,10 @@ SMTP server.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from plain.runtime import PLAIN_TEMP_PATH
+from plain.utils import timezone
 from plain.utils.crypto import get_random_string
 
 from .base import BaseEmailBackend
@@ -35,7 +35,7 @@ class EmailBackend(BaseEmailBackend):
 
         count = 0
         for message in email_messages:
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            timestamp = timezone.localtime().strftime("%Y%m%d-%H%M%S")
             stem = f"{timestamp}-{get_random_string(8)}"
             (EMAIL_DIR / f"{stem}.eml").write_bytes(
                 message.message().as_bytes(linesep="\r\n")

@@ -8,7 +8,6 @@ flags recompute every time. Disabled flags short-circuit.
 from __future__ import annotations
 
 import pytest
-
 from plain.flags import Flag
 from plain.flags.exceptions import FlagDisabled
 from plain.flags.models import Flag as FlagModel
@@ -109,7 +108,7 @@ def test_disabled_flag_raises_when_debug(db, settings):
     FlagModel.query.filter(name="StrictFlag").update(enabled=False)
 
     with pytest.raises(FlagDisabled):
-        StrictFlag().value
+        StrictFlag().value  # noqa: B018 — the property access is the assertion
 
 
 def test_flag_is_truthy_and_supports_membership(db):

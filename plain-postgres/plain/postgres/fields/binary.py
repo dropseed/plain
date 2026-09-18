@@ -5,10 +5,9 @@ from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 import psycopg
-
 from plain.validators import MaxLengthValidator
 
-from .base import ColumnField
+from .base import NOT_PROVIDED, DefaultableField
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
@@ -17,10 +16,11 @@ if TYPE_CHECKING:
 
 class BinaryField[
     T: (bytes | memoryview, bytes | memoryview | None) = bytes | memoryview
-](ColumnField[T]):
+](DefaultableField[T]):
     db_type_sql = "bytea"
-    empty_values = [None, b""]
+    empty_values = (None, b"")
     _default_empty_value = b""
+    only_empty_default = True
 
     def __init__(
         self,
@@ -28,20 +28,20 @@ class BinaryField[
         max_length: int | None = None,
         required: bool = True,
         allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # `default` is intentionally not accepted: a str default on a bytes
-        # field is a type mismatch.
         self.max_length = max_length
         super().__init__(
             required=required,
             allow_null=allow_null,
+            default=default,
             validators=validators,
         )
         if self.max_length is not None:
             self.validators.append(MaxLengthValidator(self.max_length))
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.max_length is not None:
             kwargs["max_length"] = self.max_length

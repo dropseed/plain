@@ -35,8 +35,6 @@ class Promise:
     It's used to recognize promises in code.
     """
 
-    pass
-
 
 def lazy(func: Callable[..., Any], *resultclasses: type) -> Callable[..., Any]:
     """
@@ -127,9 +125,10 @@ def lazy(func: Callable[..., Any], *resultclasses: type) -> Callable[..., Any]:
             # a __str__() method from the proxied class.
             return str(self.__cast())
 
-        def __eq__(self, other: Any) -> bool:
+        def __eq__(self, other: object) -> bool:
             if isinstance(other, Promise):
-                other = other.__cast()
+                # The mangled __cast exists on the runtime proxy subclass.
+                other = other.__cast()  # ty: ignore[unresolved-attribute]
             return self.__cast() == other
 
         def __lt__(self, other: Any) -> bool:
