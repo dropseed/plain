@@ -17,7 +17,7 @@ def test_markdown_page_returns_html():
 
 
 def test_markdown_accept_header_returns_rendered_markdown():
-    """Requesting markdown via Accept header should return Jinja-rendered source."""
+    """Requesting markdown via Accept header should return interpolated source."""
     client = Client()
     response = client.get("/", headers={"Accept": "text/markdown"})
     assert response.status_code == 200
@@ -28,7 +28,7 @@ def test_markdown_accept_header_returns_rendered_markdown():
 
 
 def test_markdown_url_returns_rendered_markdown():
-    """The .md URL should return Jinja-rendered source."""
+    """The .md URL should return interpolated source."""
     client = Client()
     response = client.get("/index.md")
     assert response.status_code == 200
@@ -36,26 +36,26 @@ def test_markdown_url_returns_rendered_markdown():
     assert b"# Welcome" in response.content
 
 
-def test_markdown_jinja_rendered_via_accept_header():
-    """Markdown served via Accept header should have Jinja tags resolved."""
+def test_markdown_expressions_interpolated_via_accept_header():
+    """Markdown served via Accept header should have `{{ }}` interpolated."""
     client = Client()
-    response = client.get("/jinja-test", headers={"Accept": "text/markdown"})
+    response = client.get("/interpolated", headers={"Accept": "text/markdown"})
     assert response.status_code == 200
     content = response.content.decode()
-    # Jinja should be rendered — no raw {{ }} tags
+    # Expressions are evaluated — no raw {{ }} left in the body
     assert "{{ page.title }}" not in content
-    assert "Jinja Test" in content
+    assert "Interpolated Page" in content
     assert "{{ DEBUG }}" not in content
 
 
-def test_markdown_jinja_rendered_via_md_url():
-    """Markdown served via .md URL should have Jinja tags resolved."""
+def test_markdown_expressions_interpolated_via_md_url():
+    """Markdown served via .md URL should have `{{ }}` interpolated."""
     client = Client()
-    response = client.get("/jinja-test.md")
+    response = client.get("/interpolated.md")
     assert response.status_code == 200
     content = response.content.decode()
     assert "{{ page.title }}" not in content
-    assert "Jinja Test" in content
+    assert "Interpolated Page" in content
     assert "{{ DEBUG }}" not in content
 
 
@@ -77,8 +77,8 @@ def test_html_page_ignores_markdown_accept():
     assert b"<h1>" in response.content
 
 
-def test_render_plain_skips_jinja():
-    """Pages with render_plain: true should not have Jinja tags processed."""
+def test_render_plain_skips_interpolation():
+    """Pages with render_plain: true should not have `{{ }}` processed."""
     client = Client()
     response = client.get("/raw.md")
     assert response.status_code == 200

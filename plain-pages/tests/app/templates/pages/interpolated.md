@@ -1,5 +1,5 @@
 ---
-title: Jinja Test
+title: Interpolated Page
 ---
 
 # Hello {{ page.title }}
