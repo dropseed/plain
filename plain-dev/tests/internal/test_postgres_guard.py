@@ -13,6 +13,7 @@ import pytest
 from plain.dev.postgres import guard
 from plain.dev.postgres.cluster import Cluster
 from plain.postgres.migrations.exceptions import ResetBoundaryError
+from plain.postgres.migrations.executor import PendingMigrations
 
 
 class FakeCluster:
@@ -58,7 +59,9 @@ def test_nothing_pending_keeps_the_shared_database(
     guarded: tuple[Path, FakeCluster], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root, cluster = guarded
-    monkeypatch.setattr(guard, "pending_migration_count", lambda url: 0)
+    monkeypatch.setattr(
+        guard, "pending_migrations", lambda url: PendingMigrations(run=0, record=0)
+    )
 
     assert (
         guard.guard_shared_database(root, cluster=as_cluster(cluster), db_name="shared")
@@ -72,10 +75,10 @@ def test_a_refusal_forks_instead_of_disabling_the_guard(
 ) -> None:
     root, cluster = guarded
 
-    def refuse(url: str) -> int:
+    def refuse(url: str) -> PendingMigrations:
         raise ResetBoundaryError("examples", "0018_x", "2.0")
 
-    monkeypatch.setattr(guard, "pending_migration_count", refuse)
+    monkeypatch.setattr(guard, "pending_migrations", refuse)
 
     assert (
         guard.guard_shared_database(root, cluster=as_cluster(cluster), db_name="shared")
