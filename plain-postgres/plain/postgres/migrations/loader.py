@@ -163,9 +163,9 @@ class MigrationLoader:
         assert self.disk_migrations is not None
         for (label, name), migration in self.disk_migrations.items():
             if not migration.supersedes:
-                if migration.retired or migration.since:
+                if migration.retired or migration.shipped_in:
                     raise BadMigrationError(
-                        f"Migration {label}.{name} sets `retired`/`since` but no `supersedes`; "
+                        f"Migration {label}.{name} sets `retired`/`shipped_in` but no `supersedes`; "
                         "a baseline names the one migration it supersedes."
                     )
                 continue
@@ -258,8 +258,21 @@ class MigrationLoader:
                 if self.ignore_no_migrations:
                     return None
                 else:
-                    raise ValueError(f"Dependency on app with no migrations: {key[0]}")
-        raise ValueError(f"Dependency on unknown app: {key[0]}")
+                    raise BadMigrationError(
+                        f"Dependency on app with no migrations: {key[0]}"
+                    )
+        raise BadMigrationError(f"Dependency on unknown app: {key[0]}")
+
+    def resolved_dependencies(self, migration: Migration) -> list[tuple[str, str]]:
+        """The migration's dependencies as graph edges: a dependency on a
+        migration a baseline retired points at the baseline. The migration's
+        own `dependencies` are left as written."""
+        if not self.retired_to_baseline:
+            return list(migration.dependencies)
+        return [
+            self.retired_to_baseline.get(parent, parent)
+            for parent in migration.dependencies
+        ]
 
     def add_internal_dependencies(
         self, key: tuple[str, str], migration: Migration
@@ -268,7 +281,7 @@ class MigrationLoader:
         Internal dependencies need to be added first to ensure `__first__`
         dependencies find the correct root node.
         """
-        for parent in migration.dependencies:
+        for parent in self.resolved_dependencies(migration):
             # Ignore __first__ references to the same app.
             if parent[0] == key[0] and parent[1] != "__first__":
                 # Migration object is used only for error messages in add_dependency
@@ -277,7 +290,7 @@ class MigrationLoader:
     def add_external_dependencies(
         self, key: tuple[str, str], migration: Migration
     ) -> None:
-        for parent in migration.dependencies:
+        for parent in self.resolved_dependencies(migration):
             # Skip internal dependencies
             if key[0] == parent[0]:
                 continue
@@ -294,19 +307,12 @@ class MigrationLoader:
         """
         self.load_disk()
         assert self.disk_migrations is not None  # load_disk() ensures this
-        self.build_graph_from(self.disk_migrations)
+        self._build_graph_from(self.disk_migrations)
 
-    def build_graph_from(
+    def _build_graph_from(
         self, disk_migrations: dict[tuple[str, str], Migration]
     ) -> None:
-        """Build the graph over the given migrations instead of what is on disk.
-
-        `build_graph()` passes what `load_disk()` found; `plain migrations
-        reset` passes what the disk *would* hold after a reset, so every check
-        here - baseline registration, dependency normalization, consistency,
-        cycles - runs on the candidate before a file is touched. Dependency
-        normalization rewrites the migrations it is given.
-        """
+        """Build and check the graph over these migrations."""
         self.disk_migrations = disk_migrations
         self.baselines = {}
         self.retired_to_baseline = {}
@@ -317,15 +323,6 @@ class MigrationLoader:
         else:
             recorder = MigrationRecorder(self.connection)
             self.applied_migrations = recorder.applied_migrations()
-        # A dependency on a migration a baseline retired points at the baseline.
-        # Done once here so every reader of `dependencies` sees the same graph.
-        for migration in (
-            self.disk_migrations.values() if self.retired_to_baseline else ()
-        ):
-            migration.dependencies = [
-                self.retired_to_baseline.get(parent, parent)
-                for parent in migration.dependencies
-            ]
         # To start, populate the migration graph with nodes for ALL migrations
         # and their dependencies.
         self.graph = MigrationGraph()
@@ -343,6 +340,19 @@ class MigrationLoader:
             self.baseline_status = classify_baselines(
                 self, self.applied_migrations, self.connection
             )
+
+    def with_migrations(
+        self, disk_migrations: dict[tuple[str, str], Migration]
+    ) -> MigrationLoader:
+        """A loader over a candidate set of migrations: no database, and this
+        loader's knowledge of which packages are migrated."""
+        candidate = MigrationLoader(
+            None, load=False, ignore_no_migrations=self.ignore_no_migrations
+        )
+        candidate.migrated_packages = self.migrated_packages
+        candidate.unmigrated_packages = self.unmigrated_packages
+        candidate._build_graph_from(disk_migrations)
+        return candidate
 
     def check_consistent_history(self, connection: DatabaseConnection) -> None:
         """

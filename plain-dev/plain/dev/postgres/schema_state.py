@@ -11,6 +11,11 @@ Two directions, and they mean very different things:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from plain.postgres.migrations.executor import PendingMigrations
+
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
@@ -38,13 +43,15 @@ def _connected(url: str) -> Generator[Any]:
         conn.close()
 
 
-def pending_migration_count(url: str) -> int:
+def pending_migrations(url: str) -> PendingMigrations:
     """Migrations on disk that this database hasn't applied yet."""
     from plain.postgres.migrations.executor import MigrationExecutor
 
     with _connected(url) as conn:
         executor = MigrationExecutor(conn)
-        return len(executor.migration_plan(executor.loader.graph.leaf_nodes()))
+        return executor.split_plan(
+            executor.migration_plan(executor.loader.graph.leaf_nodes())
+        )
 
 
 def migrations_not_on_disk(url: str) -> list[tuple[str, str]]:
