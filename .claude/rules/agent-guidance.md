@@ -26,7 +26,7 @@ How to write a rule or skill is documented for package authors in `plain/plain/a
 Django-specific corrections (e.g., "use X not Django's Y") are split by scope so each loads only where it's relevant:
 
 - **Core** framework diffs (URLs, request data, middleware) live in `plain.md`'s "Key Differences from Django" section.
-- **Package-specific** diffs live in that package's rule under its own `## Differences from Django` section (see `plain-postgres`, `plain-templates`).
+- **Package-specific** diffs live in that package's rule under its own `## Differences from Django` section (see `plain-postgres`, `plain-html`).
 
 Keep each correction in exactly one place — don't duplicate a package diff into `plain.md`. The rest of a rule should describe how Plain works, not what Django does differently.
 

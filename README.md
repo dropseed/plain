@@ -155,9 +155,9 @@ plain docs --search "queryset"         # search across all packages
 
 **Frontend:**
 
+- [plain.html](https://plainframework.com/docs/plain-html/plain/html/) — HTML templates and components
 - [plain.htmx](https://plainframework.com/docs/plain-htmx/plain/htmx/) — dynamic UI
 - [plain.tailwind](https://plainframework.com/docs/plain-tailwind/plain/tailwind/) — CSS framework
-- [plain.elements](https://plainframework.com/docs/plain-elements/plain/elements/) — HTML components
 - [plain.pages](https://plainframework.com/docs/plain-pages/plain/pages/) — static pages
 
 **Development:**

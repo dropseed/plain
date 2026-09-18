@@ -34,7 +34,6 @@ FULLY_TYPED_PATHS = [
     "plain-cache",
     "plain-code",
     "plain-dev",
-    "plain-elements",
     "plain-email",
     "plain-flags",
     "plain-htmx",

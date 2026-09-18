@@ -72,4 +72,15 @@ In this repo's templates (admin, toolbar, packages), the same CSP rules apply as
 
 The compile cache lives at `<project>/.plain/html/` (mode `0700`). Override the location with the `HTML_CACHE_DIR` setting; disable entirely with `HTML_CACHE_DISABLED = True`. Both accept Plain's standard `PLAIN_*` env-var overrides (`PLAIN_HTML_CACHE_DIR`, `PLAIN_HTML_CACHE_DISABLED`).
 
+## Differences from Django
+
+- No `{% extends %}` / `{% block %}` — a page imports its layout as a component and passes content into its slots
+- No `{% include %}` — declare the template under `components:` and invoke it as a PascalCase tag
+- No filters (`|date`, `|length`) — `{{ }}` is real Python, so call the function: `{{ len(items) }}`
+- No `{% empty %}` / `for`-`else` — render the empty case with a separate `{% if not items %}`
+- No `{% with %}` / `{% set %}` — compute in the view or inline in `{{ }}`
+- No `{% load %}` and no template-tag registry — helpers come from frontmatter `imports:`
+- No `{% csrf_token %}` — `plain.csrf` uses a cookie/header pair, not a form field
+- `{%- -%}` whitespace control doesn't exist — `plain html format` owns whitespace
+
 Run `uv run plain docs html` for full documentation.

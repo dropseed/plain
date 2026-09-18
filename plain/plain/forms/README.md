@@ -200,7 +200,7 @@ The view is explicit `get`/`post`:
 
 ```python
 from plain.http import RedirectResponse
-from plain.templates.views import TemplateView
+from plain.html.views import TemplateView
 
 
 class ContactView(TemplateView):
@@ -240,7 +240,7 @@ In the template, helpers take `form` (the result) plus a field reference (`form_
         name="{{ form_class.email.name }}"
         id="{{ form_class.email.html_id }}"
         value="{{ field_value(form, form_class.email) }}"
-        {% if form_class.email.required %}required{% endif %}>
+        required="{{ form_class.email.required }}">
     {% for error in field_errors(form, form_class.email) %}
     <div class="field-error">{{ error.message }}</div>
     {% endfor %}
@@ -249,7 +249,7 @@ In the template, helpers take `form` (the result) plus a field reference (`form_
 </form>
 ```
 
-`{% for name, field in form_class.fields().items() %}` iterates every declared field. For large apps, reduce repetition with Jinja [macros](https://jinja.palletsprojects.com/en/stable/templates/#macros) or [plain.elements](/plain-elements/README.md).
+`{% for (name, field) in form_class.fields().items() %}` iterates every declared field. For large apps, reduce repetition by extracting a field [component](/plain-html/plain/html/README.md#components) and invoking it as a tag.
 
 The helpers are typed through the field reference — `field_value(form, ContactForm.email)` narrows to `str | None`, `field_value(form, ContactForm.age)` to `int | None`, and so on. Python's type system can't dispatch attribute lookup by literal name, so the function-call shape is what carries the type through.
 
@@ -365,7 +365,7 @@ Wire it to a view with explicit `get`/`post`:
 ```python
 # app/views.py
 from plain.http import RedirectResponse
-from plain.templates.views import TemplateView
+from plain.html.views import TemplateView
 
 from .forms import ContactForm
 
