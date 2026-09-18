@@ -14,7 +14,6 @@ import uuid
 
 import pytest
 from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
-
 from plain.postgres import get_connection
 from plain.postgres.fields import DATABASE_DEFAULT
 from plain.postgres.functions import GenRandomUUID, Now
@@ -391,7 +390,9 @@ def test_datetime_default_kwarg_rejected_at_signature():
     from plain.postgres import fields as plain_fields
 
     with pytest.raises(TypeError, match="unexpected keyword argument 'default'"):
-        plain_fields.DateTimeField(default=datetime.datetime(2020, 1, 1))  # ty: ignore[unknown-argument]
+        plain_fields.DateTimeField(
+            default=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC)  # ty: ignore[unknown-argument]
+        )
 
 
 def test_get_db_default_expression_returns_now_when_create_now():

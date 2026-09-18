@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from plain.forms import Error, Form, types
+from plain.postgres.forms import ModelForm, model_field
 from plain.utils import timezone
 
 from app.users.models import User
-from plain.forms import Error, Form, types
-from plain.postgres.forms import ModelForm, model_field
 
 from .models import Project, Tag, Task
 
@@ -35,7 +35,11 @@ class TaskForm(ModelForm):
         )
 
     def check(self) -> list[Error] | None:
-        if self.is_complete and self.due_date and self.due_date > timezone.localtime().date():
+        if (
+            self.is_complete
+            and self.due_date
+            and self.due_date > timezone.localtime().date()
+        ):
             return [
                 Error(
                     "A task that's already complete can't have a future due date.",

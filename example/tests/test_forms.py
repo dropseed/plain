@@ -8,12 +8,13 @@ FK/M2M ModelForm, and HTMX.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 from app.contacts.models import ContactSubmission
 from app.notes.models import Note
 from app.tasks.models import Project, Tag, Task
 from app.users.models import User
-
 from plain.test import Client
 
 
@@ -68,7 +69,7 @@ class TestNotes:
 
 
 class TestContacts:
-    valid = {
+    valid: ClassVar = {
         "name": "Dave",
         "email": "dave@example.com",
         "subject": "general",
