@@ -41,5 +41,5 @@ def test_paginated_page_not_a_number_falls_back_to_first(list_client):
 def test_paginated_empty_list(list_client):
     response = list_client.get("/empty")
     assert response.status_code == 200
-    assert "items:\n" in response.content.decode()
+    assert "items:\n\npage:1/1" in response.content.decode()
     assert "page:1/1" in response.content.decode()

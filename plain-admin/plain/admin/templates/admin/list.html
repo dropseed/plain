@@ -73,14 +73,14 @@ attrs:
                     >{{ page_obj.paginator.count }} result{{ "s" if page_obj.paginator.count != 1 else "" }}</h3>
                     {% if actions %}
                         <span
-                            data-selection-summary
-                            class="text-sm text-admin-muted-foreground hidden group-data-[selecting]:inline"
-                        ></span>
+                        data-selection-summary
+                        class="text-sm text-admin-muted-foreground hidden group-data-[selecting]:inline"
+                    ></span>
                         <form
-                            method="POST"
-                            data-actions-form
-                            data-total-count="{{ page_obj.paginator.count }}"
-                        >
+                        method="POST"
+                        data-actions-form
+                        data-total-count="{{ page_obj.paginator.count }}"
+                    >
                             <div class="admin-dropdown-menu">
                                 <button
                                     type="button"
@@ -104,7 +104,10 @@ attrs:
                                             role="heading"
                                             class="text-xs font-normal text-admin-muted-foreground group-data-[selecting]:hidden"
                                         >Select rows to run actions</div>
-                                        <hr role="separator" class="group-data-[selecting]:hidden">
+                                        <hr
+                                            role="separator"
+                                            class="group-data-[selecting]:hidden"
+                                        >
                                         {# Every action opens a confirmation, so every item gets the "…" suffix. #}
                                         {% for action in actions %}<button
                                             type="button"
@@ -119,46 +122,46 @@ attrs:
                         </form>
                         {% if page_obj.has_other_pages() %}
                             <button
-                                type="button"
-                                data-action-select-all
-                                class="hidden admin-btn admin-btn-sm admin-btn-link"
-                            >Select all {{ page_obj.paginator.count }}</button>
+                        type="button"
+                        data-action-select-all
+                        class="hidden admin-btn admin-btn-sm admin-btn-link"
+                    >Select all {{ page_obj.paginator.count }}</button>
                         {% endif %}
                         <button
-                            type="button"
-                            data-action-clear
-                            class="hidden group-data-[selecting]:inline-flex admin-btn admin-btn-sm admin-btn-ghost"
-                        >Clear</button>
+                        type="button"
+                        data-action-clear
+                        class="hidden group-data-[selecting]:inline-flex admin-btn admin-btn-sm admin-btn-ghost"
+                    >Clear</button>
                     {% endif %}
                 {% endif %}
             </div>
             <div class="flex space-x-2">
                 {% if table_style == "preview" %}
                     <a
-                        class="text-sm"
-                        href="{{ request.path + ("?search=" + search_query if search_query else "") }}"
-                    >View {{ page_obj.paginator.count }} result{{ "s" if page_obj.paginator.count != 1 else "" }}</a>
+                    class="text-sm"
+                    href="{{ request.path + ("?search=" + search_query if search_query else "") }}"
+                >View {{ page_obj.paginator.count }} result{{ "s" if page_obj.paginator.count != 1 else "" }}</a>
                 {% else %}
                     <form method="GET" class="inline-flex space-x-2">
-                        {% if filter_names %}<select
-                            data-autosubmit
-                            name="filter"
-                            class="admin-select admin-select-sm w-auto"
-                        >
-                            <option value="">Filter...</option>
-                            {% for f in filter_names %}
-                                <option selected="{{ f == current_filter }}">{{ f }}</option>
-                            {% endfor %}
-                        </select>{% endif %}
-                        {% if search_fields %}
-                            <SearchInput
-                                name="search"
-                                id="search"
-                                value="{{ search_query or "" }}"
-                                class="admin-input input-sm w-auto pl-8!"
-                            />
-                        {% endif %}
-                    </form>
+                    {% if filter_names %}<select
+                        data-autosubmit
+                        name="filter"
+                        class="admin-select admin-select-sm w-auto"
+                    >
+                        <option value="">Filter...</option>
+                        {% for f in filter_names %}
+                            <option selected="{{ f == current_filter }}">{{ f }}</option>
+                        {% endfor %}
+                    </select>{% endif %}
+                    {% if search_fields %}
+                        <SearchInput
+                            name="search"
+                            id="search"
+                            value="{{ search_query or "" }}"
+                            class="admin-input input-sm w-auto pl-8!"
+                        />
+                    {% endif %}
+                </form>
                 {% endif %}
             </div>
         </header>
@@ -192,30 +195,33 @@ attrs:
                                             <div class="text-xs font-normal">{{ get_field_label(field) }}</div>
                                         {% else %}
                                             <a
-                                                data-merge-params
-                                                aria-label="{{ ("Sort by " + get_field_label(field) + " ascending") if field != order_by_field else (("Sort by " + get_field_label(field) + " descending") if order_by_direction != "-" else ("Stop sorting by " + get_field_label(field))) }}"
-                                                class="text-xs font-normal flex items-center gap-1 hover:text-admin-foreground group"
-                                                href="{{ "?page=1&order_by=" + (field if field != order_by_field else (("-" + field) if order_by_direction != "-" else "")) }}"
-                                            >
+                                            data-merge-params
+                                            aria-label="{{ ("Sort by " + get_field_label(field) + " ascending") if field != order_by_field else (("Sort by " + get_field_label(field) + " descending") if order_by_direction != "-" else ("Stop sorting by " + get_field_label(field))) }}"
+                                            class="text-xs font-normal flex items-center gap-1 hover:text-admin-foreground group"
+                                            href="{{ "?page=1&order_by=" + (field if field != order_by_field else (("-" + field) if order_by_direction != "-" else "")) }}"
+                                        >
                                                 <span>{{ get_field_label(field) }}</span>
                                                 {% if field == order_by_field and order_by_direction == "-" %}
-                                                    {# Sorted descending; the next click clears, so reveal an x on hover/focus. #}
-                                                    <Icon
-                                                        name="caret-down-fill"
-                                                        class="text-[10px] group-hover:hidden group-focus:hidden"
-                                                    />
-                                                    <Icon
-                                                        name="x-lg"
-                                                        class="text-[10px] hidden group-hover:inline group-focus:inline"
-                                                    />
-                                                {% elif field == order_by_field %}
-                                                    <Icon name="caret-up-fill" class="text-[10px]" />
-                                                {% else %}
-                                                    <Icon
-                                                        name="caret-up-fill"
-                                                        class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100 group-focus:opacity-100"
-                                                    />
-                                                {% endif %}
+                                            {# Sorted descending; the next click clears, so reveal an x on hover/focus. #}
+                                            <Icon
+                                                name="caret-down-fill"
+                                                class="text-[10px] group-hover:hidden group-focus:hidden"
+                                            />
+                                            <Icon
+                                                name="x-lg"
+                                                class="text-[10px] hidden group-hover:inline group-focus:inline"
+                                            />
+                                        {% elif field == order_by_field %}
+                                            <Icon
+                                                name="caret-up-fill"
+                                                class="text-[10px]"
+                                            />
+                                        {% else %}
+                                            <Icon
+                                                name="caret-up-fill"
+                                                class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100 group-focus:opacity-100"
+                                            />
+                                        {% endif %}
                                             </a>
                                         {% endif %}
                                     </th>
@@ -242,7 +248,9 @@ attrs:
                                     </td>
                                 {% endif %}
                                 {% for field in fields %}
-                                    <td data-column-autolink="{{ get_object_url(obj) }}">
+                                    <td
+                                        data-column-autolink="{{ get_object_url(obj) }}"
+                                    >
                                         <div class="max-w-prose truncate">{{ render_value_template(get_field_value_template(obj, field, format_field_value(obj, field, get_field_value(obj, field))), {"object": obj, "field": field, "value": format_field_value(obj, field, get_field_value(obj, field))}) }}</div>
                                     </td>
                                 {% endfor %}
@@ -266,7 +274,10 @@ attrs:
                                                 class="w-48"
                                             >
                                                 <div role="menu">
-                                                    {% for (text, link_url) in get_object_links(obj).items() %}<a role="menuitem" href="{{ link_url }}">{{ text }}</a>{% endfor %}
+                                                    {% for (text, link_url) in get_object_links(obj).items() %}<a
+                                                        role="menuitem"
+                                                        href="{{ link_url }}"
+                                                    >{{ text }}</a>{% endfor %}
                                                 </div>
                                             </div>
                                         </div>
@@ -302,7 +313,10 @@ attrs:
                         >&lt;</a>{% endif %}
                         {# submitFormClean merges this onto the current URL, so search/filter/sort carry over without hidden inputs. #}
                         <form data-autosubmit method="GET">
-                            <select name="page" class="admin-select admin-select-sm w-auto">
+                            <select
+                                name="page"
+                                class="admin-select admin-select-sm w-auto"
+                            >
                                 {% for page_num in page_obj.paginator.page_range %}
                                     <option
                                         value="{{ page_num }}"
