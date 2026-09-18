@@ -88,7 +88,9 @@ class MigrationAutodetector:
         to try and restrict to (restriction is not guaranteed)
         """
         changes = self._detect_changes(convert_packages, graph)
-        changes = self.arrange_for_graph(changes, graph, migration_name)
+        changes = arrange_for_graph(
+            changes, graph, questioner=self.questioner, migration_name=migration_name
+        )
         if trim_to_packages:
             changes = self._trim_to_packages(changes, trim_to_packages)
         return changes
@@ -1051,66 +1053,6 @@ class MigrationAutodetector:
                     ),
                 )
 
-    def arrange_for_graph(
-        self,
-        changes: dict[str, list[Migration]],
-        graph: MigrationGraph,
-        migration_name: str | None = None,
-    ) -> dict[str, list[Migration]]:
-        """
-        Take a result from changes() and a MigrationGraph, and fix the names
-        and dependencies of the changes so they extend the graph from the leaf
-        nodes for each app.
-        """
-        leaves = graph.leaf_nodes()
-        name_map = {}
-        for package_label, migrations in list(changes.items()):
-            if not migrations:
-                continue
-            # Find the app label's current leaf node
-            app_leaf = None
-            for leaf in leaves:
-                if leaf[0] == package_label:
-                    app_leaf = leaf
-                    break
-            # Do they want an initial migration for this app?
-            if app_leaf is None and not self.questioner.ask_initial(package_label):
-                # They don't.
-                for migration in migrations:
-                    name_map[(package_label, migration.name)] = (
-                        package_label,
-                        "__first__",
-                    )
-                del changes[package_label]
-                continue
-            # Work out the next number in the sequence
-            if app_leaf is None:
-                next_number = 1
-            else:
-                next_number = (self.parse_number(app_leaf[1]) or 0) + 1
-            # Name each migration
-            for i, migration in enumerate(migrations):
-                if i == 0 and app_leaf:
-                    migration.dependencies = [*migration.dependencies, app_leaf]
-                new_name_parts = ["%04i" % next_number]  # noqa: UP031
-                if migration_name:
-                    new_name_parts.append(migration_name)
-                elif i == 0 and not app_leaf:
-                    new_name_parts.append("initial")
-                else:
-                    new_name_parts.append(migration.suggest_name()[:100])
-                new_name = "_".join(new_name_parts)
-                name_map[(package_label, migration.name)] = (package_label, new_name)
-                next_number += 1
-                migration.name = new_name
-        # Now fix dependencies
-        for migrations in changes.values():
-            for migration in migrations:
-                migration.dependencies = [
-                    name_map.get(d, d) for d in migration.dependencies
-                ]
-        return changes
-
     def _trim_to_packages(
         self, changes: dict[str, list[Migration]], package_labels: set[str]
     ) -> dict[str, list[Migration]]:
@@ -1157,6 +1099,68 @@ class MigrationAutodetector:
         return None
 
 
+def arrange_for_graph(
+    changes: dict[str, list[Migration]],
+    graph: MigrationGraph,
+    *,
+    questioner: MigrationQuestioner,
+    migration_name: str | None = None,
+) -> dict[str, list[Migration]]:
+    """
+    Take a result from changes() and a MigrationGraph, and fix the names
+    and dependencies of the changes so they extend the graph from the leaf
+    nodes for each app.
+    """
+    leaves = graph.leaf_nodes()
+    name_map = {}
+    for package_label, migrations in list(changes.items()):
+        if not migrations:
+            continue
+        # Find the app label's current leaf node
+        app_leaf = None
+        for leaf in leaves:
+            if leaf[0] == package_label:
+                app_leaf = leaf
+                break
+        # Do they want an initial migration for this app?
+        if app_leaf is None and not questioner.ask_initial(package_label):
+            # They don't.
+            for migration in migrations:
+                name_map[(package_label, migration.name)] = (
+                    package_label,
+                    "__first__",
+                )
+            del changes[package_label]
+            continue
+        # Work out the next number in the sequence
+        if app_leaf is None:
+            next_number = 1
+        else:
+            next_number = (MigrationAutodetector.parse_number(app_leaf[1]) or 0) + 1
+        # Name each migration
+        for i, migration in enumerate(migrations):
+            if i == 0 and app_leaf:
+                migration.dependencies = [*migration.dependencies, app_leaf]
+            new_name_parts = ["%04i" % next_number]  # noqa: UP031
+            if migration_name:
+                new_name_parts.append(migration_name)
+            elif i == 0 and not app_leaf:
+                new_name_parts.append("initial")
+            else:
+                new_name_parts.append(migration.suggest_name()[:100])
+            new_name = "_".join(new_name_parts)
+            name_map[(package_label, migration.name)] = (package_label, new_name)
+            next_number += 1
+            migration.name = new_name
+    # Now fix dependencies
+    for migrations in changes.values():
+        for migration in migrations:
+            migration.dependencies = [
+                name_map.get(d, d) for d in migration.dependencies
+            ]
+    return changes
+
+
 def deep_deconstruct(obj: Any) -> Any:
     """
     Recursive deconstruction for a field and its arguments.
@@ -1197,13 +1201,18 @@ def deep_deconstruct(obj: Any) -> Any:
 
 
 def detect_model_changes(
-    loader: MigrationLoader, package_labels: set[str] | None = None
+    loader: MigrationLoader,
+    *,
+    package_labels: set[str] | None = None,
+    questioner: MigrationQuestioner | None = None,
+    migration_name: str | None = None,
 ) -> dict[str, list[Migration]]:
     """The migrations `plain migrations create` would write right now.
 
-    Empty when the models and the migration history agree. `apply` uses it to
-    warn, `reset` to refuse: a model change the history doesn't hold would be
-    folded into the baseline and never reach a database that adopts it.
+    Empty when the models and the migration history agree. `create` writes
+    them, `apply` uses them to warn, `reset` to refuse: a model change the
+    history doesn't hold would be folded into the baseline and never reach a
+    database that adopts it.
     """
     from plain.postgres.migrations.state import ProjectState
     from plain.postgres.registry import models_registry
@@ -1211,11 +1220,13 @@ def detect_model_changes(
     autodetector = MigrationAutodetector(
         loader.project_state(),
         ProjectState.from_models_registry(models_registry),
+        questioner,
     )
     return autodetector.changes(
         graph=loader.graph,
         trim_to_packages=package_labels,
         convert_packages=package_labels,
+        migration_name=migration_name,
     )
 
 

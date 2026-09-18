@@ -15,7 +15,7 @@ from plain.utils.text import Truncator
 
 from ..db import get_connection
 from ..migrations.autodetector import (
-    MigrationAutodetector,
+    arrange_for_graph,
     describe_changes,
     detect_model_changes,
 )
@@ -232,13 +232,6 @@ def create(
             dry_run=dry_run,
         )
 
-    # Set up autodetector
-    autodetector = MigrationAutodetector(
-        loader.project_state(),
-        ProjectState.from_models_registry(models_registry),
-        questioner,
-    )
-
     # Handle empty migrations if requested
     if empty:
         if not package_labels_set:
@@ -248,20 +241,18 @@ def create(
         changes = {
             package: [Migration("custom", package)] for package in package_labels_set
         }
-        changes = autodetector.arrange_for_graph(
-            changes=changes,
-            graph=loader.graph,
-            migration_name=migration_name,
+        changes = arrange_for_graph(
+            changes, loader.graph, questioner=questioner, migration_name=migration_name
         )
         write_migration_files(changes)
         return
 
     # Detect changes
     try:
-        changes = autodetector.changes(
-            graph=loader.graph,
-            trim_to_packages=package_labels_set or None,
-            convert_packages=package_labels_set or None,
+        changes = detect_model_changes(
+            loader,
+            package_labels=package_labels_set or None,
+            questioner=questioner,
             migration_name=migration_name,
         )
     except MigrationSchemaError as e:
@@ -939,7 +930,8 @@ def prune(package_label: str | None, yes: bool) -> None:
 @cli.command()
 @click.argument("package_label")
 @click.option(
-    "--since",
+    "--shipped-in",
+    "shipped_in",
     default="",
     help="Version this reset ships in; named in the refusal a database that missed the leaf gets, and required before this package can be reset again.",
 )
@@ -947,7 +939,7 @@ def prune(package_label: str | None, yes: bool) -> None:
     "--dry-run", is_flag=True, help="Show the baseline and what would be deleted."
 )
 @database_management_command
-def reset(package_label: str, since: str, dry_run: bool) -> None:
+def reset(package_label: str, shipped_in: str, dry_run: bool) -> None:
     """Replace a package's migration history with one baseline"""
     try:
         packages_registry.get_package_config(package_label)
@@ -957,7 +949,7 @@ def reset(package_label: str, since: str, dry_run: bool) -> None:
     loader = MigrationLoader(None, ignore_no_migrations=True)
 
     try:
-        pending = detect_model_changes(loader, {package_label})
+        pending = detect_model_changes(loader, package_labels={package_label})
     except MigrationSchemaError as e:
         raise click.ClickException(str(e)) from e
     if pending:
@@ -970,7 +962,7 @@ def reset(package_label: str, since: str, dry_run: bool) -> None:
         )
 
     try:
-        plan = plan_reset(loader, package_label, since=since)
+        plan = plan_reset(loader, package_label, shipped_in=shipped_in)
         _require_committed(plan)
         validate_reset(loader, plan)
     except BadMigrationError as e:
@@ -1035,9 +1027,9 @@ def reset(package_label: str, since: str, dry_run: bool) -> None:
         "Commit the new file and the deletions together; other packages' "
         "dependencies on the deleted names need no edits."
     )
-    if not since:
+    if not shipped_in:
         click.echo(
-            "`since` is empty - set it in the baseline when this ships, or the "
+            "`shipped_in` is empty - set it in the baseline when this ships, or the "
             "next reset of this package is refused."
         )
     click.echo(
