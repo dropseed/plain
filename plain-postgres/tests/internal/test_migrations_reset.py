@@ -8,6 +8,7 @@ is the reset of the whole package, circular FK inside.
 
 from __future__ import annotations
 
+import importlib
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -32,6 +33,15 @@ EXAMPLES_NAMES = sorted(path.stem for path in REAL_EXAMPLES.glob("0*.py"))
 EXAMPLES_COUNT = len(EXAMPLES_NAMES)
 LEAF = EXAMPLES_NAMES[-1]
 NEXT_NUMBER = f"{EXAMPLES_COUNT + 1:04d}"
+# The models the leaf migration creates, so deleting it has a known consequence.
+LEAF_CREATED_MODELS = [
+    operation.name
+    for operation in importlib.import_module(
+        f"app.examples.migrations.{LEAF}"
+    ).Migration.operations
+    if isinstance(operation, operations.CreateModel)
+]
+assert LEAF_CREATED_MODELS, f"{LEAF} creates no models, so this file needs a new anchor"
 
 
 def migration_source(
@@ -444,7 +454,8 @@ def test_pending_model_changes_refuse(migrations_dir: Path) -> None:
 
     assert result.exit_code != 0
     assert "model changes its migrations don't hold" in result.output
-    assert "Create model " in result.output
+    for model_name in LEAF_CREATED_MODELS:
+        assert f"Create model {model_name}" in result.output
     assert len(examples_files(migrations_dir)) == EXAMPLES_COUNT - 1
 
 
