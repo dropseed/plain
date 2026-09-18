@@ -57,7 +57,7 @@ def render_source(
     mod = types.ModuleType(f"_plain_html_inline_{abs(hash(source))}")
     mod.__file__ = "<source>"
     code = compile(src, "<source>", "exec")
-    exec(code, mod.__dict__)
+    exec(code, mod.__dict__)  # noqa: S102 — the engine's own generated module
     return mod.render(**ctx)
 
 
@@ -78,5 +78,5 @@ def render_text_source(source: str, context: dict | None = None) -> str:
     mod = types.ModuleType(f"_plain_html_text_{abs(hash(source))}")
     mod.__file__ = "<text>"
     code = compile(src, "<text>", "exec")
-    exec(code, mod.__dict__)
+    exec(code, mod.__dict__)  # noqa: S102 — the engine's own generated module
     return mod.render(**(context or {}))

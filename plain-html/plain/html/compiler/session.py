@@ -228,15 +228,13 @@ class CompileSession:
         include_renders: dict[int, str] = {}
         include_funcs: dict[str, Callable[..., str]] = {}
         child_keys: list[str] = []
-        idx = 0
-        for inc_node in _walk_includes(tree):
+        for idx, inc_node in enumerate(_walk_includes(tree)):
             assert inc_node.include_path is not None
             child_path = self.resolver(inc_node.include_path, current_template=path)
             child_render = self.compile_path(child_path)
             slot_name = f"_inc_{idx}"
             include_renders[id(inc_node)] = slot_name
             include_funcs[slot_name] = child_render
-            idx += 1
             # The child's entry has a key — pick it up so this template's key
             # transitively reflects child changes.
             child_entry = _process_cache_get(child_path.resolve())
@@ -274,7 +272,7 @@ class CompileSession:
         # Inject child renderers as module globals before exec so the
         # generated bare-name references resolve.
         mod.__dict__.update(include_funcs)
-        exec(code, mod.__dict__)
+        exec(code, mod.__dict__)  # noqa: S102 — the engine's own generated module
         return _CompiledEntry(render=mod.render, key=key)
 
 

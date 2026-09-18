@@ -276,7 +276,6 @@ class PullRequestsRouter(Router):
     ]
 
 
-
 # views.py
 class PullRequestDetailView(HTMXView, DetailView):
     def htmx_post_update(self):

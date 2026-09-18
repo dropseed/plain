@@ -10,7 +10,6 @@ user-visible contract for `Template`/`render`/`Markup` lives in
 from __future__ import annotations
 
 import pytest
-
 from plain.html import Markup, render_source, render_text_source
 from plain.html.parser import ParseError
 from plain.html.tokenizer import TokenizeError

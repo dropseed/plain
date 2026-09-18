@@ -302,8 +302,7 @@ def emit_module(
 
     if imports:
         header.append("# Frontmatter imports:")
-        for stmt in imports:
-            header.append(stmt)
+        header.extend(imports)
         header.append("")
 
     # `_root_ctx` threads the view's original context through every `:include`

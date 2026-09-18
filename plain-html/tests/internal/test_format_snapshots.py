@@ -19,7 +19,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from plain.html.format import format_source
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "format"

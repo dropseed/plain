@@ -41,10 +41,8 @@ def _skip_leading_whitespace(source: str, start: int) -> int:
 
 def offset_to_line_col(source: str, offset: int) -> tuple[int, int]:
     """Convert a 0-based byte offset in `source` to 1-based (line, column)."""
-    if offset < 0:
-        offset = 0
-    if offset > len(source):
-        offset = len(source)
+    offset = max(offset, 0)
+    offset = min(offset, len(source))
     head = source[:offset]
     line = head.count("\n") + 1
     last_newline = head.rfind("\n")

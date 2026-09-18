@@ -18,7 +18,6 @@ import types
 from pathlib import Path
 
 import pytest
-
 from plain.html.compiler import CompileError, CompileSession
 from plain.html.components import ComponentsError, parse_components
 from plain.html.parser import ParseError
@@ -33,7 +32,7 @@ def _load(source: str, *, label: str = "<test>"):
     src = _compile_string(source, label=label)
     mod = types.ModuleType(f"_plain_html_test_{abs(hash(source))}")
     mod.__file__ = label
-    exec(compile(src, label, "exec"), mod.__dict__)
+    exec(compile(src, label, "exec"), mod.__dict__)  # noqa: S102 — the engine's own generated module
     return mod.render
 
 

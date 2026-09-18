@@ -32,7 +32,6 @@ from typing import Any
 
 import html5lib
 import pytest
-
 from plain.html.format import format_source
 from plain.html.parser import ParseError
 from plain.html.positions import body_offset

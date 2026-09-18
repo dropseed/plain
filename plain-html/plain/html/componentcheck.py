@@ -54,9 +54,7 @@ def check_component_files(
     """
     errors: list[str] = []
     for path in sorted(set(components.values())):
-        if current_template is None and (
-            path.startswith("./") or path.startswith("../")
-        ):
+        if current_template is None and path.startswith(("./", "../")):
             # No base directory to resolve a relative path against.
             continue
         try:
@@ -205,6 +203,4 @@ def _is_content(node: Node) -> bool:
     """
     if isinstance(node, TextNode):
         return bool(node.text.strip())
-    if isinstance(node, HtmlCommentNode | TemplateCommentNode | DoctypeNode):
-        return False
-    return True
+    return not isinstance(node, HtmlCommentNode | TemplateCommentNode | DoctypeNode)

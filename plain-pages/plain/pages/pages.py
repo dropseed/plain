@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import frontmatter
-
 from plain.html import render_source, render_text_source
 from plain.runtime import settings
 from plain.urls import URLPattern, path

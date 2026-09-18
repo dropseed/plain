@@ -21,9 +21,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 import plain.html
+import pytest
 from plain.html import (
     Markup,
     Template,

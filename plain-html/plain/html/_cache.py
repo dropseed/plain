@@ -150,17 +150,16 @@ def imports_mtimes(stmts: list[str]) -> dict[str, int]:
                 # `import a.b.c` / `import a.b.c as x` → record `a.b.c`.
                 for alias in node.names:
                     candidates.append(alias.name)
-            elif isinstance(node, ast.ImportFrom):
-                if node.module:
-                    # The from-target itself, plus each imported name as a
-                    # potential submodule (`from a.b import c` may import
-                    # the submodule `a.b.c` — record that and let
-                    # `module_mtime_ns` walk back to `a.b` on failure).
-                    candidates.append(node.module)
-                    for alias in node.names:
-                        if alias.name == "*":
-                            continue
-                        candidates.append(f"{node.module}.{alias.name}")
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                # The from-target itself, plus each imported name as a
+                # potential submodule (`from a.b import c` may import
+                # the submodule `a.b.c` — record that and let
+                # `module_mtime_ns` walk back to `a.b` on failure).
+                candidates.append(node.module)
+                for alias in node.names:
+                    if alias.name == "*":
+                        continue
+                    candidates.append(f"{node.module}.{alias.name}")
             for candidate in candidates:
                 if candidate in out:
                     continue

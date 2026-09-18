@@ -35,7 +35,7 @@ class CompileError(Exception):
 # Defined-then-imported: session/emit do `from . import CompileError`, which
 # resolves against the partially-initialized package module — the class above
 # is in place by the time those imports run.
-from .session import (  # noqa: E402
+from .session import (
     CompileSession,
     PathResolver,
     clear_process_cache,

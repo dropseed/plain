@@ -12,7 +12,6 @@ import time
 from pathlib import Path
 
 import pytest
-
 from plain.html.format import format_source
 from plain.html.parser import ParseError
 from plain.html.tokenizer import TokenizeError

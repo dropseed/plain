@@ -56,7 +56,7 @@ def find_template(name: str, *, current_template: Path | None = None) -> Path:
     base_name = name.removesuffix(".html") if name.endswith(".html") else name
     filename = f"{base_name}.html"
 
-    if name.startswith("./") or name.startswith("../"):
+    if name.startswith(("./", "../")):
         if current_template is None:
             raise TemplateFileMissing(
                 f"Relative template path {name!r} requires a calling template"

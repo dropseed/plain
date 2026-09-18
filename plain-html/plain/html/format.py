@@ -152,7 +152,7 @@ def _parse_frontmatter_sections(inner: str) -> tuple[list[tuple[str, str]], str]
         i += 1
         while i < n:
             nxt = lines[i]
-            if nxt == "" or nxt.startswith(" ") or nxt.startswith("\t"):
+            if nxt == "" or nxt.startswith((" ", "\t")):
                 block_lines.append(nxt)
                 i += 1
                 continue

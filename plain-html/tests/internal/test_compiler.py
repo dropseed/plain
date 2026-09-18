@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from plain.html import render_source
 from plain.html.compiler import (
     CompileError,
@@ -41,7 +40,7 @@ def _load(source: str, *, label: str = "<test>"):
     mod = types.ModuleType(f"_plain_html_test_{abs(hash(source))}")
     mod.__file__ = label
     code = compile(src, label, "exec")
-    exec(code, mod.__dict__)
+    exec(code, mod.__dict__)  # noqa: S102 — the engine's own generated module
     return mod.render
 
 
@@ -1038,9 +1037,11 @@ PARITY_CASES: list[tuple[str, dict]] = [
         {"items": ["a", "b", "c"]},
     ),
     (
-        "{% for r in rows %}<tr>"
-        "{% for c in r %}<td>{{ c }}</td>{% endfor %}"
-        "</tr>{% endfor %}",
+        (
+            "{% for r in rows %}<tr>"
+            "{% for c in r %}<td>{{ c }}</td>{% endfor %}"
+            "</tr>{% endfor %}"
+        ),
         {"rows": [[1, 2], [3, 4]]},
     ),
     ("<template>{{ x }}<br></template>", {"x": "hi"}),

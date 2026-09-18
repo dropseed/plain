@@ -24,14 +24,13 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from plain.html.compiler import CompileSession
 
 # `tests/internal/` isn't a package — no __init__.py — so a relative
 # import doesn't work. Add the directory to sys.path so the shared
 # fixtures module loads as a plain module.
 sys.path.insert(0, str(Path(__file__).parent))
-from _perf_fixtures import PERF_CASES  # noqa: E402
+from _perf_fixtures import PERF_CASES
 
 # 25 ms per warm render. Bench numbers as of writing are all sub-millisecond;
 # the budget is loose enough to absorb CI machine variance (typically 3-5×
@@ -55,7 +54,7 @@ def _load_compiled(plain_source: str) -> Any:
     src = CompileSession().compile_string(plain_source, label="<perf>")
     mod = types.ModuleType(f"_perf_{abs(hash(plain_source))}")
     code = compile(src, "<perf>", "exec")
-    exec(code, mod.__dict__)
+    exec(code, mod.__dict__)  # noqa: S102 — the engine's own generated module
     return mod.render
 
 

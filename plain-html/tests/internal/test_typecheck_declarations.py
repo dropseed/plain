@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from plain.html.typecheck.declarations import (
     DeclarationError,
     parse,

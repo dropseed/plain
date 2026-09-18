@@ -5,8 +5,8 @@ from typing import NoReturn
 from plain.admin.urls import AdminRouter
 from plain.assets.urls import AssetsRouter
 from plain.auth.views import LogoutView
-from plain.passwords.views import PasswordLoginView
 from plain.html.views import NotFoundView, TemplateView
+from plain.passwords.views import PasswordLoginView
 from plain.urls import Router, include, path
 
 from app.contacts.urls import ContactsRouter

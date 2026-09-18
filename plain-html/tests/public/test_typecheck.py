@@ -10,7 +10,6 @@ from __future__ import annotations
 import shutil
 
 import pytest
-
 from plain.html.typecheck import check_source
 from plain.html.typecheck.backends import TyBackend
 

@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.print import print_event
 
@@ -31,7 +30,6 @@ from .typecheck.declarations import parse as parse_declarations
 @click.group()
 def cli() -> None:
     """plain.html template checks and tooling"""
-    pass
 
 
 @cli.command()
