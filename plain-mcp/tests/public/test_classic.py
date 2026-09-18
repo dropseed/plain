@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from helpers import bare_post
+from mcp_test_helpers import bare_post
 from plain.mcp.views import CLASSIC_PROTOCOL_VERSIONS
 from plain.test import Client, case, cases
 

@@ -11,8 +11,8 @@ default. For URL-resolution failures (no view ever runs), mount
 
 from __future__ import annotations
 
-from clients import error_client as _error_client
 from plain.test import patch
+from templates_test_clients import error_client as _error_client
 
 
 class TestPlainViewFallsThroughToText:

@@ -44,7 +44,9 @@ def swap_router(
 def error_client() -> Generator[Client]:
     """Client routed to the error-raising views in `error_routers.py`."""
     with swap_router(
-        "error_routers.ErrorRouter", debug=False, raise_request_exception=False
+        "templates_error_routers.ErrorRouter",
+        debug=False,
+        raise_request_exception=False,
     ) as client:
         yield client
 

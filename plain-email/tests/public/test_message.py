@@ -136,4 +136,7 @@ def test_send_mail_with_html_message_captured():
     assert len(outbox) == 1
     sent = outbox[0]
     assert sent.body == "Plain body"
+    # An html_message makes send_mail build the multi-alternatives subclass —
+    # that promotion is part of what this test is checking.
+    assert isinstance(sent, EmailMultiAlternatives)
     assert ("<p>HTML body</p>", "text/html") in sent.alternatives

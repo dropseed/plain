@@ -17,8 +17,8 @@ import concurrent.futures
 import contextvars
 import threading
 
-from helpers import clean_connection
 from plain.postgres.db import _db_conn, has_connection
+from postgres_test_helpers import clean_connection
 
 
 class FakeConn:

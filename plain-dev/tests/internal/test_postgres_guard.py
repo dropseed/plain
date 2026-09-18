@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, cast
 
-from helpers import sandbox
+from dev_test_helpers import sandbox
 from plain.dev.postgres import guard
 from plain.dev.postgres.cluster import Cluster
 from plain.postgres.migrations.exceptions import ResetBoundaryError

@@ -19,7 +19,6 @@ from contextlib import contextmanager
 from unittest.mock import patch
 
 import plain.postgres.middleware
-from helpers import clean_connection
 from plain.http import Response, StreamingResponse
 from plain.internal.handlers.base import BaseHandler
 from plain.postgres.connection import DatabaseConnection
@@ -34,6 +33,7 @@ from plain.test import Client, RequestFactory, override_settings
 from plain.urls import Router, path
 from plain.urls.resolvers import _get_cached_resolver
 from plain.views import ServerSentEvent, ServerSentEventsView, View
+from postgres_test_helpers import clean_connection
 
 
 def _sync_db_query():

@@ -14,11 +14,11 @@ put and `Atomic.__exit__`'s error recovery drops it instead.
 from __future__ import annotations
 
 import psycopg
-from helpers import clean_connection
 from plain.postgres import transaction
 from plain.postgres.db import get_connection
 from plain.postgres.sources import runtime_pool_source
 from plain.test import raises
+from postgres_test_helpers import clean_connection
 
 
 def _terminate_backend(pid: int) -> None:

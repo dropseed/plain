@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from helpers import mcp_post
+from mcp_test_helpers import mcp_post
 from plain.mcp.views import PROTOCOL_VERSION
 from plain.test import Client
 

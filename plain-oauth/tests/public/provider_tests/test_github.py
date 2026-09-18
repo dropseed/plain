@@ -61,9 +61,16 @@ def test_github_provider():
 
         # Check the user and connection that was created
         user = get_request_user(response.request)
-        assert user.username == "userone"
+        assert user is not None
+        # `get_request_user` is annotated with `app.users.models.User`, and
+        # `app` is a single flat module name that every test app and the
+        # example app claim. Type-checking the workspace resolves it to the
+        # example app's model, which has neither `username` nor this
+        # package's `oauth_connections` accessor — so the reads below are
+        # correct at runtime and unresolvable at type time.
+        assert user.username == "userone"  # ty: ignore[unresolved-attribute]
         assert user.email == "user@example.com"
-        connections = user.oauth_connections.query.all()
+        connections = user.oauth_connections.query.all()  # ty: ignore[unresolved-attribute]
         assert len(connections) == 1
         assert connections[0].provider_key == "github"
         assert connections[0].provider_user_id == "99"

@@ -7,7 +7,7 @@ somebody else's data without saying anything.
 
 from __future__ import annotations
 
-from helpers import sandbox
+from dev_test_helpers import sandbox
 from plain.dev.state import checkout_state_path, find_project_root, sanitize
 
 

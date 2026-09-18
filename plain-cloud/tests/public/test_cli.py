@@ -9,7 +9,7 @@ from pathlib import Path
 
 import httpx
 from click.testing import CliRunner
-from helpers import isolated_cloud_env
+from cloud_test_helpers import isolated_cloud_env
 from plain.cloud import cli as cli_module
 from plain.cloud.cli import cli
 from plain.cloud.client import Client

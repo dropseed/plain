@@ -12,6 +12,17 @@ from plain.auth.requests import get_request_user
 from plain.test import Client
 
 
+def acting_user_id(response) -> int:
+    """The id of the user the request was served as.
+
+    `get_request_user` can return None (an anonymous request), so a lost
+    session fails here, naming the problem, rather than on `.id`.
+    """
+    user = get_request_user(response.request)
+    assert user is not None, "expected an authenticated request"
+    return user.id
+
+
 def test_admin_can_impersonate_regular_user():
     admin = User.query.create(username="admin", is_admin=True)
     target = User.query.create(username="target", is_admin=False)
@@ -24,7 +35,7 @@ def test_admin_can_impersonate_regular_user():
 
     # Subsequent requests are now served as the target user.
     response = client.get("/whoami")
-    assert get_request_user(response.request).id == target.id
+    assert acting_user_id(response) == target.id
 
 
 def test_stopping_impersonation_restores_original_user():
@@ -34,13 +45,13 @@ def test_stopping_impersonation_restores_original_user():
     client = Client()
     client.force_login(admin)
     client.get(f"/admin/impersonate/start/{target.id}")
-    assert get_request_user(client.get("/whoami").request).id == target.id
+    assert acting_user_id(client.get("/whoami")) == target.id
 
     stopped = client.get("/admin/impersonate/stop")
     assert stopped.status_code == 302
 
     # Back to acting as the admin.
-    assert get_request_user(client.get("/whoami").request).id == admin.id
+    assert acting_user_id(client.get("/whoami")) == admin.id
 
 
 def test_non_admin_cannot_start_impersonation():
@@ -54,7 +65,7 @@ def test_non_admin_cannot_start_impersonation():
     assert started.status_code == 403
 
     # The effective user is unchanged — no impersonation took hold.
-    assert get_request_user(client.get("/whoami").request).id == regular.id
+    assert acting_user_id(client.get("/whoami")) == regular.id
 
 
 def test_admin_users_cannot_be_impersonated():
@@ -72,4 +83,4 @@ def test_admin_users_cannot_be_impersonated():
     assert blocked.status_code == 403
 
     # After the refusal the marker is cleared, so normal requests resume.
-    assert get_request_user(client.get("/whoami").request).id == admin.id
+    assert acting_user_id(client.get("/whoami")) == admin.id

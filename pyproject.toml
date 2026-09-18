@@ -104,10 +104,18 @@ version = "1.75.0"
 exclude = ["example", "scratch", "scripts"]
 
 [tool.ty.environment]
+# Every tests root that holds helper modules the test files import. Module
+# names across these are unique on purpose (`postgres_test_helpers`, not
+# `helpers`) — they all land in one flat namespace here, and a repeated name
+# would resolve to whichever root came first.
 extra-paths = [
-  "plain-postgres/tests",
   "plain/tests",
   "plain-admin/tests",
+  "plain-cloud/tests",
+  "plain-dev/tests",
+  "plain-mcp/tests",
   "plain-oauthserver/tests",
+  "plain-postgres/tests",
+  "plain-templates/tests",
   "example",
 ]

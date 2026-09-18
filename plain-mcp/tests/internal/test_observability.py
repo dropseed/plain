@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from helpers import bare_post, mcp_post, mcp_post_raw
+from mcp_test_helpers import bare_post, mcp_post, mcp_post_raw
 from opentelemetry import trace
 from plain.mcp.exceptions import INVALID_PARAMS, METHOD_NOT_FOUND
 from plain.mcp.views import META_PROTOCOL_VERSION, PROTOCOL_VERSION

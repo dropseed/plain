@@ -8,7 +8,7 @@ automatically because the kernel has already dropped its lock.
 
 import os
 
-from helpers import Sandbox, sandbox
+from dev_test_helpers import Sandbox, sandbox
 from plain.dev.process import Supervisor
 
 

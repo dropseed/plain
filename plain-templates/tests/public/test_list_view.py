@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from clients import list_client
+from templates_test_clients import list_client
 
 
 def test_unpaginated_list():

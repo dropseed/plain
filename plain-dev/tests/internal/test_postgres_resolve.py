@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import sys
 
-from helpers import sandbox
+from dev_test_helpers import sandbox
 from plain.dev.postgres.identity import (
     read_pointer,
     resolve_database_name,

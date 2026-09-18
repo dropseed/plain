@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import base64
 
-from helpers import mcp_post, mcp_post_raw
+from mcp_test_helpers import mcp_post, mcp_post_raw
 from opentelemetry.trace import SpanKind, StatusCode
 from plain.mcp.views import (
     META_CLIENT_CAPABILITIES,

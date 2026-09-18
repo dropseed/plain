@@ -41,11 +41,11 @@ def temp_migrations(*labels: str) -> Generator[Path]:
             return original(package_label)
 
         sys.path.insert(0, str(tmp_dir))
-        MigrationLoader.migrations_module = staticmethod(migrations_module)  # type: ignore[method-assign]
+        MigrationLoader.migrations_module = staticmethod(migrations_module)  # ty: ignore[invalid-assignment] (swapping a classmethod for the test)
         try:
             yield root
         finally:
-            MigrationLoader.migrations_module = original  # type: ignore[method-assign]
+            MigrationLoader.migrations_module = original  # ty: ignore[invalid-assignment] (restoring the classmethod)
             try:
                 sys.path.remove(str(tmp_dir))
             except ValueError:

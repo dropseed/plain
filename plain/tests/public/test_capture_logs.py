@@ -38,7 +38,9 @@ def test_structured_context_lands_on_the_record():
     with capture_logs("plain.jobs") as logs:
         logging.getLogger("plain.jobs").warning("Job failed", extra={"job_id": 7})
 
-    assert logs[0].job_id == 7
+    # `extra=` lands as a real attribute on the record; the type checker
+    # can't know the name, which is the whole point of structured context.
+    assert logs[0].job_id == 7  # ty: ignore[unresolved-attribute]
 
 
 def test_a_record_reaching_two_captured_loggers_is_recorded_once():

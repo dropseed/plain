@@ -30,4 +30,6 @@ Still unsure? **Would a failure surprise a user reading the changelog?** If yes 
 - **Lifecycle**: `internal/` tests are regenerable — delete and rewrite freely when features change. `public/` tests evolve deliberately.
 - **Promotion**: when a test crosses into contract territory, move from `internal/` to `public/`; the reverse isn't a thing.
 
-Both directories run in the normal `plain test` suite and must pass. There are no fixtures and no `conftest.py` — shared helpers live in ordinary modules at the tests root (e.g. `helpers.py`), imported explicitly.
+Both directories run in the normal `plain test` suite and must pass. There are no fixtures and no `conftest.py` — shared helpers live in ordinary modules at the tests root, imported explicitly.
+
+Name those modules for their package, not their role: `postgres_test_helpers.py`, `templates_test_clients.py`, `oauth_helpers.py`. Every tests root is its own `sys.path` entry, but the type checker sees them as one flat namespace (`[tool.ty.environment] extra-paths`), so a second `helpers.py` resolves to whichever root came first.
