@@ -25,6 +25,7 @@ from plain.forms.fields import EMPTY_VALUES, Field
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
+    from plain.postgres.fields.base import ColumnField
     from plain.postgres.fields.related_managers import ManyToManyManager
 
 __all__ = [
@@ -128,10 +129,11 @@ def _modelfield_to_formfield(modelfield: Any) -> Field[Any] | None:
     """Map a postgres model field to a form field instance, or `None` when
     the column isn't user input: the primary key, a non-column field, or a
     column the database fills itself (`generate`/`create_now`/`update_now`)."""
-    from plain import postgres
     from plain.postgres.fields import ChoicesField
     from plain.postgres.fields.base import ColumnField, DefaultableField
     from plain.postgres.fields.related import ManyToManyField
+
+    from plain import postgres
 
     if isinstance(modelfield, ManyToManyField):
         return ModelMultipleChoiceField(
@@ -220,7 +222,9 @@ def _resolve_model_field(column: Any) -> Any:
 @overload
 def model_field[M: Model](column: ManyToManyManager[M]) -> Field[list[M]]: ...
 @overload
-def model_field[T](column: T) -> Field[T]: ...
+def model_field[T](column: ColumnField[T]) -> Field[T]: ...
+@overload
+def model_field(column: Any) -> Field[Any]: ...
 def model_field(column: Any) -> Field[Any]:
     """Declare a `ModelForm` field derived from a model column.
 
