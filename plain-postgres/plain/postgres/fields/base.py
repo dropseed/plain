@@ -540,6 +540,35 @@ class Field[T](RegisterLookupMixin):
         return getattr(obj, self.name)
 
 
+def validate_none_only_default(
+    field: Field[Any], default: Any, *, allow_null: bool
+) -> None:
+    """Enforce the `default=None`-or-nothing contract.
+
+    Some fields can't express a persistent literal column DEFAULT --
+    ColumnField-direct ones (UUIDField, DateTimeField, ForeignKeyField) have no
+    DefaultableField machinery at all, and EncryptedJSONField's ciphertext is
+    non-deterministic. They still accept `default=None` so a nullable variant
+    reads as *optional* in the typed constructor: a stock type checker treats a
+    field as omittable only when its definition passes `default=`. None is the
+    only allowed value and it requires allow_null; the caller stores nothing,
+    because a nullable column already yields None when constructed without a
+    value (see ColumnField.get_default). So `default=None` is purely a typing
+    affordance, and `has_persistent_literal_default()` stays False.
+    """
+    if default is NOT_PROVIDED:
+        return
+    name = type(field).__name__
+    if default is not None:
+        raise TypeError(
+            f"{name} does not accept a persistent default. "
+            "Only default=None is allowed (with allow_null=True), which "
+            "makes the field optional in the constructor."
+        )
+    if not allow_null:
+        raise TypeError(f"{name}(default=None) requires allow_null=True.")
+
+
 class ColumnField[T](Field[T]):
     """Base for fields backed by a column value (required/allow_null/validators)."""
 
@@ -558,25 +587,7 @@ class ColumnField[T](Field[T]):
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # A plain ColumnField can't express a persistent literal column
-        # DEFAULT (that's DefaultableField's job), but it still accepts
-        # `default=None` so a nullable variant reads as optional in the typed
-        # constructor -- a stock type checker only treats a field as omittable
-        # when the call site passes `default=`. None is the only allowed value
-        # and it requires allow_null; nothing is stored, because a nullable
-        # column already yields None when constructed without a value (see
-        # get_default). So `default=None` here is purely a typing affordance.
-        if default is not NOT_PROVIDED:
-            if default is not None:
-                raise TypeError(
-                    f"{type(self).__name__} does not accept a persistent default. "
-                    "Only default=None is allowed (with allow_null=True), which "
-                    "makes the field optional in the constructor."
-                )
-            if not allow_null:
-                raise TypeError(
-                    f"{type(self).__name__}(default=None) requires allow_null=True."
-                )
+        validate_none_only_default(self, default, allow_null=allow_null)
         self.required = required
         self.allow_null = allow_null
         self._validators = list(validators)

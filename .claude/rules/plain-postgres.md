@@ -49,9 +49,6 @@ class Article(postgres.Model):
 - **JSON**: `JSONField`/`EncryptedJSONField` return `Any` from the stub (the
   runtime class isn't generic over its value shape), so the annotation is what
   preserves typing: `Field[dict]` / `Field[dict[str, Any]]`.
-- **`EncryptedJSONField`** can't express a column DEFAULT (Fernet ciphertext is
-  non-deterministic), so it has no `default=` to make it omittable — it stays a
-  required constructor argument.
 - **Custom querysets**: declare `query: ClassVar[MyQuerySet] = MyQuerySet()`
   (`ClassVar` so it isn't treated as a field). Default-queryset models declare
   nothing — `Model.query` is typed automatically.

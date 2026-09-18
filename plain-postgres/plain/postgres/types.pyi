@@ -496,6 +496,7 @@ def EncryptedJSONField(
     decoder: Any = None,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> Any: ...
 @overload
