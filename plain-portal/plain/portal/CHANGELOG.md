@@ -1,5 +1,49 @@
 # plain-portal changelog
 
+## [0.3.0](https://github.com/dropseed/plain/releases/plain-portal@0.3.0) (2026-09-02)
+
+### What's changed
+
+- `plain portal start` now requires exactly one of `--read-only` or `--read-write`. There is no default, so the database mode is always visible in the command itself — which matters when an agent (or a permission prompt) has to judge whether a command is safe to run against production ([fb858bda7c](https://github.com/dropseed/plain/commit/fb858bda7c))
+- `--writable` is replaced by `--read-write`. It still prompts for confirmation before starting, and `--yes` still skips the prompt ([fb858bda7c](https://github.com/dropseed/plain/commit/fb858bda7c))
+- The `plain-portal` agent skill now tells agents to use `--read-only` unless the user has explicitly asked for database writes ([fb858bda7c](https://github.com/dropseed/plain/commit/fb858bda7c))
+
+### Upgrade instructions
+
+- Update everywhere the remote side is started — Heroku/Fly/Kubernetes/Docker/SSH commands, runbooks, and scripts. `plain portal start` becomes `plain portal start --read-only`, and `plain portal start --writable` becomes `plain portal start --read-write`.
+- A bare `plain portal start` now exits with a usage error instead of defaulting to read-only.
+
+## [0.2.10](https://github.com/dropseed/plain/releases/plain-portal@0.2.10) (2026-08-12)
+
+### What's changed
+
+- Session log timestamps use the app's `TIME_ZONE` ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Relay server lockfile security updates ([99caf7fd9e](https://github.com/dropseed/plain/commit/99caf7fd9e))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.2.9](https://github.com/dropseed/plain/releases/plain-portal@0.2.9) (2026-08-02)
+
+### What's changed
+
+- The server's npm lockfile now resolves wrangler 4.114.0, picking up sharp 0.35.2 to clear Dependabot-flagged libvips CVEs (GHSA-f88m-g3jw-g9cj). sharp is only part of the local dev/deploy toolchain — the deployed worker never touches it. ([e7fda362d5](https://github.com/dropseed/plain/commit/e7fda362d5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.2.8](https://github.com/dropseed/plain/releases/plain-portal@0.2.8) (2026-06-26)
+
+### What's changed
+
+- Bumped the portal server's npm dependencies (undici, Cloudflare workerd/wrangler) to resolve security advisories. ([cea9cd30b2](https://github.com/dropseed/plain/commit/cea9cd30b2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.7](https://github.com/dropseed/plain/releases/plain-portal@0.2.7) (2026-05-05)
 
 ### What's changed

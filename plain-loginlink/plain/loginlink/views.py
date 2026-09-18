@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.auth import login, logout
 from plain.auth.views import AuthView
@@ -19,9 +19,26 @@ from .links import (
     send_login_link,
 )
 
+if TYPE_CHECKING:
+    from plain.http import Request
+
+
+def redirect_to_next_url(request: Request, default: str = "/") -> RedirectResponse:
+    """Redirect to the "next" query param, or the default when it's missing,
+    empty, or an external URL (which RedirectResponse refuses)."""
+    next_url = request.query_params.get("next") or default
+    try:
+        return RedirectResponse(next_url, status_code=302)
+    except ValueError:
+        return RedirectResponse(default, status_code=302)
+
 
 class LoginLinkFormView(AuthView, TemplateView):
     form_class = LoginLinkForm
+
+    # How long a link stays valid, in seconds. Links work for this entire
+    # window, so pick a duration you're comfortable handing out.
+    link_expires_in: int = 60 * 60
 
     def sent_url(self, next_url: str | None) -> str:
         url = reverse("loginlink:sent")
@@ -32,19 +49,23 @@ class LoginLinkFormView(AuthView, TemplateView):
         return url
 
     def get(self) -> Response:
-        # Redirect if the user is already logged in
+        # Redirect if the user is already logged in. The form is never
+        # validated on a GET, so "next" comes from the query string.
         if self.user:
-            return RedirectResponse(
-                self.sent_url(self.request.query_params.get("next"))
-            )
+            return redirect_to_next_url(self.request)
         return self.render_form(self.form_class)
 
     def post(self) -> Response:
         result = self.validate_form(self.form_class)
         if isinstance(result, Response):
             return result
-        send_login_link(email=result.email, request=self.request, next_url=result.next)
-        return RedirectResponse(self.sent_url(result.next or None))
+        send_login_link(
+            email=result.email,
+            request=self.request,
+            next_url=result.next,
+            expires_in=self.link_expires_in,
+        )
+        return RedirectResponse(self.sent_url(result.next or None), status_code=302)
 
 
 class LoginLinkSentView(AuthView, TemplateView):
@@ -53,7 +74,7 @@ class LoginLinkSentView(AuthView, TemplateView):
     def get(self) -> Response:
         # Redirect if the user is already logged in
         if self.user:
-            return RedirectResponse(self.request.query_params.get("next", "/"))
+            return redirect_to_next_url(self.request)
 
         return super().get()
 
@@ -81,15 +102,18 @@ class LoginLinkLoginView(AuthView, View):
         try:
             user = get_link_token_user(token)
         except LoginLinkExpired:
-            return RedirectResponse(reverse("loginlink:failed") + "?error=expired")
+            return RedirectResponse(
+                reverse("loginlink:failed") + "?error=expired", status_code=302
+            )
         except LoginLinkInvalid:
-            return RedirectResponse(reverse("loginlink:failed") + "?error=invalid")
+            return RedirectResponse(
+                reverse("loginlink:failed") + "?error=invalid", status_code=302
+            )
         except LoginLinkChanged:
-            return RedirectResponse(reverse("loginlink:failed") + "?error=changed")
+            return RedirectResponse(
+                reverse("loginlink:failed") + "?error=changed", status_code=302
+            )
 
         login(self.request, user)
 
-        if next_url := self.request.query_params.get("next"):
-            return RedirectResponse(next_url)
-
-        return RedirectResponse(self.success_url)
+        return redirect_to_next_url(self.request, default=self.success_url)

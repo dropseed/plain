@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from plain import postgres
 from plain.postgres import types
+
+from plain import postgres
 
 
 @postgres.register_model
@@ -10,3 +11,8 @@ class User(postgres.Model):
     is_admin = types.BooleanField(default=False)
 
     query: postgres.QuerySet[User] = postgres.QuerySet()
+
+    @property
+    def username_upper(self) -> str:
+        """A computed (non-column) field, to exercise in-memory sorting."""
+        return self.username.upper()

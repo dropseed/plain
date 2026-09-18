@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import requests
-from requests.exceptions import ConnectionError as RequestsConnectionError
-from requests.exceptions import SSLError
+import httpx
 
 from . import __version__
 from .audits import (
@@ -34,7 +32,7 @@ class Scanner:
     def __init__(self, url: str, disabled_audits: set[str] | None = None) -> None:
         self.url = url
         self.disabled_audits = disabled_audits or set()
-        self.response: requests.Response | None = None
+        self.response: httpx.Response | None = None
         self.fetch_exception: Exception | None = None
 
         # Initialize all available audits
@@ -54,24 +52,24 @@ class Scanner:
             CORSAudit(),
         ]
 
-    def fetch(self) -> requests.Response:
+    def fetch(self) -> httpx.Response:
         """Fetch the URL and cache the response."""
         if self.response is None:
             try:
                 user_agent = (
                     f"plain-scan/{__version__} (+https://plainframework.com/scan)"
                 )
-                self.response = requests.get(
+                self.response = httpx.get(
                     self.url,
-                    allow_redirects=True,
+                    follow_redirects=True,
                     timeout=30,
                     headers={"User-Agent": user_agent},
                 )
-            except (
-                SSLError,
-                RequestsConnectionError,
-            ) as e:
-                # Store TLS/network exceptions so TLSAudit can report them
+            except httpx.TransportError as e:
+                # Store TLS/network exceptions so TLSAudit can report them.
+                # TransportError covers cert failures, connection refused, and
+                # connect/read timeouts alike (httpx splits these across
+                # ConnectError and TimeoutException, both TransportError).
                 self.fetch_exception = e
                 raise
         return self.response
@@ -86,10 +84,7 @@ class Scanner:
         response = None
         try:
             response = self.fetch()
-        except (
-            SSLError,
-            RequestsConnectionError,
-        ):
+        except httpx.TransportError:
             # Exception is already stored in self.fetch_exception
             # Continue with scan so TLSAudit can report it
             pass
@@ -121,10 +116,7 @@ class Scanner:
                 try:
                     audit_result = audit.check(self)
                     scan_result.audits.append(audit_result)
-                except (
-                    SSLError,
-                    RequestsConnectionError,
-                ):
+                except httpx.TransportError:
                     # Audit couldn't run due to fetch failure
                     # Skip non-TLS audits since they need a successful response
                     if audit.slug != "tls":

@@ -10,7 +10,6 @@ from __future__ import annotations
 import psycopg.errors
 import pytest
 from app.examples.models.iteration import IterationExample
-
 from plain.postgres import transaction
 from plain.postgres.db import read_only
 from plain.postgres.transaction import TransactionManagementError
@@ -18,9 +17,8 @@ from plain.postgres.transaction import TransactionManagementError
 
 class TestReadOnly:
     def test_blocks_writes(self, isolated_db):
-        with read_only():
-            with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
-                IterationExample.query.create(name="Toyota", tag="Tundra")
+        with read_only(), pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
+            IterationExample.query.create(name="Toyota", tag="Tundra")
 
     def test_allows_reads(self, isolated_db):
         IterationExample.query.create(name="Toyota", tag="Tundra")
@@ -37,25 +35,25 @@ class TestReadOnly:
 
     def test_nested_atomic_inherits_read_only(self, isolated_db):
         IterationExample.query.create(name="Toyota", tag="Tundra")
-        with read_only():
-            with transaction.atomic():
-                assert IterationExample.query.count() == 1
-                with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
-                    IterationExample.query.create(name="Ford", tag="F150")
+        with read_only(), transaction.atomic():
+            assert IterationExample.query.count() == 1
+            with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
+                IterationExample.query.create(name="Ford", tag="F150")
 
     def test_cannot_enter_inside_atomic(self, isolated_db):
-        with transaction.atomic():
-            with pytest.raises(
+        with (
+            transaction.atomic(),
+            pytest.raises(
                 TransactionManagementError,
                 match="read_only.*cannot be entered inside an existing atomic",
-            ):
-                with read_only():
-                    pass
+            ),
+            read_only(),
+        ):
+            pass
 
     def test_exception_leaves_connection_writable(self, isolated_db):
-        with pytest.raises(RuntimeError):
-            with read_only():
-                raise RuntimeError("boom")
+        with pytest.raises(RuntimeError), read_only():
+            raise RuntimeError("boom")
 
         # Connection is writable again after the block unwinds.
         IterationExample.query.create(name="Toyota", tag="Tundra")
@@ -79,9 +77,11 @@ class TestReadOnly:
     def test_nested_atomic_rescues_caught_write(self, isolated_db):
         IterationExample.query.create(name="Toyota", tag="Tundra")
         with read_only():
-            with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
-                with transaction.atomic():
-                    IterationExample.query.create(name="Ford", tag="F150")
+            with (
+                pytest.raises(psycopg.errors.ReadOnlySqlTransaction),
+                transaction.atomic(),
+            ):
+                IterationExample.query.create(name="Ford", tag="F150")
             # The savepoint rolled back, so the outer read-only txn is
             # healthy and reads continue to work.
             assert IterationExample.query.count() == 1

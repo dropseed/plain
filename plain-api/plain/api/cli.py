@@ -1,7 +1,6 @@
 import sys
 
 import click
-
 from plain.cli import register_cli
 from plain.runtime import settings
 from plain.utils.module_loading import import_string

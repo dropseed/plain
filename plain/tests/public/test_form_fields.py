@@ -147,7 +147,7 @@ class TestNullBooleanField:
 
 
 class TestChoiceField:
-    choices = [("a", "A"), ("b", "B")]
+    choices = (("a", "A"), ("b", "B"))
 
     def test_valid_choice(self):
         assert clean(types.ChoiceField(choices=self.choices), "a") == "a"
@@ -158,7 +158,7 @@ class TestChoiceField:
 
 
 class TestMultipleChoiceField:
-    choices = [("a", "A"), ("b", "B")]
+    choices = (("a", "A"), ("b", "B"))
 
     def test_valid_subset(self):
         field = types.MultipleChoiceField(choices=self.choices)
@@ -179,7 +179,9 @@ class TestDateField:
 
 class TestDateTimeField:
     def test_valid(self):
-        assert clean(types.DateTimeField(), "2026-05-18T09:30:00") == datetime.datetime(
+        # DateTimeField parses to a naive datetime — it does no timezone
+        # conversion of its own.
+        assert clean(types.DateTimeField(), "2026-05-18T09:30:00") == datetime.datetime(  # noqa: DTZ001
             2026, 5, 18, 9, 30
         )
 

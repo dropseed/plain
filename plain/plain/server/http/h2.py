@@ -1,35 +1,39 @@
 from __future__ import annotations
 
 import asyncio
-import io
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 import h2.config
 import h2.connection
+import h2.errors
 import h2.events
 import h2.exceptions
 import h2.settings
-
-from plain.http import AsyncStreamingResponse, FileResponse, StreamingResponse
+from plain.http import (
+    AsyncStreamingResponse,
+    FileResponse,
+    StreamingResponse,
+    content_length_forbidden,
+    response_omits_body,
+)
 from plain.http import Request as HttpRequest
 from plain.logs import get_framework_logger
 
 from ..accesslog import log_access
-from ..util import http_date
+from ..util import HEALTHCHECK_BODY, http_date
+from .errors import BodyBudgetExceeded, LimitRequestBody
 from .request import _merge_headers, _resolve_path, _resolve_remote_addr
 from .response import FileWrapper
+from .sink import BodyBudget, BodyRateFloor, BodySink
+
+if TYPE_CHECKING:
+    from plain.http.request import RequestStream
 
 log = get_framework_logger()
-
-# Fallback max request body size per H2 stream when DATA_UPLOAD_MAX_MEMORY_SIZE is None (10 MiB)
-_H2_BODY_FALLBACK = 10 * 1024 * 1024
-
-# Idle timeout for HTTP/2 connections with no active streams (seconds).
-# Browsers typically keep connections open for 5-10 minutes.
-H2_IDLE_TIMEOUT = 300
 
 # HTTP/1.1 hop-by-hop headers that must not appear in HTTP/2 responses
 _H2_SKIP_HEADERS = frozenset(
@@ -38,15 +42,71 @@ _H2_SKIP_HEADERS = frozenset(
 
 
 class H2Stream:
-    """Accumulates headers and data for a single HTTP/2 stream."""
+    """Accumulates headers and body for a single HTTP/2 stream.
 
-    __slots__ = ("stream_id", "headers", "data", "data_size")
+    The body lands in a BodySink: memory below the spool threshold, an
+    anonymous temp file above it, with the per-stream policy cap and the
+    worker-wide in-flight budget both enforced on received bytes inside
+    the sink.
+    """
 
-    def __init__(self, stream_id: int) -> None:
+    __slots__ = (
+        "_rate_marked_at",
+        "_rate_marked_received",
+        "declared",
+        "headers",
+        "method",
+        "opened",
+        "rate",
+        "sink",
+        "stream_id",
+    )
+
+    def __init__(
+        self,
+        stream_id: int,
+        *,
+        spool_size: int,
+        max_size: int | None,
+        budget: BodyBudget | None,
+        min_rate: int,
+    ) -> None:
         self.stream_id = stream_id
         self.headers: list[tuple[str, str]] = []
-        self.data = io.BytesIO()
-        self.data_size = 0
+        # Declared content-length, set once headers are parsed. None for
+        # an undeclared-length body — the rate sweep can't tell "done" from
+        # "still arriving" for those and keeps watching.
+        self.declared: int | None = None
+        # The ":method" pseudo-header, set once headers are parsed.
+        # None until then (and for a malformed request without one).
+        self.method: str | None = None
+        self.sink = BodySink(spool_size=spool_size, max_size=max_size, budget=budget)
+        self.rate = BodyRateFloor(min_rate)
+        self.opened = time.monotonic()
+        self._rate_marked_at = self.opened
+        self._rate_marked_received = 0
+
+    def observe_rate(self, now: float) -> bool:
+        """Record wall time and bytes since the last sweep; True = below floor.
+
+        With bodies ingested independently of the app, wall time between
+        sweeps IS time spent waiting on the client, so it feeds the same
+        BodyRateFloor h1 uses (grace period and sustained-rate window
+        included).
+        """
+        self.rate.record(
+            waited=now - self._rate_marked_at,
+            received=self.sink.received - self._rate_marked_received,
+        )
+        self._rate_marked_at = now
+        self._rate_marked_received = self.sink.received
+        return self.rate.violated()
+
+    @property
+    def is_head(self) -> bool:
+        """Every response written for a HEAD stream — including
+        server-generated errors — must be headers-only."""
+        return self.method == "HEAD"
 
 
 class H2Request:
@@ -85,6 +145,80 @@ class H2Response:
         self.headers_sent: bool = False
 
 
+def _declared_content_length(headers: list[tuple[str, str]]) -> int | None:
+    """Parse the content-length header from decoded h2 request headers."""
+    for name, value in headers:
+        if name == "content-length":
+            try:
+                return int(value)
+            except ValueError:
+                return None
+    return None
+
+
+def _send_stream_response(
+    conn: h2.connection.H2Connection,
+    stream: H2Stream,
+    status_code: int,
+    body: bytes,
+    content_type: str,
+    *,
+    extra_headers: list[tuple[str, str]] | None = None,
+) -> None:
+    """Send a complete server-generated response and close the stream.
+
+    RFC 9113 §8.1: after a complete response to a request the client
+    may still be sending, RST_STREAM with NO_ERROR tells it to stop.
+    Without the reset the client keeps transferring the body (later
+    frames are acked, reopening its flow window).
+
+    A HEAD stream gets the headers (Content-Length included) with no
+    DATA — a strict h2 client treats body bytes on a HEAD response as a
+    connection-level protocol error that kills every stream.
+    """
+    stream_id = stream.stream_id
+    headers = [
+        (":status", str(status_code)),
+        ("content-type", content_type),
+        ("content-length", str(len(body))),
+    ]
+    if extra_headers:
+        headers.extend(extra_headers)
+    try:
+        if stream.is_head:
+            conn.send_headers(stream_id, headers, end_stream=True)
+        else:
+            conn.send_headers(stream_id, headers)
+            conn.send_data(stream_id, body, end_stream=True)
+        try:
+            conn.reset_stream(stream_id, error_code=h2.errors.ErrorCodes.NO_ERROR)
+        except h2.exceptions.StreamClosedError:
+            # The client already ended its side (e.g. an app error after
+            # END_STREAM) — there is nothing to tell it to stop sending.
+            pass
+    except h2.exceptions.ProtocolError:
+        try:
+            conn.reset_stream(stream_id)
+        except h2.exceptions.ProtocolError:
+            pass
+
+
+def _send_stream_error(
+    conn: h2.connection.H2Connection,
+    stream: H2Stream,
+    status_code: int,
+) -> None:
+    _send_stream_response(
+        conn,
+        stream,
+        status_code,
+        f"<h1>{status_code}</h1>".encode(),
+        "text/html",
+        # The load-shedding 503 explicitly invites a retry (h1 ditto).
+        extra_headers=[("retry-after", "1")] if status_code == 503 else None,
+    )
+
+
 def _reject_h2_stream(
     conn: h2.connection.H2Connection,
     state: H2ConnectionState,
@@ -92,41 +226,27 @@ def _reject_h2_stream(
     stream: H2Stream,
     status_code: int,
 ) -> None:
-    """Reject an H2 stream with an error response and clean up state."""
-    body = f"<h1>{status_code}</h1>".encode()
-    try:
-        conn.send_headers(
-            event.stream_id,
-            [
-                (":status", str(status_code)),
-                ("content-type", "text/html"),
-                ("content-length", str(len(body))),
-            ],
-        )
-        conn.send_data(event.stream_id, body, end_stream=True)
-    except h2.exceptions.ProtocolError:
-        try:
-            conn.reset_stream(event.stream_id)
-        except h2.exceptions.ProtocolError:
-            pass
+    """Reject an in-progress H2 stream and clean up its state."""
+    _send_stream_error(conn, stream, status_code)
     conn.acknowledge_received_data(event.flow_controlled_length, event.stream_id)
-    state.aggregate_body_size -= stream.data_size
     state.streams.pop(event.stream_id, None)
+    stream.sink.close()
 
 
 def _extract_headers_from_stream(
     stream: H2Stream, scheme: str
 ) -> tuple[str, str, str, str, list[tuple[str, str]]]:
     """Extract method, path, authority, scheme, and regular headers from an H2Stream."""
-    method = "GET"
+    # The single :method derivation is stream.method (set at
+    # RequestReceived) — re-deriving here could silently frame the
+    # response for one method while dispatching the view for another.
+    method = stream.method or "GET"
     path = "/"
     authority = ""
     raw_headers: list[tuple[str, str]] = []
 
     for name, value in stream.headers:
-        if name == ":method":
-            method = value
-        elif name == ":path":
+        if name == ":path":
             path = value
         elif name == ":authority":
             authority = value
@@ -165,14 +285,24 @@ def _build_http_request(
     authority: str,
     client: tuple[str, int] | Any,
     server: tuple[str, int] | Any,
+    stream: RequestStream,
+    received: int,
+    ingest_seconds: float,
 ) -> HttpRequest:
     """Build a plain.http.Request from extracted H2 stream data."""
     headers_dict = _merge_headers(raw_headers)
+
+    # The body arrived in full before dispatch — advertise its length
+    # when the client didn't declare one (HTTP/2 allows that), so
+    # Content-Length consumers (multipart parsing) see the body. The h1
+    # counterpart is the de-chunking in request.create_request.
+    if received and "CONTENT-LENGTH" not in headers_dict:
+        headers_dict["CONTENT-LENGTH"] = str(received)
     remote_addr = _resolve_remote_addr(client)
     server_name, server_port = _resolve_h2_server_address(server, authority, scheme)
     path = _resolve_path(raw_path)
 
-    return HttpRequest(
+    request = HttpRequest(
         method=method,
         path=path,
         headers=headers_dict,
@@ -182,6 +312,13 @@ def _build_http_request(
         server_port=server_port,
         remote_addr=remote_addr,
     )
+    # The fully-ingested body — never a socket-backed reader, so app
+    # reads can't block on the client.
+    request._stream = stream
+    request._read_started = False
+    if received:
+        request._body_ingest_seconds = ingest_seconds
+    return request
 
 
 def _prepare_stream_request(
@@ -200,7 +337,19 @@ def _prepare_stream_request(
         raw_path, query = raw_path.split("?", 1)
 
     http_request = _build_http_request(
-        method, raw_path, query, scheme, raw_headers, authority, client, server
+        method,
+        raw_path,
+        query,
+        scheme,
+        raw_headers,
+        authority,
+        client,
+        server,
+        stream.sink.finish(),
+        stream.sink.received,
+        # Headers-to-END_STREAM wall time — what receiving this body
+        # cost before dispatch could start.
+        time.monotonic() - stream.opened,
     )
 
     h2_req = H2Request(
@@ -211,10 +360,6 @@ def _prepare_stream_request(
         peer_addr=client,
         scheme=scheme,
     )
-
-    stream.data.seek(0)
-    http_request._stream = stream.data
-    http_request._read_started = False
 
     return h2_req, http_request, H2Response()
 
@@ -227,11 +372,14 @@ def _build_h2_response_headers(http_response: Any) -> list[tuple[str, str]]:
         ("date", http_date()),
     ]
 
+    status_code = http_response.status_code
     for key, value in http_response.headers.items():
         if value is None:
             continue
         lkey = key.lower()
         if lkey in _H2_SKIP_HEADERS:
+            continue
+        if lkey == "content-length" and content_length_forbidden(status_code):
             continue
         # RFC 9113 §8.2.2: TE header is only valid with value "trailers"
         if lkey == "te" and value.strip().lower() != "trailers":
@@ -258,7 +406,6 @@ class H2ConnectionState:
         executor: ThreadPoolExecutor,
         *,
         stream_budget: asyncio.Semaphore | None = None,
-        max_aggregate_body: int = 0,
         on_stream_complete: Callable[[], None] | None = None,
     ) -> None:
         self.conn = conn
@@ -273,8 +420,6 @@ class H2ConnectionState:
         self.reset_streams: set[int] = set()
         self.window_events: dict[int, asyncio.Event] = {}
         self.stream_budget = stream_budget
-        self.aggregate_body_size: int = 0
-        self.max_aggregate_body = max_aggregate_body
         self.on_stream_complete = on_stream_complete
 
     def get_window_event(self, stream_id: int) -> asyncio.Event:
@@ -305,8 +450,15 @@ async def async_handle_h2_connection(
     handler: Any,
     is_ssl: bool,
     executor: ThreadPoolExecutor,
+    *,
     stream_budget: asyncio.Semaphore | None = None,
     on_stream_complete: Callable[[], None] | None = None,
+    shutdown_event: asyncio.Event | None = None,
+    keepalive_timeout: float,
+    max_request_body: int | None = None,
+    body_budget: BodyBudget | None = None,
+    spool_size: int,
+    body_min_rate: int = 0,
 ) -> None:
     """Async HTTP/2 connection loop.
 
@@ -314,6 +466,10 @@ async def async_handle_h2_connection(
     stream as an independent asyncio task. All I/O goes through asyncio's
     transport layer (memory BIO for TLS), eliminating the need for a
     dedicated reader thread.
+
+    When shutdown_event is set, the connection drains: new streams are
+    refused (REFUSED_STREAM, safe for clients to retry), dispatched streams
+    run to completion, and the connection then closes with GOAWAY.
     """
     config = h2.config.H2Configuration(client_side=False)
     conn = h2.connection.H2Connection(config=config)
@@ -328,7 +484,9 @@ async def async_handle_h2_connection(
     )
 
     scheme = "https" if is_ssl else "http"
-    max_body = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or _H2_BODY_FALLBACK
+    # Body policy (cap, spool threshold, budget, rate floor) arrives
+    # fully resolved by the Worker — like keepalive_timeout — so h1 and
+    # h2 always share one resolution.
     healthcheck_path: str = settings.HEALTHCHECK_PATH
     state = H2ConnectionState(
         conn,
@@ -339,11 +497,50 @@ async def async_handle_h2_connection(
         scheme,
         executor,
         stream_budget=stream_budget,
-        max_aggregate_body=max_body * 10,
         on_stream_complete=on_stream_complete,
     )
 
     stream_tasks: dict[int, asyncio.Task[None]] = {}
+
+    async def sweep_stalled_bodies() -> None:
+        """408 any half-open stream whose body has dropped below the rate floor.
+
+        Slow-drip defense, h2 shape: a dripper holding sink bytes in the
+        worker-wide budget is caught by the same floor h1 enforces (see
+        H2Stream.observe_rate). Runs after every frame batch AND on every
+        wait timeout — a stalled upload sharing the connection with a
+        long-running response stream (SSE, a slow view) produces no
+        frames of its own, so the timeout path is what reaches it.
+        """
+        if body_min_rate <= 0 or not state.streams:
+            return
+        now = time.monotonic()
+        swept = False
+        for stream in list(state.streams.values()):
+            # A stream that already delivered its full declared body is
+            # done — it's only holding open for trailers or a late
+            # END_STREAM, not dripping.
+            if stream.declared is not None and stream.sink.received >= stream.declared:
+                continue
+            if stream.observe_rate(now):
+                _send_stream_error(conn, stream, 408)
+                state.streams.pop(stream.stream_id, None)
+                stream.sink.close()
+                swept = True
+                log.debug(
+                    "H2 stream below minimum body transfer rate",
+                    extra={"stream_id": stream.stream_id},
+                )
+        if swept:
+            async with state.write_lock:
+                await state.flush()
+
+    loop = asyncio.get_running_loop()
+    draining = False
+    shutdown_wait: asyncio.Task[bool] | None = (
+        loop.create_task(shutdown_event.wait()) if shutdown_event is not None else None
+    )
+    read_task: asyncio.Task[bytes] | None = None
 
     try:
         # Send connection preface
@@ -351,14 +548,69 @@ async def async_handle_h2_connection(
             await state.flush()
 
         while True:
-            try:
-                data = await asyncio.wait_for(
-                    reader.read(65535),
-                    timeout=H2_IDLE_TIMEOUT,
-                )
-            except TimeoutError:
+            if draining and not stream_tasks and not state.streams:
+                # All accepted streams finished — close out (the finally
+                # block sends GOAWAY). state.streams matters too: a stream
+                # whose HEADERS arrived but whose body hasn't finished has
+                # no task yet, and GOAWAY's last_stream_id would tell the
+                # client it was processed — keep reading until it
+                # completes (bounded by the worker's drain deadline).
+                break
+
+            if read_task is None:
+                read_task = loop.create_task(reader.read(65535))
+
+            # Keep reading while draining — in-flight responses depend on
+            # WINDOW_UPDATE frames from the client — but wake regularly to
+            # notice the last stream finishing even if the client is quiet.
+            waiters: set[asyncio.Task[Any]] = {read_task}
+            if shutdown_wait is not None and not draining:
+                waiters.add(shutdown_wait)
+            # Stream completions wake the wait so the idle clock restarts
+            # when in-flight work ends, not at the last inbound frame —
+            # otherwise a long response eats its connection's idle window
+            # and the close races the next pooled request.
+            waiters.update(stream_tasks.values())
+            if draining:
+                wait_timeout = 0.5
+            elif body_min_rate > 0 and state.streams:
+                # A half-open body is being watched by the rate sweep,
+                # which must keep running even if the client goes silent
+                # — wake at sweep cadence, not the keepalive window.
+                wait_timeout = min(1.0, keepalive_timeout)
+            else:
+                wait_timeout = keepalive_timeout
+            done, _ = await asyncio.wait(
+                waiters,
+                timeout=wait_timeout,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+
+            if shutdown_wait is not None and shutdown_wait in done:
+                draining = True
+                continue
+
+            if read_task not in done:
+                await sweep_stalled_bodies()
+                if draining:
+                    continue
+                if done or stream_tasks or (body_min_rate > 0 and state.streams):
+                    # Not idle: a stream just finished (done — restart
+                    # the idle clock from now), dispatched views are
+                    # still running (e.g. a slow view with a frame-quiet
+                    # client), or a half-open body is mid-transfer. The
+                    # keepalive timeout only applies between requests.
+                    # Half-open streams keep the connection only while
+                    # the rate sweep watches them — with the floor
+                    # disabled they fall through to the idle timeout, so
+                    # a silent half-open stream can't hold the
+                    # connection forever either way.
+                    continue
                 log.debug("HTTP/2 idle timeout", extra={"client": client})
                 break
+
+            data = read_task.result()
+            read_task = None
             if not data:
                 break
 
@@ -366,7 +618,22 @@ async def async_handle_h2_connection(
 
             for event in h2_events:
                 if isinstance(event, h2.events.RequestReceived):
-                    stream = H2Stream(event.stream_id)
+                    if draining:
+                        # Refuse streams opened during shutdown — the
+                        # client can safely retry them (REFUSED_STREAM
+                        # means nothing was processed).
+                        conn.reset_stream(
+                            event.stream_id,
+                            error_code=h2.errors.ErrorCodes.REFUSED_STREAM,
+                        )
+                        continue
+                    stream = H2Stream(
+                        event.stream_id,
+                        spool_size=spool_size,
+                        max_size=max_request_body,
+                        budget=body_budget,
+                        min_rate=body_min_rate,
+                    )
                     stream.headers = [
                         (
                             n.decode("utf-8", errors="surrogateescape")
@@ -378,40 +645,100 @@ async def async_handle_h2_connection(
                         )
                         for n, v in event.headers
                     ]
+
+                    stream.declared = _declared_content_length(stream.headers)
+                    # RFC 9113 8.3: pseudo-headers precede regular fields,
+                    # so this stops at the front of the list.
+                    stream.method = next(
+                        (value for name, value in stream.headers if name == ":method"),
+                        None,
+                    )
+
+                    # Reject a declared-too-large body at the headers,
+                    # before any of it is transferred (mirrors h1's
+                    # fail-fast on Content-Length). The stream is never
+                    # registered, so its data frames are acked and
+                    # discarded by the stream-is-None branch below.
+                    if (
+                        max_request_body is not None
+                        and stream.declared is not None
+                        and stream.declared > max_request_body
+                    ):
+                        _send_stream_error(conn, stream, 413)
+                        stream.sink.close()
+                        log.warning(
+                            "H2 stream declared body over max size",
+                            extra={
+                                "stream_id": event.stream_id,
+                                "content_length": stream.declared,
+                                "max_size": max_request_body,
+                            },
+                        )
+                        continue
+
+                    # Health check — answered from the headers alone,
+                    # before any body transfers, like h1. The stream is
+                    # never registered, so DATA frames (a healthcheck
+                    # POST, say) are acked and discarded below.
+                    if healthcheck_path:
+                        stream_path = ""
+                        for hname, hval in stream.headers:
+                            if hname == ":path":
+                                stream_path = hval.split("?", 1)[0]
+                                break
+                        if stream_path == healthcheck_path:
+                            _send_stream_response(
+                                conn, stream, 200, HEALTHCHECK_BODY, "text/plain"
+                            )
+                            stream.sink.close()
+                            continue
+
                     state.streams[event.stream_id] = stream
 
                 elif isinstance(event, h2.events.DataReceived):
                     stream = state.streams.get(event.stream_id)
-                    data_len = len(event.data)
                     if stream is None:
                         # Stream already rejected/completed — still acknowledge
                         # the data to avoid leaking the connection flow-control window.
                         conn.acknowledge_received_data(
                             event.flow_controlled_length, event.stream_id
                         )
-                    elif (
-                        state.max_aggregate_body > 0
-                        and state.aggregate_body_size + data_len
-                        > state.max_aggregate_body
-                    ):
-                        _reject_h2_stream(conn, state, event, stream, 503)
-                        log.warning(
-                            "H2 aggregate body budget exceeded",
-                            extra={"stream_id": event.stream_id},
-                        )
-                    elif stream.data_size + data_len > max_body:
-                        _reject_h2_stream(conn, state, event, stream, 413)
-                        log.warning(
-                            "H2 stream exceeded max body size",
-                            extra={
-                                "stream_id": event.stream_id,
-                                "max_body": max_body,
-                            },
-                        )
                     else:
-                        stream.data_size += data_len
-                        state.aggregate_body_size += data_len
-                        stream.data.write(event.data)
+                        # The sink checks the per-stream cap before the
+                        # worker-wide budget, so when one frame crosses
+                        # both limits the specific 413 wins over the
+                        # retry-inviting 503.
+                        try:
+                            stream.sink.feed(event.data)
+                        except LimitRequestBody:
+                            _reject_h2_stream(conn, state, event, stream, 413)
+                            log.warning(
+                                "H2 stream exceeded max body size",
+                                extra={
+                                    "stream_id": event.stream_id,
+                                    "max_size": max_request_body,
+                                },
+                            )
+                            continue
+                        except BodyBudgetExceeded:
+                            _reject_h2_stream(conn, state, event, stream, 503)
+                            log.warning(
+                                "In-flight body budget exceeded",
+                                extra={"stream_id": event.stream_id},
+                            )
+                            continue
+                        except OSError:
+                            # A spool write failed (ENOSPC, EMFILE):
+                            # this stream's problem, not the
+                            # connection's — unrelated streams keep
+                            # going. h1 maps the same failure to a
+                            # per-request 500.
+                            _reject_h2_stream(conn, state, event, stream, 500)
+                            log.exception(
+                                "H2 body spool write failed",
+                                extra={"stream_id": event.stream_id},
+                            )
+                            continue
                         conn.acknowledge_received_data(
                             event.flow_controlled_length, event.stream_id
                         )
@@ -419,47 +746,38 @@ async def async_handle_h2_connection(
                 elif isinstance(event, h2.events.StreamEnded):
                     stream = state.streams.pop(event.stream_id, None)
                     if stream is not None:
-                        # Health check — respond immediately without thread pool.
-                        if healthcheck_path:
-                            stream_path = ""
-                            for hname, hval in stream.headers:
-                                if hname == ":path":
-                                    stream_path = hval.split("?", 1)[0]
-                                    break
-                            if stream_path == healthcheck_path:
-                                async with state.write_lock:
-                                    conn.send_headers(
-                                        event.stream_id,
-                                        [
-                                            (":status", "200"),
-                                            ("content-type", "text/plain"),
-                                            ("content-length", "2"),
-                                        ],
-                                    )
-                                    conn.send_data(
-                                        event.stream_id, b"ok", end_stream=True
-                                    )
-                                    await state.flush()
-                                state.aggregate_body_size -= stream.data_size
-                                continue
-
                         task = asyncio.get_running_loop().create_task(
                             _async_handle_stream(state, stream)
                         )
                         stream_tasks[event.stream_id] = task
 
                         def _on_stream_done(
-                            t: asyncio.Task[None], sid: int = event.stream_id
+                            t: asyncio.Task[None],
+                            sid: int = event.stream_id,
+                            stream: H2Stream = stream,
                         ) -> None:
                             stream_tasks.pop(sid, None)
                             state.cleanup_stream(sid)
+                            # A task cancelled before its first step (a
+                            # client RST or GOAWAY in the same frame
+                            # batch as END_STREAM) never runs its
+                            # coroutine at all — not even its
+                            # except/finally — so the sink MUST be
+                            # released here, in the one hook that always
+                            # fires, or every aborted upload leaks its
+                            # bytes from the worker-wide budget forever.
+                            # After a normal run this close() is an
+                            # idempotent no-op.
+                            stream.sink.close()
+                            if state.on_stream_complete is not None:
+                                state.on_stream_complete()
 
                         task.add_done_callback(_on_stream_done)
 
                 elif isinstance(event, h2.events.StreamReset):
                     stream = state.streams.pop(event.stream_id, None)
                     if stream is not None:
-                        state.aggregate_body_size -= stream.data_size
+                        stream.sink.close()
                     state.reset_streams.add(event.stream_id)
                     task = stream_tasks.pop(event.stream_id, None)
                     if task is not None:
@@ -475,6 +793,19 @@ async def async_handle_h2_connection(
                         for ev in state.window_events.values():
                             ev.set()
 
+                elif isinstance(event, h2.events.RemoteSettingsChanged):
+                    # An INITIAL_WINDOW_SIZE change re-credits every
+                    # stream's send window with no WindowUpdated event
+                    # (h2 applies the delta internally) — wake all
+                    # parked senders so they re-read their windows.
+                    # BDP-tuning clients (grpc-go) grant window this way.
+                    if (
+                        h2.settings.SettingCodes.INITIAL_WINDOW_SIZE
+                        in event.changed_settings
+                    ):
+                        for ev in state.window_events.values():
+                            ev.set()
+
                 elif isinstance(event, h2.events.PriorityUpdated):
                     pass
 
@@ -484,6 +815,7 @@ async def async_handle_h2_connection(
                     break
 
             else:
+                await sweep_stalled_bodies()
                 async with state.write_lock:
                     await state.flush()
                 continue
@@ -497,14 +829,20 @@ async def async_handle_h2_connection(
                 await state.flush()
         except OSError:
             pass
-    except OSError:
-        log.debug("HTTP/2 connection closed", extra={"client": client})
-    except Exception:
-        log.exception(
-            "Unexpected error in HTTP/2 connection",
-            extra={"client": client},
-        )
+    # Connection-level error triage (socket noise vs. unexpected bug)
+    # lives in Worker._on_connection; only the h2-specific ProtocolError
+    # flush above is handled here.
     finally:
+        if read_task is not None:
+            read_task.cancel()
+        if shutdown_wait is not None:
+            shutdown_wait.cancel()
+
+        # Streams whose bodies never completed still hold sinks (and
+        # possibly spooled files) — release them with the connection.
+        for stream in state.streams.values():
+            stream.sink.close()
+
         for task in stream_tasks.values():
             task.cancel()
         if stream_tasks:
@@ -515,17 +853,26 @@ async def async_handle_h2_connection(
             goaway_data = conn.data_to_send()
             if goaway_data:
                 writer.write(goaway_data)
-                await writer.drain()
+                # Bounded — a backpressured peer must not stall teardown.
+                await asyncio.wait_for(writer.drain(), timeout=0.5)
         except Exception:
             pass
 
         # Close the connection — writer.close() sends TLS close_notify
-        # and closes the underlying transport.
+        # and closes the underlying transport. Every wait here is bounded
+        # so the whole teardown fits inside the worker's
+        # DRAIN_TEARDOWN_MARGIN: a peer that never answers the
+        # close_notify would otherwise pin this task for
+        # ssl_shutdown_timeout (30s) and lose the race to the arbiter's
+        # SIGKILL. On timeout, abort the transport outright.
         if not writer.is_closing():
             writer.close()
+        try:
+            await asyncio.wait_for(writer.wait_closed(), timeout=1.0)
+        except (TimeoutError, OSError):
             try:
-                await writer.wait_closed()
-            except OSError:
+                writer.transport.abort()
+            except Exception:
                 pass
 
 
@@ -541,14 +888,19 @@ async def _async_handle_stream(
             await budget.acquire()
             acquired = True
         await _async_handle_stream_inner(state, stream)
+    except asyncio.CancelledError:
+        # A cancelled task (client RST, connection teardown) leaves its
+        # executor thread running — a view may still read the body.
+        # Detach so close() doesn't yank the file out from under that
+        # read; GC reclaims it when the thread drops its reference.
+        stream.sink.detach()
+        raise
     finally:
-        # Always release aggregate body budget — it was incremented in
-        # DataReceived before this task was created.
-        state.aggregate_body_size -= stream.data_size
+        # Sink release and request accounting live in the task's done
+        # callback (_on_stream_done), which fires even when the task is
+        # cancelled before this coroutine ever runs.
         if acquired and budget is not None:
             budget.release()
-        if state.on_stream_complete is not None:
-            state.on_stream_complete()
 
 
 async def _async_handle_stream_inner(
@@ -556,7 +908,7 @@ async def _async_handle_stream_inner(
     stream: H2Stream,
 ) -> None:
     """Inner stream handler — budget acquire/release is in the caller."""
-    request_start = datetime.now()
+    request_start = datetime.now(UTC)
 
     try:
         h2_req, http_request, h2_resp = _prepare_stream_request(
@@ -567,7 +919,7 @@ async def _async_handle_stream_inner(
             "Error building HTTP/2 request",
             extra={"stream_id": stream.stream_id},
         )
-        await _async_send_h2_error(state, stream.stream_id, 500)
+        await _async_send_h2_error(state, stream, 500)
         return
 
     try:
@@ -577,11 +929,9 @@ async def _async_handle_stream_inner(
             if stream.stream_id in state.reset_streams:
                 return
 
-            await _async_write_h2_response(
-                state, stream.stream_id, http_response, h2_resp
-            )
+            await _async_write_h2_response(state, stream, http_response, h2_resp)
         finally:
-            request_time = datetime.now() - request_start
+            request_time = datetime.now(UTC) - request_start
             if http_response.log_access:
                 log_access(h2_resp, h2_req, request_time)
             if isinstance(http_response, AsyncStreamingResponse):
@@ -600,21 +950,28 @@ async def _async_handle_stream_inner(
         )
         if stream.stream_id not in state.reset_streams:
             if h2_resp.headers_sent:
-                # Headers already sent — can't send a clean error response.
-                # Reset the stream so the client doesn't hang.
+                # Headers already sent — can't send a clean error
+                # response. Reset so the client doesn't hang, and with
+                # INTERNAL_ERROR: the default NO_ERROR would tell a
+                # spec-following client the truncated body was complete
+                # (RFC 9113 §8.1 treats NO_ERROR after a response as a
+                # clean end).
                 async with state.write_lock:
                     try:
-                        state.conn.reset_stream(stream.stream_id)
+                        state.conn.reset_stream(
+                            stream.stream_id,
+                            error_code=h2.errors.ErrorCodes.INTERNAL_ERROR,
+                        )
                         await state.flush()
                     except Exception:
                         pass
             else:
-                await _async_send_h2_error(state, stream.stream_id, 500)
+                await _async_send_h2_error(state, stream, 500)
 
 
 async def _async_write_h2_response(
     state: H2ConnectionState,
-    stream_id: int,
+    stream: H2Stream,
     http_response: Any,
     h2_resp: H2Response,
 ) -> None:
@@ -622,10 +979,21 @@ async def _async_write_h2_response(
     loop = asyncio.get_running_loop()
     conn = state.conn
     executor = state.executor
+    stream_id = stream.stream_id
+    method = stream.method
     status_code = http_response.status_code
     h2_resp.status = f"{status_code} {http_response.reason_phrase}"
 
     response_headers = _build_h2_response_headers(http_response)
+
+    if response_omits_body(method=method, status_code=status_code):
+        # Headers only, END_STREAM, no DATA frames — a 204/304-with-DATA
+        # is malformed per RFC 9113 8.1.1. The body is never read.
+        async with state.write_lock:
+            conn.send_headers(stream_id, response_headers, end_stream=True)
+            await state.flush()
+            h2_resp.headers_sent = True
+        return
 
     # Async streaming (SSE, etc.) — iterate on event loop
     if isinstance(http_response, AsyncStreamingResponse):
@@ -767,9 +1135,12 @@ async def _async_send_h2_data(
                 "H2 stream timed out waiting for flow-control window update, resetting stream",
                 extra={"stream_id": stream_id},
             )
+            # CANCEL, not the default NO_ERROR — the response is
+            # truncated, and NO_ERROR would tell the client it was
+            # complete (RFC 9113 §8.1).
             async with state.write_lock:
                 try:
-                    conn.reset_stream(stream_id)
+                    conn.reset_stream(stream_id, error_code=h2.errors.ErrorCodes.CANCEL)
                     await state.flush()
                 except Exception:
                     pass
@@ -783,23 +1154,16 @@ async def _async_send_h2_data(
 
 async def _async_send_h2_error(
     state: H2ConnectionState,
-    stream_id: int,
+    stream: H2Stream,
     status_code: int,
 ) -> None:
-    """Send a simple error response on an HTTP/2 stream."""
+    """Send an error response on an HTTP/2 stream via the shared sender."""
     try:
-        body = f"<h1>{status_code}</h1>".encode()
-        headers = [
-            (":status", str(status_code)),
-            ("content-type", "text/html"),
-            ("content-length", str(len(body))),
-        ]
         async with state.write_lock:
-            state.conn.send_headers(stream_id, headers)
-            state.conn.send_data(stream_id, body, end_stream=True)
+            _send_stream_error(state.conn, stream, status_code)
             await state.flush()
     except Exception:
         log.debug(
             "Failed to send H2 error response",
-            extra={"stream_id": stream_id},
+            extra={"stream_id": stream.stream_id},
         )

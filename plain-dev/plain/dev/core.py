@@ -3,32 +3,30 @@ import platform
 import socket
 import subprocess
 import sys
-import time
 import tomllib
 from importlib.metadata import entry_points
 from importlib.util import find_spec
 from pathlib import Path
 
 import click
+from plain.cli.print import print_event
+from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 from rich.columns import Columns
 from rich.console import Console
 from rich.text import Text
 
-from plain.cli.print import print_event
-from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
-
-from .backups.core import DatabaseBackups
 from .mkcert import MkcertManager
 from .process import Supervisor
+from .state import find_project_root
 from .utils import has_pyproject_toml
 
 ENTRYPOINT_GROUP = "plain.dev"
 
 
 class DevSupervisor(Supervisor):
-    pidfile = PLAIN_TEMP_PATH / "dev" / "dev.pid"
+    state_filename = "dev.pid"
     log_dir = PLAIN_TEMP_PATH / "dev" / "logs" / "run"
-    background_command = ["dev"]
+    background_command = ("dev",)
     display_name = "`plain dev`"
 
     def setup(
@@ -138,10 +136,7 @@ class DevSupervisor(Supervisor):
             return 1
 
         mkcert_manager = MkcertManager()
-        mkcert_manager.setup_mkcert(
-            install_path=Path.home() / ".plain" / "dev",
-            force_reinstall=reinstall_ssl,
-        )
+        mkcert_manager.setup_mkcert(force_reinstall=reinstall_ssl)
         self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
             domain=self.hostname,
             storage_path=Path(PLAIN_TEMP_PATH) / "dev" / "certs",
@@ -156,32 +151,38 @@ class DevSupervisor(Supervisor):
         self.run_preflight()
 
         if find_spec("plain.postgres"):
+            # Shared-DB divergence guard (managed DBs only). If this checkout
+            # borrowed another checkout's database and would apply a divergent
+            # migration, fork to a private copy first so the shared DB is never
+            # silently mutated. No-op for BYO. Never block dev on it.
+            try:
+                from .postgres.branch_switch import check_branch_switch
+                from .postgres.guard import guard_dev_database
+                from .postgres.resolve import INJECTED_URL_ENV_VAR
+
+                # The app directory is often a level below the project root
+                # (`example/`, `backend/`). Anchor on the same root the rest of
+                # the flow uses, or the guard reads a nonexistent cache path,
+                # decides nothing is managed, and silently does nothing.
+                project_root = find_project_root(Path(APP_PATH).parent)
+
+                guarded_url = guard_dev_database(project_root)
+                if guarded_url:
+                    self.plain_env[INJECTED_URL_ENV_VAR] = guarded_url
+                    os.environ[INJECTED_URL_ENV_VAR] = guarded_url
+
+                # Advisory only — tells you when this database still carries a
+                # branch you've moved away from.
+                check_branch_switch(project_root)
+            except Exception as e:
+                click.secho(f"Database checks skipped: {e}", fg="yellow", err=True)
+
             print_event("Waiting for database...", newline=False)
             subprocess.run(
                 [sys.executable, "-m", "plain", "postgres", "wait"],
                 env=self.plain_env,
                 check=True,
             )
-
-            # Backup before syncing if sync would make changes
-            check_result = subprocess.run(
-                [sys.executable, "-m", "plain", "postgres", "sync", "--check"],
-                env=self.plain_env,
-                capture_output=True,
-            )
-
-            if check_result.returncode != 0:
-                backup_name = time.strftime("%Y%m%d_%H%M%S")
-                print_event(f"Backing up database ({backup_name})...", newline=False)
-                try:
-                    DatabaseBackups().create(
-                        backup_name,
-                        source="dev",
-                        pg_dump=os.environ.get("PG_DUMP", "pg_dump"),
-                    )
-                    click.secho("✔", fg="green")
-                except Exception:
-                    click.secho("skipped", dim=True)
 
             print_event("Syncing database...")
             subprocess.run(
@@ -202,6 +203,12 @@ class DevSupervisor(Supervisor):
         self.add_entrypoints()
         self.add_pyproject_run()
 
+        # The status bar is invisible in piped output and the log file,
+        # so print the URLs as regular lines too.
+        self.poncho.system_print(f"Server running at {self.url}\n")
+        if self.tunnel_url:
+            self.poncho.system_print(f"Tunnel running at {self.tunnel_url}\n")
+
         try:
             # Start processes we know about and block the main thread
             self.poncho.loop()
@@ -219,7 +226,7 @@ class DevSupervisor(Supervisor):
         """Symlink the plain package into .plain so we can look at it easily"""
         spec = find_spec("plain.runtime")
         if spec is None or spec.origin is None:
-            return None
+            return
         plain_path = Path(spec.origin).parent.parent
         if not PLAIN_TEMP_PATH.exists():
             PLAIN_TEMP_PATH.mkdir()
@@ -329,7 +336,7 @@ class DevSupervisor(Supervisor):
 
     def run_preflight(self) -> None:
         if subprocess.run(
-            ["plain", "preflight", "--quiet"], env=self.plain_env
+            ["plain", "preflight", "--quiet"], env=self.plain_env, check=False
         ).returncode:
             click.secho("Preflight check failed!", fg="red")
             sys.exit(1)

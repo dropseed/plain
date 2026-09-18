@@ -1,0 +1,7 @@
+---
+attrs:
+  objects: Any
+  page_obj: Any = None
+---
+items:{% for item in objects %}{{ item }},{% endfor %}
+{% if page_obj is not None %}page:{{ page_obj.number }}/{{ page_obj.paginator.num_pages }}{% else %}unpaginated{% endif %}

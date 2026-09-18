@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import re
 
-from plain import postgres
 from plain.exceptions import ValidationError
 from plain.postgres import types
+
+from plain import postgres
 
 __all__ = ["Flag", "FlagResult"]
 
@@ -43,7 +44,7 @@ class Flag(postgres.Model):
     name = types.TextField(max_length=255, validators=[validate_flag_name])
 
     # Optional description that can be filled in after the flag is used/created
-    description = types.TextField(required=False)
+    description = types.TextField(required=False, default="")
 
     # To manually disable a flag before completing deleting
     # (good to disable first to make sure the code doesn't use the flag anymore)

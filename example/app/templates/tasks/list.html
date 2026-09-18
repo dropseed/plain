@@ -1,11 +1,15 @@
 ---
 imports:
+  - from collections.abc import Sequence
+  - from plain.paginator import Page
   - from plain.urls import reverse as url
 components:
   - base as Base
   - components/BackLink
+  - components/Pagination
 attrs:
-  tasks: list[app.tasks.models.Task]
+  tasks: Sequence[app.tasks.models.Task]
+  page_obj: Page | None = None
 ---
 <Base>
     {% slot "title" %}Tasks{% endslot %}
@@ -14,43 +18,43 @@ attrs:
         <div class="flex items-end justify-between gap-4">
             <h1 class="page-h1">Tasks</h1>
             <div class="flex gap-2">
-            <a href="{{ url('tasks:seed') }}" class="btn-secondary">Seed projects + tags</a>
-            <a href="{{ url('tasks:create') }}" class="btn-primary">New task</a>
-        </div>
+                <a href="{{ url('tasks:seed') }}" class="btn-secondary">Seed projects + tags</a>
+                <a href="{{ url('tasks:create') }}" class="btn-primary">New task</a>
+            </div>
         </div>
         <p class="mt-3 text-sm text-muted max-w-2xl">
-        ModelForm with FK (project), M2M (tags), choice (priority), date (due_date),
-        boolean (is_complete), and a cross-field <span class="font-mono text-body">clean()</span>.
-    </p>
+            ModelForm with FK (project), M2M (tags), choice (priority), date (due_date),
+            boolean (is_complete), and a cross-field <span class="font-mono text-body">clean()</span>.
+        </p>
         {% if tasks %}
             <ul class="list-card mt-6">
                 {% for task in tasks %}
                     <li>
-            <a
-                href="{{ url('tasks:detail', id=task.id) }}"
-                class="block px-4 py-3 hover:bg-warm-tint transition-colors no-underline"
-            >
-                <div class="flex items-baseline justify-between gap-3">
-                    <div
-                        class="{{ ["text-sm", "font-semibold", "line-through text-muted" if task.is_complete else "text-ink"] }}"
-                    >{{ task.title }}</div>
-                    <div class="text-[12px] text-muted whitespace-nowrap">
-                        {{ task.priority }}{% if task.due_date %} · due <span class="font-mono">{{ task.due_date }}</span>{% endif %}</div>
-                </div>
-                <div class="text-[12px] text-muted mt-1">
-                    {% if task.project %}{{ task.project.name }}{% endif %}
-                    {% if not task.project %}<span class="italic">No project</span>{% endif %}
-                    {% for tag in task.tags.query %} · #{{ tag.name }}{% endfor %}
-                </div>
-            </a>
-        </li>
+                        <a
+                            href="{{ url('tasks:detail', id=task.id) }}"
+                            class="block px-4 py-3 hover:bg-warm-tint transition-colors no-underline"
+                        >
+                            <div class="flex items-baseline justify-between gap-3">
+                                <div
+                                    class="{{ ["text-sm", "font-semibold", "line-through text-muted" if task.is_complete else "text-ink"] }}"
+                                >{{ task.title }}</div>
+                                <div class="text-[12px] text-muted whitespace-nowrap">
+                                    {{ task.priority }}{% if task.due_date %} · due <span class="font-mono">{{ task.due_date }}</span>{% endif %}</div>
+                            </div>
+                            <div class="text-[12px] text-muted mt-1">
+                                {% if task.project %}{{ task.project.name }}{% endif %}
+                                {% if not task.project %}<span class="italic">No project</span>{% endif %}
+                                {% for tag in task.tags.query %} · #{{ tag.name }}{% endfor %}
+                            </div>
+                        </a>
+                    </li>
                 {% endfor %}
             </ul>
-        {% endif %}
-        {% if not tasks %}
+            <Pagination page_obj="{{ page_obj }}" />
+        {% else %}
             <p class="mt-6 text-sm text-muted">
-        No tasks yet — start with <a class="body-link" href="{{ url('tasks:seed') }}">seeding</a>, then create one.
-    </p>
+                No tasks yet — start with <a class="body-link" href="{{ url('tasks:seed') }}">seeding</a>, then create one.
+            </p>
         {% endif %}
     </div>
 </Base>

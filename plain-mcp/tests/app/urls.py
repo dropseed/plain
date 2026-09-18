@@ -1,8 +1,16 @@
 from __future__ import annotations
 
 import hmac
+from typing import Any, cast
 
-from plain.mcp import MCPTool, MCPUnauthorized, MCPView
+from plain.mcp import (
+    MCPProtectedResourceView,
+    MCPTool,
+    MCPUnauthorized,
+    MCPView,
+    OAuthResourceServer,
+    TokenInfo,
+)
 from plain.urls import Router, path
 
 
@@ -25,14 +33,14 @@ class Secret(MCPTool):
 
 class PublicMCP(MCPView):
     name = "public"
-    tools = [Echo]
+    tools = (Echo,)
 
 
 class AuthedMCP(MCPView):
-    """Bearer token auth via `check_auth` override — mirrors the README recipe."""
+    """Bearer token auth via `before_request` override — mirrors the README recipe."""
 
     name = "authed"
-    tools = [Secret]
+    tools = (Secret,)
 
     _token = "topsecret"
 
@@ -49,7 +57,7 @@ class BoomMCP(MCPView):
     5xx branch is exercised end to end."""
 
     name = "boom"
-    tools: list[type[MCPTool]] = []
+    tools = ()
 
     def before_request(self) -> None:
         raise RuntimeError("mcp boom")
@@ -60,17 +68,62 @@ class RPCBoomMCP(MCPView):
     is exercised."""
 
     name = "rpc_boom"
-    tools: list[type[MCPTool]] = []
+    tools = ()
 
     def rpc_boom(self, params: dict) -> dict:
         raise RuntimeError("rpc handler boom")
 
+    def rpc_bad(self, params: dict) -> Any:
+        # Returns the wrong shape on purpose — the handler-contract guard
+        # must catch this on both revision paths.
+        return ["not", "a", "dict"]
+
+
+class WhoAmI(MCPTool):
+    """Reflect the authenticated identity so tests can assert propagation."""
+
+    def run(self) -> dict:
+        mcp = cast("OAuthMCP", self.mcp)
+        return {"user": mcp.user, "scopes": sorted(mcp.scopes)}
+
+
+class OAuthMCP(OAuthResourceServer, MCPView):
+    """OAuth-protected endpoint with a stub token validator."""
+
+    name = "oauth"
+    tools = (Secret, WhoAmI)
+
+    def authenticate_token(self, token: str) -> TokenInfo | None:
+        if token == "valid-token":
+            return TokenInfo(user="alice", scopes=frozenset({"read"}))
+        return None
+
+
+class OAuthPRM(MCPProtectedResourceView):
+    authorization_servers = ("https://auth.example.com",)
+    oauth_scopes_supported = ("read",)
+
+
+class OAuthPRMSameApp(MCPProtectedResourceView):
+    """No authorization_servers set — defaults to this app's own origin."""
+
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("mcp", PublicMCP, name="public_mcp"),
         path("authed", AuthedMCP, name="authed_mcp"),
         path("boom", BoomMCP, name="boom_mcp"),
         path("rpc-boom", RPCBoomMCP, name="rpc_boom_mcp"),
-    ]
+        path("oauth-mcp", OAuthMCP, name="oauth_mcp"),
+        path(
+            ".well-known/oauth-protected-resource/oauth-mcp",
+            OAuthPRM,
+            name="oauth_prm",
+        ),
+        path(
+            ".well-known/oauth-protected-resource/oauth-mcp-sameapp",
+            OAuthPRMSameApp,
+            name="oauth_prm_sameapp",
+        ),
+    )

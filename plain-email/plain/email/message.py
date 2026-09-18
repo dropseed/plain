@@ -164,14 +164,14 @@ class MIMEMixin:
         return fp.getvalue()
 
 
-class SafeMIMEMessage(MIMEMixin, MIMEMessage):
+class SafeMIMEMessage(MIMEMixin, MIMEMessage):  # ty: ignore[invalid-method-override]
     def __setitem__(self, name: str, val: str) -> None:
         # message/rfc822 attachments must be ASCII
         name, val = _forbid_multi_line_headers(name, val, "ascii")
         MIMEMessage.__setitem__(self, name, val)
 
 
-class SafeMIMEText(MIMEMixin, MIMEText):
+class SafeMIMEText(MIMEMixin, MIMEText):  # ty: ignore[invalid-method-override]
     def __init__(
         self, _text: str, _subtype: str = "plain", _charset: str | None = None
     ) -> None:
@@ -196,7 +196,7 @@ class SafeMIMEText(MIMEMixin, MIMEText):
         MIMEText.set_payload(self, payload, charset=charset)
 
 
-class SafeMIMEMultipart(MIMEMixin, MIMEMultipart):
+class SafeMIMEMultipart(MIMEMixin, MIMEMultipart):  # ty: ignore[invalid-method-override]
     def __init__(
         self,
         _subtype: str = "mixed",
@@ -354,16 +354,15 @@ class EmailMessage:
                 mimetype = mimetypes.guess_type(filename)[0]
             if mimetype is None:
                 mimetype = _DEFAULT_ATTACHMENT_MIME_TYPE
-            basetype, subtype = mimetype.split("/", 1)
+            basetype, _subtype = mimetype.split("/", 1)
 
-            if basetype == "text":
-                if isinstance(content, bytes):
-                    try:
-                        content = content.decode()
-                    except UnicodeDecodeError:
-                        # If mimetype suggests the file is text but it's
-                        # actually binary, read() raises a UnicodeDecodeError.
-                        mimetype = _DEFAULT_ATTACHMENT_MIME_TYPE
+            if basetype == "text" and isinstance(content, bytes):
+                try:
+                    content = content.decode()
+                except UnicodeDecodeError:
+                    # If mimetype suggests the file is text but it's
+                    # actually binary, read() raises a UnicodeDecodeError.
+                    mimetype = _DEFAULT_ATTACHMENT_MIME_TYPE
 
             self.attachments.append((filename, content, mimetype))
 

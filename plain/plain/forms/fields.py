@@ -18,38 +18,40 @@ import json
 import math
 import re
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from decimal import Decimal, DecimalException
 from io import BytesIO
 from typing import Any, Self, overload
 from urllib.parse import urlsplit, urlunsplit
 
-from plain import validators
 from plain.exceptions import ValidationError
 from plain.utils.dateparse import parse_date, parse_datetime, parse_duration, parse_time
+from plain.utils.timezone import naive_datetime_from_date
+
+from plain import validators
 
 __all__ = [
-    "Field",
-    "TextField",
-    "EmailField",
-    "URLField",
-    "RegexField",
-    "IntegerField",
-    "FloatField",
-    "DecimalField",
     "BooleanField",
-    "NullBooleanField",
     "ChoiceField",
-    "TypedChoiceField",
-    "MultipleChoiceField",
     "DateField",
-    "TimeField",
     "DateTimeField",
+    "DecimalField",
     "DurationField",
-    "UUIDField",
-    "JSONField",
+    "EmailField",
+    "Field",
     "FileField",
+    "FloatField",
     "ImageField",
+    "IntegerField",
+    "JSONField",
+    "MultipleChoiceField",
+    "NullBooleanField",
+    "RegexField",
+    "TextField",
+    "TimeField",
+    "TypedChoiceField",
+    "URLField",
+    "UUIDField",
 ]
 
 # Values that count as "no input" — an empty one fails a required field.
@@ -79,8 +81,8 @@ class Field[T]:
     """
 
     # Validators every instance of this field type runs. Subclasses set a
-    # class-level list; __init__ copies it so per-instance appends are safe.
-    default_validators: list[Callable[[Any], None]] = []
+    # class-level tuple; __init__ copies it into a per-instance list.
+    default_validators: tuple[Callable[[Any], None], ...] = ()
 
     # True for fields whose raw input is a list of values rather than one —
     # `Form.validate` reads them with `.getlist()` from multi-valued data.
@@ -88,7 +90,7 @@ class Field[T]:
 
     # `(value, label)` options when the field renders as a <select> — empty
     # for a field with no fixed choice set; choice fields set their own.
-    choices: list[tuple[Any, Any]] = []
+    choices: Sequence[tuple[Any, Any]] = ()
 
     # The attribute name the field is declared under; set by `__set_name__`.
     name: str = ""
@@ -182,11 +184,11 @@ class TextField(Field[str]):
 
 
 class EmailField(TextField):
-    default_validators: list[Callable[[Any], None]] = [validators.validate_email]
+    default_validators = (validators.validate_email,)
 
 
 class URLField(TextField):
-    default_validators: list[Callable[[Any], None]] = [validators.URLValidator()]
+    default_validators = (validators.URLValidator(),)
 
     def parse(self, value: Any) -> str:
         value = super().parse(value)
@@ -234,9 +236,9 @@ class NumericField[T](Field[T]):
     def __init__(
         self,
         *,
-        max_value: int | float | Decimal | None = None,
-        min_value: int | float | Decimal | None = None,
-        step_size: int | float | Decimal | None = None,
+        max_value: float | Decimal | None = None,
+        min_value: float | Decimal | None = None,
+        step_size: float | Decimal | None = None,
         required: bool = True,
         initial: Any = None,
     ) -> None:
@@ -484,7 +486,7 @@ class DateTimeField(Field[datetime.datetime]):
         if isinstance(value, datetime.datetime):
             return value
         if isinstance(value, datetime.date):
-            return datetime.datetime(value.year, value.month, value.day)
+            return naive_datetime_from_date(value)
         try:
             parsed = parse_datetime(str(value).strip())
         except ValueError:
@@ -516,7 +518,7 @@ class UUIDField(Field[uuid.UUID]):
         if isinstance(value, uuid.UUID):
             return value
         try:
-            return uuid.UUID(str(value))
+            return uuid.UUID(str(value).strip())
         except (AttributeError, ValueError):
             raise ValidationError("Enter a valid UUID.", code="invalid")
 
@@ -576,9 +578,7 @@ class FileField(Field[Any]):
 
 
 class ImageField(FileField):
-    default_validators: list[Callable[[Any], None]] = [
-        validators.validate_image_file_extension
-    ]
+    default_validators = (validators.validate_image_file_extension,)
 
     def parse(self, value: Any) -> Any:
         uploaded = super().parse(value)

@@ -135,7 +135,7 @@ class PackagesRegistry:
             # If "not ready" is due to unconfigured settings, accessing
             # INSTALLED_PACKAGES raises a more helpful ImproperlyConfigured
             # exception.
-            settings.INSTALLED_PACKAGES
+            settings.INSTALLED_PACKAGES  # noqa: B018 — raises ImproperlyConfigured if unconfigured
             raise PackageRegistryNotReady("Packages aren't loaded yet.")
 
     def get_package_configs(self) -> Iterable[PackageConfig]:
@@ -177,7 +177,7 @@ class PackagesRegistry:
                 if subpath == "" or subpath[0] == ".":
                     candidates.append(package_config)
         if candidates:
-            return sorted(candidates, key=lambda ac: -len(ac.name))[0]
+            return min(candidates, key=lambda ac: -len(ac.name))
         return None
 
     def register_config(self, package_config: PackageConfig) -> PackageConfig:
@@ -203,7 +203,6 @@ class PackagesRegistry:
         def _import_if_exists(name: str) -> None:
             if find_spec(name):
                 import_module(name)
-            return None
 
         # Load from all packages
         for package_config in self.get_package_configs():

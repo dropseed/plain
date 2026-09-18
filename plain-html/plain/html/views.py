@@ -6,8 +6,9 @@ from typing import Any, NoReturn
 
 from plain.exceptions import ImproperlyConfigured
 from plain.forms import Form, Invalid
-from plain.http import HTTPException, NotFoundError404, Response
+from plain.http import NotFoundError404, Response, status_for_exception
 from plain.logs import get_framework_logger
+from plain.paginator import Page, Paginator
 from plain.runtime import settings
 from plain.views import View
 
@@ -19,7 +20,7 @@ logger = get_framework_logger("plain.html")
 try:
     from plain.postgres.exceptions import ObjectDoesNotExist
 except ImportError:
-    ObjectDoesNotExist = None  # ty: ignore[invalid-assignment]
+    ObjectDoesNotExist = None
 
 
 class TemplateView(View):
@@ -67,16 +68,23 @@ class TemplateView(View):
 
         raise TemplateFileMissing(template_names)
 
-    def render(self, **context: Any) -> Response:
+    def render(self, *, status_code: int = 200, **context: Any) -> Response:
         """Render the template to a `Response`, layering `context` over `get_template_context()`.
 
         A handler passes what the template needs straight in —
         `self.render(form=form)` — rather than stashing it on `self` for
         `get_template_context()` to read back. Called with no arguments it
         renders `get_template_context()` as-is, which is what `get()` does.
+
+        `status_code` sets the response status (a form's 422, say) —
+        `Response.status_code` is fixed at construction, so this is the
+        way to render a template at a non-200 status. The name is
+        reserved: a template variable called `status_code` has to come
+        from `get_template_context()` instead.
         """
         return Response(
-            self.get_template().render({**self.get_template_context(), **context})
+            self.get_template().render({**self.get_template_context(), **context}),
+            status_code=status_code,
         )
 
     def get(self) -> Response:
@@ -141,7 +149,7 @@ class TemplateView(View):
 
     def handle_exception(self, exc: Exception) -> Response:
         """Render `{status}.html` for the exception, falling through on missing template."""
-        status = exc.status_code if isinstance(exc, HTTPException) else 500
+        status = status_for_exception(exc)
         try:
             body = Template(f"{status}.html").render(
                 {
@@ -222,11 +230,25 @@ class DetailView(TemplateView, ABC):
 
 class ListView(TemplateView, ABC):
     """
-    Render some list of objects, set by `self.get_queryset()`, with a response
+    Render some list of objects, set by `self.get_objects()`, with a response
     rendered by a template.
+
+    Set `page_size` to paginate: the objects are wrapped in a `Paginator`, the
+    page number is read from the `?page` query param (invalid values fall back
+    to the first or last page), and the current `Page` is what lands in the
+    template context — iterate it exactly like the full list. The page is also
+    available as `page_obj` for rendering pagination controls; it is `None`
+    when pagination is off. Override `get_page_size()` to compute the size per
+    request.
+
+    A paginated queryset needs a deterministic order (an `order_by()` or a
+    model default) — unordered results can shift between pages. An empty
+    `Page` is falsy, so check `page_obj is not none` to test whether
+    pagination is on.
     """
 
     context_object_name = ""
+    page_size: int | None = None
 
     @cached_property
     def objects(self) -> Any:
@@ -235,18 +257,33 @@ class ListView(TemplateView, ABC):
     @abstractmethod
     def get_objects(self) -> Any: ...
 
+    def get_page_size(self) -> int | None:
+        """Page size for pagination, or `None` to render the full list."""
+        return self.page_size
+
+    @cached_property
+    def page_obj(self) -> Page | None:
+        if (page_size := self.get_page_size()) is None:
+            return None
+        return Paginator(self.objects, page_size).get_page(
+            self.request.query_params.get("page", 1)
+        )
+
     def get_template_context(self) -> dict[str, Any]:
-        """Insert the single object into the context dict."""
+        """Insert the list of objects (or the current page of it) into the context dict."""
         context = super().get_template_context()
-        context["objects"] = self.objects
+        page_obj = self.page_obj
+        objects = page_obj if page_obj is not None else self.objects
+        context["objects"] = objects
+        context["page_obj"] = page_obj
         if self.context_object_name:
-            context[self.context_object_name] = self.objects
+            context[self.context_object_name] = objects
         return context
 
 
 __all__ = [
-    "TemplateView",
-    "NotFoundView",
     "DetailView",
     "ListView",
+    "NotFoundView",
+    "TemplateView",
 ]

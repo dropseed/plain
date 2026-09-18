@@ -24,7 +24,7 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 from .exceptions import (
     BadRequestError400,
-    RequestDataTooBigError400,
+    ContentTooLargeError413,
     SuspiciousMultipartFormError400,
     TooManyFieldsSentError400,
     TooManyFilesSentError400,
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from plain.http.request import Request
     from plain.internal.files.uploadhandler import FileUploadHandler
 
-__all__ = ["MultiPartParser", "MultiPartParserError", "InputStreamExhausted"]
+__all__ = ["InputStreamExhausted", "MultiPartParser", "MultiPartParserError"]
 
 
 class MultiPartParserError(BadRequestError400):
@@ -45,8 +45,6 @@ class InputStreamExhausted(Exception):
     """
     No more reads are allowed from this device.
     """
-
-    pass
 
 
 _RAW = "raw"
@@ -241,7 +239,7 @@ class MultiPartParser:
                         settings.DATA_UPLOAD_MAX_MEMORY_SIZE is not None
                         and num_bytes_read > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
                     ):
-                        raise RequestDataTooBigError400(
+                        raise ContentTooLargeError413(
                             "Request body exceeded "
                             "settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
                         )
@@ -409,8 +407,9 @@ class MultiPartParser:
         # We should document that...
         # (Maybe add handler.free_file to complement new_file)
         for handler in self._upload_handlers:
-            if hasattr(handler, "file"):
-                handler.file.close()  # ty: ignore[unresolved-attribute]
+            file = getattr(handler, "file", None)
+            if file is not None:
+                file.close()
 
 
 class LazyStream:

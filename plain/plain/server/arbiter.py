@@ -21,7 +21,7 @@ from plain.logs import get_framework_logger
 from plain.runtime import settings
 
 from . import sock
-from .errors import APP_LOAD_ERROR, WORKER_BOOT_ERROR, HaltServer
+from .errors import WORKER_BOOT_ERROR, HaltServer
 from .workers.entry import worker_main
 from .workers.worker import check_worker_config
 from .workers.workertmp import WorkerHeartbeat
@@ -85,7 +85,7 @@ class Arbiter:
         except SystemExit:
             raise
         except Exception:
-            self.log.error("Unhandled exception in main loop", exc_info=True)
+            self.log.exception("Unhandled exception in main loop")
             self._stop(graceful=False)
             sys.exit(-1)
 
@@ -145,13 +145,22 @@ class Arbiter:
         self._listeners = []
 
         sig = signal.SIGTERM if graceful else signal.SIGQUIT
-        limit = time.time() + settings.SERVER_GRACEFUL_TIMEOUT
+        # Monotonic, to share one clock with the workers' drain deadlines
+        # (WorkerHeartbeat relies on CLOCK_MONOTONIC being system-wide).
+        limit = time.monotonic() + settings.SERVER_GRACEFUL_TIMEOUT
+
+        # This shutdown ends in SIGKILL at the limit — publish it so the
+        # workers cap their drains and finish teardown first. (Retirement
+        # SIGTERMs in manage_workers have no SIGKILL follower and don't
+        # set this.)
+        for info in self._workers.values():
+            info.heartbeat.set_kill_deadline(limit)
 
         # Instruct the workers to exit
         self._kill_workers(sig)
 
         # Wait until the graceful timeout
-        while self._workers and time.time() < limit:
+        while self._workers and time.monotonic() < limit:
             self.reap_workers()
             time.sleep(0.1)
 
@@ -213,8 +222,6 @@ class Arbiter:
                 self._halt_error = HaltServer(
                     "Worker failed to boot.", WORKER_BOOT_ERROR
                 )
-            elif exitcode == APP_LOAD_ERROR and self._halt_error is None:
-                self._halt_error = HaltServer("App failed to load.", APP_LOAD_ERROR)
             elif exitcode < 0:
                 # Negative exit codes mean the worker was killed by a signal
                 try:

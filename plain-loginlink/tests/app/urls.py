@@ -19,6 +19,13 @@ class LoginView(LoginLinkFormView):
     template_name = "loginlinkform.html"
 
 
+class AlreadyExpiredLoginView(LoginLinkFormView):
+    """Mints links that are past their expiration the moment they're sent."""
+
+    template_name = "loginlinkform.html"
+    link_expires_in = -3600
+
+
 class IndexView(View):
     """Default post-login redirect target."""
 
@@ -37,9 +44,14 @@ class WhoamiView(AuthView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("login", LoginView, name="login"),
+        path(
+            "login-already-expired",
+            AlreadyExpiredLoginView,
+            name="login-already-expired",
+        ),
         include("loginlink", LoginlinkRouter),
         path("whoami", WhoamiView, name="whoami"),
         path("", IndexView, name="index"),
-    ]
+    )

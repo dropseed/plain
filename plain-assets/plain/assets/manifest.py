@@ -9,62 +9,60 @@ from plain.runtime import PLAIN_TEMP_PATH
 _FINGERPRINT_LENGTH = 7
 
 
-class AssetsManifest(dict[str, str | None]):
+class AssetsManifest(dict[str, str | bool]):
     """
-    A manifest of compiled assets.
+    A manifest of compiled assets. Each path's value encodes its role:
 
-    Keys are all compiled asset paths. Values are either:
-    - A string path to redirect to (original → fingerprinted)
-    - None if this is the final path (no redirect needed)
+    - a ``str`` → redirect to that served URL (an original → its fingerprinted name)
+    - ``True``  → an immutable terminal (served at its own name, cache forever)
+    - ``False`` → a mutable terminal (served at its own name, short cache)
 
-    Assets not in the manifest were not compiled.
+    Immutability is stored inline, not derived — so it survives save/load, and a
+    really large manifest stays compact (one bare flag per terminal, no second
+    structure). Paths not in the manifest were not compiled.
     """
 
     def __init__(self):
         self.path = PLAIN_TEMP_PATH / "assets" / "manifest.json"
-        self.fingerprinted_paths: set[str] = set()
 
     def load(self) -> None:
-        if self.path.exists():
-            with open(self.path) as f:
-                self.update(json.load(f))
-        # Build set of fingerprinted paths (redirect targets from original → fingerprinted mappings)
-        self.fingerprinted_paths = {v for v in self.values() if v is not None}
+        if not self.path.exists():
+            return
+        with open(self.path) as f:
+            self.update(json.load(f))
 
     def save(self) -> None:
         with open(self.path, "w") as f:
             json.dump(self, f, indent=2)
 
     def add_fingerprinted(self, original_path: str, fingerprinted_path: str) -> None:
-        """Add a fingerprinted asset.
-
-        Creates two entries:
-        - original_path -> fingerprinted_path (redirect)
-        - fingerprinted_path -> None (terminal)
-        """
+        """Add a Plain-fingerprinted asset: the original redirects to the immutable hashed name."""
         self[original_path] = fingerprinted_path
-        self[fingerprinted_path] = None
-        self.fingerprinted_paths.add(fingerprinted_path)
+        self[fingerprinted_path] = True
 
     def add_non_fingerprinted(self, path: str) -> None:
-        """Add a non-fingerprinted asset (terminal, no redirect)."""
-        self[path] = None
+        """Add a mutable terminal — served at its own name, not cached forever."""
+        self[path] = False
 
-    def is_fingerprinted(self, path: str) -> bool:
-        """Check if a path is a fingerprinted path (pointed to by another entry)."""
-        return path in self.fingerprinted_paths
+    def add_already_hashed(self, path: str) -> None:
+        """Add an already content-hashed asset: an immutable terminal whose hash the
+        build tool owns, so Plain serves it as-is (no md5 rename)."""
+        self[path] = True
+
+    def is_immutable(self, path: str) -> bool:
+        """Whether the path is served with far-future immutable caching."""
+        return self.get(path) is True
 
     def resolve(self, url_path: str) -> str | None:
-        """
-        Get the best compiled path for an asset URL path.
+        """Resolve an asset URL path to its served path.
 
-        Returns the redirect target if one exists, otherwise the path itself if compiled.
-        Returns None if the asset is not in the manifest (was not compiled).
+        Returns the redirect target for an original, the path itself for a
+        terminal, or None if the asset was not compiled.
         """
         if url_path not in self:
             return None
-        # If there's a redirect target, use it; otherwise use the path itself
-        return self[url_path] or url_path
+        target = self[url_path]
+        return target if isinstance(target, str) else url_path
 
 
 @cache

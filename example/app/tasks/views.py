@@ -7,6 +7,7 @@ from plain.forms import Form, Invalid
 from plain.html.views import DetailView, ListView, TemplateView
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
+from plain.postgres import QuerySet
 from plain.postgres.forms import create_from, update_from
 from plain.urls import reverse
 from plain.views import View
@@ -19,12 +20,15 @@ class TaskListView(AuthView, ListView):
     template_name = "tasks/list.html"
     context_object_name = "tasks"
     login_required = True
+    page_size = 20
 
-    def get_objects(self) -> list[Task]:
-        return list(
+    def get_objects(self) -> QuerySet[Task]:
+        # Ordering comes from Task.model_options (is_complete, -created_at),
+        # so pagination is deterministic.
+        return (
             Task.query.filter(owner=self.user)
             .select_related("project")
-            .prefetch_related("tags")[:100]
+            .prefetch_related("tags")
         )
 
 
@@ -78,7 +82,7 @@ class TaskCreateView(AuthView, TemplateView):
             return result
         # `owner` isn't a form field — pass it to create_from() as an extra.
         create_from(Task, result, owner=self.user)
-        return RedirectResponse(reverse("tasks:list"))
+        return RedirectResponse(reverse("tasks:list"), status_code=302)
 
 
 class TaskUpdateView(AuthView, DetailView):
@@ -103,7 +107,9 @@ class TaskUpdateView(AuthView, DetailView):
         if isinstance(result, Response):
             return result
         update_from(self.object, result)
-        return RedirectResponse(reverse("tasks:detail", id=self.object.id))
+        return RedirectResponse(
+            reverse("tasks:detail", id=self.object.id), status_code=302
+        )
 
 
 class TaskDeleteView(AuthView, DetailView):
@@ -119,7 +125,7 @@ class TaskDeleteView(AuthView, DetailView):
 
     def post(self) -> Response:
         self.object.delete()
-        return RedirectResponse(reverse("tasks:list"))
+        return RedirectResponse(reverse("tasks:list"), status_code=302)
 
 
 class TaskSeedView(AuthView, View):
@@ -136,4 +142,4 @@ class TaskSeedView(AuthView, View):
         if not Tag.query.filter(owner=self.user).exists():
             for n in ("urgent", "later", "fun"):
                 Tag.query.create(owner=self.user, name=n)
-        return RedirectResponse(reverse("tasks:list"))
+        return RedirectResponse(reverse("tasks:list"), status_code=302)

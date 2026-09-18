@@ -7,7 +7,6 @@ from __future__ import annotations
 import logging
 
 import pytest
-
 from plain.http import Response
 from plain.internal.handlers.exception import response_for_exception
 from plain.test import RequestFactory

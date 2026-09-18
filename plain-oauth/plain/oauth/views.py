@@ -19,7 +19,7 @@ class OAuthLoginView(View):
         request = self.request
         provider = self.url_kwargs["provider"]
         if get_request_user(request):
-            return RedirectResponse("/")
+            return RedirectResponse("/", status_code=302)
 
         provider_instance = get_oauth_provider_instance(provider_key=provider)
         return provider_instance.handle_login_request(request=request)
@@ -41,15 +41,14 @@ class OAuthCallbackView(TemplateView):
             logger.warning("OAuth error: %s", e.message)
             self.oauth_error = e
 
-            response = super().get()
-            response.status_code = 400
-            return response
+            return self.render(status_code=400)
 
     def get_template_names(self) -> list[str]:
         names = []
-        if oauth_error := getattr(self, "oauth_error", None):
-            if oauth_error.template_name:
-                names.append(oauth_error.template_name)
+        if (
+            oauth_error := getattr(self, "oauth_error", None)
+        ) and oauth_error.template_name:
+            names.append(oauth_error.template_name)
         names.append(self.template_name)
         return names
 
@@ -60,6 +59,8 @@ class OAuthCallbackView(TemplateView):
 
 
 class OAuthConnectView(AuthView):
+    login_required = True
+
     def post(self) -> Response:
         request = self.request
         provider = self.url_kwargs["provider"]
@@ -68,6 +69,8 @@ class OAuthConnectView(AuthView):
 
 
 class OAuthDisconnectView(AuthView):
+    login_required = True
+
     def post(self) -> Response:
         request = self.request
         provider = self.url_kwargs["provider"]

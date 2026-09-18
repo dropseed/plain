@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import operator
 from collections.abc import Iterator
+from itertools import chain
 from typing import Any
 
 from plain.utils.hashable import make_hashable
@@ -16,13 +17,9 @@ from plain.utils.hashable import make_hashable
 class PackageRegistryNotReady(Exception):
     """The plain.packages registry is not populated yet"""
 
-    pass
-
 
 class ImproperlyConfigured(Exception):
     """Plain is somehow improperly configured"""
-
-    pass
 
 
 # MARK: Validation
@@ -66,14 +63,16 @@ class ValidationError(Exception):
 
         elif isinstance(message, list):
             self.error_list = []
-            for message in message:
+            for entry in message:
                 # Normalize plain strings to instances of ValidationError.
-                if not isinstance(message, ValidationError):
-                    message = ValidationError(message)
-                if hasattr(message, "error_dict"):
-                    self.error_list.extend(sum(message.error_dict.values(), []))
+                if not isinstance(entry, ValidationError):
+                    entry = ValidationError(entry)
+                if hasattr(entry, "error_dict"):
+                    self.error_list.extend(
+                        chain.from_iterable(entry.error_dict.values())
+                    )
                 else:
-                    self.error_list.extend(message.error_list)
+                    self.error_list.extend(entry.error_list)
 
         else:
             self.message = message
@@ -84,7 +83,8 @@ class ValidationError(Exception):
     @property
     def messages(self) -> list[str]:
         if hasattr(self, "error_dict"):
-            return sum(dict(self).values(), [])  # ty: ignore[no-matching-overload]
+            # dict(self) relies on __iter__ yielding pairs in the error_dict case.
+            return list(chain.from_iterable(dict(self).values()))  # ty: ignore[no-matching-overload]
         return list(self)
 
     def update_error_dict(

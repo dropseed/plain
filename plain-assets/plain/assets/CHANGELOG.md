@@ -1,5 +1,48 @@
 # plain-assets changelog
 
+## [0.4.3](https://github.com/dropseed/plain/releases/plain-assets@0.4.3) (2026-08-12)
+
+### What's changed
+
+- Conditional-request validators (`ETag`, `Last-Modified`, file size) are computed fresh per request for non-fingerprinted assets, so replacing a served file on disk is reflected immediately. (The previous per-view-instance cache never actually produced hits, so behavior in practice is unchanged — this makes the intent explicit) ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `Last-Modified` is omitted when a file's mtime is 0 instead of emitting a 1970 date ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- HTTP date formatting goes through `plain.utils.http.http_date()` ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.4.2](https://github.com/dropseed/plain/releases/plain-assets@0.4.2) (2026-08-02)
+
+### What's changed
+
+- The compiled-asset redirect now passes an explicit `status_code=302`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.4.1](https://github.com/dropseed/plain/releases/plain-assets@0.4.1) (2026-06-26)
+
+### What's changed
+
+- Removed references to the retired `plain.esbuild` package from the docs and the `compile` command's comments; `plain.tailwind` remains an example `plain.assets.compile` hook. ([c6b3c7efc9](https://github.com/dropseed/plain/commit/c6b3c7efc9))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.4.0](https://github.com/dropseed/plain/releases/plain-assets@0.4.0) (2026-06-22)
+
+### What's changed
+
+- Reserved two top-level subdirectory names inside any assets dir for build tooling. A top-level `src/` holds build _inputs_ (a bundler's entry points and the modules they import) — it's skipped by discovery and never served. A top-level `dist/` holds build _outputs_ the tool has already content-hashed — Plain serves them immutable and as-is, without re-fingerprinting (it trusts the build tool's hash). Only the top-level `src/`/`dist/` are special; a nested `foo/src/` is treated normally. Added the `is_build_output()` helper. ([ceefa283](https://github.com/dropseed/plain/commit/ceefa283))
+- The assets manifest now records each asset's role inline (redirect target, immutable terminal, or mutable terminal) so immutability survives save/load. ([ceefa283](https://github.com/dropseed/plain/commit/ceefa283))
+
+### Upgrade instructions
+
+- If you serve files from a top-level `src/` directory inside your assets, they will no longer be served — move them out of `src/` (or rename the directory). If you output a build tool's pre-hashed files into a top-level `dist/`, they'll now be served immutable without Plain re-fingerprinting them. Otherwise no changes required.
+
 ## [0.3.0](https://github.com/dropseed/plain/releases/plain-assets@0.3.0) (2026-05-12)
 
 ### What's changed

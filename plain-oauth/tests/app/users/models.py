@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plain import postgres
 from plain.postgres import types
+
+from plain import postgres
 
 if TYPE_CHECKING:
     from plain.oauth.models import OAuthConnection

@@ -8,6 +8,8 @@ from pathlib import Path
 
 import click
 
+from .runtime import without_runtime_setup
+
 
 def _get_agent_dirs() -> list[Path]:
     """Get list of agents/.claude/ directories from installed plain.* and plainx.* packages."""
@@ -39,13 +41,14 @@ def _get_agent_dirs() -> list[Path]:
                             if agent_dir.exists() and agent_dir.is_dir():
                                 agent_dirs.append(agent_dir)
                     except Exception:
+                        # Best-effort plugin discovery; a broken package is skipped.
                         continue
     except Exception:
         pass
 
     # Search plainx.* packages
     try:
-        import plainx  # ty: ignore[unresolved-import]
+        import plainx
 
         # Check plainx.* subpackages
         if hasattr(plainx, "__path__"):
@@ -60,6 +63,7 @@ def _get_agent_dirs() -> list[Path]:
                             if agent_dir.exists() and agent_dir.is_dir():
                                 agent_dirs.append(agent_dir)
                     except Exception:
+                        # Best-effort plugin discovery; a broken package is skipped.
                         continue
     except Exception:
         pass
@@ -106,9 +110,11 @@ def _install_agent_dir(source_dir: Path, dest_dir: Path) -> tuple[int, int]:
             if rule_file.is_file() and rule_file.suffix == ".md":
                 dest_rule = dest_rules / rule_file.name
                 # Check mtime to skip unchanged
-                if dest_rule.exists():
-                    if rule_file.stat().st_mtime <= dest_rule.stat().st_mtime:
-                        continue
+                if (
+                    dest_rule.exists()
+                    and rule_file.stat().st_mtime <= dest_rule.stat().st_mtime
+                ):
+                    continue
                 shutil.copy2(rule_file, dest_rule)
                 installed_count += 1
 
@@ -199,10 +205,10 @@ def _cleanup_session_hook(dest_dir: Path) -> None:
         settings_file.unlink()
 
 
+@without_runtime_setup
 @click.group()
 def agent() -> None:
     """AI agent integration for Plain projects"""
-    pass
 
 
 @agent.command()

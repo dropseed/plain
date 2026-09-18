@@ -18,6 +18,7 @@
 - [Forms](#forms)
 - [Architecture](#architecture)
 - [Diagnostics](#diagnostics)
+- [Tracing](#tracing)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -130,7 +131,7 @@ PLAIN_POSTGRES_MANAGEMENT_URL=postgresql://app@postgres:5432/myapp
 
 When `POSTGRES_MANAGEMENT_URL` is set, these commands connect through it instead of `POSTGRES_URL`:
 
-- `plain migrations create`, `plain migrations apply`, `plain migrations list`, `plain migrations prune`, `plain migrations squash`
+- `plain migrations create`, `plain migrations apply`, `plain migrations list`, `plain migrations prune`
 - `plain postgres sync`, `plain postgres converge`, `plain postgres schema`
 - `plain postgres diagnose`, `plain postgres drop-unknown-tables`, `plain postgres shell`
 
@@ -165,9 +166,8 @@ user = User.query.get(email="test@example.com")
 
 # Complex queries with Q objects
 from plain.postgres import Q
-users = User.query.filter(
-    Q(is_admin=True) | Q(email__endswith="@example.com")
-)
+
+users = User.query.filter(Q(is_admin=True) | Q(email__endswith="@example.com"))
 
 # Ordering
 users = User.query.order_by("-created_at")
@@ -186,6 +186,7 @@ You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specializ
 from typing import Self
 from plain.postgres import types
 
+
 class PublishedQuerySet(postgres.QuerySet["Article"]):
     def published_only(self) -> Self:
         return self.filter(status="published")
@@ -193,12 +194,14 @@ class PublishedQuerySet(postgres.QuerySet["Article"]):
     def draft_only(self) -> Self:
         return self.filter(status="draft")
 
+
 @postgres.register_model
 class Article(postgres.Model):
     title: str = types.TextField(max_length=200)
     status: str = types.TextField(max_length=20)
 
     query = PublishedQuerySet()
+
 
 # Usage - all methods available on Article.query
 all_articles = Article.query.all()
@@ -225,6 +228,7 @@ from __future__ import annotations
 from plain import postgres
 from plain.postgres import types
 
+
 @postgres.register_model
 class User(postgres.Model):
     email: str = types.EmailField()
@@ -242,11 +246,14 @@ For complex queries that can't be expressed with the ORM, you can use raw SQL.
 Use `Model.query.raw()` to execute raw SQL and get model instances back:
 
 ```python
-users = User.query.raw("""
+users = User.query.raw(
+    """
     SELECT * FROM users
     WHERE created_at > %s
     ORDER BY created_at DESC
-""", [some_date])
+""",
+    [some_date],
+)
 
 for user in users:
     print(user.email)  # Full model instance with all fields
@@ -319,6 +326,7 @@ for category in Category.query.all():
 
 # Good — single query with annotation
 from plain.postgres.aggregates import Count
+
 for category in Category.query.annotate(num_products=Count("products")).all():
     print(category.num_products)
 ```
@@ -331,6 +339,7 @@ Templates should only render data, never trigger queries. Prepare everything in 
 # Bad — template triggers lazy queries
 def get_template_context(self):
     return {"posts": Post.query.all()}  # related lookups happen in template
+
 
 # Good — eagerly load everything
 def get_template_context(self):
@@ -355,10 +364,12 @@ emails = list(User.query.values_list("email", flat=True))
 
 ```python
 # Bad
-if User.query.filter(is_active=True).count() > 0: ...
+if User.query.filter(is_active=True).count() > 0:
+    ...
 
 # Good
-if User.query.filter(is_active=True).exists(): ...
+if User.query.filter(is_active=True).exists():
+    ...
 ```
 
 #### Use `.count()` instead of `len(queryset)`
@@ -465,8 +476,8 @@ Run a block of code in a read-only transaction using `read_only()`. Any write (I
 from plain.postgres.db import read_only
 
 with read_only():
-    users = User.query.all()       # reads work
-    User.query.create(name="x")   # raises psycopg.errors.ReadOnlySqlTransaction
+    users = User.query.all()  # reads work
+    User.query.create(name="x")  # raises psycopg.errors.ReadOnlySqlTransaction
 ```
 
 `read_only()` opens a single `BEGIN READ ONLY` transaction for the block. Nested `atomic()` blocks inside become savepoints of the outer read-only transaction and inherit read-only.
@@ -479,10 +490,10 @@ Because the whole block is one transaction, catching a database error inside `re
 with read_only():
     try:
         with atomic():
-            User.query.create(name="x")   # raises, savepoint rolls back
+            User.query.create(name="x")  # raises, savepoint rolls back
     except psycopg.errors.ReadOnlySqlTransaction:
         pass
-    User.query.count()   # still works — outer txn is healthy
+    User.query.count()  # still works — outer txn is healthy
 ```
 
 ## Schema management
@@ -579,15 +590,16 @@ Key flags:
 
 Shared commands (apply equally to structural and data migrations):
 
-| Command                                     | Purpose                                              |
-| ------------------------------------------- | ---------------------------------------------------- |
-| `plain migrations apply`                    | Apply pending migrations                             |
-| `plain migrations apply --plan`             | Preview what would run                               |
-| `plain migrations apply --check`            | Exit non-zero if unapplied migrations exist (for CI) |
-| `plain migrations apply --fake`             | Mark as applied without running SQL                  |
-| `plain migrations list`                     | View migration status by package                     |
-| `plain migrations squash <pkg> <migration>` | Squash migrations into one                           |
-| `plain migrations prune`                    | Remove stale migration records                       |
+| Command                            | Purpose                                                           |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| `plain migrations apply`           | Apply pending migrations                                          |
+| `plain migrations apply --plan`    | Preview what would run                                            |
+| `plain migrations apply --check`   | Exit non-zero if unapplied migrations exist (for CI)              |
+| `plain migrations apply --fake`    | Mark as applied without running SQL                               |
+| `plain migrations list`            | View migration status by package                                  |
+| `plain migrations prune`           | Remove orphan migration records                                   |
+| `plain migrations prune <package>` | Remove every record for one package (lets its baseline run again) |
+| `plain migrations reset <package>` | Replace the package's history with one baseline                   |
 
 #### Development workflow
 
@@ -602,43 +614,65 @@ Use this when migrations exist only in your local dev environment and haven't be
 3. `plain migrations create` — creates a single fresh migration with all the changes
 4. `plain migrations apply --fake` — marks the new migration as applied (the schema is already correct from the old migrations)
 
-**Consolidating committed migrations (squash):**
+Migrations that are committed but not yet deployed anywhere can be consolidated the same way if every developer resets their database; production then applies the consolidated migration normally. Once a migration has reached any deployed environment, use a full reset (below).
 
-Use this when migrations have already been committed or deployed to other environments.
+#### Baselines
 
-`plain migrations squash <package> <migration>` creates a replacement migration with a `replaces` list. Keep the original files until all environments have migrated past the squash point, then delete them and run `migrations prune`.
+A package whose migration history has been reset ships one **baseline** migration in place of the deleted files. It is an ordinary migration with three extra attributes:
 
-**Which method to use:**
+```python
+class Migration(migrations.Migration):
+    supersedes = "0008_add_widgets"  # the sentinel: the last deleted migration; its record proves a database is caught up
+    retired = (
+        "0001_initial",
+        ...,
+        "0008_add_widgets",
+    )  # every deleted name, so dependencies on them still resolve
+    since = "0.61"  # the release that shipped the reset, for messages
+    dependencies = (("users", "0001_initial"),)
+    operations = (migrations.CreateModel(...), ...)
+```
 
-| Scenario                                  | Method                                                  |
-| ----------------------------------------- | ------------------------------------------------------- |
-| Migrations are local only (not committed) | Delete-and-recreate                                     |
-| Migrations are committed but not deployed | Delete-and-recreate (if all developers reset) or squash |
-| Migrations are deployed to production     | Squash or full reset                                    |
+What `plain postgres sync` (or `plain migrations apply`) does with it depends only on what the database has recorded:
+
+| Database has                                                      | Result                                                                                                 |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| No records for the package, no tables (fresh, or newly installed) | Runs the baseline like any migration                                                                   |
+| No records for the package, but its tables exist                  | Refuses: record it with `apply <pkg> <baseline> --fake` if the schema is current, else drop the tables |
+| The baseline recorded                                             | Nothing                                                                                                |
+| The `supersedes` migration recorded                               | Records the baseline without running it - one row, once                                                |
+| Records, but not the `supersedes` migration                       | Refuses: upgrade through the last release that still has that migration                                |
+| Records, but none of the package's tables                         | Refuses: `plain migrations prune <pkg>` drops the records; then it runs                                |
+
+`plain migrations apply --plan --check` and `plain postgres sync --check` report a baseline waiting to be recorded as a pending change, and `plain preflight` reports a refusal as an error. Nothing ever deletes records on its own; `prune` stays explicit. A database where the baseline _ran_ (rather than was recorded) cannot roll back to code from before the reset.
 
 #### Resetting migrations
 
-Over time a package can accumulate dozens of migrations. Once **every environment** (dev, staging, production) has applied all of them, you can replace the entire history with a single fresh `0001_initial`.
+Once **every environment** has applied a package's migrations, its history can be collapsed into one baseline:
 
-**Prerequisites:**
+```bash
+plain migrations reset <package>
+```
 
-- Every environment (dev, staging, production) has applied all existing migrations. If any environment is behind, the reset will break it.
-- The first migration is named `0001_initial` (the default). If it has a different name, this workflow won't work cleanly.
+The command writes `NNNN_baseline.py` past the current leaf (the package's newest migration) — the package's schema as `CreateModel`s, `supersedes` set to the leaf, `retired` set to every deleted name — and deletes the old files. Commit the new file and the deletions together. Existing databases adopt it with one record on their next `plain postgres sync`; the retired records stay as the rollback path; a fresh database runs it. Other packages' migrations that depended on a deleted name resolve to the baseline; nothing there needs rewriting. Do not add a `prune` step. Before it touches anything it checks, in this order:
 
-**Steps:**
+- The models agree with the history (`plain migrations create` would write nothing). A change the history doesn't hold would be folded into the baseline, and databases that adopt it would never run it.
+- The package ends in a single leaf, and no earlier baseline is waiting unreleased (see second resets below).
+- The deleted history holds nothing a fresh database would miss. `RunPython`, `RunSQL`, any custom operation, and anything on the database side of `SeparateDatabaseAndState` are listed and refused until each carries `skip_on_reset=True` — "a fresh database can do without this." If it can't (a seed, an extension), move the effect somewhere a fresh database does get it, then mark it.
+- The migrations directory is committed — tracked, unmodified, inside a git repository (so an installed package in site-packages cannot be reset; the check applies to `--dry-run` too). The leaf becomes the baseline's sentinel, so it cannot be something you created a minute ago. No check can prove every environment applied it — the command prints that obligation, and a database that hasn't is refused until it does. If anything goes wrong the output has already printed the one line that puts it back: `git checkout -- <migrations dir> && rm <the new baseline>`.
+- The result loads: dependencies on retired names resolve, the graph has no cycle, the baseline reproduces the models exactly.
+- Nothing the baseline needs is defined inside a migration file. A custom field class or callable written in the history disappears with it; move it into the app first.
 
-1. Run `plain migrations list` locally and verify everything is applied.
-2. Delete every file in the package's `migrations/` directory except `__init__.py`.
-3. Run `plain migrations create` to generate a fresh `0001_initial`.
-4. Run `plain migrations prune --yes` to remove stale DB records. The existing `0001_initial` record matches the new file, so the database is immediately up to date.
-5. Verify with `plain postgres schema` (zero issues means the reset is clean) and `plain migrations create --check` (no pending changes).
-6. Commit and deploy. On every other environment, run `plain migrations prune --yes`. No actual SQL runs — it only cleans up migration history records. If `migrations prune` is already in your deploy steps, no changes are needed.
+Options:
 
-**Things to keep in mind:**
+- `--since <version>` — the release this reset ships in, named in the refusal a database that missed the leaf gets, and required before the package can be reset again. Plain's own packages leave it empty and fill it in at release time (a repository test enforces it, and the package's `plain.postgres` minimum is raised to the first release that understands baselines); an app should pass the version or deploy this ships in.
+- `--dry-run` — print the baseline and the deletion list, write nothing.
 
-- If resetting multiple packages, process depended-on packages first — the new `0001_initial` may have cross-package FK dependencies.
-- Data migrations (`RunPython`) in the deleted history are gone, which is fine since they've already run everywhere.
-- If CI runs `migrations create --check` or `migrations apply --check`, the reset PR must be merged and deployed before those checks pass in other branches.
+**Dependencies.** The baseline depends on each other package its models reference, at the earliest migration of that package where the referenced models exist — and on nothing else. A package that another package pinned early _and_ whose models now point back at that package cannot get a single root: the graph would be a cycle, and the command refuses with it. That is a limit of migration graphs, not of the command; nothing to do with a second package fixes it.
+
+**Support boundaries.** Adoption checks that the sentinel is recorded and the tables exist, not columns; editing history behind a released leaf is outside what any check can catch. A data migration in _another_ package that read this package's historical state (a field the baseline no longer has) keeps loading but can fail on a fresh database; the command cannot see it.
+
+**Second reset.** Run it again later and the previous baseline joins `retired`. It refuses while the previous baseline's `since` is empty: nothing shipped it yet, so superseding its name would strand every database still at the original sentinel — once that baseline has shipped everywhere, set its `since` to the version that shipped it and reset again; otherwise restore the history and reset once.
 
 ### Data migrations
 
@@ -661,7 +695,9 @@ def forwards(models, schema_editor):
 
 For large tables, chunk the work (e.g. by ID range) and commit between batches so no single transaction holds locks for too long.
 
-See [Structural migrations](#structural-migrations) for shared commands (`apply`, `list`, `squash`, `prune`).
+When the package's history is later collapsed (see [Resetting migrations](#resetting-migrations)), `plain migrations reset` refuses while any `RunPython`/`RunSQL` is unmarked. Pass `skip_on_reset=True` once a fresh database can do without its effect; if it can't, move the effect into a seed first.
+
+See [Structural migrations](#structural-migrations) for shared commands (`apply`, `list`, `prune`).
 
 #### Cascading deletes inside data migrations
 
@@ -704,7 +740,9 @@ class User(postgres.Model):
         ],
         constraints=[
             postgres.UniqueConstraint(fields=["email"], name="users_email_uniq"),
-            postgres.CheckConstraint(check=postgres.Q(age__gte=0), name="users_age_positive"),
+            postgres.CheckConstraint(
+                check=postgres.Q(age__gte=0), name="users_age_positive"
+            ),
         ],
     )
 ```
@@ -774,6 +812,26 @@ Environment overrides: every setting accepts `PLAIN_POSTGRES_*` env vars, so you
 PLAIN_POSTGRES_MIGRATION_STATEMENT_TIMEOUT=30s plain migrations apply
 ```
 
+### Schema lock
+
+Schema-changing commands — `plain postgres sync`, `plain migrations apply`, `plain postgres converge`, and `plain postgres drop-unknown-tables` — serialize on a single session-level advisory lock, so two deploy processes running at once (a retried migrate job, overlapping release phases) can't interleave schema changes. You don't have to do anything to get this.
+
+A second process warns and waits, retrying until the holder finishes:
+
+```python
+# app/settings.py — defaults shown (waits up to an hour total)
+POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL = 5.0
+POSTGRES_SCHEMA_LOCK_MAX_RETRIES = 720
+```
+
+The wait is generous by default because a legitimate holder can be mid index build. If the budget runs out, the command fails with the holder's `pid` so you can see what's blocking. A crashed holder is not a problem — the lock releases automatically when its database session closes.
+
+The lock is held on its own connection, separate from the one running DDL, so non-transactional operations (`CREATE INDEX CONCURRENTLY`, `VALIDATE CONSTRAINT`) work normally while it's held. Session-level locks don't survive transaction-mode poolers like pgbouncer — if your `POSTGRES_URL` points at one, set [`POSTGRES_MANAGEMENT_URL`](#bypassing-a-connection-pooler-for-management-operations) to a direct connection.
+
+The lock connection sits idle while your DDL runs, so it enables TCP keepalives to survive NAT and load-balancer idle timeouts. A server-side `idle_session_timeout` would still kill it (releasing the lock mid-run) — don't set one for the role that runs migrations. `sync` re-verifies the lock between its migrate and converge phases and stops with a clear error if the session died.
+
+To see the lock live: `SELECT * FROM pg_locks WHERE locktype = 'advisory' AND objid = 1047265496`.
+
 ## Fields
 
 You can use many field types for different data:
@@ -784,6 +842,7 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
+
 
 class Product(postgres.Model):
     # Text fields
@@ -889,6 +948,7 @@ This is **not** for passwords or tokens you issue — those should be hashed (on
 from plain import postgres
 from plain.postgres import types
 
+
 @postgres.register_model
 class Integration(postgres.Model):
     name: str = types.TextField(max_length=100)
@@ -907,6 +967,7 @@ Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived
 
 - **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported.
 - **No indexes or constraints** — encrypted fields cannot be used in indexes or unique constraints. Preflight checks will catch this.
+- **Only `default=""`** — on `EncryptedTextField` (paired with `required=False`), the empty string is stored as plaintext `''`, so it's the one value expressible as a column `DEFAULT` (declare it to add the field to a populated table). Any other default would need ciphertext, which is non-deterministic. `EncryptedJSONField` accepts no default at all — even `{}` serializes to text that would need ciphertext; use `allow_null=True`.
 
 **Key rotation:**
 
@@ -924,6 +985,7 @@ Use [`ForeignKeyField`](./fields/related.py#ForeignKeyField) for many-to-one and
 from plain import postgres
 from plain.postgres import types
 
+
 @postgres.register_model
 class Book(postgres.Model):
     title: str = types.TextField(max_length=200)
@@ -937,14 +999,22 @@ Accessing a foreign key gives you the related object without a query — only it
 
 ```python
 book = Book.query.get(id=1)
-book.author        # no query — a partial Author instance
-book.author.id     # no query — the foreign key value
-book.author.name   # one query — loads the rest of the row
+book.author  # no query — a partial Author instance
+book.author.id  # no query — the foreign key value
+book.author.name  # one query — loads the rest of the row
 ```
 
 The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `select_related()` to load related rows up front and avoid a query per row.
 
 The partial-instance shortcut is safe because Plain always creates a database foreign-key constraint, so the referenced row is guaranteed to exist.
+
+### Constraints are checked immediately
+
+Every constraint is checked at the write that violates it, never at commit — the same as Postgres's own default. Inserting a child row that points at a parent that doesn't exist yet fails at that `INSERT`, with a traceback pointing at the offending write, and deleting a parent with `RESTRICT` children fails at that `DELETE`. Create parents before children. A cycle of foreign keys needs a nullable back-reference: create both rows, then `update()` the back-reference. Two required foreign keys pointing at each other can never be inserted.
+
+To swap two rows' values under a unique constraint (reordering by `position`, say), move one row to a temporary value first — a single `UPDATE` that swaps them fails, because Postgres checks uniqueness per row.
+
+A migration can add a column, backfill it in `RunPython`, and drop or alter columns on the same table, all in one transaction.
 
 ### Reverse relationships
 
@@ -954,16 +1024,19 @@ When you define a `ForeignKey` or `ManyToManyField`, Plain automatically creates
 from plain import postgres
 from plain.postgres import types
 
+
 @postgres.register_model
 class Author(postgres.Model):
     name: str = types.TextField(max_length=200)
     # Explicit reverse accessor for all books by this author
     books = types.ReverseForeignKey(to="Book", field="author")
 
+
 @postgres.register_model
 class Book(postgres.Model):
     title: str = types.TextField(max_length=200)
     author: Author = types.ForeignKeyField(Author, on_delete=postgres.CASCADE)
+
 
 # Usage
 author = Author.query.get(name="Jane Doe")
@@ -983,10 +1056,12 @@ class Feature(postgres.Model):
     # Explicit reverse accessor for all cars with this feature
     cars = types.ReverseManyToMany(to="Car", field="features")
 
+
 @postgres.register_model
 class Car(postgres.Model):
     model: str = types.TextField(max_length=100)
     features = types.ManyToManyField(Feature)
+
 
 # Usage
 feature = Feature.query.get(name="Sunroof")
@@ -1007,10 +1082,14 @@ To get type checking for custom QuerySet methods on reverse relations, specify t
 
 ```python
 # Basic usage
-books: types.ReverseForeignKey[Book] = types.ReverseForeignKey(to="Book", field="author")
+books: types.ReverseForeignKey[Book] = types.ReverseForeignKey(
+    to="Book", field="author"
+)
 
 # With custom QuerySet for proper method recognition
-books: types.ReverseForeignKey[Book, BookQuerySet] = types.ReverseForeignKey(to="Book", field="author")
+books: types.ReverseForeignKey[Book, BookQuerySet] = types.ReverseForeignKey(
+    to="Book", field="author"
+)
 
 # Now type checkers recognize custom methods like .published()
 author.books.query.published()
@@ -1041,7 +1120,7 @@ class User(postgres.Model):
 
 Field-level validation happens automatically based on field types and constraints.
 
-**The database is authoritative for constraints.** `create()`/`update()` don't pre-check your declared unique/check constraints — they attempt the write, and if Postgres rejects it, translate the `IntegrityError` into a `ValidationError` (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). You get the same field-level error you'd expect, the write costs no per-constraint `SELECT`, and a raced concurrent insert can't slip through as a 500. (FK violations, `NOT NULL`, and a hand-set primary-key collision have no declared constraint to map to and re-raise as the original `IntegrityError`. `create()` always inserts, so passing a stray `id` that already exists is rejected by Postgres as the original `IntegrityError`.)
+**The database is authoritative for constraints.** `create()`/`update()` don't pre-check your declared unique/check constraints — they attempt the write, and if Postgres rejects it, translate the `IntegrityError` into a `ValidationError` (routed to the field for single-column uniques, `NON_FIELD_ERRORS` otherwise). You get the same field-level error you'd expect, the write costs no per-constraint `SELECT`, and a raced concurrent insert can't slip through as a 500. A foreign key pointing at a row that doesn't exist maps the same way, as an error on that field. (`NOT NULL` and a hand-set primary-key collision have no declared constraint to map to and re-raise as the original `IntegrityError`. `create()` always inserts, so passing a stray `id` that already exists is rejected by Postgres as the original `IntegrityError`.)
 
 Because the rejected write reaches the database, it aborts the surrounding transaction. If you catch the `ValidationError` and want to keep using the transaction, wrap the write in `transaction.atomic()` so it rolls back to a savepoint:
 
@@ -1053,9 +1132,9 @@ except ValidationError:
     ...  # report it — the transaction is still usable
 ```
 
-Forms are the exception: a `ModelForm` pre-checks constraints explicitly (a `validate_constraints()` call in its `_post_clean`) so it can surface every violation at once, then writes via `form.create()`/`form.update()` with validation already done. A direct `create()`/`update()` reports the first violation Postgres hits.
+A `ModelForm` is no exception — it validates shape and never writes, so the constraint is still enforced when `create_from()`/`update_from()` writes the row. Call `validate_constraints()` yourself before the write if you want every violation surfaced at once; otherwise `create()`/`update()` reports the first violation Postgres hits.
 
-This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to. If you retry on a unique conflict, catch both:
+This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to, and so does a `delete()` blocked by `RESTRICT` children. If you retry on a unique conflict, catch both:
 
 ```python
 try:
@@ -1065,8 +1144,6 @@ except (psycopg.IntegrityError, ValidationError):
 ```
 
 For a plain insert-or-update with no per-row logic, `bulk_create(..., update_conflicts=True, unique_fields=[...])` is an atomic upsert with no race to catch.
-
-Two caveats. The mapping covers **immediate** constraints — the default. An explicitly deferred constraint (`UniqueConstraint(deferrable=Deferrable.DEFERRED)`) is checked at commit, _after_ the write returns, so its violation still surfaces as a raw `psycopg.IntegrityError`. And when a row violates several constraints at once, a form's pre-check (or an explicit `validate_constraints()`) reports them all, while a direct `create()`/`update()` gets only the first one the database hits.
 
 ### Indexes and constraints
 
@@ -1090,7 +1167,7 @@ class User(postgres.Model):
     )
 ```
 
-Constraints are checked by `validate_constraints()` — run by a `ModelForm` (and any explicit `validate_constraints()` call), but **not** by `full_clean()` (which validates shape only) or a direct `create()`/`update()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
+Constraints are checked by an explicit `validate_constraints()` call, but **not** by `full_clean()` (which validates shape only) or a direct `create()`/`update()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
 
 ```python
 # Simple message — lands on NON_FIELD_ERRORS
@@ -1154,6 +1231,7 @@ class Order(postgres.Model):
     status: str = types.TextField(max_length=20)
     created_at: datetime = types.DateTimeField()
 
+
 # Good — indexed for common queries
 class Order(postgres.Model):
     status: str = types.TextField(max_length=20)
@@ -1175,6 +1253,7 @@ def create(self):
         raise ValueError("duplicate")
     return super().create()
 
+
 # Good — database-enforced
 model_options = postgres.Options(
     constraints=[postgres.UniqueConstraint(fields=["email"])],
@@ -1187,7 +1266,9 @@ CASCADE for owned children, RESTRICT for referenced data, SET_NULL for optional 
 
 ```python
 # Bad — blindly using CASCADE everywhere
-company: Company = types.ForeignKeyField("Company", on_delete=postgres.CASCADE)  # deleting company deletes invoices!
+company: Company = types.ForeignKeyField(
+    "Company", on_delete=postgres.CASCADE
+)  # deleting company deletes invoices!
 
 # Good — block the delete while invoices reference the company
 company: Company = types.ForeignKeyField("Company", on_delete=postgres.RESTRICT)
@@ -1227,8 +1308,8 @@ result = UserForm.validate(request.form_data)
 if not result:
     ...  # re-render with result.errors
 
-user = create_from(User, result)     # insert a new row
-update_from(existing_user, result)   # write onto an existing row
+user = create_from(User, result)  # insert a new row
+update_from(existing_user, result)  # write onto an existing row
 ```
 
 Pass columns the form doesn't carry as keyword arguments — `create_from(User, result, team=team)`. See [`plain.forms`](../../../plain/plain/forms/README.md) for the full reference.
@@ -1427,6 +1508,21 @@ These are static, code-level checks that catch issues before you deploy. The `di
 - **Historical trending** — `diagnose` is stateless; it reports on the current state of cumulative stats. Continuous monitoring is out of scope.
 - **Niche server checks** (WAL bloat, replication slot age, etc.) — better covered by your Postgres provider's monitoring or a dedicated tool; users on self-hosted setups that need them typically have their own tooling.
 
+## Tracing
+
+Every query runs inside an OpenTelemetry `CLIENT` span with standard `db.*` attributes, so queries show up as children of whatever request, job, or chore triggered them. You don't configure anything for this — it's on by default and only exports if your app exports traces (e.g. with [plain.connect](../../../plain-connect/plain/connect/README.md)).
+
+If code runs a query with _no_ active span — a background thread, a polling loop — that query's span becomes its own single-span trace. For framework-internal housekeeping queries where that's pure noise, you can suppress query tracing entirely:
+
+```python
+from plain.postgres.otel import suppress_db_tracing
+
+with suppress_db_tracing():
+    MyModel.query.count()  # No span, no query metrics
+```
+
+This is meant for infrastructure code (pollers, metric gauge callbacks, test fixtures) — not for hiding application queries, which you almost always want visible in traces.
+
 ## Settings
 
 The connection is configured with a single URL (`POSTGRES_URL`). `DATABASE_URL` is read as a platform-compat fallback. Set the URL to `none` to explicitly disable the database (e.g. during Docker image builds).
@@ -1452,9 +1548,9 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 Add the field to your model class, then run `plain migrations create` to create a migration.
 
-If the field is required (no `default=` and not `allow_null=True`), the autodetector refuses to generate the migration, since there's no value to seed existing rows with. You have two options:
+If the field has no `default=` and isn't `allow_null=True`, the autodetector refuses to generate the migration, since there's no value to seed existing rows with — `required=False` alone is not enough (it only affects Python-side validation, not the column). You have two options:
 
-1. Declare a `default=` on the field so the new column has a value for existing rows.
+1. Declare a `default=` on the field so the new column has a value for existing rows. For an optional string field the idiom is `required=False, default=""` (for `BinaryField`, `default=b""`).
 2. Add the field with `allow_null=True`, scaffold a data migration with `plain migrations create --empty --name backfill_<field>` to populate existing rows, then remove `allow_null=True` from the field — convergence applies `NOT NULL` on the next `postgres sync`.
 
 #### How do I make an existing column `NOT NULL`?
@@ -1471,7 +1567,9 @@ Use `UniqueConstraint` in your model's `model_options`:
 ```python
 model_options = postgres.Options(
     constraints=[
-        postgres.UniqueConstraint(fields=["email", "organization"], name="unique_email_per_org"),
+        postgres.UniqueConstraint(
+            fields=["email", "organization"], name="unique_email_per_org"
+        ),
     ],
 )
 ```

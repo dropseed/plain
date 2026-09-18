@@ -40,3 +40,10 @@ POSTGRES_MIGRATION_LOCK_TIMEOUT: str = "3s"
 POSTGRES_MIGRATION_STATEMENT_TIMEOUT: str = "3s"
 POSTGRES_CONVERGENCE_LOCK_TIMEOUT: str = "3s"
 POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT: str = "3s"
+
+# Retry budget for the schema advisory lock that serializes schema-changing
+# commands (see schema_lock.py). Non-blocking acquire, retried; the defaults
+# wait up to an hour (720 × 5s) because a legitimate holder can be mid
+# index build.
+POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL: float = 5.0
+POSTGRES_SCHEMA_LOCK_MAX_RETRIES: int = 720

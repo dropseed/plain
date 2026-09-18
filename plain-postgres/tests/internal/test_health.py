@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from plain.postgres.introspection import build_table_owners
 
 

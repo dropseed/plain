@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from app.users.models import User
-
 from plain.forms import Error, Form, types
 from plain.postgres.forms import ModelForm, model_field
 

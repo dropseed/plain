@@ -1,27 +1,84 @@
-/* Hovercard — hover-triggered version of popover. Trigger can be any
-   element (no <button> requirement); panel is positioned `fixed` via
-   JS using `getBoundingClientRect()` so it escapes container clipping.
+/* Hovercard — hover-triggered top-layer panel. Trigger can be any element
+   (no <button> requirement). Self-contained, but built from the same pieces
+   as [data-popover]: top layer + anchor positioning + the shared overlay
+   fade (just snappier and scale-free). components.js sets `popover="manual"`
+   and links the panel to its trigger, so it escapes container clipping and
+   opens below the trigger, left-aligned.
 
    Markup:
-     <span class="hovercard">
+     <span class="admin-hovercard">
        <some-trigger />
-       <div data-hovercard aria-hidden="true">…panel content…</div>
+       <div data-hovercard>…panel content…</div>
      </span>
 
-   Surface treatment (bg, border, shadow, radius) is shared with
-   [data-popover] in popover.css. */
+   Placement: defaults to opening below the trigger. Set
+   `data-hovercard-side="right|left|top|bottom"` on the panel — or on any
+   ancestor, e.g. a table column — to change the side. Setting it on an
+   ancestor lets a whole column of hovercards (including the auto-wrapped
+   <time> ones) open to one side, keeping the trigger column clear so you
+   can scan straight down it without the open panel covering the next row. */
 @layer components {
   .admin-hovercard {
     @apply relative inline-flex;
   }
 
   [data-hovercard] {
-    @apply fixed p-1 text-sm whitespace-nowrap z-50 transition-opacity duration-100;
+    @apply bg-admin-popover text-admin-popover-foreground border shadow-md fixed inset-auto z-50 p-1 text-sm whitespace-nowrap;
+    border-radius: var(--radius-popover);
+    --admin-overlay-fade: 100ms;
+
+    /* Default placement; overridden per-side below. */
+    position-area: bottom span-right;
+    position-try-fallbacks: flip-block, flip-inline;
+    margin: 0.25rem 0;
+
+    /* Closed base state; the Popover API drives `:popover-open`. `visibility:
+       hidden` is the real hide (robust to the `flex` utility above overriding
+       the UA `display: none`); `pointer-events: none` covers the exit fade. No
+       `scale` delta — hovercards just fade, for a snappier hover feel. */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: var(--admin-overlay-transition);
+    &:popover-open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      @starting-style {
+        opacity: 0;
+      }
+    }
   }
-  [data-hovercard][aria-hidden='true'] {
-    @apply opacity-0 invisible pointer-events-none;
+
+  /* Placement overrides. Each side sets its own edge-flip order (flip toward
+     the opposite side first) and swaps the gap to the relevant axis. Matched
+     on the panel itself OR any ancestor carrying data-hovercard-side, so a
+     container (a table column, say) can steer every hovercard inside it. */
+  [data-hovercard][data-hovercard-side="right"],
+  [data-hovercard-side="right"] [data-hovercard] {
+    position-area: right span-bottom;
+    position-try-fallbacks: flip-inline, flip-block;
+    margin: 0 0.25rem;
   }
-  [data-hovercard][aria-hidden='false'] {
-    @apply opacity-100 visible pointer-events-auto;
+
+  [data-hovercard][data-hovercard-side="left"],
+  [data-hovercard-side="left"] [data-hovercard] {
+    position-area: left span-bottom;
+    position-try-fallbacks: flip-inline, flip-block;
+    margin: 0 0.25rem;
+  }
+
+  [data-hovercard][data-hovercard-side="top"],
+  [data-hovercard-side="top"] [data-hovercard] {
+    position-area: top span-right;
+    position-try-fallbacks: flip-block, flip-inline;
+    margin: 0.25rem 0;
+  }
+
+  [data-hovercard][data-hovercard-side="bottom"],
+  [data-hovercard-side="bottom"] [data-hovercard] {
+    position-area: bottom span-right;
+    position-try-fallbacks: flip-block, flip-inline;
+    margin: 0.25rem 0;
   }
 }

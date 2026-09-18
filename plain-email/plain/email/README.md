@@ -255,6 +255,7 @@ Subclass [`BaseEmailBackend`](./backends/base.py#BaseEmailBackend) and implement
 ```python
 from plain.email.backends.base import BaseEmailBackend
 
+
 class MyBackend(BaseEmailBackend):
     def send_messages(self, email_messages):
         # Your sending logic here

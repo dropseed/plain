@@ -776,7 +776,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <UiSection
                 id="popovers"
                 title="Popovers"
-                blurb="Generic click-to-open panel. Wrap a trigger `<button>` and a `[data-popover]` panel in a `.admin-popover` element — the panel can hold anything (form fields, descriptive content, multi-step UI). Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end). JS in `components.js` shares open/close, outside-click, and Esc handling with `.admin-dropdown-menu`."
+                blurb='Generic click-to-open panel. Wrap a trigger `<button>` and a `[data-popover]` panel in a `.admin-popover` element — the panel can hold anything (form fields, descriptive content, multi-step UI). The panel carries `popover="manual"` so it opens in the top layer, escaping any ancestor `overflow` clip (e.g. a table scroll box), and is tethered to the trigger with CSS anchor positioning. Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end) — `position-area` places it and `position-try-fallbacks` flips it away from viewport edges. JS in `components.js` shares open/close, outside-click, and Esc handling with `.admin-dropdown-menu`.'
             >
                 <p class="text-sm text-admin-muted-foreground mb-2">Popover surface tokens (shared with dropdowns and hovercards):</p>
                 <UiSwatchGrid
@@ -787,16 +787,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 />
                 <div class="mt-4"></div>
                 <UiExample
-                    markup="{{ '<div class="admin-popover">\n    <button\n        type="button"\n        aria-haspopup="dialog"\n        aria-expanded="false"\n        aria-controls="example-popover-panel"\n        class="admin-btn admin-btn-outline"\n    >\n        Filter <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-popover-panel" data-popover data-align="end" aria-hidden="true" class="w-64">\n        <div class="space-y-2">\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" /> Active\n            </label>\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" checked /> Archived\n            </label>\n            <button type="button" class="admin-btn admin-btn-sm admin-btn-primary w-full mt-2">Apply</button>\n        </div>\n    </div>\n</div>' }}"
+                    markup="{{ '<div class="admin-popover">\n    <button\n        type="button"\n        aria-haspopup="dialog"\n        aria-expanded="false"\n        aria-controls="example-popover-panel"\n        class="admin-btn admin-btn-outline"\n    >\n        Filter <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-popover-panel" popover="manual" data-popover data-align="end" class="w-64">\n        <div class="space-y-2">\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" /> Active\n            </label>\n            <label class="flex items-center gap-2 text-sm">\n                <input class="admin-input" type="checkbox" checked /> Archived\n            </label>\n            <button type="button" class="admin-btn admin-btn-sm admin-btn-primary w-full mt-2">Apply</button>\n        </div>\n    </div>\n</div>' }}"
                 />
             </UiSection>
             <UiSection
                 id="dropdowns"
                 title="Dropdowns"
-                blurb='Wrap a trigger button + a [data-popover] menu in a .admin-dropdown-menu element. Items use role="menuitem" and pick up styling from the admin-dropdown-menu component. JS in components.js handles open/close, outside-click, and keyboard navigation (arrow keys, Home/End, Enter/Esc).'
+                blurb='Wrap a trigger button + a [data-popover] menu in a .admin-dropdown-menu element. The menu carries popover="manual" so it opens in the top layer and is never clipped by a table or other overflow container. Items use role="menuitem" and pick up styling from the admin-dropdown-menu component. JS in components.js handles open/close, outside-click, and keyboard navigation (arrow keys, Home/End, Enter/Esc).'
             >
                 <UiExample
-                    markup="{{ '<div class="admin-dropdown-menu">\n    <button\n        type="button"\n        aria-haspopup="menu"\n        aria-expanded="false"\n        aria-controls="example-actions-popover"\n        class="admin-btn admin-btn-outline"\n    >\n        Actions <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-40">\n        <div role="menu">\n            <a role="menuitem" href="#">Edit</a>\n            <a role="menuitem" href="#">Duplicate</a>\n            <hr role="separator">\n            <a role="menuitem" href="#" class="text-admin-danger">Delete</a>\n        </div>\n    </div>\n</div>' }}"
+                    markup="{{ '<div class="admin-dropdown-menu">\n    <button\n        type="button"\n        aria-haspopup="menu"\n        aria-expanded="false"\n        aria-controls="example-actions-popover"\n        class="admin-btn admin-btn-outline"\n    >\n        Actions <admin.Icon name="chevron-down" />\n    </button>\n    <div id="example-actions-popover" popover="manual" data-popover data-align="end" class="w-40">\n        <div role="menu">\n            <a role="menuitem" href="#">Edit</a>\n            <a role="menuitem" href="#">Duplicate</a>\n            <hr role="separator">\n            <a role="menuitem" href="#" class="text-admin-danger">Delete</a>\n        </div>\n    </div>\n</div>' }}"
                 />
             </UiSection>
             <UiSection
@@ -816,11 +816,11 @@ document.addEventListener("DOMContentLoaded", () => {
             <UiSection
                 id="hovercards"
                 title="Hovercards"
-                blurb="Hover-triggered version of popover. Trigger can be any element (no `<button>` requirement); panel positions fixed via JS so it escapes table-cell clipping. Use for preview/info that doesn't want a click commitment — user mention previews, FK row previews, the datetime hover details on every `<time>` in the admin."
+                blurb="Hover-triggered version of popover. Trigger can be any element (no `<button>` requirement); the panel opens in the top layer and is anchor-positioned (same model as the click popover), so it escapes table-cell clipping. Use for preview/info that doesn't want a click commitment — user mention previews, FK row previews, the datetime hover details on every `<time>` in the admin."
             >
                 <UiExample
                     caption="Inline trigger — user preview"
-                    markup="{{ '<div class="text-sm">\n    Pinged by\n    <span class="admin-hovercard">\n        <span class="text-admin-link cursor-help underline decoration-dotted">alice</span>\n        <div data-hovercard aria-hidden="true" class="w-64 flex gap-3 p-3">\n            <div class="w-10 h-10 rounded-full bg-admin-muted text-admin-muted-foreground flex items-center justify-center font-medium shrink-0" aria-hidden="true">A</div>\n            <div class="flex flex-col gap-0.5 min-w-0">\n                <span class="font-medium truncate">Alice Sanchez</span>\n                <span class="text-admin-muted-foreground text-xs truncate">alice@example.com</span>\n                <span class="admin-badge admin-badge-success mt-1 self-start">Admin</span>\n            </div>\n        </div>\n    </span>\n    in #releases.\n</div>' }}"
+                    markup="{{ '<div class="text-sm">\n    Pinged by\n    <span class="admin-hovercard">\n        <span class="text-admin-link cursor-help underline decoration-dotted">alice</span>\n        <div data-hovercard class="w-64 flex gap-3 p-3">\n            <div class="w-10 h-10 rounded-full bg-admin-muted text-admin-muted-foreground flex items-center justify-center font-medium shrink-0" aria-hidden="true">A</div>\n            <div class="flex flex-col gap-0.5 min-w-0">\n                <span class="font-medium truncate">Alice Sanchez</span>\n                <span class="text-admin-muted-foreground text-xs truncate">alice@example.com</span>\n                <span class="admin-badge admin-badge-success mt-1 self-start">Admin</span>\n            </div>\n        </div>\n    </span>\n    in #releases.\n</div>' }}"
                 />
                 <p class="text-sm text-admin-muted-foreground mt-3">
     Hovercards are a generic primitive — wrap anything in <code>&lt;span class="admin-hovercard"&gt;</code>
@@ -829,6 +829,18 @@ document.addEventListener("DOMContentLoaded", () => {
     <code>&lt;time datetime="…"&gt;</code> is auto-wrapped at runtime with local/UTC/relative/Unix/ISO
     rows, each clickable to copy via the <code>data-copy-value</code> behavior.
 </p>
+                <p class="text-sm text-admin-muted-foreground mt-3">
+    Panels open below the trigger by default. Set
+    <code>data-hovercard-side="right|left|top|bottom"</code> on the panel — or on any ancestor,
+    like a table column — to change the side. Steering a whole column to
+    <code>right</code> keeps the trigger column clear so you can scan straight down it without the
+    open panel covering the next row (handy for the auto-wrapped <code>&lt;time&gt;</code> cells,
+    whose panels you don't author directly).
+</p>
+                <UiExample
+                    caption="Right-side placement"
+                    markup="{{ '<div class="text-sm">\n    Updated\n    <span class="admin-hovercard">\n        <span class="text-admin-link cursor-help underline decoration-dotted">just now</span>\n        <div data-hovercard data-hovercard-side="right" class="w-64 whitespace-normal flex gap-3 p-3">\n            <div class="flex flex-col gap-0.5 min-w-0">\n                <span class="font-medium">Opens to the right</span>\n                <span class="text-admin-muted-foreground text-xs">Trigger column stays clear for vertical scanning.</span>\n            </div>\n        </div>\n    </span>\n    by the worker.\n</div>' }}"
+                />
                 <UiExample
                     caption="Auto-wrapped <time> element"
                     markup="{{ '<div class="text-sm">\n    Last seen <time datetime="2026-04-27T14:14:00Z">2 days ago</time> by alice.\n</div>' }}"
@@ -909,7 +921,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </tbody>
                 </table>
                 <p class="text-sm text-admin-muted-foreground mt-3">
-    GET-form submissions are also intercepted globally to drop empty params from the URL — keeps list views from accumulating <code>?q=&amp;filter=</code> cruft when filters are cleared. No attribute needed; applies to every <code>&lt;form method="GET"&gt;</code>.
+    GET-form submissions are also intercepted globally: a form that stays on the current view merges its fields onto the existing query string — so unrelated state like the active sort survives — while dropping any emptied params and resetting <code>page</code> unless the form itself paginates. Forms that navigate elsewhere (e.g. global search) start from a clean query string. No attribute needed; applies to every <code>&lt;form method="GET"&gt;</code>.
 </p>
             </UiSection>
         </div>

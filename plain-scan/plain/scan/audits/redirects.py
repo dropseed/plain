@@ -3,12 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-import requests
-
 from ..results import AuditResult, CheckResult
 from .base import Audit
 
 if TYPE_CHECKING:
+    import httpx
+
     from ..scanner import Scanner
 
 
@@ -61,7 +61,7 @@ class RedirectsAudit(Audit):
         )
 
     def _check_http_to_https(
-        self, original_url: str, response: requests.Response
+        self, original_url: str, response: httpx.Response
     ) -> CheckResult:
         """Check if HTTP redirects to HTTPS."""
         original_parsed = urlparse(original_url)
@@ -75,7 +75,7 @@ class RedirectsAudit(Audit):
             )
 
         # Check if we ended up on HTTPS
-        final_parsed = urlparse(response.url)
+        final_parsed = urlparse(str(response.url))
         if final_parsed.scheme == "https":
             return CheckResult(
                 name="http-to-https",
@@ -89,7 +89,7 @@ class RedirectsAudit(Audit):
             message="HTTP does not redirect to HTTPS",
         )
 
-    def _check_redirect_chain_length(self, response: requests.Response) -> CheckResult:
+    def _check_redirect_chain_length(self, response: httpx.Response) -> CheckResult:
         """Check that redirect chain is not too long."""
         redirect_count = len(response.history)
 
@@ -137,7 +137,7 @@ class RedirectsAudit(Audit):
         )
 
     def _check_cross_origin_redirects(
-        self, original_url: str, response: requests.Response
+        self, original_url: str, response: httpx.Response
     ) -> CheckResult:
         """
         Check for problematic cross-origin redirects.
@@ -160,7 +160,7 @@ class RedirectsAudit(Audit):
         # Check if first redirect is to HTTPS on a different host
         if response.history:
             first_redirect = response.history[0]
-            first_redirect_parsed = urlparse(first_redirect.url)
+            first_redirect_parsed = urlparse(str(first_redirect.url))
 
             # If first redirect is HTTP->HTTPS and changes host, this prevents HSTS
             if (
@@ -174,7 +174,7 @@ class RedirectsAudit(Audit):
                 )
 
         # Check final URL
-        final_parsed = urlparse(response.url)
+        final_parsed = urlparse(str(response.url))
         if final_parsed.netloc != original_parsed.netloc:
             # Cross-origin but passed the checks above
             return CheckResult(
@@ -189,7 +189,7 @@ class RedirectsAudit(Audit):
             message="All redirects stay on the same domain",
         )
 
-    def _check_status_codes(self, response: requests.Response) -> CheckResult:
+    def _check_status_codes(self, response: httpx.Response) -> CheckResult:
         """Check that redirects use appropriate status codes."""
         # Valid redirect status codes: 301, 302, 303, 307, 308
         # Preferred: 301 (permanent), 302/307 (temporary), 308 (permanent, preserves method)
@@ -215,7 +215,7 @@ class RedirectsAudit(Audit):
         )
 
     def _check_trailing_slash_redirect(
-        self, original_url: str, response: requests.Response
+        self, original_url: str, response: httpx.Response
     ) -> CheckResult:
         """Check if redirect is just adding/removing a trailing slash."""
         if not response.history:

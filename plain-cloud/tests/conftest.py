@@ -7,7 +7,7 @@ import pytest
 
 class InMemoryKeyring(keyring.backend.KeyringBackend):
     name = "in-memory"
-    priority = 1  # type: ignore[assignment]
+    priority = 1
 
     def __init__(self) -> None:
         self._store: dict[tuple[str, str], str] = {}

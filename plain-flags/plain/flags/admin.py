@@ -34,9 +34,9 @@ class FlagAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = Flag
         description = "Toggle features on/off without deploying code."
-        fields = ["name", "enabled", "created_at__date", "used_at__date"]
-        search_fields = ["name", "description"]
-        cards = [UnusedFlagsCard]
+        fields = ("name", "enabled", "created_at__date", "used_at__date")
+        search_fields = ("name", "description")
+        cards = (UnusedFlagsCard,)
         nav_section = "Feature flags"
         nav_icon = "flag"
 
@@ -55,14 +55,14 @@ class FlagResultAdmin(AdminViewset):
         model = FlagResult
         title = "Flag results"
         description = "Cached flag evaluations for specific keys (users, teams, etc)."
-        fields = [
+        fields = (
             "flag",
             "key",
             "value",
             "created_at__date",
             "updated_at__date",
-        ]
-        search_fields = ["flag__name", "key"]
+        )
+        search_fields = ("flag__name", "key")
         nav_section = "Feature flags"
         nav_icon = "check2-square"
 

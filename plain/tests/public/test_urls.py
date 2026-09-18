@@ -1,5 +1,4 @@
 import pytest
-
 from plain.runtime import settings
 from plain.urls import absolute_url, reverse_absolute
 

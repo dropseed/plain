@@ -1,38 +1,42 @@
 ---
 imports:
+  - from collections.abc import Sequence
+  - from plain.paginator import Page
   - from plain.urls import reverse as url
 components:
   - base as Base
   - components/BackLink
+  - components/Pagination
 attrs:
-  notes: list[app.notes.models.Note]
+  notes: Sequence[app.notes.models.Note]
+  page_obj: Page | None = None
 ---
 <Base>
     {% slot "title" %}Notes{% endslot %}
     <div class="max-w-2xl mx-auto px-5 py-12">
         <BackLink href="{{ url('index') }}" label="Back to index" />
         <div class="flex items-end justify-between gap-4">
-        <h1 class="page-h1">Notes</h1>
-        <a href="{{ url('notes:create') }}" class="btn-primary">New note</a>
-    </div>
+            <h1 class="page-h1">Notes</h1>
+            <a href="{{ url('notes:create') }}" class="btn-primary">New note</a>
+        </div>
         {% if notes %}
             <ul class="list-card mt-6">
                 {% for note in notes %}
                     <li>
-            <a
-                href="{{ url('notes:detail', id=note.id) }}"
-                class="block px-4 py-3 hover:bg-warm-tint transition-colors no-underline"
-            >
-                <div class="text-sm font-semibold text-ink">{{ note.title }}</div>
-                <div class="text-[12px] font-mono text-muted mt-1">
-                    {{ note.updated_at.strftime("%Y-%m-%d %H:%M") }}
-                </div>
-            </a>
-        </li>
+                        <a
+                            href="{{ url('notes:detail', id=note.id) }}"
+                            class="block px-4 py-3 hover:bg-warm-tint transition-colors no-underline"
+                        >
+                            <div class="text-sm font-semibold text-ink">{{ note.title }}</div>
+                            <div class="text-[12px] font-mono text-muted mt-1">
+                                {{ note.updated_at.strftime("%Y-%m-%d %H:%M") }}
+                            </div>
+                        </a>
+                    </li>
                 {% endfor %}
             </ul>
-        {% endif %}
-        {% if not notes %}
+            <Pagination page_obj="{{ page_obj }}" />
+        {% else %}
             <p class="mt-6 text-sm text-muted">No notes yet. Create your first one.</p>
         {% endif %}
     </div>

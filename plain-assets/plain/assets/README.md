@@ -5,6 +5,7 @@
 - [Overview](#overview)
 - [Local development](#local-development)
 - [Production deployment](#production-deployment)
+- [Build inputs and outputs](#build-inputs-and-outputs)
 - [Using `AssetView` directly](#using-assetview-directly)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -23,10 +24,10 @@ from plain.urls import include, Router
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("assets/", AssetsRouter),
         # your other routes here...
-    ]
+    )
 ```
 
 Now in your template you can use the `asset()` function to get the URL, which will output the fully compiled and fingerprinted URL.
@@ -62,9 +63,18 @@ The purpose of fingerprinting the assets is to allow the browser to cache them i
     openapi = {cmd = "plain api generate-openapi --validate > app/assets/openapi.json"}
     ```
 
-2. Package-registered hooks via the `plain.assets.compile` entry-point group. Packages like `plain.tailwind` and `plain.esbuild` ship one of these to compile CSS / JS before the asset fingerprinter runs.
+2. Package-registered hooks via the `plain.assets.compile` entry-point group. Packages like `plain.tailwind` ship one of these to compile CSS before the asset fingerprinter runs.
 
 3. The asset compile itself (fingerprinting, compression).
+
+## Build inputs and outputs
+
+Two top-level subdirectory names are reserved inside any assets dir, so build tools have a place for their source and their pre-hashed output:
+
+- **`src/`** — build _inputs_. A top-level `app/assets/src/` is skipped by discovery and never served. It holds source consumed by a build step — a bundler's entry points and the modules they import — not deployable assets.
+- **`dist/`** — build _outputs_. A top-level `app/assets/dist/` holds files a build tool has already content-hashed. Plain serves them immutable, as-is, and does **not** re-fingerprint them — it trusts the build tool's hash. Gitignore this directory; it's generated.
+
+Everything else in `app/assets/` is static passthrough, fingerprinted by Plain as usual. Only the top-level `src/` and `dist/` are special — a nested `foo/src/` is treated normally.
 
 ## Using `AssetView` directly
 
@@ -77,9 +87,7 @@ from plain.urls import path, Router
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
-        path("favicon.ico", AssetView.as_view(asset_path="favicon.ico")),
-    ]
+    urls = (path("favicon.ico", AssetView.as_view(asset_path="favicon.ico")),)
 ```
 
 ## FAQs
