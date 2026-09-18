@@ -497,7 +497,7 @@ class AdminUpdateView(AdminView, DetailView):
         )
 
     def post(self) -> Response:
-        result = self.validate_form(self.form_class)
+        result = self.validate_form(self.form_class, instance=self.object)
         if isinstance(result, Response):
             return result
         update_from(self.object, result)

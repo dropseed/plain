@@ -1,0 +1,33 @@
+---
+imports:
+  - from plain.forms import field_errors, field_value, form_errors
+attrs:
+  form: Any = None
+  form_class: Any = None
+---
+<form method="post">
+    {% for error in form_errors(form) %}
+    <p class="form-error">{{ error.message }}</p>
+{% endfor %}
+    <label for="{{ form_class.name.html_id }}">Name</label>
+    <input
+        type="text"
+        name="{{ form_class.name.name }}"
+        id="{{ form_class.name.html_id }}"
+        value="{{ field_value(form, form_class.name) or '' }}"
+    >
+    {% for error in field_errors(form, form_class.name) %}
+    <p class="field-error">{{ error.message }}</p>
+{% endfor %}
+    <label for="{{ form_class.size.html_id }}">Size</label>
+    <input
+        type="text"
+        name="{{ form_class.size.name }}"
+        id="{{ form_class.size.html_id }}"
+        value="{{ field_value(form, form_class.size) or '' }}"
+    >
+    {% for error in field_errors(form, form_class.size) %}
+    <p class="field-error">{{ error.message }}</p>
+{% endfor %}
+    <button type="submit">Save</button>
+</form>

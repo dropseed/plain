@@ -66,7 +66,7 @@ class NoteUpdateView(AuthView, DetailView):
         return self.render_form(NoteForm, values=NoteForm.initial_from(self.object))
 
     def post(self) -> Response:
-        result = self.validate_form(NoteForm)
+        result = self.validate_form(NoteForm, instance=self.object)
         if isinstance(result, Response):
             return result
         update_from(self.object, result)

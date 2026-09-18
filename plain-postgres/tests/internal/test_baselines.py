@@ -78,7 +78,7 @@ from plain.postgres import migrations
 class Migration(migrations.Migration):
     supersedes = {supersedes!r}
     retired = {tuple(retired)!r}
-    since = "2.0"
+    shipped_in = "2.0"
     dependencies = {dependencies}
     operations = (
         migrations.CreateModel(
@@ -272,6 +272,11 @@ def test_dependency_on_a_retired_name_resolves_to_the_baseline(
 
     parents = loader.graph.node_map[("examples", "0020_next")].parents
     assert {p.key for p in parents} == {BASELINE}
+    # The edge is resolved; the migration's own dependencies stay as written,
+    # so a loader over a candidate set can share these instances.
+    migration = loader.graph.nodes[("examples", "0020_next")]
+    assert migration is not None
+    assert migration.dependencies == [("examples", SENTINEL)]
 
 
 def test_applied_migration_on_a_pending_baseline_is_consistent(
@@ -384,7 +389,7 @@ def test_writer_serializes_a_baseline() -> None:
     class Baseline(Migration):
         supersedes = SENTINEL
         retired = (A_RETIRED_NAME, SENTINEL)
-        since = "2.0"
+        shipped_in = "2.0"
         dependencies = ()
         operations = ()
 
@@ -392,7 +397,7 @@ def test_writer_serializes_a_baseline() -> None:
 
     assert f"supersedes = {SENTINEL!r}" in source
     assert f"retired = ({A_RETIRED_NAME!r}, {SENTINEL!r})" in source
-    assert "since = '2.0'" in source
+    assert "shipped_in = '2.0'" in source
 
 
 def test_fake_repair_is_scoped_to_the_named_package(migrations_dir: Path) -> None:
@@ -604,7 +609,7 @@ from plain.postgres import migrations
 class Migration(migrations.Migration):
     supersedes = "0000_gone"
     retired = ()
-    since = "2.0"
+    shipped_in = "2.0"
     dependencies = (("examples", "0019_gadget"),)
     operations = (
         migrations.CreateModel(
@@ -645,7 +650,7 @@ from plain.postgres import migrations
 class Migration(migrations.Migration):
     supersedes = {SENTINEL!r}
     retired = {tuple(recorded("examples"))!r}
-    since = "2.0"
+    shipped_in = "2.0"
     dependencies = (("html", "0001_gadget"),)
     operations = (
         migrations.CreateModel(

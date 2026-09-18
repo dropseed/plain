@@ -149,6 +149,8 @@ amount = types.DecimalField(max_digits=10, decimal_places=2)
 
 **[`DateField`](./fields.py#DateField)**, **[`TimeField`](./fields.py#TimeField)**, and **[`DateTimeField`](./fields.py#DateTimeField)** parse dates and times into the matching `datetime` objects. **[`DurationField`](./fields.py#DurationField)** parses a duration into a `timedelta`.
 
+`DateTimeField` cleans to an **aware** datetime: a submitted value carries no zone, so a naive one is read as local wall time in the current timezone. `field_value()` applies the inverse when rendering, so an aware value loaded from the database shows as the local time the user typed. A wall time that local DST makes ambiguous or imaginary is rejected with code `"ambiguous_timezone"` rather than guessed.
+
 ```python
 birthday = types.DateField()
 scheduled_at = types.DateTimeField()
@@ -225,6 +227,26 @@ self.render_form(ContactForm)  # blank — shows each field's initial
 self.render_form(ContactForm, result)  # a failed validate() — values + errors
 self.render_form(ContactForm, values={"email": user.email})  # pre-filled
 ```
+
+There is no `errors=` argument. For a failure the form itself can't see — an authentication rejection that runs after `validate()` already succeeded — build the `Invalid` and pass it as `result`, which is the same thing `validate()` would have handed you:
+
+```python
+from plain.forms import Error, Invalid
+
+result = self.validate_form(LoginForm)
+if isinstance(result, Response):
+    return result
+if authenticate(result.email, result.password) is None:
+    return self.render_form(
+        LoginForm,
+        Invalid(
+            errors=[Error("Incorrect email or password.", code="invalid_login")],
+            raw=self.request.form_data,
+        ),
+    )
+```
+
+`raw` is what the re-rendered inputs read their values from, so pass the submitted data.
 
 In the template, helpers take `form` (the result) plus a field reference (`form_class.email`). Field metadata is on the field reference itself — `form_class.email.required`, `.choices`, `.html_id`, `.name`:
 
@@ -307,7 +329,13 @@ class NoteForm(ModelForm):
     body = model_field(Note.body)
 ```
 
-`NoteForm` validates like any form — `ModelForm` itself never writes. To persist a validated result, pass it to the `create_from()` / `update_from()` functions in `plain.postgres.forms`: `create_from(Note, result)` inserts a new row — pass any columns the form doesn't carry as keyword arguments, e.g. `create_from(Note, result, author=user)` — and `update_from(note, result)` writes it onto an existing row.
+`NoteForm` validates like any form — `ModelForm` itself never writes. It does go one step further than a plain `Form`: it pre-checks the model's declared constraints (unique, unique-together, check) against a constructed-but-unsaved instance, so a duplicate comes back in the same `Invalid` as every other error. Editing an existing row takes `instance=`, which excludes that row from the uniqueness lookup:
+
+```python
+result = NoteForm.validate(request.form_data, instance=note)
+```
+
+To persist a validated result, pass it to the `create_from()` / `update_from()` functions in `plain.postgres.forms`: `create_from(Note, result)` inserts a new row — pass any columns the form doesn't carry as keyword arguments, e.g. `create_from(Note, result, author=user)` — and `update_from(note, result)` writes it onto an existing row.
 
 ## FAQs
 

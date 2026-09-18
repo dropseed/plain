@@ -628,7 +628,7 @@ class Migration(migrations.Migration):
         ...,
         "0008_add_widgets",
     )  # every deleted name, so dependencies on them still resolve
-    since = "0.61"  # the release that shipped the reset, for messages
+    shipped_in = "0.61"  # the release that shipped the reset; empty until it has
     dependencies = (("users", "0001_initial"),)
     operations = (migrations.CreateModel(...), ...)
 ```
@@ -665,14 +665,14 @@ The command writes `NNNN_baseline.py` past the current leaf (the package's newes
 
 Options:
 
-- `--since <version>` — the release this reset ships in, named in the refusal a database that missed the leaf gets, and required before the package can be reset again. Plain's own packages leave it empty and fill it in at release time (a repository test enforces it, and the package's `plain.postgres` minimum is raised to the first release that understands baselines); an app should pass the version or deploy this ships in.
+- `--shipped-in <version>` — the release this reset ships in, named in the refusal a database that missed the leaf gets, and required before the package can be reset again. Plain's own packages leave it empty and fill it in at release time (a repository test enforces it, and the package's `plain.postgres` minimum is raised to the first release that understands baselines); an app should pass the version or deploy this ships in.
 - `--dry-run` — print the baseline and the deletion list, write nothing.
 
 **Dependencies.** The baseline depends on each other package its models reference, at the earliest migration of that package where the referenced models exist — and on nothing else. A package that another package pinned early _and_ whose models now point back at that package cannot get a single root: the graph would be a cycle, and the command refuses with it. That is a limit of migration graphs, not of the command; nothing to do with a second package fixes it.
 
 **Support boundaries.** Adoption checks that the sentinel is recorded and the tables exist, not columns; editing history behind a released leaf is outside what any check can catch. A data migration in _another_ package that read this package's historical state (a field the baseline no longer has) keeps loading but can fail on a fresh database; the command cannot see it.
 
-**Second reset.** Run it again later and the previous baseline joins `retired`. It refuses while the previous baseline's `since` is empty: nothing shipped it yet, so superseding its name would strand every database still at the original sentinel — once that baseline has shipped everywhere, set its `since` to the version that shipped it and reset again; otherwise restore the history and reset once.
+**Second reset.** Run it again later and the previous baseline joins `retired`. It refuses while the previous baseline's `shipped_in` is empty: nothing shipped it yet, so superseding its name would strand every database still at the original sentinel — once that baseline has shipped everywhere, set its `shipped_in` to the version that shipped it and reset again; otherwise restore the history and reset once.
 
 ### Data migrations
 
@@ -1132,7 +1132,7 @@ except ValidationError:
     ...  # report it — the transaction is still usable
 ```
 
-A `ModelForm` is no exception — it validates shape and never writes, so the constraint is still enforced when `create_from()`/`update_from()` writes the row. Call `validate_constraints()` yourself before the write if you want every violation surfaced at once; otherwise `create()`/`update()` reports the first violation Postgres hits.
+Forms are the exception: `ModelForm.validate()` pre-checks the model's constraints against a constructed-but-unsaved instance, so one submission surfaces every violation at once as `Invalid` errors. The pre-check is not a lock — two submissions racing each other can both pass it, and the loser's write raises the same `ValidationError` through the mapping below. A direct `create()`/`update()` reports the first violation Postgres hits.
 
 This applies to instance writes only. Set-based writes — `QuerySet.update()` and `bulk_create()` — raise the raw `psycopg.IntegrityError`, since there's no instance to attribute the error to, and so does a `delete()` blocked by `RESTRICT` children. If you retry on a unique conflict, catch both:
 
@@ -1167,7 +1167,7 @@ class User(postgres.Model):
     )
 ```
 
-Constraints are checked by an explicit `validate_constraints()` call, but **not** by `full_clean()` (which validates shape only) or a direct `create()`/`update()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
+Constraints are checked by `validate_constraints()` — run by a `ModelForm`'s pre-check and by any explicit call — but **not** by `full_clean()` (which validates shape only) or a direct `create()`/`update()`, where the database enforces them instead (see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
 
 ```python
 # Simple message — lands on NON_FIELD_ERRORS
@@ -1301,7 +1301,17 @@ class UserForm(ModelForm):
     is_admin = model_field(User.is_admin)
 ```
 
-`ModelForm` validates like any `Form` — `UserForm.validate(data)` returns a typed instance or an `Invalid`, and never writes to the database itself. Persist a validated result with `create_from()` (insert) or `update_from()` (update):
+`ModelForm` validates like any `Form` — `UserForm.validate(data)` returns a typed instance or an `Invalid`, and never writes to the database itself. On top of field shape it pre-checks the model's constraints, so a duplicate comes back as an `Invalid` alongside any other errors rather than blowing up at write time.
+
+When editing an existing row, pass `instance=` so the uniqueness lookup skips that row and unchanged values stay valid:
+
+```python
+result = UserForm.validate(request.form_data, instance=user)
+```
+
+On a `TemplateView`, `self.validate_form(UserForm, instance=self.object)` forwards it.
+
+Persist a validated result with `create_from()` (insert) or `update_from()` (update):
 
 ```python
 result = UserForm.validate(request.form_data)

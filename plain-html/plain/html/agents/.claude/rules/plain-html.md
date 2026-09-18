@@ -10,6 +10,8 @@ Templates are `.html` files under `templates/` (in your app or any installed pac
 
 ## Expressions
 
+- Never call `.query` from a template — every row a template reads should already be in the view's context.
+
 - Interpolate with `{{ ... }}` — real Python, NOT a DSL. No `|filter` syntax; call Python directly. Need a helper? Import it in frontmatter.
 - Single `{` and `}` are ordinary text. For a literal `{{`, `{%`, or `{#`, wrap the region in `{% raw %}...{% endraw %}`.
 - `class` works as a normal attribute (`<div class="{{ css }}">`). Don't use `class_=` — that's a Jinja workaround and doesn't apply here.

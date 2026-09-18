@@ -4,6 +4,7 @@ from http.client import responses as http_status_phrases
 from typing import Any, ClassVar, cast
 
 from plain.exceptions import ValidationError
+from plain.forms import Invalid
 from plain.http import (
     HTTPException,
     JsonResponse,
@@ -38,6 +39,7 @@ __all__ = [
 type APIResult = (
     Response
     | None
+    | Invalid
     | Mapping[str, Any]
     | list[Any]
     | tuple[int, dict[str, Any] | list[Any]]
@@ -69,6 +71,44 @@ def _validation_field_errors(exc: ValidationError) -> list[FieldError] | None:
         for field, messages in exc
         for message in messages
     ]
+
+
+# Error codes a form attaches to an Error, mapped to the response `id` that
+# describes a body made only of that code. `missing_field` is the one master
+# raised as its own exception (FormFieldMissingError); here it falls out of the
+# codes the form already reports, so there is one table rather than a special
+# case. Anything mixed, or any code not listed, is a plain validation_error.
+_INVALID_ERROR_IDS = {
+    "required": "missing_field",
+}
+
+
+def _invalid_response(invalid: Invalid) -> JsonResponse:
+    """Render a form `Invalid` as the standard error body.
+
+    Every `Error` becomes a `{field, message}` entry — form-level errors
+    (`field=None`) included, so nothing is dropped.
+    """
+    codes = {error.code for error in invalid.errors}
+    error_id = "validation_error"
+    if len(codes) == 1:
+        error_id = _INVALID_ERROR_IDS.get(codes.pop(), "validation_error")
+
+    fields = sorted({e.field for e in invalid.errors if e.field})
+    if error_id == "missing_field":
+        message = f"Missing field: {', '.join(fields)}" if fields else "Missing field"
+    else:
+        message = "Validation error"
+
+    return _error_response(
+        error_id=error_id,
+        message=message,
+        status_code=400,
+        errors=[
+            {"field": error.field or "", "message": error.message}
+            for error in invalid.errors
+        ],
+    )
 
 
 # Snake-case ids are part of the public API surface — client libs key off them.
@@ -186,6 +226,11 @@ class APIView(View[APIResult]):
 
         if result is None:
             raise NotFoundError404
+
+        if isinstance(result, Invalid):
+            # A handler can hand back what `validate()` returned; the error
+            # body is the same shape every other API error uses.
+            return _invalid_response(result)
 
         status_code = 200
 

@@ -24,15 +24,6 @@ def _get_callable_parameters(
     return _get_func_parameters(func, remove_first=is_method)
 
 
-def get_func_args(func: Callable[..., Any]) -> list[str]:
-    params = _get_callable_parameters(func)
-    return [
-        param.name
-        for param in params
-        if param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD
-    ]
-
-
 def func_accepts_kwargs(func: Callable[..., Any]) -> bool:
     """Return True if function 'func' accepts keyword arguments **kwargs."""
     return any(p for p in _get_callable_parameters(func) if p.kind == p.VAR_KEYWORD)

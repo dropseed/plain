@@ -127,7 +127,9 @@ class TemplateView(View):
             result = form_class(**data)
         return self.render(form_class=form_class, form=result, **context)
 
-    def validate_form[F: Form](self, form_class: type[F]) -> F | Response:
+    def validate_form[F: Form](
+        self, form_class: type[F], *, instance: Any = None
+    ) -> F | Response:
         """Validate the request against `form_class`. Returns the typed form
         instance on success, or a re-rendered template `Response` (with the
         submission and its errors) on failure.
@@ -141,8 +143,16 @@ class TemplateView(View):
         ordinary HTML POST case without arguments. For other shapes (a JSON
         body, or a custom failure response) call `form_class.validate()`
         directly — this helper is the one-line case, not a wrapper.
+
+        `instance=` is for editing an existing row with a `ModelForm`: it
+        forwards to `ModelForm.validate()`, which excludes that row from the
+        uniqueness pre-check so unchanged values stay valid. A plain `Form`
+        takes no instance.
         """
-        result = form_class.validate(self.request.form_data, files=self.request.files)
+        kwargs: dict[str, Any] = {"files": self.request.files}
+        if instance is not None:
+            kwargs["instance"] = instance
+        result = form_class.validate(self.request.form_data, **kwargs)
         if not result:
             return self.render_form(form_class, result)
         return result

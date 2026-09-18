@@ -22,6 +22,8 @@ from plain.exceptions import ValidationError
 from plain.forms import Form
 from plain.forms import fields as form_fields
 from plain.forms.fields import EMPTY_VALUES, Field
+from plain.forms.forms import _errors_from_exception
+from plain.forms.result import Error, Invalid
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
@@ -36,6 +38,23 @@ __all__ = [
     "model_field",
     "update_from",
 ]
+
+
+# `model_field()` stamps the model column it derived a form field from onto
+# that field, under this attribute. It is what lets a `ModelForm` name its
+# model and line its fields up with columns for the constraint pre-check —
+# the rebuilt form has no `Meta.model` to read.
+_SOURCE_COLUMN = "_plain_source_column"
+
+
+def _set_source_column(field: Field[Any], column: Any) -> None:
+    setattr(field, _SOURCE_COLUMN, column)
+
+
+def source_column(field: Field[Any]) -> Any:
+    """The model column `field` was derived from, or `None` for a field
+    declared with a plain `types.*` constructor."""
+    return getattr(field, _SOURCE_COLUMN, None)
 
 
 class _ModelChoiceBase(Field[Any]):
@@ -57,6 +76,7 @@ class _ModelChoiceBase(Field[Any]):
         """A copy of this field bound to a different (e.g. owner-scoped) queryset."""
         clone = type(self)(queryset, required=self.required, initial=self.initial)
         clone.name = self.name
+        _set_source_column(clone, source_column(self))
         return clone
 
     @property
@@ -249,6 +269,7 @@ def model_field(column: Any) -> Field[Any]:
             f"{modelfield!r} can't be derived into a form field — declare the "
             f"field explicitly with a `types.*` field instead."
         )
+    _set_source_column(derived, modelfield)
     return derived
 
 
@@ -291,6 +312,143 @@ class ModelForm(Form):
         scoped = cast(type[Self], type(f"{cls.__name__}Scoped", (cls,), {}))
         scoped._form_fields = scoped_fields
         return scoped
+
+    @classmethod
+    def model(cls) -> type[Model]:
+        """The model this form's fields were declared from.
+
+        Derived from the `model_field(Model.column)` declarations rather
+        than a `Meta.model` — there is no second place to keep in sync, and
+        a form whose fields span two models is a declaration error.
+        """
+        models = {
+            column.model
+            for field in cls._form_fields.values()
+            if (column := source_column(field)) is not None
+        }
+        if not models:
+            raise TypeError(
+                f"{cls.__name__} declares no model_field() fields, so it has "
+                f"no model. Declare at least one as model_field(Model.column)."
+            )
+        if len(models) > 1:
+            names = sorted(m.__name__ for m in models)
+            raise TypeError(
+                f"{cls.__name__} mixes columns from more than one model "
+                f"({', '.join(names)}); a ModelForm maps to exactly one."
+            )
+        return models.pop()
+
+    @classmethod
+    def validate(
+        cls,
+        data: dict[str, Any] | None,
+        *,
+        files: Any = None,
+        instance: Any = None,
+    ) -> Self | Invalid:
+        """Validate `data`, including the model's declared constraints.
+
+        Beyond a plain `Form.validate()`, this pre-checks the model's
+        constraints (unique, unique-together, check) against a
+        constructed-but-unsaved instance, so one submission surfaces every
+        violation at once instead of whichever one the database happens to
+        reject first.
+
+        Pass `instance=` when validating an edit of an existing row: the
+        uniqueness lookup then excludes that row, so keeping a field at its
+        current value stays valid. The instance is only read — a failed
+        validate leaves it untouched.
+
+        The pre-check is not a lock. Two submissions racing each other can
+        still both pass it and have the database reject the loser; that
+        write raises `ValidationError` (the same error, via the
+        IntegrityError mapping) rather than returning `Invalid`.
+        """
+        raw = data or {}
+        files_map: dict[str, Any] = files if files is not None else {}
+        cleaned, errors = cls._clean_fields(raw, files_map)
+
+        # A field that failed to clean has no value worth testing a
+        # constraint against, so the pre-check skips it — the shape error is
+        # already reported and a lookup on a bad value would be nonsense.
+        errors += cls._constraint_errors(
+            cleaned,
+            failed={e.field for e in errors if e.field},
+            instance=instance,
+        )
+
+        if errors:
+            return Invalid(errors=errors, raw=raw)
+
+        return cls._checked(cleaned, raw)
+
+    @classmethod
+    def _constraint_errors(
+        cls,
+        cleaned: dict[str, Any],
+        *,
+        failed: set[str],
+        instance: Any,
+    ) -> list[Error]:
+        """Run the model's constraints against the submitted values."""
+        model = cls.model()
+        if not model.model_options.constraints:
+            return []
+
+        probe, exclude = cls._probe(model, cleaned, failed=failed, instance=instance)
+        try:
+            probe.validate_constraints(exclude=exclude)
+        except ValidationError as e:
+            return _errors_from_exception(e)
+        return []
+
+    @classmethod
+    def _probe(
+        cls,
+        model: type[Model],
+        cleaned: dict[str, Any],
+        *,
+        failed: set[str],
+        instance: Any,
+    ) -> tuple[Model, set[str]]:
+        """A throwaway instance carrying the submitted values, plus the set of
+        column names the constraint check must ignore.
+
+        Always a fresh instance, never the one being edited: validation must
+        not leave the caller's object half-assigned when it fails. Only the
+        identity is borrowed, which is what lets a unique lookup exclude the
+        row being edited.
+        """
+        probe = model()
+        columns = {f.name for f in model._model_meta.fields}
+        exclude = set(columns)
+
+        for fname, field in cls._form_fields.items():
+            if fname not in columns or fname in failed or fname not in cleaned:
+                continue
+            value = cleaned[fname]
+            source = source_column(field)
+            # A column the model requires but the form doesn't, submitted
+            # empty, would raise its own required-error from the constraint
+            # path — the form already decided empty is acceptable here.
+            if (
+                source is not None
+                and getattr(source, "required", False)
+                and not field.required
+                and value in EMPTY_VALUES
+            ):
+                continue
+            setattr(probe, fname, value)
+            exclude.discard(fname)
+
+        if instance is not None:
+            # Borrow the identity so UniqueConstraint.validate() excludes the
+            # row being edited from its own uniqueness lookup.
+            probe.id = instance.id
+            probe._state.adding = instance._state.adding
+
+        return probe, exclude
 
     @classmethod
     def initial_from(cls, instance: Any) -> dict[str, Any]:

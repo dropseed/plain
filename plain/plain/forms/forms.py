@@ -250,6 +250,16 @@ class Form:
         if errors:
             return Invalid(errors=errors, raw=raw)
 
+        return cls._checked(cleaned, raw)
+
+    @classmethod
+    def _checked(cls, cleaned: dict[str, Any], raw: dict[str, Any]) -> Self | Invalid:
+        """Build the instance from cleaned values and run the `check()` hook.
+
+        Split out of `validate()` so a subclass that needs its own work
+        between field cleaning and `check()` — `ModelForm`'s constraint
+        pre-check — can reuse the tail rather than restate it.
+        """
         instance = cls(**cleaned)
 
         # Cross-field hook.
