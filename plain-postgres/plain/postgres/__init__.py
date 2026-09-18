@@ -8,7 +8,7 @@ from . import (
 )
 
 # Imports that would create circular imports if sorted
-from .base import Model
+from .base import Model, ModelMixin
 from .constraints import CheckConstraint, UniqueConstraint
 from .db import get_connection, use_management_connection
 from .middleware import DatabaseConnectionMiddleware
@@ -82,6 +82,9 @@ __all__ = [
     "JSONField",
     "ManyToManyField",
     "Model",
+    # Base for plain-Python mixins that declare shared model fields:
+    #   class TimestampedMixin(postgres.ModelMixin): ...
+    "ModelMixin",
     "Options",
     "PrimaryKeyField",
     "Q",

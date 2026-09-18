@@ -52,9 +52,18 @@ that constructor only when its definition passes `default=` (this is general,
 not nullable-specific — a `required=False` field with no `default=` is still a
 required constructor arg), so nullable fields use `Field[T | None]` with
 `default=None`. DB-owned fields (`id`, `create_now`, generated values) are
-auto-excluded from the constructor. A custom field type works the same as long
-as it ships a `Field`-returning stub (like `PasswordField`); one without a typed
-stub falls back to a value-type annotation (`name: str = MyField()`).
+auto-excluded from the constructor.
+
+Field types declared outside `plain.postgres.types` — `PasswordField`, or one of
+your own — are the exception: their stub still types the value, but they are
+always _optional_ in the constructor, even when the column is `NOT NULL`. PEP
+681 recognizes a field declaration by matching the constructor against a fixed
+list, and that list is baked into `plain.postgres` where a third-party field
+type can't join it, so the checker reads the assignment as a plain default
+value. Wrong value types and unknown field names are still caught; only
+requiredness is lost, and omitting one surfaces as a `NOT NULL` error on insert
+instead. [Sharing fields across models](#sharing-fields-across-models) shows how
+a package that ships a field type can keep it required.
 
 Every model automatically includes an `id` field which serves as the primary
 key. The name `id` is reserved and can't be used for other fields.
@@ -899,27 +908,31 @@ See [Encrypted fields](#encrypted-fields) for details.
 
 For relationship fields, see [Relationships](#relationships).
 
-For nullable fields, use `| None` in the annotation:
+For nullable fields, use `| None` in the annotation and `default=None` to make
+the field optional in the constructor:
 
 ```python
-published_at: datetime | None = types.DateTimeField(allow_null=True, required=False)
+published_at: Field[datetime | None] = types.DateTimeField(
+    allow_null=True, required=False, default=None
+)
 ```
 
 ### Sharing fields across models
 
-To share common fields across multiple models, use Python classes as mixins. The final, registered model must inherit directly from `postgres.Model` and the mixins should not.
+To share common fields across multiple models, use Python classes as mixins. A mixin that declares fields must inherit `postgres.ModelMixin`, and the final, registered model must inherit directly from `postgres.Model` (the mixins must not).
 
 ```python
 from datetime import datetime
 
 from plain import postgres
-from plain.postgres import Field, types
+from plain.postgres import Field, ModelMixin, types
 
 
 # Regular Python class for shared fields
-class TimestampedMixin:
+class TimestampedMixin(ModelMixin):
     created_at: Field[datetime] = types.DateTimeField(create_now=True)
     updated_at: Field[datetime] = types.DateTimeField(update_now=True)
+    source: Field[str] = types.TextField(max_length=50, required=False, default="")
 
 
 # Models inherit from the mixin AND postgres.Model
@@ -935,6 +948,40 @@ class Note(TimestampedMixin, postgres.Model):
     content: Field[str] = types.TextField(max_length=1024)
     liked: Field[bool] = types.BooleanField(default=False)
 ```
+
+`ModelMixin` is what puts the mixin's fields into each model's typed
+constructor. The runtime collects fields off the whole MRO either way, but a
+mixin inheriting nothing isn't visible to PEP 681, so the checker would reject
+`Note(source="import")` on code that runs fine. `ModelMixin` carries no runtime
+behavior — it's the same transform models get, and mixins are still declarations
+you never instantiate directly.
+
+That is also the one way to keep a **custom field type** required in the
+constructor. A package that ships its own field type can declare the field on a
+mixin carrying a transform that lists its constructor, and models mixing it in
+get the field with its requiredness intact:
+
+```python
+from typing import dataclass_transform
+
+from plain.postgres import Field
+from plain.passwords.types import PasswordField
+
+
+@dataclass_transform(kw_only_default=True, field_specifiers=(PasswordField,))
+class _PasswordFieldSpec: ...
+
+
+class PasswordMixin(_PasswordFieldSpec):
+    password: Field[str] = PasswordField()
+```
+
+A model mixing in `PasswordMixin` now gets `password` as a required constructor
+argument, so `User(email="a@b.com")` is a type error again. The specifier list
+has to name every constructor the mixin's own body uses, core ones included.
+Declared in the model's own body instead, `password` stays optional to the
+checker — a model body is governed by the specifier list `plain.postgres`
+declares, which a package outside it can't extend.
 
 ### Encrypted fields
 

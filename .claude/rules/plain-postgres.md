@@ -57,6 +57,15 @@ class Article(postgres.Model):
   `children: ClassVar[types.ReverseForeignKey[Child]] = types.ReverseForeignKey(...)`.
   (A non-`ClassVar` accessor leaks into the synthesized constructor — the checker
   would accept `Model(children=...)` even though the runtime rejects it.)
+- **Mixins that declare fields** must inherit `postgres.ModelMixin`. The checker
+  only collects fields from bases carrying the transform, so a plain mixin's
+  fields are missing from the synthesized constructor and `Model(shared=...)` is
+  rejected on code the runtime accepts.
+- **Custom field types** — anything outside `plain.postgres.types`, like
+  `PasswordField` — are typed by their stub but always _optional_ in the
+  constructor. PEP 681 matches field declarations against a fixed list that only
+  `plain.postgres` can declare, so omitting one is a `NOT NULL` error on insert
+  rather than a type error.
 
 Do NOT import field classes directly from `plain.postgres` or `plain.postgres.fields`.
 

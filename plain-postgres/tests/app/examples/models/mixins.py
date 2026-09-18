@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from plain.postgres import Field, types
+from plain.postgres import Field, ModelMixin, types
 
 from plain import postgres
 
 
-class TimestampMixin:
+class TimestampMixin(ModelMixin):
     """Mixin that provides timestamp fields."""
 
     created_at: Field[datetime] = types.DateTimeField(create_now=True)

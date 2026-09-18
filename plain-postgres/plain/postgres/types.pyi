@@ -6,8 +6,8 @@ typed *descriptor* (`XField[T]`), not the primitive `T`. Combined with
 `Field.__get__`'s overloads, this gives you:
 
     class User(postgres.Model):
-        email = types.EmailField()
-        age = types.IntegerField(allow_null=True)
+        email: Field[str] = types.EmailField()
+        age: Field[int | None] = types.IntegerField(allow_null=True, default=None)
 
     User.email   # EmailField[str]        — typed reference
     user.email   # str                    — the loaded value
