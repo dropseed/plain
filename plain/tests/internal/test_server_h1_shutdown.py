@@ -33,7 +33,7 @@ from typing import Any
 from plain.http import Response
 from plain.server.connection import Connection
 from plain.server.http import h1
-from plain.test import cases, patch
+from plain.test import case, cases, patch
 from server_stubs import BodyLengthHandler, StubApp, h1_connect, make_worker
 
 
@@ -67,7 +67,10 @@ _CHUNKED_POST = (
 _connect = h1_connect
 
 
-@cases(True, False)
+@cases(
+    case(True, id="begin_drain"),
+    case(False, id="reload"),
+)
 def test_request_arriving_after_shutdown_starts_is_served_with_close(
     full_drain: bool,
 ) -> None:
@@ -271,7 +274,10 @@ def test_chunked_complete_with_binary_pipelined_tail_is_framed() -> None:
     asyncio.run(scenario())
 
 
-@cases(_REQUEST + _REQUEST, _POST + _REQUEST)
+@cases(
+    case(_REQUEST + _REQUEST, id="two GETs"),
+    case(_POST + _REQUEST, id="POST then GET"),
+)
 def test_pipelined_request_gets_connection_close(payload: bytes) -> None:
     # We deliberately do NOT serve inline-pipelined requests: re-framing
     # the trailing bytes ourselves would make our body-boundary detection

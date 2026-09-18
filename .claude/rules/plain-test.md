@@ -15,8 +15,8 @@ uv run plain test [targets] [options]
 
 - Files `tests/**/test_*.py`; functions `test_*`; classes `Test*` with `test_*` methods (fresh instance per test, no setup_method).
 - There are no fixtures and no conftest.py. Shared setup is ordinary Python — helper modules at the tests root, imported explicitly.
-- Decorators declare static facts: `@cases(...)` (parametrize), `@skip("reason")`, `@tag("name")` — from `plain.test`.
-- Runtime state enters through `with` blocks: `override_settings(...)`, `patch(obj, "name", value)`, `capture_spans()`, `capture_metrics()` — from `plain.test`.
+- Decorators declare static facts: `@cases(...)` (parametrize; wrap a case in `case(..., id="name")` to name it), `@skip("reason")`, `@tag("name")` — from `plain.test`.
+- Runtime state enters through `with` blocks: `override_settings(...)`, `patch(obj, "name", value)`, `capture_spans()`, `capture_metrics()`, `capture_logs()` — from `plain.test`.
 - `raises(ExcType, match=...)` for expected exceptions; the caught exception is `caught.exception`.
 - Bare `assert` everywhere — failures show both sides of comparisons.
 - Database isolation is automatic (rolled-back transaction per test). DDL-heavy tests use `@isolated_db` from `plain.postgres.test`.

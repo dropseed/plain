@@ -218,7 +218,7 @@ def test_invoice_totals(): ...
 def test_big_import(): ...
 ```
 
-- `@cases(...)` — parametrization. Each tuple becomes its own test, reported as `test_email_validation[0]`, `test_email_validation[1]`, etc., with the case values shown in the report.
+- `@cases(...)` — parametrization. Each tuple becomes its own test, reported as `test_email_validation[0]`, `test_email_validation[1]`, etc. Wrap a case in `case(..., id="no at sign")` to name it instead of numbering it.
 - `@skip(reason)` — always skipped, reason shown in the report.
 - `@tag(name)` — labels for selection: `plain test --tag slow` or `plain test --exclude-tag slow`.
 - `@timeout(seconds)` — per-test override of the runner's default timeout.

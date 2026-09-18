@@ -1,6 +1,6 @@
 import os
 
-from plain.test import cases, patch, raises
+from plain.test import case, cases, patch, raises
 
 
 def test_raises_catches_and_exposes_exception():
@@ -69,3 +69,25 @@ def test_patch_mapping_restores_and_removes():
 @cases(("a", True), ("", False))
 def test_cases_pass_arguments(value, expected):
     assert bool(value) is expected
+
+
+@cases(
+    case("a@example.com", True, id="plain address"),
+    case("nope", False, id="no at sign"),
+)
+def test_case_ids_pass_arguments(value, expected):
+    assert ("@" in value) is expected
+
+
+def test_case_requires_a_non_empty_id():
+    with raises(TypeError, match="non-empty id"):
+        case("x", id="")
+
+
+def test_cases_rejects_duplicate_ids():
+    with raises(TypeError, match="ids must be unique"):
+        cases(case("a", id="same"), case("b", id="same"))
+
+
+def test_case_repr_names_its_values_and_id():
+    assert repr(case(1, 2, id="pair")) == "case(1, 2, id='pair')"

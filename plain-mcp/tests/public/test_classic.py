@@ -12,7 +12,7 @@ from typing import Any
 
 from helpers import bare_post
 from plain.mcp.views import CLASSIC_PROTOCOL_VERSIONS
-from plain.test import Client, cases
+from plain.test import Client, case, cases
 
 
 def classic_post(
@@ -201,9 +201,12 @@ class TestExtraTransportHeaders:
         assert result["tools"][0]["name"] == "Echo"
 
     @cases(
-        {"Mcp-Method": "tools/list"},
-        {"MCP-Protocol-Version": "2026-01-01"},
-        {"MCP-Protocol-Version": "2026-01-01", "Mcp-Method": "tools/list"},
+        case({"Mcp-Method": "tools/list"}, id="mcp-method-alone"),
+        case({"MCP-Protocol-Version": "2026-01-01"}, id="unknown-version"),
+        case(
+            {"MCP-Protocol-Version": "2026-01-01", "Mcp-Method": "tools/list"},
+            id="both",
+        ),
     )
     def test_never_a_modern_error_without_meta(self, headers: dict[str, str]) -> None:
         # The invariant behind the class: a request that doesn't declare the

@@ -215,6 +215,22 @@ def test_big_import(): ...
 - [`skip`](./decorators.py#skip) — always skipped, reason shown in the report
 - [`tag`](./decorators.py#tag) — labels for selection (`plain test --tag slow`)
 
+Cases are reported by position — `test_email_validation[0]`, `[1]`. Wrap one in [`case`](./decorators.py#case) to name it instead:
+
+```python
+from plain.test import case, cases
+
+
+@cases(
+    case("a@example.com", True, id="plain address"),
+    case("nope", False, id="no at sign"),
+)
+def test_email_validation(email, valid):
+    assert is_valid_email(email) is valid
+```
+
+That reports as `test_email_validation[no at sign]`, and the re-run command in the failure output names the case. The id sits on the case it names, so adding or reordering cases can't shift the names onto the wrong values.
+
 ## Overriding context
 
 Runtime state changes are context managers, so their scope is visible as indentation:

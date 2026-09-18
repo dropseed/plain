@@ -1,5 +1,5 @@
 from .client import Client, RequestFactory
-from .decorators import cases, skip, tag
+from .decorators import case, cases, skip, tag
 from .lifecycle import TestLifecycle
 from .logs import CapturedLogs, capture_logs
 from .otel import capture_metrics, capture_spans
@@ -14,6 +14,7 @@ __all__ = [
     "capture_logs",
     "capture_metrics",
     "capture_spans",
+    "case",
     "cases",
     "override_settings",
     "patch",

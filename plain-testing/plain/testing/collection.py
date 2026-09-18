@@ -212,12 +212,12 @@ def _expand(
 
     return [
         CollectedTest(
-            id=f"{base_id}[{index}]",
-            func=functools.partial(run, *case),
+            id=f"{base_id}[{case_id if case_id is not None else index}]",
+            func=functools.partial(run, *values),
             tags=tags,
             skip_reason=skip_reason,
         )
-        for index, case in enumerate(case_list)
+        for index, (values, case_id) in enumerate(case_list)
     ]
 
 
