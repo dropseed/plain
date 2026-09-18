@@ -314,6 +314,10 @@ def _encode_request_body(
 
     Exactly one body source may be given: form_data (optionally with files),
     json_data, or a raw body. `content_type` only applies to a raw body.
+
+    A form encodes the way a browser would: urlencoded, and multipart only
+    when there are files. Views under test then see the content type they'd
+    see in production.
     """
     sources = [
         form_data is not None or files is not None,
@@ -325,6 +329,15 @@ def _encode_request_body(
             "Pass only one of form_data/files, json_data, or body per request"
         )
     if content_type is not None and body is None:
+        if not any(sources):
+            # `post(path, content_type="application/json")` with nothing to
+            # send. Building an empty body here would hand the view a b"" that
+            # its content type says is parseable, and the failure would
+            # surface somewhere further in. Say it at the call instead.
+            raise TypeError(
+                "content_type needs a body — pass body=... alongside it "
+                '(body=b"" for a deliberately empty one)'
+            )
         raise TypeError(
             "content_type only applies to a raw body — form_data and json_data set their own"
         )
@@ -346,12 +359,21 @@ def _encode_request_body(
             body = body.encode(charset)
         return (body, resolved_content_type)
 
-    if form_data is not None or files is not None:
+    if files:
+        # Files can only travel as multipart, and any form fields sent with
+        # them ride along in the same body.
         merged: dict[str, Any] = dict(form_data or {})
-        merged.update(files or {})
+        merged.update(files)
         return (
             encode_multipart(_BOUNDARY, merged),
             _MULTIPART_CONTENT,
+        )
+
+    if form_data is not None or files is not None:
+        # A plain form — what a browser (and htmx) sends without a file input.
+        return (
+            urlencode(form_data or {}, doseq=True).encode(),
+            "application/x-www-form-urlencoded",
         )
 
     return (b"", "")
@@ -420,8 +442,12 @@ class RequestFactory:
         if cookie_str:
             all_headers["Cookie"] = cookie_str
 
-        # Add content headers when there's a body
-        if data:
+        # Content headers follow the content type, not the byte count: a POST
+        # of an empty form still declares what it is, with Content-Length: 0,
+        # the same as a browser submitting a form with nothing filled in.
+        # Requests with no body source at all (a GET) resolve to no content
+        # type and get neither header.
+        if content_type:
             all_headers["Content-Type"] = content_type
             all_headers["Content-Length"] = str(len(data))
 

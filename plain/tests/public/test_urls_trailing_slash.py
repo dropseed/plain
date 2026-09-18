@@ -68,8 +68,8 @@ def test_post_method_preserved_across_redirect():
 
 
 def test_post_method_preserved_without_body():
-    """POST with no body follows the 308 with the same body shape (empty
-    multipart form) and content headers as the initial request — not `b""`.
+    """POST with no body follows the 308 with the same body shape (an empty
+    form) and content headers as the initial request — not `b""`.
     """
     with slash_client() as client:
         response = client.post("/with-slash", form_data={}, follow_redirects=True)
@@ -77,9 +77,10 @@ def test_post_method_preserved_without_body():
         assert response.request.method == "POST"
         assert response.content == b"with-slash POST"
         # 308 must preserve the body shape: the followed request carries the
-        # same empty-multipart body and content headers as the initial request.
-        assert response.request.headers.get("Content-Type", "").startswith(
-            "multipart/form-data"
+        # same empty form body and content headers as the initial request.
+        assert (
+            response.request.headers.get("Content-Type", "")
+            == "application/x-www-form-urlencoded"
         )
 
 

@@ -60,6 +60,8 @@ response = client.post(
 )
 ```
 
+A form is urlencoded, and becomes multipart only when `files=` is given — the same choice a browser makes, so the view under test sees the content type it will see in production.
+
 Send JSON — the value is serialized for you:
 
 ```python
