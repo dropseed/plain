@@ -24,10 +24,10 @@ from plain.urls import include, Router
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("assets/", AssetsRouter),
         # your other routes here...
-    ]
+    )
 ```
 
 Now in your template you can use the `asset()` function to get the URL, which will output the fully compiled and fingerprinted URL.
@@ -87,9 +87,7 @@ from plain.urls import path, Router
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
-        path("favicon.ico", AssetView.as_view(asset_path="favicon.ico")),
-    ]
+    urls = (path("favicon.ico", AssetView.as_view(asset_path="favicon.ico")),)
 ```
 
 ## FAQs

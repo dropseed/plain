@@ -120,7 +120,9 @@ FILE_UPLOAD_HANDLERS: list[str] = [
 FILE_UPLOAD_MAX_MEMORY_SIZE: int = 2621440  # i.e. 2.5 MB
 
 # Maximum size in bytes of request data (excluding file uploads) that will be
-# read before a SuspiciousOperationError400 (RequestDataTooBigError400) is raised.
+# read into memory before a ContentTooLargeError413 is raised. This bounds
+# what request.body/form parsing materializes in RAM — the server-edge cap
+# on total request body size is SERVER_MAX_REQUEST_BODY_SIZE.
 DATA_UPLOAD_MAX_MEMORY_SIZE: int = 2621440  # i.e. 2.5 MB
 
 # Maximum number of GET/POST parameters that will be read before a
@@ -163,7 +165,9 @@ LOG_STREAM: str = "split"  # "split", "stdout", or "stderr"
 
 # MARK: Server
 
-SERVER_WORKERS: int = int(os.environ.get("WEB_CONCURRENCY", 0))  # 0 = auto (CPU count)
+SERVER_WORKERS: int = int(
+    os.environ.get("WEB_CONCURRENCY", "0")
+)  # 0 = auto (CPU count)
 SERVER_THREADS: int = 4
 SERVER_TIMEOUT: int = 30
 SERVER_ACCESS_LOG: bool = True
@@ -179,11 +183,60 @@ SERVER_ACCESS_LOG_FIELDS: list[str] = [
     "referer",
 ]
 SERVER_GRACEFUL_TIMEOUT: int = 30
+# Idle timeout (seconds) for connections with no request in progress:
+# HTTP/1.1 connections waiting for a request (first or keep-alive reuse)
+# and HTTP/2 connections with no active streams. In-flight requests are
+# never affected. Must exceed any fronting router/load balancer's
+# connection reuse window so the router is always the side that closes an
+# idle connection — it knows not to reuse one it's closing, while a
+# server-side close races a request being written onto the connection
+# (Heroku H13).
+SERVER_KEEPALIVE_TIMEOUT: int = 300
 SERVER_SENDFILE: bool = True
 SERVER_CONNECTIONS: int = 1000
 SERVER_H2_MAX_CONCURRENT_STREAMS: int = 100
-SERVER_MAX_REQUESTS: int = 1000  # 0 = disabled
-SERVER_MAX_REQUESTS_JITTER: int = 100  # random variance to stagger restarts
+SERVER_MAX_REQUESTS: int = 10000  # 0 = disabled
+SERVER_MAX_REQUESTS_JITTER: int = 1000  # random variance to stagger restarts
+# Largest request body the server accepts, enforced with a 413 on both
+# HTTP/1.1 and HTTP/2. A declared Content-Length over the cap is
+# rejected from the headers, before any of the body transfers; bodies
+# with no declared length (chunked) are rejected the moment the received
+# bytes exceed it, during ingest — always on bytes actually received,
+# never on the declared length alone. This is a pre-auth allowance —
+# what an anonymous client can make a worker receive and spool before
+# any app code runs — so the default covers forms, images, and
+# documents; raise it deliberately for larger uploads, or better, send
+# large files direct to object storage (presigned URLs) instead of
+# through the app server. None = no per-request cap of its own; the
+# request is then limited only by the worker-wide
+# SERVER_MAX_INFLIGHT_BODY_SIZE (a single body can never exceed the
+# in-flight budget, so the worker enforces that bound as this cap and
+# answers with the specific 413 instead of a 503). This is pure
+# request-size policy, not a memory bound: bodies past
+# SERVER_BODY_MAX_MEMORY_SIZE spool to an anonymous temp file.
+SERVER_MAX_REQUEST_BODY_SIZE: int | None = 10485760  # i.e. 10 MB
+# Request bodies are fully received before dispatch — in memory up to
+# this size, spooling to an anonymous temp file beyond it (both
+# protocols). Purely the RAM-vs-disk threshold, kept small because it
+# bounds worst-case ingest memory at roughly this value times the
+# concurrent request count. Per-write spool costs are microseconds
+# (page cache); crossing the threshold pays a one-time rollover copy of
+# this many bytes (~2ms at 1MB) on the event loop.
+SERVER_BODY_MAX_MEMORY_SIZE: int = 1048576  # i.e. 1 MB
+# Total in-flight request-body bytes (memory + disk spool) the worker
+# holds across ALL connections. A request that would push past it gets a
+# 503 — load shedding under an upload flood, bounding worst-case disk
+# use no matter how many clients upload at once. None = no limit.
+SERVER_MAX_INFLIGHT_BODY_SIZE: int | None = 1073741824  # i.e. 1 GB
+# Minimum transfer rate (bytes/second) a client must sustain while the
+# server is receiving a request body, after a short grace period for
+# TCP slow-start. Inactivity timeouts alone can't stop a slow-drip body
+# (R.U.D.Y.) — a client sending one byte per second stays "active"
+# forever while pinning server resources. Only receive time counts
+# (bodies are ingested before dispatch, so request processing can never
+# trip it). Violations get a 408. 0 = disabled. Default matches
+# Kestrel's MinRequestBodyDataRate.
+SERVER_BODY_MIN_BYTES_PER_SECOND: int = 240
 
 # MARK: Preflight Checks
 

@@ -133,6 +133,17 @@ Put rules in `<your-package>/agents/.claude/rules/<name>.md`. Keep them short (~
 - Use `paths:` frontmatter to scope rules to relevant file patterns (e.g., `"**/models.py"`)
 - Prefix the filename with `plain-` or `plainx-` so `plain agent install` can manage it
 
+A rule body should read as one-line reminders that end in a pointer, not a tutorial:
+
+```markdown
+- Use `select_related()` for FK access in loops, `prefetch_related()` for reverse/M2N
+- Use `.exists()` not `.count() > 0`, `.count()` not `len(qs)`
+
+Run `uv run plain docs postgres` for full patterns with code examples.
+```
+
+Keep each piece of guidance in exactly one rule, scoped to where it's relevant. If a correction only applies to one package, it belongs in that package's rule — not duplicated into a broader one, where it costs context for everyone who never touches that package.
+
 ## Creating skills for your package
 
 Put skills in `<your-package>/agents/.claude/skills/<skill-name>/SKILL.md`. Skills are multi-step workflows — they coordinate tools, run commands, and guide multi-turn processes.

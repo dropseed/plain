@@ -18,7 +18,6 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import pytest
-
 from plain.postgres.db import _db_conn, get_connection
 from plain.postgres.sources import runtime_pool_source
 

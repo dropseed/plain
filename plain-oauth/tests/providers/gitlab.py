@@ -1,5 +1,4 @@
 import httpx
-
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 

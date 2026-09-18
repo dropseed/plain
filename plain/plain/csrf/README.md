@@ -40,11 +40,11 @@ You can disable CSRF protection for specific paths using regex patterns. This is
 ```python
 # app/settings.py
 CSRF_EXEMPT_PATHS = [
-    r"^/api/",             # All API endpoints
-    r"^/api/v\d+/",        # Versioned APIs: /api/v1/, /api/v2/, etc.
-    r"/webhooks/.*",       # All webhook paths
+    r"^/api/",  # All API endpoints
+    r"^/api/v\d+/",  # Versioned APIs: /api/v1/, /api/v2/, etc.
+    r"/webhooks/.*",  # All webhook paths
     r"/webhooks/github/",  # Specific webhook
-    r"/health$",           # Exact match for /health endpoint
+    r"/health$",  # Exact match for /health endpoint
 ]
 ```
 

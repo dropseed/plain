@@ -6,10 +6,11 @@ from collections.abc import Callable, Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain import exceptions
 from plain.preflight import PreflightResult
 from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time
+
+from plain import exceptions
 
 from .base import NOT_PROVIDED, ColumnField, DefaultableField
 
@@ -212,7 +213,7 @@ class DateTimeField[
             ]
         return []
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.create_now:
             kwargs["create_now"] = True
@@ -226,7 +227,7 @@ class DateTimeField[
         if isinstance(value, datetime.datetime):
             return value
         if isinstance(value, datetime.date):
-            value = datetime.datetime(value.year, value.month, value.day)
+            value = timezone.naive_datetime_from_date(value)
 
             # For backwards compatibility, interpret naive datetimes in
             # local time. This won't work during DST change, but we can't
@@ -256,7 +257,8 @@ class DateTimeField[
         try:
             parsed = parse_date(value)
             if parsed is not None:
-                return datetime.datetime(parsed.year, parsed.month, parsed.day)
+                # Interpreted in the current timezone by the caller.
+                return timezone.naive_datetime_from_date(parsed)
         except ValueError:
             raise exceptions.ValidationError(
                 _INVALID_DATE_MESSAGE,
@@ -271,7 +273,6 @@ class DateTimeField[
         )
 
     def pre_save(self, model_instance: Model, add: bool) -> datetime.datetime | None:
-        assert self.name is not None
         if self.update_now:
             value = timezone.now()
             setattr(model_instance, self.name, value)

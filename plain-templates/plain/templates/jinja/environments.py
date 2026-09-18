@@ -4,7 +4,6 @@ from typing import Any
 
 from jinja2 import Environment, StrictUndefined
 from jinja2.loaders import FileSystemLoader
-
 from plain.packages import packages_registry
 from plain.runtime import settings
 

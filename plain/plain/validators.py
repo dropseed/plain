@@ -5,7 +5,7 @@ import math
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from plain.exceptions import ValidationError
@@ -128,10 +128,10 @@ class URLValidator(RegexValidator):
         re.IGNORECASE,
     )
     message = "Enter a valid URL."
-    schemes = ["http", "https", "ftp", "ftps"]
+    schemes: tuple[str, ...] = ("http", "https", "ftp", "ftps")
     unsafe_chars = frozenset("\t\r\n")
 
-    def __init__(self, schemes: list[str] | None = None, **kwargs: Any) -> None:
+    def __init__(self, schemes: tuple[str, ...] | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         if schemes is not None:
             self.schemes = schemes
@@ -207,13 +207,13 @@ class EmailValidator:
         r"\[([A-F0-9:.]+)\]\Z",
         re.IGNORECASE,
     )
-    domain_allowlist = ["localhost"]
+    domain_allowlist: tuple[str, ...] = ("localhost",)
 
     def __init__(
         self,
         message: str | None = None,
         code: str | None = None,
-        allowlist: list[str] | None = None,
+        allowlist: tuple[str, ...] | None = None,
     ) -> None:
         if message is not None:
             self.message = message
@@ -241,9 +241,9 @@ class EmailValidator:
                 pass
             else:
                 if self.validate_domain_part(domain_part):
-                    return None
+                    return
             raise ValidationError(self.message, code=self.code, params={"value": value})
-        return None
+        return
 
     def validate_domain_part(self, domain_part: str) -> bool:
         if self.domain_regex.match(domain_part):
@@ -301,16 +301,16 @@ def validate_ipv46_address(value: str, /) -> None:
             )
 
 
-ip_address_validator_map: dict[str, tuple[list[Callable[[str], None]], str]] = {
-    "both": ([validate_ipv46_address], "Enter a valid IPv4 or IPv6 address."),
-    "ipv4": ([validate_ipv4_address], "Enter a valid IPv4 address."),
-    "ipv6": ([validate_ipv6_address], "Enter a valid IPv6 address."),
+ip_address_validator_map: dict[str, tuple[tuple[Callable[[str], None], ...], str]] = {
+    "both": ((validate_ipv46_address,), "Enter a valid IPv4 or IPv6 address."),
+    "ipv4": ((validate_ipv4_address,), "Enter a valid IPv4 address."),
+    "ipv6": ((validate_ipv6_address,), "Enter a valid IPv6 address."),
 }
 
 
 def ip_address_validators(
     protocol: str, unpack_ipv4: bool
-) -> tuple[list[Callable[[str], None]], str]:
+) -> tuple[tuple[Callable[[str], None], ...], str]:
     """
     Depending on the given parameters, return the appropriate validators for
     the GenericIPAddressField.
@@ -452,7 +452,7 @@ class DecimalValidator:
     expected, otherwise raise ValidationError.
     """
 
-    messages = {
+    messages: ClassVar = {
         "invalid": "Enter a number.",
         "max_digits": pluralize_lazy(
             "Ensure that there are no more than %(max)s digit in total.",

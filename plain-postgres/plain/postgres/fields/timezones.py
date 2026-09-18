@@ -3,7 +3,7 @@ from __future__ import annotations
 import zoneinfo
 from collections.abc import Callable, Sequence
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from plain import exceptions
 
@@ -62,7 +62,7 @@ class TimeZoneField[
 
     # Mapping of legacy timezone names to canonical IANA names
     # Based on IANA timezone database backward compatibility file
-    LEGACY_TO_CANONICAL = {
+    LEGACY_TO_CANONICAL: ClassVar = {
         "US/Alaska": "America/Anchorage",
         "US/Aleutian": "America/Adak",
         "US/Arizona": "America/Phoenix",
@@ -98,7 +98,7 @@ class TimeZoneField[
             validators=validators,
         )
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         # Don't serialize choices - they're computed dynamically from system tzdata
         kwargs.pop("choices", None)

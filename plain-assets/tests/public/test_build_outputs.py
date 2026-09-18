@@ -17,7 +17,6 @@ Both rules are inert for existing apps (no top-level src//dist/ today).
 from __future__ import annotations
 
 import pytest
-
 from plain.assets import finders
 from plain.assets.compile import compile_assets
 from plain.assets.manifest import AssetsManifest

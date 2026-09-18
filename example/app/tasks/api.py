@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 from plain.api import openapi
 from plain.api.views import APIView
 from plain.auth import get_request_user
@@ -103,7 +105,5 @@ class TaskListAPIView(APIView):
 )
 class TasksAPIRouter(Router):
     namespace = "tasks_api"
-    openapi_components = {"schemas": {"Task": TASK_SCHEMA}}
-    urls = [
-        path("tasks/", TaskListAPIView, name="list"),
-    ]
+    openapi_components: ClassVar = {"schemas": {"Task": TASK_SCHEMA}}
+    urls = (path("tasks/", TaskListAPIView, name="list"),)

@@ -8,6 +8,7 @@ from typing import Any
 import click
 
 from ..db import use_management_connection
+from ..migrations.exceptions import MigrationHistoryError
 from ..schema_lock import SchemaLockLost, SchemaLockTimeout, schema_lock
 
 
@@ -30,11 +31,17 @@ def database_management_command[F: Callable[..., Any]](f: F) -> F:
     database management operations. Inside the command, `get_connection()`
     returns a connection opened against `POSTGRES_MANAGEMENT_URL` (falling
     back to `POSTGRES_URL` when unset).
+
+    A planner refusal (`MigrationHistoryError`) surfaces as one clean line
+    instead of a traceback, the same way `cli_schema_lock` treats lock errors.
     """
 
     @functools.wraps(f)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        with use_management_connection():
-            return f(*args, **kwargs)
+        try:
+            with use_management_connection():
+                return f(*args, **kwargs)
+        except MigrationHistoryError as e:
+            raise click.ClickException(str(e)) from e
 
     return wrapper  # ty: ignore[invalid-return-type]

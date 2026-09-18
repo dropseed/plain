@@ -4,7 +4,6 @@ from pprint import pformat
 from typing import Any, NoReturn
 
 from markupsafe import Markup, escape
-
 from plain.http import Response
 from plain.views.exceptions import ResponseException
 
@@ -25,8 +24,5 @@ def dd(*objs: Any) -> NoReturn:
     ]
     combined_dump_str = Markup("\n\n").join(html_objs)
 
-    response = Response()
-    response.status_code = 500
-    response.content = combined_dump_str
-    response.headers["Content-Type"] = "text/html"
+    response = Response(combined_dump_str, status_code=500, content_type="text/html")
     raise ResponseException(response)

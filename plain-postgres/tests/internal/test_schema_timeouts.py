@@ -6,11 +6,8 @@ out.
 
 from __future__ import annotations
 
-from typing import cast
-
 import pytest
 from app.examples.models.defaults import DefaultsExample
-
 from plain.postgres import get_connection
 from plain.postgres.migrations.operations.special import RunSQL
 from plain.runtime import settings as plain_settings
@@ -88,15 +85,9 @@ def test_runsql_no_timeout_opts_out(db):
     """`RunSQL(no_timeout=True)` disables the SET LOCAL prelude entirely so a
     long-running data migration can run without a statement_timeout."""
     connection = get_connection()
-    # cast: Operation.__new__ is annotated `-> Operation`, so ty infers the
-    # widened type for every subclass constructor. Narrows back to RunSQL
-    # so `._run_sql` / `.sql` access type-checks.
-    op = cast(
-        RunSQL,
-        RunSQL(
-            "UPDATE examples_defaultsexample SET role = role",
-            no_timeout=True,
-        ),
+    op = RunSQL(
+        "UPDATE examples_defaultsexample SET role = role",
+        no_timeout=True,
     )
 
     with connection.schema_editor(atomic=True, collect_sql=True) as editor:
@@ -109,7 +100,7 @@ def test_runsql_no_timeout_opts_out(db):
 def test_runsql_default_applies_timeouts(db):
     """Without `no_timeout=True`, RunSQL DDL gets the migration timeouts."""
     connection = get_connection()
-    op = cast(RunSQL, RunSQL("UPDATE examples_defaultsexample SET role = role"))
+    op = RunSQL("UPDATE examples_defaultsexample SET role = role")
 
     with connection.schema_editor(atomic=True, collect_sql=True) as editor:
         op._run_sql(editor, op.sql)

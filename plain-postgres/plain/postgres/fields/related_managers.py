@@ -79,20 +79,18 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
     # Type hints for attributes
     model: type[T]
     instance: Model
-    field: ForeignKeyField
     core_filters: dict[str, Model]
     allow_null: bool
 
     def __init__(
         self, instance: Model, field: ForeignKeyField, related_model: type[Model]
     ):
-        assert field.name is not None, "Field must have a name"
         self.model = cast(type[T], related_model)
         self.instance = instance
-        # ForeignKeyField is itself a descriptor type (it inherits the field
-        # descriptor protocol), so ty reads this plain attribute as a
-        # descriptor slot; storing the field object on it is fine.
-        self.field = field  # ty: ignore[invalid-assignment]
+        # Annotated here rather than as a class-body attribute: ForeignKeyField
+        # is itself a descriptor, so a class-body `field: ForeignKeyField`
+        # would route every `self.field` read through its __get__.
+        self.field: ForeignKeyField = field
         self.core_filters = {self.field.name: instance}
         self.allow_null = self.field.allow_null
 
@@ -300,7 +298,6 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
     # Type hints for attributes
     model: type[T]
     instance: Model
-    field: ManyToManyField
     through: type[Model]
     query_field_name: str
     prefetch_cache_name: str
@@ -319,7 +316,6 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         is_reverse: bool,
         symmetrical: bool = False,
     ):
-        assert field.name is not None, "Field must have a name"
         # Set direction-specific attributes
         if is_reverse:
             # Reverse: accessing from the target model back to the source
@@ -354,7 +350,6 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
 
         source_fk = self.source_field
         rh_name = source_fk.target_field.name
-        assert rh_name is not None
         self.core_filters = {
             f"{self.query_field_name}__{rh_name}": getattr(instance, rh_name)
         }

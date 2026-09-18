@@ -4,7 +4,6 @@ import re
 
 from app.users.models import User
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
 from plain.test import Client
 
 TOKEN = "plain_pv_testtoken"

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import psycopg
 import pytest
-
 from plain.postgres.db import get_connection
 from plain.postgres.schema_lock import (
     SCHEMA_LOCK_KEY,
@@ -66,9 +65,8 @@ def test_acquisition_times_out_when_held_by_another_session(db, settings):
     with psycopg.connect(**params, autocommit=True) as holder:
         holder.execute("SELECT pg_advisory_lock(%s)", [SCHEMA_LOCK_KEY])
 
-        with pytest.raises(SchemaLockTimeout) as exc_info:
-            with schema_lock():
-                pass
+        with pytest.raises(SchemaLockTimeout) as exc_info, schema_lock():
+            pass
 
         # The failed acquisition didn't disturb the holder.
         assert _lock_holder_count() == 1
@@ -79,18 +77,19 @@ def test_acquisition_times_out_when_held_by_another_session(db, settings):
 
 
 def test_lock_released_when_block_raises(db):
-    with pytest.raises(RuntimeError):
-        with schema_lock():
-            raise RuntimeError("boom")
+    with pytest.raises(RuntimeError), schema_lock():
+        raise RuntimeError("boom")
 
     assert _lock_holder_count() == 0
 
 
 def test_nested_acquisition_raises_immediately(db):
-    with schema_lock():
-        with pytest.raises(RuntimeError, match="not reentrant"):
-            with schema_lock():
-                pass
+    with (
+        schema_lock(),
+        pytest.raises(RuntimeError, match="not reentrant"),
+        schema_lock(),
+    ):
+        pass
 
     # The failed nested entry didn't corrupt the held flag.
     with schema_lock():
@@ -102,9 +101,11 @@ def test_invalid_retry_interval_rejected(db, settings):
 
     settings.POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL = 0.0
 
-    with pytest.raises(ImproperlyConfigured, match="must be greater than 0"):
-        with schema_lock():
-            pass
+    with (
+        pytest.raises(ImproperlyConfigured, match="must be greater than 0"),
+        schema_lock(),
+    ):
+        pass
 
 
 def test_verify_passes_while_session_alive(db):
