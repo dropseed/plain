@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 import pytest
 from click.testing import CliRunner
@@ -63,19 +61,7 @@ def migrations_dir(temp_migrations: Callable[..., Path], db: None) -> Path:
     return root
 
 
-def forget_imported_migrations() -> None:
-    """A rewritten file must be re-imported, not served from sys.modules.
-
-    Every real invocation is its own process; a test that rewrites a file
-    between two loads has to do this by hand. (The prefix is the conftest's
-    `TEMP_MIGRATIONS_MODULE`.)"""
-    for name in list(sys.modules):
-        if name.startswith("temp_migrations_under_test."):
-            del sys.modules[name]
-
-
 def loader() -> MigrationLoader:
-    forget_imported_migrations()
     return MigrationLoader(get_connection())
 
 
@@ -179,47 +165,51 @@ def test_dependencies_come_from_what_the_baseline_references(
     )
 
 
-def test_unregenerable_operations_refuse_unless_skipped(
-    migrations_dir: Path,
-) -> None:
-    prelude = "\n\ndef noop(models, schema_editor):\n    pass\n"
-    path = migrations_dir / "plaintemplates" / "0001_initial.py"
+NOOP = "\n\ndef noop(models, schema_editor):\n    pass\n"
 
-    path.write_text(
-        migration_source(
-            operations=f"({create_model('Note')}, migrations.RunPython(noop),)",
-            prelude=prelude,
-        )
+
+@pytest.mark.parametrize(
+    ("operations_source", "refused"),
+    [
+        (
+            f"({create_model('Note')}, migrations.RunPython(noop),)",
+            "plaintemplates.0001_initial: Raw Python operation (operation 1)",
+        ),
+        (
+            f"({create_model('Note')}, migrations.SeparateDatabaseAndState(database_operations=[migrations.RunSQL('select 1')]),)",
+            "Raw SQL operation",
+        ),
+        # A table created on the database side only never reaches state.
+        (
+            f"({create_model('Note')}, migrations.SeparateDatabaseAndState(database_operations=[{create_model('Shadow')}]),)",
+            "Create model Shadow (operation 1)",
+        ),
+    ],
+)
+def test_unregenerable_operations_refuse(
+    migrations_dir: Path, operations_source: str, refused: str
+) -> None:
+    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
+        migration_source(operations=operations_source, prelude=NOOP)
     )
+
     with pytest.raises(BadMigrationError) as excinfo:
         plan_reset(loader(), "plaintemplates")
-    assert "plaintemplates.0001_initial: Raw Python operation" in str(excinfo.value)
+
+    assert refused in str(excinfo.value)
     assert "skip_on_reset=True" in str(excinfo.value)
 
-    path.write_text(
-        migration_source(
-            operations=f"({create_model('Note')}, migrations.SeparateDatabaseAndState(database_operations=[migrations.RunSQL('select 1')]),)",
-        )
-    )
-    with pytest.raises(BadMigrationError, match="Raw SQL operation"):
-        plan_reset(loader(), "plaintemplates")
 
-    # A table created on the database side only never reaches state.
-    path.write_text(
-        migration_source(
-            operations=f"({create_model('Note')}, migrations.SeparateDatabaseAndState(database_operations=[{create_model('Shadow')}]),)",
-        )
-    )
-    with pytest.raises(BadMigrationError, match=r"Create model Shadow \(operation 1\)"):
-        plan_reset(loader(), "plaintemplates")
-
-    path.write_text(
+def test_skipped_operations_are_left_out(migrations_dir: Path) -> None:
+    (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
         migration_source(
             operations=f"({create_model('Note')}, migrations.RunPython(noop, skip_on_reset=True), migrations.RunSQL('select 1', skip_on_reset=True),)",
-            prelude=prelude,
+            prelude=NOOP,
         )
     )
+
     plan = plan_reset(loader(), "plaintemplates")
+
     assert [type(op) for op in plan.baseline.operations] == [operations.CreateModel]
 
 
@@ -433,90 +423,6 @@ def test_outside_a_repository_refuses(migrations_dir: Path) -> None:
     assert "git could not read" in result.output
     assert "not a git repository" in result.output
     assert len(examples_files(migrations_dir)) == 18
-
-
-def test_released_at(repo: Path, migrations_dir: Path) -> None:
-    leaf = migrations_dir / "examples" / f"{LEAF}.py"
-    original = leaf.read_text()
-
-    def attempt(ref: str) -> Any:
-        forget_imported_migrations()
-        return CliRunner().invoke(
-            reset, ["examples", "--released-at", ref, "--dry-run"]
-        )
-
-    # A data migration's local function is a new object in the released copy.
-    (migrations_dir / "examples" / "0019_data.py").write_text(
-        migration_source(
-            dependencies=(("examples", LEAF),),
-            operations="(migrations.RunPython(touch, skip_on_reset=True),)",
-            prelude="\n\ndef touch(models, schema_editor):\n    pass\n",
-        )
-    )
-    git(repo, "add", "-A")
-    git(repo, "commit", "-qm", "data migration")
-    result = attempt("HEAD")
-    assert result.exit_code == 0, result.output
-    assert "Supersedes 0019_data" in result.output
-    # Marking it after the release is not a change to what those databases ran.
-    data = migrations_dir / "examples" / "0019_data.py"
-    data.write_text(
-        data.read_text().replace("skip_on_reset=True", "skip_on_reset=True  # noqa")
-    )
-    git(repo, "commit", "-qam", "note")
-    unmarked = data.read_text().replace(", skip_on_reset=True  # noqa", "")
-    data.write_text(unmarked)
-    git(repo, "commit", "-qam", "as released: unmarked")
-    data.write_text(
-        unmarked.replace("RunPython(touch)", "RunPython(touch, skip_on_reset=True)")
-    )
-    git(repo, "commit", "-qam", "marked for the reset")
-    result = attempt("HEAD~1")
-    assert result.exit_code == 0, result.output
-    # A ref that doesn't exist, and a leaf that cannot be loaded at the ref.
-    result = attempt("no-such-ref")
-    assert result.exit_code != 0
-    assert "No such git ref: no-such-ref" in result.output
-    data.write_text(
-        data.read_text().replace(
-            "from plain import postgres",
-            "from plain import postgres\nimport gone_module_xyz",
-        )
-    )
-    git(repo, "commit", "-qam", "broken import")
-    data.write_text(data.read_text().replace("\nimport gone_module_xyz", ""))
-    git(repo, "commit", "-qam", "fixed import")
-    result = attempt("HEAD~1")
-    assert result.exit_code != 0
-    assert "cannot be loaded" in result.output
-    (migrations_dir / "examples" / "0019_data.py").unlink()
-    git(repo, "commit", "-qam", "drop data migration")
-
-    # Reformatting only: the same migration.
-    leaf.write_text(
-        original.replace("    operations = (", "    operations = (  # noqa")
-    )
-    git(repo, "commit", "-qam", "reformat")
-    result = attempt("HEAD~1")
-    assert result.exit_code == 0, result.output
-
-    # The ref holds different operations: not what those environments applied.
-    leaf.write_text(original.replace("max_length=100", "max_length=120"))
-    git(repo, "commit", "-qam", "changed")
-    leaf.write_text(original)
-    git(repo, "commit", "-qam", "back")
-    result = attempt("HEAD~1")
-    assert result.exit_code != 0
-    assert "differs from the one at HEAD~1" in result.output
-
-    # Not there at all.
-    git(repo, "rm", "-q", "--cached", str(leaf))
-    git(repo, "commit", "-qm", "untrack leaf")
-    git(repo, "add", str(leaf))
-    git(repo, "commit", "-qm", "track leaf again")
-    result = attempt("HEAD~1")
-    assert result.exit_code != 0
-    assert "does not exist at HEAD~1" in result.output
 
 
 def test_pending_model_changes_refuse(migrations_dir: Path) -> None:

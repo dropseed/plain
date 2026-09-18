@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import os
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -17,7 +16,6 @@ from plain.utils.text import Truncator
 from ..db import get_connection
 from ..migrations.autodetector import (
     MigrationAutodetector,
-    deep_deconstruct,
     describe_changes,
     detect_model_changes,
 )
@@ -946,16 +944,10 @@ def prune(package_label: str | None, yes: bool) -> None:
     help="Version this reset ships in; named in the refusal a database that missed the leaf gets, and required before this package can be reset again.",
 )
 @click.option(
-    "--released-at",
-    "released_at",
-    default="",
-    help="A git ref (tag, commit) at which the leaf migration must already exist with the same dependencies and operations.",
-)
-@click.option(
     "--dry-run", is_flag=True, help="Show the baseline and what would be deleted."
 )
 @database_management_command
-def reset(package_label: str, since: str, released_at: str, dry_run: bool) -> None:
+def reset(package_label: str, since: str, dry_run: bool) -> None:
     """Replace a package's migration history with one baseline"""
     try:
         packages_registry.get_package_config(package_label)
@@ -980,8 +972,6 @@ def reset(package_label: str, since: str, released_at: str, dry_run: bool) -> No
     try:
         plan = plan_reset(loader, package_label, since=since)
         _require_committed(plan)
-        if released_at:
-            _require_released(loader, plan, ref=released_at)
         validate_reset(loader, plan)
     except BadMigrationError as e:
         raise click.ClickException(str(e)) from e
@@ -1109,76 +1099,4 @@ def _require_committed(plan: ResetPlan) -> None:
             f"{plan.migrations_dir} has uncommitted changes:\n{modified.rstrip()}\n"
             "Commit them first - the leaf migration becomes the baseline's "
             "sentinel, and every environment must have applied it."
-        )
-
-
-def _require_released(loader: MigrationLoader, plan: ResetPlan, *, ref: str) -> None:
-    """The leaf must exist at `ref` with the same dependencies and operations."""
-    assert loader.disk_migrations is not None
-    leaf = loader.disk_migrations[plan.package_label, plan.sentinel]
-    leaf_file = f"{plan.sentinel}.py"
-    try:
-        _git(
-            ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
-            cwd=plan.migrations_dir,
-        )
-    except BadMigrationError:
-        raise BadMigrationError(f"No such git ref: {ref}") from None
-    repo_path = _git(
-        ["ls-files", "--full-name", "--", leaf_file], cwd=plan.migrations_dir
-    ).strip()
-    try:
-        shown = _git(["show", f"{ref}:{repo_path}"], cwd=plan.migrations_dir)
-    except BadMigrationError:
-        raise BadMigrationError(
-            f"`{plan.package_label}.{plan.sentinel}` does not exist at {ref}. The "
-            "sentinel must be a migration that already existed at the ref you name."
-        ) from None
-    try:
-        with tempfile.TemporaryDirectory() as tmp:
-            released_path = Path(tmp) / leaf_file
-            released_path.write_text(shown, encoding="utf-8")
-            spec = importlib.util.spec_from_file_location(
-                f"released_{plan.sentinel}", released_path
-            )
-            assert spec is not None
-            assert spec.loader is not None
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-        released = module.Migration(plan.sentinel, plan.package_label)
-    except Exception as e:
-        raise BadMigrationError(
-            f"`{plan.package_label}.{plan.sentinel}` at {ref} cannot be loaded "
-            f"({e}); it cannot be compared with the leaf."
-        ) from e
-
-    def comparable(value: Any) -> Any:
-        # A function defined in the migration file is a different object in
-        # the released copy; compare what it does, not which one it is.
-        # `skip_on_reset` is a note to this command, not a change in what the
-        # migration did.
-        if isinstance(value, list | tuple):
-            return type(value)(comparable(v) for v in value)
-        if isinstance(value, dict):
-            return {k: comparable(v) for k, v in value.items() if k != "skip_on_reset"}
-        if callable(value) and hasattr(value, "__code__"):
-            return (
-                value.__qualname__,
-                value.__code__.co_code,
-                value.__code__.co_consts,
-            )
-        return value
-
-    def shape(migration: Migration) -> Any:
-        return comparable(
-            (
-                sorted(type(migration).dependencies),
-                [deep_deconstruct(op.deconstruct()) for op in migration.operations],
-            )
-        )
-
-    if shape(released) != shape(leaf):
-        raise BadMigrationError(
-            f"`{plan.package_label}.{plan.sentinel}` differs from the one at {ref}. "
-            "The sentinel must be the migration those environments applied."
         )
