@@ -185,6 +185,8 @@ def test_invalid_email():
 
 Pass `match=` to also require the message to match a regex.
 
+`caught.exception` is typed as the exception class you asked for, so its own attributes are reachable without a cast (`caught.exception.messages` on a `ValidationError`). It's readable only after the block exits — inside the block nothing has been caught yet, and reading it says so rather than handing back a `None`.
+
 ## Test metadata
 
 Decorators declare static facts about a test — they never inject runtime values:

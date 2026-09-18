@@ -30,6 +30,26 @@ def test_raises_lets_unexpected_exceptions_propagate():
         raise KeyError("different")
 
 
+def test_raises_exception_is_unreadable_inside_the_block():
+    """Nothing has been caught yet, so say so rather than hand back a None
+    that fails somewhere further down the test."""
+    with (
+        raises(AttributeError, match="only available after"),
+        raises(ValueError) as caught,
+    ):
+        caught.exception  # noqa: B018 — the attribute access is the assertion
+
+
+def test_raises_exception_keeps_the_caught_subclass():
+    class Specific(ValueError):
+        detail = "specific"
+
+    with raises(ValueError) as caught:
+        raise Specific("boom")
+
+    assert caught.exception.detail == "specific"  # ty: ignore[unresolved-attribute]
+
+
 class Thing:
     attr = "original"
 
