@@ -45,7 +45,7 @@ class ContactView(TemplateView):
         if isinstance(result, ContactFormWithCompany):
             submission.company = result.company or ""
         submission.create()
-        return RedirectResponse(reverse("contacts:success"))
+        return RedirectResponse(reverse("contacts:success"), status_code=302)
 
 
 class ContactSuccessView(TemplateView):

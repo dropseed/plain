@@ -82,7 +82,7 @@ class TaskCreateView(AuthView, TemplateView):
             return result
         # `owner` isn't a form field — pass it to create_from() as an extra.
         create_from(Task, result, owner=self.user)
-        return RedirectResponse(reverse("tasks:list"))
+        return RedirectResponse(reverse("tasks:list"), status_code=302)
 
 
 class TaskUpdateView(AuthView, DetailView):
@@ -107,7 +107,9 @@ class TaskUpdateView(AuthView, DetailView):
         if isinstance(result, Response):
             return result
         update_from(self.object, result)
-        return RedirectResponse(reverse("tasks:detail", id=self.object.id))
+        return RedirectResponse(
+            reverse("tasks:detail", id=self.object.id), status_code=302
+        )
 
 
 class TaskDeleteView(AuthView, DetailView):
@@ -123,7 +125,7 @@ class TaskDeleteView(AuthView, DetailView):
 
     def post(self) -> Response:
         self.object.delete()
-        return RedirectResponse(reverse("tasks:list"))
+        return RedirectResponse(reverse("tasks:list"), status_code=302)
 
 
 class TaskSeedView(AuthView, View):

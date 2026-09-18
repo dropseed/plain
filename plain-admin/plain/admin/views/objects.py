@@ -324,7 +324,7 @@ class AdminCreateView(AdminView):
         if isinstance(result, Response):
             return result
         obj = create_from(self.model, result)
-        return RedirectResponse(self.get_success_url(obj))
+        return RedirectResponse(self.get_success_url(obj), status_code=302)
 
     def get_success_url(self, obj: Any) -> str:
         if list_url := self.get_list_url():
@@ -422,7 +422,7 @@ class AdminUpdateView(AdminView, DetailView):
         if isinstance(result, Response):
             return result
         update_from(self.object, result)
-        return RedirectResponse(self.get_success_url())
+        return RedirectResponse(self.get_success_url(), status_code=302)
 
     def get_links(self) -> dict[str, str]:
         links = super().get_links()
@@ -477,7 +477,7 @@ class AdminDeleteView(AdminView, DetailView):
 
     def post(self) -> Response:
         self.object.delete()
-        return RedirectResponse(self.get_success_url())
+        return RedirectResponse(self.get_success_url(), status_code=302)
 
     def get_links(self) -> dict[str, str]:
         links = super().get_links()

@@ -48,7 +48,7 @@ class NoteCreateView(AuthView, TemplateView):
             return result
         # `author` isn't a form field — pass it to create_from() as an extra.
         note = create_from(Note, result, author=self.user)
-        return RedirectResponse(note.get_absolute_url())
+        return RedirectResponse(note.get_absolute_url(), status_code=302)
 
 
 class NoteUpdateView(AuthView, DetailView):
@@ -70,7 +70,7 @@ class NoteUpdateView(AuthView, DetailView):
         if isinstance(result, Response):
             return result
         update_from(self.object, result)
-        return RedirectResponse(self.object.get_absolute_url())
+        return RedirectResponse(self.object.get_absolute_url(), status_code=302)
 
 
 class NoteDeleteView(AuthView, DetailView):
@@ -86,4 +86,4 @@ class NoteDeleteView(AuthView, DetailView):
 
     def post(self) -> Response:
         self.object.delete()
-        return RedirectResponse(reverse("notes:list"))
+        return RedirectResponse(reverse("notes:list"), status_code=302)
