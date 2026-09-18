@@ -228,6 +228,26 @@ self.render_form(ContactForm, result)  # a failed validate() — values + errors
 self.render_form(ContactForm, values={"email": user.email})  # pre-filled
 ```
 
+There is no `errors=` argument. For a failure the form itself can't see — an authentication rejection that runs after `validate()` already succeeded — build the `Invalid` and pass it as `result`, which is the same thing `validate()` would have handed you:
+
+```python
+from plain.forms import Error, Invalid
+
+result = self.validate_form(LoginForm)
+if isinstance(result, Response):
+    return result
+if authenticate(result.email, result.password) is None:
+    return self.render_form(
+        LoginForm,
+        Invalid(
+            errors=[Error("Incorrect email or password.", code="invalid_login")],
+            raw=self.request.form_data,
+        ),
+    )
+```
+
+`raw` is what the re-rendered inputs read their values from, so pass the submitted data.
+
 In the template, helpers take `form` (the result) plus a field reference (`form_class.email`). Field metadata is on the field reference itself — `form_class.email.required`, `.choices`, `.html_id`, `.name`:
 
 ```html
