@@ -970,3 +970,53 @@ def test_return_annotation_fills_in_200_when_schema_decorator_only_sets_summary(
     assert op["responses"]["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/Item"
     }
+
+
+class TestInvalidResult:
+    """A form `Invalid` returned from a handler renders as the standard error
+    body. The `id` comes from the error codes the form reported, so
+    `missing_field` — which master raised as its own FormFieldMissingError —
+    falls out of the same table as every other code."""
+
+    def post(self, body):
+        return Client().post("/form", data=body, content_type="application/json")
+
+    def test_missing_required_field_is_missing_field(self):
+        response = self.post({"email": "a@example.com"})
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["id"] == "missing_field"
+        assert body["message"] == "Missing field: age"
+        assert body["errors"] == [
+            {"field": "age", "message": "This field is required."}
+        ]
+
+    def test_several_missing_fields_are_all_reported(self):
+        body = self.post({}).json()
+
+        assert body["id"] == "missing_field"
+        assert body["message"] == "Missing field: age, email"
+        assert {e["field"] for e in body["errors"]} == {"age", "email"}
+
+    def test_a_bad_value_is_a_validation_error(self):
+        response = self.post({"email": "not-an-email", "age": 3})
+        body = response.json()
+
+        assert response.status_code == 400
+        assert body["id"] == "validation_error"
+        assert body["errors"] == [
+            {"field": "email", "message": "Enter a valid email address."}
+        ]
+
+    def test_mixed_codes_fall_back_to_validation_error(self):
+        body = self.post({"email": "not-an-email"}).json()
+
+        assert body["id"] == "validation_error"
+        assert {e["field"] for e in body["errors"]} == {"age", "email"}
+
+    def test_a_valid_body_still_returns_data(self):
+        response = self.post({"email": "a@example.com", "age": 30})
+
+        assert response.status_code == 200
+        assert response.json() == {"email": "a@example.com", "age": 30}

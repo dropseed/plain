@@ -534,9 +534,34 @@ You can return status codes in several ways:
 
 - Return a tuple of `(status_code, data)`: `return 201, {"id": note.id}` — for bodiless statuses the data must be empty (`return 204, {}`), since a 204 can't carry a body
 - Return `None`: automatically returns 404
+- Return an [`Invalid`](/plain/plain/forms/README.md) from `validate()`: automatically returns 400 with the standard error body
 - Return a `Response` with a custom status code: `return Response(status_code=204)` (for no content)
 - Return a `JsonResponse` with a custom status code: `return JsonResponse({"error": "Bad request"}, status_code=400)`
 - Raise an exception: `raise NotFoundError404` or `raise ForbiddenError403`
+
+#### How do I validate a request body?
+
+Validate it with a [form](/plain/plain/forms/README.md) and return the `Invalid` straight back — it renders as the standard error body with a 400:
+
+```python
+class SignupAPIView(APIView):
+    def post(self):
+        result = SignupForm.validate(self.request.json_data)
+        if not result:
+            return result
+        user = create_from(User, result)
+        return 201, {"id": user.id}
+```
+
+The response `id` is derived from the error codes the form reported. A body whose errors are all `required` is `missing_field`; anything else is `validation_error`. Either way `errors` lists every failure as `{"field", "message"}`, with `""` for a form-level error:
+
+```json
+{
+    "id": "missing_field",
+    "message": "Missing field: age",
+    "errors": [{"field": "age", "message": "This field is required."}]
+}
+```
 
 #### How do I access the request body?
 
