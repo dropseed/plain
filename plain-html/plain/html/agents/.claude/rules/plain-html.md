@@ -68,6 +68,7 @@ In this repo's templates (admin, toolbar, packages), the same CSP rules apply as
 - `uv run plain html check` — parse + validate every template (add `--typecheck` to run `ty` over expressions and component call sites against `attrs:` / `imports:` / `components:`).
 - `uv run plain html format` — canonicalize whitespace and attribute order in place. Use `--check` in CI.
 - `uv run plain html compile` — pre-fill the on-disk cache (deploy-time warm).
+- Add `--template-dir DIR` (repeatable) to `check` / `format` to name the template roots explicitly. Nothing is then read from the app, so the standalone `uv run plain-html …` command works with no app or database (that's how CI runs it).
 
 ## Cache location
 

@@ -8,6 +8,8 @@ a `.html` file on disk inside a `templates/` directory. Relative paths
 from __future__ import annotations
 
 import functools
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from plain.packages import packages_registry
@@ -28,12 +30,34 @@ class TemplateFileMissing(FileNotFoundError):
             return "Template file not found"
 
 
+# Set by `use_template_dirs`. When present, these roots replace the ones
+# derived from settings and the package registry — that is what lets
+# `plain-html check --template-dir …` resolve component names in a
+# checkout with no app to load (CI, a package built on its own).
+_template_dirs_override: tuple[Path, ...] | None = None
+
+
+@contextmanager
+def use_template_dirs(dirs: tuple[Path, ...]) -> Iterator[None]:
+    """Resolve template names against `dirs` instead of the app's."""
+    global _template_dirs_override
+    previous = _template_dirs_override
+    _template_dirs_override = tuple(Path(d).resolve() for d in dirs)
+    try:
+        yield
+    finally:
+        _template_dirs_override = previous
+
+
 def get_template_dirs() -> tuple[Path, ...]:
     """Return the ordered list of directories to search for plain.html templates.
 
     First the app's own `templates/` directory, then each installed
-    package's `templates/` directory.
+    package's `templates/` directory — unless `use_template_dirs` has
+    supplied an explicit list.
     """
+    if _template_dirs_override is not None:
+        return _template_dirs_override
     app_templates = settings.path.parent / "templates"
     return (app_templates,) + _get_package_template_dirs()
 

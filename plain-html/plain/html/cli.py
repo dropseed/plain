@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import re
 import sys
 from pathlib import Path
@@ -14,7 +15,7 @@ from .componentcheck import check_component_files, check_component_slots
 from .components import ComponentsError, parse_components
 from .format import format_source
 from .frontmatter import split as split_frontmatter
-from .loader import get_template_dirs
+from .loader import get_template_dirs, use_template_dirs
 from .parser import ParseError, parse
 from .positions import body_offset, offset_to_line_col
 from .tokenizer import TokenizeError, tokenize
@@ -64,12 +65,24 @@ def cli() -> None:
         "development only — end-user projects should leave this off."
     ),
 )
+@click.option(
+    "--template-dir",
+    "template_dirs",
+    multiple=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help=(
+        "A templates/ directory to work on, repeatable. Supplying these "
+        "replaces the app's template directories, so nothing is read from "
+        "the app — run it as `plain-html` when there is no app to load."
+    ),
+)
 def check(
     paths: tuple[str, ...],
     run_typecheck: bool,
     backend_name: str | None,
     no_cache: bool,
     include_installed_packages: bool,
+    template_dirs: tuple[Path, ...],
 ) -> None:
     """Check .html templates for syntax and structural errors
 
@@ -77,7 +90,38 @@ def check(
     `<stdin>:line:col: message`. Add `--typecheck` to also run the
     template's `{expr}` content through the configured Python type
     checker (ty by default).
+
+    `--template-dir` names the directories component paths resolve
+    against. Supplying them means nothing has to be read from the app,
+    which is how this runs in a checkout with no app or database.
     """
+    with _template_dir_scope(template_dirs):
+        _run_check(
+            paths,
+            run_typecheck=run_typecheck,
+            backend_name=backend_name,
+            no_cache=no_cache,
+            include_installed_packages=include_installed_packages,
+            extra_dirs=template_dirs,
+        )
+
+
+def _template_dir_scope(template_dirs: tuple[Path, ...]):
+    """`use_template_dirs` when dirs were given, otherwise a no-op."""
+    if template_dirs:
+        return use_template_dirs(template_dirs)
+    return contextlib.nullcontext()
+
+
+def _run_check(
+    paths: tuple[str, ...],
+    *,
+    run_typecheck: bool,
+    backend_name: str | None,
+    no_cache: bool,
+    include_installed_packages: bool,
+    extra_dirs: tuple[Path, ...] = (),
+) -> None:
     if "-" in paths:
         if len(paths) != 1:
             raise click.UsageError("Cannot mix `-` with other paths")
@@ -89,7 +133,7 @@ def check(
         return
 
     files = _collect_files(
-        _paths_to_paths(paths),
+        _paths_to_paths(paths) or extra_dirs,
         include_installed_packages=include_installed_packages,
     )
     if not files:
@@ -245,10 +289,22 @@ def _paths_to_paths(paths: tuple[str, ...]) -> tuple[Path, ...]:
         "For framework / package development only."
     ),
 )
+@click.option(
+    "--template-dir",
+    "template_dirs",
+    multiple=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help=(
+        "A templates/ directory to work on, repeatable. Supplying these "
+        "replaces the app's template directories, so nothing is read from "
+        "the app — run it as `plain-html` when there is no app to load."
+    ),
+)
 def format_cmd(
     paths: tuple[str, ...],
     check_only: bool,
     include_installed_packages: bool,
+    template_dirs: tuple[Path, ...],
 ) -> None:
     """Format .html templates in place
 
@@ -262,7 +318,7 @@ def format_cmd(
         return
 
     files = _collect_files(
-        _paths_to_paths(paths),
+        _paths_to_paths(paths) or template_dirs,
         include_installed_packages=include_installed_packages,
     )
     if not files:

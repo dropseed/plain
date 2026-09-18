@@ -504,6 +504,14 @@ plain html compile      # pre-compile every template into the on-disk cache
 
 All three accept paths or directories on the command line, or `-` to read source from stdin.
 
+`check` and `format` also take `--template-dir DIR` (repeatable), naming the directories to work on and to resolve component paths against. With it, nothing is read from the app — no settings, no package registry, no database — so the standalone `plain-html` command can check a checkout that has no app to load:
+
+```bash
+plain-html check --typecheck --template-dir src/mypackage/templates
+```
+
+That's how this repo gates every package's templates from a single CI job.
+
 ## FAQs
 
 #### Why not Jinja2?

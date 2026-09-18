@@ -1,11 +1,21 @@
-#!/bin/sh -e
-# Run `plain html check --typecheck` across the entire repo template corpus.
+#!/bin/bash -e
+# Run `plain html check --typecheck` across the whole repo template corpus.
 #
-# Operates from `example/` because plain.runtime needs an `app/` directory;
-# the example app is the canonical place for that. The
-# `--include-installed-packages` flag (hidden from end-user `--help`)
-# expands the walk to cover every shipped Plain package's `html/` dir, so
-# this single invocation gates the whole monorepo's `.html` files.
+# Uses the standalone `plain-html` command and passes every templates/
+# directory explicitly, so nothing is read from an app: no settings, no
+# package registry, no database. That is what lets this run in the
+# Postgres-less lint job — and it covers every shipped package, including
+# ones the example app doesn't install.
+#
+# ty resolves `app.*` in the example app's `attrs:` through the
+# `[tool.ty.environment] extra-paths` entry in the root pyproject, so this
+# has to run from the repo root.
 
-cd "$(dirname "$0")/../example"
-uv run plain html check --typecheck --include-installed-packages "$@"
+cd "$(dirname "$0")/.."
+
+args=()
+for dir in */plain/*/templates example/app/templates; do
+  [ -d "$dir" ] && args+=(--template-dir "$dir")
+done
+
+uv run plain-html check --typecheck "${args[@]}" "$@"

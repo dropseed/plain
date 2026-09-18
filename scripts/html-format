@@ -1,0 +1,14 @@
+#!/bin/bash -e
+# Run `plain html format` across the whole repo template corpus.
+#
+# Same app-free shape as scripts/html-check — see that file for why.
+# Pass --check to fail instead of writing.
+
+cd "$(dirname "$0")/.."
+
+args=()
+for dir in */plain/*/templates example/app/templates; do
+  [ -d "$dir" ] && args+=(--template-dir "$dir")
+done
+
+uv run plain-html format "${args[@]}" "$@"

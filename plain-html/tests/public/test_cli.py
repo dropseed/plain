@@ -546,3 +546,96 @@ def test_check_skips_attr_validation_for_missing_component(tmp_path: Path) -> No
     assert "template file not found" in result.output
     assert "unknown attr" not in result.output
     assert "1 error found" in result.output
+
+
+# --- app-free path mode -----------------------------------------------------
+
+
+def test_check_template_dir_walks_the_given_directories(tmp_path: Path) -> None:
+    """`--template-dir` supplies both the files to check and the roots
+    component paths resolve against, so no app has to be loaded."""
+    one = tmp_path / "one" / "templates"
+    two = tmp_path / "two" / "templates"
+    _write(
+        one,
+        "components/Card.html",
+        "---\nslots:\n  default: required\n---\n<div>{{ children }}</div>\n",
+    )
+    _write(
+        two,
+        "page.html",
+        "---\ncomponents:\n  - components/Card\n---\n<main><Card><p>hi</p></Card></main>\n",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["check", "--template-dir", str(one), "--template-dir", str(two)]
+    )
+
+    assert result.exit_code == 0
+    assert "Checking 2 template(s)" in result.output
+    assert "All templates checked" in result.output
+
+
+def test_check_template_dir_resolves_components_across_dirs(tmp_path: Path) -> None:
+    """A component in one directory is reachable from another — that's
+    what makes one invocation cover a whole monorepo."""
+    one = tmp_path / "one" / "templates"
+    two = tmp_path / "two" / "templates"
+    _write(
+        one,
+        "widgets/Badge.html",
+        "---\nattrs:\n  label: str\n---\n<span>{{ label }}</span>\n",
+    )
+    _write(
+        two,
+        "page.html",
+        '---\ncomponents:\n  - widgets/Badge\n---\n<main><Badge label="hi" /></main>\n',
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["check", "--template-dir", str(one), "--template-dir", str(two)]
+    )
+
+    assert result.exit_code == 0
+
+
+def test_check_template_dir_reports_an_unresolvable_component(tmp_path: Path) -> None:
+    root = tmp_path / "templates"
+    _write(
+        root,
+        "page.html",
+        "---\ncomponents:\n  - widgets/Missing\n---\n<main><Missing /></main>\n",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["check", "--template-dir", str(root)])
+
+    assert result.exit_code == 1
+    assert "widgets/Missing" in result.output
+
+
+def test_check_template_dir_does_not_leak_into_later_calls(tmp_path: Path) -> None:
+    """The override is scoped to the invocation, not process-global."""
+    from plain.html import loader
+
+    root = tmp_path / "templates"
+    _write(root, "ok.html", "<p>hi</p>\n")
+
+    runner = CliRunner()
+    runner.invoke(cli, ["check", "--template-dir", str(root)])
+
+    assert loader._template_dirs_override is None
+
+
+def test_format_template_dir_walks_the_given_directories(tmp_path: Path) -> None:
+    root = tmp_path / "templates"
+    path = _write(root, "page.html", "<div>\n<p>hi</p>\n</div>\n")
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["format", "--template-dir", str(root)])
+
+    assert result.exit_code == 0
+    assert "Formatting 1 template(s)" in result.output
+    assert path.read_text() != "<div>\n<p>hi</p>\n</div>\n"
