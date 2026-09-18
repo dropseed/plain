@@ -1230,8 +1230,8 @@ source = { editable = "plain-oauthserver" }
 dependencies = [
     { name = "plain" },
     { name = "plain-auth" },
+    { name = "plain-html" },
     { name = "plain-postgres" },
-    { name = "plain-templates" },
 ]
 
 [package.dev-dependencies]
@@ -1243,8 +1243,8 @@ dev = [
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-auth", editable = "plain-auth" },
+    { name = "plain-html", editable = "plain-html" },
     { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-templates", specifier = ">=0.1.0,<1.0.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -1467,19 +1467,6 @@ requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
     { name = "tomlkit", specifier = ">=0.12.1" },
-]
-
-[[package]]
-name = "plain-templates"
-version = "0.6.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "jinja2" },
-    { name = "plain" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/77/60/3642a1aec5cf521fd830fa31716a188cc6b8fa8fcbeeb96af0a4c1052f20/plain_templates-0.6.1.tar.gz", hash = "sha256:c6897e7e6df2dfa8d0497f92c068bcd7b2c156aafb8d81bcb5ccabb71ee692ac", size = 23472, upload-time = "2026-09-04T20:29:22.439Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ea/6c/3f14daaf05e464de1f1f633769590ac726bf5fb00091c01f9ed781061c6f/plain_templates-0.6.1-py3-none-any.whl", hash = "sha256:bf286a0ff4074b8edc605a55c4250b09caba353e120cac4a8a9028ab21cf7cd1", size = 26357, upload-time = "2026-09-04T20:29:21.56Z" },
 ]
 
 [[package]]

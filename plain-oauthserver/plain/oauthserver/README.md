@@ -143,7 +143,7 @@ Install the `plain.oauthserver` package from [PyPI](https://pypi.org/project/pla
 uv add plain-oauthserver
 ```
 
-Add it to `INSTALLED_PACKAGES` (it needs `plain.auth` and `plain.templates`):
+Add it to `INSTALLED_PACKAGES` (it needs `plain.auth` and `plain.html`):
 
 ```python
 # app/settings.py
@@ -151,7 +151,7 @@ INSTALLED_PACKAGES = [
     "plain.auth",
     "plain.sessions",
     "plain.postgres",
-    "plain.templates",
+    "plain.html",
     "plain.oauthserver",
     ...,
 ]

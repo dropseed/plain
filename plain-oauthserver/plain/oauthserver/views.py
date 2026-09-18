@@ -17,10 +17,10 @@ from typing import Any
 from urllib.parse import urlencode, urlparse, urlunparse
 
 from plain.auth.views import AuthView
+from plain.html import Template
 from plain.http import JsonResponse, RedirectResponse, Request, Response
 from plain.postgres import transaction
 from plain.runtime import settings
-from plain.templates import Template
 from plain.urls import reverse
 from plain.utils import timezone
 from plain.views import View
@@ -194,11 +194,11 @@ class AuthorizeView(AuthView):
         )
 
     def _render(self, context: dict[str, Any]) -> Response:
-        # Always supply every variable the template reads (Jinja runs in strict
-        # mode), so the template needs no `is defined` guards.
+        # Always supply every variable the template reads, so the template
+        # needs no fallbacks of its own.
         full = {
             "request": self.request,
-            "error": None,
+            "error": "",
             "application": None,
             "scope": "",
             "params": {},
