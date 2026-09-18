@@ -16,24 +16,22 @@ attrs:
   extra_links: dict = {}
   parent_view_classes: list = []
   object: Any = None
-  cards: list = []
+  cards: tuple = ()
   table_style: str = ""
   page_obj: Any = None
   search_query: str = ""
-  search_fields: list = []
-  filter_names: list = []
+  search_fields: tuple = ()
+  filter_names: tuple | dict = ()
   current_filter: str = ""
-  actions: list = []
-  fields: list = []
-  order_by_field: str = ""
-  order_by_direction: str = ""
-  objects: list = []
+  actions: tuple = ()
+  fields: tuple = ()
+  column_headers: tuple = ()
+  objects: Any = ()
   request: plain.http.Request = None
   get_object_id: Any = None
   get_object_url: Any = None
   get_object_links: Any = None
   get_field_value: Any = None
-  get_field_label: Any = None
   get_field_value_template: Any = None
   format_field_value: Any = None
 ---
@@ -185,24 +183,25 @@ attrs:
                                     >
                                 </th>
                             {% endif %}
-                            {# 3-state sort cycle: unsorted -> ascending -> descending -> cleared. #}
-                            {% for field in fields %}
-                                {% if order_by_field %}
-                                    <th
-                                        aria-sort="{{ (("none" if field != order_by_field else ("descending" if order_by_direction == "-" else "ascending")) if table_style != "preview" else None) }}"
-                                    >
-                                        {% if table_style == "preview" %}
-                                            <div class="text-xs font-normal">{{ get_field_label(field) }}</div>
-                                        {% else %}
-                                            <a
+                            {# The sort cycle (unsorted -> ascending -> descending
+                               -> cleared) is worked out per column by
+                               `get_column_headers` in the view. #}
+                            {% for column in column_headers %}
+                                {% if table_style == "preview" %}
+                                    <th>
+                                        <div class="text-xs font-normal">{{ column.label }}</div>
+                                    </th>
+                                {% else %}
+                                    <th aria-sort="{{ column.aria_sort }}">
+                                        <a
                                             data-merge-params
-                                            aria-label="{{ ("Sort by " + get_field_label(field) + " ascending") if field != order_by_field else (("Sort by " + get_field_label(field) + " descending") if order_by_direction != "-" else ("Stop sorting by " + get_field_label(field))) }}"
+                                            aria-label="{{ column.sort_label }}"
                                             class="text-xs font-normal flex items-center gap-1 hover:text-admin-foreground group"
-                                            href="{{ "?page=1&order_by=" + (field if field != order_by_field else (("-" + field) if order_by_direction != "-" else "")) }}"
+                                            href="{{ column.sort_url }}"
                                         >
-                                                <span>{{ get_field_label(field) }}</span>
-                                                {% if field == order_by_field and order_by_direction == "-" %}
-                                            {# Sorted descending; the next click clears, so reveal an x on hover/focus. #}
+                                            <span>{{ column.label }}</span>
+                                            {% if column.sorted_descending %}
+                                            {# The next click clears, so reveal an x on hover/focus. #}
                                             <Icon
                                                 name="caret-down-fill"
                                                 class="text-[10px] group-hover:hidden group-focus:hidden"
@@ -211,7 +210,7 @@ attrs:
                                                 name="x-lg"
                                                 class="text-[10px] hidden group-hover:inline group-focus:inline"
                                             />
-                                        {% elif field == order_by_field %}
+                                        {% elif column.sorted_ascending %}
                                             <Icon
                                                 name="caret-up-fill"
                                                 class="text-[10px]"
@@ -222,13 +221,8 @@ attrs:
                                                 class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100 group-focus:opacity-100"
                                             />
                                         {% endif %}
-                                            </a>
-                                        {% endif %}
+                                        </a>
                                     </th>
-                                {% else %}
-                                    <th
-                                        class="text-xs font-normal text-admin-muted-foreground"
-                                    >{{ get_field_label(field) }}</th>
                                 {% endif %}
                             {% endfor %}
                             <th colspan="99"></th>

@@ -3,7 +3,7 @@ components:
   - admin/detail as Detail
 attrs:
   object: Any
-  fields: list = []
+  fields: tuple = ()
   title: str = ""
   app_name: str = "Plain"
   admin_force_theme: str = ""
@@ -12,7 +12,7 @@ attrs:
   links: dict = {}
   extra_links: dict = {}
   parent_view_classes: list = []
-  cards: list = []
+  cards: tuple = ()
 ---
 <Detail
     object="{{ object }}"

@@ -6,7 +6,7 @@ components:
   - elements/admin/Icon
 attrs:
   object: Any
-  fields: list = []
+  fields: tuple = ()
   get_field_label: Any = None
   get_field_value: Any = None
   format_field_value: Any = None
@@ -19,7 +19,7 @@ attrs:
   links: dict = {}
   extra_links: dict = {}
   parent_view_classes: list = []
-  cards: list = []
+  cards: tuple = ()
 slots:
   default: optional
   actions: optional

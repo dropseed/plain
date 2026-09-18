@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
@@ -50,6 +51,79 @@ def get_field_label(field: str) -> str:
     # Convert snake_case to Title Case, then fix common acronyms
     words = field.replace("_", " ").title().split()
     return " ".join(_LABEL_ACRONYMS.get(w, w) for w in words)
+
+
+@dataclass(frozen=True)
+class ColumnHeader:
+    """One list column's heading, with its sort state worked out.
+
+    The sort control cycles unsorted -> ascending -> descending ->
+    cleared. Which arrow to show, what the link does next, and how to
+    describe it to a screen reader are three answers to the same
+    question, so they're decided together here rather than three times
+    over in the template.
+    """
+
+    field: str
+    label: str
+    # "none" | "ascending" | "descending" — the `aria-sort` value.
+    aria_sort: str
+    # Query string for the next state in the cycle. Clearing the sort
+    # sends an empty `order_by`, which the view reads as "unsorted".
+    sort_url: str
+    # `aria-label` for the link: what clicking it will do.
+    sort_label: str
+    sorted_ascending: bool
+    sorted_descending: bool
+
+
+def get_column_headers(
+    fields: tuple[str, ...] | list[str],
+    *,
+    order_by_field: str,
+    order_by_direction: str,
+) -> tuple[ColumnHeader, ...]:
+    """Build one `ColumnHeader` per field for the current sort state."""
+    headers = []
+    for field in fields:
+        label = get_field_label(field)
+        if field != order_by_field:
+            headers.append(
+                ColumnHeader(
+                    field=field,
+                    label=label,
+                    aria_sort="none",
+                    sort_url=f"?page=1&order_by={field}",
+                    sort_label=f"Sort by {label} ascending",
+                    sorted_ascending=False,
+                    sorted_descending=False,
+                )
+            )
+        elif order_by_direction != "-":
+            headers.append(
+                ColumnHeader(
+                    field=field,
+                    label=label,
+                    aria_sort="ascending",
+                    sort_url=f"?page=1&order_by=-{field}",
+                    sort_label=f"Sort by {label} descending",
+                    sorted_ascending=True,
+                    sorted_descending=False,
+                )
+            )
+        else:
+            headers.append(
+                ColumnHeader(
+                    field=field,
+                    label=label,
+                    aria_sort="descending",
+                    sort_url="?page=1&order_by=",
+                    sort_label=f"Stop sorting by {label}",
+                    sorted_ascending=False,
+                    sorted_descending=True,
+                )
+            )
+    return tuple(headers)
 
 
 class AdminListView(HTMXView, AdminView, ListView):
@@ -104,11 +178,16 @@ class AdminListView(HTMXView, AdminView, ListView):
         # Sorting
         order_by = self.request.query_params.get("order_by", "")
         if order_by.startswith("-"):
-            context["order_by_field"] = order_by[1:]
-            context["order_by_direction"] = "-"
+            order_by_field, order_by_direction = order_by[1:], "-"
         else:
-            context["order_by_field"] = order_by
-            context["order_by_direction"] = ""
+            order_by_field, order_by_direction = order_by, ""
+        context["order_by_field"] = order_by_field
+        context["order_by_direction"] = order_by_direction
+        context["column_headers"] = get_column_headers(
+            self.get_fields(),
+            order_by_field=order_by_field,
+            order_by_direction=order_by_direction,
+        )
 
         return context
 
