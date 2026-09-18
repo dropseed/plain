@@ -229,12 +229,14 @@ A traversed field offers exactly the same conditions as the field itself — a t
 ```python
 from plain.postgres import types
 
+
 @postgres.register_model
 class User(postgres.Model):
     email: str = types.EmailField()
     age: int = types.IntegerField(allow_null=True)
 
     query: postgres.QuerySet[User] = postgres.QuerySet()
+
 
 # list-like of tuple[str, int | None], precisely typed
 rows = User.query.where(User.age.gte(18)).select(User.email, User.age)
@@ -251,10 +253,12 @@ There are three modes:
 ```python
 from dataclasses import dataclass
 
+
 @dataclass
 class UserStats:
     email: str
     age: int | None
+
 
 stats = User.query.select(User.email, User.age, result_type=UserStats)
 ```

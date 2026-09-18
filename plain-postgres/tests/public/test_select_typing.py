@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, assert_type
 
 from app.examples.models.defaults import DefaultsExample as D
-
 from plain.postgres import RowQuerySet
 from plain.postgres.functions import Upper
 

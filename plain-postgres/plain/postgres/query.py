@@ -61,7 +61,6 @@ __all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet", "RowQuerySet"]
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
-
     from plain.postgres import Model
 
 # The maximum number of results to fetch in a get() query.

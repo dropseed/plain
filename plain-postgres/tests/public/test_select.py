@@ -12,7 +12,6 @@ from dataclasses import dataclass
 import pytest
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.relationships import WidgetTag
-
 from plain.postgres import RowQuerySet
 from plain.postgres.functions import Upper
 
