@@ -951,7 +951,9 @@ from plain.postgres import Field, types
 class Integration(postgres.Model):
     name: Field[str] = types.TextField(max_length=100)
     api_key: Field[str] = types.EncryptedTextField(max_length=200)
-    credentials: Field[dict | None] = types.EncryptedJSONField(required=False, allow_null=True, default=None)
+    credentials: Field[dict | None] = types.EncryptedJSONField(
+        required=False, allow_null=True, default=None
+    )
 ```
 
 Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived from `SECRET_KEY`. The `cryptography` package is required — install it with `pip install cryptography`.
@@ -1087,10 +1089,14 @@ Annotate reverse relations with `ClassVar` — they're class-level accessors, no
 
 ```python
 # Basic usage
-books: ClassVar[types.ReverseForeignKey[Book]] = types.ReverseForeignKey(to="Book", field="author")
+books: ClassVar[types.ReverseForeignKey[Book]] = types.ReverseForeignKey(
+    to="Book", field="author"
+)
 
 # With custom QuerySet for proper method recognition
-books: ClassVar[types.ReverseForeignKey[Book, BookQuerySet]] = types.ReverseForeignKey(to="Book", field="author")
+books: ClassVar[types.ReverseForeignKey[Book, BookQuerySet]] = types.ReverseForeignKey(
+    to="Book", field="author"
+)
 
 # Now type checkers recognize custom methods like .published()
 author.books.query.published()
@@ -1281,10 +1287,10 @@ Use `default=""` instead of `allow_null=True` to avoid two representations of "e
 
 ```python
 # Bad — NULL and "" both mean "empty"
-nickname: str = types.TextField(max_length=50, allow_null=True)
+nickname: Field[str] = types.TextField(max_length=50, allow_null=True)
 
 # Good — single empty representation
-nickname: str = types.TextField(max_length=50, default="")
+nickname: Field[str] = types.TextField(max_length=50, default="")
 ```
 
 ## Forms

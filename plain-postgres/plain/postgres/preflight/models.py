@@ -112,7 +112,9 @@ class CheckTypedConstruction(PreflightCheck):
                 # params; ordinary (non-model) mixins don't.
                 if not isinstance(klass, ModelBase):
                     continue
-                for attr, ann in klass.__dict__.get("__annotations__", {}).items():
+                # eval_str=False (the default) keeps string annotations as
+                # strings, so forward refs are never resolved here.
+                for attr, ann in inspect.get_annotations(klass).items():
                     if attr.startswith("__") or is_classvar(ann) or attr in real:
                         continue
                     errors.append(

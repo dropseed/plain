@@ -166,19 +166,19 @@ def test_has_persistent_literal_default_predicate():
     assert not plain_fields.UUIDField(
         allow_null=True, default=None
     ).has_persistent_literal_default()
-    assert not plain_fields.BinaryField(
+    assert not plain_fields.DateTimeField(
         allow_null=True, default=None
     ).has_persistent_literal_default()
-    from plain.postgres.fields.encrypted import (
-        EncryptedJSONField,
-        EncryptedTextField,
-    )
+    # only_empty_default fields take default=None too (with required=False),
+    # and `None` is likewise not a persistent literal.
+    assert not plain_fields.BinaryField(
+        allow_null=True, required=False, default=None
+    ).has_persistent_literal_default()
+
+    from plain.postgres.fields.encrypted import EncryptedTextField
 
     assert not EncryptedTextField(
-        allow_null=True, default=None
-    ).has_persistent_literal_default()
-    assert not EncryptedJSONField(
-        allow_null=True, default=None
+        allow_null=True, required=False, default=None
     ).has_persistent_literal_default()
 
 

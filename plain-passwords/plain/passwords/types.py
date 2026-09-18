@@ -6,14 +6,13 @@ stub file that makes type checkers interpret field assignments as their
 primitive Python types.
 
 Usage:
+    from plain.postgres import Field, types
     from plain.passwords.types import PasswordField
 
     @postgres.register_model
     class User(postgres.Model):
-        email: str = types.EmailField()
+        email: Field[str] = types.EmailField()
         password: Field[str] = PasswordField()
-
-This is optional - you can continue using untyped field definitions.
 """
 
 from plain.passwords.models import PasswordField
