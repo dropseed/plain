@@ -96,7 +96,7 @@ class TLSAudit(Audit):
                     CheckResult(
                         name="connection",
                         passed=False,
-                        message=f"Failed to connect via TLS: {str(e)}",
+                        message=f"Failed to connect via TLS: {e!s}",
                     )
                 ],
                 description=self.description,
@@ -122,15 +122,17 @@ class TLSAudit(Audit):
         """Get certificate information from the server."""
         context = ssl.create_default_context()
 
-        with socket.create_connection((hostname, port), timeout=10) as sock:
-            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-                cert = ssock.getpeercert()
-                tls_version = ssock.version()
+        with (
+            socket.create_connection((hostname, port), timeout=10) as sock,
+            context.wrap_socket(sock, server_hostname=hostname) as ssock,
+        ):
+            cert = ssock.getpeercert()
+            tls_version = ssock.version()
 
-                return {
-                    "cert": cert,
-                    "tls_version": tls_version,
-                }
+            return {
+                "cert": cert,
+                "tls_version": tls_version,
+            }
 
     def _check_certificate_expiry(self, cert_info: dict) -> CheckResult:
         """Check if certificate is expired or expiring soon."""
@@ -146,8 +148,9 @@ class TLSAudit(Audit):
             )
 
         # Parse the date string (format: 'Jul 15 12:00:00 2025 GMT')
-        not_after = datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
-        not_after = not_after.replace(tzinfo=UTC)
+        not_after = datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z").replace(
+            tzinfo=UTC
+        )
 
         now = datetime.now(UTC)
         days_until_expiry = (not_after - now).days

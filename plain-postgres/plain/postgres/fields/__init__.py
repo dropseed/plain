@@ -25,7 +25,7 @@ from .text import EmailField, RandomStringField, TextField, URLField
 from .uuid import UUIDField
 
 __all__ = [
-    "PrimaryKeyField",
+    "NOT_PROVIDED",
     "BigIntegerField",
     "BinaryField",
     "BooleanField",
@@ -39,7 +39,7 @@ __all__ = [
     "FloatField",
     "GenericIPAddressField",
     "IntegerField",
-    "NOT_PROVIDED",
+    "PrimaryKeyField",
     "RandomStringField",
     "SmallIntegerField",
     "TextField",

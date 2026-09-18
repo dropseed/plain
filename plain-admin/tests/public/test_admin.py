@@ -1,5 +1,4 @@
 from app.users.models import User
-
 from plain.admin.views.base import AdminView
 from plain.admin.views.registry import registry
 from plain.test import Client

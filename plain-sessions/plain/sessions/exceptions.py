@@ -10,5 +10,3 @@ class SessionNotAvailable(Exception):
     - An error occurred before SessionMiddleware could run
     - A request is being processed outside the normal middleware chain
     """
-
-    pass

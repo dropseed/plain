@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 from app.examples.models.relationships import Widget
 from app.examples.models.upsert import UpsertItem, UpsertOwner
-
 from plain.postgres.exceptions import FieldError
 from plain.postgres.expressions import F
 

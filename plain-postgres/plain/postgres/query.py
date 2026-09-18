@@ -12,9 +12,8 @@ from functools import cached_property
 from itertools import islice
 from typing import TYPE_CHECKING, Any, Never, Self, cast, overload
 
-import psycopg
-
 import plain.runtime
+import psycopg
 from plain.exceptions import ValidationError
 from plain.postgres import transaction
 from plain.postgres.constants import LOOKUP_SEP, OnConflict
@@ -32,6 +31,7 @@ from plain.postgres.fields import (
     Field,
     PrimaryKeyField,
 )
+from plain.postgres.fields.base import ColumnField
 from plain.postgres.functions import Cast
 from plain.postgres.query_utils import Q
 from plain.postgres.sql import (
@@ -48,7 +48,7 @@ from plain.postgres.utils import resolve_callables
 from plain.utils.functional import partition
 
 # Re-exports for public API
-__all__ = ["F", "Q", "QuerySet", "ReturningQuerySet", "RawQuerySet", "Prefetch"]
+__all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet", "ReturningQuerySet"]
 
 if TYPE_CHECKING:
     from plain.postgres import Model
@@ -287,16 +287,15 @@ class QuerySet[T: "Model"]:
     _defer_next_filter: bool
     _deferred_filter: tuple[bool, tuple[Any, ...], dict[str, Any]] | None
     # None => plain update()/delete() returning an int rowcount.
-    # () => RETURNING every concrete column, hydrated into model instances.
+    # () => RETURNING every column, hydrated into model instances.
     # (field, ...) => RETURNING those columns, returned as dicts.
     _returning: tuple[Field, ...] | None
-    # The concrete fields to RETURN, or None for a plain write. Set once by
+    # The fields to RETURN, or None for a plain write. Set once by
     # returning() so update()/delete() don't recompute them at execute.
     _returning_fields: list[Field] | None
 
     def __init__(self):
         """Minimal init for descriptor mode. Use from_model() to create instances."""
-        pass
 
     @classmethod
     def from_model(cls, model: type[T], query: Query | None = None) -> Self:
@@ -562,7 +561,7 @@ class QuerySet[T: "Model"]:
             # can't be set automatically or AttributeError if it isn't an
             # attribute.
             try:
-                arg.default_alias
+                arg.default_alias  # noqa: B018 — probe; raises for complex aggregates
             except (AttributeError, TypeError):
                 raise TypeError("Complex aggregates require an alias")
             kwargs[arg.default_alias] = arg
@@ -653,7 +652,7 @@ class QuerySet[T: "Model"]:
         if not objs:
             return objs
         meta = self.model._model_meta
-        fields = meta.concrete_fields
+        fields = meta.fields
         self._prepare_for_bulk_create(objs)
         with transaction.atomic(savepoint=False):
             objs_with_id, objs_without_id = partition(lambda o: o.id is None, objs)
@@ -667,7 +666,6 @@ class QuerySet[T: "Model"]:
                 for obj_with_id, results in zip(objs_with_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
                         if field != id_field:
-                            assert field.name is not None
                             setattr(obj_with_id, field.name, result)
                 for obj_with_id in objs_with_id:
                     obj_with_id._state.adding = False
@@ -681,7 +679,6 @@ class QuerySet[T: "Model"]:
                 assert len(returned_columns) == len(objs_without_id)
                 for obj_without_id, results in zip(objs_without_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
-                        assert field.name is not None
                         setattr(obj_without_id, field.name, result)
                     obj_without_id._state.adding = False
 
@@ -732,8 +729,8 @@ class QuerySet[T: "Model"]:
 
         if not update_fields:
             raise ValueError("bulk_upsert() requires update_fields.")
-        if any(not f.concrete for f in update_fields):
-            raise ValueError("bulk_upsert() update_fields must be concrete fields.")
+        if any(not isinstance(f, ColumnField) for f in update_fields):
+            raise ValueError("bulk_upsert() update_fields must be database columns.")
         if any(f.primary_key for f in update_fields):
             raise ValueError("bulk_upsert() cannot update primary key fields.")
         overlap = {f.name for f in update_fields} & {f.name for f in unique_fields}
@@ -791,7 +788,7 @@ class QuerySet[T: "Model"]:
         # Include the PK column only when it is itself the conflict key;
         # otherwise let Postgres generate the identity value.
         pk_is_unique = any(f.primary_key for f in unique_fields)
-        fields = meta.concrete_fields
+        fields = meta.fields
         if not pk_is_unique:
             fields = [f for f in fields if not isinstance(f, PrimaryKeyField)]
 
@@ -852,8 +849,8 @@ class QuerySet[T: "Model"]:
         ]
         from plain.postgres.fields.related import ManyToManyField
 
-        if any(not f.concrete or isinstance(f, ManyToManyField) for f in fields_list):
-            raise ValueError("bulk_update() can only be used with concrete fields.")
+        if any(isinstance(f, ManyToManyField) for f in fields_list):
+            raise ValueError("bulk_update() cannot be used with many-to-many fields.")
         if any(f.primary_key for f in fields_list):
             raise ValueError("bulk_update() cannot be used with primary key fields.")
         if not objs_tuple:
@@ -883,7 +880,6 @@ class QuerySet[T: "Model"]:
                 case_statement = Case(*when_statements, output_field=field)
                 # PostgreSQL requires casted CASE in updates
                 case_statement = Cast(case_statement, output_field=field)
-                assert field.name is not None
                 update_kwargs[field.name] = case_statement
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
@@ -1096,7 +1092,7 @@ class QuerySet[T: "Model"]:
         """Capture the rows touched by the next update() or delete().
 
         With no arguments, update()/delete() return the affected rows as
-        model instances (RETURNING every concrete column). Given field
+        model instances (RETURNING every column). Given field
         references (`Model.field`), they return a list of dicts holding just
         those columns. Without returning(), update()/delete() return an int
         rowcount.
@@ -1136,24 +1132,24 @@ class QuerySet[T: "Model"]:
                 )
 
     def _resolve_returning_fields(self) -> list[Field]:
-        """Validate self._returning and produce the concrete fields to RETURN."""
+        """Validate self._returning and produce the fields to RETURN."""
         if not self._returning:
-            # No references given: RETURN every concrete column so the rows can
+            # No references given: RETURN every column so the rows can
             # be hydrated into full model instances.
-            return list(self.model._model_meta.concrete_fields)
+            return list(self.model._model_meta.fields)
         self._validate_field_refs(self._returning, where="returning()")
         object_name = self.model.model_options.object_name
         for field in self._returning:
-            if not field.concrete:
+            if not isinstance(field, ColumnField):
                 raise FieldError(
                     f"Cannot use {object_name}.{field.name} in returning(): "
-                    "only concrete database columns can be returned."
+                    "only database columns can be returned."
                 )
         return list(self._returning)
 
     def _hydrate_returning(self, fields: list[Field], rows: list[list]) -> list[Any]:
         """Turn converted RETURNING rows into instances (no names) or dicts."""
-        field_names = cast("list[str]", [field.name for field in fields])
+        field_names = [field.name for field in fields]
         if not self._returning:
             return [self.model.from_db(field_names, row) for row in rows]
         return [dict(zip(field_names, row)) for row in rows]
@@ -1179,9 +1175,9 @@ class QuerySet[T: "Model"]:
         del_query.sql_query.select_related = False
         del_query.sql_query.clear_ordering(force=True)
 
-        # FK errors (RESTRICT / NO_ACTION) leave the DB transaction aborted.
-        # Mark the connection so outer atomic() blocks see the abort state
-        # even if the caller catches IntegrityError themselves.
+        # RESTRICT violations leave the DB transaction aborted. Mark the
+        # connection so outer atomic() blocks see the abort state even if the
+        # caller catches IntegrityError themselves.
         with transaction.mark_for_rollback_on_error():
             result = del_query._raw_delete(returning_fields)
 
@@ -1253,7 +1249,7 @@ class QuerySet[T: "Model"]:
         # Reachable only via ReturningQuerySet.update(), which returns R.
         return self._hydrate_returning(returning_fields, result)  # ty: ignore[invalid-return-type]
 
-    def _update(self, values: list[tuple[Field, Any]]) -> int:
+    def _update(self, values: Sequence[tuple[Field, Any]]) -> int:
         """
         A version of update() that accepts field objects instead of field names.
         Used primarily for model saving and not intended for use by general
@@ -1512,7 +1508,7 @@ class QuerySet[T: "Model"]:
 
         return clone
 
-    def order_by(self, *field_names: str) -> Self:
+    def order_by(self, *field_names: str | ResolvableExpression) -> Self:
         """Return a new QuerySet instance with the ordering changed."""
         if self.sql_query.is_sliced:
             raise TypeError("Cannot reorder a query once a slice has been taken.")
@@ -1585,19 +1581,17 @@ class QuerySet[T: "Model"]:
         """
         if isinstance(self, EmptyQuerySet):
             return True
-        if self.sql_query.order_by:
-            return True
-        elif (
-            self.sql_query.default_ordering
-            and self.sql_query.model
-            and self.sql_query.model._model_meta.ordering  # ty: ignore[unresolved-attribute]
-            and
-            # A default ordering doesn't affect GROUP BY queries.
-            not self.sql_query.group_by
-        ):
-            return True
-        else:
-            return False
+        return bool(
+            self.sql_query.order_by
+            or (
+                self.sql_query.default_ordering
+                and self.sql_query.model
+                and self.sql_query.model.model_options.ordering
+                and
+                # A default ordering doesn't affect GROUP BY queries.
+                not self.sql_query.group_by
+            )
+        )
 
     ###################
     # PRIVATE METHODS #
@@ -1606,7 +1600,7 @@ class QuerySet[T: "Model"]:
     def _insert(
         self,
         objs: list[T],
-        fields: list[Field],
+        fields: Sequence[Field],
         returning_fields: list[Field] | None = None,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
@@ -1633,7 +1627,7 @@ class QuerySet[T: "Model"]:
     def _batched_insert(
         self,
         objs: list[T],
-        fields: list[Field],
+        fields: Sequence[Field],
         batch_size: int | None,
         *,
         returning_fields: list[Field] | None = None,

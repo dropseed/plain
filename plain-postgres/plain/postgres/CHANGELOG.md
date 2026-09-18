@@ -1,5 +1,132 @@
 # plain-postgres changelog
 
+## [0.117.0](https://github.com/dropseed/plain/releases/plain-postgres@0.117.0) (2026-09-04)
+
+### What's changed
+
+- Fixed `QuerySet.ordered`, which raised `AttributeError: 'Meta' object has no attribute 'ordering'` for any queryset without an explicit `order_by()`. It was reading the model's default ordering off `_model_meta` instead of `model_options`, so the property only ever worked on the one branch that never reached the lookup. It now correctly reports `True` when the model declares `Meta.ordering` and `False` when it doesn't ([d9406dfc6f](https://github.com/dropseed/plain/commit/d9406dfc6f))
+- Unresolved relation references are now separate attributes from resolved model classes. `rel.model` and `ManyToManyRel.through` used to hold whatever you passed to the field — a `"package.Model"` string early on, the class after `lazy_related_operation` overwrote it — so every reader had to guess which it had, and the guessing was done inconsistently (`isinstance(..., str)` in some places, `isinstance(..., ModelBase)` in others, `hasattr(..., "_model_meta")` in others still). The raw reference now lives on `rel.model_ref` and `rel.through_ref`, and `rel.model` / `rel.through` are read-only properties that return the resolved class or raise `TypeError` if it isn't resolved yet. The `TypeError` is deliberate: an `AttributeError` would be swallowed by `hasattr`/`getattr` and silently read as "no model" ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- `ForeignKeyField.target_field` dropped its own unresolved-reference `TypeError` — the `rel.model` property raises it now, with a message naming the field ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- `ManyToManyField._check_through_fields` reports an unresolved target by name instead of crashing on `related_model.model_options.object_name`, so a `through_fields` mistake on a not-yet-resolved relation produces the intended preflight message ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- `ModelState` now raises `TypeError` (was `ValueError`) when a field's `to` or `through` refers to a model class instead of a string reference, and detects it by checking the reference directly rather than probing for `_model_meta` ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- Removed `Field.concrete`. It was set to `self.column is not None` right after `column` was assigned the field's name, so it was `True` on every forward field and the checks that consulted it were dead. `bulk_create()` and `bulk_update()` now say what they actually reject — "bulk_update() cannot be used with many-to-many fields." rather than "can only be used with concrete fields." — and `Model.save(update_fields=...)` drops "non-concrete fields" from its error message. `ForeignObjectRel.concrete` and the unreachable virtual-field skip in `Model.__init__` are gone too ([af56244677](https://github.com/dropseed/plain/commit/af56244677))
+- `OrderBy.asc()` and `.desc()` return the `OrderBy` instead of `None`, matching every other expression's `asc`/`desc` and making `expr.desc().asc()` and inline use work. They still take no options — passing `nulls_first` or `nulls_last` raises `TypeError` pointing you at the attributes on the `OrderBy` itself, rather than being silently ignored ([f00e707ed0](https://github.com/dropseed/plain/commit/f00e707ed0))
+- Preflight expression checks no longer crash when a lookup path continues past a non-relation field — for example `Meta.ordering = ("name__nope",)` on a text field. The traversal now raises `FieldDoesNotExist` for the trailing part, which preflight already reports, instead of an `AttributeError` on `None` ([d9406dfc6f](https://github.com/dropseed/plain/commit/d9406dfc6f))
+- `MigrationGraph.make_state()` raises `NodeNotFoundError` when the plan hits a placeholder node, instead of an `AttributeError` on `None` ([d9406dfc6f](https://github.com/dropseed/plain/commit/d9406dfc6f))
+- The migration autodetector and `ProjectState` narrow on `RelatedField` / `ManyToManyField` / `ManyToManyRel` instead of `hasattr(field, "remote_field")` and `getattr(remote_field, "through", None)`. Rename handling only rewrites a reference when the old field is the same kind of relation, so a field swapped between a plain relation and an M2M during a rename no longer copies a mismatched reference across ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- `ProjectState._get_related_models` reads a forward relation's target from `remote_field.model_ref` rather than `f.model` — which returned the model the field is _declared on_, not the one it points at ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+- `Meta._expire_cache` propagation to a related model no longer swallows `AttributeError` to handle the unresolved-string case; it checks `model_ref` up front, so a genuine `AttributeError` inside `_expire_cache` surfaces ([a3962f7255](https://github.com/dropseed/plain/commit/a3962f7255))
+
+### Upgrade instructions
+
+- If you read `rel.model` or `rel.through` (via `field.remote_field`) in code that runs before models are fully loaded — preflight checks, `contribute_to_class`, custom fields, migration operations — switch to `rel.model_ref` / `rel.through_ref` and check `isinstance(ref, str)`. After model loading completes, `rel.model` and `rel.through` behave as before.
+- If you _assigned_ to `rel.model` or `rel.through`, assign to `rel.model_ref` / `rel.through_ref` instead — the plain names are now read-only properties.
+- If you referenced `Field.concrete` or `ForeignObjectRel.concrete`, remove the check. `concrete` was `True` for every forward field and `False` only on reverse relations, which `get_fields()` doesn't return unless you pass `include_reverse=True`.
+- If you asserted on the exact text of the `bulk_create()`, `bulk_update()`, or `save(update_fields=...)` errors, update the expected strings.
+- If you caught `ValueError` from `ModelState` for a model-class `to`/`through` reference, catch `TypeError`.
+- `OrderBy.asc()`/`.desc()` returning `self` is additive — existing calls that discarded the return value are unaffected.
+
+## [0.116.0](https://github.com/dropseed/plain/releases/plain-postgres@0.116.0) (2026-09-04)
+
+### What's changed
+
+- **`Meta` now exposes exactly two forward-field collections: `fields` and `many_to_many`.** `local_fields`, `local_many_to_many`, `concrete_fields`, and `local_concrete_fields` are gone. Plain has no model inheritance and no non-concrete forward fields, so "local" and "concrete" drew distinctions that could never differ — four names for two lists, each with its own cached property and its own filtering pass. `fields` is every column-backed field (primary key first, then sorted by name) and `many_to_many` is every `ManyToManyField` (sorted by name); both now read straight from the storage `add_field()` fills, instead of re-filtering `_get_fields()` on each access ([9f0d0da22d](https://github.com/dropseed/plain/commit/9f0d0da22d))
+- `Meta.fields` is typed as `ImmutableList[ColumnField]` and `Meta.many_to_many` as `ImmutableList[ManyToManyField]`, so the column attributes (`column`, `db_type()`, `primary_key`) are readable off a field without an `isinstance` check first. `add_field()` enforces that by raising `TypeError` for a field that is neither a `ColumnField` nor a `ManyToManyField` ([996c099e2b](https://github.com/dropseed/plain/commit/996c099e2b), [9f0d0da22d](https://github.com/dropseed/plain/commit/9f0d0da22d))
+- The `postgres.non_local_field_reference` preflight check is removed. It rejected an `indexes` or `constraints` entry naming a field "not local to" the model — unreachable without inheritance, since a forward field found on the model is always the model's own ([9f0d0da22d](https://github.com/dropseed/plain/commit/9f0d0da22d))
+- `Field.name` is typed `str` instead of `str | None` — it starts as `""` and becomes the real name in `set_attributes_from_name()`. That drops roughly twenty `assert self.name is not None` guards from the field descriptor, save, and preflight paths. `Field.deconstruct()` (and the `ColumnField`, `DefaultableField`, `ChoicesField`, `RelatedField`, `ForeignKeyField`, and `ManyToManyField` overrides) returns `tuple[str, str, list, dict]` accordingly ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+- `get_joining_columns()` moved from `ForeignObjectRel` to `ForeignKeyRel`. It delegates to `field.get_joining_columns(reverse_join=True)`, which only a foreign key has ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+- `PathInfo.join_field` is typed `ForeignKeyField | ForeignKeyRel` (was `ForeignKeyField | ForeignObjectRel`), and `select_related_descend()` is a `TypeGuard[RelatedField]` so a passing field narrows at the call site ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+- `QuerySet._update()`, `_insert()`, `_batched_insert()`, `UpdateQuery.add_update_fields()`, and `InsertQuery.insert_values()` accept a `Sequence` of fields rather than requiring a `list`, so an `ImmutableList` from `Meta` can be passed straight through ([51cb71f758](https://github.com/dropseed/plain/commit/51cb71f758))
+
+### Upgrade instructions
+
+- Replace `_model_meta.local_fields`, `_model_meta.concrete_fields`, and `_model_meta.local_concrete_fields` with `_model_meta.fields`. In Plain these were always the same set of fields.
+- Replace `_model_meta.local_many_to_many` with `_model_meta.many_to_many`.
+- Replace `_model_meta._non_pk_concrete_field_names` with `_model_meta._non_pk_field_names`.
+- If you have a custom `Field` subclass, `deconstruct()` now returns `str` as its first element rather than `str | None`, and `self.name` is `""` (not `None`) before the field is contributed to a model class. Update any annotation or `is None` check accordingly.
+- If you called `get_joining_columns()` on a reverse relation, it is now available on `ForeignKeyRel` only.
+
+## [0.115.0](https://github.com/dropseed/plain/releases/plain-postgres@0.115.0) (2026-09-02)
+
+### What's changed
+
+- **Foreign keys are now `NOT DEFERRABLE`** (Postgres's own default) and checked at each write. Plain inherited Django's `DEFERRABLE INITIALLY DEFERRED` foreign keys, added in 2007 so fixtures could contain forward references. Plain has no fixtures, and the deferral was causing real problems: a migration that adds a column, backfills it in `RunPython`, then alters the same table failed with "cannot ALTER TABLE ... because it has pending trigger events" whenever the backfill touched a row, and FK violations only surfaced at `COMMIT` with a traceback pointing at `atomic.__exit__` instead of the offending write ([8cbfa0cb40](https://github.com/dropseed/plain/commit/8cbfa0cb40))
+- Convergence detects an existing `DEFERRABLE` foreign key as drift and fixes it with a catalog-only `ALTER CONSTRAINT ... NOT DEFERRABLE` — no revalidation scan, just a brief `ACCESS EXCLUSIVE` lock bounded by the usual `lock_timeout` — so the first `postgres sync` after upgrading rewrites every FK quickly. A legacy `DEFERRABLE` + `NOT VALID` foreign key gets both corrections in one pass ([8cbfa0cb40](https://github.com/dropseed/plain/commit/8cbfa0cb40))
+- `NO_ACTION` is removed. Its only meaning was deferred checking — use `RESTRICT` ([8cbfa0cb40](https://github.com/dropseed/plain/commit/8cbfa0cb40))
+- A foreign key violation from `create()`/`update()` now surfaces as a `ValidationError` routed to the `ForeignKeyField` — "Author with id 5 does not exist." — with code `invalid_choice` so forms can override it. It lands in the same `IntegrityError` mapping that unique and check constraints already used, so a missing related row reports like any other field error instead of a 500. The message is `ForeignKeyField.does_not_exist_error_message`. Set-based writes (`QuerySet.update()`, `bulk_create()`) and a `delete()` blocked by `RESTRICT` still raise the raw `psycopg` error, since there's no instance to attribute it to ([31df77e665](https://github.com/dropseed/plain/commit/31df77e665))
+- That mapping keys on the foreign key's generated constraint name, so convergence now treats a stale name — left behind by `RenameField`/`RenameModel`, which only rename the column or table — as drift and renames the constraint. Because the write-path mapping depends on those corrections having run, FK renames and the `NOT DEFERRABLE` flip block sync on failure. `generate_fk_constraint_name()` moved to `plain.postgres.utils` and is now the single source of that name for both convergence and the write path ([31df77e665](https://github.com/dropseed/plain/commit/31df77e665))
+- **`UniqueConstraint(deferrable=...)` and the `Deferrable` enum are removed.** With foreign keys immediate, this was the last deferred-constraint concept in Plain, nothing in Plain's own packages used it, and it forced a caveat onto every "constraints are checked at the write" statement while keeping the pending-trigger-events failure alive for one case. Rails (pre-7.1), Ecto, and Laravel never had it for uniques. Every constraint is now checked at the write that violates it, never at commit ([fd1e7f1e13](https://github.com/dropseed/plain/commit/fd1e7f1e13))
+- `DatabaseConnection.check_constraints()` is gone, and the pytest `db` fixture no longer forces deferred constraints to immediate at teardown — there is nothing left to defer ([fd1e7f1e13](https://github.com/dropseed/plain/commit/fd1e7f1e13))
+- Constraint renames now run in convergence pass 1, matching index renames, so anything else planned for the same constraint in that pass addresses it by its new name ([fd1e7f1e13](https://github.com/dropseed/plain/commit/fd1e7f1e13))
+- New README section, "Constraints are checked immediately", covering the patterns this changes: create parents before children, use a nullable back-reference for a foreign key cycle (two required FKs pointing at each other can never be inserted), and move through a temporary value when swapping two rows under a unique constraint, since Postgres checks uniqueness per row even within a single `UPDATE` ([8cbfa0cb40](https://github.com/dropseed/plain/commit/8cbfa0cb40), [fd1e7f1e13](https://github.com/dropseed/plain/commit/fd1e7f1e13))
+
+### Upgrade instructions
+
+- Replace `NO_ACTION` with `RESTRICT` in your models **and in any historical migration file that references it** — `postgres.NO_ACTION` no longer exists, so a migration importing it fails to load.
+- Remove `deferrable=` from every `UniqueConstraint(...)` and drop any `Deferrable` import. An existing deferred unique constraint in the database shows as CHANGED drift with staged-rollout guidance — nothing is rewritten silently.
+- Run `plain postgres sync` after upgrading. It flips every existing foreign key to `NOT DEFERRABLE` (catalog-only, no table scan) and renames foreign key constraints left stale by past `RenameField`/`RenameModel`.
+- Code that inserted a child row before its parent, or deleted a parent and re-pointed its children later in the same transaction, now raises `ForeignKeyViolation` at that statement rather than succeeding by commit time. Create parents before children; for a foreign key cycle, create both rows and then `update()` the nullable back-reference.
+- If you catch `psycopg.IntegrityError` around `create()`/`update()` to handle a missing related row, catch `ValidationError` instead — or both, if the same block also covers set-based writes.
+- If you called `connection.check_constraints()`, remove the call.
+
+## [0.114.0](https://github.com/dropseed/plain/releases/plain-postgres@0.114.0) (2026-08-12)
+
+### What's changed
+
+- Wrong-type arguments now raise `TypeError` instead of `ValueError` across the schema and query APIs: `UniqueConstraint`/`Index` options (`condition`, `deferrable`, `include`, `opclasses`, `fields`), `Extract`/`Trunc` field types, non-bool `isnull` lookups, `RunPython` without a callable, serializer registration, assigning a wrong-model instance (or bool) to a foreign key, and reverse descriptors on non-FK/M2M fields ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `Migration.operations`/`dependencies`/`replaces` are typed as `Sequence`, and `plain migrations create` now writes them as tuples in generated files. Existing list-based migration files keep working ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Migration filename timestamps use the app's `TIME_ZONE` (via `timezone.localtime()`) instead of the machine's local clock, so a team generates consistently named migrations ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Model field `default_validators` is now a tuple and `empty_values` a tuple; `ignored_tables` on the connection is a tuple ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `ModelsRegistry.get_models()` caching was reworked to a per-instance memo (still cleared by `clear_cache()`), replacing a `functools.cache` keyed on the registry instance ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `on_commit()` handler errors are logged with `logger.exception()` — same message and traceback, standard idiom ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- If you catch `ValueError` around any of the argument-validation cases above, catch `TypeError` instead
+- Newly generated migrations use tuples for `dependencies`/`operations`; existing migration files don't need to change
+- Requires `plain>=0.157.0`
+
+## [0.113.2](https://github.com/dropseed/plain/releases/plain-postgres@0.113.2) (2026-08-10)
+
+### What's changed
+
+- Fixed a `NameError` on any expression-based ordering — `Model.query.order_by(F("name"))`, `order_by(Lower("name"))`, or `Options(ordering=[Lower("name")])`. `SQLCompiler` cast ordering items to `BaseExpression`, which was imported only under `TYPE_CHECKING`; `cast()`'s first argument is an ordinary expression and is evaluated at runtime, so the branch raised instead of compiling. `BaseExpression` moves into the existing runtime import from `plain.postgres.expressions`. ([3429735be0](https://github.com/dropseed/plain/commit/3429735be0))
+- `QuerySet.order_by()` and `Query.add_ordering()` now accept `str | ResolvableExpression` instead of `str` / `str | BaseExpression`. That's the protocol both layers actually test with `isinstance()`, and the one `F()` satisfies (`F` extends `Combinable`, not `BaseExpression`) — so no type-checked caller could reach the expression branch at all before. ([3429735be0](https://github.com/dropseed/plain/commit/3429735be0))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.113.1](https://github.com/dropseed/plain/releases/plain-postgres@0.113.1) (2026-08-07)
+
+### What's changed
+
+- Internal: `Meta` field sorting tolerates a field whose `name` hasn't been set yet, keeping the sort key type-correct under ty 0.0.65. No behavior change. ([a798c13c92](https://github.com/dropseed/plain/commit/a798c13c92))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.113.0](https://github.com/dropseed/plain/releases/plain-postgres@0.113.0) (2026-08-02)
+
+### What's changed
+
+- **`QuerySet.extra()` has been removed**, along with all of its supporting machinery (`extra_select`, `extra_tables`, `extra_order_by`, `ExtraWhere`). Use `annotate()` with `RawSQL` or other expressions instead. ([3fed0b32f1](https://github.com/dropseed/plain/commit/3fed0b32f1))
+- **`FilteredRelation` has been removed** — it's no longer importable from `plain.postgres` or usable in `annotate()`. Express conditional joins with `Q` filters or subqueries instead. ([434f57852f](https://github.com/dropseed/plain/commit/434f57852f))
+- **`QuerySet.alias()` and logical XOR have been removed** — `Q(...) ^ Q(...)` and `queryset ^ queryset` are no longer supported. Use `annotate()` in place of `alias()`, and compose AND/OR/NOT in place of XOR. ([c12cf81af4](https://github.com/dropseed/plain/commit/c12cf81af4))
+- **Encrypted and binary fields now accept their empty value as a declared `default=`.** `EncryptedTextField` (now a `TextField` subclass) accepts exactly `default=""` and `BinaryField` accepts exactly `default=b""`, each paired with `required=False` — the empty value is stored as plaintext so it's the one default expressible as a column `DEFAULT`, which is what lets the field be added to a populated table. `default=None` requires `allow_null=True` + `required=False`. The `types.pyi` stub overloads encode the same coupling. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+- **The migration autodetector no longer waves through `required=False` fields with no declared default.** Adding a non-nullable field without a `default=` now refuses at `plain migrations create` time with a field-accurate remedy (previously these could generate an `AddField` that failed at apply time on any populated table). The optional-string idiom is `required=False, default=""`. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+- **`EncryptedJSONField` is now a `JSONField` subclass** and `EncryptedTextField` a `TextField` subclass, instead of parallel `ColumnField` implementations — behavior like max_length validation and JSON encoding now comes from the real base classes. The encrypted lookup surface is still just `exact`/`isnull`, and JSON key transforms are blocked (they'd operate on ciphertext). `EncryptedJSONField` accepts no `default=` at all — even `{}` would need ciphertext; use `allow_null=True`. ([5153ceb106](https://github.com/dropseed/plain/commit/5153ceb106), [2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+- Model forms no longer prefill a `BinaryField`'s `b""` default as a text input's initial value (it rendered as the literal `b''`), and encrypted fields now map to form fields through the regular `TextField`/`JSONField` branches. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+- M2M prefetches now expose the through-table join column via `annotate(RawSQL(...))` instead of the removed `extra()`, and internal path-info plumbing lost its `filtered_relation` threading. ([3fed0b32f1](https://github.com/dropseed/plain/commit/3fed0b32f1), [434f57852f](https://github.com/dropseed/plain/commit/434f57852f))
+
+### Upgrade instructions
+
+- Replace `QuerySet.extra()` calls: `extra(select=...)` becomes `annotate(name=RawSQL("...", []))`, `extra(where=...)` becomes `filter()` with expressions or `RawSQL`, and `extra(order_by=...)` becomes `order_by()` on an annotation.
+- Replace `FilteredRelation` annotations with filtered subqueries or `Q` conditions, and `QuerySet.alias()` with `annotate()`.
+- Replace `Q(a) ^ Q(b)` / `qs1 ^ qs2` with explicit AND/OR logic: `(Q(a) | Q(b)) & ~(Q(a) & Q(b))`.
+- If `plain migrations create` now refuses a field it previously accepted, follow the error's remedy: declare `required=False, default=""` (or `default=b""` / an appropriate literal) so existing rows get a value, or add it with `allow_null=True` plus a backfill data migration.
+
 ## [0.112.0](https://github.com/dropseed/plain/releases/plain-postgres@0.112.0) (2026-07-21)
 
 ### What's changed
@@ -367,7 +494,11 @@
 
     ```python
     # Before
-    from plain.postgres.connections import get_connection, read_only, use_management_connection
+    from plain.postgres.connections import (
+        get_connection,
+        read_only,
+        use_management_connection,
+    )
 
     # After
     from plain.postgres.db import get_connection, read_only, use_management_connection

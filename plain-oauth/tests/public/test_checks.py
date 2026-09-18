@@ -1,5 +1,4 @@
 from app.users.models import User
-
 from plain.oauth.models import OAuthConnection
 from plain.oauth.preflight import CheckOAuthProviderKeys
 

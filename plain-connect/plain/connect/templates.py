@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 from jinja2.runtime import Context
-
 from plain.runtime import settings
 from plain.templates import register_template_extension, register_template_global
 from plain.templates.jinja.extensions import InclusionTagExtension
@@ -27,7 +26,7 @@ except ImportError:
 
 @register_template_extension
 class ConnectPageviewsExtension(InclusionTagExtension):
-    tags = {"connect_pageviews"}
+    tags = {"connect_pageviews"}  # noqa: RUF012 — jinja2 types `tags` as an instance attribute; ClassVar here fails ty's LSP check
     template_name = "connect/pageviews.html"
 
     def get_context(
@@ -50,7 +49,7 @@ class ConnectPageviewsExtension(InclusionTagExtension):
 
 @register_template_extension
 class ConnectSupportFieldsExtension(InclusionTagExtension):
-    tags = {"connect_support_fields"}
+    tags = {"connect_support_fields"}  # noqa: RUF012 — jinja2 types `tags` as an instance attribute; ClassVar here fails ty's LSP check
     template_name = "connect/support_fields.html"
 
     def get_context(

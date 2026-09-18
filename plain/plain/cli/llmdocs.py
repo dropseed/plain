@@ -125,14 +125,16 @@ class LLMDocs:
             if not isinstance(node, ast.Assign):
                 continue
             for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "__all__":
-                    if isinstance(node.value, ast.List | ast.Tuple):
-                        return {
-                            elt.value
-                            for elt in node.value.elts
-                            if isinstance(elt, ast.Constant)
-                            and isinstance(elt.value, str)
-                        }
+                if (
+                    isinstance(target, ast.Name)
+                    and target.id == "__all__"
+                    and isinstance(node.value, ast.List | ast.Tuple)
+                ):
+                    return {
+                        elt.value
+                        for elt in node.value.elts
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+                    }
         return set()
 
     @staticmethod

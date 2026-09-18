@@ -29,12 +29,32 @@ class MigrationExecutor:
         self.loader = MigrationLoader(self.connection)
         self.recorder = MigrationRecorder(self.connection)
         self.progress_callback = progress_callback
+        # A baseline an explicitly named --fake is recording by hand; the one
+        # case the loader's refusal for that package is stepped around.
+        self.repair_baseline: tuple[str, str] | None = None
+
+    @property
+    def record_only(self) -> set[tuple[str, str]]:
+        """Baselines to record without running: the loader's adoptions, plus
+        the one a named --fake is repairing."""
+        keys = self.loader.baseline_status.adopt_keys
+        if self.repair_baseline is not None:
+            keys = keys | {self.repair_baseline}
+        return keys
 
     def migration_plan(
-        self, targets: list[tuple[str, str]], clean_start: bool = False
+        self,
+        targets: list[tuple[str, str]],
+        clean_start: bool = False,
+        repair_baseline: tuple[str, str] | None = None,
     ) -> list[Migration]:
         """
         Given a set of targets, return a list of Migration instances.
+
+        A baseline the loader says to adopt stays in the plan and is recorded
+        rather than run (see `record_only`). A package the loader refuses
+        raises here when it is in the plan - except the one `repair_baseline`
+        names, which an explicit `--fake` is recording by hand.
         """
         plan = []
         if clean_start:
@@ -47,6 +67,18 @@ class MigrationExecutor:
                 if migration not in applied:
                     plan.append(self.loader.graph.nodes[migration])
                     applied[migration] = self.loader.graph.nodes[migration]
+        if not clean_start:
+            self.repair_baseline = repair_baseline
+            packages = {m.package_label for m in plan if m is not None}
+            for refusal in self.loader.baseline_status.refusals:
+                if refusal.package_label not in packages:
+                    continue
+                if (
+                    repair_baseline is not None
+                    and refusal.package_label == repair_baseline[0]
+                ):
+                    continue
+                raise refusal
         return plan  # ty: ignore[invalid-return-type] (graph.nodes may hold dummy None, never reached here)
 
     def _create_project_state(
@@ -62,7 +94,14 @@ class MigrationExecutor:
             full_plan = self.migration_plan(
                 self.loader.graph.leaf_nodes(), clean_start=True
             )
-            applied_source = self.loader.applied_migrations or {}
+            # An unrecorded baseline that a recorded migration depends on must
+            # already be in the state: that dependent's models reference it.
+            # Every other baseline - adopted or run - contributes its state at
+            # its own turn, after its own dependencies have.
+            applied_source = (
+                set(self.loader.applied_migrations or {})
+                | self._baselines_recorded_migrations_need()
+            )
             applied_migrations = {
                 self.loader.graph.nodes[key]
                 for key in applied_source
@@ -72,6 +111,28 @@ class MigrationExecutor:
                 if migration in applied_migrations:
                     migration.mutate_state(state, preserve=False)
         return state
+
+    def _baselines_recorded_migrations_need(self) -> set[tuple[str, str]]:
+        """Unrecorded baselines that some recorded migration depends on.
+
+        Their models are already referenced by state the pre-run replay
+        builds, so they go in first. A baseline nothing recorded depends on
+        waits its turn in plan order - preloading it would reference models
+        of its own dependencies that may not be applied yet.
+        """
+        applied = self.loader.applied_migrations or {}
+        candidates = {
+            (label, baseline.name)
+            for label, baseline in self.loader.baselines.items()
+            if (label, baseline.name) not in applied
+        }
+        if not candidates:
+            return set()
+        needed_by_recorded: set[tuple[str, str]] = set()
+        for key in applied:
+            if key in self.loader.graph.nodes:
+                needed_by_recorded.update(self.loader.graph.forwards_plan(key))
+        return candidates & needed_by_recorded
 
     def migrate(
         self,
@@ -128,56 +189,55 @@ class MigrationExecutor:
                         break
                     if migration in migrations_to_run:
                         if "models_registry" not in state.__dict__:
-                            state.models_registry  # Render all -- performance critical
-                        state = self.apply_migration(state, migration, fake=fake)
+                            state.models_registry  # noqa: B018 — cached-property render; performance critical
+                        state = self.apply_migration(
+                            state,
+                            migration,
+                            fake=fake,
+                            record_only=(migration.package_label, migration.name)
+                            in self.record_only,
+                        )
                         migrations_to_run.remove(migration)
-
-        self.check_replacements()
 
         assert state is not None
         return state
 
     def apply_migration(
-        self, state: ProjectState, migration: Migration, fake: bool = False
+        self,
+        state: ProjectState,
+        migration: Migration,
+        fake: bool = False,
+        record_only: bool = False,
     ) -> ProjectState:
-        """Run a migration forwards."""
+        """Run a migration forwards.
+
+        `record_only` is a baseline being adopted: the database already has
+        its tables, so it is recorded without running - like `fake`, and
+        reported to the callback as such.
+        """
         if self.progress_callback:
-            self.progress_callback("apply_start", migration=migration, fake=fake)
-        if not fake:
+            self.progress_callback(
+                "apply_start", migration=migration, fake=fake or record_only
+            )
+        if fake or record_only:
+            # Recorded, not run - but the project state still moves forward so
+            # a migration that follows can build on what this one declares.
+            # (A baseline the pre-run replay already put there is re-added
+            # unchanged.)
+            state = migration.mutate_state(state, preserve=False)
+            self.recorder.record_applied(migration.package_label, migration.name)
+        else:
             with self.connection.schema_editor(
                 atomic=migration.atomic
             ) as schema_editor:
                 state = migration.apply(
                     state, schema_editor, operation_callback=self.progress_callback
                 )
-                self.record_migration(migration)
-        else:
-            self.record_migration(migration)
+                # Recorded inside the schema editor's transaction, so the row
+                # commits with the DDL or rolls back with it.
+                self.recorder.record_applied(migration.package_label, migration.name)
         if self.progress_callback:
-            self.progress_callback("apply_success", migration=migration, fake=fake)
+            self.progress_callback(
+                "apply_success", migration=migration, fake=fake or record_only
+            )
         return state
-
-    def record_migration(self, migration: Migration) -> None:
-        # For replacement migrations, record individual statuses
-        if migration.replaces:
-            for package_label, name in migration.replaces:
-                self.recorder.record_applied(package_label, name)
-        else:
-            self.recorder.record_applied(migration.package_label, migration.name)
-
-    def check_replacements(self) -> None:
-        """
-        Mark replacement migrations applied if their replaced set all are.
-
-        Do this unconditionally on every migrate, rather than just when
-        migrations are applied or unapplied, to correctly handle the case
-        when a new squash migration is pushed to a deployment that already had
-        all its replaced migrations applied. In this case no new migration will
-        be applied, but the applied state of the squashed migration must be
-        maintained.
-        """
-        applied = self.recorder.applied_migrations()
-        for key, migration in self.loader.replacements.items():
-            all_applied = all(m in applied for m in migration.replaces)
-            if all_applied and key not in applied:
-                self.recorder.record_applied(*key)

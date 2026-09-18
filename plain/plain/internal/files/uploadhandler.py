@@ -27,8 +27,6 @@ class UploadFileException(Exception):
     Any error having to do with uploading files.
     """
 
-    pass
-
 
 class StopUpload(UploadFileException):
     """
@@ -55,16 +53,12 @@ class SkipFile(UploadFileException):
     This exception is raised by an upload handler that wants to skip a given file.
     """
 
-    pass
-
 
 class StopFutureHandlers(UploadFileException):
     """
     Upload handlers that have handled a file and do not want future handlers to
     run should raise this exception instead of returning None.
     """
-
-    pass
 
 
 class FileUploadHandler(ABC):
@@ -103,7 +97,6 @@ class FileUploadHandler(ABC):
 
         Note: Access self.request for content_length, environ, or other request data.
         """
-        pass
 
     def new_file(
         self,
@@ -150,14 +143,12 @@ class FileUploadHandler(ABC):
         Signal that the upload is complete. Subclasses should perform cleanup
         that is necessary for this handler.
         """
-        pass
 
     def upload_interrupted(self) -> None:
         """
         Signal that the upload was interrupted. Subclasses should perform
         cleanup that is necessary for this handler.
         """
-        pass
 
 
 class TemporaryFileUploadHandler(FileUploadHandler):
@@ -180,7 +171,6 @@ class TemporaryFileUploadHandler(FileUploadHandler):
 
     def receive_data_chunk(self, raw_data: bytes, start: int) -> None:
         self.file.write(raw_data)
-        return None
 
     def file_complete(self, file_size: int) -> TemporaryUploadedFile:
         self.file.seek(0)

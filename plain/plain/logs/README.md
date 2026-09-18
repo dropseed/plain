@@ -37,7 +37,9 @@ app_logger.info("User logged in", context={"user_id": 123, "method": "oauth"})
 
 # All log levels work the same way
 app_logger.warning("Rate limit approaching", context={"requests": 95, "limit": 100})
-app_logger.error("Payment failed", context={"order_id": "abc-123", "reason": "insufficient_funds"})
+app_logger.error(
+    "Payment failed", context={"order_id": "abc-123", "reason": "insufficient_funds"}
+)
 ```
 
 ## Using app_logger
@@ -59,11 +61,14 @@ app_logger.critical("Database connection pool exhausted")
 Pass structured data using the `context` parameter. This data appears in your log output based on your chosen format.
 
 ```python
-app_logger.info("Order placed", context={
-    "order_id": "ord-456",
-    "items": 3,
-    "total": 99.99,
-})
+app_logger.info(
+    "Order placed",
+    context={
+        "order_id": "ord-456",
+        "items": 3,
+        "total": 99.99,
+    },
+)
 ```
 
 You can also include exception tracebacks:
@@ -87,7 +92,9 @@ Log messages should be **capitalized sentence fragments** — short, stable, and
 # Good: message is stable, data is structured
 app_logger.info("Order placed", context={"order_id": "ord-456", "total": 99.99})
 app_logger.warning("Rate limit approaching", context={"requests": 95, "limit": 100})
-app_logger.error("Webhook delivery failed", context={"url": "https://example.com", "attempts": 3})
+app_logger.error(
+    "Webhook delivery failed", context={"url": "https://example.com", "attempts": 3}
+)
 ```
 
 This keeps the message and data visually distinct in output. The message stays greppable across environments, and the structured data is available for filtering in log aggregation tools.
@@ -144,7 +151,7 @@ app_logger.context["request_id"] = "req-789"
 app_logger.context["user_id"] = 42
 
 app_logger.info("Starting request")  # Includes request_id and user_id
-app_logger.info("Fetching data")     # Includes request_id and user_id
+app_logger.info("Fetching data")  # Includes request_id and user_id
 
 # Clear when done
 app_logger.context.clear()
@@ -159,9 +166,9 @@ app_logger.context["user_id"] = 42
 
 with app_logger.include_context(operation="checkout", cart_id="cart-123"):
     app_logger.info("Starting checkout")  # Has user_id, operation, cart_id
-    app_logger.info("Validating items")   # Has user_id, operation, cart_id
+    app_logger.info("Validating items")  # Has user_id, operation, cart_id
 
-app_logger.info("Checkout complete")      # Only has user_id
+app_logger.info("Checkout complete")  # Only has user_id
 ```
 
 ## Debug mode

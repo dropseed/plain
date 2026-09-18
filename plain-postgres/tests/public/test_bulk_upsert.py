@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 from app.examples.models.returning import ReturningEvent
 from app.examples.models.upsert import UpsertItem
-
 from plain.postgres.exceptions import FieldError
 
 

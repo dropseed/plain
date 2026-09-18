@@ -1,5 +1,4 @@
 from app.users.models import User
-
 from plain.auth import login, logout
 from plain.auth.views import AuthView
 from plain.http import Response
@@ -77,7 +76,7 @@ class NoLoginUrlView(AuthView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("login", LoginView, name="login"),
         path("visit", VisitView, name="visit"),
         path("session-login", SessionLoginView, name="session_login"),
@@ -87,4 +86,4 @@ class AppRouter(Router):
         path("open", OpenView, name="open"),
         path("admin", AdminView, name="admin"),
         path("nolink", NoLoginUrlView, name="nolink"),
-    ]
+    )

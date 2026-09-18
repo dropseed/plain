@@ -65,11 +65,11 @@ if os.name == "nt":
         _fields_ = [("Offset", DWORD), ("OffsetHigh", DWORD)]
 
     class _OFFSET_UNION(Union):
-        _anonymous_ = ["_offset"]
-        _fields_ = [("_offset", _OFFSET), ("Pointer", PVOID)]
+        _anonymous_ = ("_offset",)
+        _fields_ = (("_offset", _OFFSET), ("Pointer", PVOID))
 
     class OVERLAPPED(Structure):
-        _anonymous_ = ["_offset_union"]
+        _anonymous_ = ("_offset_union",)
         _fields_ = [
             ("Internal", ULONG_PTR),
             ("InternalHigh", ULONG_PTR),

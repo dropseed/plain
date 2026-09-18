@@ -73,9 +73,9 @@ class ResponseMetadata:
             # `_rest` dict; SameSite casing varies by server, so match case-insensitively.
             rest: dict[str, str | None] = getattr(cookie, "_rest", {})
             samesite = None
-            for key in rest:
+            for key, rest_value in rest.items():
                 if key.lower() == "samesite":
-                    samesite = rest[key]
+                    samesite = rest_value
                     break
 
             cookies.append(

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import threading
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
@@ -16,14 +16,13 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 from opentelemetry.trace import NoOpTracer
-from psycopg_pool import PoolTimeout
-
 from plain.postgres import otel as postgres_otel
 from plain.postgres.db import get_connection
 from plain.postgres.otel import register_pool_observables
 from plain.postgres.sources import runtime_pool_source
 from plain.runtime import settings
 from plain.test.otel import install_test_meter
+from psycopg_pool import PoolTimeout
 
 # Pool observables were registered against the proxy meter at package
 # `ready()`; ensure the real MeterProvider is installed and rebind so
@@ -101,7 +100,7 @@ class TestQuerySpanAttributes:
         monkeypatch.setattr(postgres_otel, "tracer", NoOpTracer())
 
         class StubDb:
-            settings_dict: dict[str, Any] = {}
+            settings_dict: ClassVar[dict[str, Any]] = {}
 
         with postgres_otel.db_span(StubDb(), "SELECT 1") as span:  # ty: ignore[invalid-argument-type]
             pass

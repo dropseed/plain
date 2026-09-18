@@ -79,4 +79,4 @@ class PackageConfig:
         """
         Override this method in subclasses to run code when Plain starts.
         """
-        return None
+        return

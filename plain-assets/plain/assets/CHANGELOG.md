@@ -1,5 +1,27 @@
 # plain-assets changelog
 
+## [0.4.3](https://github.com/dropseed/plain/releases/plain-assets@0.4.3) (2026-08-12)
+
+### What's changed
+
+- Conditional-request validators (`ETag`, `Last-Modified`, file size) are computed fresh per request for non-fingerprinted assets, so replacing a served file on disk is reflected immediately. (The previous per-view-instance cache never actually produced hits, so behavior in practice is unchanged — this makes the intent explicit) ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- `Last-Modified` is omitted when a file's mtime is 0 instead of emitting a 1970 date ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- HTTP date formatting goes through `plain.utils.http.http_date()` ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.4.2](https://github.com/dropseed/plain/releases/plain-assets@0.4.2) (2026-08-02)
+
+### What's changed
+
+- The compiled-asset redirect now passes an explicit `status_code=302`, per the new requirement in plain 0.155.0. Behavior is unchanged. ([caa718b4bf](https://github.com/dropseed/plain/commit/caa718b4bf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.4.1](https://github.com/dropseed/plain/releases/plain-assets@0.4.1) (2026-06-26)
 
 ### What's changed

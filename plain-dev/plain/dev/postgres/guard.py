@@ -44,14 +44,20 @@ def guard_shared_database(
     hasn't applied. When it acts it forks — the choice that can't damage anyone
     else's data — which is the right default for people, CI, and agents alike.
     """
+    # Lazy, like every plain.postgres import here: plain-dev doesn't depend on it.
+    from plain.postgres.migrations.exceptions import MigrationHistoryError
+
     current = checkout_id(project_root)
     metadata = cluster.get_metadata(db_name) or {}
     owner = metadata.get("checkout")
     # Shared means the metadata names a *different* checkout as the owner.
     if not owner or owner == current:
         return db_name
-    if pending_migration_count(cluster.url(db_name)) == 0:
-        return db_name  # shared, but nothing divergent to apply
+    try:
+        if pending_migration_count(cluster.url(db_name)) == 0:
+            return db_name  # shared, but nothing divergent to apply
+    except MigrationHistoryError:
+        pass  # the code has moved past this database: divergent, fork it
 
     project_name, _ = project_identity(project_root)
     fork_name = database_name_for_checkout(project_name, checkout=project_root)

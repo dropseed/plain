@@ -8,13 +8,9 @@ from typing import Any, cast
 class EmptyResultSet(Exception):
     """A database query predicate is impossible."""
 
-    pass
-
 
 class FullResultSet(Exception):
     """A database query predicate is matches everything."""
-
-    pass
 
 
 # MARK: Model and Field Errors
@@ -23,25 +19,17 @@ class FullResultSet(Exception):
 class FieldDoesNotExist(Exception):
     """The requested model field does not exist"""
 
-    pass
-
 
 class FieldError(Exception):
     """Some kind of problem with a model field."""
-
-    pass
 
 
 class ObjectDoesNotExist(Exception):
     """The requested object does not exist"""
 
-    pass
-
 
 class MultipleObjectsReturned(Exception):
     """The query returned multiple objects when only one was expected."""
-
-    pass
 
 
 # MARK: Model Exception Descriptors

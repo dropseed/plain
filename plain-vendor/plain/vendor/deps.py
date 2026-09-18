@@ -6,7 +6,6 @@ from pathlib import Path
 
 import httpx
 import tomlkit
-
 from plain.assets.finders import _APP_ASSETS_DIR
 
 from .exceptions import (
