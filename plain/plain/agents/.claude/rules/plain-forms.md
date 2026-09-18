@@ -21,7 +21,7 @@ paths:
 ## Views
 
 - No `FormView`/`CreateView`/`UpdateView`/`DeleteView` — write explicit `get`/`post` on a `TemplateView`.
-- Use `self.render_form(MyForm, result)` on `TemplateView` — passes `form_class` and `form` to the template. `result=None` is a blank render; pass `values=` to pre-fill it. Pass `errors=[...]` for a custom failure (e.g., authentication rejection after validate succeeded).
+- Use `self.render_form(MyForm, result)` on `TemplateView` — passes `form_class` and `form` to the template. `result=None` is a blank render; pass `values=` to pre-fill it. For a custom failure (e.g., authentication rejection after validate succeeded), build an `Invalid(errors=[...], raw=data)` and pass it as `result`.
 - `self.validate_form(MyForm)` is the one-liner for "validate from `request.form_data`, re-render on failure, otherwise return the typed instance."
 - Side effects (send email, create related rows) → a function the view calls after `validate()` succeeds.
 

@@ -218,7 +218,7 @@ class ContactView(TemplateView):
         return RedirectResponse("/thanks/")
 ```
 
-`self.render_form(form_class, result=None, *, values=None, errors=None, **context)` passes both `form_class` and `form` into the template context. Three modes:
+`self.render_form(form_class, result=None, *, values=None, **context)` passes both `form_class` and `form` into the template context. Three modes:
 
 ```python
 self.render_form(ContactForm)  # blank — shows each field's initial
