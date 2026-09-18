@@ -36,6 +36,10 @@ def redirect_to_next_url(request: Request, default: str = "/") -> RedirectRespon
 class LoginLinkFormView(AuthView, TemplateView):
     form_class = LoginLinkForm
 
+    # How long a link stays valid, in seconds. Links work for this entire
+    # window, so pick a duration you're comfortable handing out.
+    link_expires_in: int = 60 * 60
+
     def sent_url(self, next_url: str | None) -> str:
         url = reverse("loginlink:sent")
         if next_url:
@@ -55,7 +59,12 @@ class LoginLinkFormView(AuthView, TemplateView):
         result = self.validate_form(self.form_class)
         if isinstance(result, Response):
             return result
-        send_login_link(email=result.email, request=self.request, next_url=result.next)
+        send_login_link(
+            email=result.email,
+            request=self.request,
+            next_url=result.next,
+            expires_in=self.link_expires_in,
+        )
         return RedirectResponse(self.sent_url(result.next or None), status_code=302)
 
 
