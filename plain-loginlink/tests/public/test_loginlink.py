@@ -62,8 +62,8 @@ class TestRequestLink:
 
 
 class TestLinkExpiration:
-    def test_form_link_expires_in_is_honored(self, db, mailoutbox):
-        """A form's `link_expires_in` sets the window on the links it sends."""
+    def test_view_link_expires_in_is_honored(self, db, mailoutbox):
+        """A view's `link_expires_in` sets the window on the links it sends."""
         User.query.create(email="shortlived@example.com")
         client = Client()
 
