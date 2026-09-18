@@ -8,7 +8,6 @@ from jinja2.ext import Extension
 from jinja2.nodes import CallBlock, Node
 from jinja2.parser import Parser
 from jinja2.runtime import Context
-
 from plain.runtime import settings
 from plain.templates import register_template_extension
 from plain.templates.jinja.extensions import InclusionTagExtension
@@ -16,7 +15,7 @@ from plain.templates.jinja.extensions import InclusionTagExtension
 
 @register_template_extension
 class HTMXJSExtension(InclusionTagExtension):
-    tags = {"htmx_js"}
+    tags = {"htmx_js"}  # noqa: RUF012 — jinja2 types `tags` as an instance attribute; ClassVar here fails ty's LSP check
     template_name = "htmx/js.html"
 
     def get_context(
@@ -39,7 +38,7 @@ class _FragmentFound(Exception):
 
 @register_template_extension
 class HTMXFragmentExtension(Extension):
-    tags = {"htmxfragment"}
+    tags = {"htmxfragment"}  # noqa: RUF012 — jinja2 types `tags` as an instance attribute; ClassVar here fails ty's LSP check
 
     def parse(self, parser: Parser) -> Node:
         lineno = next(parser.stream).lineno

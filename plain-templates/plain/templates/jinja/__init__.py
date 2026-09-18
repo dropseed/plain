@@ -69,8 +69,8 @@ def register_template_filter(
 
 
 __all__ = [
-    "environment",
     "DefaultEnvironment",
+    "environment",
     "get_template_dirs",
     "register_template_extension",
     "register_template_filter",

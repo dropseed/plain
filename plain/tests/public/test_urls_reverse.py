@@ -9,7 +9,6 @@ get rendered into HTML.
 from __future__ import annotations
 
 import pytest
-
 from plain.http import Response
 from plain.runtime import settings
 from plain.urls import Router, get_resolver, include, path, reverse
@@ -148,7 +147,7 @@ def test_reverse_coerces_non_string_value_for_str_converter(use_router):
 
     class _Router(Router):
         namespace = ""
-        urls = [path("user/<name>/", _OkView, name="user")]
+        urls = (path("user/<name>/", _OkView, name="user"),)
 
     use_router(_Router)
     # int gets stringified
@@ -163,11 +162,11 @@ def test_reverse_included_index_follows_global_setting(use_router):
 
     class _AdminRouter(Router):
         namespace = "admin"
-        urls = [path("", _OkView, name="index")]
+        urls = (path("", _OkView, name="index"),)
 
     class _Root(Router):
         namespace = ""
-        urls = [include("admin", _AdminRouter)]
+        urls = (include("admin", _AdminRouter),)
 
     use_router(_Root)
     assert reverse("admin:index") == "/admin/"
@@ -179,11 +178,11 @@ def test_reverse_included_index_force_trailing_slash_false(use_router):
 
     class _AdminRouter(Router):
         namespace = "admin"
-        urls = [path("", _OkView, name="index", force_trailing_slash=False)]
+        urls = (path("", _OkView, name="index", force_trailing_slash=False),)
 
     class _Root(Router):
         namespace = ""
-        urls = [include("admin", _AdminRouter)]
+        urls = (include("admin", _AdminRouter),)
 
     use_router(_Root)
     assert reverse("admin:index") == "/admin"
@@ -195,11 +194,11 @@ def test_reverse_unnamespaced_included_index_follows_global_setting(use_router):
 
     class _AdminRouter(Router):
         namespace = ""
-        urls = [path("", _OkView, name="dashboard")]
+        urls = (path("", _OkView, name="dashboard"),)
 
     class _Root(Router):
         namespace = ""
-        urls = [include("admin", _AdminRouter)]
+        urls = (include("admin", _AdminRouter),)
 
     use_router(_Root)
     assert reverse("dashboard") == "/admin/"
@@ -214,14 +213,14 @@ def test_reverse_suffix_capture_round_trips(use_router):
 
     class _Router(Router):
         namespace = ""
-        urls = [
+        urls = (
             path(
                 "form/<slug:slug>.js",
                 _OkView,
                 name="form-js",
                 force_trailing_slash=False,
-            )
-        ]
+            ),
+        )
 
     use_router(_Router)
     assert reverse("form-js", slug="contact") == "/form/contact.js"
@@ -238,7 +237,7 @@ def test_reverse_kwarg_can_be_named_prefix_segments(use_router):
 
     class _Router(Router):
         namespace = ""
-        urls = [path("items/<str:prefix_segments>/", _OkView, name="item")]
+        urls = (path("items/<str:prefix_segments>/", _OkView, name="item"),)
 
     use_router(_Router)
     assert reverse("item", prefix_segments="hello") == "/items/hello/"
@@ -256,15 +255,15 @@ def test_reverse_nested_unnamespaced_include_keeps_outer_slash(use_router):
 
     class _AdminRouter(Router):
         namespace = "admin"
-        urls = [path("", _OkView, name="index")]
+        urls = (path("", _OkView, name="index"),)
 
     class _ApiRouter(Router):
         namespace = ""
-        urls = [include("", _AdminRouter)]
+        urls = (include("", _AdminRouter),)
 
     class _Root(Router):
         namespace = ""
-        urls = [include("api/", _ApiRouter)]
+        urls = (include("api/", _ApiRouter),)
 
     use_router(_Root)
     assert reverse("admin:index") == "/api/"
@@ -289,7 +288,7 @@ def test_reverse_does_not_normalize_caller_supplied_values(use_router):
 
     class _Router(Router):
         namespace = ""
-        urls = [
+        urls = (
             path("file/<str:name>/", _OkView, name="file"),
             # `doc/<path:rest>` is not a catchall (has a literal prefix);
             # opt out of the slash so the test's assertion is stable.
@@ -299,7 +298,7 @@ def test_reverse_does_not_normalize_caller_supplied_values(use_router):
                 name="doc",
                 force_trailing_slash=False,
             ),
-        ]
+        )
 
     use_router(_Router)
     assert reverse("file", name="..") == "/file/../"
@@ -322,7 +321,7 @@ def test_reverse_escapes_leading_slash_from_path_converter(use_router):
 
     class _Router(Router):
         namespace = ""
-        urls = [path("<path:rest>", _OkView, name="catch")]
+        urls = (path("<path:rest>", _OkView, name="catch"),)
 
     use_router(_Router)
     assert reverse("catch", rest="/evil.com") == "/%2Fevil.com"

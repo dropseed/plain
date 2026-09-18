@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from plain import exceptions
 from plain.preflight import PreflightResult
+
+from plain import exceptions
 
 from .base import ColumnField
 
@@ -40,7 +41,7 @@ class PrimaryKeyField(ColumnField[int]):
         # for every other field type.
         return [e for e in errors if e.id != "fields.reserved_field_name_id"]
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         return (
             self.name,
             "plain.postgres.PrimaryKeyField",

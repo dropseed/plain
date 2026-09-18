@@ -33,8 +33,8 @@ class EmptyPaginatedListView(ListView):
 
 class ListRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("unpaginated", UnpaginatedListView),
         path("paginated", PaginatedListView),
         path("empty", EmptyPaginatedListView),
-    ]
+    )

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import psycopg
 import pytest
-
 from plain.postgres import transaction
 from plain.postgres.db import get_connection
 
@@ -28,9 +27,8 @@ def _execute(sql: str) -> None:
 def _fail_in_savepoint_via_mark(sql: str) -> None:
     """Mimic Model.create()/update(): a query that fails inside a savepoint,
     routed through mark_for_rollback_on_error() so rollback_exc is set."""
-    with transaction.atomic():  # savepoint
-        with transaction.mark_for_rollback_on_error():
-            _execute(sql)
+    with transaction.atomic(), transaction.mark_for_rollback_on_error():  # savepoint
+        _execute(sql)
 
 
 def _fail_in_savepointless_block(sql: str) -> None:
@@ -46,9 +44,8 @@ class TestRollbackExcAttribution:
 
         # Transaction 1: a caught failure through the Model.create()/update()
         # path sets rollback_exc, which is not cleared when the block ends.
-        with transaction.atomic():
-            with pytest.raises(psycopg.errors.UndefinedTable):
-                _fail_in_savepoint_via_mark("SELECT * FROM txn1_missing_table")
+        with transaction.atomic(), pytest.raises(psycopg.errors.UndefinedTable):
+            _fail_in_savepoint_via_mark("SELECT * FROM txn1_missing_table")
 
         # rollback_exc lingers on the reused wrapper until the next outermost
         # atomic() block clears it (documents the leak this test guards).
@@ -75,9 +72,8 @@ class TestRollbackExcAttribution:
         conn = get_connection()
 
         # Leave a stale rollback_exc behind, as transaction 1 above does.
-        with transaction.atomic():
-            with pytest.raises(psycopg.errors.UndefinedTable):
-                _fail_in_savepoint_via_mark("SELECT * FROM stale_table")
+        with transaction.atomic(), pytest.raises(psycopg.errors.UndefinedTable):
+            _fail_in_savepoint_via_mark("SELECT * FROM stale_table")
         assert conn.rollback_exc is not None
 
         # Entering a fresh outermost block clears it.

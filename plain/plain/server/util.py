@@ -15,7 +15,10 @@ import re
 import socket
 import time
 import urllib.parse
-from typing import Any
+
+# Healthcheck body shared by the h1 and h2 responders so the two
+# protocols can't drift apart.
+HEALTHCHECK_BODY = b"ok"
 
 # Server and Date aren't technically hop-by-hop
 # headers, but they are in the purview of the
@@ -24,13 +27,18 @@ from typing import Any
 # In the future, concatenation server header values
 # might be better, but nothing else does it and
 # dropping them is easier.
-hop_headers = set(
-    """
-    connection keep-alive proxy-authenticate proxy-authorization
-    te trailers transfer-encoding upgrade
-    server date
-    """.split()
-)
+hop_headers = {
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "transfer-encoding",
+    "upgrade",
+    "server",
+    "date",
+}
 
 
 def is_ipv6(addr: str) -> bool:
@@ -73,7 +81,9 @@ def close_on_exec(fd: int) -> None:
     fcntl.fcntl(fd, fcntl.F_SETFD, flags)
 
 
-def _error_response_bytes(status_int: int, reason: str, mesg: str) -> bytes:
+def _error_response_bytes(
+    status_int: int, reason: str, mesg: str, *, head: bool = False
+) -> bytes:
     body = (
         "<html>\n"
         f"  <head><title>{reason}</title></head>\n"
@@ -84,13 +94,19 @@ def _error_response_bytes(status_int: int, reason: str, mesg: str) -> bytes:
         "</html>\n"
     )
 
+    # The load-shedding 503 explicitly invites a retry — tell
+    # well-behaved clients how soon.
+    retry_after = "Retry-After: 1\r\n" if status_int == 503 else ""
     response = (
         f"HTTP/1.1 {status_int} {reason}\r\n"
         f"Connection: close\r\n"
+        f"{retry_after}"
         f"Content-Type: text/html\r\n"
         f"Content-Length: {len(body)}\r\n"
         f"\r\n"
-        f"{body}"
+        # A HEAD response keeps the Content-Length but sends no body
+        # (RFC 9110 9.3.2).
+        f"{'' if head else body}"
     )
     return response.encode("latin1")
 
@@ -122,19 +138,6 @@ def to_bytestring(value: str | bytes, encoding: str = "utf8") -> bytes:
         raise TypeError(f"{value!r} is not a string")
 
     return value.encode(encoding)
-
-
-def make_fail_handler(msg: str | bytes) -> Any:
-    """Create a handler that returns a 500 error for all requests."""
-    msg = to_bytestring(msg)
-
-    class FailHandler:
-        async def handle(self, request: Any, executor: Any) -> Any:
-            from plain.http import Response
-
-            return Response(msg, status_code=500, content_type="text/plain")
-
-    return FailHandler()
 
 
 def split_request_uri(uri: str) -> urllib.parse.SplitResult:

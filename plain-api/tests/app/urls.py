@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import ClassVar, TypedDict
 
 from plain.api.versioning import APIVersionChange, VersionedAPIView
 from plain.api.views import APIView, JsonNotFoundView
@@ -69,7 +69,7 @@ class ChangeMsgMessage(APIVersionChange):
 
 
 class TestVersionedAPIView(VersionedAPIView):
-    api_versions = {
+    api_versions: ClassVar = {
         "v2": [ChangeToName, ChangeMsgMessage],
         "v1": [],
     }
@@ -83,7 +83,7 @@ class TestVersionedAPIView(VersionedAPIView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("test", TestView, name="test"),
         path("typed-dict-return", TypedDictReturnView, name="typed_dict_return"),
         path("tuple-status-return", TupleStatusReturnView, name="tuple_status_return"),
@@ -92,4 +92,4 @@ class AppRouter(Router):
         path("json-echo", JsonEchoView, name="json_echo"),
         path("unhandled-exception", UnhandledExceptionView, name="unhandled_exception"),
         path("missing/<path:_>", JsonNotFoundView, name="missing"),
-    ]
+    )

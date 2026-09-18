@@ -10,7 +10,6 @@ import nacl.exceptions
 import nacl.secret
 import pytest
 import spake2
-
 from plain.portal.codegen import WORDLIST, generate_code, validate_code
 from plain.portal.crypto import PortalEncryptor, channel_id
 from plain.portal.local import _MAX_FRAME_SIZE, _recv_framed, _send_framed
@@ -413,7 +412,7 @@ class TestFraming:
         """Verify the wire format is a 4-byte big-endian length prefix."""
 
         async def _run():
-            reader, writer = _make_stream_pair()
+            _reader, writer = _make_stream_pair()
             payload = b"test"
             await _send_framed(writer, payload)
             raw = bytes(writer._buf)
@@ -507,7 +506,7 @@ def _make_execute_code(*, writable: bool = False):
                     expr_code = compile(
                         ast.Expression(last_expr.value), "<portal>", "eval"
                     )
-                    result = eval(expr_code, namespace)  # noqa: S307
+                    result = eval(expr_code, namespace)
                     if result is not None:
                         if json_output:
                             try:

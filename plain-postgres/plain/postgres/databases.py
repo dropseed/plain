@@ -23,10 +23,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 import psycopg
-from psycopg import sql
-
 from plain.postgres.database_url import DatabaseConfig
 from plain.postgres.sources import build_connection_params
+from psycopg import sql
 
 __all__ = [
     "DatabaseInfo",
@@ -62,9 +61,8 @@ def maintenance_cursor(config: DatabaseConfig) -> Generator[psycopg.Cursor]:
     """
     maintenance_config: DatabaseConfig = {**config, "DATABASE": "postgres"}
     params = build_connection_params(maintenance_config)
-    with psycopg.connect(**params, autocommit=True) as conn:
-        with conn.cursor() as cursor:
-            yield cursor
+    with psycopg.connect(**params, autocommit=True) as conn, conn.cursor() as cursor:
+        yield cursor
 
 
 def create_database(

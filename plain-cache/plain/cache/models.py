@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Self
 
-from plain import postgres
 from plain.postgres import types
 from plain.runtime import settings
 from plain.utils import timezone
+
+from plain import postgres
 
 __all__ = ["CachedItem", "CachedItemQuerySet"]
 

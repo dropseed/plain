@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import datetime
 from typing import Any
+
+from plain.postgres.forms import ModelForm, ModelMultipleChoiceField
+from plain.utils import timezone
 
 from app.users.models import User
 from plain import forms
-from plain.postgres.forms import ModelForm, ModelMultipleChoiceField
 
 from .models import Project, Tag, Task
 
@@ -42,7 +43,7 @@ class TaskForm(ModelForm):
         cleaned = super().clean()
         is_complete = cleaned.get("is_complete")
         due_date = cleaned.get("due_date")
-        if is_complete and due_date and due_date > datetime.date.today():
+        if is_complete and due_date and due_date > timezone.localtime().date():
             raise forms.ValidationError(
                 "A task that's already complete can't have a future due date."
             )

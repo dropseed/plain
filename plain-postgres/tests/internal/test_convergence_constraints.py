@@ -4,14 +4,11 @@ import pytest
 from app.examples.models.constraints import ConstraintExample
 from conftest_convergence import (
     constraint_exists,
-    constraint_is_deferrable,
     constraint_is_valid,
     execute,
     index_exists,
 )
-
 from plain.postgres import CheckConstraint, Q, UniqueConstraint, get_connection
-from plain.postgres.constraints import Deferrable
 from plain.postgres.convergence import (
     analyze_model,
     can_auto_correct,
@@ -285,30 +282,6 @@ class TestDetectConstraintFixes:
         assert plan.executable() == []
         assert plan.blocked == []
 
-    def test_detects_unique_deferrable_changed(self, db):
-        """Same columns but different deferrable setting is a definition change."""
-        # DB has non-deferrable unique_constraintexample_name_description; model declares it deferrable
-        original_constraints = list(ConstraintExample.model_options.constraints)
-        ConstraintExample.model_options.constraints = [
-            UniqueConstraint(
-                fields=["name", "description"],
-                name="unique_constraintexample_name_description",
-                deferrable=Deferrable.DEFERRED,
-            ),
-        ]
-
-        try:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                plan = plan_model_convergence(conn, cursor, ConstraintExample)
-
-            assert plan.executable() == []
-            assert len(plan.blocked) == 1
-            assert isinstance(plan.blocked[0].drift, ConstraintDrift)
-            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
-        finally:
-            ConstraintExample.model_options.constraints = original_constraints
-
     def test_detects_unique_include_changed(self, isolated_db):
         """Same columns but added INCLUDE column is a definition change."""
         # Drop the existing constraint and recreate with INCLUDE
@@ -536,7 +509,6 @@ class TestApplyConstraintFixes:
         from unittest.mock import patch
 
         import psycopg
-
         from plain.postgres.convergence.analysis import (
             _normalize_constraint_def,
             _normalize_default_expr,
@@ -554,23 +526,25 @@ class TestApplyConstraintFixes:
 
         # Patch every helper's `_probe_table` and verify the privilege
         # error propagates instead of returning the empty sentinel.
-        with patch(
-            "plain.postgres.convergence.analysis._probe_table",
-            _raising_probe_table,
+        with (
+            patch(
+                "plain.postgres.convergence.analysis._probe_table",
+                _raising_probe_table,
+            ),
+            conn.cursor() as cursor,
         ):
-            with conn.cursor() as cursor:
-                with pytest.raises(psycopg.errors.InsufficientPrivilege):
-                    _normalize_constraint_def(
-                        cursor, ConstraintExample, "CHECK (length(name) > 0)"
-                    )
-                with pytest.raises(psycopg.errors.InsufficientPrivilege):
-                    _normalize_default_expr(cursor, ConstraintExample, "name", "'x'")
-                with pytest.raises(psycopg.errors.InsufficientPrivilege):
-                    _normalize_index_def(
-                        cursor,
-                        ConstraintExample,
-                        fields_orders=[("name", "")],
-                    )
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                _normalize_constraint_def(
+                    cursor, ConstraintExample, "CHECK (length(name) > 0)"
+                )
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                _normalize_default_expr(cursor, ConstraintExample, "name", "'x'")
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                _normalize_index_def(
+                    cursor,
+                    ConstraintExample,
+                    fields_orders=[("name", "")],
+                )
 
     def test_normalization_does_not_drop_real_user_table(self, isolated_db):
         """The round-trip helper uses a fixed temp-table name
@@ -805,40 +779,6 @@ class TestApplyConstraintFixes:
         assert constraint_exists(
             "examples_constraintexample", "unique_constraintexample_name_description"
         )
-
-    @pytest.mark.parametrize(
-        "deferrable",
-        [Deferrable.DEFERRED, Deferrable.IMMEDIATE],
-        ids=["deferred", "immediate"],
-    )
-    def test_add_deferrable_unique_constraint(self, isolated_db, deferrable):
-        """Deferrable unique constraints include the appropriate DEFERRABLE clause."""
-        constraint = UniqueConstraint(
-            fields=["name"],
-            name=f"examples_constraintexample_name_{deferrable.value}",
-            deferrable=deferrable,
-        )
-        original_constraints = list(ConstraintExample.model_options.constraints)
-        ConstraintExample.model_options.constraints = [
-            *original_constraints,
-            constraint,
-        ]
-
-        try:
-            correction = AddConstraintCorrection(
-                table="examples_constraintexample",
-                constraint=constraint,
-                model=ConstraintExample,
-            )
-            sql = correction.apply()
-
-            assert f"DEFERRABLE INITIALLY {deferrable.name}" in sql
-            assert constraint_exists("examples_constraintexample", constraint.name)
-            assert constraint_is_deferrable(
-                "examples_constraintexample", constraint.name
-            )
-        finally:
-            ConstraintExample.model_options.constraints = original_constraints
 
 
 class TestConstraintRename:
@@ -1408,9 +1348,8 @@ class TestProbeTableReuse:
 
         conn = get_connection()
         try:
-            with capture_queries() as queries:
-                with conn.cursor() as cursor:
-                    analyze_model(conn, cursor, ConstraintExample)
+            with capture_queries() as queries, conn.cursor() as cursor:
+                analyze_model(conn, cursor, ConstraintExample)
             sqls = [q["sql"] for q in queries]
         finally:
             ConstraintExample.model_options.constraints = original

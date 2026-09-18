@@ -13,7 +13,9 @@ class ImpersonateStartView(AuthView):
         impersonator = get_request_impersonator(self.request) or self.user
         if impersonator and can_be_impersonator(impersonator):
             self.session[_IMPERSONATE_SESSION_KEY] = self.url_kwargs["id"]
-            return RedirectResponse(self.request.query_params.get("next", "/"))
+            return RedirectResponse(
+                self.request.query_params.get("next", "/"), status_code=302
+            )
 
         return Response(status_code=403)
 
@@ -21,4 +23,6 @@ class ImpersonateStartView(AuthView):
 class ImpersonateStopView(SessionView):
     def get(self) -> Response:
         self.session.pop(_IMPERSONATE_SESSION_KEY)
-        return RedirectResponse(self.request.query_params.get("next", "/"))
+        return RedirectResponse(
+            self.request.query_params.get("next", "/"), status_code=302
+        )

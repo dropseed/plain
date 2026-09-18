@@ -6,6 +6,8 @@ from urllib.parse import quote, unquote_to_bytes
 from plain.http import Request as HttpRequest
 
 if TYPE_CHECKING:
+    from plain.http.request import RequestStream
+
     from .message import Request as ServerRequest
 
 
@@ -46,6 +48,10 @@ def create_request(
     req: ServerRequest,
     client: str | bytes | tuple[str, int],
     server: str | tuple[str, int],
+    *,
+    stream: RequestStream,
+    received: int,
+    ingest_seconds: float,
 ) -> HttpRequest:
     """Build a plain.http.Request directly from the server's parsed HTTP message."""
 
@@ -56,6 +62,15 @@ def create_request(
             host = hdr_value
 
     headers = _merge_headers(req.headers)
+
+    # The body was fully received before dispatch, so a chunked request
+    # is de-chunked here exactly like a buffering gateway (RFC 9112
+    # §7.1.3): drop Transfer-Encoding and advertise the actual length.
+    # Content-Length consumers (multipart parsing, request.content_length)
+    # then see chunked and declared bodies identically.
+    if "TRANSFER-ENCODING" in headers:
+        del headers["TRANSFER-ENCODING"]
+        headers["CONTENT-LENGTH"] = str(received)
     remote_addr = _resolve_remote_addr(client)
     server_name, server_port = _resolve_server_address(server, host, req.scheme)
     path = _resolve_path(req.path or "")
@@ -71,10 +86,12 @@ def create_request(
         remote_addr=remote_addr,
     )
 
-    # Body stream — set by the message parser before this point.
-    assert req.body is not None
-    request._stream = req.body
+    # The fully-ingested body (see BodySink) — never a socket-backed
+    # reader, so app reads can't block on the client.
+    request._stream = stream
     request._read_started = False
+    if received:
+        request._body_ingest_seconds = ingest_seconds
 
     return request
 

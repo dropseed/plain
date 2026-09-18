@@ -4,7 +4,6 @@ from app.examples.models.delete import ChildSetNull
 from app.examples.models.nullability import NullabilityExample
 from app.examples.models.trees import TreeNode
 from conftest_convergence import column_is_not_null, constraint_exists, execute
-
 from plain.postgres import get_connection
 from plain.postgres.convergence import (
     analyze_model,

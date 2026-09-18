@@ -4,7 +4,7 @@ import datetime
 from typing import TYPE_CHECKING, Any
 
 import httpx
-
+from plain.oauth.exceptions import OAuthError
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 from plain.utils import timezone
 
@@ -68,11 +68,18 @@ class BitbucketOAuthProvider(OAuthProvider):
             },
         )
         response.raise_for_status()
-        confirmed_primary_email = [
-            x["email"]
-            for x in response.json()["values"]
-            if x["is_primary"] and x["is_confirmed"]
-        ][0]
+        confirmed_primary_email = next(
+            (
+                x["email"]
+                for x in response.json()["values"]
+                if x["is_primary"] and x["is_confirmed"]
+            ),
+            None,
+        )
+        if confirmed_primary_email is None:
+            raise OAuthError(
+                "A confirmed primary email address is required on Bitbucket"
+            )
 
         return OAuthUser(
             provider_id=user_id,

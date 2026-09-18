@@ -8,9 +8,6 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, LiteralString, NamedTuple, cast
 
 import psycopg
-from psycopg import errors
-from psycopg import sql as psycopg_sql
-
 from plain.logs import get_framework_logger
 from plain.postgres import utils
 from plain.postgres.dialect import quote_name
@@ -21,12 +18,13 @@ from plain.postgres.transaction import TransactionManagementError
 from plain.postgres.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from plain.postgres.utils import CursorWrapper, debug_transaction
 from plain.runtime import settings
+from psycopg import errors
+from psycopg import sql as psycopg_sql
 
 if TYPE_CHECKING:
-    from psycopg import Connection as PsycopgConnection
-
     from plain.postgres.database_url import DatabaseConfig
     from plain.postgres.fields import Field
+    from psycopg import Connection as PsycopgConnection
 
 logger = get_framework_logger()
 
@@ -62,7 +60,7 @@ class DatabaseConnection:
 
     queries_limit: int = 9000
 
-    ignored_tables: list[str] = []
+    ignored_tables: tuple[str, ...] = ()
 
     def __init__(self, source: ConnectionSource):
         # Lazy — acquired on first use via self._source.
@@ -149,15 +147,6 @@ class DatabaseConnection:
         """Backend-specific implementation to enable or disable autocommit."""
         assert self.connection is not None
         self.connection.autocommit = autocommit
-
-    def check_constraints(self, table_names: list[str] | None = None) -> None:
-        """
-        Check constraints by setting them to immediate. Return them to deferred
-        afterward.
-        """
-        with self.cursor() as cursor:
-            cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
-            cursor.execute("SET CONSTRAINTS ALL DEFERRED")
 
     def make_debug_cursor(self, cursor: psycopg.Cursor[Any]) -> CursorDebugWrapper:
         return CursorDebugWrapper(cursor, self)
@@ -398,9 +387,8 @@ class DatabaseConnection:
                 try:
                     func()
                 except Exception as e:
-                    logger.error(
+                    logger.exception(
                         "Error calling on_commit() handler",
-                        exc_info=True,
                         extra={"handler": func.__qualname__, "error": str(e)},
                     )
             else:
@@ -416,9 +404,8 @@ class DatabaseConnection:
                 try:
                     func()
                 except Exception as e:
-                    logger.error(
+                    logger.exception(
                         "Error calling on_commit() handler during transaction",
-                        exc_info=True,
                         extra={"handler": func.__qualname__, "error": str(e)},
                     )
             else:
@@ -504,8 +491,8 @@ class DatabaseConnection:
             )
 
         if cursor is None:
-            with self.cursor() as cursor:
-                return get_names(cursor)
+            with self.cursor() as opened_cursor:
+                return get_names(opened_cursor)
         return get_names(cursor)
 
     def get_table_list(self, cursor: CursorWrapper) -> Sequence[TableInfo]:
@@ -548,9 +535,7 @@ class DatabaseConnection:
         tables = set()
         for model in get_migratable_models():
             tables.add(model.model_options.db_table)
-            tables.update(
-                f.m2m_db_table() for f in model._model_meta.local_many_to_many
-            )
+            tables.update(f.m2m_db_table() for f in model._model_meta.many_to_many)
         tables = list(tables)
         if only_existing:
             existing_tables = set(self.table_names(include_views=include_views))
@@ -619,7 +604,8 @@ class DatabaseConnection:
                 WHERE fka.attrelid = c.confrelid AND fka.attnum = c.confkey[1]),
                 c.convalidated,
                 pg_get_constraintdef(c.oid),
-                c.confdeltype
+                c.confdeltype,
+                c.condeferrable
             FROM pg_constraint AS c
             JOIN pg_class AS cl ON c.conrelid = cl.oid
             WHERE cl.relname = %s AND pg_catalog.pg_table_is_visible(cl.oid)
@@ -634,6 +620,7 @@ class DatabaseConnection:
             validated,
             constraintdef,
             confdeltype,
+            condeferrable,
         ) in cursor.fetchall():
             constraints[constraint] = {
                 "columns": columns,
@@ -643,6 +630,7 @@ class DatabaseConnection:
                 "definition": constraintdef,
                 "validated": validated,
                 "on_delete_action": confdeltype if kind == "f" else None,
+                "deferrable": condeferrable if kind == "f" else None,
             }
         # Now get indexes. Sort order, opclasses, INCLUDE, and predicates all
         # ride along inside `pg_get_indexdef` and are compared via the

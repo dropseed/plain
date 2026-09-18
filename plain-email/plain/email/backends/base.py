@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -48,9 +48,8 @@ class BaseEmailBackend(ABC):
 
     def close(self) -> None:
         """Close a network connection."""
-        pass
 
-    def __enter__(self) -> BaseEmailBackend:
+    def __enter__(self) -> Self:
         try:
             self.open()
         except Exception:

@@ -4,6 +4,4 @@ from plain.urls import Router, include
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
-        include("", PagesRouter),
-    ]
+    urls = (include("", PagesRouter),)

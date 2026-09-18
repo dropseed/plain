@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import os
 from io import BytesIO
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from plain.internal.files import temp as tempfile
 from plain.internal.files.base import File
@@ -81,11 +81,8 @@ class TemporaryUploadedFile(UploadedFile):
         content_type_extra: dict[str, str] | None = None,
     ) -> None:
         _, ext = os.path.splitext(name)
-        file = cast(
-            IO[Any],
-            tempfile.NamedTemporaryFile(
-                suffix=".upload" + ext, dir=settings.FILE_UPLOAD_TEMP_DIR
-            ),
+        file = tempfile.NamedTemporaryFile(
+            suffix=".upload" + ext, dir=settings.FILE_UPLOAD_TEMP_DIR
         )
         super().__init__(file, name, content_type, size, charset, content_type_extra)
 

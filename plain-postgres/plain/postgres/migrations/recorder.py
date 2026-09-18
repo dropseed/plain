@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import psycopg
-
-from plain import postgres
 from plain.postgres.meta import Meta
 from plain.postgres.registry import ModelsRegistry
 from plain.utils.functional import classproperty
+
+from plain import postgres
 
 from .exceptions import MigrationSchemaMissing
 

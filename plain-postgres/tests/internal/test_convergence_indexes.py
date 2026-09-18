@@ -8,7 +8,6 @@ from conftest_convergence import (
     index_exists,
     index_is_valid,
 )
-
 from plain.postgres import Index, Q, get_connection
 from plain.postgres.convergence import (
     ReadOnlyConnectionError,
@@ -1025,12 +1024,14 @@ class TestReadOnlyConnection:
         )
         try:
             conn = get_connection()
-            with read_only():
-                with pytest.raises(
+            with (
+                read_only(),
+                pytest.raises(
                     ReadOnlyConnectionError,
                     match="requires write access",
-                ):
-                    with conn.cursor() as cursor:
-                        analyze_model(conn, cursor, IndexExample)
+                ),
+                conn.cursor() as cursor,
+            ):
+                analyze_model(conn, cursor, IndexExample)
         finally:
             IndexExample.model_options.indexes = original_indexes

@@ -44,7 +44,7 @@ class TemplateViewRaises500(TemplateView):
 
 class ErrorRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("plain-404/", PlainViewRaises404, name="plain-404"),
         path("plain-500/", PlainViewRaises500, name="plain-500"),
         path("plain-402/", PlainViewRaisesCustomHTTPException, name="plain-402"),
@@ -52,4 +52,4 @@ class ErrorRouter(Router):
         path("template-403/", TemplateViewRaises403, name="template-403"),
         path("template-500/", TemplateViewRaises500, name="template-500"),
         path("<path:_>", NotFoundView),
-    ]
+    )

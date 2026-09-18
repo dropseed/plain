@@ -41,8 +41,8 @@ class OAuthConnectionViewset(AdminViewset):
         model = OAuthConnection
         title = "Connections"
         description = "User accounts linked to OAuth providers (Google, GitHub, etc)."
-        fields = ["id", "user", "provider_key", "provider_user_id"]
-        cards = [ProvidersChartCard]
+        fields = ("id", "user", "provider_key", "provider_user_id")
+        cards = (ProvidersChartCard,)
 
     class DetailView(AdminModelDetailView):
         model = OAuthConnection

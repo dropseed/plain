@@ -4,8 +4,9 @@ import datetime
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from plain import exceptions
 from plain.utils.dateparse import parse_duration
+
+from plain import exceptions
 
 from .base import DefaultableField
 

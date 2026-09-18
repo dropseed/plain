@@ -1,7 +1,6 @@
 import re
 
 import pytest
-
 from plain.test import Client
 
 

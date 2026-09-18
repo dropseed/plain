@@ -1,5 +1,25 @@
 # plain-flags changelog
 
+## [0.37.2](https://github.com/dropseed/plain/releases/plain-flags@0.37.2) (2026-08-12)
+
+### What's changed
+
+- Admin viewset attributes declared as tuples; internal lint cleanups ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.37.1](https://github.com/dropseed/plain/releases/plain-flags@0.37.1) (2026-08-02)
+
+### What's changed
+
+- `Flag.description` now declares `default=""` explicitly, matching the plain-postgres 0.113.0 optional-string idiom (`required=False, default=""`). The column `DEFAULT` is applied by convergence on the next `plain postgres sync` — no migration needed. ([2a86968e5a](https://github.com/dropseed/plain/commit/2a86968e5a))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.37.0](https://github.com/dropseed/plain/releases/plain-flags@0.37.0) (2026-06-22)
 
 ### What's changed
