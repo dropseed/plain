@@ -1,6 +1,6 @@
 """A baseline in a shipped package needs one fact a reset cannot supply.
 
-`since` names the release the reset shipped in. It is filled in by hand
+`shipped_in` names the release the reset shipped in. It is filled in by hand
 when the package is released; this test is what makes forgetting fail CI.
 (The package's `plain.postgres>=` minimum is raised at the same time, like
 any other cross-package minimum - see the release skill.)
@@ -15,7 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def shipped_baselines() -> list[tuple[Path, str]]:
-    """(migration file, since) for every baseline under `plain-*/plain/*/migrations`."""
+    """(migration file, shipped_in) for every baseline under `plain-*/plain/*/migrations`."""
     found: list[tuple[Path, str]] = []
     for path in sorted(REPO_ROOT.glob("plain-*/plain/*/migrations/0*.py")):
         if path.parents[3].name == "plain-postgres":
@@ -34,18 +34,18 @@ def shipped_baselines() -> list[tuple[Path, str]]:
                 ):
                     attributes[statement.targets[0].id] = str(statement.value.value)
         if attributes.get("supersedes"):
-            found.append((path, attributes.get("since", "")))
+            found.append((path, attributes.get("shipped_in", "")))
     return found
 
 
 def test_shipped_baselines_are_stamped() -> None:
     problems = []
-    for path, since in shipped_baselines():
+    for path, shipped_in in shipped_baselines():
         package_dir = path.parents[3]
         relative = path.relative_to(REPO_ROOT)
-        if not since:
+        if not shipped_in:
             problems.append(
-                f"{relative}: `since` is empty - set it to the {package_dir.name} "
+                f"{relative}: `shipped_in` is empty - set it to the {package_dir.name} "
                 "version this reset ships in."
             )
     assert not problems, "\n".join(problems)

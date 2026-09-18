@@ -86,7 +86,7 @@ def test_reset_of_the_examples_history(migrations_dir: Path) -> None:
 
     assert plan.baseline.name == f"{NEXT_NUMBER}_baseline"
     assert plan.baseline.supersedes == LEAF
-    assert plan.baseline.since == ""
+    assert plan.baseline.shipped_in == ""
     assert plan.baseline.initial is None
     assert plan.baseline.dependencies == []
     assert set(plan.baseline.retired) == {p.stem for p in REAL_EXAMPLES.glob("0*.py")}
@@ -132,7 +132,7 @@ def test_written_baseline_loads_clean_with_the_history_gone(
 
     after = loader()
     assert after.baselines["examples"].name == f"{NEXT_NUMBER}_baseline"
-    assert detect_model_changes(after, {"examples"}) == {}
+    assert detect_model_changes(after, package_labels={"examples"}) == {}
 
 
 def test_dependencies_come_from_what_the_baseline_references(
@@ -234,7 +234,7 @@ def test_second_reset_folds_the_previous_baseline_into_retired(
     (migrations_dir / "plaintemplates" / "0002_baseline.py").write_text(
         migration_source(operations=f"({create_model('Note')},)").replace(
             "    dependencies",
-            '    supersedes = "0001_initial"\n    retired = ()\n    since = "1.0"\n    dependencies',
+            '    supersedes = "0001_initial"\n    retired = ()\n    shipped_in = "1.0"\n    dependencies',
         )
     )
     (migrations_dir / "plaintemplates" / "0003_more.py").write_text(
@@ -257,7 +257,7 @@ def test_second_reset_refuses_while_the_first_is_unreleased(
     (migrations_dir / "plaintemplates" / "0002_baseline.py").write_text(
         migration_source(operations=f"({create_model('Note')},)").replace(
             "    dependencies",
-            '    supersedes = "0001_initial"\n    retired = ()\n    since = ""\n    dependencies',
+            '    supersedes = "0001_initial"\n    retired = ()\n    shipped_in = ""\n    dependencies',
         )
     )
     (migrations_dir / "plaintemplates" / "0003_more.py").write_text(
@@ -277,7 +277,7 @@ def test_first_reset_cycle_is_refused_before_anything_changes(
     (migrations_dir / "plaintemplates" / "0001_initial.py").write_text(
         migration_source(operations=f"({create_model('Note')},)")
     )
-    (migrations_dir / "examples" / "0019_gadget.py").write_text(
+    (migrations_dir / "examples" / f"{NEXT_NUMBER}_gadget.py").write_text(
         migration_source(
             dependencies=(("examples", LEAF), ("plaintemplates", "0001_initial")),
             operations=f"({create_model('Gadget')},)",
@@ -287,7 +287,7 @@ def test_first_reset_cycle_is_refused_before_anything_changes(
         migration_source(
             dependencies=(
                 ("plaintemplates", "0001_initial"),
-                ("examples", "0019_gadget"),
+                ("examples", f"{NEXT_NUMBER}_gadget"),
             ),
             operations='(migrations.AddField(model_name="note", name="gadget", field=postgres.ForeignKeyField(to="examples.gadget", on_delete=postgres.CASCADE, allow_null=True)),)',
         )
@@ -296,11 +296,11 @@ def test_first_reset_cycle_is_refused_before_anything_changes(
 
     current = loader()
     plan = plan_reset(current, "plaintemplates")
-    assert plan.baseline.dependencies == [("examples", "0019_gadget")]
+    assert plan.baseline.dependencies == [("examples", f"{NEXT_NUMBER}_gadget")]
     with pytest.raises(BadMigrationError) as excinfo:
         validate_reset(current, plan)
     # The cycle, reported from whichever node the search entered it.
-    assert "examples.0019_gadget" in str(excinfo.value)
+    assert f"examples.{NEXT_NUMBER}_gadget" in str(excinfo.value)
     assert "plaintemplates.0003_baseline" in str(excinfo.value)
 
     assert (
@@ -317,10 +317,10 @@ def test_nothing_to_reset(migrations_dir: Path) -> None:
 
 
 def test_two_leaves_refuse(migrations_dir: Path) -> None:
-    (migrations_dir / "examples" / "0019_a.py").write_text(
+    (migrations_dir / "examples" / f"{NEXT_NUMBER}_a.py").write_text(
         migration_source(dependencies=(("examples", LEAF),))
     )
-    (migrations_dir / "examples" / "0019_b.py").write_text(
+    (migrations_dir / "examples" / f"{NEXT_NUMBER}_b.py").write_text(
         migration_source(dependencies=(("examples", LEAF),))
     )
     with pytest.raises(BadMigrationError, match="2 leaf migrations"):
@@ -354,19 +354,19 @@ def examples_files(migrations_dir: Path) -> list[str]:
 def test_reset_command_writes_and_deletes_then_the_runtime_adopts(
     repo: Path, migrations_dir: Path
 ) -> None:
-    result = CliRunner().invoke(reset, ["examples", "--since", "2.0"])
+    result = CliRunner().invoke(reset, ["examples", "--shipped-in", "2.0"])
 
     assert result.exit_code == 0, result.output
     assert f"Supersedes {LEAF}" in result.output
     assert "Recover from any failure with: git checkout --" in result.output
     assert "&& rm " in result.output
     assert "Commit the new file and the deletions together" in result.output
-    assert "`since` is empty" not in result.output
+    assert "`shipped_in` is empty" not in result.output
     assert f"must have applied `examples.{LEAF}`" in result.output
     assert examples_files(migrations_dir) == [f"{NEXT_NUMBER}_baseline.py"]
     source = (migrations_dir / "examples" / f"{NEXT_NUMBER}_baseline.py").read_text()
     assert f"supersedes = '{LEAF}'" in source
-    assert "since = '2.0'" in source
+    assert "shipped_in = '2.0'" in source
     assert "initial = True" not in source
 
     # The test database recorded the sentinel: the runtime adopts.
@@ -401,7 +401,7 @@ def test_generated_baseline_runs_on_a_cleared_database(
     tables = connection.table_names()
     assert "examples_circa" in tables
     assert "examples_widgettag" in tables
-    assert detect_model_changes(loader(), {"examples"}) == {}
+    assert detect_model_changes(loader(), package_labels={"examples"}) == {}
 
 
 def test_dry_run_changes_nothing(repo: Path, migrations_dir: Path) -> None:

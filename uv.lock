@@ -739,7 +739,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.163.0"
+version = "0.163.1"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -976,7 +976,7 @@ dev = [
 
 [[package]]
 name = "plain-dev"
-version = "0.67.0"
+version = "0.68.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
@@ -1321,7 +1321,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-postgres"
-version = "0.117.0"
+version = "0.118.0"
 source = { editable = "plain-postgres" }
 dependencies = [
     { name = "plain" },
