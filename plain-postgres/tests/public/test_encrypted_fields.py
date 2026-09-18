@@ -178,6 +178,15 @@ class TestTypedQueryMethodsBlocked:
         with pytest.raises(TypeError, match=r"does not support \.is_in\("):
             SecretStore.api_key.is_in(["x", "y"])  # ty: ignore[invalid-argument-type]
 
+    @pytest.mark.parametrize(
+        "method", ["contains", "icontains", "startswith", "endswith"]
+    )
+    def test_text_pattern_condition_raises(self, method):
+        """EncryptedTextField inherits TextField's pattern conditions and
+        blocks them — matching ciphertext by substring is meaningless."""
+        with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
+            getattr(SecretStore.api_key, method)("x")
+
     def test_is_null_returns_correct_lookup(self):
         """is_null is the one comparison that makes sense on ciphertext."""
         from plain.postgres.query_utils import Q

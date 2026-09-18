@@ -185,6 +185,7 @@ For more advanced querying options, see the [`QuerySet`](./query.py#QuerySet) cl
 ```python
 from plain.postgres import types
 
+
 @postgres.register_model
 class User(postgres.Model):
     email: str = types.EmailField()
@@ -192,6 +193,7 @@ class User(postgres.Model):
     age: int = types.IntegerField(allow_null=True)
 
     query: postgres.QuerySet[User] = postgres.QuerySet()
+
 
 # Each argument is a condition; multiple arguments are ANDed together.
 admins = User.query.where(
@@ -1007,7 +1009,7 @@ Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived
 
 **Limitations:**
 
-- **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported.
+- **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported. Comparing against a value raises `TypeError` rather than silently matching nothing — both `filter(api_key="x")` and the typed [condition methods](#typed-conditions-with-where) (`equals`, `contains`, …). `filter(api_key=None)` still rewrites to `IS NULL`.
 - **No indexes or constraints** — encrypted fields cannot be used in indexes or unique constraints. Preflight checks will catch this.
 - **Only `default=""`** — on `EncryptedTextField` (paired with `required=False`), the empty string is stored as plaintext `''`, so it's the one value expressible as a column `DEFAULT` (declare it to add the field to a populated table). Any other default would need ciphertext, which is non-deterministic. `EncryptedJSONField` accepts no default at all — even `{}` serializes to text that would need ciphertext; use `allow_null=True`.
 

@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, assert_type
 
 from app.examples.models.defaults import DefaultsExample
-
 from plain.postgres.fields.numeric import IntegerField
 from plain.postgres.fields.text import TextField
 from plain.postgres.query_utils import Q

@@ -257,7 +257,12 @@ class EncryptedFieldMixin:
         return errors
 
 
-class EncryptedTextField[T: (str, str | None) = str](EncryptedFieldMixin, TextField[T]):
+# The mixin narrows Field's typed-query comparison methods to `Never` on
+# purpose — that narrowing is the type-level block, and it is exactly what a
+# Liskov check objects to, so the override diagnostic is suppressed here.
+class EncryptedTextField[T: (str, str | None) = str](  # ty: ignore[invalid-method-override]
+    EncryptedFieldMixin, TextField[T]
+):
     """A TextField that encrypts its value before storing in the database.
 
     Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key
@@ -293,6 +298,23 @@ class EncryptedTextField[T: (str, str | None) = str](EncryptedFieldMixin, TextFi
             validators=validators,
         )
 
+    # TextField's pattern conditions arrive with the base class and are as
+    # meaningless on ciphertext as the comparisons the mixin blocks, so they
+    # are blocked here, where they arrive. Same shape as the mixin's blocks:
+    # `Never` rejects the call site, the raise covers anyone who bypasses the
+    # type checker.
+    def contains(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("contains"))
+
+    def icontains(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("icontains"))
+
+    def startswith(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("startswith"))
+
+    def endswith(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("endswith"))
+
     def get_db_prep_value(
         self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
@@ -309,7 +331,10 @@ class EncryptedTextField[T: (str, str | None) = str](EncryptedFieldMixin, TextFi
         return _decrypt(value)
 
 
-class EncryptedJSONField(EncryptedFieldMixin, JSONField):
+# The mixin narrows Field's typed-query comparison methods to `Never` on
+# purpose — that narrowing is the type-level block, and it is exactly what a
+# Liskov check objects to, so the override diagnostic is suppressed here.
+class EncryptedJSONField(EncryptedFieldMixin, JSONField):  # ty: ignore[invalid-method-override]
     """A JSONField that encrypts its serialized value before storing in the database.
 
     The JSON value is serialized to a string, encrypted, and stored as text.
