@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from typing import Any
 
 import click
 from plain.runtime import settings
@@ -118,7 +119,19 @@ def _migrate() -> None:
 
     conn = get_connection()
     conn.ensure_connection()
-    executor = MigrationExecutor(conn)
+
+    def progress(
+        action: str, *, migration: Any = None, fake: bool = False, **_: Any
+    ) -> None:
+        if (
+            action == "apply_success"
+            and fake
+            and migration is not None
+            and migration.supersedes
+        ):
+            click.echo(f"  {migration} (baseline: recorded, not run)")
+
+    executor = MigrationExecutor(conn, progress)
     targets = executor.loader.graph.leaf_nodes()
     migration_plan = executor.migration_plan(targets)
 
@@ -126,9 +139,24 @@ def _migrate() -> None:
         click.echo("  No migrations to apply.")
         return
 
-    click.echo(f"  Applying {len(migration_plan)} migration(s)...")
+    recording = sum(
+        (m.package_label, m.name) in executor.record_only for m in migration_plan
+    )
+    running = len(migration_plan) - recording
+
+    def summary(verb_run: str, verb_record: str) -> str:
+        # "Applying 2 migration(s), recording 1 baseline(s)"
+        parts = []
+        if running:
+            parts.append(f"{verb_run} {running} migration(s)")
+        if recording:
+            parts.append(f"{verb_record} {recording} baseline(s)")
+        line = ", ".join(parts)
+        return line[0].upper() + line[1:]
+
+    click.echo(f"  {summary('Applying', 'recording')}...")
     executor.migrate(targets, plan=migration_plan)
-    click.echo(f"  Applied {len(migration_plan)} migration(s).")
+    click.echo(f"  {summary('Applied', 'recorded')}.")
 
 
 def _converge() -> None:

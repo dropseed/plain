@@ -8,8 +8,7 @@ history back to ordinary records.
 
 from __future__ import annotations
 
-import sys
-from collections.abc import Generator
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -19,8 +18,6 @@ from plain.postgres.cli.migrations import apply
 from plain.postgres.migrations.exceptions import BadMigrationError
 from plain.postgres.migrations.loader import MigrationLoader
 from plain.postgres.migrations.recorder import MigrationRecorder
-
-MODULE_NAME = "replaces_removed_migrations"
 
 SQUASHED = """\
 from plain.postgres import migrations
@@ -52,32 +49,8 @@ class Migration(migrations.Migration):
 
 
 @pytest.fixture
-def examples_migrations(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Generator[Path]:
-    """Point the `examples` package at a migrations module under tmp_path."""
-    module_dir = tmp_path / MODULE_NAME
-    module_dir.mkdir()
-    (module_dir / "__init__.py").write_text("")
-
-    monkeypatch.syspath_prepend(str(tmp_path))
-
-    original = MigrationLoader.migrations_module
-
-    def migrations_module(package_label: str) -> tuple[str | None, bool]:
-        if package_label == "examples":
-            return MODULE_NAME, False
-        return original(package_label)
-
-    monkeypatch.setattr(
-        MigrationLoader, "migrations_module", staticmethod(migrations_module)
-    )
-
-    yield module_dir
-
-    for name in list(sys.modules):
-        if name == MODULE_NAME or name.startswith(f"{MODULE_NAME}."):
-            del sys.modules[name]
+def examples_migrations(temp_migrations: Callable[..., Path]) -> Path:
+    return temp_migrations("examples") / "examples"
 
 
 def test_replaces_on_disk_fails_to_load_with_the_recipe(

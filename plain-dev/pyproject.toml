@@ -21,7 +21,7 @@ dependencies = [
 env = "plain.dev.env:cli"
 
 [dependency-groups]
-dev = ["pytest>=8.0.0"]
+dev = ["pytest>=8.0.0", "plain.postgres"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

@@ -988,6 +988,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "plain-postgres" },
     { name = "pytest" },
 ]
 
@@ -1001,7 +1002,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0.0" }]
+dev = [
+    { name = "plain-postgres", editable = "plain-postgres" },
+    { name = "pytest", specifier = ">=8.0.0" },
+]
 
 [[package]]
 name = "plain-elements"

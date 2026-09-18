@@ -12,7 +12,7 @@ from plain.utils.text import Truncator
 
 from ..db import get_connection
 from ..migrations.autodetector import MigrationAutodetector
-from ..migrations.exceptions import MigrationSchemaError
+from ..migrations.exceptions import MigrationSchemaError, StaleMigrationRecordsError
 from ..migrations.executor import MigrationExecutor
 from ..migrations.loader import AmbiguityError, MigrationLoader
 from ..migrations.migration import Migration
@@ -370,7 +370,9 @@ def apply(
 
         if action == "apply_start":
             click.echo()  # Always add newline between migrations
-            if fake:
+            if fake and migration is not None and migration.supersedes:
+                click.secho(f"{migration} (baseline: recorded, not run)", fg="cyan")
+            elif fake:
                 click.secho(f"{migration} (faked)", fg="cyan")
             else:
                 click.secho(f"{migration}", fg="cyan")
@@ -467,7 +469,23 @@ def apply(
     else:
         targets = list(executor.loader.graph.leaf_nodes())
 
-    migration_plan = executor.migration_plan(targets)
+    # A named --fake of the baseline itself is how an operator records it by
+    # hand, so that one must get past the boundary refusal that stops all else.
+    repair_baseline = (
+        (package_label, migration.name)
+        if fake and package_label and migration_name and migration.supersedes
+        else None
+    )
+    migration_plan = executor.migration_plan(targets, repair_baseline=repair_baseline)
+    if repair_baseline is not None:
+        extra = [
+            m for m in migration_plan if (m.package_label, m.name) != repair_baseline
+        ]
+        if extra:
+            raise click.ClickException(
+                f"Recording {repair_baseline[0]}.{repair_baseline[1]} by hand would also "
+                f"fake {', '.join(str(m) for m in extra)}. Apply those first, then repeat."
+            )
 
     if plan:
         if not quiet:
@@ -476,6 +494,12 @@ def apply(
                 click.echo("  No planned migration operations.")
             else:
                 for migration in migration_plan:
+                    key = (migration.package_label, migration.name)
+                    if key in executor.record_only:
+                        click.secho(
+                            f"{migration} (baseline: recorded, not run)", fg="cyan"
+                        )
+                        continue
                     click.secho(str(migration), fg="cyan")
                     for operation in migration.operations:
                         message, is_error = describe_operation(operation)
@@ -509,7 +533,9 @@ def apply(
             # Re-plan under the lock — another process may have applied some
             # or all of these migrations while we waited for it.
             executor = MigrationExecutor(get_connection(), migration_progress_callback)
-            migration_plan = executor.migration_plan(targets)
+            migration_plan = executor.migration_plan(
+                targets, repair_baseline=repair_baseline
+            )
             if not migration_plan:
                 if not quiet:
                     click.echo(
@@ -688,6 +714,7 @@ def list_migrations(
             package_names_list = sorted(loader.migrated_packages)
         # For each app, print its migrations in order from oldest (roots) to
         # newest (leaves).
+        adopt_keys = loader.baseline_status.adopt_keys
         for package_name in package_names_list:
             click.secho(package_name, fg="cyan", bold=True)
             shown = set()
@@ -701,6 +728,8 @@ def list_migrations(
                         )
                         marker = "X" if applied_migration else " "
                         output = f" [{marker}] {plan_node[1]}"
+                        if plan_node in adopt_keys:
+                            output += " (baseline: will be recorded, not run)"
                         if (
                             applied_migration
                             and verbosity >= 2
@@ -709,6 +738,9 @@ def list_migrations(
                             output += f" (applied at {applied_migration.applied.strftime('%Y-%m-%d %H:%M:%S')})"
                         click.echo(output)
                         shown.add(plan_node)
+            for refusal in loader.baseline_status.refusals:
+                if refusal.package_label == package_name:
+                    click.secho(f" ! {refusal}", fg="red")
             # If we didn't print anything, then a small message
             if not shown:
                 click.secho(" (no migrations)", fg="red")
@@ -770,6 +802,7 @@ def list_migrations(
 
 
 @cli.command("prune")
+@click.argument("package_label", required=False)
 @click.option(
     "--yes",
     "-y",
@@ -777,8 +810,12 @@ def list_migrations(
     help="Skip confirmation prompt.",
 )
 @database_management_command
-def prune(yes: bool) -> None:
-    """Remove stale migration records from the database"""
+def prune(package_label: str | None, yes: bool) -> None:
+    """Remove orphan migration records from the database.
+
+    With a PACKAGE_LABEL, remove every record for that package - the way to
+    let its baseline run again when the tables are gone.
+    """
     # Load migrations from disk and database
     conn = get_connection()
     loader = MigrationLoader(conn, ignore_no_migrations=True)
@@ -786,16 +823,30 @@ def prune(yes: bool) -> None:
     recorder = MigrationRecorder(conn)
     recorded_migrations = recorder.applied_migrations()
 
-    # Find all prunable migrations (recorded but not on disk)
-    all_prunable = [
-        migration
-        for migration in recorded_migrations
-        if migration not in loader.disk_migrations
-    ]
+    if package_label:
+        try:
+            packages_registry.get_package_config(package_label)
+        except LookupError as err:
+            raise click.ClickException(str(err))
+        all_prunable = [m for m in recorded_migrations if m[0] == package_label]
+    else:
+        all_prunable = loader.orphan_records(recorded_migrations)
+        # A refusal that prescribes `prune <package>` is why someone runs this.
+        for refusal in loader.baseline_status.refusals:
+            if isinstance(refusal, StaleMigrationRecordsError):
+                click.secho(f"! {refusal}", fg="red")
+        retired = [m for m in recorded_migrations if m in loader.retired_to_baseline]
+        if retired and all_prunable:
+            click.echo(
+                f"Keeping {len(retired)} record{'s' if len(retired) != 1 else ''} retired "
+                "by a baseline - they are the rollback path across the reset."
+            )
 
     if not all_prunable:
-        click.echo("No stale migration records found.")
+        click.echo("No orphan migration records found.")
         return
+
+    kind = "migration" if package_label else "orphan migration"
 
     # Separate into existing packages vs orphaned packages
     existing_packages = set(loader.migrated_packages)
@@ -816,7 +867,9 @@ def prune(yes: bool) -> None:
     # Display what was found
     if prunable_existing:
         click.secho(
-            "Stale migration records (from existing packages):",
+            f"Every record for {package_label}:"
+            if package_label
+            else "Orphan migration records (from existing packages):",
             fg="yellow",
             bold=True,
         )
@@ -844,7 +897,7 @@ def prune(yes: bool) -> None:
 
     if not yes:
         click.echo(
-            f"Found {total_count} stale migration record{'s' if total_count != 1 else ''}."
+            f"Found {total_count} {kind} record{'s' if total_count != 1 else ''}."
         )
         click.echo()
 
@@ -870,6 +923,6 @@ def prune(yes: bool) -> None:
             click.echo(" OK")
 
     click.secho(
-        f"✓ Removed {total_count} stale migration record{'s' if total_count != 1 else ''}.",
+        f"✓ Removed {total_count} {kind} record{'s' if total_count != 1 else ''}.",
         fg="green",
     )

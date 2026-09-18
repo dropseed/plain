@@ -120,6 +120,16 @@ def status(as_json: bool) -> None:
         else None
     )
 
+    pending: int | None = None
+    history_error: str | None = None
+    if exists:
+        from plain.postgres.migrations.exceptions import MigrationHistoryError
+
+        try:
+            pending = pending_migration_count(cluster.url(db_name))
+        except MigrationHistoryError as e:
+            history_error = str(e)
+
     # The container/image/volume only exist for the docker backend; a local
     # Postgres has none of them.
     container = cluster.server.container
@@ -142,9 +152,8 @@ def status(as_json: bool) -> None:
                     "size_bytes": database.size_bytes if database else None,
                     "branch": database.branch if database else None,
                     "created_via": database.created_via if database else None,
-                    "pending_migrations": pending_migration_count(cluster.url(db_name))
-                    if exists
-                    else None,
+                    "pending_migrations": pending,
+                    "history_error": history_error,
                     "container": container,
                     "image": image,
                     "volume": volume,
@@ -165,12 +174,10 @@ def status(as_json: bool) -> None:
         if database.branch:
             click.echo(f"Branch:    {database.branch}")
 
-    if exists:
-        pending = pending_migration_count(cluster.url(db_name))
-        if pending:
-            click.secho(
-                f"Pending:   {pending} migration(s) not yet applied", fg="yellow"
-            )
+    if history_error:
+        click.secho(f"History:   {history_error}", fg="red")
+    elif pending:
+        click.secho(f"Pending:   {pending} migration(s) not yet applied", fg="yellow")
 
     if container:
         click.echo(f"Container: {container}")

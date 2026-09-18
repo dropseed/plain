@@ -590,14 +590,15 @@ Key flags:
 
 Shared commands (apply equally to structural and data migrations):
 
-| Command                          | Purpose                                              |
-| -------------------------------- | ---------------------------------------------------- |
-| `plain migrations apply`         | Apply pending migrations                             |
-| `plain migrations apply --plan`  | Preview what would run                               |
-| `plain migrations apply --check` | Exit non-zero if unapplied migrations exist (for CI) |
-| `plain migrations apply --fake`  | Mark as applied without running SQL                  |
-| `plain migrations list`          | View migration status by package                     |
-| `plain migrations prune`         | Remove stale migration records                       |
+| Command                            | Purpose                                                           |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| `plain migrations apply`           | Apply pending migrations                                          |
+| `plain migrations apply --plan`    | Preview what would run                                            |
+| `plain migrations apply --check`   | Exit non-zero if unapplied migrations exist (for CI)              |
+| `plain migrations apply --fake`    | Mark as applied without running SQL                               |
+| `plain migrations list`            | View migration status by package                                  |
+| `plain migrations prune`           | Remove orphan migration records                                   |
+| `plain migrations prune <package>` | Remove every record for one package (lets its baseline run again) |
 
 #### Development workflow
 
@@ -614,29 +615,52 @@ Use this when migrations exist only in your local dev environment and haven't be
 
 Migrations that are committed but not yet deployed anywhere can be consolidated the same way if every developer resets their database; production then applies the consolidated migration normally. Once a migration has reached any deployed environment, use a full reset (below).
 
+#### Baselines
+
+A package whose migration history has been reset ships one **baseline** migration in place of the deleted files. It is an ordinary migration with three extra attributes:
+
+```python
+class Migration(migrations.Migration):
+    supersedes = "0008_add_widgets"  # the last deleted migration; its record proves a database is caught up
+    retired = (
+        "0001_initial",
+        ...,
+        "0008_add_widgets",
+    )  # every deleted name, so dependencies on them still resolve
+    since = "0.61"  # the release that shipped the reset, for messages
+    dependencies = (("users", "__first__"),)
+    operations = (migrations.CreateModel(...), ...)
+```
+
+What `plain postgres sync` (or `plain migrations apply`) does with it depends only on what the database has recorded:
+
+| Database has                                                      | Result                                                                                                 |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| No records for the package, no tables (fresh, or newly installed) | Runs the baseline like any migration                                                                   |
+| No records for the package, but its tables exist                  | Refuses: record it with `apply <pkg> <baseline> --fake` if the schema is current, else drop the tables |
+| The baseline recorded                                             | Nothing                                                                                                |
+| The `supersedes` migration recorded                               | Records the baseline without running it - one row, once                                                |
+| Records, but not the `supersedes` migration                       | Refuses: upgrade through the last release that still has that migration                                |
+| Records, but none of the package's tables                         | Refuses: `plain migrations prune <pkg>` drops the records; then it runs                                |
+
+`plain migrations apply --plan --check` and `plain postgres sync --check` report a baseline waiting to be recorded as a pending change, and `plain preflight` reports a refusal as an error. Nothing ever deletes records on its own; `prune` stays explicit. A database where the baseline _ran_ (rather than was recorded) cannot roll back to code from before the reset.
+
 #### Resetting migrations
 
-Over time a package can accumulate dozens of migrations. Once **every environment** (dev, staging, production) has applied all of them, you can replace the entire history with a single fresh `0001_initial`.
+Once **every environment** has applied a package's migrations, its history can be collapsed into one baseline. Nothing about this touches `plainmigrations` by hand, and nothing prunes: existing databases adopt the baseline with one record, the retired records stay as the rollback path, and a database that somehow missed the last migration is refused with instructions instead of drifting.
 
-**Prerequisites:**
-
-- Every environment (dev, staging, production) has applied all existing migrations. If any environment is behind, the reset will break it.
-- The first migration is named `0001_initial` (the default). If it has a different name, this workflow won't work cleanly.
-
-**Steps:**
-
-1. Run `plain migrations list` locally and verify everything is applied.
-2. Delete every file in the package's `migrations/` directory except `__init__.py`.
-3. Run `plain migrations create` to generate a fresh `0001_initial`.
-4. Run `plain migrations prune --yes` to remove stale DB records. The existing `0001_initial` record matches the new file, so the database is immediately up to date.
-5. Verify with `plain postgres schema` (zero issues means the reset is clean) and `plain migrations create --check` (no pending changes).
-6. Commit and deploy. On every other environment, run `plain migrations prune --yes`. No actual SQL runs — it only cleans up migration history records. If `migrations prune` is already in your deploy steps, no changes are needed.
+1. Confirm every environment is at the leaf (`plain migrations list` there).
+2. Note the leaf's name and every migration file's name in the package.
+3. Write the baseline **before deleting anything**, numbered past the old leaf (`0019_baseline.py` after `0018_…`): `supersedes` is the old leaf, `retired` is every name from step 2, `since` is the release this ships in, and its `operations` are the package's schema as it stands - the initial migration's `CreateModel`s with every later field folded in. (Until `plain migrations reset` generates this, it is written by hand.) Nothing loads until step 4 - the loader refuses a baseline whose retired files are still on disk.
+4. Delete the old migration files. Other packages that depended on a deleted name now resolve to the baseline; nothing else needs editing.
+5. `plain migrations apply --plan` locally shows it as `(baseline: recorded, not run)`; `plain postgres sync` records it.
+6. Commit and deploy. Every environment's `plain postgres sync` records it the same way; a fresh database runs it. Do not add a `prune` step.
 
 **Things to keep in mind:**
 
-- If resetting multiple packages, process depended-on packages first — the new `0001_initial` may have cross-package FK dependencies.
-- Data migrations (`RunPython`) in the deleted history are gone, which is fine since they've already run everywhere.
-- If CI runs `migrations create --check` or `migrations apply --check`, the reset PR must be merged and deployed before those checks pass in other branches.
+- Other packages' migrations that depended on a retired name resolve to the baseline automatically. Nothing needs rewriting.
+- Data migrations (`RunPython`) in the deleted history are gone, which is fine on databases that ran them and means a fresh database doesn't get their effects - move anything a fresh install needs into the baseline or a seed.
+- If CI runs `migrations create --check` or `migrations apply --check`, the reset must be merged and deployed before those checks pass in other branches.
 
 ### Data migrations
 

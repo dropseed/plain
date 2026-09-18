@@ -39,7 +39,9 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
 - A new worktree's database is forked from the project's main database **with
   its data** — don't re-seed by hand, and don't tell users to.
 - `plain db status --json` before diagnosing anything database-shaped: database,
-  server, size, branch, and pending migration count. `plain db list --json` for
+  server, size, branch, and pending migration count - or, when the migration
+  planner refuses the database, `history_error` with `pending_migrations: null`.
+  `plain db list --json` for
   every database in the project and which checkout owns it.
 - `plain postgres shell` for a psql prompt on the active database; it accepts
   piped SQL, so `echo 'select ...' | plain postgres shell` is the way to inspect

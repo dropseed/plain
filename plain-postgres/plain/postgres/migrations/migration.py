@@ -37,6 +37,17 @@ class Migration:
     # (package_label, migration_name) pairs to run before this migration.
     dependencies: Sequence[tuple[str, str]] = ()
 
+    # A baseline stands in for a package's deleted migration history. `supersedes`
+    # names the one deleted migration whose record proves a database is caught
+    # up: a database that has it adopts the baseline with a single record write;
+    # one that doesn't is refused. `retired` lists every deleted name so that a
+    # dependency on any of them resolves to the baseline. `since` is the release
+    # that shipped the reset, for messages. Written by hand today; the reset
+    # command that will generate it is next.
+    supersedes: str | None = None
+    retired: Sequence[str] = ()
+    since: str = ""
+
     # Is this an initial migration? Initial migrations are skipped on
     # --fake-initial if the table or fields already exist. If None, check if
     # the migration has any dependencies to determine if there are dependencies

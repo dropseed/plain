@@ -130,6 +130,7 @@ class MigrationWriter:
         """Return a string of the file contents."""
         items = {
             "initial_str": "",
+            "baseline_str": "",
         }
 
         imports = set()
@@ -184,6 +185,12 @@ class MigrationWriter:
 
         if self.migration.initial:
             items["initial_str"] = "\n    initial = True\n"
+        if self.migration.supersedes:
+            items["baseline_str"] = (
+                f"\n    supersedes = {self.serialize(self.migration.supersedes)[0]}"
+                f"\n    retired = {self.serialize(tuple(self.migration.retired))[0]}"
+                f"\n    since = {self.serialize(self.migration.since)[0]}\n"
+            )
 
         return MIGRATION_TEMPLATE % items
 
@@ -278,7 +285,7 @@ MIGRATION_TEMPLATE = """\
 %(migration_header)s%(imports)s
 
 class Migration(migrations.Migration):
-%(initial_str)s
+%(initial_str)s%(baseline_str)s
     dependencies = (
 %(dependencies)s\
     )
