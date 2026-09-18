@@ -27,7 +27,7 @@ class AdminViewset:
             DeleteView.parent_view_class = DetailView
 
         # Now iterate all inner view classes
-        views = []
+        views: list[type[View]] = []
 
         for attr in cls.__dict__.values():
             if isinstance(attr, type) and issubclass(attr, View):

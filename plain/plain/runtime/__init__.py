@@ -85,9 +85,9 @@ def setup() -> None:
 
 __all__ = [
     "APP_PATH",
-    "AppPathNotFound",
     "PLAIN_CACHE_PATH",
     "PLAIN_TEMP_PATH",
+    "AppPathNotFound",
     "Secret",
     "SetupError",
     "__version__",

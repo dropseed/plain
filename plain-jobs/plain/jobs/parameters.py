@@ -51,7 +51,7 @@ class ModelParameter(JobParameter):
                     package, model_name, obj_id = parts
                     model = models_registry.get_model(package, model_name)
                     return model.query.get(id=obj_id)
-            except (ValueError, Exception):
+            except Exception:
                 pass
         return None
 
@@ -117,7 +117,7 @@ class LegacyModelParameter(JobParameter):
                 package, model, obj_id = value_part.split("/")
                 model = models_registry.get_model(package, model)
                 return model.query.get(id=obj_id)
-            except (ValueError, Exception):
+            except Exception:
                 pass
         return None
 

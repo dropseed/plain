@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pytest
-
 from plain.cache import cache
 from plain.cache.models import CachedItem
 from plain.utils import timezone

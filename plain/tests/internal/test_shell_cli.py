@@ -5,7 +5,6 @@ import sys
 from unittest import mock
 
 from click.testing import CliRunner
-
 from plain.cli.shell import shell
 
 

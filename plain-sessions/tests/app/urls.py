@@ -29,9 +29,9 @@ class FlushView(SessionView):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         path("", IndexView),
         path("set", SetView),
         path("get", GetView),
         path("flush", FlushView),
-    ]
+    )

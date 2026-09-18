@@ -13,7 +13,6 @@ from typing import (
     overload,
 )
 
-from plain import exceptions, validators
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import quote_name
 from plain.postgres.enums import ChoicesMeta
@@ -23,6 +22,8 @@ from plain.preflight import PreflightResult
 from plain.utils.datastructures import DictWrapper
 from plain.utils.functional import Promise
 from plain.utils.itercompat import is_iterable
+
+from plain import exceptions, validators
 
 from ..registry import models_registry
 
@@ -112,20 +113,22 @@ class Field[T](Selectable[T], RegisterLookupMixin):
     cast_db_type_sql: str | None = None
 
     # Instance attributes set during field lifecycle
-    # Set by __init__
-    name: str | None
+    # Set by __init__; becomes the real field name once contributed to a
+    # model class (set_attributes_from_name, called by contribute_to_class)
+    name: str
     # Set by set_attributes_from_name (called by contribute_to_class)
     column: str
-    concrete: bool
     # Set by contribute_to_class
     model: type[Model]
 
     # Designates whether empty strings fundamentally are allowed at the
     # database level.
     empty_strings_allowed = True
-    empty_values = list(validators.EMPTY_VALUES)
+    empty_values = tuple(validators.EMPTY_VALUES)
 
-    default_validators = []  # Default set of validators
+    default_validators: tuple[
+        Callable[[Any], None], ...
+    ] = ()  # Default set of validators
     unique_error_message = "A %(model_name)s with this %(field_label)s already exists."
 
     # Kwargs that don't affect the column definition; the schema editor
@@ -134,7 +137,7 @@ class Field[T](Selectable[T], RegisterLookupMixin):
     non_migration_attrs: tuple[str, ...] = ()
 
     def __init__(self) -> None:
-        self.name = None  # Set by set_attributes_from_name
+        self.name = ""  # Set by set_attributes_from_name
         self.primary_key = False
         self.auto_created = False
 
@@ -151,8 +154,8 @@ class Field[T](Selectable[T], RegisterLookupMixin):
     def __repr__(self) -> str:
         """Display the module, class, and name of the field."""
         path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
-        name = getattr(self, "name", None)
-        if name is not None:
+        name = getattr(self, "name", "")
+        if name:
             return f"<{path}: {name}>"
         return f"<{path}>"
 
@@ -201,7 +204,6 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         Check if field name is valid, i.e. 1) does not end with an
         underscore, 2) does not contain "__" and 3) is not "id".
         """
-        assert self.name is not None, "Field name must be set before checking"
         if self.name.endswith("_"):
             return [
                 PreflightResult(
@@ -252,7 +254,7 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         """
         return sql, params
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         """
         Return enough information to recreate the field as a 4-tuple:
 
@@ -296,7 +298,6 @@ class Field[T](Selectable[T], RegisterLookupMixin):
             cls_name = self.__class__.__qualname__
             if getattr(_postgres_root, cls_name, None) is self.__class__:
                 path = f"plain.postgres.{cls_name}"
-        # Note: self.name can be None during migration state rendering when fields are cloned
         return (self.name, path, [], keywords)
 
     def clone(self) -> Self:
@@ -304,7 +305,7 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         Uses deconstruct() to clone a new copy of this Field.
         Will not preserve any class attachments/attribute names.
         """
-        name, path, args, kwargs = self.deconstruct()
+        _name, _path, args, kwargs = self.deconstruct()
         return self.__class__(*args, **kwargs)
 
     def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
@@ -342,7 +343,6 @@ class Field[T](Selectable[T], RegisterLookupMixin):
             # values - so, this is very close to normal pickle.
             state = self.__dict__.copy()
             return _empty, (self.__class__,), state
-        assert self.name is not None
         options = model.model_options
         return _load_field, (
             options.package_label,
@@ -415,7 +415,6 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         # The database column is the field name. A foreign key overrides this
         # method only to append the "_id" suffix to `column`.
         self.column = self.name
-        self.concrete = self.column is not None
 
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
         """
@@ -431,7 +430,6 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         # Field is its own descriptor; make sure it is set on the class so
         # attribute access hits __get__/__set__.
         if self.column:
-            assert self.name is not None
             setattr(cls, self.name, self)
 
     # Descriptor protocol implementation
@@ -459,7 +457,6 @@ class Field[T](Selectable[T], RegisterLookupMixin):
             return self
 
         # Instance access - get value from instance dict
-        assert self.name is not None
         data = instance.__dict__
         field_name = self.name
 
@@ -469,9 +466,7 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         # instance cheap to use beyond its primary key.
         if field_name not in data:
             missing = [
-                f.name
-                for f in instance._model_meta.concrete_fields
-                if f.name not in data
+                f.name for f in instance._model_meta.fields if f.name not in data
             ]
             instance.refresh_from_db(fields=missing)
 
@@ -509,7 +504,6 @@ class Field[T](Selectable[T], RegisterLookupMixin):
             stored = self.to_python(value)
 
         # Store in instance dict
-        assert self.name is not None
         instance.__dict__[self.name] = stored
 
     def __delete__(self, instance: Model) -> None:
@@ -518,7 +512,6 @@ class Field[T](Selectable[T], RegisterLookupMixin):
 
         Removes the value from instance.__dict__.
         """
-        assert self.name is not None
         try:
             del instance.__dict__[self.name]
         except KeyError:
@@ -528,7 +521,6 @@ class Field[T](Selectable[T], RegisterLookupMixin):
 
     def pre_save(self, model_instance: Model, add: bool) -> T | None:
         """Return field's value just before saving."""
-        assert self.name is not None
         return getattr(model_instance, self.name)
 
     def get_prep_value(self, value: Any) -> Any:
@@ -556,8 +548,8 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         return self.get_db_prep_value(value, connection=connection, prepared=False)
 
     # Empty-value fallback used by ColumnField.get_default for the
-    # not-null + not-required + empty_strings_allowed case (Python-side
-    # Model() construction). BinaryField overrides with b"".
+    # not-null + empty_strings_allowed case (Python-side Model()
+    # construction). BinaryField overrides with b"".
     _default_empty_value: Any = ""
 
     def has_default(self) -> bool:
@@ -581,12 +573,10 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         return self.get_db_default_expression() is not None
 
     def save_form_data(self, instance: Model, data: Any) -> None:
-        assert self.name is not None
         setattr(instance, self.name, data)
 
     def value_from_object(self, obj: Model) -> T | None:
         """Return the value of this field in the given model instance."""
-        assert self.name is not None
         return getattr(obj, self.name)
 
 
@@ -640,7 +630,7 @@ class ColumnField[T](Field[T]):
                     PreflightResult(
                         fix=(
                             "All 'validators' must be callable. "
-                            f"validators[{i}] ({repr(validator)}) isn't a function or "
+                            f"validators[{i}] ({validator!r}) isn't a function or "
                             "instance of a validator class."
                         ),
                         obj=self,
@@ -690,7 +680,7 @@ class ColumnField[T](Field[T]):
             return None
         return self._default_empty_value
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.required is not True:
             kwargs["required"] = self.required
@@ -706,6 +696,15 @@ class DefaultableField[T](ColumnField[T]):
 
     non_migration_attrs = (*ColumnField.non_migration_attrs, "default")
 
+    # Subclasses whose __init__ deliberately doesn't take default=
+    # (EncryptedJSONField) set this False so callers like the autodetector's
+    # error guidance don't suggest a kwarg that would raise.
+    accepts_default = True
+
+    # Subclasses set this when their only expressible column DEFAULT is the
+    # class's `_default_empty_value` ("" / b"").
+    only_empty_default = False
+
     def __init__(
         self,
         *,
@@ -714,22 +713,48 @@ class DefaultableField[T](ColumnField[T]):
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        if default is not NOT_PROVIDED and callable(default):
-            raise TypeError(
-                f"{type(self).__name__}(default=...) must be a static literal. "
-                f"For empty collections pass default={{}} or default=[]; for "
-                f"per-row generation use a DB-side expression "
-                f"(create_now=True, generate=True, RandomStringField)."
-            )
-        if default is not NOT_PROVIDED and isinstance(default, str) and "\\" in default:
-            # psycopg quotes backslash-bearing strings with `E'...'` escape
-            # syntax, but pg_get_expr returns the stored DEFAULT as a standard
-            # `'...'` literal — the two forms don't compare lexically, so
-            # convergence would flag spurious drift on every sync. Reject at
-            # declaration time rather than ship a sync that never converges.
-            raise ValueError(
-                f"{type(self).__name__}(default=...) must not contain a backslash."
-            )
+        if default is not NOT_PROVIDED:
+            if callable(default):
+                raise TypeError(
+                    f"{type(self).__name__}(default=...) must be a static literal. "
+                    f"For empty collections pass default={{}} or default=[]; for "
+                    f"per-row generation use a DB-side expression "
+                    f"(create_now=True, generate=True, RandomStringField)."
+                )
+            if isinstance(default, str) and "\\" in default:
+                # psycopg quotes backslash-bearing strings with `E'...'` escape
+                # syntax, but pg_get_expr returns the stored DEFAULT as a standard
+                # `'...'` literal — the two forms don't compare lexically, so
+                # convergence would flag spurious drift on every sync. Reject at
+                # declaration time rather than ship a sync that never converges.
+                raise ValueError(
+                    f"{type(self).__name__}(default=...) must not contain a backslash."
+                )
+            if self.only_empty_default:
+                empty = self._default_empty_value
+                if default is None:
+                    if not allow_null or required:
+                        raise ValueError(
+                            f"{type(self).__name__} with default=None must also "
+                            f"set allow_null=True and required=False — the "
+                            f"column must accept NULL, and required=True would "
+                            f"reject the defaulted None on every save."
+                        )
+                # `type()` (not isinstance/==) so bytearray()/memoryview(b"")
+                # can't slip through — they compare equal to b"" but don't
+                # deepcopy or serialize like it.
+                elif type(default) is not type(empty) or default != empty:
+                    raise ValueError(
+                        f"{type(self).__name__} only supports default={empty!r} — "
+                        f"the empty value, used to backfill existing rows when "
+                        f"the field is added to a populated table."
+                    )
+                elif required:
+                    raise ValueError(
+                        f"{type(self).__name__} with default={empty!r} must also "
+                        f"set required=False — the default fills the field with "
+                        f"an empty value that required=True then rejects."
+                    )
         self.default = default
         super().__init__(
             required=required,
@@ -752,7 +777,7 @@ class DefaultableField[T](ColumnField[T]):
         # shared state across instances.
         return copy.deepcopy(self.default)
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.default is not NOT_PROVIDED:
             kwargs["default"] = self.default
@@ -893,7 +918,7 @@ class ChoicesField[T](DefaultableField[T]):
             )
         super().validate(value, model_instance)
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.choices is not None:
             choices = self.choices

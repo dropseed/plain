@@ -50,16 +50,14 @@ def pending_migration_count(url: str) -> int:
 def migrations_not_on_disk(url: str) -> list[tuple[str, str]]:
     """Migrations this database has applied that no longer exist as files.
 
-    This is the "your database is ahead of your code" signal. The same
-    comparison backs the `postgres.prunable_migrations` preflight check, but
-    the remedy differs by context: prune is right when a migration was deleted
+    This is the "your database is ahead of your code" signal - the same
+    comparison the `postgres.prunable_migrations` preflight check reports.
+    Preflight prescribes nothing; the branch-switch report offers fork/reset,
+    which are safe either way. Pruning is right when a migration was deleted
     for good, and wrong when you simply switched branches and will switch back.
     """
     from plain.postgres.migrations.loader import MigrationLoader
-    from plain.postgres.migrations.recorder import MigrationRecorder
 
     with _connected(url) as conn:
         loader = MigrationLoader(conn, ignore_no_migrations=True)
-        applied = MigrationRecorder(conn).applied_migrations()
-        on_disk = loader.disk_migrations or {}
-        return sorted(m for m in applied if m not in on_disk)
+        return sorted(loader.orphan_records(loader.applied_migrations or {}))

@@ -14,13 +14,17 @@ except ImportError:
     InvalidToken = None  # ty: ignore[invalid-assignment]
     MultiFernet = None  # ty: ignore[invalid-assignment]
     hashes = None  # ty: ignore[invalid-assignment]
-    PBKDF2HMAC = None  # ty: ignore[invalid-assignment]
+    PBKDF2HMAC = None
 
-from plain import exceptions, preflight
+from plain.postgres.lookups import Exact, IsNull
 from plain.runtime import settings
 from plain.utils.encoding import force_bytes
 
-from .base import ColumnField
+from plain import preflight
+
+from .base import NOT_PROVIDED
+from .json import JSONField
+from .text import TextField
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -30,8 +34,8 @@ if TYPE_CHECKING:
     from plain.preflight.results import PreflightResult
 
 __all__ = [
-    "EncryptedTextField",
     "EncryptedJSONField",
+    "EncryptedTextField",
 ]
 
 # Fixed salt for key derivation — changing this would invalidate all encrypted data.
@@ -105,49 +109,40 @@ def _decrypt(value: str) -> str:
 
 
 # Shared tail explaining why encrypted fields reject value comparisons — used
-# by both the lookup-construction guard (_exact_for_encrypted) and the
-# typed-query method guard (_lookup_unsupported_message).
+# by both the exact-lookup guard (_EncryptedExact) and the typed-query method
+# guard (_lookup_unsupported_message).
 _NON_DETERMINISTIC_EXPLANATION = (
     "ciphertext is non-deterministic. Use .is_null() instead."
 )
 
 
-# isnull is obviously needed. exact is required so that `filter(field=None)`
-# works — the ORM resolves "exact" first and then rewrites None to isnull.
-# get_lookup() below wraps the exact lookup class to reject non-None right-hand
-# values at lookup construction time, so the silent-no-rows behavior on
-# `filter(field='something')` is also blocked.
-_ALLOWED_LOOKUPS = {"isnull", "exact"}
+class _EncryptedExact(Exact):
+    """An exact lookup that rejects non-None right-hand values.
 
-
-@cache
-def _exact_for_encrypted(base: type[Lookup]) -> type[Lookup]:
-    """Return a subclass of `base` (the Exact lookup) that rejects non-None
-    right-hand values. None passes through so the ORM's exact-None → isnull
-    rewrite in `build_lookup` still works.
+    None passes through so the ORM's exact-None → isnull rewrite in
+    `build_lookup` still works. Any other value could only ever match nothing
+    (ciphertext is non-deterministic), so it raises instead of silently
+    returning no rows.
     """
 
-    class _EncryptedExact(base):  # ty: ignore[unsupported-base]
-        def __init__(self, lhs: Any, rhs: Any) -> None:
-            if rhs is not None:
-                target = getattr(lhs, "target", None)
-                field_name = getattr(target, "name", None) or "<encrypted>"
-                raise TypeError(
-                    f"Encrypted field {field_name!r} cannot be filtered by "
-                    f"equality against a non-None value — "
-                    f"{_NON_DETERMINISTIC_EXPLANATION}"
-                )
-            super().__init__(lhs, rhs)
-
-    return _EncryptedExact
+    def __init__(self, lhs: Any, rhs: Any) -> None:
+        if rhs is not None:
+            target = getattr(lhs, "target", None)
+            field_name = getattr(target, "name", None) or "<encrypted>"
+            raise TypeError(
+                f"Encrypted field {field_name!r} cannot be filtered by "
+                f"equality against a non-None value — "
+                f"{_NON_DETERMINISTIC_EXPLANATION}"
+            )
+        super().__init__(lhs, rhs)
 
 
 class EncryptedFieldMixin:
     """Shared behavior for all encrypted fields.
 
-    Blocks lookups (except isnull) since encrypted values are non-deterministic.
-    Allows exact only for the None-rewrite path; rejects non-None exact rhs.
-    Errors at preflight if the field is used in indexes or unique constraints.
+    Owns the lookup surface (isnull and exact only — ciphertext is
+    non-deterministic) and the preflight that blocks indexes and unique
+    constraints. Also blocks the typed-query comparison methods.
 
     Must be used with Field as a co-base class.
     """
@@ -156,18 +151,24 @@ class EncryptedFieldMixin:
     name: str
     model: Any
 
-    def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
-        if lookup_name not in _ALLOWED_LOOKUPS:
-            return None
-        get_lookup = getattr(super(), "get_lookup")
-        base = get_lookup(lookup_name)
-        if lookup_name == "exact" and base is not None:
-            return _exact_for_encrypted(base)
-        return base
+    # The complete lookup surface, replacing the base field's registry.
+    # isnull is obviously needed. exact is required so that `filter(field=None)`
+    # works — the ORM resolves "exact" first and then rewrites None to isnull.
+    # _EncryptedExact rejects non-None right-hand values, so the silent-no-rows
+    # behavior on `filter(field='something')` is blocked too. The base classes
+    # are named directly — inheriting the concrete field's registrations would
+    # leak specialized lookups like JSONField's JSONExact, which compares
+    # against the jsonb 'null' literal and defeats the None→isnull rewrite.
+    # get_lookup()/get_transform() and registry consumers (e.g.
+    # unsupported-lookup error suggestions) all resolve through this one dict.
+    # A classmethod so both class-level and instance-level callers work.
+    @classmethod
+    def get_lookups(cls) -> dict[str, type[Lookup | Transform]]:
+        return {"exact": _EncryptedExact, "isnull": IsNull}
 
-    def get_transform(
-        self, lookup_name: str
-    ) -> type[Transform] | Callable[..., Any] | None:
+    def get_transform(self, name: str) -> Callable[..., Transform] | None:
+        # JSONField's get_transform falls back to KeyTransformFactory for any
+        # name — key transforms would operate on ciphertext, so block them.
         return None
 
     # Block typed-query comparison methods. Ciphertext is non-deterministic,
@@ -208,6 +209,11 @@ class EncryptedFieldMixin:
             f"Encrypted field {self.name!r} does not support .{method}() — "
             f"{_NON_DETERMINISTIC_EXPLANATION}"
         )
+
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
+        errors: list[PreflightResult] = super().preflight(**kwargs)  # ty: ignore[unresolved-attribute]
+        errors.extend(self._check_encrypted_constraints())
+        return errors
 
     def _check_encrypted_constraints(self) -> list[PreflightResult]:
         errors: list[PreflightResult] = []
@@ -251,20 +257,26 @@ class EncryptedFieldMixin:
         return errors
 
 
-class EncryptedTextField[T: (str, str | None) = str](
-    EncryptedFieldMixin, ColumnField[T]
+# The mixin narrows Field's typed-query comparison methods to `Never` on
+# purpose — that narrowing is the type-level block, and it is exactly what a
+# Liskov check objects to, so the override diagnostic is suppressed here.
+class EncryptedTextField[T: (str, str | None) = str](  # ty: ignore[invalid-method-override]
+    EncryptedFieldMixin, TextField[T]
 ):
-    """A text field that encrypts its value before storing in the database.
+    """A TextField that encrypts its value before storing in the database.
 
     Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key
     derived from SECRET_KEY. The database column is always ``text`` regardless
     of max_length, since ciphertext length is unpredictable.
 
     max_length is enforced on the plaintext value (validation), not on the
-    ciphertext stored in the database.
+    ciphertext stored in the database. Only ``default=""`` (with
+    ``required=False``) is accepted — empty strings are stored as plaintext
+    ``''``, so the empty value is the one default expressible as a column
+    DEFAULT; anything else would need ciphertext, which is non-deterministic.
     """
 
-    db_type_sql = "text"
+    only_empty_default = True
 
     def __init__(
         self,
@@ -272,39 +284,36 @@ class EncryptedTextField[T: (str, str | None) = str](
         max_length: int | None = None,
         required: bool = True,
         allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # `default` is intentionally not accepted: Fernet encryption is
-        # non-deterministic, so a literal column DEFAULT cannot be expressed.
-        self.max_length = max_length
+        # Deliberately narrower than TextField: no `choices` — exact lookups
+        # on ciphertext are non-deterministic, so choice-based filtering would
+        # silently match nothing.
         super().__init__(
+            max_length=max_length,
             required=required,
             allow_null=allow_null,
+            default=default,
             validators=validators,
         )
 
-    def to_python(self, value: Any) -> str | None:
-        if isinstance(value, str) or value is None:
-            return value
-        return str(value)
+    # TextField's pattern conditions arrive with the base class and are as
+    # meaningless on ciphertext as the comparisons the mixin blocks, so they
+    # are blocked here, where they arrive. Same shape as the mixin's blocks:
+    # `Never` rejects the call site, the raise covers anyone who bypasses the
+    # type checker.
+    def contains(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("contains"))
 
-    def validate(self, value: Any, model_instance: Any) -> None:
-        super().validate(value, model_instance)
-        if (
-            self.max_length is not None
-            and value is not None
-            and len(value) > self.max_length
-        ):
-            raise exceptions.ValidationError(
-                f"Ensure this value has at most {self.max_length} characters (it has {len(value)}).",
-                code="max_length",
-            )
+    def icontains(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("icontains"))
 
-    def get_prep_value(self, value: Any) -> Any:
-        value = super().get_prep_value(value)
-        if value is None:
-            return value
-        return self.to_python(value)
+    def startswith(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("startswith"))
+
+    def endswith(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("endswith"))
 
     def get_db_prep_value(
         self, value: Any, connection: DatabaseConnection, prepared: bool = False
@@ -321,19 +330,11 @@ class EncryptedTextField[T: (str, str | None) = str](
             return value
         return _decrypt(value)
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()
-        if self.max_length is not None:
-            kwargs["max_length"] = self.max_length
-        return name, path, args, kwargs
 
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        errors = super().preflight(**kwargs)
-        errors.extend(self._check_encrypted_constraints())
-        return errors
-
-
-class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
+# The mixin narrows Field's typed-query comparison methods to `Never` on
+# purpose — that narrowing is the type-level block, and it is exactly what a
+# Liskov check objects to, so the override diagnostic is suppressed here.
+class EncryptedJSONField(EncryptedFieldMixin, JSONField):  # ty: ignore[invalid-method-override]
     """A JSONField that encrypts its serialized value before storing in the database.
 
     The JSON value is serialized to a string, encrypted, and stored as text.
@@ -341,7 +342,7 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
     """
 
     db_type_sql = "text"
-    empty_strings_allowed = False
+    accepts_default = False
 
     def __init__(
         self,
@@ -352,47 +353,23 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # `default` is intentionally not accepted: Fernet encryption is
-        # non-deterministic, so a literal column DEFAULT cannot be expressed.
-        if encoder and not callable(encoder):
-            raise ValueError("The encoder parameter must be a callable object.")
-        if decoder and not callable(decoder):
-            raise ValueError("The decoder parameter must be a callable object.")
-        self.encoder = encoder
-        self.decoder = decoder
+        # Deliberately narrower than JSONField: no `default` — there is no
+        # empty plaintext value (even {} serializes to text that would need
+        # ciphertext, which is non-deterministic), so no literal column
+        # DEFAULT can be expressed.
         super().__init__(
+            encoder=encoder,
+            decoder=decoder,
             required=required,
             allow_null=allow_null,
             validators=validators,
         )
 
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()
-        if self.encoder is not None:
-            kwargs["encoder"] = self.encoder
-        if self.decoder is not None:
-            kwargs["decoder"] = self.decoder
-        return name, path, args, kwargs
-
-    def validate(self, value: Any, model_instance: Any) -> None:
-        super().validate(value, model_instance)
-        try:
-            json.dumps(value, cls=self.encoder)
-        except TypeError:
-            raise exceptions.ValidationError(
-                "Value must be valid JSON.",
-                code="invalid",
-                params={"value": value},
-            )
-
-    def get_db_prep_value(
-        self, value: Any, connection: DatabaseConnection, prepared: bool = False
-    ) -> Any:
-        value = super().get_db_prep_value(value, connection, prepared)
+    def adapt_json_db_value(self, value: Any) -> Any:
+        # jsonb adaptation would emit jsonb — this column stores ciphertext.
         if value is None:
             return value
-        json_str = json.dumps(value, cls=self.encoder)
-        return _encrypt(json_str)
+        return _encrypt(json.dumps(value, cls=self.encoder))
 
     def from_db_value(
         self, value: Any, expression: Any, connection: DatabaseConnection
@@ -407,8 +384,3 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
                 "Encrypted field contains data that is not valid JSON. "
                 "The stored value may be corrupt."
             )
-
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        errors = super().preflight(**kwargs)
-        errors.extend(self._check_encrypted_constraints())
-        return errors

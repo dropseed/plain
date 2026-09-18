@@ -9,7 +9,6 @@ from collections import defaultdict
 
 import click
 import psycopg
-
 from plain.cli import register_cli
 
 from ..database_url import postgres_cli_args, postgres_cli_env
@@ -122,9 +121,10 @@ def drop_unknown_tables(yes: bool) -> None:
             )
     click.echo()
 
-    if not yes:
-        if not click.confirm(f"Drop {tables_label} (CASCADE)? This cannot be undone."):
-            return
+    if not yes and not click.confirm(
+        f"Drop {tables_label} (CASCADE)? This cannot be undone."
+    ):
+        return
 
     with cli_schema_lock():
         # Re-check under the lock — while we sat at the prompt or waited for

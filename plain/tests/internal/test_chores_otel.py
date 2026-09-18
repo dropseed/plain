@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 from click.testing import CliRunner
 from opentelemetry import trace
-
 from plain.chores import Chore, register_chore
 from plain.cli.core import cli
 from plain.test.otel import install_test_tracer

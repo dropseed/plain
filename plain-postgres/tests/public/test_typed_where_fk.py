@@ -18,7 +18,6 @@ from app.examples.models.delete import (
 from app.examples.models.encrypted import SecretStore
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.shadowing import ShadowSource, ShadowTarget
-
 from plain.postgres.query_utils import Q
 
 
@@ -100,7 +99,7 @@ def test_unknown_attribute_on_related_raises_attribute_error():
     """Traversal into a non-existent field on the related model fails loudly,
     not silently producing a wrong-shaped Q."""
     with pytest.raises(AttributeError):
-        ChildCascade.parent.nonexistent_field  # ty: ignore[unresolved-attribute]
+        _ = ChildCascade.parent.nonexistent_field  # ty: ignore[unresolved-attribute]
 
 
 # ---------------------------------------------------------------------------
@@ -185,18 +184,20 @@ class TestEncryptedFieldTraversalBlocked:
             with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
                 getattr(ref, method)("x")
 
-    def test_traversed_text_method_absent_raises_attribute_error(self):
-        # Traversal exposes exactly the field's own surface. An encrypted field
-        # never defines .contains(), so traversing to it raises AttributeError,
-        # matching direct access (SecretStore.api_key.contains would too).
+    @pytest.mark.parametrize(
+        "method", ["contains", "icontains", "startswith", "endswith"]
+    )
+    def test_traversed_text_method_raises(self, method):
+        # EncryptedTextField inherits TextField's pattern conditions and blocks
+        # them, so traversal reports the same TypeError direct access does.
         from plain.postgres.fields.related_typed import PrefixedFieldRef
 
         ref = PrefixedFieldRef(
             field=SecretStore._model_meta.get_forward_field("api_key"),
             parent_path="store",
         )
-        with pytest.raises(AttributeError):
-            ref.contains("x")
+        with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
+            getattr(ref, method)("x")
 
     def test_traversed_is_in_raises(self):
         from plain.postgres.fields.related_typed import PrefixedFieldRef

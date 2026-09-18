@@ -1,5 +1,4 @@
 import pytest
-
 from plain.internal.middleware.hosts import split_domain_port, validate_host
 
 

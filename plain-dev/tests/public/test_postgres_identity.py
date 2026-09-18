@@ -8,7 +8,6 @@ derivation *is* the contract that keeps two worktrees off each other's data.
 from __future__ import annotations
 
 import pytest
-
 from plain.dev.postgres.identity import (
     MAX_NAME_LENGTH,
     InvalidDatabaseName,

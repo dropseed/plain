@@ -1,11 +1,13 @@
 from typing import Literal, TypedDict
 
+import pytest
 from plain.api import openapi
 from plain.api.openapi.generator import OpenAPISchemaGenerator
 from plain.api.openapi.utils import schema_from_type
 from plain.api.openapi.validation import validate_openapi_schema
 from plain.api.views import APIKeyView, APIView
-from plain.test import Client
+from plain.http import HTTPException
+from plain.test import Client, RequestFactory
 from plain.urls import Router, path
 
 
@@ -30,6 +32,43 @@ def test_tuple_status_code_return_overrides_default_200():
     response = client.post("/tuple-status-return")
     assert response.status_code == 201
     assert response.json() == {"id": 42, "created": True}
+
+
+def test_tuple_bodiless_status_sends_empty_response():
+    """`return 204, {}` sends a bodiless 204 (a 204 can't carry JSON)."""
+    view = APIView(request=RequestFactory().post("/"))
+    response = view.convert_result_to_response((204, {}))
+    assert response.status_code == 204
+    assert response.content == b""
+    # No representation, no Content-Type — and nothing for versioning
+    # transforms to parse.
+    assert "Content-Type" not in response.headers
+
+
+def test_bodiless_http_exception_renders_bodiless():
+    """A user-defined 304/204 HTTPException renders as that status, not a
+    500. The bodiless answer lives in the View funnel, so it holds for
+    every renderer without per-package handling."""
+
+    class NotModified304(HTTPException):
+        status_code = 304
+
+    class RaisingView(APIView):
+        def get(self):
+            raise NotModified304()
+
+    view = RaisingView(request=RequestFactory().get("/"))
+    response = view.get_response()
+    assert response.status_code == 304
+    assert response.content == b""
+    assert "Content-Type" not in response.headers
+
+
+def test_tuple_bodiless_status_with_data_raises():
+    """`return 204, {...}` is a contradiction — raise with a pointed message."""
+    view = APIView(request=RequestFactory().post("/"))
+    with pytest.raises(ValueError, match="cannot include data"):
+        view.convert_result_to_response((204, {"deleted": True}))
 
 
 def test_versioned_api_view():
@@ -145,7 +184,7 @@ def test_openapi_only_emits_operations_for_implemented_methods():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("only-get", GetOnlyView, name="only_get")]
+        urls = (path("only-get", GetOnlyView, name="only_get"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     operations = schema["paths"]["/only-get"]
@@ -162,11 +201,11 @@ def test_openapi_path_params_translated_for_both_url_forms():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [
+        urls = (
             path("explicit/<int:pk>", IssueView, name="explicit"),
             path("shorthand/<slug>", IssueView, name="shorthand"),
             path("mixed/<int:pk>/<slug>", IssueView, name="mixed"),
-        ]
+        )
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     paths = set(schema["paths"].keys())
@@ -193,12 +232,12 @@ def test_path_params_use_native_openapi_types():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [
+        urls = (
             path("by-int/<int:pk>", TargetView, name="by_int"),
             path("by-uuid/<uuid:id>", TargetView, name="by_uuid"),
             path("by-slug/<slug:tag>", TargetView, name="by_slug"),
             path("by-str/<str:name>", TargetView, name="by_str"),
-        ]
+        )
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     by_name = {
@@ -231,7 +270,7 @@ def test_operation_id_defaults_from_view_class_and_method():
 
     class LocalRouter(Router):
         namespace = "api"
-        urls = [path("notes", CrudView, name="notes_list")]
+        urls = (path("notes", CrudView, name="notes_list"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     operations = schema["paths"]["/notes"]
@@ -254,7 +293,7 @@ def test_operation_id_can_be_overridden():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("things", CustomView, name="things_list")]
+        urls = (path("things", CustomView, name="things_list"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     assert schema["paths"]["/things"]["get"]["operationId"] == "fetchEverything"
@@ -332,10 +371,10 @@ def test_api_key_view_auto_emits_security_scheme():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [
+        urls = (
             path("secure", SecureView, name="secure"),
             path("public", PublicView, name="public"),
-        ]
+        )
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     assert schema["components"]["securitySchemes"]["BearerAuth"] == {
@@ -371,7 +410,7 @@ def test_generated_schema_validates_against_openapi_spec():
     )
     class APIRouter(Router):
         namespace = ""
-        urls = [path("items/<int:id>", ItemView, name="item")]
+        urls = (path("items/<int:id>", ItemView, name="item"),)
 
     schema = OpenAPISchemaGenerator(APIRouter()).schema
     validate_openapi_schema(schema)
@@ -414,7 +453,7 @@ def test_schema_from_type_dict_emits_additional_properties():
 
 def test_schema_from_type_resolves_forward_ref_annotations():
     """String-form annotations (from `from __future__ import annotations`) resolve via `get_type_hints`."""
-    Wrapper = TypedDict("Wrapper", {"items": "list[int]", "name": "str"})  # noqa: UP013
+    Wrapper = TypedDict("Wrapper", {"items": "list[int]", "name": "str"})
 
     assert schema_from_type(Wrapper) == {
         "type": "object",
@@ -445,7 +484,7 @@ def test_path_params_auto_merged_with_declared_query_params():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("apps/<slug>/insights", WindowedView, name="insights")]
+        urls = (path("apps/<slug>/insights", WindowedView, name="insights"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     params = schema["paths"]["/apps/{slug}/insights"]["get"]["parameters"]
@@ -476,7 +515,7 @@ def test_declared_path_param_overrides_auto_extracted():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("things/<slug>", CustomView, name="thing")]
+        urls = (path("things/<slug>", CustomView, name="thing"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     params = schema["paths"]["/things/{slug}"]["get"]["parameters"]
@@ -496,7 +535,7 @@ def test_return_annotation_drives_200_response_schema():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("items", ItemView, name="items")]
+        urls = (path("items", ItemView, name="items"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     op = schema["paths"]["/items"]["get"]
@@ -529,7 +568,7 @@ def test_nested_typed_dicts_register_as_separate_components():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("items", V, name="items")]
+        urls = (path("items", V, name="items"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     schemas = schema["components"]["schemas"]
@@ -562,7 +601,7 @@ def test_nested_typed_dict_via_dict_value_registers():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("activity", V, name="activity")]
+        urls = (path("activity", V, name="activity"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     schemas = schema["components"]["schemas"]
@@ -585,7 +624,7 @@ def test_return_annotation_extracts_typed_dict_from_union_with_response():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("items", ItemView, name="items")]
+        urls = (path("items", ItemView, name="items"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     ref = schema["paths"]["/items"]["get"]["responses"]["200"]["content"][
@@ -609,7 +648,7 @@ def test_return_annotation_does_not_override_explicit_decorator():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("things", Mixed, name="things")]
+        urls = (path("things", Mixed, name="things"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     ref = schema["paths"]["/things"]["get"]["responses"]["200"]["content"][
@@ -633,7 +672,7 @@ def test_method_docstring_becomes_summary_and_description():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("notes", V, name="notes")]
+        urls = (path("notes", V, name="notes"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     op = schema["paths"]["/notes"]["get"]
@@ -654,7 +693,7 @@ def test_method_docstring_wrapped_summary_paragraph_joined():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("me", V, name="me")]
+        urls = (path("me", V, name="me"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     op = schema["paths"]["/me"]["get"]
@@ -677,7 +716,7 @@ def test_class_docstring_used_when_method_has_none():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("v", V, name="v")]
+        urls = (path("v", V, name="v"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     op = schema["paths"]["/v"]["get"]
@@ -701,7 +740,7 @@ def test_leading_http_method_line_is_dropped_from_docstring():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("things", V, name="things")]
+        urls = (path("things", V, name="things"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     op = schema["paths"]["/things"]["get"]
@@ -721,7 +760,7 @@ def test_explicit_summary_overrides_docstring():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("x", V, name="x")]
+        urls = (path("x", V, name="x"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     op = schema["paths"]["/x"]["get"]
@@ -730,34 +769,34 @@ def test_explicit_summary_overrides_docstring():
 
 def test_openapi_parameters_class_attribute_walked_via_mro():
     class WindowedView(APIView):
-        openapi_parameters = [
+        openapi_parameters = (
             {
                 "name": "since",
                 "in": "query",
                 "required": False,
                 "schema": {"type": "string"},
-            }
-        ]
+            },
+        )
 
     class Item(TypedDict):
         ok: bool
 
     class ItemView(WindowedView):
-        openapi_parameters = [
+        openapi_parameters = (
             {
                 "name": "name",
                 "in": "query",
                 "required": True,
                 "schema": {"type": "string"},
-            }
-        ]
+            },
+        )
 
         def get(self) -> Item:
             return {"ok": True}
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("ts/<slug>", ItemView, name="ts")]
+        urls = (path("ts/<slug>", ItemView, name="ts"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     params = schema["paths"]["/ts/{slug}"]["get"]["parameters"]
@@ -782,10 +821,10 @@ def test_include_view_filter_drops_excluded_views():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [
+        urls = (
             path("public", PublicView, name="public"),
             path("internal", InternalView, name="internal"),
-        ]
+        )
 
     class PublicOnlyGenerator(OpenAPISchemaGenerator):
         def include_view(self, view_class):
@@ -811,7 +850,7 @@ def test_ref_parameters_merge_alongside_path_params():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("items/<int:pk>", ListView, name="items")]
+        urls = (path("items/<int:pk>", ListView, name="items"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     params = schema["paths"]["/items/{pk}"]["get"]["parameters"]
@@ -831,7 +870,7 @@ def test_response_typed_dict_decorator_emits_named_component():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("items", ItemView, name="items")]
+        urls = (path("items", ItemView, name="items"),)
 
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     op = schema["paths"]["/items"]["get"]
@@ -860,7 +899,7 @@ def test_response_typed_dict_decorator_walks_nested_typed_dicts():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("v", V, name="v")]
+        urls = (path("v", V, name="v"),)
 
     schemas = OpenAPISchemaGenerator(LocalRouter()).schema["components"]["schemas"]
     assert "Outer" in schemas
@@ -889,7 +928,7 @@ def test_inline_responses_via_schema_decorator_pass_through():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("v", V, name="v")]
+        urls = (path("v", V, name="v"),)
 
     op = OpenAPISchemaGenerator(LocalRouter()).schema["paths"]["/v"]["get"]
     assert op["responses"]["200"]["description"] == "Custom"
@@ -905,7 +944,7 @@ def test_view_without_any_response_declaration_is_dropped():
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("nothing", V, name="nothing")]
+        urls = (path("nothing", V, name="nothing"),)
 
     paths = OpenAPISchemaGenerator(LocalRouter()).schema["paths"]
     assert "/nothing" not in paths
@@ -924,7 +963,7 @@ def test_return_annotation_fills_in_200_when_schema_decorator_only_sets_summary(
 
     class LocalRouter(Router):
         namespace = ""
-        urls = [path("items", V, name="items")]
+        urls = (path("items", V, name="items"),)
 
     op = OpenAPISchemaGenerator(LocalRouter()).schema["paths"]["/items"]["get"]
     assert op["summary"] == "List items"

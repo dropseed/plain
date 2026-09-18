@@ -24,10 +24,10 @@ class LogoutView(View):
 
 class AppRouter(Router):
     namespace = ""
-    urls = [
+    urls = (
         include("admin", AdminRouter),
         include("assets", AssetsRouter),
         path("login", LoginView, name="login"),
         path("logout", LogoutView, name="logout"),
         path("whoami", WhoView, name="whoami"),
-    ]
+    )

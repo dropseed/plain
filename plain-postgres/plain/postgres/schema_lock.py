@@ -23,7 +23,6 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
 import psycopg
-
 from plain.exceptions import ImproperlyConfigured
 from plain.logs import get_framework_logger
 from plain.runtime import settings

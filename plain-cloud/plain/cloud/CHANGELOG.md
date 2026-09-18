@@ -1,5 +1,16 @@
 # plain-cloud changelog
 
+## [0.4.3](https://github.com/dropseed/plain/releases/plain-cloud@0.4.3) (2026-08-12)
+
+### What's changed
+
+- Internal typing cleanups in the API client ([f52e18f532](https://github.com/dropseed/plain/commit/f52e18f532))
+- Added a test suite ([f8a8491e85](https://github.com/dropseed/plain/commit/f8a8491e85))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.4.2](https://github.com/dropseed/plain/releases/plain-cloud@0.4.2) (2026-05-19)
 
 ### What's changed

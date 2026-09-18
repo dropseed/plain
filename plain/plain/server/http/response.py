@@ -11,7 +11,11 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
-from plain.http import FileResponse
+from plain.http import (
+    FileResponse,
+    content_length_forbidden,
+    response_omits_body,
+)
 
 from .. import util
 from .errors import InvalidHeader, InvalidHeaderName
@@ -56,28 +60,38 @@ class Response:
         self.status: str | None = None
         self.chunked = False
         self.must_close = False
+        # Latched when headers are framed: what the Connection header
+        # actually said. Set in default_headers().
+        self.framed_close: bool | None = None
         self.headers: list[tuple[str, str]] = []
         self.headers_sent = False
         self.response_length: int | None = None
         self.sent = 0
-        self.upgrade = False
         self.status_code: int | None = None
+
+    @property
+    def omits_body(self) -> bool:
+        """True when this response sends only headers: a HEAD request,
+        or a bodiless status (1xx/204/304)."""
+        return response_omits_body(method=self.req.method, status_code=self.status_code)
 
     def force_close(self) -> None:
         self.must_close = True
 
     def should_close(self) -> bool:
+        # Once headers are framed, the wire is the answer — the keepalive
+        # decision after the response is written must match what the
+        # client was told, or the socket closes on a client that was just
+        # promised keep-alive (a dropped request when it pipelines/reuses).
+        if self.framed_close is not None:
+            return self.framed_close
         if self.must_close or self.req.should_close():
             return True
         if self.response_length is not None or self.chunked:
             return False
-        if self.req.method == "HEAD":
-            return False
-        if self.status_code is not None and (
-            self.status_code < 200 or self.status_code in (204, 304)
-        ):
-            return False
-        return True
+        # Nothing frames the body, so close delimits it — unless there
+        # is none at all (HEAD/1xx/204/304). An unparsed status closes.
+        return not self.omits_body
 
     def set_status_and_headers(
         self,
@@ -115,17 +129,12 @@ class Response:
             value = value.strip(" \t")
             lname = name.lower()
             if lname == "content-length":
+                if content_length_forbidden(self.status_code):
+                    continue
                 self.response_length = int(value)
             elif util.is_hoppish(name):
-                if lname == "connection":
-                    # handle websocket
-                    if value.lower() == "upgrade":
-                        self.upgrade = True
-                elif lname == "upgrade":
-                    if value.lower() == "websocket":
-                        self.headers.append((name, value))
-
-                # ignore hopbyhop headers
+                # Hop-by-hop headers (Connection, Upgrade, ...) are the
+                # server's to frame, never the app's — drop them.
                 continue
             self.headers.append((name, value))
 
@@ -133,27 +142,18 @@ class Response:
         # Only use chunked responses when the client is
         # speaking HTTP/1.1 or newer and there was
         # no Content-Length header set.
-        if self.response_length is not None:
+        if self.response_length is not None or self.req.version <= (1, 0):
             return False
-        elif self.req.version <= (1, 0):
-            return False
-        elif self.req.method == "HEAD":
-            # Responses to a HEAD request MUST NOT contain a response body.
-            return False
-        elif self.status_code is not None and self.status_code in (204, 304):
-            # Do not use chunked responses when the response is guaranteed to
-            # not have a response body.
-            return False
-        return True
+        # HEAD, 1xx, 204, and 304 responses have no body to frame.
+        return not self.omits_body
 
     def default_headers(self) -> list[str]:
-        # set the connection header
-        if self.upgrade:
-            connection = "upgrade"
-        elif self.should_close():
-            connection = "close"
-        else:
-            connection = "keep-alive"
+        # Set the connection header and latch the close decision so the
+        # keepalive loop follows what the client was actually told.
+        close = self.should_close()
+        connection = "close" if close else "keep-alive"
+
+        self.framed_close = close
 
         headers = [
             f"HTTP/{self.req.version[0]}.{self.req.version[1]} {self.status}\r\n",
@@ -225,6 +225,14 @@ class Response:
     async def async_write_response(self, http_response: Any) -> None:
         """Write a plain.http.Response using async I/O."""
         self.prepare_response(http_response)
+
+        if self.omits_body:
+            # Headers only (HEAD keeps its Content-Length) — the body is
+            # never read or written. A status/body contradiction is
+            # unrepresentable on a plain.http Response (immutable,
+            # validated status), so this is framing, not cleanup.
+            await self.async_close()
+            return
 
         if (
             isinstance(http_response, FileResponse)

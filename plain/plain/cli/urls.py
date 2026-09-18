@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 import click
 
@@ -25,7 +25,7 @@ def list_urls(flat: bool) -> None:
     if flat:
 
         def flat_list(
-            patterns: list[URLPattern | URLResolver],
+            patterns: Sequence[URLPattern | URLResolver],
             prefix_segments: tuple[Segment, ...] = (),
             curr_ns: str = "",
         ) -> Iterator[str]:
@@ -65,7 +65,7 @@ def list_urls(flat: bool) -> None:
     else:
 
         def print_tree(
-            patterns: list[URLPattern | URLResolver],
+            patterns: Sequence[URLPattern | URLResolver],
             prefix: str = "",
             curr_ns: str = "",
         ) -> None:

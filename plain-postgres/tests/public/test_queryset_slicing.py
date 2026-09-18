@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 from app.examples.models.iteration import IterationExample
-
 from plain.postgres import F, QuerySet
 
 

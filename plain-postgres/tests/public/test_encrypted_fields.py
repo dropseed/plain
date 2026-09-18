@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 from app.examples.models.encrypted import SecretStore
-
+from plain.postgres.exceptions import FieldError
 from plain.postgres.fields.encrypted import (
     _ENCRYPTED_PREFIX,
     _decrypt,
@@ -125,7 +125,7 @@ class TestLookupBlocking:
         SecretStore.query.create(name="test", api_key="sk-test", config=None)
         assert SecretStore.query.filter(config__isnull=True).count() == 1
 
-    def test_exact_lookup_allowed(self, db):
+    def test_exact_lookup_allowed(self):
         """Exact is allowed so filter(field=None) works (ORM rewrites to isnull)."""
         field = SecretStore._model_meta.get_field("api_key")
         assert field.get_lookup("exact") is not None
@@ -135,13 +135,22 @@ class TestLookupBlocking:
         SecretStore.query.create(name="test", api_key="sk-test", config=None)
         assert SecretStore.query.filter(config=None).count() == 1
 
-    def test_contains_lookup_blocked(self, db):
+    def test_contains_lookup_blocked(self):
         field = SecretStore._model_meta.get_field("api_key")
         assert field.get_lookup("contains") is None
 
-    def test_transform_blocked(self, db):
+    def test_transform_blocked(self):
         field = SecretStore._model_meta.get_field("api_key")
         assert field.get_transform("lower") is None  # ty: ignore[unresolved-attribute]
+
+    def test_unsupported_lookup_raises_field_error(self):
+        """An unsupported lookup on an encrypted field must fail as a normal
+        FieldError at query-build time — not leak into transform resolution
+        (which once raised a bare TypeError via class-level get_lookups)."""
+        with pytest.raises(FieldError):
+            SecretStore.query.filter(api_key__contains="x")
+        with pytest.raises(FieldError):
+            SecretStore.query.filter(config__has_key="token")
 
 
 class TestTypedQueryMethodsBlocked:
@@ -168,6 +177,15 @@ class TestTypedQueryMethodsBlocked:
     def test_is_in_raises(self):
         with pytest.raises(TypeError, match=r"does not support \.is_in\("):
             SecretStore.api_key.is_in(["x", "y"])  # ty: ignore[invalid-argument-type]
+
+    @pytest.mark.parametrize(
+        "method", ["contains", "icontains", "startswith", "endswith"]
+    )
+    def test_text_pattern_condition_raises(self, method):
+        """EncryptedTextField inherits TextField's pattern conditions and
+        blocks them — matching ciphertext by substring is meaningless."""
+        with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
+            getattr(SecretStore.api_key, method)("x")
 
     def test_is_null_returns_correct_lookup(self):
         """is_null is the one comparison that makes sense on ciphertext."""
