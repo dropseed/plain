@@ -19,6 +19,7 @@ import os
 import types
 from collections.abc import Callable
 from pathlib import Path
+from types import FunctionType
 
 from .compiler import CompileSession, get_or_compile
 
@@ -41,13 +42,25 @@ def _render_with_fragment(
     raise FragmentNotFound(_fragment_error(render_fn, fragment, captured, label))
 
 
+def _declared_fragments(render_fn: Callable[..., str]) -> tuple[str, ...]:
+    """The literal `{% fragment %}` names the compiler saw in the template.
+
+    Every compiled template is a module-level `render` function, so this
+    reads the tuple `emit_module` wrote next to it. Only used to explain
+    a miss, so anything else answers "none declared".
+    """
+    if not isinstance(render_fn, FunctionType):
+        return ()
+    return render_fn.__globals__.get("__template_fragments__", ())
+
+
 def _fragment_error(
     render_fn: Callable[..., str],
     fragment: str,
     captured: dict[str, str],
     label: str,
 ) -> str:
-    declared = render_fn.__globals__.get("__template_fragments__", ())
+    declared = _declared_fragments(render_fn)
     rendered = sorted(captured)
     if rendered:
         return (

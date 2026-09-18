@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import re
 import sys
+from contextlib import AbstractContextManager
 from pathlib import Path
 
 import click
@@ -106,7 +107,9 @@ def check(
         )
 
 
-def _template_dir_scope(template_dirs: tuple[Path, ...]):
+def _template_dir_scope(
+    template_dirs: tuple[Path, ...],
+) -> AbstractContextManager[None]:
     """`use_template_dirs` when dirs were given, otherwise a no-op."""
     if template_dirs:
         return use_template_dirs(template_dirs)

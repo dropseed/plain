@@ -18,11 +18,32 @@ attrs:
     autofocus="{{ True }}"
     required="{{ True }}"
 />
-<Field form="{{ form }}" field="{{ form_class.project }}" label="Project" type="select" />
-<Field form="{{ form }}" field="{{ form_class.notes }}" label="Notes" type="textarea" min_height="120px" />
+<Field
+    form="{{ form }}"
+    field="{{ form_class.project }}"
+    label="Project"
+    type="select"
+/>
+<Field
+    form="{{ form }}"
+    field="{{ form_class.notes }}"
+    label="Notes"
+    type="textarea"
+    min_height="120px"
+/>
 <div class="grid grid-cols-2 gap-4">
-    <Field form="{{ form }}" field="{{ form_class.due_date }}" label="Due date" type="date" />
-    <Field form="{{ form }}" field="{{ form_class.priority }}" label="Priority" type="select" />
+    <Field
+        form="{{ form }}"
+        field="{{ form_class.due_date }}"
+        label="Due date"
+        type="date"
+    />
+    <Field
+        form="{{ form }}"
+        field="{{ form_class.priority }}"
+        label="Priority"
+        type="select"
+    />
 </div>
 <label class="flex items-center gap-2 text-sm text-body">
     <input

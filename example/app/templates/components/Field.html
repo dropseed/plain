@@ -33,7 +33,10 @@ attrs:
     required="{{ required }}"
 >
     {% for (value, choice_label) in field.choices %}
-        <option value="{{ value }}" selected="{{ str(field_value(form, field)) == str(value) }}">{{ choice_label }}</option>
+        <option
+            value="{{ value }}"
+            selected="{{ str(field_value(form, field)) == str(value) }}"
+        >{{ choice_label }}</option>
     {% endfor %}
 </select>
     {% endif %}{% if type not in ("textarea", "select") %}

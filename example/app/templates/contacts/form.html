@@ -33,7 +33,13 @@ attrs:
             autofocus="{{ True }}"
             required="{{ True }}"
         />
-        <Field form="{{ form }}" field="{{ form_class.email }}" label="Email" type="email" required="{{ True }}" />
+        <Field
+            form="{{ form }}"
+            field="{{ form_class.email }}"
+            label="Email"
+            type="email"
+            required="{{ True }}"
+        />
         <Field
             form="{{ form }}"
             field="{{ form_class.subject }}"
@@ -42,7 +48,11 @@ attrs:
             required="{{ True }}"
         />
         {% if 'company' in form_class.fields() %}
-            <Field form="{{ form }}" field="{{ form_class.company }}" label="Company (optional)" />
+            <Field
+                form="{{ form }}"
+                field="{{ form_class.company }}"
+                label="Company (optional)"
+            />
         {% endif %}<Field
             form="{{ form }}"
             field="{{ form_class.message }}"

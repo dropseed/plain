@@ -24,7 +24,13 @@ attrs:
             autofocus="{{ True }}"
             required="{{ True }}"
         />
-        <Field form="{{ form }}" field="{{ form_class.body }}" label="Body" type="textarea" min_height="200px" />
+        <Field
+            form="{{ form }}"
+            field="{{ form_class.body }}"
+            label="Body"
+            type="textarea"
+            min_height="200px"
+        />
         <button type="submit" class="btn-primary self-start">Create</button>
     </form>
     </div>
