@@ -6,7 +6,7 @@ paths:
 
 # Forms
 
-`plain.forms` is a pure validating parser — an untrusted dict in, typed Python data out. It does not render HTML, take a request, or touch a database.
+`plain.forms` is a validating parser — an untrusted dict in, typed Python data out. It does not render HTML or take a request.
 
 ## Declaring and validating
 
@@ -16,14 +16,28 @@ paths:
 - Branch with `if not result:` — a `Form` is truthy, `Invalid` is falsy. Past the guard, `result` is the typed form (`result.email` is `str`).
 - `Invalid.errors` is one flat `list[Error]`; `Error(message, code, field)` — `field=None` is a form-level error. `Invalid.raw` keeps the input.
 - Cross-field rules → override `check()`, return `list[Error] | None`. Don't raise.
-- Validation needing the DB or current user goes in the view, not the form.
+- Validation needing the current user, or any state the form doesn't carry, goes in the view. (A `ModelForm` is the exception that already knows the database — see below.)
+- `DateTimeField` cleans to an **aware** datetime: a naive submission is read as local wall time in the current timezone.
 
 ## Views
 
 - No `FormView`/`CreateView`/`UpdateView`/`DeleteView` — write explicit `get`/`post` on a `TemplateView`.
-- Use `self.render_form(MyForm, result)` on `TemplateView` — passes `form_class` and `form` to the template. `result=None` is a blank render; pass `values=` to pre-fill it. For a custom failure (e.g., authentication rejection after validate succeeded), build an `Invalid(errors=[...], raw=data)` and pass it as `result`.
-- `self.validate_form(MyForm)` is the one-liner for "validate from `request.form_data`, re-render on failure, otherwise return the typed instance."
+- `self.validate_form(MyForm)` is the one-liner for "validate from `request.form_data`, re-render on failure, otherwise return the typed instance." Add `instance=obj` when editing an existing row with a `ModelForm`.
+- `self.render_form(MyForm, result)` passes `form_class` and `form` to the template. `result=None` is a blank render; pass `values=` to pre-fill it.
+- There is no `errors=` argument. For a failure the form itself can't see — an authentication rejection after `validate()` succeeded — build the result and pass it as `result`:
+
+    ```python
+    return self.render_form(
+        LoginForm,
+        Invalid(
+            errors=[Error("Incorrect email or password.", code="invalid_login")],
+            raw=self.request.form_data,
+        ),
+    )
+    ```
+
 - Side effects (send email, create related rows) → a function the view calls after `validate()` succeeds.
+- An `APIView` can `return` an `Invalid` directly — it renders as the standard JSON error body with a 400.
 
 ## Templates
 
@@ -36,11 +50,22 @@ paths:
 
 ## Model-backed forms
 
-- `ModelForm` lives in `plain.postgres` (`from plain.postgres.forms import ModelForm, model_field`). Declare each field `name = model_field(Model.column)` — no `model =`, no annotation.
+- `ModelForm` lives in `plain.postgres` (`from plain.postgres.forms import ModelForm, model_field`). Declare each field `name = model_field(Model.column)` — no `model =`, no annotation. `MyForm.model()` reports the model those columns came from.
+- `validate()` also pre-checks the model's constraints, so a duplicate comes back as an `Invalid` rather than blowing up at write time. Editing an existing row takes `instance=` so the row doesn't collide with itself.
 - `ModelForm` never writes. Persist a validated result with the `plain.postgres.forms` functions: `create_from(Model, result, **extra)` inserts, `update_from(instance, result)` updates.
 
-## Removed in the rebuild — don't use
+## Differences from Django
 
-- `is_valid()`, `cleaned_data`, `clean_<field>()`, `clean()`, `non_field_errors`, `BoundField`, `form.fields[...]`, `prefix`, `error_messages`, `Form.apply_to()`, `ModelForm.save()`, `FormDisplay`, `FieldDisplay`.
+The rebuilt API has no equivalent for these — don't reach for them:
+
+- `is_valid()` / `cleaned_data` → `validate()` returns the typed form or `Invalid`; read `result.<field>` directly.
+- `clean_<field>()` → the field's own validators, or a `types.*` field with the constraint on it.
+- `clean()` / `add_error()` / `non_field_errors` → `check()`, returning `list[Error]` with `field=None` for form-level ones.
+- `BoundField` / `form.fields[...]` / `form[name]` → the `field_value` / `field_errors` helpers plus the `Field` reference for metadata.
+- `prefix` → give the two forms distinct field names, or validate whichever one was submitted.
+- `error_messages` → the message is on the `ValidationError` a field raises; match on `Error.code`, not wording.
+- `ModelForm.Meta` (`model`, `fields`, `exclude`) → one `model_field(Model.column)` per field.
+- `ModelForm.save()` / `save(commit=False)` → `create_from()` / `update_from()`.
+- Forms never render HTML — no widgets, no `{{ form.as_p }}`, no `form.media`.
 
 Run `uv run plain docs forms` for full patterns and the field list.
