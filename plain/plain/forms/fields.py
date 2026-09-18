@@ -25,6 +25,7 @@ from typing import Any, Self, overload
 from urllib.parse import urlsplit, urlunsplit
 
 from plain.exceptions import ValidationError
+from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_duration, parse_time
 from plain.utils.timezone import naive_datetime_from_date
 
@@ -123,6 +124,16 @@ class Field[T]:
     def parse(self, value: Any) -> Any:
         """Coerce a raw value to this field's Python type. Empty input
         returns an empty value rather than raising."""
+        return value
+
+    def display(self, value: Any) -> Any:
+        """The cleaned value as its form input should show it.
+
+        `parse()`'s inverse for the cases where the two differ — the
+        `field_value` helper calls this on a success result so a
+        re-rendered input round-trips. Identity for most fields;
+        `DateTimeField` overrides it to drop back to local wall time.
+        """
         return value
 
     def clean(self, value: Any) -> Any:
@@ -480,20 +491,31 @@ class TimeField(Field[datetime.time]):
 
 
 class DateTimeField(Field[datetime.datetime]):
+    """Parses to an *aware* datetime.
+
+    A submitted datetime carries no zone, so a naive one is read as local
+    wall time in the current timezone — `from_current_timezone` below.
+    `display()` is the inverse, so an aware value from the database
+    renders back as the local wall time the user typed.
+    """
+
     def parse(self, value: Any) -> datetime.datetime | None:
         if value in EMPTY_VALUES:
             return None
         if isinstance(value, datetime.datetime):
-            return value
+            return from_current_timezone(value)
         if isinstance(value, datetime.date):
-            return naive_datetime_from_date(value)
+            return from_current_timezone(naive_datetime_from_date(value))
         try:
             parsed = parse_datetime(str(value).strip())
         except ValueError:
             parsed = None
         if parsed is None:
             raise ValidationError("Enter a valid date/time.", code="invalid")
-        return parsed
+        return from_current_timezone(parsed)
+
+    def display(self, value: Any) -> Any:
+        return to_current_timezone(value)
 
 
 class DurationField(Field[datetime.timedelta]):
@@ -607,3 +629,40 @@ class ImageField(FileField):
         if hasattr(uploaded, "seek") and callable(uploaded.seek):
             uploaded.seek(0)
         return uploaded
+
+
+def from_current_timezone(
+    value: datetime.datetime | None,
+) -> datetime.datetime | None:
+    """Read a naive datetime as local wall time in the current timezone.
+
+    Submitted datetimes carry no zone, so this is what makes a form value
+    unambiguous before it reaches a `timestamptz` column. An aware value
+    passes through untouched. A wall time that local DST makes ambiguous
+    (repeated) or imaginary (skipped) is rejected rather than guessed.
+    """
+    if value is None or timezone.is_aware(value):
+        return value
+
+    current_timezone = timezone.get_current_timezone()
+    try:
+        if timezone._datetime_ambiguous_or_imaginary(value, current_timezone):
+            raise ValueError("Ambiguous or non-existent time.")
+        return timezone.make_aware(value, current_timezone)
+    except Exception as exc:
+        raise ValidationError(
+            f"{value} couldn't be interpreted in time zone {current_timezone}; "
+            f"it may be ambiguous or it may not exist.",
+            code="ambiguous_timezone",
+        ) from exc
+
+
+def to_current_timezone(
+    value: datetime.datetime | None,
+) -> datetime.datetime | None:
+    """`from_current_timezone`'s inverse — an aware datetime as local wall
+    time, which is what a datetime input displays. Naive values and `None`
+    pass through."""
+    if value is not None and timezone.is_aware(value):
+        return timezone.make_naive(value)
+    return value

@@ -41,7 +41,8 @@ def field_value[T](form: Form | Invalid, field: Field[T]) -> T | None:
 
     Always returns something safe to put in an `<input value=...>`. Typed
     through `Field[T]`: a `Field[str]` gives back `str | None`, a
-    `Field[int | None]` gives back `int | None`.
+    `Field[int | None]` gives back `int | None`. On the success arm the
+    value passes through the field's `display()`.
     """
     name = field.name
     if isinstance(form, Invalid):
@@ -49,7 +50,10 @@ def field_value[T](form: Form | Invalid, field: Field[T]) -> T | None:
         if field.multi_value and isinstance(raw, MultiValueDict):
             return raw.getlist(name)  # ty: ignore[invalid-return-type]
         return raw.get(name)
-    return getattr(form, name, None)
+    # `display()` is `parse()`'s inverse where the two differ, so the value
+    # round-trips through the input it came from (an aware datetime renders
+    # as the local wall time that was typed).
+    return field.display(getattr(form, name, None))
 
 
 def field_errors(form: Form | Invalid, field: Field[Any]) -> list[Error]:

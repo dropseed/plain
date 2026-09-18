@@ -149,6 +149,8 @@ amount = types.DecimalField(max_digits=10, decimal_places=2)
 
 **[`DateField`](./fields.py#DateField)**, **[`TimeField`](./fields.py#TimeField)**, and **[`DateTimeField`](./fields.py#DateTimeField)** parse dates and times into the matching `datetime` objects. **[`DurationField`](./fields.py#DurationField)** parses a duration into a `timedelta`.
 
+`DateTimeField` cleans to an **aware** datetime: a submitted value carries no zone, so a naive one is read as local wall time in the current timezone. `field_value()` applies the inverse when rendering, so an aware value loaded from the database shows as the local time the user typed. A wall time that local DST makes ambiguous or imaginary is rejected with code `"ambiguous_timezone"` rather than guessed.
+
 ```python
 birthday = types.DateField()
 scheduled_at = types.DateTimeField()

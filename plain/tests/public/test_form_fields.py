@@ -13,6 +13,7 @@ from decimal import Decimal
 from typing import Any
 
 from plain.forms import Field, Form, types
+from plain.utils import timezone
 
 
 def clean(field: Field[Any], value: Any) -> Any:
@@ -179,11 +180,31 @@ class TestDateField:
 
 class TestDateTimeField:
     def test_valid(self):
-        # DateTimeField parses to a naive datetime — it does no timezone
-        # conversion of its own.
-        assert clean(types.DateTimeField(), "2026-05-18T09:30:00") == datetime.datetime(  # noqa: DTZ001
+        # A submitted datetime carries no zone, so it is read as local wall
+        # time and comes back aware.
+        cleaned = clean(types.DateTimeField(), "2026-05-18T09:30:00")
+        assert timezone.is_aware(cleaned)
+        assert (
+            cleaned.utcoffset()
+            == datetime.datetime(
+                2026, 5, 18, 9, 30, tzinfo=timezone.get_current_timezone()
+            ).utcoffset()
+        )
+        assert timezone.make_naive(cleaned) == datetime.datetime(  # noqa: DTZ001
             2026, 5, 18, 9, 30
         )
+
+    def test_aware_input_passes_through(self):
+        aware = datetime.datetime(2026, 5, 18, 9, 30, tzinfo=datetime.UTC)
+        assert clean(types.DateTimeField(), aware) == aware
+
+    def test_display_returns_local_wall_time(self):
+        """`display()` is `parse()`'s inverse, so an aware value from the
+        database renders as the wall time the user typed."""
+        field = types.DateTimeField()
+        cleaned = clean(field, "2026-05-18T09:30:00")
+        assert timezone.is_naive(field.display(cleaned))
+        assert field.display(cleaned) == datetime.datetime(2026, 5, 18, 9, 30)  # noqa: DTZ001
 
     def test_invalid(self):
         assert error(types.DateTimeField(), "nope").code == "invalid"
