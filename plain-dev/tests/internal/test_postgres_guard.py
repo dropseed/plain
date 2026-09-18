@@ -15,6 +15,7 @@ from dev_test_helpers import sandbox
 from plain.dev.postgres import guard
 from plain.dev.postgres.cluster import Cluster
 from plain.postgres.migrations.exceptions import ResetBoundaryError
+from plain.postgres.migrations.executor import PendingMigrations
 from plain.test import patch
 
 
@@ -60,7 +61,9 @@ def as_cluster(fake: FakeCluster) -> Cluster:
 
 def test_nothing_pending_keeps_the_shared_database() -> None:
     with guarded() as (root, cluster):
-        with patch(guard, "pending_migration_count", lambda url: 0):
+        with patch(
+            guard, "pending_migrations", lambda url: PendingMigrations(run=0, record=0)
+        ):
             assert (
                 guard.guard_shared_database(
                     root, cluster=as_cluster(cluster), db_name="shared"
@@ -71,11 +74,11 @@ def test_nothing_pending_keeps_the_shared_database() -> None:
 
 
 def test_a_refusal_forks_instead_of_disabling_the_guard() -> None:
-    def refuse(url: str) -> int:
+    def refuse(url: str) -> PendingMigrations:
         raise ResetBoundaryError("examples", "0018_x", "2.0")
 
     with guarded() as (root, cluster):
-        with patch(guard, "pending_migration_count", refuse):
+        with patch(guard, "pending_migrations", refuse):
             assert (
                 guard.guard_shared_database(
                     root, cluster=as_cluster(cluster), db_name="shared"

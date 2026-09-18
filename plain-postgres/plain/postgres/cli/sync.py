@@ -139,18 +139,15 @@ def _migrate() -> None:
         click.echo("  No migrations to apply.")
         return
 
-    recording = sum(
-        (m.package_label, m.name) in executor.record_only for m in migration_plan
-    )
-    running = len(migration_plan) - recording
+    pending = executor.split_plan(migration_plan)
 
     def summary(verb_run: str, verb_record: str) -> str:
         # "Applying 2 migration(s), recording 1 baseline(s)"
         parts = []
-        if running:
-            parts.append(f"{verb_run} {running} migration(s)")
-        if recording:
-            parts.append(f"{verb_record} {recording} baseline(s)")
+        if pending.run:
+            parts.append(f"{verb_run} {pending.run} migration(s)")
+        if pending.record:
+            parts.append(f"{verb_record} {pending.record} baseline(s)")
         line = ", ".join(parts)
         return line[0].upper() + line[1:]
 

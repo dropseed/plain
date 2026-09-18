@@ -70,7 +70,7 @@ class ResetPlan:
 
 
 def plan_reset(
-    loader: MigrationLoader, package_label: str, *, since: str = ""
+    loader: MigrationLoader, package_label: str, *, shipped_in: str = ""
 ) -> ResetPlan:
     """Build the baseline that would replace `package_label`'s history.
 
@@ -96,12 +96,12 @@ def plan_reset(
     sentinel = leaves[0][1]
 
     previous = loader.baselines.get(package_label)
-    if previous is not None and not previous.since:
+    if previous is not None and not previous.shipped_in:
         raise BadMigrationError(
             f"`{package_label}` already has a baseline ({previous.name}) that no "
-            "release has shipped (`since` is empty). Superseding it would strand "
+            "release has shipped (`shipped_in` is empty). Superseding it would strand "
             f"every database still at {previous.supersedes}. Once that baseline has "
-            "shipped everywhere, set its `since` to the version that shipped it and "
+            "shipped everywhere, set its `shipped_in` to the version that shipped it and "
             "reset again; otherwise restore the history it replaced and reset once."
         )
 
@@ -156,7 +156,7 @@ def plan_reset(
             "dependencies": _referenced_dependencies(loader, state, package_label),
             "supersedes": sentinel,
             "retired": tuple(sorted(retired)),
-            "since": since,
+            "shipped_in": shipped_in,
         },
     )
     delete = [_source_path(migration) for migration in on_disk.values()]
@@ -172,7 +172,7 @@ def validate_reset(loader: MigrationLoader, plan: ResetPlan) -> None:
 
     Runs the loader's own graph build over what the disk would hold after
     the reset - the old files gone, the baseline in their place - so
-    baseline registration, dependency normalization, consistency and cycle
+    baseline registration, dependency resolution, consistency and cycle
     checks all fire here rather than after the deletion. Then renders the
     baseline's state (an FK to a model its dependencies don't supply only
     fails on render) and asks the autodetector for what `create` would
@@ -181,25 +181,16 @@ def validate_reset(loader: MigrationLoader, plan: ResetPlan) -> None:
     Raises `BadMigrationError` with the reason.
     """
     assert loader.disk_migrations is not None
-    # Fresh instances: the graph build rewrites dependencies on retired names,
-    # and the caller's loader must keep its own.
+    baseline_key = (plan.package_label, plan.baseline.name)
     candidate = {
-        key: type(migration)(migration.name, migration.package_label)
+        key: migration
         for key, migration in loader.disk_migrations.items()
         if key[0] != plan.package_label
     }
-    baseline_key = (plan.package_label, plan.baseline.name)
-    candidate[baseline_key] = type(plan.baseline)(
-        plan.baseline.name, plan.package_label
-    )
+    candidate[baseline_key] = plan.baseline
 
-    validation = MigrationLoader(
-        None, load=False, ignore_no_migrations=loader.ignore_no_migrations
-    )
-    validation.migrated_packages = loader.migrated_packages
-    validation.unmigrated_packages = loader.unmigrated_packages
     try:
-        validation.build_graph_from(candidate)
+        validation = loader.with_migrations(candidate)
         rendered = validation.graph.make_state(
             nodes=[baseline_key], real_packages=validation.unmigrated_packages
         )
@@ -219,7 +210,7 @@ def validate_reset(loader: MigrationLoader, plan: ResetPlan) -> None:
         raise BadMigrationError(str(e)) from e
 
     try:
-        pending = detect_model_changes(validation, {plan.package_label})
+        pending = detect_model_changes(validation, package_labels={plan.package_label})
     except MigrationSchemaError as e:
         raise BadMigrationError(str(e)) from e
     if pending:

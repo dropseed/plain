@@ -5,19 +5,27 @@ from typing import Any
 import psycopg
 
 
-class AmbiguityError(Exception):
+class MigrationsError(Exception):
+    """Base for everything the migration files or history can be wrong about.
+
+    A caller that only wants to report - `plain db status`, the plain-dev fork
+    guard - catches this and nothing else.
+    """
+
+
+class AmbiguityError(MigrationsError):
     """More than one migration matches a name prefix."""
 
 
-class BadMigrationError(Exception):
+class BadMigrationError(MigrationsError):
     """There's a bad migration (unreadable/bad format/etc.)."""
 
 
-class CircularDependencyError(Exception):
+class CircularDependencyError(MigrationsError):
     """There's an impossible-to-resolve circular dependency."""
 
 
-class InconsistentMigrationHistory(Exception):
+class InconsistentMigrationHistory(MigrationsError):
     """An applied migration has some of its dependencies not applied."""
 
 
@@ -25,7 +33,7 @@ class InvalidBasesError(ValueError):
     """A model's base classes can't be resolved."""
 
 
-class NodeNotFoundError(LookupError):
+class NodeNotFoundError(MigrationsError, LookupError):
     """An attempt on a node is made that is not available in the graph."""
 
     def __init__(self, message: str, node: Any, origin: Any = None) -> None:
@@ -51,7 +59,7 @@ class MigrationSchemaError(Exception):
     with no value."""
 
 
-class MigrationHistoryError(Exception):
+class MigrationHistoryError(MigrationsError):
     """The planner refuses to touch this database until an operator acts.
 
     Raised by `MigrationExecutor.migration_plan`; preflight runs the same
@@ -65,11 +73,11 @@ class MigrationHistoryError(Exception):
 class ResetBoundaryError(MigrationHistoryError):
     """This database's records predate a package's migration reset."""
 
-    def __init__(self, package_label: str, sentinel: str, since: str) -> None:
+    def __init__(self, package_label: str, sentinel: str, shipped_in: str) -> None:
         self.package_label = package_label
         super().__init__(
             f"Migration records for `{package_label}` predate the reset shipped in "
-            f"{f'version {since} of `{package_label}`' if since else 'a later release'}: "
+            f"{f'version {shipped_in} of `{package_label}`' if shipped_in else 'a later release'}: "
             f"`{package_label}.{sentinel}` was never applied "
             f"to this database. Upgrade through the last release that still includes "
             f"`{package_label}.{sentinel}`, run `plain postgres sync`, then upgrade again."

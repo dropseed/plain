@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.163.1](https://github.com/dropseed/plain/releases/plain@0.163.1) (2026-09-18)
+
+### What's changed
+
+- Removed `plain.utils.inspect.get_func_args()`, which nothing in Plain used anymore ([4eb466fa46](https://github.com/dropseed/plain/commit/4eb466fa46))
+
+### Upgrade instructions
+
+- If you imported `get_func_args` from `plain.utils.inspect`, use `inspect.signature()` from the standard library instead.
+
 ## [0.163.0](https://github.com/dropseed/plain/releases/plain@0.163.0) (2026-09-04)
 
 ### What's changed
