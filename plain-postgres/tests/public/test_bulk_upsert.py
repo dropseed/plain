@@ -122,7 +122,9 @@ def test_bulk_upsert_unique_fields_must_match_a_constraint(db):
 def test_bulk_upsert_null_unique_value_rejected(db):
     with pytest.raises(ValueError, match="non-null key"):
         UpsertItem.query.bulk_upsert(
-            [UpsertItem(key=None, value=1)],
+            # A null unique value is a type error the checker catches; the
+            # runtime guard is what protects callers that aren't type-checked.
+            [UpsertItem(key=None, value=1)],  # ty: ignore[invalid-argument-type]
             update_fields=[UpsertItem.value],
             unique_fields=[UpsertItem.key],
         )

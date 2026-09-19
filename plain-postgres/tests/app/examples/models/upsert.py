@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from plain.postgres import types
+from plain.postgres import Field, types
 
 from plain import postgres
 
 
 @postgres.register_model
 class UpsertItem(postgres.Model):
-    key = types.TextField(max_length=100)
-    value = types.IntegerField(default=0)
-    label = types.TextField(default="", required=False)
-
-    query: postgres.QuerySet[UpsertItem] = postgres.QuerySet()
+    key: Field[str] = types.TextField(max_length=100)
+    value: Field[int] = types.IntegerField(default=0)
+    label: Field[str] = types.TextField(default="", required=False)
 
     model_options = postgres.Options(
         constraints=[
