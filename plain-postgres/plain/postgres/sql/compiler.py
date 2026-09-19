@@ -1523,7 +1523,6 @@ class SQLInsertCompiler(SQLCompiler):
         # VALUES in the statement.
         conflict_overrides, conflict_params = self._conflict_override_sql()
         conflict_suffix_sql = on_conflict_suffix_sql(
-            fields,  # ty: ignore[invalid-argument-type]
             self.query.on_conflict,
             (f.column for f in self.query.update_fields),
             (f.column for f in self.query.unique_fields),
@@ -1536,12 +1535,9 @@ class SQLInsertCompiler(SQLCompiler):
             )
             if conflict_suffix_sql:
                 result.append(conflict_suffix_sql)
-            if returning := returning_columns(self.returning_fields):
-                if self.query.returning_created:
-                    # xmax is 0 on a freshly inserted row and non-zero on a row
-                    # touched by the ON CONFLICT DO UPDATE, so (xmax = 0) is the
-                    # created flag returned alongside the field columns.
-                    returning += ", (xmax = 0)"
+            if returning := returning_columns(
+                self.returning_fields, include_created=self.query.returning_created
+            ):
                 result.append(returning)
             params = tuple(chain.from_iterable(param_rows)) + tuple(conflict_params)
             return [(" ".join(result), params)]
