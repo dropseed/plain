@@ -29,7 +29,7 @@ from plain.postgres.expressions import (
     ResolvableExpression,
     Value,
 )
-from plain.postgres.fields import DATABASE_DEFAULT
+from plain.postgres.fields import DATABASE_DEFAULT, Field
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.functions import Cast, Random
 from plain.postgres.lookups import Lookup
@@ -109,8 +109,8 @@ def apply_converters(
 
 
 def convert_returning_rows(
-    rows: Iterable, fields: list[Any], connection: DatabaseConnection
-) -> list[list]:
+    rows: Iterable, fields: list[Field], connection: DatabaseConnection
+) -> list[Sequence[Any]]:
     """Apply each field's DB converters to the raw rows of a RETURNING clause.
 
     The fields are given in the same order as the emitted RETURNING columns,
@@ -120,7 +120,7 @@ def convert_returning_rows(
     converters = get_converters(cols, connection)
     if converters:
         return list(apply_converters(rows, converters, connection))
-    return [list(row) for row in rows]
+    return list(rows)
 
 
 class SQLCompiler:
@@ -526,14 +526,6 @@ class SQLCompiler:
     def compile(self, node: SQLCompilable) -> SqlWithParams:
         sql, params = node.as_sql(self, self.connection)
         return sql, tuple(params)
-
-    def _returning_sql(self) -> str:
-        """Return the RETURNING clause for this query's returning_fields, or "".
-
-        Shared by the UPDATE and DELETE compilers, whose queries carry
-        returning_fields; the RETURNING clause never takes params.
-        """
-        return returning_columns(self.query.returning_fields or [])  # ty: ignore[unresolved-attribute]
 
     def get_qualify_sql(self) -> tuple[list[str], list[Any]]:
         where_parts = []
@@ -1522,7 +1514,31 @@ class SQLInsertCompiler(SQLCompiler):
         return convert_returning_rows(rows, self.returning_fields, self.connection)
 
 
-class SQLDeleteCompiler(SQLCompiler):
+class SQLWriteCompiler(SQLCompiler):
+    """Base for the UPDATE and DELETE compilers.
+
+    Both of their queries can carry returning_fields, so both run the
+    statement the same way: a rowcount normally, the converted RETURNING
+    rows when fields were asked for.
+    """
+
+    query: UpdateQuery | DeleteQuery
+
+    def execute_sql(self, result_type: str) -> Any:  # ty: ignore[invalid-method-override]
+        cursor = super().execute_sql(result_type)
+        if not cursor:
+            return [] if self.query.returning_fields else 0
+        try:
+            if self.query.returning_fields:
+                return convert_returning_rows(
+                    cursor.fetchall(), self.query.returning_fields, self.connection
+                )
+            return cursor.rowcount
+        finally:
+            cursor.close()
+
+
+class SQLDeleteCompiler(SQLWriteCompiler):
     query: DeleteQuery
 
     @cached_property
@@ -1552,15 +1568,19 @@ class SQLDeleteCompiler(SQLCompiler):
         )
 
     def _as_sql(self, query: Query) -> SqlWithParams:
-        delete = f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"  # ty: ignore[invalid-argument-type]
-        returning = self._returning_sql()
-        if returning:
-            returning = f" {returning}"
+        result = [f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"]  # ty: ignore[invalid-argument-type]
         try:
             where, params = self.compile(query.where)
         except FullResultSet:
-            return f"{delete}{returning}", ()
-        return f"{delete} WHERE {where}{returning}", tuple(params)
+            params = ()
+        else:
+            result.append(f"WHERE {where}")
+        # RETURNING comes off self.query, not the query argument: the
+        # multi-alias branch below passes in a freshly built outer Query that
+        # carries no returning_fields of its own.
+        if returning := returning_columns(self.query.returning_fields):
+            result.append(returning)
+        return " ".join(result), tuple(params)
 
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
@@ -1581,26 +1601,8 @@ class SQLDeleteCompiler(SQLCompiler):
         outerq.add_filter("id__in", innerq)
         return self._as_sql(outerq)
 
-    def execute_sql(self, result_type: str) -> Any:  # ty: ignore[invalid-method-override]
-        """Execute the delete.
 
-        Return the number of rows deleted, or — when the query carries
-        returning_fields — the converted RETURNING rows.
-        """
-        cursor = super().execute_sql(result_type)
-        if not cursor:
-            return [] if self.query.returning_fields else 0
-        try:
-            if self.query.returning_fields:
-                return convert_returning_rows(
-                    cursor.fetchall(), self.query.returning_fields, self.connection
-                )
-            return cursor.rowcount
-        finally:
-            cursor.close()
-
-
-class SQLUpdateCompiler(SQLCompiler):
+class SQLUpdateCompiler(SQLWriteCompiler):
     query: UpdateQuery
 
     def as_sql(
@@ -1667,27 +1669,9 @@ class SQLUpdateCompiler(SQLCompiler):
             params = []
         else:
             result.append(f"WHERE {where}")
-        if returning := self._returning_sql():
+        if returning := returning_columns(self.query.returning_fields):
             result.append(returning)
         return " ".join(result), tuple(update_params + list(params))
-
-    def execute_sql(self, result_type: str) -> Any:  # ty: ignore[invalid-method-override]
-        """Execute the update.
-
-        Return the number of rows affected, or — when the query carries
-        returning_fields — the converted RETURNING rows.
-        """
-        cursor = super().execute_sql(result_type)
-        if not cursor:
-            return [] if self.query.returning_fields else 0
-        try:
-            if self.query.returning_fields:
-                return convert_returning_rows(
-                    cursor.fetchall(), self.query.returning_fields, self.connection
-                )
-            return cursor.rowcount
-        finally:
-            cursor.close()
 
     def pre_sql_setup(
         self, with_col_aliases: bool = False
