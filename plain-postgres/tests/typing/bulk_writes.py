@@ -60,3 +60,24 @@ def must_accept_a_foreign_key_reference() -> None:
         update_fields=[UpsertScoped.value],
         unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
     )
+
+
+def must_accept_a_hoisted_conflict_target() -> None:
+    # list is invariant, so a hoisted [M.fk, M.key] infers
+    # list[type[Scope] | Field[str]] and would not satisfy a list parameter
+    # even though the same literal written inline does. The parameters are
+    # Sequence so naming the target is as good as inlining it.
+    conflict_target = [UpsertScoped.tenant, UpsertScoped.slug]
+    UpsertScoped.query.bulk_upsert(
+        [UpsertScoped(tenant=UpsertTenant(name="t"), slug="s", value=1)],
+        update_fields=[UpsertScoped.value],
+        unique_fields=conflict_target,
+    )
+
+
+def must_accept_tuples() -> None:
+    UpsertScoped.query.bulk_upsert(
+        [UpsertScoped(tenant=UpsertTenant(name="t"), slug="s", value=1)],
+        update_fields=(UpsertScoped.value,),
+        unique_fields=(UpsertScoped.tenant, UpsertScoped.slug),
+    )

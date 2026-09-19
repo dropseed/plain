@@ -750,26 +750,26 @@ class QuerySet[T: "Model"]:
 
     def _resolve_bulk_upsert_fields(
         self,
-        update_fields: Sequence[Any],
-        unique_fields: Sequence[Any],
+        update_fields: Sequence[Field[Any] | type[Model]],
+        unique_fields: Sequence[Field[Any] | type[Model]],
     ) -> tuple[list[Field], list[Field]]:
         """Check both bulk_upsert() field lists and return the columns they
         name, with any `Model.fk` reference resolved to its foreign key
         column."""
         object_name = self.model.model_options.object_name
 
-        unique_fields = self._validate_field_refs(
+        unique_columns = self._validate_field_refs(
             unique_fields, where="bulk_upsert() unique_fields"
         )
-        update_fields = self._validate_field_refs(
+        update_columns = self._validate_field_refs(
             update_fields, where="bulk_upsert() update_fields"
         )
 
-        if not unique_fields:
+        if not unique_columns:
             raise ValueError("bulk_upsert() requires unique_fields.")
         # The conflict key is also what matches each RETURNING row back to its
         # object, so it has to be a value the caller holds and the row keeps.
-        for field in unique_fields:
+        for field in unique_columns:
             if field.db_returning and not field.primary_key:
                 raise ValueError(
                     f"bulk_upsert() cannot use {object_name}.{field.name} in "
@@ -783,22 +783,22 @@ class QuerySet[T: "Model"]:
                     "can never be a stable conflict key."
                 )
         if not self.model.model_options.unique_fields_match_constraint(
-            {f.name for f in unique_fields}
+            {f.name for f in unique_columns}
         ):
-            names = [f.name for f in unique_fields]
+            names = [f.name for f in unique_columns]
             raise ValueError(
                 f"bulk_upsert() unique_fields {names} on {object_name} must name "
                 "the primary key or a UniqueConstraint declared on the model "
                 "without a condition or expressions."
             )
 
-        if not update_fields:
+        if not update_columns:
             raise ValueError("bulk_upsert() requires update_fields.")
-        if any(not isinstance(f, ColumnField) for f in update_fields):
+        if any(not isinstance(f, ColumnField) for f in update_columns):
             raise ValueError("bulk_upsert() update_fields must be database columns.")
-        if any(f.primary_key for f in update_fields):
+        if any(f.primary_key for f in update_columns):
             raise ValueError("bulk_upsert() cannot update primary key fields.")
-        for field in update_fields:
+        for field in update_columns:
             # A database-owned value (create_now, generate=True,
             # RandomStringField) isn't the caller's to overwrite: EXCLUDED
             # carries a freshly evaluated default, so naming one here would
@@ -810,21 +810,21 @@ class QuerySet[T: "Model"]:
                     "the database generates its value, so the update would "
                     "overwrite the stored one with a fresh default."
                 )
-        overlap = {f.name for f in update_fields} & {f.name for f in unique_fields}
+        overlap = {f.name for f in update_columns} & {f.name for f in unique_columns}
         if overlap:
             raise ValueError(
                 "bulk_upsert() update_fields cannot overlap unique_fields: "
                 f"{sorted(overlap)}."
             )
 
-        return update_fields, unique_fields
+        return update_columns, unique_columns
 
     def bulk_upsert(
         self,
         objs: Sequence[T],
         *,
-        update_fields: list[Field[Any] | type[Model]],
-        unique_fields: list[Field[Any] | type[Model]],
+        update_fields: Sequence[Field[Any] | type[Model]],
+        unique_fields: Sequence[Field[Any] | type[Model]],
         batch_size: int | None = None,
     ) -> list[T]:
         """

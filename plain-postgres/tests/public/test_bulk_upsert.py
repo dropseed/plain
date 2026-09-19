@@ -470,3 +470,19 @@ def test_bulk_upsert_duplicate_nan_keys_rejected(db):
         )
 
     assert UpsertFloatKey.query.count() == 0
+
+
+def test_bulk_upsert_accepts_any_sequence_of_field_references(db):
+    # The parameters are Sequence, so a tuple -- or a conflict target hoisted
+    # into a variable, which a list parameter would reject as invariant --
+    # works as well as an inline list.
+    conflict_target = (UpsertPair.bucket, UpsertPair.slug)
+    items = [UpsertPair(bucket="b", slug="s", value=1)]
+    UpsertPair.query.bulk_upsert(
+        items,
+        update_fields=(UpsertPair.value,),
+        unique_fields=conflict_target,
+    )
+
+    assert items[0].id is not None
+    assert UpsertPair.query.get(bucket="b", slug="s").value == 1
