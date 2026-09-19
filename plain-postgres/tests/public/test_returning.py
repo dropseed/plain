@@ -7,6 +7,8 @@ returning(*Model.field) returns a list of dicts holding just those columns.
 
 from __future__ import annotations
 
+from typing import Any, assert_type
+
 import pytest
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.returning import ReturningEvent
@@ -253,3 +255,21 @@ def test_returning_rejects_other_writes(db, write):
         TypeError, match="only applies to update\\(\\) and delete\\(\\)"
     ):
         write(ReturningEvent.query.returning())
+
+
+def test_returning_return_types_are_honest(db):
+    """The four write shapes resolve to what they actually return.
+
+    These `assert_type` calls are checked by the type checker, not at
+    runtime -- `./scripts/type-check .` is what makes this test meaningful.
+    """
+    qs = ReturningEvent.query.filter(label="a")
+
+    assert_type(qs.update(count=1), int)
+    assert_type(qs.delete(), int)
+    assert_type(qs.returning().update(count=1), list[ReturningEvent])
+    assert_type(qs.returning().delete(), list[ReturningEvent])
+    assert_type(
+        qs.returning(ReturningEvent.id).update(count=1), list[dict[str, Any]]
+    )
+    assert_type(qs.returning(ReturningEvent.id).delete(), list[dict[str, Any]])
