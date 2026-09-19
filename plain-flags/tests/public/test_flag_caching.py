@@ -151,11 +151,13 @@ def test_reused_flag_refreshes_its_timestamps(db):
     assert TimestampFlag().value is True
     row = FlagModel.query.get(name="TimestampFlag")
     first_used_at, first_updated_at = row.used_at, row.updated_at
+    assert first_used_at is not None
 
     assert TimestampFlag().value is True
 
     assert FlagModel.query.filter(name="TimestampFlag").count() == 1
     row = FlagModel.query.get(name="TimestampFlag")
+    assert row.used_at is not None
     assert row.used_at > first_used_at
     assert row.updated_at > first_updated_at
     assert row.enabled is True
