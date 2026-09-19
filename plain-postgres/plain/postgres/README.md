@@ -462,6 +462,38 @@ for name in names:
 Tag.query.bulk_create([Tag(name=name) for name in names])
 ```
 
+`bulk_create` is insert-only. To insert new rows and update the ones that
+already exist in a single statement, use `bulk_upsert` (below).
+
+#### Use `bulk_upsert` to insert-or-update in one statement
+
+`bulk_upsert(objs, *, update_fields, unique_fields, batch_size=None)` issues one
+`INSERT ... ON CONFLICT (unique_fields) DO UPDATE SET ... RETURNING` per batch.
+Rows that don't exist yet are inserted; rows that collide on `unique_fields` have
+their `update_fields` overwritten. Every object comes back — inserted or updated —
+with its DB-generated fields (primary key, DB defaults) populated.
+
+```python
+# Insert new items, refresh `value`/`expires_at` on any existing key.
+CacheItem.query.bulk_upsert(
+    [CacheItem(key=k, value=v, expires_at=exp) for k, v in items],
+    update_fields=[CacheItem.value, CacheItem.expires_at],
+    unique_fields=[CacheItem.key],
+)
+```
+
+- `update_fields` and `unique_fields` take field references (`Model.field`), not
+  strings.
+- `unique_fields` must name the **primary key** or a `UniqueConstraint` declared
+  on the model (no condition, no expressions) — this is the conflict target.
+- `update_fields` must be concrete, non-primary-key, and must not overlap
+  `unique_fields`.
+- Every object must have a non-null value for every unique field. `NULL` never
+  conflicts in Postgres, so it can't be upserted.
+- Each batch is sorted by the conflict key and matches returned rows back to
+  objects by that key, so it's safe to run concurrently without deadlocking on
+  overlapping keys.
+
 #### Use queryset `.update()` / `.delete()` for mass operations
 
 ```python
@@ -1299,7 +1331,7 @@ except (psycopg.IntegrityError, ValidationError):
     ...  # lost a race — reload and retry, or report it
 ```
 
-For a plain insert-or-update with no per-row logic, `bulk_create(..., update_conflicts=True, unique_fields=[...])` is an atomic upsert with no race to catch.
+For a plain insert-or-update with no per-row logic, `bulk_upsert(objs, update_fields=[...], unique_fields=[...])` is an atomic upsert with no race to catch.
 
 ### Indexes and constraints
 

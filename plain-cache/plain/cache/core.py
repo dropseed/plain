@@ -106,7 +106,7 @@ class Cache:
         if not mapping:
             return
 
-        # bulk_create fires pre_save, so updated_at's update_now stamps a fresh
+        # bulk_upsert fires pre_save, so updated_at's update_now stamps a fresh
         # now() at write time on its own. created_at (no update_now) would
         # otherwise fall to its DB default, evaluated a hair later -- leaving a
         # brand-new row with updated_at < created_at. Stamp created_at from an
@@ -122,11 +122,11 @@ class Cache:
             # construction so created_at <= updated_at (see comment above).
             item.created_at = now
             items.append(item)
-        self._model.query.bulk_create(
+        model = self._model
+        model.query.bulk_upsert(
             items,
-            update_conflicts=True,
-            update_fields=["value", "expires_at", "updated_at"],
-            unique_fields=["key"],
+            update_fields=[model.value, model.expires_at, model.updated_at],
+            unique_fields=[model.key],
         )
 
     def get_or_set(
