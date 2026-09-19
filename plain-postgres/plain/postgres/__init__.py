@@ -36,6 +36,7 @@ from .fields import (
     URLField,
     UUIDField,
 )
+from .fields.encrypted import EncryptedField
 from .fields.json import JSONField
 from .fields.timezones import TimeZoneField
 from .fields.related import (
@@ -70,6 +71,10 @@ __all__ = [
     "DecimalField",
     "DurationField",
     "EmailField",
+    # The typed descriptor base for encrypted fields, for annotating them:
+    #   api_key: EncryptedField[str] = types.EncryptedTextField()
+    # It blocks the value-comparison conditions a plain Field[T] would allow.
+    "EncryptedField",
     "F",
     # The typed descriptor base, for annotating model fields:
     #   name: Field[str] = types.TextField()

@@ -4,7 +4,7 @@ from plain import postgres
 
 
 class Migration(migrations.Migration):
-    dependencies = (("examples", "0018_storageparametersexample"),)
+    dependencies = (("examples", "0020_stringconditionsexample"),)
 
     operations = (
         migrations.CreateModel(
