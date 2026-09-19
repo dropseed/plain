@@ -241,7 +241,7 @@ class Cache:
         """
         # QuerySet.update() issues a direct SQL UPDATE and does NOT fire pre_save,
         # so updated_at's update_now won't bump on its own -- stamp it by hand.
-        # (set_many() relies on pre_save instead, since bulk_create does fire it.)
+        # (set_many() relies on pre_save instead, since bulk_upsert does fire it.)
         now = timezone.now()
         updated = (
             self._model.query.live()

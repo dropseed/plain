@@ -471,28 +471,38 @@ already exist in a single statement, use `bulk_upsert` (below).
 `INSERT ... ON CONFLICT (unique_fields) DO UPDATE SET ... RETURNING` per batch.
 Rows that don't exist yet are inserted; rows that collide on `unique_fields` have
 their `update_fields` overwritten. Every object comes back — inserted or updated —
-with its DB-generated fields (primary key, DB defaults) populated.
+with its DB-generated fields (primary key, DB defaults) populated, in the order
+you passed them in.
 
 ```python
 # Insert new items, refresh `value`/`expires_at` on any existing key.
-CacheItem.query.bulk_upsert(
-    [CacheItem(key=k, value=v, expires_at=exp) for k, v in items],
-    update_fields=[CacheItem.value, CacheItem.expires_at],
-    unique_fields=[CacheItem.key],
+CachedItem.query.bulk_upsert(
+    [CachedItem(key=k, value=v, expires_at=exp) for k, v in items],
+    update_fields=[CachedItem.value, CachedItem.expires_at],
+    unique_fields=[CachedItem.key],
 )
 ```
 
 - `update_fields` and `unique_fields` take field references (`Model.field`), not
   strings.
 - `unique_fields` must name the **primary key** or a `UniqueConstraint` declared
-  on the model (no condition, no expressions) — this is the conflict target.
+  on the model (no condition, no expressions) — this is the conflict target. A
+  unique `Index` is not enough; declare a `UniqueConstraint`.
 - `update_fields` must be concrete, non-primary-key, and must not overlap
   `unique_fields`.
 - Every object must have a non-null value for every unique field. `NULL` never
-  conflicts in Postgres, so it can't be upserted.
-- Each batch is sorted by the conflict key and matches returned rows back to
-  objects by that key, so it's safe to run concurrently without deadlocking on
-  overlapping keys.
+  conflicts in Postgres, so it can't be upserted. A database-generated column
+  (`create_now`, `generate=True`, `RandomStringField`) can't be a unique field
+  either — your objects never hold its value.
+- **Two objects with the same unique key raise `ValueError`.** Postgres can only
+  touch a row once per statement, so collapse duplicates before calling.
+- **Only the named `update_fields` are written on a conflict.** An
+  `update_now=True` column left out of `update_fields` keeps its stored value,
+  even though the in-memory object gets a fresh stamp — name it in
+  `update_fields` if you want the row refreshed.
+- Batches are issued in conflict-key order and returned rows are matched back to
+  objects by that key, so concurrent `bulk_upsert` calls over overlapping keys
+  can't deadlock each other.
 
 #### Use queryset `.update()` / `.delete()` for mass operations
 
