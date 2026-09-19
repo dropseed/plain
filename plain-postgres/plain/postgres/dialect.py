@@ -376,8 +376,8 @@ def lookup_cast(lookup_type: str, field: Field | None = None) -> str:
     return lookup
 
 
-def returning_columns(fields: list[Field]) -> str:
-    """Return the RETURNING clause SQL for the given fields, or "" when empty."""
+def returning_columns(fields: list[Field] | None) -> str:
+    """Return the RETURNING clause SQL for the given fields, or "" when there are none."""
     if not fields:
         return ""
     columns = [

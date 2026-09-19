@@ -602,8 +602,13 @@ for row in deleted:
 - **`returning()`** returns full model instances. For `update()` they hold the new values; for `delete()`, the rows as they were.
 - **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a many-to-many field or one from another model raises an error at the `returning()` call.
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
+- `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_upsert()`, `bulk_update()`, `get_or_create()`, `upsert()` — raises `TypeError` rather than quietly dropping it.
+
+The values you get back are whatever the statement wrote, exactly as Postgres holds them. A set-based `update()` doesn't run Python-side field hooks, so an `update_now=True` timestamp comes back unchanged unless the `update()` set it.
 
 `RETURNING` only reports rows of the statement's own target table. Rows removed by a cascading `ON DELETE` are never included — a `delete()` with `returning()` gives you the parent rows you deleted, not the children Postgres cascaded.
+
+Every affected row is fetched and built into memory at once, so `returning()` belongs on writes you've already bounded by a filter. For a write that spans a whole table, take the rowcount and page through the rows separately.
 
 ## Transactions
 
@@ -1188,7 +1193,7 @@ Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived
     Integration.query.get_or_create(name="acme", defaults={"api_key": "k"})
     ```
 
-    The same applies to `update_or_create()`, and to an expression right-hand side like `filter(api_key=F("name"))` — the column is still ciphertext.
+    The same applies to `upsert()`, and to an expression right-hand side like `filter(api_key=F("name"))` — the column is still ciphertext.
 
 - **No indexes or constraints** — encrypted fields cannot be used in indexes or unique constraints. Preflight checks will catch this.
 - **Only `default=""`** — on `EncryptedTextField` (paired with `required=False`), the empty string is stored as plaintext `''`, so it's the one value expressible as a column `DEFAULT` (declare it to add the field to a populated table). Any other default would need ciphertext, which is non-deterministic. `EncryptedJSONField` has no persistent default at all — even `{}` serializes to text that would need ciphertext — so pair `allow_null=True` with `default=None`, which stores nothing and just marks the field optional in the constructor.

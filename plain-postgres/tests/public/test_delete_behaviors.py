@@ -38,7 +38,7 @@ from app.examples.models.delete import (
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.trees import TreeNode
 from plain.exceptions import ValidationError
-from plain.postgres import transaction
+from plain.postgres import transaction, types
 
 
 def _create_parents():
@@ -485,7 +485,5 @@ def test_instance_delete_bypasses_custom_query_filters(db):
 
 def test_on_delete_must_be_sentinel():
     """Passing a non-OnDelete value raises TypeError at FK construction."""
-    from plain.postgres.fields.related import ForeignKeyField
-
     with pytest.raises(TypeError, match="on_delete must be one of"):
-        ForeignKeyField(DeleteParent, on_delete=lambda *a: None)  # ty: ignore[invalid-argument-type]
+        types.ForeignKeyField(DeleteParent, on_delete=lambda *a: None)  # ty: ignore[no-matching-overload]
