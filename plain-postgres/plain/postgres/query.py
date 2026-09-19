@@ -1023,6 +1023,10 @@ class QuerySet[T: "Model"]:
         those columns. Without returning(), update()/delete() return an int
         rowcount.
 
+        Instances from delete() are snapshots: every value is there to read,
+        the id included, but the row is gone, so create()/update()/delete()
+        on them raise rather than target a row that no longer exists.
+
         The references are validated here, so a bad one errors at the
         returning() call rather than when the write runs.
 
@@ -1105,13 +1109,24 @@ class QuerySet[T: "Model"]:
             columns.append(field)
         return columns
 
-    def _hydrate_returning(self, rows: list[Sequence[Any]]) -> list[Any]:
-        """Turn converted RETURNING rows into instances or dicts."""
+    def _hydrate_returning(
+        self, rows: list[Sequence[Any]], *, deleted: bool = False
+    ) -> list[Any]:
+        """Turn converted RETURNING rows into instances or dicts.
+
+        Instances from a delete are snapshots -- the rows are gone, so they
+        are marked to refuse the write methods rather than silently target
+        a row that no longer exists.
+        """
         assert self._returning_fields is not None
         field_names = [field.name for field in self._returning_fields]
-        if self._returning_instances:
-            return [self.model.from_db(field_names, row) for row in rows]
-        return [dict(zip(field_names, row)) for row in rows]
+        if not self._returning_instances:
+            return [dict(zip(field_names, row)) for row in rows]
+        instances = [self.model.from_db(field_names, row) for row in rows]
+        if deleted:
+            for instance in instances:
+                instance._state.deleted = True
+        return instances
 
     def _reject_returning(self, method_name: str) -> None:
         """Refuse a write that RETURNING doesn't apply to.
@@ -1131,6 +1146,9 @@ class QuerySet[T: "Model"]:
         Returns the number of parent rows deleted. Cascaded child rows are
         handled by Postgres via the declared `on_delete` clauses and are not
         included in the count.
+
+        After returning(), the deleted rows come back instead -- as read-only
+        snapshots when returning() took no arguments.
         """
         return self._execute_delete()
 
@@ -1165,7 +1183,7 @@ class QuerySet[T: "Model"]:
         self._result_cache = None
         if self._returning_fields is None:
             return result
-        return self._hydrate_returning(result)
+        return self._hydrate_returning(result, deleted=True)
 
     def _raw_delete(self) -> Any:
         """

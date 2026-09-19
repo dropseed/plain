@@ -177,6 +177,11 @@ class ModelState:
     # message, and related-manager unsaved checks.
     adding = True
 
+    # True on the instances QuerySet.returning().delete() hands back. They are
+    # snapshots of rows that are gone: every value is there to read, but the
+    # write methods would target a row that no longer exists, so they refuse.
+    deleted = False
+
     def __init__(self) -> None:
         self.fields_cache: dict[str, Any] = {}
 
@@ -481,6 +486,12 @@ class Model(metaclass=ModelBase):
         loaded field is written (deferred fields are skipped). Raises if no row
         matched -- the row was deleted out from under us.
         """
+        if self._state.deleted:
+            raise ValueError(
+                f"Cannot update() this {self.__class__.__name__}: it is a "
+                "snapshot of a row that returning().delete() removed, not a "
+                "live instance."
+            )
         if self._state.adding:
             raise ValueError(
                 f"Cannot update() a {self.__class__.__name__} that hasn't been "
@@ -648,6 +659,12 @@ class Model(metaclass=ModelBase):
         Cascades are handled entirely by Postgres via the `on_delete`
         clauses declared on related foreign keys.
         """
+        if self._state.deleted:
+            raise ValueError(
+                f"Cannot delete() this {self.model_options.object_name}: it is "
+                "a snapshot of a row that returning().delete() already "
+                "removed, not a live instance."
+            )
         if self.id is None:
             raise ValueError(
                 f"{self.model_options.object_name} object can't be deleted because its id attribute is set "

@@ -534,3 +534,49 @@ def test_none_keeps_returning_and_writes_nothing(db, capture_queries):
 
     assert queries == []
     assert ReturningEvent.query.count() == 3
+
+
+# ===========================================================================
+# Deleted rows come back as snapshots
+# ===========================================================================
+
+
+def test_deleted_instances_keep_their_data(db):
+    seeded = ReturningEvent(label="gone", count=3, payload={"n": 1}).create()
+
+    (row,) = ReturningEvent.query.filter(label="gone").returning().delete()
+
+    # The id is the point of a delete-with-RETURNING: it is what lets the
+    # caller correlate the row with whatever it was tracking.
+    assert row.id == seeded.id
+    assert row.label == "gone"
+    assert row.count == 3
+    assert row.payload == {"n": 1}
+
+
+@pytest.mark.parametrize(
+    ("method", "match"),
+    [
+        ("update", "snapshot of a row that returning"),
+        ("delete", "snapshot of a row that returning"),
+        ("create", "already persisted"),
+    ],
+)
+def test_deleted_instances_refuse_writes(db, method, match):
+    ReturningEvent(label="gone", count=3).create()
+    (row,) = ReturningEvent.query.filter(label="gone").returning().delete()
+
+    with pytest.raises(ValueError, match=match):
+        getattr(row, method)()
+
+
+def test_updated_instances_are_still_live(db):
+    # Only the delete path marks snapshots -- update() hands back rows that
+    # are still there and still writable.
+    _seed_events()
+    (row, _) = ReturningEvent.query.filter(label="a").returning().update(count=5)
+
+    row.count = 6
+    row.update()
+
+    assert ReturningEvent.query.get(id=row.id).count == 6

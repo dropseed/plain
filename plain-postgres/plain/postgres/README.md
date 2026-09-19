@@ -522,7 +522,7 @@ for row in deleted:
     print(row["id"], row["payload"])  # the rows as they were deleted
 ```
 
-- **`returning()`** returns full model instances. For `update()` they hold the new values; for `delete()`, the rows as they were.
+- **`returning()`** returns full model instances. For `update()` they hold the new values and stay live. For `delete()` they are **read-only snapshots**: every value is there to read, the id included, but the row is gone, so `create()`, `update()` and `delete()` on them raise.
 - **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a many-to-many field or one from another model raises an error at the `returning()` call.
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
 - `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_update()`, `get_or_create()`, `update_or_create()` — raises `TypeError` rather than quietly dropping it.
