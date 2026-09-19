@@ -698,6 +698,21 @@ class QuerySet[T: "Model"]:
 
         if not unique_fields:
             raise ValueError("bulk_upsert() requires unique_fields.")
+        # The conflict key is also what matches each RETURNING row back to its
+        # object, so it has to be a value the caller holds and the row keeps.
+        for field in unique_fields:
+            if field.db_returning and not field.primary_key:
+                raise ValueError(
+                    f"bulk_upsert() cannot use {object_name}.{field.name} in "
+                    "unique_fields: the database generates its value, so the "
+                    "objects never carry one to conflict on."
+                )
+            if field.auto_fills_on_save:
+                raise ValueError(
+                    f"bulk_upsert() cannot use {object_name}.{field.name} in "
+                    "unique_fields: it is stamped again on every write, so it "
+                    "can never be a stable conflict key."
+                )
         if not self.model.model_options.unique_fields_match_constraint(
             {f.name for f in unique_fields}
         ):
@@ -707,16 +722,6 @@ class QuerySet[T: "Model"]:
                 "the primary key or a UniqueConstraint declared on the model "
                 "without a condition or expressions."
             )
-        for field in unique_fields:
-            # Postgres fills in every db_returning column but the primary key
-            # (create_now, generate=True, RandomStringField), so the objects
-            # never carry a value to conflict on or to match the row back by.
-            if field.db_returning and not field.primary_key:
-                raise ValueError(
-                    f"bulk_upsert() cannot use {object_name}.{field.name} in "
-                    "unique_fields: the database generates its value, so the "
-                    "objects never carry one to conflict on."
-                )
 
         if not update_fields:
             raise ValueError("bulk_upsert() requires update_fields.")
@@ -724,6 +729,18 @@ class QuerySet[T: "Model"]:
             raise ValueError("bulk_upsert() update_fields must be database columns.")
         if any(f.primary_key for f in update_fields):
             raise ValueError("bulk_upsert() cannot update primary key fields.")
+        for field in update_fields:
+            # A database-owned value (create_now, generate=True,
+            # RandomStringField) isn't the caller's to overwrite: EXCLUDED
+            # carries a freshly evaluated default, so naming one here would
+            # reset a creation timestamp on every update. A column that is also
+            # update_now is exempt -- rewriting it is the whole point.
+            if field.db_returning and not field.auto_fills_on_save:
+                raise ValueError(
+                    f"bulk_upsert() cannot update {object_name}.{field.name}: "
+                    "the database generates its value, so the update would "
+                    "overwrite the stored one with a fresh default."
+                )
         overlap = {f.name for f in update_fields} & {f.name for f in unique_fields}
         if overlap:
             raise ValueError(
@@ -750,8 +767,9 @@ class QuerySet[T: "Model"]:
         (`Model.field`); unique_fields must name the primary key or a
         UniqueConstraint declared on the model.
 
-        Only the named update_fields are written on a conflicting row -- an
-        update_now column left out of update_fields keeps its stored value.
+        A conflicting row is written with the named update_fields plus every
+        update_now column on the model, so the stored row and the returned
+        object agree on when it was last touched.
 
         bulk_upsert() carries its own RETURNING to populate the objects, so a
         prior returning() has nothing to add and is refused.
@@ -796,6 +814,16 @@ class QuerySet[T: "Model"]:
                 )
             obj_by_key[key] = obj
 
+        # An update_now column is stamped by pre_save on the way in, so the
+        # object already holds a fresh value whether it inserts or updates.
+        # Setting it from EXCLUDED on the conflict path too is what keeps the
+        # stored row and the returned object agreeing -- and it's what
+        # update_now means. The caller doesn't have to name it.
+        conflict_update_fields = list(update_fields)
+        for field in meta.fields:
+            if field.auto_fills_on_save and field not in conflict_update_fields:
+                conflict_update_fields.append(field)
+
         # Include the PK column only when it is itself the conflict key;
         # otherwise let Postgres generate the identity value.
         pk_is_unique = any(f.primary_key for f in unique_fields)
@@ -823,7 +851,7 @@ class QuerySet[T: "Model"]:
                 batch_size,
                 returning_fields=returning_fields,
                 on_conflict=OnConflict.UPDATE,
-                update_fields=update_fields,
+                update_fields=conflict_update_fields,
                 unique_fields=unique_fields,
             )
 
