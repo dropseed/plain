@@ -103,6 +103,13 @@ version = "1.75.0"
 [tool.plain.code.annotations]
 exclude = ["example", "scratch", "scripts"]
 
+[tool.ty.rules]
+# An unused suppression is how the typing corpus asserts a must-reject claim:
+# `tests/typing/` writes the offending call and marks it `# ty: ignore[<code>]`,
+# so the day the call stops being a type error the marker goes unused and the
+# build fails. A warning wouldn't say that loudly enough.
+unused-ignore-comment = "error"
+
 [tool.ty.environment]
 extra-paths = [
   "plain-postgres/tests",
