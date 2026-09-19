@@ -106,7 +106,7 @@ class Cache:
         if not mapping:
             return
 
-        # bulk_create fires pre_save, so updated_at's update_now stamps a fresh
+        # bulk_upsert fires pre_save, so updated_at's update_now stamps a fresh
         # now() at write time on its own. created_at (no update_now) would
         # otherwise fall to its DB default, evaluated a hair later -- leaving a
         # brand-new row with updated_at < created_at. Stamp created_at from an
@@ -114,10 +114,14 @@ class Cache:
         # update_fields, so it's preserved on conflict.
         now = timezone.now()
         expires_at = _coerce_expiration(expiration, now=now)
-        items = [
-            self._model(key=key, value=value, expires_at=expires_at, created_at=now)
-            for key, value in mapping.items()
-        ]
+        items = []
+        for key, value in mapping.items():
+            item = self._model(key=key, value=value, expires_at=expires_at)
+            # created_at is a create_now field (DB-owned), so it's not a
+            # constructor argument -- stamp it from the shared `now` after
+            # construction so created_at <= updated_at (see comment above).
+            item.created_at = now
+            items.append(item)
         model = self._model
         model.query.bulk_upsert(
             items,

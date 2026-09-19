@@ -6,8 +6,8 @@ typed *descriptor* (`XField[T]`), not the primitive `T`. Combined with
 `Field.__get__`'s overloads, this gives you:
 
     class User(postgres.Model):
-        email = types.EmailField()
-        age = types.IntegerField(allow_null=True)
+        email: Field[str] = types.EmailField()
+        age: Field[int | None] = types.IntegerField(allow_null=True, default=None)
 
     User.email   # EmailField[str]        — typed reference
     user.email   # str                    — the loaded value
@@ -28,6 +28,7 @@ from zoneinfo import ZoneInfo
 
 from plain.postgres.base import Model
 from plain.postgres.deletion import OnDelete
+from plain.postgres.fields.base import Field as _Field
 from plain.postgres.fields.binary import BinaryField as _BinaryField
 from plain.postgres.fields.boolean import BooleanField as _BooleanField
 from plain.postgres.fields.duration import DurationField as _DurationField
@@ -167,7 +168,7 @@ def SmallIntegerField(
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _SmallIntegerField[int]: ...
-def PrimaryKeyField() -> _PrimaryKeyField: ...
+def PrimaryKeyField(*, init: bool = False) -> _PrimaryKeyField: ...
 
 # Numeric fields
 @overload
@@ -245,10 +246,31 @@ def DateField(
 @overload
 def DateTimeField(
     *,
+    create_now: Literal[True],
+    update_now: bool = False,
+    required: bool = True,
+    allow_null: bool = False,
+    validators: Sequence[Callable[..., Any]] = (),
+    init: bool = False,
+) -> _DateTimeField[datetime]: ...
+@overload
+def DateTimeField(
+    *,
+    create_now: bool = False,
+    update_now: Literal[True],
+    required: bool = True,
+    allow_null: bool = False,
+    validators: Sequence[Callable[..., Any]] = (),
+    init: bool = False,
+) -> _DateTimeField[datetime]: ...
+@overload
+def DateTimeField(
+    *,
     create_now: bool = False,
     update_now: bool = False,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _DateTimeField[datetime | None]: ...
 @overload
@@ -310,12 +332,23 @@ def TimeZoneField(
 ) -> _TimeZoneField[ZoneInfo]: ...
 
 # Other fields
+# generate=True -> Postgres generates the value per row, so it's caller-excluded
+@overload
+def UUIDField(
+    *,
+    generate: Literal[True],
+    required: bool = True,
+    allow_null: bool = False,
+    validators: Sequence[Callable[..., Any]] = (),
+    init: bool = False,
+) -> _UUIDField[UUID]: ...
 @overload
 def UUIDField(
     *,
     generate: bool = False,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _UUIDField[UUID | None]: ...
 @overload
@@ -326,6 +359,8 @@ def UUIDField(
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _UUIDField[UUID]: ...
+
+# RandomStringField always generates its value in the DB -> caller-excluded
 @overload
 def RandomStringField(
     *,
@@ -333,6 +368,7 @@ def RandomStringField(
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
+    init: bool = False,
 ) -> _RandomStringField[str | None]: ...
 @overload
 def RandomStringField(
@@ -341,6 +377,7 @@ def RandomStringField(
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
+    init: bool = False,
 ) -> _RandomStringField[str]: ...
 @overload
 def BinaryField(
@@ -459,6 +496,7 @@ def EncryptedJSONField(
     decoder: Any = None,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> Any: ...
 @overload
@@ -495,7 +533,10 @@ def EncryptedJSONField(
 # type-checks here. The runtime `ForwardForeignKeyDescriptor.__set__`
 # explicitly rejects bool with `ValueError`, so this language quirk is
 # caught at runtime rather than silently coerced to PK 0/1.
-class _ForeignKeyDescriptor[T: Model, V]:
+class _ForeignKeyDescriptor[T: Model, V](_Field[V]):
+    # Subclasses Field[V] so an FK field is assignable to a `Field[V]`
+    # annotation (e.g. `org: Field[Org] = types.ForeignKeyField(Org)`) under
+    # both ty and pyright. The FK-specific __get__/__set__ override the base.
     @overload
     def __get__(self, instance: None, owner: type) -> _ForeignKeyDescriptor[T, V]: ...
     @overload
@@ -511,6 +552,7 @@ def ForeignKeyField[T: Model](
     related_query_name: str | None = None,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _ForeignKeyDescriptor[T, T | None]: ...
 @overload
@@ -533,6 +575,7 @@ def ForeignKeyField[T: Model](
     related_query_name: str | None = None,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> T | None: ...
 @overload
@@ -552,6 +595,7 @@ def ManyToManyField[T: Model](
     through_fields: tuple[str, str] | None = None,
     related_query_name: str | None = None,
     symmetrical: bool | None = None,
+    init: bool = False,
 ) -> ManyToManyManager[T]: ...
 
 # Reverse relation descriptors

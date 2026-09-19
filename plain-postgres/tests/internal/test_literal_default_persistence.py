@@ -159,9 +159,27 @@ def test_has_persistent_literal_default_predicate():
     assert not plain_fields.TextField(
         default=None, allow_null=True
     ).has_persistent_literal_default()
-    # Fields that don't extend DefaultableField don't accept default= at all.
     assert not plain_fields.UUIDField().has_persistent_literal_default()
     assert not plain_fields.DateTimeField().has_persistent_literal_default()
+    # ColumnField-direct fields accept only default=None (the nullable-optional
+    # marker for typed construction), which is never a persistent literal.
+    assert not plain_fields.UUIDField(
+        allow_null=True, default=None
+    ).has_persistent_literal_default()
+    assert not plain_fields.DateTimeField(
+        allow_null=True, default=None
+    ).has_persistent_literal_default()
+    # only_empty_default fields take default=None too (with required=False),
+    # and `None` is likewise not a persistent literal.
+    assert not plain_fields.BinaryField(
+        allow_null=True, required=False, default=None
+    ).has_persistent_literal_default()
+
+    from plain.postgres.fields.encrypted import EncryptedTextField
+
+    assert not EncryptedTextField(
+        allow_null=True, required=False, default=None
+    ).has_persistent_literal_default()
 
 
 def test_compile_literal_default_sql_handles_jsonfield():

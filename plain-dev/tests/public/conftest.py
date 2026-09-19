@@ -12,9 +12,13 @@ from plain.dev import dotenv as dotenv_module
 def _isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Each test runs in an empty cwd with the once-flag reset and a clean env."""
     monkeypatch.setattr(dotenv_module, "_files_loaded", False)
+    monkeypatch.setattr(dotenv_module, "_consumed_env_key", None)
+    monkeypatch.setattr(dotenv_module, "_directives", {})
     dotenv_module.bound_sources.clear()
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("PLAIN_ENV", raising=False)
+    monkeypatch.delenv("PLAIN_ENV_KEY", raising=False)
+    monkeypatch.delenv("PLAIN_ENV_KEY_ID", raising=False)
     monkeypatch.delenv("DEV_ENV_KEY", raising=False)
     baseline = set(os.environ)
     yield
