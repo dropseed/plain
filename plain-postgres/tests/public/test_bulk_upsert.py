@@ -395,3 +395,39 @@ def test_bulk_upsert_key_values_that_do_not_compare_to_each_other(db):
 
     assert len({item.id for item in items}) == 4
     assert {row.value for row in UpsertValueKey.query.all()} == {1, 2, 3, 4}
+
+
+def test_bulk_upsert_json_key_with_non_string_object_keys(db):
+    # jsonb object keys are always strings -- the encoder stringifies an int
+    # key on the way in. The conflict key has to be canonicalized the same
+    # way, or sorting the keys compares an int against a str and raises.
+    utc = ZoneInfo("UTC")
+    UpsertValueKey(
+        payload={1: "a", "2": "b", "nested": {"z": 1, "y": 2}},
+        blob=b"x",
+        zone=utc,
+        value=1,
+    ).create()
+    seeded_id = UpsertValueKey.query.get(value=1).id
+
+    # The same logical key, written with its keys in another order and the
+    # int key spelled as a string.
+    conflicting = UpsertValueKey(
+        payload={"nested": {"y": 2, "z": 1}, "2": "b", "1": "a"},
+        blob=b"x",
+        zone=utc,
+        value=99,
+    )
+    UpsertValueKey.query.bulk_upsert(
+        [conflicting],
+        update_fields=[UpsertValueKey.value],
+        unique_fields=[
+            UpsertValueKey.payload,
+            UpsertValueKey.blob,
+            UpsertValueKey.zone,
+        ],
+    )
+
+    assert conflicting.id == seeded_id
+    assert UpsertValueKey.query.count() == 1
+    assert UpsertValueKey.query.get(id=seeded_id).value == 99

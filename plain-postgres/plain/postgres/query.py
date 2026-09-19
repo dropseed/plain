@@ -22,6 +22,7 @@ from plain.postgres.db import (
     PLAIN_VERSION_PICKLE_KEY,
     get_connection,
 )
+from plain.postgres.dialect import get_json_dumps
 from plain.postgres.exceptions import (
     FieldDoesNotExist,
     FieldError,
@@ -33,6 +34,7 @@ from plain.postgres.fields import (
     PrimaryKeyField,
 )
 from plain.postgres.fields.base import ColumnField
+from plain.postgres.fields.json import JSONField
 from plain.postgres.functions import Cast
 from plain.postgres.query_utils import Q
 from plain.postgres.sql import (
@@ -65,13 +67,19 @@ def conflict_key_value(field: Field, value: Any) -> Any:
     naive datetime becomes aware, a UUID string becomes a UUID.
     """
     value = field.get_prep_value(value)
+    if isinstance(field, JSONField):
+        # Canonicalize the value the way the column will store it: encode with
+        # the field's own encoder, which stringifies non-string object keys,
+        # and only then re-parse and dump with the keys sorted. Sorting before
+        # the encode would compare an int key against a str one and raise. A
+        # jsonb column keys as a string either way, scalars included, which is
+        # also what makes an otherwise unhashable object usable as a key.
+        return json.dumps(
+            json.loads(get_json_dumps(field.encoder)(value)), sort_keys=True
+        )
     if isinstance(value, memoryview | bytearray):
         # psycopg hands a bytea column back as a memoryview.
         return bytes(value)
-    if isinstance(value, dict | list):
-        # A jsonb container is unhashable, and two equal objects can be built
-        # with their keys in either order.
-        return json.dumps(value, sort_keys=True, default=str)
     return value
 
 
