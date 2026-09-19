@@ -996,9 +996,19 @@ class QuerySet[T: "Model"]:
         else:
             # No references given: RETURN every column so the rows can be
             # hydrated into full model instances.
-            clone._returning_fields = list(self.model._model_meta.fields)
+            clone._returning_fields = self._all_returning_fields()
             clone._returning_instances = True
         return cast("ReturningQuerySet[T, Any]", clone)
+
+    def _all_returning_fields(self) -> list[Field]:
+        """Every column of this model, for a no-argument returning()."""
+        fields: list[Field] = list(self.model._model_meta.fields)
+        if not fields:
+            raise FieldError(
+                f"returning() has no columns to return for "
+                f"{self.model.model_options.object_name}."
+            )
+        return fields
 
     def _validated_returning_fields(
         self, fields: tuple[Field[Any], ...]
@@ -1010,6 +1020,13 @@ class QuerySet[T: "Model"]:
         )
 
         object_name = self.model.model_options.object_name
+        if not fields:
+            # The write path distinguishes "no returning()" from "returning()"
+            # by `_returning_fields is None`, so an empty selection would emit
+            # no RETURNING clause and then try to read rows back from it.
+            raise FieldError(
+                f"returning() needs at least one column to return for {object_name}."
+            )
         columns = []
         for field in fields:
             if isinstance(field, ForwardForeignKeyDescriptor):
@@ -1755,6 +1772,15 @@ if TYPE_CHECKING:
         def update(self, **kwargs: Any) -> R: ...  # ty: ignore[invalid-method-override]
 
         def delete(self) -> R: ...  # ty: ignore[invalid-method-override]
+
+else:
+    # returning()'s annotations name this, and annotations get evaluated:
+    # typing.get_type_hints() and any API-doc generator walk them, so the
+    # name has to resolve at runtime too. A type alias is what it should
+    # resolve to -- QuerySet takes one type parameter and this takes two,
+    # and unlike a placeholder class there is nothing here for someone to
+    # reach for with isinstance().
+    type ReturningQuerySet[T, R] = QuerySet[T]
 
 
 class InstanceCheckMeta(type):

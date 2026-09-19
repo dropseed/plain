@@ -1527,11 +1527,21 @@ class SQLWriteCompiler(SQLCompiler):
     query: UpdateQuery | DeleteQuery
 
     def execute_sql(self, result_type: str) -> Any:  # ty: ignore[invalid-method-override]
+        # A write has a rowcount or a RETURNING set, never a result set to
+        # shape, so SINGLE/MULTI have nothing to work with -- asking for one
+        # gets a psycopg "didn't produce records" error several frames from
+        # here. Say it where the mistake is. NO_RESULTS is the other honest
+        # answer: run it and keep nothing (UpdateQuery.update_batch).
+        assert result_type in (CURSOR, NO_RESULTS), (
+            f"A write is executed with CURSOR or NO_RESULTS, not "
+            f"{result_type!r} -- it has a rowcount or its RETURNING rows, "
+            "not a result set."
+        )
         cursor = super().execute_sql(result_type)
         if not cursor:
-            return [] if self.query.returning_fields else 0
+            return [] if self.query.returning_fields is not None else 0
         try:
-            if self.query.returning_fields:
+            if self.query.returning_fields is not None:
                 return convert_returning_rows(
                     cursor.fetchall(), self.query.returning_fields, self.connection
                 )
