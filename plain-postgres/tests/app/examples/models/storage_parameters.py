@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from plain.postgres import types
+from plain.postgres import Field, types
 
 from plain import postgres
 
@@ -10,6 +10,4 @@ class StorageParametersExample(postgres.Model):
     """Dedicated to storage-parameter convergence tests so in-place mutations
     of `model_options.storage_parameters` don't leak into other suites."""
 
-    name = types.TextField(max_length=100)
-
-    query: postgres.QuerySet[StorageParametersExample] = postgres.QuerySet()
+    name: Field[str] = types.TextField(max_length=100)

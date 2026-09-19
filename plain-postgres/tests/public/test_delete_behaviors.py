@@ -272,7 +272,11 @@ def test_child_insert_before_parent_raises_at_the_insert(db):
     missing_id = 10**9
 
     with pytest.raises(ValidationError), transaction.atomic():
-        ChildCascade(parent=missing_id).create(clean_and_validate=False)
+        # A raw pk is deliberate here -- the runtime accepts it so the DB can
+        # reject the missing target; the typed constructor wants the instance.
+        ChildCascade(parent=missing_id).create(  # ty: ignore[invalid-argument-type]
+            clean_and_validate=False
+        )
 
     assert not ChildCascade.query.filter(parent=missing_id).exists()
 

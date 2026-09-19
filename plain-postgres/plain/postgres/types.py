@@ -8,13 +8,13 @@ typed descriptor (`XField[T]`). Combined with the descriptor's overloaded
 the primitive value at instance access — no annotation needed.
 
 Usage:
-    from plain.postgres import types
+    from plain.postgres import Field, types
 
     @postgres.register_model
     class User(postgres.Model):
-        email = types.EmailField()
-        age = types.IntegerField()
-        is_active = types.BooleanField(default=True)
+        email: Field[str] = types.EmailField()
+        age: Field[int] = types.IntegerField()
+        is_active: Field[bool] = types.BooleanField(default=True)
 """
 
 # Re-export scalar field types

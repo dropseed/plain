@@ -12,38 +12,52 @@ Parser supports:
 - export KEY=value (strips export prefix)
 - Comments (# comment and inline KEY=value # comment)
 - Variable expansion: $VAR and ${VAR} (in unquoted and double-quoted values)
-- Command substitution: $(command)
-- Encrypted values: KEY=encrypted:<token>, decrypted with DEV_ENV_KEY
+- Encrypted values: KEY=encrypted:<token>, decrypted with the project's key
+
+Nothing in a `.env` file runs. There is no `$(command)` substitution: a committed
+file that executes commands on every checkout is a supply-chain hole, and the
+one thing it was used for — fetching the key — has a home of its own now.
 
 `encrypted:` is recognized syntactically — at the start of an *unquoted* value,
 before anything is expanded. So an encrypted value is never expanded, and
 quoting it (`KEY='encrypted:aes'`) makes it ordinary text.
 
 Encrypted values are resolved in a second phase, after parsing. `load_dotenv_files`
-resolves once after every file has loaded, so the key line can live in
-`.env.dev.local`, in the shell, or as a committed `DEV_ENV_KEY=$(op read ...)`
-reference next to the values themselves. Decrypted plaintext is bound literally —
-no variable expansion or command substitution.
+resolves once after every file has loaded, then looks the key up: `PLAIN_ENV_KEY`
+from the environment if set (a sandbox, a shell export), else this machine's
+key store, by the id the file names in `PLAIN_ENV_KEY_ID=<id>`. Decrypted
+plaintext is bound literally — no variable expansion.
 """
 
 from __future__ import annotations
 
 import os
 import re
-import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import NamedTuple
 
 import click
 from plain.exceptions import ImproperlyConfigured
 
+from .envkeys import (
+    DIRECTIVE_NAMES,
+    ENV_KEY_ID_VAR,
+    ENV_KEY_VAR,
+    KEY_LINE_NAMES,
+    resolve_env_key,
+)
+
 __all__ = ["load_dotenv", "load_dotenv_files", "parse_dotenv"]
 
-# Environment variable holding the project's Fernet key.
-ENV_KEY_VAR = "DEV_ENV_KEY"
 # Written form of an encrypted value: `KEY=encrypted:<fernet token>`.
 ENCRYPTED_VALUE_PREFIX = "encrypted:"
+
+# Loader state, set by `load_dotenv_files`: the key it took out of the
+# environment, and the directive lines the files supplied (see
+# `envkeys.DIRECTIVE_NAMES`), first file wins.
+_consumed_env_key: str | None = None
+_directives: dict[str, Binding] = {}
 
 # Match ${VAR} or $VAR (VAR must start with letter/underscore, then alphanumeric/underscore)
 _VAR_BRACE_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
@@ -118,7 +132,7 @@ def load_dotenv_files(*, decrypt: bool = True) -> None:
 
     Idempotent within a process — repeat calls are a no-op.
     """
-    global _files_loaded
+    global _files_loaded, _consumed_env_key, _directives
     if _files_loaded:
         return
     _files_loaded = True
@@ -130,17 +144,25 @@ def load_dotenv_files(*, decrypt: bool = True) -> None:
         )
 
     bound_sources.clear()
+    # The key is consumed, not shared (see `ENV_KEY_VAR`). Once taken it is
+    # remembered for the process, so a later load still has it.
+    if (from_environment := os.environ.pop(ENV_KEY_VAR, None)) is not None:
+        _consumed_env_key = from_environment
 
     # Encrypted values from every file are collected here and decrypted once
-    # at the end, so DEV_ENV_KEY can come from any file (or the shell).
+    # at the end, so the key id (or the key) can come from any file or the shell.
     deferred: dict[str, Binding] = {}
+    directives: dict[str, Binding] = {}
 
     for path in dotenv_ladder(plain_env):
-        if _load_dotenv_deferring_encrypted(path, override=False, deferred=deferred):
+        if _load_dotenv_deferring_encrypted(
+            path, override=False, deferred=deferred, directives=directives
+        ):
             click.secho(f"Loading {path}...", dim=True, italic=True, err=True)
 
+    _directives = directives
     if decrypt:
-        _bind_decrypted(deferred)
+        _bind_decrypted(deferred, directives=directives)
 
 
 def load_dotenv(
@@ -149,28 +171,23 @@ def load_dotenv(
     override: bool = False,
     decrypt: bool = True,
 ) -> bool:
-    """
-    Load environment variables from a .env file into os.environ.
+    """Load one .env file into os.environ, returning False if it doesn't exist.
 
-    Args:
-        filepath: Path to the .env file
-        override: If True, overwrite existing environment variables
-        decrypt: If False, leave encrypted values unbound instead of decrypting
+    `override` overwrites names already in the environment; `decrypt=False`
+    leaves encrypted values unbound instead of decrypting them.
 
-    Returns:
-        True if the file was loaded, False if it doesn't exist
-
-    Encrypted values are decrypted with DEV_ENV_KEY once the whole file has
-    been parsed, so the key may be defined earlier in the same file.
+    Encrypted values are decrypted once the whole file has been parsed, so a
+    `PLAIN_ENV_KEY_ID` line may come after the values it unlocks.
     """
     deferred: dict[str, Binding] = {}
+    directives: dict[str, Binding] = {}
     loaded = _load_dotenv_deferring_encrypted(
-        filepath, override=override, deferred=deferred
+        filepath, override=override, deferred=deferred, directives=directives
     )
     if not loaded:
         return False
     if decrypt:
-        _bind_decrypted(deferred)
+        _bind_decrypted(deferred, directives=directives)
     return True
 
 
@@ -179,25 +196,28 @@ def parse_dotenv(filepath: str | Path, *, decrypt: bool = True) -> dict[str, str
     Parse a .env file and return a dictionary of key-value pairs.
 
     Does not modify os.environ. Supports multiline values in quoted strings.
-    Encrypted values are decrypted with DEV_ENV_KEY from os.environ, falling
-    back to a `DEV_ENV_KEY=` line in the file itself.
+    Encrypted values are decrypted with the key the file's own directive lines
+    (and the environment) point to. The key line itself is never returned.
     """
     path = Path(filepath)
     content = path.read_text(encoding="utf-8")
 
     encrypted: list[Binding] = []
+    directives: dict[str, Binding] = {}
 
     def collect(binding: Binding) -> None:
-        if binding.encrypted:
+        if binding.key in DIRECTIVE_NAMES:
+            directives.setdefault(binding.key, binding)
+        elif binding.encrypted:
             encrypted.append(binding)
 
     result = _FileParser(content, source=path).parse(collect)
-    if not decrypt:
-        return result
-
-    env_key = os.environ.get(ENV_KEY_VAR) or result.get(ENV_KEY_VAR)
-    for binding in encrypted:
-        result[binding.key] = decrypt_env_binding(binding, env_key=env_key)
+    # A key line is a secret, and callers hand these dicts to subprocesses and
+    # logs; the id is a pointer and stays.
+    for name in KEY_LINE_NAMES:
+        result.pop(name, None)
+    if decrypt:
+        result.update(_decrypt_all(encrypted, directives=directives))
     return result
 
 
@@ -206,11 +226,14 @@ def _load_dotenv_deferring_encrypted(
     *,
     override: bool,
     deferred: dict[str, Binding],
+    directives: dict[str, Binding],
 ) -> bool:
     """Bind a file's plain values now and collect its encrypted ones in `deferred`.
 
     A key with a deferred value counts as bound: a later file (or a later line)
-    can't take it over, which keeps first-file-wins precedence intact.
+    can't take it over, which keeps first-file-wins precedence intact. Lines
+    named in `DIRECTIVE_NAMES` go into `directives` (first wins) instead of the
+    environment.
     """
     path = Path(filepath)
     if not path.exists():
@@ -219,11 +242,25 @@ def _load_dotenv_deferring_encrypted(
     content = path.read_text(encoding="utf-8")
 
     # Keys that are already bound: their values are located but not expanded,
-    # so nothing in them runs and nothing in them is decrypted.
-    skip_for = None if override else set(os.environ) | deferred.keys()
+    # so nothing in them runs and nothing in them is decrypted. Directives are
+    # never bound, so the environment can't pre-empt them; a file supplying one
+    # does.
+    skip_for = None
+    if not override:
+        skip_for = (set(os.environ) | deferred.keys()) - DIRECTIVE_NAMES
+        skip_for |= directives.keys()
 
     def on_bind(binding: Binding) -> None:
         key = binding.key
+        if key in DIRECTIVE_NAMES:
+            # An empty id line names nothing and doesn't shadow a later one; an
+            # empty key line is kept, so the error can say it is empty.
+            if key == ENV_KEY_ID_VAR and not binding.value:
+                return
+            if override or key not in directives:
+                directives[key] = binding
+                bound_sources[key] = path
+            return
         if not override and (key in os.environ or key in deferred):
             return
         if override:
@@ -243,46 +280,72 @@ def _load_dotenv_deferring_encrypted(
     return True
 
 
-def _bind_decrypted(deferred: dict[str, Binding]) -> None:
-    """Decrypt every deferred binding with DEV_ENV_KEY and bind the plaintext literally."""
-    for binding in deferred.values():
-        os.environ[binding.key] = decrypt_env_binding(binding)
+def _bind_decrypted(
+    deferred: dict[str, Binding], *, directives: dict[str, Binding]
+) -> None:
+    """Decrypt every deferred binding and bind the plaintext literally."""
+    os.environ.update(_decrypt_all(deferred.values(), directives=directives))
+
+
+def _decrypt_all(
+    bindings: Iterable[Binding], *, directives: dict[str, Binding]
+) -> dict[str, str]:
+    """Decrypt `bindings` with the one key the directives (and environment) point to."""
+    bindings = list(bindings)
+    if not bindings:
+        return {}
+    first = bindings[0]
+    env_key = resolve_env_key(
+        env_key=env_key_from_environment(),
+        key_line=key_line_of(directives),
+        key_id=named_key_id(directives),
+        about=f"{first.key} in {first.source} is encrypted, but ",
+    )
+    return {b.key: decrypt_env_binding(b, env_key=env_key) for b in bindings}
+
+
+def named_key_id(directives: dict[str, Binding]) -> str | None:
+    """The id these directives name, if any; an empty id line names nothing."""
+    binding = directives.get(ENV_KEY_ID_VAR)
+    return binding.value if binding and binding.value else None
+
+
+def key_line_of(directives: dict[str, Binding]) -> tuple[str, str] | None:
+    for name in KEY_LINE_NAMES:
+        if binding := directives.get(name):
+            return name, binding.value
+    return None
+
+
+# --- what the loader found ---
+
+
+def env_key_from_environment() -> str | None:
+    """The key the environment supplied, if any: consumed by the loader, else still in it."""
+    if _consumed_env_key is not None:
+        return _consumed_env_key
+    return os.environ.get(ENV_KEY_VAR)
+
+
+def loaded_directives() -> dict[str, Binding]:
+    """The directive lines the loaded files supplied, by name."""
+    return _directives
 
 
 # --- encrypted values ---
 
 
-def decrypt_env_binding(binding: Binding, env_key: str | None = None) -> str:
+def decrypt_env_binding(binding: Binding, *, env_key: str) -> str:
     """Decrypt one binding, or raise ImproperlyConfigured saying exactly what is wrong."""
     from cryptography.fernet import InvalidToken
-
-    if env_key is None:
-        env_key = os.environ.get(ENV_KEY_VAR, "")
-
-    if not env_key:
-        if ENV_KEY_VAR in os.environ:
-            raise ImproperlyConfigured(
-                f"{binding.key} in {binding.source} is encrypted, but {ENV_KEY_VAR} is "
-                f"set to an empty value. If it is bound with a command like "
-                f'{ENV_KEY_VAR}=$(op read "op://..."), that command failed — run it '
-                "yourself to see why."
-            )
-        plain_env = os.environ.get("PLAIN_ENV", "")
-        key_file_hint = f".env.{plain_env}.local" if plain_env else ".env.local"
-        raise ImproperlyConfigured(
-            f"{binding.key} in {binding.source} is encrypted, but {ENV_KEY_VAR} is not set. "
-            f"Set {ENV_KEY_VAR} to this project's key — usually with a line in {key_file_hint} "
-            f'like {ENV_KEY_VAR}=$(op read "op://..."), or commit that reference line in '
-            f"{binding.source} so teammates get it too. Generate a new key with `plain env key`."
-        )
 
     try:
         return decrypt_env_value(binding.value, env_key)
     except (InvalidToken, ValueError) as e:
         raise ImproperlyConfigured(
-            f"{ENV_KEY_VAR} does not decrypt {binding.key} in {binding.source}. "
-            "Check that it is this project's key. If the value is meant to be the "
-            f"literal text and not an encrypted value, quote it: "
+            f"The key does not decrypt {binding.key} in {binding.source}. "
+            "Check that it is the key this file was encrypted with. If the value "
+            "is meant to be the literal text and not an encrypted value, quote it: "
             f"{binding.key}='{ENCRYPTED_VALUE_PREFIX}...'"
         ) from e
 
@@ -295,13 +358,6 @@ def is_encrypted_value(value: str) -> bool:
     error rather than plain text.
     """
     return value.startswith(ENCRYPTED_VALUE_PREFIX)
-
-
-def generate_env_key() -> str:
-    """Generate a new DEV_ENV_KEY (a Fernet key: urlsafe base64, 44 chars)."""
-    from cryptography.fernet import Fernet
-
-    return Fernet.generate_key().decode("ascii")
 
 
 def encrypt_env_value(plaintext: str, env_key: str) -> str:
@@ -340,14 +396,16 @@ def find_env_binding(
     a second binding on the same line — is exactly what counts when the file is
     loaded. `source` is only recorded on the binding, for error messages.
     """
-    found: Binding | None = None
+    for binding in find_env_bindings(content, source=source):
+        if binding.key == name:
+            return binding
+    return None
 
-    def match(binding: Binding) -> None:
-        nonlocal found
-        if found is None and binding.key == name:
-            found = binding
 
-    _FileParser(content, source=source, expand=False).parse(match)
+def find_env_bindings(content: str, *, source: Path | None = None) -> list[Binding]:
+    """Every binding in .env file content, in order, without evaluating anything."""
+    found: list[Binding] = []
+    _FileParser(content, source=source, expand=False).parse(found.append)
     return found
 
 
@@ -511,16 +569,15 @@ class _FileParser:
         if char == "'":
             return _parse_single_quoted(content, pos)
 
-        # Double-quoted: process escapes, variable expansion, and commands, supports multiline
+        # Double-quoted: process escapes and variable expansion, supports multiline
         if char == '"':
             value, pos = _parse_double_quoted(content, pos)
             if expand:
                 value = self._expand_variables(value, key)
-                value = _expand_commands(value)
             value = value.replace(_ESCAPED_DOLLAR, "$")  # Restore escaped $
             return value, pos
 
-        # Unquoted value: variable expansion and command substitution
+        # Unquoted value: variable expansion
         return self._unquoted(pos, key, expand=expand)
 
     def _unquoted(self, pos: int, key: str, *, expand: bool) -> tuple[str, int]:
@@ -560,10 +617,8 @@ class _FileParser:
 
         value = "".join(result).rstrip()
 
-        # Expand variables, then commands
         if expand:
             value = self._expand_variables(value, key)
-            value = _expand_commands(value)
         value = value.replace(_ESCAPED_DOLLAR, "$")  # Restore escaped $
         return value, pos
 
@@ -583,6 +638,12 @@ class _FileParser:
                     f"{key} in {self.source} references {var_name}, which "
                     "is an encrypted value. Encrypted values can't be referenced "
                     "from other values."
+                )
+            if var_name in KEY_LINE_NAMES:
+                # The one value a committed file must never be able to capture.
+                raise ImproperlyConfigured(
+                    f"{key} in {self.source} references {var_name}, which is "
+                    "the key itself and can't be referenced from a value."
                 )
             # Check values defined earlier in this file, then os.environ
             if var_name in self.result:
@@ -658,60 +719,3 @@ def _parse_double_quoted(content: str, pos: int) -> tuple[str, int]:
 
     # No closing quote found, return what we have
     return "".join(result), pos
-
-
-def _expand_commands(value: str) -> str:
-    """Expand all $(command) substitutions in value.
-
-    Handles nested parentheses within commands, e.g., $(echo "(test)").
-    """
-    result = []
-    i = 0
-    length = len(value)
-
-    while i < length:
-        # Look for $(
-        if i + 1 < length and value[i] == "$" and value[i + 1] == "(":
-            # Find matching closing paren, accounting for nesting
-            cmd_start = i + 2
-            depth = 1
-            j = cmd_start
-
-            while j < length and depth > 0:
-                if value[j] == "(":
-                    depth += 1
-                elif value[j] == ")":
-                    depth -= 1
-                j += 1
-
-            if depth == 0:
-                # Found matching ), extract and execute command
-                command = value[cmd_start : j - 1]
-                output = _execute_command(command)
-                result.append(output)
-                i = j
-            else:
-                # No matching ), keep literal
-                result.append(value[i])
-                i += 1
-        else:
-            result.append(value[i])
-            i += 1
-
-    return "".join(result)
-
-
-def _execute_command(command: str, timeout: float = 5.0) -> str:
-    """Execute a shell command and return stdout."""
-    try:
-        result = subprocess.run(
-            command,
-            shell=True,
-            stdout=subprocess.PIPE,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-        return result.stdout.strip() if result.returncode == 0 else ""
-    except (subprocess.TimeoutExpired, OSError):
-        return ""
