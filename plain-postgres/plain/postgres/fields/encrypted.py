@@ -22,7 +22,7 @@ from plain.utils.encoding import force_bytes
 
 from plain import preflight
 
-from .base import NOT_PROVIDED, validate_none_only_default
+from .base import NOT_PROVIDED, Field, validate_none_only_default
 from .json import JSONField
 from .text import TextField
 
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from plain.preflight.results import PreflightResult
 
 __all__ = [
+    "EncryptedField",
     "EncryptedJSONField",
     "EncryptedTextField",
 ]
@@ -137,19 +138,26 @@ class _EncryptedExact(Exact):
         super().__init__(lhs, rhs)
 
 
-class EncryptedFieldMixin:
-    """Shared behavior for all encrypted fields.
+class EncryptedField[T](Field[T]):
+    """Shared base for all encrypted fields, and the type to annotate them with.
 
     Owns the lookup surface (isnull and exact only — ciphertext is
     non-deterministic) and the preflight that blocks indexes and unique
     constraints. Also blocks the typed-query comparison methods.
 
-    Must be used with Field as a co-base class.
-    """
+    Annotate encrypted model fields with this rather than the plain ``Field``:
 
-    # Type hints for attributes provided by Field (the required co-base class)
-    name: str
-    model: Any
+        api_key: EncryptedField[str] = types.EncryptedTextField(max_length=200)
+
+    The annotation is what the type checker sees, so a plain ``Field[str]``
+    would hide the ``Never``-typed blocks below and let
+    ``Model.api_key.equals("x")`` type-check on its way to a runtime
+    ``TypeError``. It is a ``Field[T]`` subclass, so the synthesized
+    constructor types the field exactly as ``Field[T]`` would.
+
+    Concrete encrypted fields mix this with the field they specialize
+    (``TextField``, ``JSONField``), which supplies the column behavior.
+    """
 
     # The complete lookup surface, replacing the base field's registry.
     # isnull is obviously needed. exact is required so that `filter(field=None)`
@@ -162,6 +170,10 @@ class EncryptedFieldMixin:
     # get_lookup()/get_transform() and registry consumers (e.g.
     # unsupported-lookup error suggestions) all resolve through this one dict.
     # A classmethod so both class-level and instance-level callers work.
+    def __init__(self, **kwargs: Any) -> None:
+        # Cooperative passthrough to the concrete field this is mixed with.
+        super().__init__(**kwargs)
+
     @classmethod
     def get_lookups(cls) -> dict[str, type[Lookup | Transform]]:
         return {"exact": _EncryptedExact, "isnull": IsNull}
@@ -179,26 +191,43 @@ class EncryptedFieldMixin:
     # `Never` is assignable to `Q` so `where(field.equals(...))` still
     # type-checks at the use site, and the parameter error is the one that
     # surfaces.
-    def equals(self, value: Never) -> Never:
+    def equals(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
         raise TypeError(self._lookup_unsupported_message("equals"))
 
-    def not_equal(self, value: Never) -> Never:
+    def not_equal(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
         raise TypeError(self._lookup_unsupported_message("not_equal"))
 
-    def gt(self, value: Never) -> Never:
+    def gt(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
         raise TypeError(self._lookup_unsupported_message("gt"))
 
-    def gte(self, value: Never) -> Never:
+    def gte(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
         raise TypeError(self._lookup_unsupported_message("gte"))
 
-    def lt(self, value: Never) -> Never:
+    def lt(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
         raise TypeError(self._lookup_unsupported_message("lt"))
 
-    def lte(self, value: Never) -> Never:
+    def lte(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
         raise TypeError(self._lookup_unsupported_message("lte"))
 
-    def is_in(self, values: Never) -> Never:
+    def is_in(self, values: Never) -> Never:  # ty: ignore[invalid-method-override]
         raise TypeError(self._lookup_unsupported_message("is_in"))
+
+    # The pattern conditions are declared on Field (implemented on TextField)
+    # and are as meaningless on ciphertext as the comparisons above, so they
+    # are blocked in the same shape: `Never` rejects the call site, the raise
+    # covers anyone who bypasses the type checker. EncryptedJSONField never
+    # had them at runtime; blocking here costs it nothing.
+    def contains(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("contains"))
+
+    def icontains(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("icontains"))
+
+    def startswith(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("startswith"))
+
+    def endswith(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
+        raise TypeError(self._lookup_unsupported_message("endswith"))
 
     def _lookup_unsupported_message(self, method: str) -> str:
         assert self.name is not None, (
@@ -211,7 +240,7 @@ class EncryptedFieldMixin:
         )
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        errors: list[PreflightResult] = super().preflight(**kwargs)  # ty: ignore[unresolved-attribute]
+        errors: list[PreflightResult] = super().preflight(**kwargs)
         errors.extend(self._check_encrypted_constraints())
         return errors
 
@@ -257,13 +286,13 @@ class EncryptedFieldMixin:
         return errors
 
 
-# The mixin narrows Field's typed-query comparison methods to `Never` on
-# purpose — that narrowing is the type-level block, and it is exactly what a
-# Liskov check objects to, so the override diagnostic is suppressed here.
-# The suppression is class-wide (ty reports the conflict at the class line), so
-# any OTHER override added to this class has to be checked by hand.
+# `EncryptedField` narrows the pattern conditions `TextField` implements down to
+# `Never` — that narrowing is the type-level block, and it is exactly what the
+# base-class-conflict check objects to, so the diagnostic is suppressed here.
+# The suppression is class-wide, so any OTHER base-class conflict introduced on
+# this class has to be checked by hand.
 class EncryptedTextField[T: (str, str | None) = str](  # ty: ignore[invalid-method-override]
-    EncryptedFieldMixin, TextField[T]
+    EncryptedField[T], TextField[T]
 ):
     """A TextField that encrypts its value before storing in the database.
 
@@ -300,23 +329,6 @@ class EncryptedTextField[T: (str, str | None) = str](  # ty: ignore[invalid-meth
             validators=validators,
         )
 
-    # TextField's pattern conditions arrive with the base class and are as
-    # meaningless on ciphertext as the comparisons the mixin blocks, so they
-    # are blocked here, where they arrive. Same shape as the mixin's blocks:
-    # `Never` rejects the call site, the raise covers anyone who bypasses the
-    # type checker.
-    def contains(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("contains"))
-
-    def icontains(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("icontains"))
-
-    def startswith(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("startswith"))
-
-    def endswith(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("endswith"))
-
     def get_db_prep_value(
         self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
@@ -333,12 +345,7 @@ class EncryptedTextField[T: (str, str | None) = str](  # ty: ignore[invalid-meth
         return _decrypt(value)
 
 
-# The mixin narrows Field's typed-query comparison methods to `Never` on
-# purpose — that narrowing is the type-level block, and it is exactly what a
-# Liskov check objects to, so the override diagnostic is suppressed here.
-# The suppression is class-wide (ty reports the conflict at the class line), so
-# any OTHER override added to this class has to be checked by hand.
-class EncryptedJSONField(EncryptedFieldMixin, JSONField):  # ty: ignore[invalid-method-override]
+class EncryptedJSONField(EncryptedField[Any], JSONField):
     """A JSONField that encrypts its serialized value before storing in the database.
 
     The JSON value is serialized to a string, encrypted, and stored as text.

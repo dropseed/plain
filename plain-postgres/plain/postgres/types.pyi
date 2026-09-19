@@ -514,19 +514,22 @@ def EncryptedJSONField(
 # Two overload families:
 #
 # 1. Class-argument FK (`to=SomeModel`) — T is inferred from the class.
-#    Returns `_ForeignKeyDescriptor[T, V]` whose `__get__` overloads do
-#    double duty: class-access (`Child.parent`) yields `type[T]` so the
-#    related model's typed field surface (e.g. `Child.parent.name.equals(...)`)
-#    is visible for typed where() chaining; instance-access (`child.parent`)
-#    yields V (T or T | None for nullable FKs).
+#    Returns `_ForeignKeyDescriptor[T, V]`, a `Field[V]`. `Field.__get__`
+#    does the double duty: class-access (`Child.parent`) yields `type[T]` so
+#    the related model's typed field surface (e.g.
+#    `Child.parent.name.equals(...)`) is visible for typed where() chaining;
+#    instance-access (`child.parent`) yields V (T or T | None for nullable
+#    FKs). Both survive the `Field[T]` annotation the model declares.
 #
 # 2. String-argument FK (`to="SomeModel"`, `to="self"`) — T can't be
 #    inferred from the string, so the return type falls back to bare `T`.
-#    This requires an explicit LHS annotation (`parent: TreeNode | None = …`)
-#    but preserves instance-access typing for forward references and
-#    self-references. Type-level FK traversal isn't available through
-#    string-arg FKs — the runtime `RelatedFieldRef` still resolves
-#    `Child.parent.name` regardless.
+#    This requires an explicit *value-type* LHS annotation
+#    (`parent: TreeNode | None = …`) which preserves instance-access typing
+#    for forward references and self-references, but makes class access a
+#    `TreeNode` rather than a field: type-level FK traversal isn't available
+#    through string-arg FKs. The runtime `RelatedFieldRef` still resolves
+#    `Child.parent.name` regardless. Declare the model before the FK and pass
+#    the class when you want traversal to type-check.
 #
 # `__set__` accepts the related instance, None (via V), or a bare PK
 # value (int) — matching what `ForwardForeignKeyDescriptor` already
@@ -539,11 +542,12 @@ def EncryptedJSONField(
 class _ForeignKeyDescriptor[T: Model, V](_Field[V]):
     # Subclasses Field[V] so an FK field is assignable to a `Field[V]`
     # annotation (e.g. `org: Field[Org] = types.ForeignKeyField(Org)`) under
-    # both ty and pyright. The FK-specific __get__/__set__ override the base.
-    @overload
-    def __get__(self, instance: None, owner: type) -> type[T]: ...
-    @overload
-    def __get__(self, instance: Model, owner: type) -> V: ...
+    # both ty and pyright. That annotation is also what models actually carry,
+    # so `__get__` is deliberately NOT overridden here -- `Field.__get__`'s
+    # model-valued overloads already give class access `type[T]` (traversal)
+    # and instance access `V`, and they keep working through the `Field[V]`
+    # annotation, which an override here would not. Only `__set__` is
+    # widened, to accept a bare PK alongside the instance.
     def __set__(self, instance: Model, value: V | int) -> None: ...
 
 # Class-argument FK overloads

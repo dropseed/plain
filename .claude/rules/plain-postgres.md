@@ -46,9 +46,17 @@ class Article(postgres.Model):
 - **String forward-ref FKs** (`"self"`, `"OtherModel"`) keep a _value-type_
   annotation — the checker can't resolve the string to a model:
   `parent: Foo | None = types.ForeignKeyField("self", on_delete=postgres.CASCADE, allow_null=True, default=None)`.
+  That annotation is a model instance, not a field, so `where()` traversal
+  (`Child.parent.name.equals(...)`) doesn't type-check through it — declare the
+  target above and pass the class when you want traversal typed.
+- **Encrypted fields** are annotated `EncryptedField[T]` (imported from
+  `plain.postgres` alongside `Field`), not `Field[T]`. It's a `Field[T]`
+  subclass, so the constructor is typed identically, but it also carries the
+  `Never`-typed blocks that reject `Model.secret.equals(...)` at the call site.
+  A plain `Field[T]` hides them and the comparison only fails at runtime.
 - **JSON**: `JSONField`/`EncryptedJSONField` return `Any` from the stub (the
   runtime class isn't generic over its value shape), so the annotation is what
-  preserves typing: `Field[dict]` / `Field[dict[str, Any]]`.
+  preserves typing: `Field[dict]` / `EncryptedField[dict[str, Any]]`.
 - **Custom querysets**: declare `query: ClassVar[MyQuerySet] = MyQuerySet()`
   (`ClassVar` so it isn't treated as a field). Default-queryset models declare
   nothing — `Model.query` is typed automatically.

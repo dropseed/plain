@@ -10,20 +10,25 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, assert_type
 
 from app.examples.models.defaults import DefaultsExample
-from plain.postgres.fields.numeric import IntegerField
-from plain.postgres.fields.text import TextField
+from plain.postgres import Field
 from plain.postgres.query_utils import Q
 
 
 def test_class_access_yields_typed_descriptors() -> None:
     """Class-level field access returns the descriptor, parameterized by T.
 
+    The declared type is what the checker sees — models annotate their fields
+    `Field[T]`, so that (not the concrete `TextField[T]` the stub returns) is
+    the type of a class-level access. `Field[T]` therefore has to carry the
+    whole condition surface, including the string-only conditions, which it
+    restricts to string-valued fields via the `self` annotation.
+
     These `assert_type` calls are checked by the type checker, not at runtime
     — but the function still has to import cleanly.
     """
-    assert_type(DefaultsExample.name, TextField[str])
-    assert_type(DefaultsExample.note, TextField[str | None])
-    assert_type(DefaultsExample.priority, IntegerField[int])
+    assert_type(DefaultsExample.name, Field[str])
+    assert_type(DefaultsExample.note, Field[str | None])
+    assert_type(DefaultsExample.priority, Field[int])
 
 
 def test_instance_access_yields_value_type() -> None:
@@ -66,6 +71,18 @@ if TYPE_CHECKING:
         DefaultsExample.priority.is_in([1, 2, 3])
         DefaultsExample.name.is_in(["a", "b"])
         DefaultsExample.priority.is_in(["no", "ints"])  # ty: ignore[invalid-argument-type]
+
+    def _typed_check_string_conditions_are_string_only() -> None:
+        # The pattern conditions are declared on Field with a `self`
+        # annotation that restricts them to string-valued fields, so they
+        # survive the `Field[T]` annotation models carry without becoming
+        # available on every field. The ignore marker is load-bearing — if the
+        # restriction were dropped, ty would report it as unused. These stay
+        # type-check-only because a non-text field has no such method at
+        # runtime (AttributeError), which is what traversal reflects.
+        DefaultsExample.name.startswith("a")
+        DefaultsExample.note.contains("a")
+        DefaultsExample.priority.startswith("a")  # ty: ignore[invalid-argument-type]
 
 
 def test_field_methods_return_q_objects():

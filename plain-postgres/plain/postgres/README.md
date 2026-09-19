@@ -1035,28 +1035,36 @@ This is **not** for passwords or tokens you issue — those should be hashed (on
 
 ```python
 from plain import postgres
-from plain.postgres import Field, types
+from plain.postgres import EncryptedField, Field, types
 
 
 @postgres.register_model
 class Integration(postgres.Model):
     name: Field[str] = types.TextField(max_length=100)
-    api_key: Field[str] = types.EncryptedTextField(max_length=200)
-    credentials: Field[dict | None] = types.EncryptedJSONField(
+    api_key: EncryptedField[str] = types.EncryptedTextField(max_length=200)
+    credentials: EncryptedField[dict | None] = types.EncryptedJSONField(
         required=False, allow_null=True, default=None
     )
 ```
+
+Annotate encrypted fields `EncryptedField[T]`, not `Field[T]`. The annotation is
+what the type checker reads, and `EncryptedField[T]` is the `Field[T]` subclass
+that declares the blocked conditions — with a plain `Field[T]`,
+`Integration.api_key.equals("x")` type-checks its way to a runtime `TypeError`
+instead of being rejected at the call site. It types the constructor exactly as
+`Field[T]` does.
 
 Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived from `SECRET_KEY`. The `cryptography` package is required — install it with `pip install cryptography`.
 
 **Available fields:**
 
+- `EncryptedField[T]` — the annotation type; also the shared base the two fields below derive from.
 - `EncryptedTextField` — encrypts text, stored as `text` in the database regardless of `max_length` (ciphertext is longer than plaintext). `max_length` is enforced on the plaintext value during validation.
 - `EncryptedJSONField` — serializes to JSON, encrypts, and stores as `text`. Supports custom `encoder` and `decoder` parameters (same as `JSONField`).
 
 **Limitations:**
 
-- **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported. Comparing against a value raises `TypeError` rather than silently matching nothing — both `filter(api_key="x")` and the typed [condition methods](#typed-conditions-with-where) (`equals`, `contains`, …). `filter(api_key=None)` still rewrites to `IS NULL`.
+- **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported. Comparing against a value raises `TypeError` rather than silently matching nothing — both `filter(api_key="x")` and the typed [condition methods](#typed-conditions-with-where) (`equals`, `contains`, …), which are also rejected at the call site when the field is annotated `EncryptedField[T]`. `filter(api_key=None)` still rewrites to `IS NULL`.
 - **No indexes or constraints** — encrypted fields cannot be used in indexes or unique constraints. Preflight checks will catch this.
 - **Only `default=""`** — on `EncryptedTextField` (paired with `required=False`), the empty string is stored as plaintext `''`, so it's the one value expressible as a column `DEFAULT` (declare it to add the field to a populated table). Any other default would need ciphertext, which is non-deterministic. `EncryptedJSONField` has no persistent default at all — even `{}` serializes to text that would need ciphertext — so pair `allow_null=True` with `default=None`, which stores nothing and just marks the field optional in the constructor.
 

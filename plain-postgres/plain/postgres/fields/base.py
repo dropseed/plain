@@ -182,6 +182,22 @@ class Field[T](RegisterLookupMixin):
     def is_in(self, values: Iterable[T]) -> Q:
         return self._build_q("in", values)
 
+    if TYPE_CHECKING:
+        # Pattern conditions are implemented on TextField, not here -- the
+        # runtime surface stays exactly as narrow as the field it belongs to,
+        # which is what where() traversal reflects. They are *declared* here
+        # so they survive the `Field[T]` annotation models carry: a model
+        # field's declared type is `Field[str]`, not `TextField[str]`, so the
+        # checker only sees what `Field` offers. The `self` annotation keeps
+        # the restriction -- a `Field[int]` still rejects `.startswith(...)`.
+        def contains(self: Field[str] | Field[str | None], value: str) -> Q: ...
+
+        def icontains(self: Field[str] | Field[str | None], value: str) -> Q: ...
+
+        def startswith(self: Field[str] | Field[str | None], value: str) -> Q: ...
+
+        def endswith(self: Field[str] | Field[str | None], value: str) -> Q: ...
+
     def _build_q(self, suffix: str, value: Any) -> Q:
         """Build a Q from a lookup suffix + value. Uses Q's positional-tuple
         constructor to bypass its reserved `_connector`/`_negated` kwargs that
@@ -430,6 +446,25 @@ class Field[T](RegisterLookupMixin):
             setattr(cls, self.name, self)
 
     # Descriptor protocol implementation
+    #
+    # The first two overloads are class access on a *model-valued* field -- a
+    # foreign key. They yield `type[T]` rather than the descriptor so the
+    # related model's own typed field surface is reachable for where()
+    # traversal (`Child.parent.name.equals(...)`), matching what
+    # `ForwardForeignKeyDescriptor.__get__` returns at runtime (a
+    # `RelatedFieldRef` proxy onto the related model). They come first so they
+    # win over the plain `Self` overload for FK fields; a non-model T never
+    # matches them.
+    @overload
+    def __get__[M: Model](
+        self: Field[M], instance: None, owner: type[Model]
+    ) -> type[M]: ...
+
+    @overload
+    def __get__[M: Model](
+        self: Field[M | None], instance: None, owner: type[Model]
+    ) -> type[M]: ...
+
     @overload
     def __get__(self, instance: None, owner: type[Model]) -> Self: ...
 
