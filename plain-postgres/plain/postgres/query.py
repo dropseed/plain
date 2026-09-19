@@ -1046,19 +1046,14 @@ class QuerySet[T: "Model"]:
         else:
             # No references given: RETURN every column so the rows can be
             # hydrated into full model instances.
-            clone._returning_fields = self._all_returning_fields()
+            clone._returning_fields = list(self.model._model_meta.fields)
             clone._returning_instances = True
+        # The write path tells "no returning()" from "returning()" by
+        # `_returning_fields is None`, so an empty selection would emit no
+        # RETURNING clause and then try to read rows back from it. Neither
+        # branch above can produce one -- a model always has an id column.
+        assert clone._returning_fields, "returning() selected no columns"
         return cast("ReturningQuerySet[T, Any]", clone)
-
-    def _all_returning_fields(self) -> list[Field]:
-        """Every column of this model, for a no-argument returning()."""
-        fields: list[Field] = list(self.model._model_meta.fields)
-        if not fields:
-            raise FieldError(
-                f"returning() has no columns to return for "
-                f"{self.model.model_options.object_name}."
-            )
-        return fields
 
     def _validated_returning_fields(
         self, fields: tuple[Field[Any], ...]
@@ -1070,13 +1065,6 @@ class QuerySet[T: "Model"]:
         )
 
         object_name = self.model.model_options.object_name
-        if not fields:
-            # The write path distinguishes "no returning()" from "returning()"
-            # by `_returning_fields is None`, so an empty selection would emit
-            # no RETURNING clause and then try to read rows back from it.
-            raise FieldError(
-                f"returning() needs at least one column to return for {object_name}."
-            )
         columns = []
         for field in fields:
             if isinstance(field, ForwardForeignKeyDescriptor):
@@ -1151,17 +1139,11 @@ class QuerySet[T: "Model"]:
         handled by Postgres via the declared `on_delete` clauses and are not
         included in the count.
 
-        After returning(), the deleted rows come back instead -- as read-only
-        snapshots when returning() took no arguments.
-        """
-        return self._execute_delete()
-
-    def _execute_delete(self) -> Any:
-        """Run the DELETE.
-
-        Returns the rowcount, or — when returning() set columns on this
-        queryset — the affected rows. Only the target table's rows come
-        back; cascade deletes never appear in a RETURNING clause.
+        After returning(), the deleted rows come back instead -- read-only
+        snapshots when returning() took no arguments, and only ever the
+        target table's rows, since a cascade never reaches the RETURNING
+        clause. The queryset is a ReturningQuerySet to a type checker by
+        then, and its delete() is declared to return them.
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot use 'limit' or 'offset' with delete().")
@@ -1185,9 +1167,11 @@ class QuerySet[T: "Model"]:
 
         # Clear the result cache, in case this QuerySet gets reused.
         self._result_cache = None
-        if self._returning_fields is None:
-            return result
-        return self._hydrate_returning(result, deleted=True)
+        if self._returning_fields is not None:
+            # returning() makes this a ReturningQuerySet to a type checker,
+            # and its delete() is declared to hand the rows back.
+            return cast("int", self._hydrate_returning(result, deleted=True))
+        return result
 
     def _raw_delete(self) -> Any:
         """
@@ -1203,14 +1187,10 @@ class QuerySet[T: "Model"]:
         """
         Update all elements in the current QuerySet, setting all the given
         fields to the appropriate values.
-        """
-        return self._execute_update(kwargs)
 
-    def _execute_update(self, kwargs: dict[str, Any]) -> Any:
-        """Run the UPDATE.
-
-        Returns the rowcount, or — when returning() set columns on this
-        queryset — the affected rows.
+        Returns the rowcount -- or, after returning(), the affected rows.
+        The queryset is a ReturningQuerySet to a type checker by then, and
+        its update() is declared to return them.
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
@@ -1247,9 +1227,11 @@ class QuerySet[T: "Model"]:
         with transaction.mark_for_rollback_on_error():
             result = query.get_compiler().execute_sql(CURSOR)
         self._result_cache = None
-        if self._returning_fields is None:
-            return result
-        return self._hydrate_returning(result)
+        if self._returning_fields is not None:
+            # returning() makes this a ReturningQuerySet to a type checker,
+            # and its update() is declared to hand the rows back.
+            return cast("int", self._hydrate_returning(result))
+        return result
 
     def _update(self, values: Sequence[tuple[Field, Any]]) -> int:
         """

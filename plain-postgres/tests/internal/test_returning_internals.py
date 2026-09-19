@@ -10,7 +10,6 @@ import typing
 
 import pytest
 from app.examples.models.returning import ReturningEvent
-from plain.postgres.exceptions import FieldError
 from plain.postgres.query import QuerySet
 from plain.postgres.sql.constants import CURSOR, MULTI, NO_RESULTS, SINGLE
 from plain.postgres.sql.query import UpdateQuery
@@ -25,14 +24,6 @@ def test_returning_annotations_resolve_at_runtime():
     hints = typing.get_type_hints(QuerySet.returning, localns=type_params)
 
     assert "return" in hints
-
-
-def test_returning_rejects_an_empty_selection(db):
-    # The write path reads "no returning()" off `_returning_fields is None`,
-    # so an empty list would emit no RETURNING clause and then try to read
-    # rows back from it. It has to be refused where it is built.
-    with pytest.raises(FieldError, match="at least one column"):
-        ReturningEvent.query._validated_returning_fields(())
 
 
 def _update_query() -> UpdateQuery:
