@@ -16,10 +16,8 @@ from app.examples.models.delete import (
     Grandparent,
     MidParent,
 )
-from app.examples.models.encrypted import SecretStore
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.shadowing import ShadowSource, ShadowTarget
-from plain.postgres.fields.base import CONDITION_METHODS
 from plain.postgres.query_utils import Q
 
 
@@ -154,44 +152,6 @@ def test_two_hop_chain_combines_with_or(db):
 # ---------------------------------------------------------------------------
 
 
-class TestEncryptedFieldTraversalBlocked:
-    """Traversal hands back the field itself, so an encrypted field's blocks
-    arrive with it — the guard is per-field, not per-call-site. The error even
-    names the full path, because the prefixed copy carries it as its name."""
-
-    @pytest.fixture
-    def traversed(self):
-        # No model in the examples app has an FK to SecretStore, so prefix the
-        # field directly. This is exactly what RelatedFieldRef hands back.
-        return SecretStore._model_meta.get_forward_field("api_key").with_lookup_prefix(
-            "store"
-        )
-
-    @pytest.mark.parametrize(
-        "method",
-        [m for m in CONDITION_METHODS if m != "is_null"],
-    )
-    def test_traversed_condition_raises(self, traversed, method):
-        with pytest.raises(
-            TypeError, match=rf"store__api_key.*does not support \.{method}\("
-        ):
-            getattr(traversed, method)("x")
-
-    def test_traversed_is_null_still_works(self, traversed):
-        assert traversed.is_null().children == [("store__api_key__isnull", True)]
-
-
-def test_traversal_hands_back_the_field_itself():
-    """The traversed object is the related model's own field, renamed — which
-    is what makes its surface identical to direct access by construction."""
-    direct = DeleteParent._model_meta.get_forward_field("name")
-    traversed = ChildCascade.parent.name
-
-    assert type(traversed) is type(direct)
-    assert traversed.name == "parent__name"
-    assert direct.name == "name"  # the original is untouched
-
-
 # ---------------------------------------------------------------------------
 # Descriptor attribute shadowing: these four names were once public attributes
 # on ForwardForeignKeyDescriptor, so a related field named after one of them
@@ -308,11 +268,12 @@ def test_where_filters_by_null_relation_key(db):
     assert [r.id for r in non_nulls] == [attached.id]
 
 
-@pytest.mark.parametrize("method", CONDITION_METHODS)
+@pytest.mark.parametrize("method", ["equals", "is_in", "is_null", "gte", "contains"])
 def test_condition_on_the_relation_itself_raises_helpful_error(method):
     """An AttributeError, so `hasattr`/`getattr(..., default)` keep working --
     but one that names the spelling that does work, or the constraint just
-    looks like a missing feature."""
+    looks like a missing feature. (The sweep across every condition name is in
+    tests/internal/test_typed_where_internals.py.)"""
     with pytest.raises(AttributeError) as excinfo:
         getattr(ChildCascade.parent, method)
 
@@ -327,8 +288,8 @@ def test_condition_on_the_relation_keeps_the_attribute_protocol():
 
 
 def test_unknown_relation_attribute_still_raises_attribute_error():
-    """Only the condition names get the TypeError; a genuine typo stays an
-    AttributeError so `hasattr` and friends behave."""
+    """A genuine typo gets the plain "not a traversable field" message rather
+    than the condition-method advice."""
     with pytest.raises(AttributeError, match="parent.nope is not a traversable"):
         getattr(ChildCascade.parent, "nope")
 
@@ -337,3 +298,51 @@ def test_related_field_named_like_a_condition_still_traverses():
     """The field lookup runs first, so a related model that really does have a
     column named after a condition method still resolves to the column."""
     assert ShadowSource.ref.field.equals("hit").children == [("ref__field", "hit")]
+
+
+# ---------------------------------------------------------------------------
+# Many-to-many relations traverse like any other. Reached *through* a relation,
+# `widget__tags__name` is as valid a lookup path as `widget__author__name`, so
+# an M2M is a hop, not a leaf -- handing the M2M field back renamed would make
+# `.name` resolve to the string "widget__tags".
+#
+# (Direct class access, `Widget.tags`, is a ForwardManyToManyDescriptor and has
+# no traversal wiring; this branch covers forward-FK traversal only.)
+#
+# This hop is runtime-only for now: at the type level `tags` is declared
+# `ManyToManyManager[Tag]`, which exposes the manager API, not the target
+# model's fields. Typing it would mean claiming class access to an M2M yields
+# `type[Tag]` -- true after a traversal hop, false for `Widget.tags` itself --
+# so the ignores below are the honest marker rather than a papered-over bug.
+# ---------------------------------------------------------------------------
+
+
+def test_m2m_traversal_through_a_foreign_key():
+    q = WidgetTag.widget.tags.name.equals(  # ty: ignore[unresolved-attribute]
+        "metal"
+    )
+    assert q.children == [("widget__tags__name", "metal")]
+
+
+def test_condition_on_a_traversed_m2m_gets_the_same_advice():
+    with pytest.raises(AttributeError) as excinfo:
+        getattr(WidgetTag.widget.tags, "equals")
+
+    message = str(excinfo.value)
+    assert "is a relation, not a field" in message
+    assert "widget__tags.id.equals(...)" in message
+
+
+def test_where_filters_through_a_foreign_key_then_an_m2m(db):
+    metal = Tag.query.create(name="metal")
+    plastic = Tag.query.create(name="plastic")
+    cog = Widget.query.create(name="cog", size="small")
+    knob = Widget.query.create(name="knob", size="small")
+    WidgetTag.query.create(widget=cog, tag=metal)
+    WidgetTag.query.create(widget=knob, tag=plastic)
+
+    condition = WidgetTag.widget.tags.name.equals(  # ty: ignore[unresolved-attribute]
+        "metal"
+    )
+    rows = list(WidgetTag.query.where(condition))
+    assert [r.widget.id for r in rows] == [cog.id]

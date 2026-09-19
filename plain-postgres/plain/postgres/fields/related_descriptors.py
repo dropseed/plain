@@ -39,7 +39,6 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Any
 
-from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.query import QuerySet
 from plain.utils.functional import LazyObject
 
@@ -152,6 +151,27 @@ class ForwardForeignKeyDescriptor:
             )
         return rel_obj
 
+    @cached_property
+    def _typed_ref(self) -> Any:
+        """The traversal entry point for this relation.
+
+        A `cached_property` for the same reason `RelatedObjectDoesNotExist` is
+        one: at construction time `remote_field.model` may still be a string,
+        and it is replaced with the resolved class when the model registers.
+        Built once per descriptor, so class-level traversal allocates nothing
+        and re-imports nothing.
+
+        The import is local because `related_typed` reaches `fields.related`,
+        which imports this module at load time.
+        """
+        from plain.postgres.fields.related_typed import RelatedFieldRef
+
+        return RelatedFieldRef(
+            model=self._field.remote_field.model,
+            prefix=self._field.name,
+            target_name=self._field.target_field.name,
+        )
+
     def __getattr__(self, name: str) -> Any:
         """Walk class-level attribute access into the related model, so typed
         where() can build joined lookups:
@@ -163,43 +183,13 @@ class ForwardForeignKeyDescriptor:
         never be (``Meta`` skips ``_``-prefixed attributes when it collects
         them), so a related field can't be shadowed by descriptor internals.
 
-        A leaf field comes back as a copy of itself carrying the relation
-        prefix; a further foreign key hands off to ``RelatedFieldRef``, which
-        accumulates the path for hops beyond the first.
+        Delegated to `RelatedFieldRef` so the first hop follows exactly the
+        same rule as every later one.
         """
         if name.startswith("_"):
             # Internals, and anything a field could never be named.
             raise AttributeError(name)
-
-        from plain.postgres.exceptions import FieldDoesNotExist
-        from plain.postgres.fields.base import CONDITION_METHODS
-        from plain.postgres.fields.related import ForeignKeyField
-        from plain.postgres.fields.related_typed import RelatedFieldRef
-
-        related_model = self._field.remote_field.model
-        prefix = self._field.name
-        try:
-            field = related_model._model_meta.get_forward_field(name)
-        except FieldDoesNotExist:
-            if name in CONDITION_METHODS:
-                raise AttributeError(
-                    f"{prefix}.{name}() is not available: {prefix!r} is a "
-                    f"relation, not a field. Build the condition on the key it "
-                    f"points at instead -- "
-                    f"{prefix}.{self._field.target_field.name}.{name}(...), "
-                    f"which compiles to the same SQL."
-                ) from None
-            raise AttributeError(
-                f"{prefix}.{name} is not a traversable field or relation"
-            ) from None
-
-        if isinstance(field, ForeignKeyField):
-            return RelatedFieldRef(
-                model=field.remote_field.model,
-                prefix=f"{prefix}{LOOKUP_SEP}{name}",
-                target_name=field.target_field.name,
-            )
-        return field.with_lookup_prefix(prefix)
+        return getattr(self._typed_ref, name)
 
     def __set__(self, instance: Any, value: Any) -> None:
         """

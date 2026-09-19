@@ -235,6 +235,16 @@ class Field[T](RegisterLookupMixin):
                 f"meaning for None -- a SQL comparison against NULL is never "
                 f"true. Use .is_null() instead."
             )
+        if suffix == "in" and isinstance(value, str | bytes):
+            # `Iterable[T]` is satisfied by `str` when T is `str`, and `str` is
+            # a `Sequence[str]`, so there is no way to exclude it statically.
+            # Left alone it iterates characters and silently matches the wrong
+            # rows.
+            raise TypeError(
+                f"{type(self).__name__} {self.name!r}: .is_in() takes a "
+                f"collection of values, not a single {type(value).__name__}. "
+                f"Pass a list -- .is_in([{value!r}])."
+            )
         if suffix and not self.get_lookup(suffix):
             # The type checker rejects most of these already (a `Field[int]`
             # has no `.startswith`); this catches what it can't see.
