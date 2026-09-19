@@ -140,7 +140,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
             queryset = self.model.query
             return cast(QS, self._apply_rel_filters(queryset))
 
-    def get_prefetch_queryset(
+    def _get_prefetch_queryset(
         self, instances: Iterable[Model], queryset: QuerySet | None = None
     ) -> tuple[
         QuerySet, Callable[[Model], Any], Callable[[Model], Any], bool, str, bool
@@ -402,7 +402,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
             queryset = self.model.query
             return cast(QS, self._apply_rel_filters(queryset))
 
-    def get_prefetch_queryset(
+    def _get_prefetch_queryset(
         self, instances: Iterable[Model], queryset: QuerySet | None = None
     ) -> tuple[
         QuerySet, Callable[[Model], Any], Callable[[Model], Any], bool, str, bool

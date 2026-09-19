@@ -199,6 +199,63 @@ first_10_users = User.query.all()[:10]
 
 For more advanced querying options, see the [`QuerySet`](./query.py#QuerySet) class.
 
+### Typed conditions with where()
+
+`where()` is a typed alternative to `filter()`. Instead of string keyword lookups, you build each condition from a field, so a type checker catches a misspelled field or a wrong value type at the call site:
+
+```python
+from plain import postgres
+from plain.postgres import Field, types
+
+
+@postgres.register_model
+class User(postgres.Model):
+    email: Field[str] = types.EmailField()
+    role: Field[str] = types.TextField(max_length=20)
+    age: Field[int | None] = types.IntegerField(allow_null=True, default=None)
+
+
+# Each argument is a condition; multiple arguments are ANDed together.
+admins = User.query.where(
+    User.role.equals("admin"),
+    User.age.gte(18),
+)
+```
+
+Every field exposes `equals`, `not_equal`, `gt`, `gte`, `lt`, `lte`, `is_null`, and `is_in`. Text fields add `contains`, `icontains`, `startswith`, and `endswith`. Each returns a `Q`, so you can combine them with `|` and `&` or negate with `~`:
+
+```python
+# Membership, negation, and OR
+User.query.where(User.role.is_in(["admin", "staff"]))
+User.query.where(~User.role.equals("guest"))
+User.query.where(User.email.endswith("@example.com") | User.role.equals("admin"))
+```
+
+Conditions traverse foreign keys — accessing a field through a relation builds the joined lookup:
+
+```python
+# Q(author__email="a@example.com")
+Post.query.where(Post.author.email.equals("a@example.com"))
+```
+
+A relation is a path to traverse, not a field, so it carries no conditions of its own. To match on the relation itself, traverse to the key it points at — that's the typed spelling of `filter(author=author)`, and it compiles to the same SQL:
+
+```python
+Post.query.where(Post.author.id.equals(author.id))
+Post.query.where(Post.author.id.is_in([a.id for a in authors]))
+Post.query.where(Post.author.id.is_null())  # nullable relation
+```
+
+`Post.author.equals(author)` raises `AttributeError` naming this spelling (an `AttributeError`, so `hasattr` and `getattr(..., default)` keep behaving). It isn't an oversight: to the type checker `Post.author` is `type[Author]`, which is what makes `Post.author.email.equals(...)` type-check, and a condition method there would be a runtime method the checker rejects.
+
+Traversal starts from a **forward foreign key**. Once inside one, every relation you pass through is another hop, many-to-many included — `WidgetTag.widget.tags.name.equals("metal")` builds `Q(widget__tags__name="metal")` — and the same rule applies to the relation itself: `WidgetTag.widget.tags.equals(tag)` points you at `WidgetTag.widget.tags.id.equals(tag.id)`.
+
+A class-level many-to-many (`Widget.tags`) is _not_ an entry point: it has no traversal wiring, and it is typed `ManyToManyManager[Tag]`, so it could not be typed as one either. Use the string path there — `Widget.query.filter(tags__name="metal")`. Reverse relations aren't traversable for the same reason (a reverse accessor is a `ClassVar`, so there is nothing for the related model to offer the checker), and the error says so.
+
+A traversed field _is_ the related field, carrying the relation path as its name — so it offers exactly the conditions that field offers, including an encrypted field's refusals.
+
+[Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`.
+
 ### Custom QuerySets
 
 You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods. Define a custom QuerySet and assign it to your model's `query` attribute as a `ClassVar` (so it isn't treated as a constructor field):
@@ -1095,28 +1152,44 @@ This is **not** for passwords or tokens you issue — those should be hashed (on
 
 ```python
 from plain import postgres
-from plain.postgres import Field, types
+from plain.postgres import EncryptedField, Field, types
 
 
 @postgres.register_model
 class Integration(postgres.Model):
     name: Field[str] = types.TextField(max_length=100)
-    api_key: Field[str] = types.EncryptedTextField(max_length=200)
-    credentials: Field[dict | None] = types.EncryptedJSONField(
+    api_key: EncryptedField[str] = types.EncryptedTextField(max_length=200)
+    credentials: EncryptedField[dict | None] = types.EncryptedJSONField(
         required=False, allow_null=True, default=None
     )
 ```
+
+Annotate encrypted fields `EncryptedField[T]`, not `Field[T]`. The annotation is
+what the type checker reads, and `EncryptedField[T]` is the `Field[T]` subclass
+that declares the blocked conditions — with a plain `Field[T]`,
+`Integration.api_key.equals("x")` type-checks its way to a runtime `TypeError`
+instead of being rejected at the call site. It types the constructor exactly as
+`Field[T]` does.
 
 Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived from `SECRET_KEY`. The `cryptography` package is required — install it with `pip install cryptography`.
 
 **Available fields:**
 
+- `EncryptedField[T]` — the annotation type; also the shared base the two fields below derive from.
 - `EncryptedTextField` — encrypts text, stored as `text` in the database regardless of `max_length` (ciphertext is longer than plaintext). `max_length` is enforced on the plaintext value during validation.
 - `EncryptedJSONField` — serializes to JSON, encrypts, and stores as `text`. Supports custom `encoder` and `decoder` parameters (same as `JSONField`).
 
 **Limitations:**
 
-- **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported.
+- **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported. Comparing against a value raises `TypeError` rather than silently matching nothing — both `filter(api_key="x")` and the typed [condition methods](#typed-conditions-with-where) (`equals`, `contains`, …), which are also rejected at the call site when the field is annotated `EncryptedField[T]`. `filter(api_key=None)` still rewrites to `IS NULL`.
+- **`get_or_create()` must not look up an encrypted field.** `get_or_create(api_key="k")` raises, and the error says to move the value into `defaults=`. This is a deliberate break: it previously "worked" by creating a new row on every call, because the lookup could never match existing ciphertext. An encrypted value can be written, just not looked up:
+
+    ```python
+    Integration.query.get_or_create(name="acme", defaults={"api_key": "k"})
+    ```
+
+    The same applies to `update_or_create()`, and to an expression right-hand side like `filter(api_key=F("name"))` — the column is still ciphertext.
+
 - **No indexes or constraints** — encrypted fields cannot be used in indexes or unique constraints. Preflight checks will catch this.
 - **Only `default=""`** — on `EncryptedTextField` (paired with `required=False`), the empty string is stored as plaintext `''`, so it's the one value expressible as a column `DEFAULT` (declare it to add the field to a populated table). Any other default would need ciphertext, which is non-deterministic. `EncryptedJSONField` has no persistent default at all — even `{}` serializes to text that would need ciphertext — so pair `allow_null=True` with `default=None`, which stores nothing and just marks the field optional in the constructor.
 
@@ -1156,6 +1229,8 @@ book.author.name  # one query — loads the rest of the row
 ```
 
 The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `select_related()` to load related rows up front and avoid a query per row.
+
+A foreign key with no value raises `RelatedObjectDoesNotExist` on access. That attribute still lives on the descriptor at runtime, but class-level access is now typed as the related model (that is what makes `Book.author.name.equals(...)` work), so `Book.author.RelatedObjectDoesNotExist` is a type error. Catch it as `Author.DoesNotExist` — the exception subclasses both that and `AttributeError` — or as `AttributeError`.
 
 The partial-instance shortcut is safe because Plain always creates a database foreign-key constraint, so the referenced row is guaranteed to exist.
 

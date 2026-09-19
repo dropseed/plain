@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import assert_type
+
 import pytest
 from app.examples.models.encrypted import SecretStore
+from plain.postgres import F
 from plain.postgres.exceptions import FieldError
 from plain.postgres.fields.encrypted import (
     _ENCRYPTED_PREFIX,
@@ -9,6 +12,7 @@ from plain.postgres.fields.encrypted import (
     _encrypt,
     _get_fernet,
 )
+from plain.postgres.query_utils import Q
 
 
 class TestEncryptDecryptFunctions:
@@ -153,6 +157,168 @@ class TestLookupBlocking:
             SecretStore.query.filter(config__has_key="token")
 
 
+class TestTypedQueryMethodsBlocked:
+    """Encrypted fields must not expose typed-query comparison methods.
+
+    The class-level overrides accept `Never`, so type checkers reject any
+    call site. The runtime also raises TypeError as a safety net for callers
+    that bypass type checking (e.g. dynamic code).
+    """
+
+    def test_equals_raises(self):
+        with pytest.raises(TypeError, match=r"api_key.*does not support \.equals\("):
+            SecretStore.api_key.equals("anything")  # ty: ignore[no-matching-overload]
+
+    def test_not_equal_raises(self):
+        with pytest.raises(TypeError, match=r"does not support \.not_equal\("):
+            SecretStore.api_key.not_equal("x")  # ty: ignore[no-matching-overload]
+
+    @pytest.mark.parametrize("method", ["gt", "gte", "lt", "lte"])
+    def test_ordering_comparison_raises(self, method):
+        with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
+            getattr(SecretStore.api_key, method)("x")
+
+    def test_is_in_raises(self):
+        with pytest.raises(TypeError, match=r"does not support \.is_in\("):
+            SecretStore.api_key.is_in(["x", "y"])  # ty: ignore[invalid-argument-type]
+
+    @pytest.mark.parametrize(
+        "method", ["contains", "icontains", "startswith", "endswith"]
+    )
+    def test_text_pattern_condition_raises(self, method):
+        """EncryptedTextField inherits TextField's pattern conditions and
+        blocks them — matching ciphertext by substring is meaningless."""
+        with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
+            getattr(SecretStore.api_key, method)("x")
+
+    def test_every_blocked_method_is_rejected_statically(self):
+        """Pin the block from the type checker's side, not just the runtime's.
+
+        Each `ty: ignore[invalid-argument-type]` below asserts that the call
+        is a type error: ty reports an unused suppression as an error of its
+        own, so if any of these parameters ever widens away from `Never`,
+        `./scripts/type-check plain-postgres` fails here. That matters because
+        the `ty: ignore[invalid-method-override]` on EncryptedTextField is
+        class-wide and would otherwise hide a block that stopped blocking.
+
+        The same calls are asserted to raise, so the runtime and the type
+        checker are pinned to each other in one place.
+        """
+        with pytest.raises(TypeError):
+            SecretStore.api_key.equals("x")  # ty: ignore[no-matching-overload]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.not_equal("x")  # ty: ignore[no-matching-overload]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.gt("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.gte("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.lt("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.lte("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.is_in(["x"])  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.contains("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.icontains("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.startswith("x")  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.api_key.endswith("x")  # ty: ignore[invalid-argument-type]
+
+    def test_json_field_is_rejected_statically(self):
+        """`config` is annotated `EncryptedField[dict | None]`, so class access
+        types as the field and the same static block applies. Spelled directly
+        rather than through getattr, because a marker can't bind to a dynamic
+        call."""
+        with pytest.raises(TypeError):
+            SecretStore.config.equals({"a": 1})  # ty: ignore[no-matching-overload]
+        with pytest.raises(TypeError):
+            SecretStore.config.not_equal({"a": 1})  # ty: ignore[no-matching-overload]
+        with pytest.raises(TypeError):
+            SecretStore.config.is_in([{"a": 1}])  # ty: ignore[invalid-argument-type]
+
+    def test_json_field_is_null_survives_the_block(self):
+        assert_type(SecretStore.config.is_null(), Q)
+
+    def test_is_null_survives_the_block_statically(self):
+        """The one condition that stays open must keep its real signature -
+        no ignore marker here, so a `Never` creeping onto is_null breaks the
+        build."""
+        assert_type(SecretStore.api_key.is_null(), Q)
+        assert_type(SecretStore.api_key.is_null(False), Q)
+
+    @pytest.mark.parametrize(
+        "method", ["equals", "not_equal", "gt", "gte", "lt", "lte", "is_in"]
+    )
+    def test_json_field_comparison_raises(self, method):
+        """EncryptedJSONField carries the same block. This case covers the
+        runtime half; `test_json_field_is_rejected_statically` below covers
+        the static half, which needs direct call sites rather than getattr."""
+        with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
+            getattr(SecretStore.config, method)("x")
+
+    def test_is_null_returns_correct_lookup(self):
+        """is_null is the one comparison that makes sense on ciphertext."""
+        from plain.postgres.query_utils import Q
+
+        q = SecretStore.api_key.is_null()
+        assert isinstance(q, Q)
+        assert q.children == [("api_key__isnull", True)]
+
+        q_false = SecretStore.api_key.is_null(False)
+        assert q_false.children == [("api_key__isnull", False)]
+
+
+class TestKwargFilterBlocked:
+    """Block the legacy kwarg/Q path the same way the typed methods are
+    blocked: `filter(api_key='x')` on an encrypted field would silently
+    return zero rows because ciphertext is non-deterministic.
+    `filter(api_key=None)` is preserved so it still rewrites to IS NULL.
+    """
+
+    def test_filter_non_none_raises(self, db):
+        with pytest.raises(TypeError, match=r"api_key.*cannot be matched against"):
+            SecretStore.query.filter(api_key="sk-test").count()
+
+    def test_exclude_non_none_raises(self, db):
+        with pytest.raises(TypeError, match=r"api_key.*cannot be matched against"):
+            SecretStore.query.exclude(api_key="sk-test").count()
+
+    def test_filter_none_still_rewrites_to_isnull(self, db):
+        """filter(field=None) must continue to work — ORM rewrites to isnull."""
+        SecretStore.query.create(name="test", api_key="sk-test", config=None)
+        assert SecretStore.query.filter(config=None).count() == 1
+
+    def test_get_or_create_on_an_encrypted_lookup_raises(self, db):
+        """A deliberate break. This used to "work": ciphertext never matched,
+        so every call created another row. Raising is the point of the block,
+        and the message has to say where the value belongs instead."""
+        with pytest.raises(TypeError, match=r"move 'api_key' into defaults="):
+            SecretStore.query.get_or_create(name="test", api_key="sk-test", config=None)
+
+    def test_get_or_create_with_the_encrypted_value_in_defaults_works(self, db):
+        """The spelling the message points at."""
+        obj, created = SecretStore.query.get_or_create(
+            name="test", defaults={"api_key": "sk-test", "config": None}
+        )
+        assert created
+        assert obj.api_key == "sk-test"
+
+        again, created_again = SecretStore.query.get_or_create(
+            name="test", defaults={"api_key": "other", "config": None}
+        )
+        assert not created_again
+        assert again.id == obj.id
+
+    def test_filter_against_an_expression_raises(self, db):
+        """An F() right-hand side is a value comparison too — the column is
+        still ciphertext, so it can never match."""
+        with pytest.raises(TypeError, match=r"api_key.*cannot be matched against"):
+            SecretStore.query.filter(api_key=F("name")).count()
+
+
 class TestKeyRotation:
     def test_decrypt_with_fallback_key(self):
         """Data encrypted with an old key should decrypt when that key is in fallbacks."""
@@ -217,3 +383,55 @@ class TestEncryptedJSONFieldDefault:
 
         with pytest.raises(TypeError, match="does not accept a persistent default"):
             EncryptedJSONField(required=False, allow_null=True, default=value)
+
+
+class TestDeterministicValuesStillMatch:
+    """The empty string is stored as plaintext `''` (that is what makes
+    `default=""` expressible as a column DEFAULT), so equality against it is
+    meaningful and must keep working -- on both the kwarg and the typed path,
+    which must agree with each other."""
+
+    def test_filter_on_empty_string_works(self, db):
+        SecretStore.query.create(name="blank", api_key="k", notes="", config=None)
+        SecretStore.query.create(name="filled", api_key="k", notes="x", config=None)
+
+        assert SecretStore.query.filter(notes="").count() == 1
+        assert SecretStore.query.exclude(notes="").count() == 1
+
+    def test_get_or_create_on_empty_string_works(self, db):
+        obj, created = SecretStore.query.get_or_create(
+            notes="", defaults={"name": "blank", "api_key": "k", "config": None}
+        )
+        assert created
+        again, created_again = SecretStore.query.get_or_create(
+            notes="", defaults={"name": "other", "api_key": "k", "config": None}
+        )
+        assert not created_again
+        assert again.id == obj.id
+
+    def test_typed_equals_matches_the_kwarg_path(self):
+        """`equals(None)` and `filter(field=None)` can't disagree, and the
+        error message advertises `=None`, so the typed path has to allow it."""
+        assert SecretStore.api_key.equals(None).children == [("api_key", None)]
+        assert SecretStore.notes.equals("").children == [("notes", "")]
+        assert SecretStore.notes.not_equal("").children == [("notes", "")]
+
+    def test_where_filters_on_the_empty_string(self, db):
+        SecretStore.query.create(name="blank", api_key="k", notes="", config=None)
+        SecretStore.query.create(name="filled", api_key="k", notes="x", config=None)
+
+        rows = list(SecretStore.query.where(SecretStore.notes.equals("")))
+        assert [r.name for r in rows] == ["blank"]
+
+    def test_a_real_value_is_still_blocked(self, db):
+        with pytest.raises(TypeError, match=r"does not support \.equals\("):
+            SecretStore.notes.equals("something")  # ty: ignore[no-matching-overload]
+        with pytest.raises(TypeError, match=r"cannot be matched against"):
+            SecretStore.query.filter(notes="something").count()
+
+    def test_json_field_allows_none_but_not_empty_string(self):
+        """Only text stores "" as plaintext; an empty string on a JSON column
+        would still be encrypted, so it stays blocked."""
+        assert SecretStore.config.equals(None).children == [("config", None)]
+        with pytest.raises(TypeError, match=r"does not support \.equals\("):
+            SecretStore.config.equals("")  # ty: ignore[no-matching-overload]
