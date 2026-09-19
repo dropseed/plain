@@ -68,7 +68,9 @@ def test_missing_foreign_key_target_raises_validation_error_on_field(db: None) -
     missing_id = 10**9
 
     with pytest.raises(ValidationError) as caught, transaction.atomic():
-        ChildCascade(parent=missing_id).create()
+        # A raw pk is deliberate here -- the runtime accepts it so the DB can
+        # reject the missing target; the typed constructor wants the instance.
+        ChildCascade(parent=missing_id).create()  # ty: ignore[invalid-argument-type]
 
     assert list(caught.value.error_dict) == ["parent"]
     assert caught.value.messages == [
@@ -81,7 +83,7 @@ def test_update_to_missing_foreign_key_target_raises_on_field(db: None) -> None:
     child = ChildCascade.query.create(parent=parent)
     missing_id = 10**9
 
-    child.parent = missing_id  # type: ignore[assignment]
+    child.parent = missing_id  # ty: ignore[invalid-assignment]
     with pytest.raises(ValidationError) as caught, transaction.atomic():
         child.update()
 
