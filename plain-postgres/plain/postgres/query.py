@@ -26,7 +26,14 @@ from plain.postgres.exceptions import (
     FieldError,
     ObjectDoesNotExist,
 )
-from plain.postgres.expressions import Case, F, ResolvableExpression, Value, When
+from plain.postgres.expressions import (
+    Case,
+    F,
+    ResolvableExpression,
+    Value,
+    When,
+    contains_excluded,
+)
 from plain.postgres.fields import (
     Field,
     PrimaryKeyField,
@@ -1018,6 +1025,18 @@ class QuerySet[T: "Model"]:
         # Reject typo'd keys with a clean FieldError before they fail later and
         # more confusingly, matching get_or_create()'s validation.
         self._validate_model_field_names(insert_values)
+
+        # Excluded() names the row this INSERT is proposing, so it can't be one
+        # of that row's values. Catch it here, before the value is assigned to
+        # a field -- field coercion runs first and would either raise something
+        # unrecognizable or, on a text column, write the repr into the row.
+        for name, value in insert_values.items():
+            if contains_excluded(value):
+                raise FieldError(
+                    f"Excluded() cannot be an inserted value ({name}=...): it "
+                    "names the row the INSERT proposes, which is the row being "
+                    "written. Move it to conflict_defaults."
+                )
 
         for field in unique_fields:
             assert field.name is not None

@@ -196,6 +196,54 @@ def test_excluded_outside_a_conflict_update_is_rejected(db):
         list(UpsertItem.query.filter(value=Excluded("value")))
 
 
+@pytest.mark.parametrize(
+    "expression",
+    [Excluded("value"), F("value") + Excluded("value")],
+    ids=["bare", "nested"],
+)
+@pytest.mark.parametrize(
+    "upsert_with",
+    [
+        lambda expression: UpsertItem.query.upsert(
+            key="a", value=expression, unique_fields=[UpsertItem.key]
+        ),
+        lambda expression: UpsertItem.query.upsert(
+            key="a", defaults={"value": expression}, unique_fields=[UpsertItem.key]
+        ),
+        lambda expression: UpsertItem.query.upsert(
+            key="a",
+            create_defaults={"value": expression},
+            unique_fields=[UpsertItem.key],
+        ),
+    ],
+    ids=["kwargs", "defaults", "create_defaults"],
+)
+def test_excluded_as_an_inserted_value_is_rejected(
+    db, capture_queries, upsert_with, expression
+):
+    """Excluded() names the row being proposed, so it can't be one of that
+    row's own values -- in any of the three value sources, bare or nested, and
+    before any SQL is emitted.
+    """
+    with (
+        capture_queries() as queries,
+        pytest.raises(FieldError, match="cannot be an inserted value"),
+    ):
+        upsert_with(expression)
+
+    assert queries == []
+
+
+def test_excluded_as_an_inserted_value_on_a_text_column_is_rejected(db):
+    """A text column would coerce the expression to its repr and write that
+    into the row, so the check can't rely on field coercion to catch it.
+    """
+    with pytest.raises(FieldError, match="cannot be an inserted value"):
+        UpsertItem.query.upsert(
+            key="a", label=Excluded("label"), unique_fields=[UpsertItem.key]
+        )
+
+
 def test_upsert_excluded_unknown_column_is_rejected(db):
     with pytest.raises(FieldError, match="does not name a column"):
         UpsertItem.query.upsert(

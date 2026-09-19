@@ -2614,6 +2614,9 @@ class InsertQuery(Query):
         # flag for the trailing "(xmax = 0)" created column in RETURNING.
         self.conflict_defaults: dict[Field, Any] = conflict_defaults or {}
         self.returning_created: bool = returning_created
+        # Raised by the compiler only while it compiles the DO UPDATE SET
+        # assignments, which is the one place EXCLUDED means anything.
+        self.compiling_conflict_assignment: bool = False
 
     def insert_values(self, fields: Sequence[Any], objs: list[Any]) -> None:
         self.fields = fields

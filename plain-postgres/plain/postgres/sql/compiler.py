@@ -1559,10 +1559,16 @@ class SQLInsertCompiler(SQLCompiler):
         """
         overrides: dict[str, str] = {}
         params: list[Any] = []
-        for field, val in self.query.conflict_defaults.items():
-            rhs, rhs_params = self._compile_assignment_value(field, val)
-            overrides[field.column] = rhs
-            params.extend(rhs_params)
+        # Excluded() reads this flag to tell a DO UPDATE SET assignment from
+        # the VALUES list of the same statement.
+        self.query.compiling_conflict_assignment = True
+        try:
+            for field, val in self.query.conflict_defaults.items():
+                rhs, rhs_params = self._compile_assignment_value(field, val)
+                overrides[field.column] = rhs
+                params.extend(rhs_params)
+        finally:
+            self.query.compiling_conflict_assignment = False
         return overrides, params
 
     def execute_sql(  # ty: ignore[invalid-method-override]

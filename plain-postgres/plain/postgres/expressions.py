@@ -13,7 +13,7 @@ from uuid import UUID
 
 import psycopg
 from plain.postgres import fields
-from plain.postgres.constants import LOOKUP_SEP, OnConflict
+from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import (
     CURRENT_ROW,
     FOLLOWING,
@@ -889,14 +889,16 @@ class Excluded(Combinable):
         summarize: bool = False,
         for_save: bool = False,
     ) -> ExcludedCol:
-        # EXCLUDED only exists inside an ON CONFLICT DO UPDATE clause, so any
-        # other compile context -- filter(), update(), annotate(), a plain
-        # insert -- has nothing for this to name.
-        if getattr(query, "on_conflict", None) is not OnConflict.UPDATE:
+        # EXCLUDED names the row the statement is proposing, so it only means
+        # anything while the DO UPDATE SET assignments are being compiled. The
+        # insert compiler raises that flag for exactly that stretch; every
+        # other context -- the VALUES list of the same statement, filter(),
+        # update(), annotate() -- has nothing for this to refer to.
+        if not getattr(query, "compiling_conflict_assignment", False):
             raise FieldError(
                 f"Excluded({self.name!r}) is only valid in upsert()'s "
                 "conflict_defaults: it names the value the INSERT proposed, "
-                "which exists only in an ON CONFLICT DO UPDATE clause."
+                "which exists only in an ON CONFLICT DO UPDATE assignment."
             )
         assert query.model is not None
         try:
@@ -913,6 +915,21 @@ class Excluded(Combinable):
             f"Excluded({self.name!r}) was compiled without being resolved "
             "against an ON CONFLICT DO UPDATE clause."
         )
+
+
+def contains_excluded(value: Any) -> bool:
+    """True when value is an Excluded() reference or contains one.
+
+    upsert() uses this to reject Excluded() in an inserted value before the
+    value reaches a field, which would coerce it (a TextField would stringify
+    the repr straight into the row) long before any compiler sees it.
+    """
+    if isinstance(value, Excluded):
+        return True
+    get_source_expressions = getattr(value, "get_source_expressions", None)
+    if get_source_expressions is None:
+        return False
+    return any(contains_excluded(source) for source in get_source_expressions())
 
 
 class ExcludedCol(Expression):

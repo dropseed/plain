@@ -555,8 +555,11 @@ view, created = PageView.query.upsert(
 )
 ```
 
-`Excluded()` is only meaningful in a conflict update, so using it anywhere else —
-`filter()`, `update()`, `annotate()` — raises a `FieldError`.
+`Excluded()` is only meaningful while the conflict update's assignments are
+being built. Anywhere else raises a `FieldError` — including as an inserted
+value in `kwargs`/`defaults`/`create_defaults` of the very same call, where it
+would be naming the row being written, and in `filter()`, `update()` or
+`annotate()`.
 
 On conflict the `SET` clause covers:
 
