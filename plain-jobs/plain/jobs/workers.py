@@ -325,7 +325,7 @@ class Worker:
             job_request = (
                 JobRequest.query.ready_to_run()
                 .filter(queue__in=self.queues)
-                .select_for_update(skip_locked=True)
+                .for_update(skip_locked=True)
                 .order_by("-priority", "-start_at", "-created_at")
                 .first()
             )
