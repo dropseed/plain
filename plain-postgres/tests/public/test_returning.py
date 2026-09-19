@@ -79,9 +79,7 @@ def test_delete_returning_named_fields_gives_deleted_rows(db):
     _seed_events()
     rows = (
         ReturningEvent.query.filter(label="a")
-        # payload is an explicitly annotated JSONField, so it types as dict|None
-        # at class access rather than Field; it is a Field at runtime.
-        .returning(ReturningEvent.id, ReturningEvent.payload)  # ty: ignore[invalid-argument-type]
+        .returning(ReturningEvent.id, ReturningEvent.payload)
         .delete()
     )
 
