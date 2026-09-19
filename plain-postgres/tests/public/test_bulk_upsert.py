@@ -245,7 +245,7 @@ def test_bulk_upsert_validates_arguments_even_when_empty(db):
         )
 
 
-def test_bulk_upsert_leaves_update_now_alone_unless_named(db):
+def test_bulk_upsert_refreshes_update_now_columns_without_naming_them(db):
     MixinTestModel(name="a").create()
     seeded = MixinTestModel.query.get(name="a")
 
@@ -253,19 +253,34 @@ def test_bulk_upsert_leaves_update_now_alone_unless_named(db):
     renamed.id = seeded.id
     MixinTestModel.query.bulk_upsert(
         [renamed],
-        update_fields=[MixinTestModel.name],
+        update_fields=[MixinTestModel.name],  # updated_at deliberately absent
         unique_fields=[MixinTestModel.id],
     )
 
     row = MixinTestModel.query.get(id=seeded.id)
     assert row.name == "b"
-    # updated_at was not named, so the stored row keeps its old stamp.
-    assert row.updated_at == seeded.updated_at
+    # The row was updated, so its update_now column was too.
+    assert row.updated_at > seeded.updated_at
+    # And the object handed back agrees with the row it was hydrated from --
+    # pre_save stamps the object, EXCLUDED carries that same stamp to the row.
+    assert renamed.updated_at == row.updated_at
 
-    # Name it and the row is refreshed.
-    MixinTestModel.query.bulk_upsert(
-        [renamed],
-        update_fields=[MixinTestModel.name, MixinTestModel.updated_at],
-        unique_fields=[MixinTestModel.id],
-    )
-    assert MixinTestModel.query.get(id=seeded.id).updated_at > seeded.updated_at
+
+def test_bulk_upsert_cannot_update_a_database_generated_column(db):
+    # created_at is create_now-only: EXCLUDED would carry a fresh now() and
+    # reset the creation timestamp on every update.
+    with pytest.raises(ValueError, match="the database generates its value"):
+        MixinTestModel.query.bulk_upsert(
+            [MixinTestModel(name="a")],
+            update_fields=[MixinTestModel.created_at],
+            unique_fields=[MixinTestModel.id],
+        )
+
+
+def test_bulk_upsert_update_now_unique_field_rejected(db):
+    with pytest.raises(ValueError, match="stamped again on every write"):
+        MixinTestModel.query.bulk_upsert(
+            [MixinTestModel(name="a")],
+            update_fields=[MixinTestModel.name],
+            unique_fields=[MixinTestModel.updated_at],
+        )
