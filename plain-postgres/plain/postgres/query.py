@@ -999,6 +999,13 @@ class QuerySet[T: "Model"]:
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
+        if self._fields is not None:
+            # Same guard delete() carries: once the queryset is in row mode
+            # (values(), values_list(), select()) it no longer describes the
+            # model rows a write would touch.
+            raise TypeError(
+                "Cannot call update() after .values(), .values_list() or .select()"
+            )
         query = self.sql_query.chain(UpdateQuery)
         query.add_update_values(kwargs)
 
