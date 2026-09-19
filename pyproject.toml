@@ -44,7 +44,10 @@ dev = [
   # every dev/CI environment rather than only where a previous
   # `uv sync --all-packages` happened to leave it installed.
   "plainx-dev",
-  # Type checking and better dev experience
+  # Type checking and better dev experience. The exact version is pinned in
+  # uv.lock: every ty release so far has moved which diagnostics fire on the
+  # typed model surface, so a bump is a deliberate change that has to pass
+  # plain-postgres/tests/typing/ -- never a silent lockfile update.
   "ty>=0.0.80",
   "psycopg[binary]>=3.2.12",
 ]
