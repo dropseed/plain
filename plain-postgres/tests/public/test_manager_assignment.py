@@ -104,4 +104,6 @@ def test_instance_cannot_access_query():
     # Test accessing .query on instance (should raise AttributeError)
     instance = DefaultQuerySetModel(name="test")
     with raises(AttributeError):
-        _ = instance.query
+        # The descriptor's instance overload returns Never, so the checker
+        # flags the access the test is asserting raises.
+        _ = instance.query  # ty: ignore[invalid-attribute-access]

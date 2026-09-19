@@ -50,6 +50,7 @@ def scratch_names(config: DatabaseConfig) -> Generator[Callable[[str], str]]:
 
     def make(suffix: str) -> str:
         name = f"{PREFIX}{suffix}"
+        assert len(name) <= 63, f"{name!r} exceeds Postgres's identifier limit"
         drop_database(config, name=name, force=True)
         created.append(name)
         return name

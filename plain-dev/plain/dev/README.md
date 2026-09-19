@@ -275,34 +275,40 @@ Under `PLAIN_ENV=test`, `.env.local` is skipped (matches Next.js and Rails doten
 Secrets can be committed in `.env.dev` as encrypted values, so a fresh checkout (or a hosted agent) gets every dev credential from git and only needs one key:
 
 ```bash
+PLAIN_ENV_KEY_ID=3f9a1c2b7d4e
 GITHUB_APP_PRIVATE_KEY=encrypted:gAAAAABo...
 ```
 
-An unquoted value that starts with `encrypted:` is decrypted by the loader with `DEV_ENV_KEY`, one symmetric key per project. The tag is recognized where it's written, before anything is expanded, so an encrypted value is never expanded — and quoting the value is the escape hatch for text that starts with it (`MODE='encrypted:aes'` is the string `encrypted:aes`). An unquoted `encrypted:` value that doesn't decrypt is an error, not text. Generate a key with `plain env key`, store it somewhere durable (1Password, your keychain), and bind it as `DEV_ENV_KEY`. The loader only reads it from the environment, wherever it came from — the usual place is your personal, gitignored `.env.dev.local`:
+An unquoted value that starts with `encrypted:` is decrypted by the loader with the project's key, one symmetric key per project. The tag is recognized where it's written, before anything is expanded, so an encrypted value is never expanded — and quoting the value is the escape hatch for text that starts with it (`MODE='encrypted:aes'` is the string `encrypted:aes`). An unquoted `encrypted:` value that doesn't decrypt is an error, not text.
+
+Nothing in the tree is ever a secret. The key lives on each machine in `~/.plain/env-keys/<id>`, readable by you alone, and the file names it with the plain `PLAIN_ENV_KEY_ID=<id>` line — a pointer, not a secret, so it's committed. A clone, a worktree and a fork of the project all find the same key. `plain env init` generates the key, stores it, and writes the line. Another machine gets the key with `plain env unlock`, which reads it from stdin so it never passes through a terminal or a shell history:
 
 ```bash
-# .env.dev.local (gitignored)
-DEV_ENV_KEY=$(op read "op://Engineering/myapp-env-key/password")
-# or macOS keychain
-DEV_ENV_KEY=$(security find-generic-password -s myapp-env-key -w)
+op read "op://Engineering/myapp/PLAIN_ENV_KEY" | plain env unlock   # e.g. from 1Password
+plain env lock                                                    # forget it again
 ```
 
-Or commit that same `$(op read ...)` line in `.env.dev` itself: the reference is not the key, and teammates with vault access get zero setup. Decryption happens after every file has loaded, so either placement works. A shell `export DEV_ENV_KEY=...` or an environment variable in a hosted agent sandbox works the same way. Don't put the key line in `.env.local` — that file loads for every command, so the `$(...)` lookup would run on every `plain` invocation.
+The store is per machine, not a backup: keep a copy of the key somewhere durable that teammates can reach, such as a shared vault. Where there is no machine to unlock — a hosted agent sandbox, or CI that needs dev services — set `PLAIN_ENV_KEY` in the environment instead. It has to be the key the file names: if it is for some other key and this machine's store has the named one, the store is used, and otherwise the mismatch is an error, never a silently wrong key. Tests need no key at all: keep `.env.test` plaintext. The loader never leaves the key in the environment: it takes `PLAIN_ENV_KEY` out on load, decrypts, and moves on, so nothing that runs under `plain dev` can read it, and a child process finds the values already bound. The `PLAIN_ENV_KEY_ID` line is a directive to the loader and is never bound as a variable either.
 
 Write and read values with `plain env`:
 
 ```bash
-plain env key                                   # print a new key (stdout only, so it can be piped)
+plain env init                                  # new project: generate and store the key, write PLAIN_ENV_KEY_ID
 plain env set STRIPE_SECRET_KEY sk_test_...     # writes STRIPE_SECRET_KEY=encrypted:... to .env.dev
 plain env set GITHUB_APP_PRIVATE_KEY < key.pem  # multi-line values come from stdin
 plain env get STRIPE_SECRET_KEY                 # decrypt and print one value
+plain env rotate                                # re-encrypt every value in the file under a new key
 ```
 
 `--file` / `-f` targets another file — the default is `.env.{PLAIN_ENV}`, which is `.env.dev` for `plain env`. `set` replaces an existing binding in place and appends otherwise; everything else in the file is left byte for byte. It warns if something that loads earlier — your shell, or a higher-precedence file — already binds that name, because the value you just committed would be ignored on your machine.
 
-`plain env` runs without loading your app, and never decrypts on the way in. So it works on a fresh clone that has no key yet (`plain env key`), and `DEV_ENV_KEY=<new key> plain env set NAME value` re-encrypts a value under a new key without needing the old one.
+`plain env` runs without loading your app, and never decrypts on the way in. So it works on a fresh clone that has no key yet, which is where `init` and `unlock` run.
 
-Put encrypted values in `.env.dev`, not `.env`: `.env` loads for every command, including `plain test`, and then every command would need the key. Without `DEV_ENV_KEY` (or with the wrong one), loading fails with an `ImproperlyConfigured` error naming the variable and file — nothing is silently bound empty. Decrypted plaintext is bound literally: no `$VAR` expansion or `$(command)` substitution is applied to it. Encrypted values also can't be referenced from other values — a `$NAME` pointing at one is an error naming both variables, not a silent empty string.
+`plain env rotate` generates a new key, re-encrypts every value in the file under it, updates the `PLAIN_ENV_KEY_ID` line and stores the new key. The old key stays in the store, so a branch that still names it keeps loading until it's rebased — there is no transition window to manage. Rotating the key does not un-leak history: ciphertext committed under the old key is in git forever, so a leaked key means rotating the underlying credentials, not just the key.
+
+Put encrypted values in `.env.dev`, not `.env`: `.env` loads for every command, including `plain test`, and then every command would need the key. Without a key (or with the wrong one), loading fails with an `ImproperlyConfigured` error naming the variable and file — nothing is silently bound empty. Decrypted plaintext is bound literally: no `$VAR` expansion is applied to it. Encrypted values also can't be referenced from other values — a `$NAME` pointing at one is an error naming both variables, not a silent empty string.
+
+Nothing in a `.env` file runs. `$VAR` and `${VAR}` references expand; `$(command)` is literal text, so a committed file can never execute anything on someone's checkout.
 
 ## Settings
 

@@ -29,20 +29,20 @@ Models are Postgres-only:
 
 ```python
 # app/users/models.py
+from datetime import datetime
+
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 from plain.passwords.models import PasswordField
 
 
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    password: str = PasswordField()
-    display_name: str = types.TextField(max_length=100)
-    is_admin: bool = types.BooleanField(default=False)
-    created_at: datetime = types.DateTimeField(create_now=True)
-
-    query: postgres.QuerySet[User] = postgres.QuerySet()
+    email: Field[str] = types.EmailField()
+    password: Field[str] = PasswordField()
+    display_name: Field[str] = types.TextField(max_length=100)
+    is_admin: Field[bool] = types.BooleanField(default=False)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
 
     model_options = postgres.Options(
         constraints=[

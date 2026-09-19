@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from plain.postgres import types
+from plain.postgres import Field, types
 
 from plain import postgres
 
@@ -14,10 +14,8 @@ class ConstraintExample(postgres.Model):
     fixture without polluting other models' schemas.
     """
 
-    name = types.TextField(max_length=100)
-    description = types.TextField(max_length=100)
-
-    query: postgres.QuerySet[ConstraintExample] = postgres.QuerySet()
+    name: Field[str] = types.TextField(max_length=100)
+    description: Field[str] = types.TextField(max_length=100)
 
     model_options = postgres.Options(
         constraints=[

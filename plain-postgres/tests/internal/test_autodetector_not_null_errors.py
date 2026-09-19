@@ -7,7 +7,7 @@ from plain.postgres.migrations.autodetector import MigrationAutodetector
 from plain.postgres.migrations.exceptions import MigrationSchemaError
 from plain.postgres.migrations.questioner import MigrationQuestioner
 from plain.postgres.migrations.state import ModelState, ProjectState
-from plain.test import cases, raises
+from plain.test import case, cases, raises
 
 
 def _state_with(model_state: ModelState) -> ProjectState:
@@ -92,10 +92,10 @@ def test_backfill_error_placeholder_is_not_executable() -> None:
 
 @cases(
     # Not a DefaultableField at all.
-    types.DateTimeField(),
-    # A DefaultableField whose __init__ deliberately takes no default=
-    # (accepts_default=False).
-    types.EncryptedJSONField(),
+    case(types.DateTimeField(), id="datetime"),
+    # A DefaultableField that can carry no persistent column DEFAULT
+    # (accepts_persistent_default=False).
+    case(types.EncryptedJSONField(), id="encrypted-json"),
 )
 def test_backfill_error_omits_default_remedy_for_non_defaultable_fields(
     field: Any,

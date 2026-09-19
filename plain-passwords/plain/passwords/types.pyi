@@ -1,19 +1,21 @@
 """
-Type stubs for typed password fields.
+Type stubs for the typed PasswordField.
 
-These stubs tell type checkers that field constructors return primitive types,
-enabling typed model definitions like:
-    password: str = types.PasswordField()
+Like the core `plain.postgres.types` field stubs, these return the typed
+descriptor `Field[T]` so a model can annotate the field with `Field[str]`:
 
-At runtime, these are Field instances (descriptors), but type checkers see the primitives.
+    password: Field[str] = PasswordField()
 
-The return type is conditional on allow_null:
-- allow_null=False (default) returns str
-- allow_null=True returns str | None
+`Field.__get__`'s overloads then give the field reference at the class level
+and the `str` value at instance access. The return type tracks nullability:
+- allow_null=False (default) -> Field[str]
+- allow_null=True            -> Field[str | None]
 """
 
 from collections.abc import Callable, Sequence
 from typing import Any, Literal, overload
+
+from plain.postgres.fields.base import Field as _Field
 
 # PasswordField extends TextField with password-specific hashing
 @overload
@@ -25,7 +27,7 @@ def PasswordField(
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-) -> str | None: ...
+) -> _Field[str | None]: ...
 @overload
 def PasswordField(
     *,
@@ -35,4 +37,4 @@ def PasswordField(
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-) -> str: ...
+) -> _Field[str]: ...

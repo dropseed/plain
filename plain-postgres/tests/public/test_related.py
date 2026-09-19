@@ -279,7 +279,7 @@ class TestEdgeCases:
 
         # Test that direct assignment to reverse relation raises error
         with raises(TypeError, match="Direct assignment.*prohibited"):
-            parent.childcascade_set = []  # ty: ignore[invalid-assignment]
+            parent.childcascade_set = []  # ty: ignore[invalid-attribute-access]
 
     def test_instance_none_handling(self):
         # Test accessing descriptor on class (not instance)
@@ -561,7 +561,7 @@ class TestForeignKeyPartialInstance:
 
     def test_assign_by_primary_key(self):
         parent = DeleteParent.query.create(name="Parent")
-        child = ChildCascade(parent=parent.id)
+        child = ChildCascade(parent=parent.id)  # ty: ignore[invalid-argument-type]
         child.create()
 
         reloaded = ChildCascade.query.get(id=child.id)
@@ -580,7 +580,7 @@ class TestForeignKeyPartialInstance:
     def test_non_nullable_fk_with_no_value_raises_consistently(self):
         # A non-nullable foreign key with no value must raise on every access,
         # not raise once and then return a cached None.
-        child = ChildCascade()
+        child = ChildCascade()  # ty: ignore[missing-argument]
         with raises(AttributeError, match="has no parent"):
             _ = child.parent
         with raises(AttributeError, match="has no parent"):
@@ -621,9 +621,9 @@ class TestForeignKeyPartialInstance:
         assert reloaded.parent.id == parent.id
 
     def test_assign_bool_is_rejected(self):
-        child = ChildCascade()
+        child = ChildCascade()  # ty: ignore[missing-argument]
         with raises(TypeError, match="Cannot assign"):
-            child.parent = True
+            child.parent = True  # ty: ignore[invalid-assignment]
 
     def test_reassign_by_bare_pk_evicts_cached_object(self):
         # When a cached foreign key is reassigned by bare primary key to a
@@ -635,7 +635,7 @@ class TestForeignKeyPartialInstance:
         # Prime the forward cache so we can prove it gets evicted.
         assert child.parent.name == "P1"
 
-        child.parent = p2.id
+        child.parent = p2.id  # ty: ignore[invalid-assignment]
 
         # The cached p1 must be gone -- a fresh read returns the new target.
         assert child.parent.id == p2.id
