@@ -7,13 +7,14 @@ The static-typing contract lives in tests/typing/select_rows.py.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field, fields
 
 import pytest
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.relationships import WidgetTag
 from plain.postgres import RowQuerySet
-from plain.postgres.expressions import F
+from plain.postgres.aggregates import Count
+from plain.postgres.expressions import F, Value
 from plain.postgres.functions import Upper
 
 
@@ -198,7 +199,7 @@ def test_select_result_type_must_be_dataclass(db):
 
 
 def test_select_result_type_arity_must_match(db):
-    with pytest.raises(TypeError, match="columns were selected"):
+    with pytest.raises(TypeError, match="constructor arguments"):
         DefaultsExample.query.select(DefaultsExample.name, result_type=NameStat)
 
 
@@ -241,6 +242,112 @@ def test_select_result_type_ignores_init_false_fields(rows):
     )
     assert result == Computed(name="alpha", priority=3)
     assert result.label == "alpha:3"
+
+
+def test_select_result_type_counts_init_vars(rows):
+    """An InitVar is a constructor parameter that never appears in
+    dataclasses.fields(), so the columns are mapped off the signature."""
+
+    @dataclass
+    class WithInitVar:
+        name: str
+        priority: InitVar[int]
+
+        def __post_init__(self, priority: int) -> None:
+            # `priority` is a constructor argument only -- consumed here and
+            # never stored, which is why fields() doesn't list it.
+            assert priority > 0
+
+    assert [f.name for f in fields(WithInitVar)] == ["name"]
+
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.name, DefaultsExample.priority, result_type=WithInitVar)
+        .first()
+    )
+    assert result == WithInitVar(name="alpha", priority=3)
+
+
+def test_select_result_type_handles_init_var_and_init_false_together(rows):
+    """fields() disagrees with the constructor in both directions here: it
+    lists `computed` (which can't be passed) and omits `priority` (which
+    must be). The signature is right on both counts."""
+
+    @dataclass
+    class Mixed:
+        name: str
+        priority: InitVar[int]
+        computed: str = field(default="", init=False)
+
+        def __post_init__(self, priority: int) -> None:
+            self.computed = f"{self.name}/{priority}"
+
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.name, DefaultsExample.priority, result_type=Mixed)
+        .first()
+    )
+    assert result == Mixed(name="alpha", priority=3)
+    assert result.computed == "alpha/3"
+
+
+def test_select_result_type_arity_counts_init_vars(rows):
+    @dataclass
+    class OnlyInitVar:
+        name: str
+        priority: InitVar[int]
+
+        def __post_init__(self, priority: int) -> None:
+            pass
+
+    with pytest.raises(TypeError, match="takes 2 constructor arguments but 1"):
+        DefaultsExample.query.select(DefaultsExample.name, result_type=OnlyInitVar)
+
+
+def test_select_result_type_rejects_a_variadic_constructor(rows):
+    @dataclass(init=False)
+    class Variadic:
+        name: str
+
+        def __init__(self, *args: object) -> None:
+            self.name = str(args[0])
+
+    with pytest.raises(TypeError, match="fixed constructor signature"):
+        DefaultsExample.query.select(DefaultsExample.name, result_type=Variadic)
+
+
+class TestAnnotateAfterSelect:
+    """An annotation appends a column, so it would change the row shape out
+    from under the type select() already declared. The supported order is
+    annotate first, then select()."""
+
+    def test_annotate_after_select_raises(self, rows):
+        with pytest.raises(TypeError, match="Annotate first, then select"):
+            DefaultsExample.query.select(DefaultsExample.name).annotate(x=Value(1))
+
+    def test_annotate_after_select_raises_in_result_type_mode(self, rows):
+        with pytest.raises(TypeError, match="Annotate first, then select"):
+            DefaultsExample.query.select(
+                DefaultsExample.name, DefaultsExample.priority, result_type=NameStat
+            ).annotate(x=Value(1))
+
+    def test_annotate_after_select_raises_in_flat_mode(self, rows):
+        with pytest.raises(TypeError, match="Annotate first, then select"):
+            DefaultsExample.query.select(DefaultsExample.name, flat=True).annotate(
+                x=Value(1)
+            )
+
+    def test_annotate_before_select_still_works(self, rows):
+        """The supported order — the annotation is selectable as a column."""
+        result = (
+            DefaultsExample.query.annotate(n=Count("id"))
+            .order_by("name")
+            .select(DefaultsExample.name)
+        )
+        assert list(result) == [("alpha",), ("beta",), ("gamma",)]
+
+    def test_annotate_is_unaffected_on_a_plain_queryset(self, rows):
+        assert DefaultsExample.query.annotate(n=Count("id")).count() == 3
 
 
 def test_get_or_create_after_select_raises(db):

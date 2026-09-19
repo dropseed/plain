@@ -1898,6 +1898,16 @@ class RowQuerySet[R](QuerySet[Any]):
     # does tell the checker control never returns, so a caller's trailing code
     # reads as unreachable rather than as a QuerySet or a model instance.
 
+    def annotate(self, *args: Any, **kwargs: Any) -> Never:
+        # An annotation appends a column, so the rows would gain a member the
+        # declared R doesn't have — silently for tuples, as a confusing
+        # constructor error for result_type=, and silently dropped for flat.
+        raise TypeError(
+            "Cannot call annotate() after select() — an annotation adds a "
+            "column, which would change the row shape out from under the "
+            "selected type. Annotate first, then select()."
+        )
+
     def values(self, *fields: str, **expressions: Any) -> Never:
         raise TypeError("Cannot call values() after select().")
 

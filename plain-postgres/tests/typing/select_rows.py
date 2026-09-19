@@ -150,6 +150,9 @@ def must_accept_row_mode_refusals_as_never_returning() -> None:
     assert_type(rows.values("name"), Never)
     assert_type(rows.values_list("name"), Never)
     assert_type(rows.get_or_create(name="a"), Never)
+    # annotate() appends a column, which would make the declared row type
+    # wrong. Runtime half: test_select.py::TestAnnotateAfterSelect.
+    assert_type(rows.annotate(n=Upper("name")), Never)
 
 
 def must_accept_the_row_type_through_iterator_and_chaining() -> None:
