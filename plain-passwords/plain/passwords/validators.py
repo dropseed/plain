@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import gzip
-from functools import cached_property
+from collections.abc import Callable
+from functools import cache, cached_property
 from pathlib import Path
 
 from plain.exceptions import (
@@ -9,6 +10,44 @@ from plain.exceptions import (
 )
 from plain.utils.deconstruct import deconstructible
 from plain.utils.text import pluralize
+
+__all__ = [
+    "CommonPasswordValidator",
+    "MinimumLengthValidator",
+    "NumericPasswordValidator",
+    "validate_raw_password",
+]
+
+
+@cache
+def _default_validators() -> tuple[Callable[[str], None], ...]:
+    # Built once and cached -- CommonPasswordValidator reads a 20,000-entry
+    # word list off disk, so this should not happen per call.
+    return (
+        MinimumLengthValidator(),
+        CommonPasswordValidator(),
+        NumericPasswordValidator(),
+    )
+
+
+def validate_raw_password(raw: str) -> None:
+    """Run the shipped password rules against a raw password.
+
+    Raises a `ValidationError` collecting every rule that failed, each
+    carrying its own `code` so a caller can branch on which one it was.
+
+    This is the only place a raw password is inspected. The password form
+    field calls it before hashing; past that point a password is a
+    `HashedPassword` and there is nothing left to validate.
+    """
+    errors: list[ValidationError] = []
+    for validator in _default_validators():
+        try:
+            validator(raw)
+        except ValidationError as error:
+            errors.extend(error.error_list)
+    if errors:
+        raise ValidationError(errors)
 
 
 @deconstructible
