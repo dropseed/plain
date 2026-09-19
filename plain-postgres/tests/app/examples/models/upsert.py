@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import ClassVar
 
 from plain.postgres import Field, types
 
@@ -32,5 +33,35 @@ class UpsertItem(postgres.Model):
     model_options = postgres.Options(
         constraints=[
             postgres.UniqueConstraint(fields=["key"], name="upsertitem_key_unique"),
+        ]
+    )
+
+
+# NOTE: #86 grows an equivalent UpsertTenant/UpsertScoped pair; collapse onto
+# whichever survives the merge.
+@postgres.register_model
+class UpsertScope(postgres.Model):
+    """Parent for the composite (foreign key, key) conflict target."""
+
+    name: Field[str] = types.TextField(max_length=100)
+
+    entries: ClassVar[types.ReverseForeignKey[UpsertScopedItem]] = (
+        types.ReverseForeignKey(to="UpsertScopedItem", field="scope")
+    )
+
+
+@postgres.register_model
+class UpsertScopedItem(postgres.Model):
+    scope: Field[UpsertScope] = types.ForeignKeyField(
+        UpsertScope, on_delete=postgres.CASCADE
+    )
+    key: Field[str] = types.TextField(max_length=100)
+    value: Field[int] = types.IntegerField(default=0)
+
+    model_options = postgres.Options(
+        constraints=[
+            postgres.UniqueConstraint(
+                fields=["scope", "key"], name="upsertscopeditem_scope_key_unique"
+            ),
         ]
     )

@@ -217,7 +217,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         defaults: dict[str, Any] | None = None,
         create_defaults: dict[str, Any] | None = None,
         conflict_defaults: dict[str, Any] | None = None,
-        unique_fields: list[Field],
+        unique_fields: list[Field[Any] | type[Model]],
         **kwargs: Any,
     ) -> tuple[T, bool]:
         self._check_fk_val()
@@ -517,7 +517,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         defaults: dict[str, Any] | None = None,
         create_defaults: dict[str, Any] | None = None,
         conflict_defaults: dict[str, Any] | None = None,
-        unique_fields: list[Field],
+        unique_fields: list[Field[Any] | type[Model]],
         **kwargs: Any,
     ) -> tuple[T, bool]:
         obj, created = self.model.query.upsert(

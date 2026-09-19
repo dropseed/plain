@@ -14,7 +14,12 @@ from datetime import UTC
 import psycopg
 import pytest
 from app.examples.models.relationships import Widget
-from app.examples.models.upsert import UpsertItem, UpsertOwner
+from app.examples.models.upsert import (
+    UpsertItem,
+    UpsertOwner,
+    UpsertScope,
+    UpsertScopedItem,
+)
 from plain.postgres import Excluded
 from plain.postgres.db import get_connection
 from plain.postgres.exceptions import FieldError
@@ -321,6 +326,80 @@ def test_upsert_all_unique_fields_is_idempotent(db):
     assert created2 is False
     assert obj1.id == obj2.id
     assert Widget.query.count() == 1
+
+
+def test_upsert_conflicts_on_a_foreign_key(db):
+    """`Model.fk` is the relation descriptor, not a Field, so a composite
+    conflict target that includes a foreign key has to resolve it to the
+    column. Static half: tests/typing/upsert_writes.py.
+    """
+    scope = UpsertScope(name="s").create()
+
+    first, created = UpsertScopedItem.query.upsert(
+        scope=scope,
+        key="a",
+        value=1,
+        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+    )
+    assert created is True
+
+    second, created = UpsertScopedItem.query.upsert(
+        scope=scope,
+        key="a",
+        value=2,
+        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+    )
+    assert created is False
+    assert second.id == first.id
+    assert second.value == 2
+    assert UpsertScopedItem.query.count() == 1
+
+
+def test_upsert_foreign_key_conflict_target_scopes_by_parent(db):
+    """The same key under a different parent is a different row."""
+    one = UpsertScope(name="one").create()
+    two = UpsertScope(name="two").create()
+
+    UpsertScopedItem.query.upsert(
+        scope=one,
+        key="a",
+        value=1,
+        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+    )
+    _, created = UpsertScopedItem.query.upsert(
+        scope=two,
+        key="a",
+        value=2,
+        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+    )
+
+    assert created is True
+    assert UpsertScopedItem.query.count() == 2
+
+
+def test_reverse_manager_upsert_conflicts_on_the_parent_key(db):
+    """Through the reverse manager the parent is filled in automatically, so
+    the conflict target still needs the foreign key column.
+    """
+    scope = UpsertScope(name="s").create()
+
+    first, created = scope.entries.upsert(
+        key="a",
+        value=1,
+        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+    )
+    assert created is True
+    assert first.scope.id == scope.id
+
+    second, created = scope.entries.upsert(
+        key="a",
+        value=5,
+        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+    )
+    assert created is False
+    assert second.id == first.id
+    assert second.value == 5
+    assert scope.entries.query.count() == 1
 
 
 def test_upsert_requires_unique_fields(db):
