@@ -62,11 +62,14 @@ def test_last_lock_mode_wins(db, capture_queries):
 
 
 def test_lock_requires_a_transaction(isolated_db):
-    with pytest.raises(TransactionManagementError):
-        list(Widget.query.for_update())
+    # isolated_db (unlike db) leaves the connection in autocommit, so this is
+    # a genuine "no open transaction" call. The message names the mode that
+    # was actually requested, not a hardcoded FOR UPDATE.
+    with pytest.raises(TransactionManagementError, match="FOR SHARE"):
+        list(Widget.query.for_share())
 
 
-def test_lock_works_inside_atomic(isolated_db):
+def test_lock_works_inside_atomic(db):
     Widget.query.create(name="W", size="L")
     with transaction.atomic():
         widgets = list(Widget.query.for_update())

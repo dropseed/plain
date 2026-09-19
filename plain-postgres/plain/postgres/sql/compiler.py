@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import (
+    LOCK_MODE_SQL,
     PK_DEFAULT_VALUE,
     bulk_insert_sql,
     distinct_sql,
@@ -677,7 +678,8 @@ class SQLCompiler:
                 if self.query.lock_mode:
                     if self.connection.get_autocommit():
                         raise TransactionManagementError(
-                            "for_update cannot be used outside of a transaction."
+                            f"{LOCK_MODE_SQL[self.query.lock_mode]} cannot be "
+                            "used outside of a transaction."
                         )
 
                     lock_part = lock_sql(
