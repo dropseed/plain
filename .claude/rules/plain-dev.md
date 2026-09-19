@@ -65,9 +65,9 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
 
 - Never write a plaintext secret into a committed `.env*` file. Add or rotate one
   with `plain env set KEY VALUE` (or `plain env set KEY < file` for multi-line
-  values), which encrypts it with the project's `DEV_ENV_KEY`.
+  values), which encrypts it with the project's `PLAIN_ENV_KEY`.
 - `plain env get KEY` reveals a secret — run it only when the task genuinely
-  needs the plaintext. Never print `DEV_ENV_KEY` or dump the environment
+  needs the plaintext. Never print `PLAIN_ENV_KEY` or dump the environment
   (`env`, `printenv`, `os.environ`).
 
 Run `uv run plain docs dev` for the full picture.

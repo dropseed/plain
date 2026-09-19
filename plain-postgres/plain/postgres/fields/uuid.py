@@ -7,7 +7,7 @@ from uuid import UUID
 
 from plain import exceptions
 
-from .base import ColumnField
+from .base import NOT_PROVIDED, ColumnField
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
@@ -22,12 +22,16 @@ class UUIDField[T: (UUID, UUID | None) = UUID](ColumnField[T]):
         self,
         *,
         generate: bool = False,
+        default: Any = NOT_PROVIDED,
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
+        # `default` accepts only None (the nullable-optional marker). There is
+        # no Python-side UUID default; for generated values use generate=True.
         self.generate = generate
         super().__init__(
+            default=default,
             required=required,
             allow_null=allow_null,
             validators=validators,
