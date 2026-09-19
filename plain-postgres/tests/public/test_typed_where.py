@@ -15,6 +15,7 @@ from app.examples.models.defaults import DefaultsExample
 from app.examples.models.relationships import Widget
 from app.examples.models.string_conditions import StringConditionsExample
 from plain.postgres import Q
+from plain.postgres.expressions import Exists
 
 
 def test_field_methods_return_q_objects():
@@ -247,3 +248,62 @@ class TestConditionsBelongToTheirModel:
         """The check is where()'s; filter() keeps taking anything."""
         DefaultsExample.query.create(name="alice")
         assert DefaultsExample.query.filter(name="alice").count() == 1
+
+
+class TestProvenanceSurvivesWrapping:
+    """A condition's origin has to survive being wrapped in another `Q`, not
+    just being combined with one.
+
+    `Exists(sub) & Model.field.equals(x)` doesn't go through `Q.__and__` at
+    all -- the expression is the left operand, so `BaseExpression.__and__`
+    runs and wraps *both* sides in `Q(...)` before combining. A wrapper that
+    reported no sources would lose the field's origin and let a cross-model
+    condition through.
+    """
+
+    def test_wrapping_a_condition_keeps_its_source(self):
+        bad = Widget.name.equals("x")
+        assert Q(bad)._source_fields == bad._source_fields
+        assert Q(Q(bad))._source_fields == bad._source_fields
+
+    def test_expression_and_cross_model_condition_raises(self, db):
+        subquery = Widget.query.filter(name="x")
+        with pytest.raises(TypeError, match="Widget.name"):
+            DefaultsExample.query.where(Exists(subquery) & Widget.name.equals("x"))
+
+    def test_expression_or_cross_model_condition_raises(self, db):
+        subquery = Widget.query.filter(name="x")
+        with pytest.raises(TypeError, match="Widget.name"):
+            DefaultsExample.query.where(Exists(subquery) | Widget.name.equals("x"))
+
+    def test_wrapped_cross_model_condition_raises(self, db):
+        with pytest.raises(TypeError, match="Widget.name"):
+            DefaultsExample.query.where(Q(Widget.name.equals("x")))
+
+    def test_negated_wrapper_raises(self, db):
+        with pytest.raises(TypeError, match="Widget.name"):
+            DefaultsExample.query.where(~Q(Widget.name.equals("x")))
+
+    def test_expression_with_a_same_model_condition_passes(self, db):
+        DefaultsExample.query.create(name="alice")
+        Widget.query.create(name="x", size="s")
+        subquery = Widget.query.filter(name="x")
+
+        rows = DefaultsExample.query.where(
+            Exists(subquery) & DefaultsExample.name.equals("alice")
+        )
+        assert [r.name for r in rows] == ["alice"]
+
+        rows = DefaultsExample.query.where(
+            Exists(subquery) | DefaultsExample.name.equals("nobody")
+        )
+        assert [r.name for r in rows] == ["alice"]
+
+    def test_bare_expression_condition_is_allowed(self, db):
+        """`where()` is typed to take Q, but an expression reaches it at
+        runtime and carries no sources -- it must pass, not blow up."""
+        DefaultsExample.query.create(name="alice")
+        Widget.query.create(name="x", size="s")
+        subquery = Widget.query.filter(name="x")
+        rows = DefaultsExample.query.where(Exists(subquery))  # ty: ignore[invalid-argument-type]
+        assert [r.name for r in rows] == ["alice"]

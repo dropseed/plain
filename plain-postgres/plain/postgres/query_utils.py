@@ -52,7 +52,7 @@ def subclasses(cls: type) -> Generator[type]:
         yield from subclasses(subclass)
 
 
-def _source_fields_of(condition: Any) -> frozenset[tuple[type[Model], str]]:
+def source_fields_of(condition: Any) -> frozenset[tuple[type[Model], str]]:
     """The (model, field name) pairs that built `condition`, or nothing.
 
     `Q` combines with any object that sets `conditional = True` -- an
@@ -74,15 +74,17 @@ class Q(tree.Node):
     conditional = True
 
     # The (model, field name) pairs that built this Q, stamped by
-    # `Field._build_q` and carried through copying and combining below.
-    # `where()` reads it to reject a condition built from another model's
-    # field; a Q written by hand (`Q(name="x")`) names no source and is never
-    # checked.
+    # `Field._build_q` and carried through wrapping, copying and combining
+    # below. `where()` reads it to reject a condition built from another
+    # model's field; a Q written by hand (`Q(name="x")`) names no source and is
+    # never checked.
     #
     # It lives on the node rather than on the leaves because `Node.copy()`
     # rebuilds the object through `create()`, so an instance attribute only
-    # survives if the three methods that rebuild a Q carry it forward. Those
-    # three are right here; nothing else has to walk the tree.
+    # survives if every method that builds a Q carries it forward. Those are
+    # `__init__`, `__copy__`, `__deepcopy__` and `_combine`, all right here --
+    # and each reads only its immediate children, which already carry their own
+    # subtree's sources. Nothing walks the tree.
     _source_fields: frozenset[tuple[type[Model], str]] = frozenset()
 
     def __copy__(self) -> Q:
@@ -109,6 +111,17 @@ class Q(tree.Node):
             connector=_connector,
             negated=_negated,
         )
+        # Wrapping a condition keeps its sources, the same way combining two
+        # does. `Exists(sub) & Model.field.equals(x)` runs through
+        # `BaseExpression.__and__`, which wraps both sides in `Q(...)` before
+        # combining -- without this the wrapper would report no sources and the
+        # condition's origin would be lost. Only the immediate children are
+        # read; each of them already carries its own subtree's sources.
+        sources: frozenset[tuple[type[Model], str]] = frozenset()
+        for arg in args:
+            sources |= source_fields_of(arg)
+        if sources:
+            self._source_fields = sources
 
     def _combine(self, other: Any, conn: str) -> Q:
         if getattr(other, "conditional", False) is False:
@@ -121,7 +134,7 @@ class Q(tree.Node):
         obj = self.create(connector=conn)
         obj.add(self, conn)
         obj.add(other, conn)
-        obj._source_fields = self._source_fields | _source_fields_of(other)
+        obj._source_fields = self._source_fields | source_fields_of(other)
         return obj
 
     def __or__(self, other: Any) -> Q:
