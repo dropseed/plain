@@ -17,18 +17,10 @@ class Tag(postgres.Model):
 
 
 @postgres.register_model
-class WidgetTag(postgres.Model):
-    """Through model for Widget-Tag many-to-many relationship."""
-
-    widget: Widget = types.ForeignKeyField("Widget", on_delete=postgres.CASCADE)
-    tag: Field[Tag] = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
-
-
-@postgres.register_model
 class Widget(postgres.Model):
     name: Field[str] = types.TextField(max_length=100)
     size: Field[str] = types.TextField(max_length=100)
-    tags: types.ManyToManyManager[Tag] = types.ManyToManyField(Tag, through=WidgetTag)
+    tags: types.ManyToManyManager[Tag] = types.ManyToManyField(Tag, through="WidgetTag")
 
     model_options = postgres.Options(
         constraints=[
@@ -37,3 +29,14 @@ class Widget(postgres.Model):
             ),
         ]
     )
+
+
+# Declared after Widget so the FK takes the model *class* rather than a string:
+# only a class-argument FK gives the stub a resolvable `T`, which is what makes
+# `WidgetTag.widget.name.equals(...)` type-check as well as run.
+@postgres.register_model
+class WidgetTag(postgres.Model):
+    """Through model for Widget-Tag many-to-many relationship."""
+
+    widget: Field[Widget] = types.ForeignKeyField(Widget, on_delete=postgres.CASCADE)
+    tag: Field[Tag] = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)

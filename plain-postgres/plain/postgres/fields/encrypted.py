@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, Never, overload
 
 try:
     from cryptography.fernet import Fernet, InvalidToken, MultiFernet
@@ -22,7 +22,7 @@ from plain.utils.encoding import force_bytes
 
 from plain import preflight
 
-from .base import NOT_PROVIDED, validate_none_only_default
+from .base import NOT_PROVIDED, Field, validate_none_only_default
 from .json import JSONField
 from .text import TextField
 
@@ -31,9 +31,11 @@ if TYPE_CHECKING:
 
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.lookups import Lookup, Transform
+    from plain.postgres.query_utils import Q
     from plain.preflight.results import PreflightResult
 
 __all__ = [
+    "EncryptedField",
     "EncryptedJSONField",
     "EncryptedTextField",
 ]
@@ -108,43 +110,186 @@ def _decrypt(value: str) -> str:
         )
 
 
-class EncryptedFieldMixin:
-    """Shared behavior for all encrypted fields.
+# Shared tail explaining why encrypted fields reject value comparisons. Kept
+# free of advice, because the right advice differs by caller -- see the two
+# refusal sites below.
+_NON_DETERMINISTIC_EXPLANATION = (
+    "encrypting the same plaintext twice produces different ciphertext, so an "
+    "equality comparison on the column can never match"
+)
+
+
+class _EncryptedExact(Exact):
+    """An exact lookup that rejects right-hand values ciphertext can't match.
+
+    None passes through so the ORM's exact-None → isnull rewrite in
+    `build_lookup` still works, and so does any other value the field stores
+    deterministically (for text, the empty string, which is stored as
+    plaintext ''). Anything else could only ever match nothing, so it raises
+    instead of silently returning no rows.
+    """
+
+    def __init__(self, lhs: Any, rhs: Any) -> None:
+        # lhs.output_field is the encrypted field itself (the lookups.py idiom),
+        # so it decides which values have a deterministic stored form.
+        field = lhs.output_field
+        if not field.matches_deterministically(rhs):
+            # Its own sentence, not _lookup_unsupported_message's: `filter()`
+            # *is* supported here, just not against an arbitrary value.
+            raise TypeError(
+                f"Encrypted field {field.name!r} cannot be matched against "
+                f"this value: {_NON_DETERMINISTIC_EXPLANATION}. "
+                f"{field.matchable_values_hint()} If this came from "
+                f"get_or_create()/update_or_create(), move {field.name!r} into "
+                f"defaults= -- it can be written, just not looked up."
+            )
+        super().__init__(lhs, rhs)
+
+
+class EncryptedField[T](Field[T]):
+    """Shared base for all encrypted fields, and the type to annotate them with.
 
     Owns the lookup surface (isnull and exact only — ciphertext is
     non-deterministic) and the preflight that blocks indexes and unique
-    constraints.
+    constraints. Also blocks the typed-query comparison methods.
 
-    Must be used with Field as a co-base class.
+    Annotate encrypted model fields with this rather than the plain ``Field``:
+
+        api_key: EncryptedField[str] = types.EncryptedTextField(max_length=200)
+
+    The annotation is what the type checker sees, so a plain ``Field[str]``
+    would hide the ``Never``-typed blocks below and let
+    ``Model.api_key.equals("x")`` type-check on its way to a runtime
+    ``TypeError``. It is a ``Field[T]`` subclass, so the synthesized
+    constructor types the field exactly as ``Field[T]`` would.
+
+    Concrete encrypted fields mix this with the field they specialize
+    (``TextField``, ``JSONField``), which supplies the column behavior.
     """
 
-    # Type hints for attributes provided by Field (the required co-base class)
-    name: str
-    model: Any
+    def __init__(self, **kwargs: Any) -> None:
+        # Present only for the type checker. ty resolves `super().__init__` in
+        # EncryptedJSONField through this class and lands on `Field.__init__`,
+        # which takes no arguments, so without a signature here it rejects the
+        # kwargs the concrete field forwards. At runtime this is a plain
+        # cooperative passthrough and the MRO would reach the concrete field
+        # either way.
+        super().__init__(**kwargs)
 
     # The complete lookup surface, replacing the base field's registry.
     # isnull is obviously needed. exact is required so that `filter(field=None)`
     # works — the ORM resolves "exact" first and then rewrites None to isnull.
-    # Exact lookups on non-None values will silently return no results (since
-    # ciphertext is non-deterministic), but blocking exact entirely would break
-    # the None/isnull path. The base classes are named directly — inheriting
-    # the concrete field's registrations would leak specialized lookups like
-    # JSONField's JSONExact, which compares against the jsonb 'null' literal
-    # and defeats the None→isnull rewrite. get_lookup()/get_transform() and
-    # registry consumers (e.g. unsupported-lookup error suggestions) all
-    # resolve through this one dict. A classmethod so both class-level and
-    # instance-level callers work.
+    # _EncryptedExact rejects non-None right-hand values, so the silent-no-rows
+    # behavior on `filter(field='something')` is blocked too. The base classes
+    # are named directly — inheriting the concrete field's registrations would
+    # leak specialized lookups like JSONField's JSONExact, which compares
+    # against the jsonb 'null' literal and defeats the None→isnull rewrite.
+    # get_lookup()/get_transform() and registry consumers (e.g.
+    # unsupported-lookup error suggestions) all resolve through this one dict.
+    # A classmethod so both class-level and instance-level callers work.
     @classmethod
     def get_lookups(cls) -> dict[str, type[Lookup | Transform]]:
-        return {"exact": Exact, "isnull": IsNull}
+        return {"exact": _EncryptedExact, "isnull": IsNull}
 
     def get_transform(self, name: str) -> Callable[..., Transform] | None:
         # JSONField's get_transform falls back to KeyTransformFactory for any
         # name — key transforms would operate on ciphertext, so block them.
         return None
 
+    def _build_q(self, method: str, suffix: str, value: Any) -> Q:
+        """The one runtime guard. Every condition method on `Field` funnels
+        through here, so blocking the ones that compare ciphertext takes a
+        single override -- including conditions that don't exist yet.
+
+        What survives is exactly what the kwarg path allows, so
+        `field.equals(None)` and `filter(field=None)` can't disagree:
+        `isnull`, and equality against a value the field stores
+        deterministically.
+        """
+        if suffix == "isnull" or (
+            suffix == "" and self.matches_deterministically(value)
+        ):
+            return super()._build_q(method, suffix, value)
+        raise TypeError(self._lookup_unsupported_message(method))
+
+    def matches_deterministically(self, value: Any) -> bool:
+        """Whether `value` has a stored form equality can actually match.
+
+        Only NULL, in general: everything else becomes ciphertext, and
+        encrypting the same plaintext twice gives different bytes.
+        """
+        return value is None
+
+    def matchable_values_hint(self) -> str:
+        return ".is_null() is the only condition it supports."
+
+    if TYPE_CHECKING:
+        # The static half of the same block. `Never` as the parameter type
+        # rejects every call site; the return is `Never` (not `Q`) to reflect
+        # that control never returns, and `Never` is assignable to `Q` so
+        # `where(field.equals(...))` still type-checks at the use site with the
+        # parameter error as the one that surfaces.
+        #
+        # Declarations only -- `_build_q` above is what raises. Keeping them
+        # here means the static block and the runtime block can't drift into
+        # disagreeing about *how* to refuse, only about which methods exist.
+        # equals/not_equal are narrowed rather than blocked: the value types
+        # below are exactly the ones `matches_deterministically` accepts, so
+        # the static surface and the runtime guard agree. Everything else is
+        # `Never`.
+        #
+        # The `self` restriction is what distinguishes them -- a string-valued
+        # encrypted column stores "" as plaintext, a JSON one doesn't -- and it
+        # has to live here rather than on EncryptedTextField, because models
+        # annotate the field `EncryptedField[T]` and that annotation is all the
+        # checker sees.
+        @overload
+        def equals(
+            self: EncryptedField[str] | EncryptedField[str | None],
+            value: Literal[""] | None,
+        ) -> Q: ...
+        @overload
+        def equals(self, value: None) -> Q: ...  # ty: ignore[invalid-method-override]
+
+        @overload
+        def not_equal(
+            self: EncryptedField[str] | EncryptedField[str | None],
+            value: Literal[""] | None,
+        ) -> Q: ...
+        @overload
+        def not_equal(self, value: None) -> Q: ...  # ty: ignore[invalid-method-override]
+
+        def gt(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def gte(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def lt(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def lte(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def is_in(self, values: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def contains(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def icontains(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def startswith(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def endswith(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+    def _lookup_unsupported_message(self, method: str) -> str:
+        assert self.name, (
+            "Encrypted field must be attached to a model before its typed-query "
+            "methods can produce a meaningful error message."
+        )
+        return (
+            f"Encrypted field {self.name!r} does not support .{method}() "
+            f"against this value: {_NON_DETERMINISTIC_EXPLANATION}. "
+            f"{self.matchable_values_hint()}"
+        )
+
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        errors: list[PreflightResult] = super().preflight(**kwargs)  # ty: ignore[unresolved-attribute]
+        errors: list[PreflightResult] = super().preflight(**kwargs)
         errors.extend(self._check_encrypted_constraints())
         return errors
 
@@ -190,7 +335,7 @@ class EncryptedFieldMixin:
         return errors
 
 
-class EncryptedTextField[T: (str, str | None) = str](EncryptedFieldMixin, TextField[T]):
+class EncryptedTextField[T: (str, str | None) = str](EncryptedField[T], TextField[T]):
     """A TextField that encrypts its value before storing in the database.
 
     Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key
@@ -226,6 +371,21 @@ class EncryptedTextField[T: (str, str | None) = str](EncryptedFieldMixin, TextFi
             validators=validators,
         )
 
+    def matches_deterministically(self, value: Any) -> bool:
+        # `_encrypt("")` returns "" -- the empty string is stored as plaintext,
+        # which is exactly what makes `default=""` expressible as a column
+        # DEFAULT. So equality against it is meaningful, and
+        # `exclude(token="")` (the documented "unset" check) keeps working.
+        return super().matches_deterministically(value) or (
+            isinstance(value, str) and value == ""
+        )
+
+    def matchable_values_hint(self) -> str:
+        return (
+            '.is_null() and equality against "" (stored as plaintext) are the '
+            "only conditions it supports."
+        )
+
     def get_db_prep_value(
         self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
@@ -242,7 +402,7 @@ class EncryptedTextField[T: (str, str | None) = str](EncryptedFieldMixin, TextFi
         return _decrypt(value)
 
 
-class EncryptedJSONField(EncryptedFieldMixin, JSONField):
+class EncryptedJSONField(EncryptedField[Any], JSONField):
     """A JSONField that encrypts its serialized value before storing in the database.
 
     The JSON value is serialized to a string, encrypted, and stored as text.
