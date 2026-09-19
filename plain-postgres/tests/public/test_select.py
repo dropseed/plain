@@ -7,12 +7,13 @@ The static-typing contract lives in tests/typing/select_rows.py.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.relationships import WidgetTag
 from plain.postgres import RowQuerySet
+from plain.postgres.expressions import F
 from plain.postgres.functions import Upper
 
 
@@ -69,6 +70,22 @@ def test_select_expression_column(rows):
         .all()
     )
     assert list(result) == [(3, "ALPHA"), (1, "BETA"), (2, "GAMMA")]
+
+
+def test_select_f_expression_column(rows):
+    """F() is a Combinable, not a BaseExpression -- select() takes it anyway,
+    because values_list() does. Static half: tests/typing/select_rows.py."""
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.name, F("priority"))
+        .all()
+    )
+    assert list(result) == [("alpha", 3), ("beta", 1), ("gamma", 2)]
+
+
+def test_select_combined_f_expression_column(rows):
+    result = DefaultsExample.query.order_by("name").select(F("priority") + 1, flat=True)
+    assert list(result) == [4, 2, 3]
 
 
 def test_select_returns_row_queryset(rows):
@@ -148,13 +165,31 @@ def test_select_rejects_string_argument(db):
 
 
 def test_select_rejects_fk_traversal(db):
-    with pytest.raises(TypeError, match="traversal"):
+    """The message names the values_list() spelling that does work."""
+    with pytest.raises(TypeError, match=r'values_list\("widget__name"\)'):
         WidgetTag.query.select(WidgetTag.widget.name)
 
 
 def test_select_rejects_fk_reference(db):
-    with pytest.raises(TypeError, match="traversal"):
+    """A relation is not a column, and its key column is out for now too."""
+    with pytest.raises(TypeError, match="key column is not selectable yet"):
         WidgetTag.query.select(WidgetTag.widget)  # ty: ignore[no-matching-overload]
+
+
+def test_select_flat_rejects_more_than_one_column(db):
+    """The message names select(), not the values_list() plumbing underneath."""
+    with pytest.raises(TypeError, match=r"select\(flat=True\) takes exactly one"):
+        DefaultsExample.query.select(  # ty: ignore[no-matching-overload]
+            DefaultsExample.name, DefaultsExample.priority, flat=True
+        )
+
+
+def test_select_rejects_the_foreign_key_column_for_now(db):
+    """`WidgetTag.widget.id` is the FK column, but it still arrives over the
+    relation, so it is refused with the rest of traversal until select() can
+    say it is nullable."""
+    with pytest.raises(TypeError, match=r'values_list\("widget__id"\)'):
+        WidgetTag.query.select(WidgetTag.widget.id)
 
 
 def test_select_result_type_must_be_dataclass(db):
@@ -186,6 +221,38 @@ def test_select_flat_and_result_type_conflict(db):
         )
 
 
+def test_select_result_type_ignores_init_false_fields(rows):
+    """An init=False field is computed by the dataclass, so it is neither
+    selected nor counted against the arity."""
+
+    @dataclass
+    class Computed:
+        name: str
+        priority: int
+        label: str = field(default="", init=False)
+
+        def __post_init__(self) -> None:
+            self.label = f"{self.name}:{self.priority}"
+
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.name, DefaultsExample.priority, result_type=Computed)
+        .first()
+    )
+    assert result == Computed(name="alpha", priority=3)
+    assert result.label == "alpha:3"
+
+
+def test_get_or_create_after_select_raises(db):
+    with pytest.raises(TypeError, match="get_or_create"):
+        DefaultsExample.query.select(DefaultsExample.name).get_or_create(name="x")
+
+
+def test_update_or_create_after_select_raises(db):
+    with pytest.raises(TypeError, match="update_or_create"):
+        DefaultsExample.query.select(DefaultsExample.name).update_or_create(name="x")
+
+
 def test_select_after_values_raises(db):
     with pytest.raises(TypeError, match="after values"):
         DefaultsExample.query.values("name").select(DefaultsExample.name)
@@ -204,6 +271,15 @@ def test_update_after_select_raises(db):
 def test_delete_after_select_raises(db):
     with pytest.raises(TypeError, match="delete"):
         DefaultsExample.query.select(DefaultsExample.name).delete()
+
+
+def test_update_refuses_any_row_mode_queryset(db):
+    """select() shares delete()'s guard rather than adding its own, so
+    update() now refuses values()/values_list() for the same reason."""
+    with pytest.raises(TypeError, match="Cannot call update"):
+        DefaultsExample.query.values("name").update(name="x")
+    with pytest.raises(TypeError, match="Cannot call update"):
+        DefaultsExample.query.values_list("name").update(name="x")
 
 
 def test_select_twice_last_wins(rows):

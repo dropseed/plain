@@ -296,11 +296,27 @@ class UserStats:
 stats = User.query.select(User.email, User.age, result_type=UserStats)
 ```
 
-You can select expression columns too — `select(User.id, Sum("amount"))` — but an expression column types as `Any` (its output type isn't tracked yet). The fields around it stay precise, so `select(User.id, Sum("amount"))` types as `tuple[int, Any]`.
+The return value is a [`RowQuerySet`](./query.py#RowQuerySet) — that is the name to reach for when you need to annotate one:
 
-**`select()` returns rows, not partial model instances.** This is deliberate: a model instance with only some columns loaded is a type-level lie — the type checker thinks every field is present, so touching an unselected column looks fine but fails or fires a hidden query at runtime. Honest tuples/dataclasses keep the types truthful. As a result, iteration, `first()`, `get()`, and slicing all return rows, and writes (`update()`, `delete()`) raise `TypeError` on a selected queryset — the same as after `values()`.
+```python
+from plain.postgres import RowQuerySet
 
-`select()` takes typed references only — a bare string like `select("email")` raises `TypeError` (use `User.email`). Foreign-key traversal (`User.profile.city`) is not supported yet and raises `TypeError`; select columns on the queried model.
+
+def adults() -> RowQuerySet[tuple[str, int | None]]:
+    return User.query.where(User.age.gte(18)).select(User.email, User.age)
+```
+
+You can select expression columns too — `select(User.id, Sum("amount"))`, or an `F()` — but an expression column types as `Any` (its output type isn't tracked yet). The fields around it stay precise, so `select(User.id, Sum("amount"))` types as `tuple[int, Any]`.
+
+Per-column typing runs to **ten columns**. An eleventh is still selected and still returns rows, but the row type degrades to `tuple[Any, ...]` — reach for `result_type=` when a row is that wide.
+
+**`select()` returns rows, not partial model instances.** This is deliberate: a model instance with only some columns loaded is a type-level lie — the type checker thinks every field is present, so touching an unselected column looks fine but fails or fires a hidden query at runtime. Honest tuples/dataclasses keep the types truthful. As a result, iteration, `first()`, `get()`, `iterator()`, and slicing all return rows, and anything that would read or write model rows — `update()`, `delete()`, `get_or_create()`, `values()`, `values_list()` — raises `TypeError`. `update()` and `delete()` refuse a queryset in row mode however it got there, `values()` and `values_list()` included.
+
+`select()` takes typed references only — a bare string like `select("email")` raises `TypeError` (use `User.email`).
+
+**Relations are not selectable yet.** `select(Post.author)` (the relation) and `select(Post.author.city)` (a column through it) both raise `TypeError`, and so does `select(Post.author.id)` — the foreign key column itself. The reason is nullability: a column reached through a relation arrives over a join, so a nullable relation yields `None` where the traversed field's type says it can't. Until `select()` can express that, `values_list("author__id", flat=True)` is the spelling, and the error message names it.
+
+**`select()` hands back a plain `RowQuerySet`, not your custom QuerySet subclass.** Chain your own methods before `select()`, not after — `User.query.active().select(...)` works, `User.query.select(...).active()` raises `AttributeError`.
 
 ### Custom QuerySets
 
