@@ -27,7 +27,7 @@ from plain.forms.result import Error, Invalid
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
-    from plain.postgres.fields.base import ColumnField
+    from plain.postgres.fields.base import Field as ModelColumn
     from plain.postgres.fields.related_managers import ManyToManyManager
 
 __all__ = [
@@ -241,8 +241,14 @@ def _resolve_model_field(column: Any) -> Any:
 
 @overload
 def model_field[M: Model](column: ManyToManyManager[M]) -> Field[list[M]]: ...
+
+
+# The model column's *value* type is what the form field carries. Match the
+# base `Field[T]`, not `ColumnField[T]`: a model annotates its columns
+# `Field[T]` (that annotation is what gives the model a typed constructor),
+# so that is the type a column reference has at the call site.
 @overload
-def model_field[T](column: ColumnField[T]) -> Field[T]: ...
+def model_field[T](column: ModelColumn[T]) -> Field[T]: ...
 @overload
 def model_field(column: Any) -> Field[Any]: ...
 def model_field(column: Any) -> Field[Any]:
