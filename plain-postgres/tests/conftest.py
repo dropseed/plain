@@ -43,15 +43,15 @@ def executed_sql():
             Model.query.filter(...).delete()
         assert "FOR UPDATE" in executed_sql(queries)
 
-    Transaction control is left out, so a block wrapped in ``atomic()`` reads
-    the same as one that wasn't.
+    Transaction control is left out -- savepoints included, which the ``db``
+    fixture wraps every test in -- so a block inside ``atomic()`` reads the
+    same as one that wasn't, and what comes back is replayable SQL.
     """
+    control = ("BEGIN", "COMMIT", "ROLLBACK", "SAVEPOINT", "RELEASE")
 
     def _join(queries: list[dict]) -> str:
         return " ".join(
-            query["sql"]
-            for query in queries
-            if query["sql"] not in ("BEGIN", "COMMIT", "ROLLBACK")
+            query["sql"] for query in queries if not query["sql"].startswith(control)
         )
 
     return _join

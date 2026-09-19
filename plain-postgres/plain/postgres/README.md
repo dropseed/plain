@@ -524,23 +524,14 @@ for row in deleted:
 
 - **`returning()`** returns full model instances. For `update()` they hold the new values and stay live. For `delete()` they are **read-only snapshots**: every value is there to read, the id included, but the row is gone, so `create()`, `update()` and `delete()` on them raise.
 - **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a many-to-many field or one from another model raises an error at the `returning()` call.
+- **A foreign key can't be named here.** At class level `Model.fk` is the relation — that is what lets `where()` traverse it, as in `Child.parent.name.equals(...)` — not its column, so `returning(Child.parent)` raises `FieldError`. Foreign key columns come back through no-argument `returning()`, which hands you whole instances.
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
 - `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_update()`, `get_or_create()`, `update_or_create()` — raises `TypeError` rather than quietly dropping it.
 - `returning()` keeps the queryset's own class, so a custom `QuerySet` and its methods survive it. Chain your own methods before `returning()` — a type checker sees the returning shape after it, not your subclass.
 
-A row lock belongs on the read side of the write — that pairing is the job-claim pattern, and it composes in either order:
+A row lock belongs on the read side of the write, and it composes in either order. The write then needs an open `transaction.atomic()`, and is emitted as a locking sub-select so the lock has somewhere to live — see [Locking a set-based write](#locking-a-set-based-write).
 
-```python
-with transaction.atomic():
-    claimed = (
-        Job.query.filter(status="pending")
-        .for_update(skip_locked=True)
-        .returning()
-        .update(status="running")
-    )
-```
-
-The write needs an open `transaction.atomic()`, and it is emitted as a locking sub-select so the lock has somewhere to live — see [Row-level locking](#row-level-locking) for the shape.
+`returning()` is inert for reads. It describes what the next `update()` or `delete()` hands back, so iterating, `count()`, `first()` and `values()` on the same queryset behave exactly as they would without it — which is what lets you inspect a chain before writing it.
 
 The values you get back are whatever the statement wrote, exactly as Postgres holds them. A set-based `update()` doesn't run Python-side field hooks, so an `update_now=True` timestamp comes back unchanged unless the `update()` set it.
 
@@ -651,9 +642,10 @@ Widget.query.for_update().distinct()  # same error, either way round
 
 #### Locking a set-based write
 
-A lock also applies to `update()` and `delete()` on the same queryset — that pairing is the job-claim pattern. Neither statement takes a locking clause of its own, so the write is emitted as a locking sub-select:
+A lock also applies to `update()` and `delete()` on the same queryset. Neither statement takes a locking clause of its own, so the write is emitted as a locking sub-select:
 
 ```python
+# Claim *all* pending rows matching the filter, in one statement
 with transaction.atomic():
     claimed = (
         Job.query.filter(status="pending")
@@ -672,6 +664,8 @@ RETURNING ...
 ```
 
 It is still one statement. A second worker running the same write skips the rows the first one holds instead of blocking on them, so each row is claimed once.
+
+Note what this is and isn't: it takes **every** row the filter matches, so it suits draining a batch, not handing one unit of work to one worker. A bounded claim would need a sliced write (`[:1]`), and `update()`/`delete()` reject a sliced queryset — so for a per-worker claim, take one row with the locked read above (`for_update(skip_locked=True)` + `first()`) and write it separately.
 
 The `transaction.atomic()` is required, same as for a locked read: a locked write outside a transaction raises `TransactionManagementError`. Nothing else honors the lock — without a transaction there is nothing for it to be held until.
 

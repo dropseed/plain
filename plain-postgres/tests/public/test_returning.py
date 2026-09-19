@@ -19,6 +19,7 @@ from plain.postgres import transaction
 from plain.postgres.db import get_connection
 from plain.postgres.exceptions import FieldError
 from plain.postgres.sources import build_connection_params
+from plain.postgres.transaction import TransactionManagementError
 
 if TYPE_CHECKING:
     from typing import LiteralString
@@ -554,3 +555,46 @@ def test_updated_instances_are_still_live(db):
     row.update()
 
     assert ReturningEvent.query.get(id=row.id).count == 6
+
+
+# ===========================================================================
+# returning() is inert for reads
+# ===========================================================================
+
+
+def test_reads_on_a_returning_queryset_are_unaffected(db):
+    # returning() describes what the *next write* hands back. Reads on the
+    # same queryset behave exactly as they would without it -- rejecting
+    # them would break inspecting a chain before writing it.
+    _seed_events()
+    qs = ReturningEvent.query.filter(label="a").returning()
+
+    assert qs.count() == 2
+    assert qs.exists()
+    assert isinstance(qs.first(), ReturningEvent)
+    assert len(list(qs)) == 2
+    assert [row["label"] for row in qs.values("label")] == ["a", "a"]
+
+    # And the state is still there for the write that follows.
+    assert {row.count for row in qs.update(count=4)} == {4}
+
+
+# ===========================================================================
+# A locked write needs a transaction
+# ===========================================================================
+
+
+@pytest.mark.parametrize("write", ["update", "delete"])
+def test_locked_write_outside_a_transaction_raises(isolated_db, write):
+    # The lock now lands on a sub-select, which Postgres only honors inside a
+    # transaction -- so the write refuses rather than running unlocked, the
+    # way it used to.
+    ReturningEvent(label="a", count=1).create()
+    qs = ReturningEvent.query.filter(label="a").for_update(skip_locked=True)
+
+    with pytest.raises(TransactionManagementError, match="outside of a transaction"):
+        qs.update(count=2) if write == "update" else qs.delete()
+
+    # The row is untouched, and the same write inside atomic() goes through.
+    with transaction.atomic():
+        assert ReturningEvent.query.filter(label="a").for_update().update(count=2) == 1
