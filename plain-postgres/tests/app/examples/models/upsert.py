@@ -82,3 +82,19 @@ class UpsertValueKey(postgres.Model):
             ),
         ]
     )
+
+
+@postgres.register_model
+class UpsertFloatKey(postgres.Model):
+    """A float conflict key -- the column type that can hold NaN."""
+
+    score: Field[float] = types.FloatField()
+    value: Field[int] = types.IntegerField(default=0)
+
+    model_options = postgres.Options(
+        constraints=[
+            postgres.UniqueConstraint(
+                fields=["score"], name="upsertfloatkey_score_unique"
+            ),
+        ]
+    )

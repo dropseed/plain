@@ -14,6 +14,7 @@ from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.mixins import MixinTestModel
 from app.examples.models.returning import ReturningEvent
 from app.examples.models.upsert import (
+    UpsertFloatKey,
     UpsertItem,
     UpsertPair,
     UpsertScoped,
@@ -431,3 +432,41 @@ def test_bulk_upsert_json_key_with_non_string_object_keys(db):
     assert conflicting.id == seeded_id
     assert UpsertValueKey.query.count() == 1
     assert UpsertValueKey.query.get(id=seeded_id).value == 99
+
+
+def test_bulk_upsert_nan_key_round_trips(db):
+    # Postgres holds NaN equal to NaN for uniqueness; Python does not, so a
+    # NaN key has to be canonicalized or it can never match its own row back.
+    items = [UpsertFloatKey(score=float("nan"), value=1)]
+    UpsertFloatKey.query.bulk_upsert(
+        items,
+        update_fields=[UpsertFloatKey.value],
+        unique_fields=[UpsertFloatKey.score],
+    )
+    seeded_id = items[0].id
+    assert seeded_id is not None
+
+    updated = [UpsertFloatKey(score=float("nan"), value=2)]
+    UpsertFloatKey.query.bulk_upsert(
+        updated,
+        update_fields=[UpsertFloatKey.value],
+        unique_fields=[UpsertFloatKey.score],
+    )
+
+    assert updated[0].id == seeded_id
+    assert UpsertFloatKey.query.count() == 1
+    assert UpsertFloatKey.query.get(id=seeded_id).value == 2
+
+
+def test_bulk_upsert_duplicate_nan_keys_rejected(db):
+    with pytest.raises(ValueError, match="more than one UpsertFloatKey"):
+        UpsertFloatKey.query.bulk_upsert(
+            [
+                UpsertFloatKey(score=float("nan"), value=1),
+                UpsertFloatKey(score=float("nan"), value=2),
+            ],
+            update_fields=[UpsertFloatKey.value],
+            unique_fields=[UpsertFloatKey.score],
+        )
+
+    assert UpsertFloatKey.query.count() == 0

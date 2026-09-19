@@ -6,9 +6,11 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import operator
 import warnings
 from collections.abc import Callable, Iterator, Sequence
+from decimal import Decimal
 from functools import cached_property
 from itertools import islice
 from typing import TYPE_CHECKING, Any, Never, Self, cast, overload
@@ -57,6 +59,11 @@ if TYPE_CHECKING:
     from plain.postgres import Model
 
 
+# What a NaN conflict key normalizes to. Any value a float or numeric column
+# can otherwise hold is a number, so a string can't collide with one.
+NAN_CONFLICT_KEY = "<nan>"
+
+
 def conflict_key_value(field: Field, value: Any) -> Any:
     """One component of a bulk_upsert() conflict key, in a form that hashes.
 
@@ -65,6 +72,13 @@ def conflict_key_value(field: Field, value: Any) -> Any:
     its Python value on each side, the two meet in the same place. Preparing
     the value is most of that: a TimeZoneField's ZoneInfo becomes its name, a
     naive datetime becomes aware, a UUID string becomes a UUID.
+
+    Values that already compare and hash alike need no help here, and several
+    near-misses turn out to be in that group: Decimal("1.0") and
+    Decimal("1.00"), -0.0 and 0.0, and two aware datetimes naming the same
+    instant in different zones. Postgres collapses each of those pairs to one
+    row as well, so Python and the database agree without being told to. NaN is
+    the one place they disagree.
     """
     value = field.get_prep_value(value)
     if isinstance(field, JSONField):
@@ -80,6 +94,13 @@ def conflict_key_value(field: Field, value: Any) -> Any:
     if isinstance(value, memoryview | bytearray):
         # psycopg hands a bytea column back as a memoryview.
         return bytes(value)
+    if (isinstance(value, float) and math.isnan(value)) or (
+        isinstance(value, Decimal) and value.is_nan()
+    ):
+        # Postgres holds NaN equal to NaN for uniqueness. Python doesn't, and
+        # every NaN hashes differently, so a NaN key would never match its own
+        # row back and two of them would walk past the duplicate check.
+        return NAN_CONFLICT_KEY
     return value
 
 
