@@ -371,3 +371,27 @@ def test_bulk_upsert_matches_keys_that_python_cannot_hash_or_sort(db):
     assert len({item.id for item in items}) == 3
     stored = {row.value for row in UpsertValueKey.query.all()}
     assert stored == {10, 20, 30}
+
+
+def test_bulk_upsert_key_values_that_do_not_compare_to_each_other(db):
+    # A jsonb conflict key can hold an object in one row and a number in the
+    # next. Those don't compare, and the batches still have to be ordered.
+    utc = ZoneInfo("UTC")
+    items = [
+        UpsertValueKey(payload={"a": 1}, blob=b"x", zone=utc, value=1),
+        UpsertValueKey(payload=7, blob=b"x", zone=utc, value=2),
+        UpsertValueKey(payload="s", blob=b"x", zone=utc, value=3),
+        UpsertValueKey(payload=[1, 2], blob=b"x", zone=utc, value=4),
+    ]
+    UpsertValueKey.query.bulk_upsert(
+        items,
+        update_fields=[UpsertValueKey.value],
+        unique_fields=[
+            UpsertValueKey.payload,
+            UpsertValueKey.blob,
+            UpsertValueKey.zone,
+        ],
+    )
+
+    assert len({item.id for item in items}) == 4
+    assert {row.value for row in UpsertValueKey.query.all()} == {1, 2, 3, 4}

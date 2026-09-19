@@ -75,6 +75,17 @@ def conflict_key_value(field: Field, value: Any) -> Any:
     return value
 
 
+def conflict_key_order(key: tuple[Any, ...]) -> tuple[tuple[str, Any], ...]:
+    """The sort key for a bulk_upsert() conflict key.
+
+    The deadlock ordering only has to be the *same* order for every caller, not
+    a meaningful one, and one column can hold values that don't compare to each
+    other -- a jsonb column with an object in one row and a number in the next.
+    Leading with the type's name keeps every comparison inside a single type.
+    """
+    return tuple((type(value).__name__, value) for value in key)
+
+
 # The maximum number of results to fetch in a get() query.
 MAX_GET_RESULTS = 21
 
@@ -875,7 +886,7 @@ class QuerySet[T: "Model"]:
         # Issue the batches in conflict-key order so concurrent upserts touching
         # overlapping keys lock rows in the same order and can't deadlock each
         # other. objs itself is untouched, so the caller gets its input order.
-        sorted_keys = sorted(obj_by_key)
+        sorted_keys = sorted(obj_by_key, key=conflict_key_order)
 
         with transaction.atomic(savepoint=False):
             returned_rows = self._batched_insert(
