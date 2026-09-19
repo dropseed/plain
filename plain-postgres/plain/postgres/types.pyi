@@ -55,9 +55,36 @@ from plain.postgres.fields.text import TextField as _TextField
 from plain.postgres.fields.text import URLField as _URLField
 from plain.postgres.fields.timezones import TimeZoneField as _TimeZoneField
 from plain.postgres.fields.uuid import UUIDField as _UUIDField
+from plain.postgres.fields.value_types import ValueType as _ValueType
 from plain.postgres.query import QuerySet
 
 # String fields
+#
+# The `value_type=` overloads come first so they win when the kwarg is
+# present. They return the base `_Field[V]` rather than `_TextField[V]`: the
+# column stores text, but the *value* is opaque, so the text-only condition
+# methods must not leak onto it. (When the typed query API lands — #84 — a
+# value-typed field's condition set is derived from `V`, not from `str`.)
+@overload
+def TextField[V: _ValueType](
+    *,
+    value_type: type[V],
+    max_length: int | None = None,
+    required: bool = True,
+    allow_null: Literal[True],
+    default: Any = ...,
+    validators: Sequence[Callable[..., Any]] = (),
+) -> _Field[V | None]: ...
+@overload
+def TextField[V: _ValueType](
+    *,
+    value_type: type[V],
+    max_length: int | None = None,
+    required: bool = True,
+    allow_null: Literal[False] = False,
+    default: Any = ...,
+    validators: Sequence[Callable[..., Any]] = (),
+) -> _Field[V]: ...
 @overload
 def TextField(
     *,
@@ -433,6 +460,33 @@ def GenericIPAddressField(
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _GenericIPAddressField[str]: ...
+
+# A plain JSONField returns `Any` (the runtime class isn't generic over its
+# value shape), so the model annotation is what preserves typing. A
+# `value_type=` one doesn't need the annotation to carry its type — `V` is
+# right there in the call.
+@overload
+def JSONField[V: _ValueType](
+    *,
+    value_type: type[V],
+    encoder: Any = None,
+    decoder: Any = None,
+    required: bool = True,
+    allow_null: Literal[True],
+    default: Any = ...,
+    validators: Sequence[Callable[..., Any]] = (),
+) -> _Field[V | None]: ...
+@overload
+def JSONField[V: _ValueType](
+    *,
+    value_type: type[V],
+    encoder: Any = None,
+    decoder: Any = None,
+    required: bool = True,
+    allow_null: Literal[False] = False,
+    default: Any = ...,
+    validators: Sequence[Callable[..., Any]] = (),
+) -> _Field[V]: ...
 @overload
 def JSONField(
     *,
