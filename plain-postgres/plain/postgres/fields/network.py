@@ -10,13 +10,15 @@ from plain.validators import ip_address_validators
 
 from plain import exceptions
 
-from .base import NOT_PROVIDED, DefaultableField
+from .base import NOT_PROVIDED, DefaultableField, StringConditionsMixin
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
 
 
-class GenericIPAddressField[T: (str, str | None) = str](DefaultableField[T]):
+class GenericIPAddressField[T: (str, str | None) = str](
+    StringConditionsMixin, DefaultableField[T]
+):
     db_type_sql = "inet"
     empty_strings_allowed = False
 

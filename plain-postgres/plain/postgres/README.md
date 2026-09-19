@@ -238,7 +238,7 @@ Conditions traverse foreign keys — accessing a field through a relation builds
 Post.query.where(Post.author.email.equals("a@example.com"))
 ```
 
-A traversed field offers exactly the same conditions as the field itself — a text-only method like `contains` is available through the relation only when the related field is a text field.
+A traversed field offers exactly the same conditions as the field itself — a string-only method like `contains` is available through the relation only when the related field is string-valued (any of them, not just `TextField`: `GenericIPAddressField` and `RandomStringField` carry them too).
 
 [Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`.
 
