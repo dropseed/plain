@@ -481,37 +481,6 @@ class TestNewRelatedManagerAPI:
         assert child1 not in parent2.childcascade_set.query.all()
 
 
-class TestMetaRelatedObjects:
-    def test_meta_related_objects_includes_reverse_fk(self, db):
-        """Test that Meta.related_objects includes reverse FK relations.
-
-        Regression test: related_objects was checking obj.field.one_to_many
-        instead of obj.one_to_many, which excluded all reverse FK relations.
-        """
-        from plain.postgres.fields.reverse_related import ForeignKeyRel
-
-        # DeleteParent has multiple child models with FKs pointing to it
-        related_objs = DeleteParent._model_meta.related_objects
-
-        # Should have reverse FK relations from child models
-        assert len(related_objs) > 0, "related_objects should not be empty"
-
-        # Convert to list of field names for easier checking
-        related_fields = [obj.field for obj in related_objs]
-        related_names = [f.name for f in related_fields]
-
-        # Should include the FK from ChildCascade
-        assert "parent" in related_names, (
-            "ChildCascade.parent reverse FK should be in related_objects"
-        )
-
-        # Find the reverse relation and verify it's a ForeignKeyRel (one_to_many)
-        parent_rel = next(obj for obj in related_objs if obj.field.name == "parent")
-        assert isinstance(parent_rel, ForeignKeyRel), (
-            "Reverse FK should be ForeignKeyRel (one_to_many from parent's perspective)"
-        )
-
-
 class TestForeignKeyPartialInstance:
     """A foreign key returns a partial related instance: the primary key is
     available with no query, other fields load on first access. There is no

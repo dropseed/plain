@@ -9,6 +9,7 @@ Tests split by what they prove, not who typed them:
 
 - **`<package>/tests/public/`** — the **contract**. Failures mean a user-visible behavior is broken.
 - **`<package>/tests/internal/`** — the **change detector**. Failures mean something shifted; you decide whether it should have.
+- **`<package>/tests/typing/`** — the **static contract**, where a package ships typed surface. Checker input, not pytest input.
 
 **Where does my test go?** Public tests assert at the layer the user interacts with.
 
@@ -25,9 +26,13 @@ Still unsure? **Would a failure surprise a user reading the changelog?** If yes 
 - Stages drift/edge scenarios with heavy helper machinery
 - Wouldn't survive a feature rewrite
 
+**Static claims go in `tests/typing/`.** "This call is a type error" can only be tested by writing the bad call and asserting the checker rejects it, so a test whose body is only `assert_type` or `ty: ignore` markers doesn't belong in `public/` or `internal/` — it belongs in the corpus, where `uv run ty check` reading the file is the test. No file there is named `test_*.py`, so pytest never collects it, and `./scripts/type-validate` is what runs it. A claim with a runtime half keeps that half in `public/`/`internal/` and cross-references it. See `plain-postgres/tests/typing/README.md`.
+
+An incidental `# ty: ignore` on a deliberately-wrong call inside a `pytest.raises` block is not a static-marker test — the `raises` is the assertion, and the test stays where it is.
+
 **Conventions:**
 
 - **Lifecycle**: `internal/` tests are regenerable — delete and rewrite freely when features change. `public/` tests evolve deliberately.
 - **Promotion**: when a test crosses into contract territory, move from `internal/` to `public/`; the reverse isn't a thing.
 
-Both directories run in the normal pytest suite and must pass. Shared fixtures in `tests/conftest.py` are inherited by both.
+`public/` and `internal/` run in the normal pytest suite and must pass; shared fixtures in `tests/conftest.py` are inherited by both. `typing/` runs under the type checker instead.
