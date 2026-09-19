@@ -74,3 +74,23 @@ def must_keep_a_custom_queryset_reachable() -> None:
     qs = CustomQuerySetModel.query.returning()
     assert isinstance(qs, CustomQuerySet)
     qs.get_custom()
+
+
+def must_keep_the_return_shape_through_a_combination() -> None:
+    """A combined queryset emits one RETURNING clause, so the shape carries
+    from whichever side returning() was called on.
+
+    Runtime half: tests/public/test_returning.py, the combining section.
+    """
+    left = ReturningEvent.query.filter(label="a")
+    right = ReturningEvent.query.filter(label="b")
+
+    assert_type((left.returning() | right).update(count=1), list[ReturningEvent])
+    assert_type((left | right.returning()).update(count=1), list[ReturningEvent])
+    assert_type(
+        (left & right.returning(ReturningEvent.id)).delete(), list[dict[str, Any]]
+    )
+    assert_type(left.returning().none().update(count=1), list[ReturningEvent])
+
+    # No returning() on either side stays an int.
+    assert_type((left | right).update(count=1), int)

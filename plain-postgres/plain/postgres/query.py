@@ -514,36 +514,78 @@ class QuerySet[T: "Model"]:
     def __class_getitem__(cls, *args: Any, **kwargs: Any) -> type[QuerySet[Any]]:
         return cls
 
-    def __and__(self, other: QuerySet[T]) -> QuerySet[T]:
+    @overload
+    def __and__[R](self, other: ReturningQuerySet[T, R]) -> ReturningQuerySet[T, R]: ...
+
+    @overload
+    def __and__(self, other: QuerySet[T]) -> Self: ...
+
+    def __and__(self, other: QuerySet[T]) -> Any:
         self._merge_sanity_check(other)
+        returning = self._merged_returning(other)
         if isinstance(other, EmptyQuerySet):
-            return other
-        if isinstance(self, EmptyQuerySet):
-            return self
-        combined = self._chain()
-        combined._merge_known_related_objects(other)
-        combined.sql_query.combine(other.sql_query, AND)
+            combined = cast("Self", other._chain())
+        elif isinstance(self, EmptyQuerySet):
+            combined = self._chain()
+        else:
+            combined = self._chain()
+            combined._merge_known_related_objects(other)
+            combined.sql_query.combine(other.sql_query, AND)
+        combined._returning_fields, combined._returning_instances = returning
         return combined
 
-    def __or__(self, other: QuerySet[T]) -> QuerySet[T]:
+    @overload
+    def __or__[R](self, other: ReturningQuerySet[T, R]) -> ReturningQuerySet[T, R]: ...
+
+    @overload
+    def __or__(self, other: QuerySet[T]) -> Self: ...
+
+    def __or__(self, other: QuerySet[T]) -> Any:
         self._merge_sanity_check(other)
+        returning = self._merged_returning(other)
         if isinstance(self, EmptyQuerySet):
-            return other
-        if isinstance(other, EmptyQuerySet):
-            return self
-        query = (
-            self
-            if self.sql_query.can_filter()
-            else self.model._model_meta.base_queryset.filter(id__in=self.values("id"))
-        )
-        combined = query._chain()
-        combined._merge_known_related_objects(other)
-        if not other.sql_query.can_filter():
-            other = other.model._model_meta.base_queryset.filter(
-                id__in=other.values("id")
+            combined = cast("Self", other._chain())
+        elif isinstance(other, EmptyQuerySet):
+            combined = self._chain()
+        else:
+            query = (
+                self
+                if self.sql_query.can_filter()
+                else self.model._model_meta.base_queryset.filter(
+                    id__in=self.values("id")
+                )
             )
-        combined.sql_query.combine(other.sql_query, OR)
+            combined = cast("Self", query._chain())
+            combined._merge_known_related_objects(other)
+            if not other.sql_query.can_filter():
+                other = other.model._model_meta.base_queryset.filter(
+                    id__in=other.values("id")
+                )
+            combined.sql_query.combine(other.sql_query, OR)
+        combined._returning_fields, combined._returning_instances = returning
         return combined
+
+    def _merged_returning(self, other: QuerySet[T]) -> tuple[list[Field] | None, bool]:
+        """Combine two querysets' returning() state, or refuse to.
+
+        A returning write over a combined queryset is fine, and it doesn't
+        matter which side returning() was called on. What it can't do is
+        honor two different selections: the combined query emits one
+        RETURNING clause, not one per operand.
+        """
+        if other._returning_fields is None:
+            return self._returning_fields, self._returning_instances
+        if self._returning_fields is None:
+            return other._returning_fields, other._returning_instances
+        if (
+            self._returning_fields != other._returning_fields
+            or self._returning_instances != other._returning_instances
+        ):
+            raise TypeError(
+                "Cannot combine two querysets with different returning() "
+                "selections -- the combined write emits one RETURNING clause."
+            )
+        return self._returning_fields, self._returning_instances
 
     ####################################
     # METHODS THAT DO DATABASE QUERIES #
@@ -1287,7 +1329,7 @@ class QuerySet[T: "Model"]:
         clone._iterable_class = FlatValuesListIterable if flat else ValuesListIterable
         return clone
 
-    def none(self) -> QuerySet[T]:
+    def none(self) -> Self:
         """Return an empty QuerySet."""
         clone = self._chain()
         clone.sql_query.set_empty()

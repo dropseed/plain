@@ -7,6 +7,7 @@ returning(*Model.field) returns a list of dicts holding just those columns.
 
 from __future__ import annotations
 
+import operator
 from typing import TYPE_CHECKING, cast
 
 import psycopg
@@ -470,3 +471,66 @@ def test_locked_returning_delete_claims_rows_exclusively(isolated_db):
     assert len(claimed_first) == 4
     assert claimed_second == set()
     assert not claimed_first & claimed_second
+
+
+# ===========================================================================
+# Combining querysets
+#
+# The combined query emits one RETURNING clause, so the state has to survive
+# the combination from either side -- and two different selections can't both
+# be honored.
+# ===========================================================================
+
+
+def test_or_carries_returning_from_the_left(db):
+    _seed_events()
+    combined = ReturningEvent.query.filter(label="a").returning() | (
+        ReturningEvent.query.filter(label="b")
+    )
+
+    rows = combined.update(count=7)
+    assert {row.count for row in rows} == {7}
+    assert len(rows) == 3
+
+
+def test_or_carries_returning_from_the_right(db):
+    _seed_events()
+    combined = ReturningEvent.query.filter(label="a") | (
+        ReturningEvent.query.filter(label="b").returning()
+    )
+
+    rows = combined.update(count=7)
+    assert {row.count for row in rows} == {7}
+    assert len(rows) == 3
+
+
+def test_and_carries_returning_from_the_right(db):
+    _seed_events()
+    combined = ReturningEvent.query.filter(label="a") & (
+        ReturningEvent.query.filter(count=1).returning(ReturningEvent.id)
+    )
+
+    rows = combined.update(count=7)
+    assert len(rows) == 2
+    assert all(set(row) == {"id"} for row in rows)
+
+
+@pytest.mark.parametrize("op", [operator.or_, operator.and_])
+def test_combining_different_returning_selections_errors(db, op):
+    left = ReturningEvent.query.filter(label="a").returning()
+    right = ReturningEvent.query.filter(label="b").returning(ReturningEvent.id)
+
+    with pytest.raises(TypeError, match="one RETURNING clause"):
+        op(left, right)
+
+
+def test_none_keeps_returning_and_writes_nothing(db, capture_queries):
+    _seed_events()
+    empty = ReturningEvent.query.returning().none()
+
+    with capture_queries() as queries:
+        assert empty.update(count=9) == []
+        assert empty.delete() == []
+
+    assert queries == []
+    assert ReturningEvent.query.count() == 3
