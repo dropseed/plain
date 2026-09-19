@@ -304,6 +304,80 @@ def test_select_result_type_arity_counts_init_vars(rows):
         DefaultsExample.query.select(DefaultsExample.name, result_type=OnlyInitVar)
 
 
+class TestResultTypeParameterKinds:
+    """Parameter kind decides how each value has to be passed. A signature
+    always orders positionals before keyword-onlys, so the row splits at one
+    point -- but the split has to happen, because a positional-only parameter
+    can't be filled by name and a keyword-only one can't be filled by
+    position."""
+
+    def test_all_positional(self, rows):
+        @dataclass
+        class AllPositional:
+            name: str
+            priority: int
+
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(
+                DefaultsExample.name,
+                DefaultsExample.priority,
+                result_type=AllPositional,
+            )
+            .first()
+        )
+        assert result == AllPositional(name="alpha", priority=3)
+
+    def test_all_keyword_only(self, rows):
+        @dataclass(kw_only=True)
+        class AllKeyword:
+            name: str
+            priority: int
+
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(
+                DefaultsExample.name, DefaultsExample.priority, result_type=AllKeyword
+            )
+            .first()
+        )
+        assert result == AllKeyword(name="alpha", priority=3)
+
+    def test_positional_only_mixed_with_keyword_only(self, rows):
+        """Neither the all-positional nor the all-keyword call works here."""
+
+        @dataclass
+        class Mixed:
+            name: str
+            priority: int
+
+            def __init__(self, name: str, /, *, priority: int) -> None:
+                self.name = name
+                self.priority = priority
+
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(DefaultsExample.name, DefaultsExample.priority, result_type=Mixed)
+            .first()
+        )
+        assert result == Mixed("alpha", priority=3)
+
+    def test_positional_or_keyword_mixed_with_keyword_only(self, rows):
+        @dataclass
+        class PartlyKwOnly:
+            name: str
+            priority: int = field(kw_only=True)
+
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(
+                DefaultsExample.name, DefaultsExample.priority, result_type=PartlyKwOnly
+            )
+            .first()
+        )
+        assert result == PartlyKwOnly(name="alpha", priority=3)
+
+
 def test_select_result_type_rejects_a_variadic_constructor(rows):
     @dataclass(init=False)
     class Variadic:

@@ -387,7 +387,7 @@ class QuerySet[T: "Model"]:
     # PYTHON MAGIC METHODS #
     ########################
 
-    def __deepcopy__(self, memo: dict[int, Any]) -> QuerySet[T]:
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
         """Don't populate the QuerySet's cache."""
         obj = self.__class__.from_model(self.model)
         for k, v in self.__dict__.items():
@@ -464,9 +464,9 @@ class QuerySet[T: "Model"]:
     def __getitem__(self, k: int) -> T: ...
 
     @overload
-    def __getitem__(self, k: slice) -> QuerySet[T]: ...
+    def __getitem__(self, k: slice) -> Self: ...
 
-    def __getitem__(self, k: int | slice) -> T | QuerySet[T]:
+    def __getitem__(self, k: int | slice) -> T | Self:
         """Retrieve an item or slice from the set of results.
 
         Slicing always returns a QuerySet, even when the results are
@@ -515,7 +515,7 @@ class QuerySet[T: "Model"]:
     def __class_getitem__(cls, *args: Any, **kwargs: Any) -> type[QuerySet[Any]]:
         return cls
 
-    def __and__(self, other: QuerySet[T]) -> QuerySet[T]:
+    def __and__(self, other: Self) -> Self:
         self._merge_sanity_check(other)
         if isinstance(other, EmptyQuerySet):
             return other
@@ -532,6 +532,13 @@ class QuerySet[T: "Model"]:
             return other
         if isinstance(other, EmptyQuerySet):
             return self
+        # A sliced left operand can't be filtered further, so it is re-expressed
+        # as an id subquery against the model's base queryset -- which is a
+        # plain QuerySet by design (see Meta.base_queryset: it must never be a
+        # user-defined queryset, which might filter rows out). That is why
+        # __or__ alone among the chaining methods can't be typed `Self`: this
+        # branch really does hand back a different class. Everything else here
+        # clones through `self._chain()`.
         query = (
             self
             if self.sql_query.can_filter()
@@ -1337,7 +1344,7 @@ class QuerySet[T: "Model"]:
             clone._iterable_class = SelectDataclassIterable
         return clone
 
-    def none(self) -> QuerySet[T]:
+    def none(self) -> Self:
         """Return an empty QuerySet."""
         clone = self._chain()
         clone.sql_query.set_empty()
@@ -1411,7 +1418,7 @@ class QuerySet[T: "Model"]:
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
         no_key: bool = False,
-    ) -> QuerySet[T]:
+    ) -> Self:
         """
         Return a new QuerySet instance that will select objects with a
         FOR UPDATE lock.
@@ -1529,7 +1536,7 @@ class QuerySet[T: "Model"]:
         obj.sql_query.add_distinct_fields(*field_names)
         return obj
 
-    def reverse(self) -> QuerySet[T]:
+    def reverse(self) -> Self:
         """Reverse the ordering of the QuerySet."""
         if self.sql_query.is_sliced:
             raise TypeError("Cannot reverse a query once a slice has been taken.")
@@ -1537,7 +1544,7 @@ class QuerySet[T: "Model"]:
         clone.sql_query.standard_ordering = not clone.sql_query.standard_ordering
         return clone
 
-    def defer(self, *fields: str | None) -> QuerySet[T]:
+    def defer(self, *fields: str | None) -> Self:
         """
         Defer the loading of data for certain fields until they are accessed.
         Add the set of deferred fields to any existing set of deferred fields.
@@ -1553,7 +1560,7 @@ class QuerySet[T: "Model"]:
             clone.sql_query.add_deferred_loading(frozenset(fields))  # ty: ignore[invalid-argument-type]
         return clone
 
-    def only(self, *fields: str) -> QuerySet[T]:
+    def only(self, *fields: str) -> Self:
         """
         Essentially, the opposite of defer(). Only the fields passed into this
         method and that are not already specified as deferred are loaded
@@ -1699,7 +1706,7 @@ class QuerySet[T: "Model"]:
         if self._prefetch_related_lookups and not self._prefetch_done:
             self._prefetch_related_objects()
 
-    def _next_is_sticky(self) -> QuerySet[T]:
+    def _next_is_sticky(self) -> Self:
         """
         Indicate that the next filter call and the one following that should
         be treated as a single filter. This is only important when it comes to

@@ -18,7 +18,7 @@ from typing import Any, Never, assert_type
 
 from app.examples.models.defaults import DefaultsExample as D
 from app.examples.models.relationships import WidgetTag
-from plain.postgres import RowQuerySet
+from plain.postgres import QuerySet, RowQuerySet
 from plain.postgres.expressions import F
 from plain.postgres.functions import Upper
 
@@ -162,3 +162,31 @@ def must_accept_the_row_type_through_iterator_and_chaining() -> None:
     assert_type(rows[0:2], RowQuerySet[tuple[str, int]])
     for row in rows.iterator():
         assert_type(row, tuple[str, int])
+
+
+def must_accept_the_row_type_surviving_every_chaining_method() -> None:
+    """`RowQuerySet[R]` specializes its base as `QuerySet[Any]`, so an
+    inherited method annotated `QuerySet[T]` would hand back `QuerySet[Any]`
+    and drop `R`. They are annotated `Self` instead, which carries it.
+    """
+    rows = D.query.select(D.name, D.priority)
+    assert_type(rows.reverse(), RowQuerySet[tuple[str, int]])
+    assert_type(rows.none(), RowQuerySet[tuple[str, int]])
+    assert_type(rows.distinct(), RowQuerySet[tuple[str, int]])
+    assert_type(rows.order_by("name"), RowQuerySet[tuple[str, int]])
+    assert_type(rows.select_for_update(), RowQuerySet[tuple[str, int]])
+    assert_type(rows & rows, RowQuerySet[tuple[str, int]])
+    assert_type(rows.all(), RowQuerySet[tuple[str, int]])
+
+
+def must_accept_or_degrading_because_its_clone_can_change_class() -> None:
+    """`__or__` is the one chaining method that can't be `Self`.
+
+    A sliced left operand is re-expressed as an id subquery against
+    `Meta.base_queryset`, which is a plain `QuerySet` by design -- it must
+    never be a user-defined queryset, which might filter rows out. So that
+    branch really does hand back a different class, and the annotation says so
+    rather than lying.
+    """
+    rows = D.query.select(D.name, D.priority)
+    assert_type(rows | rows, QuerySet[Any])
