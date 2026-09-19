@@ -15,6 +15,7 @@ from . import (  # noqa: F401
     relationships,
     shadowing,
     storage_parameters,
+    string_conditions,
     trees,
     unregistered,
 )

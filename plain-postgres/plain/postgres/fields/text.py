@@ -8,14 +8,13 @@ from plain.validators import MaxLengthValidator
 
 from plain import validators
 
-from .base import NOT_PROVIDED, ChoicesField, ColumnField
+from .base import NOT_PROVIDED, ChoicesField, ColumnField, StringConditionsMixin
 
 if TYPE_CHECKING:
     from plain.postgres.functions.random import RandomString
-    from plain.postgres.query_utils import Q
 
 
-class TextField[T: (str, str | None) = str](ChoicesField[T]):
+class TextField[T: (str, str | None) = str](StringConditionsMixin, ChoicesField[T]):
     db_type_sql = "text"
 
     def __init__(
@@ -88,18 +87,6 @@ class TextField[T: (str, str | None) = str](ChoicesField[T]):
         value = super().get_prep_value(value)
         return self.to_python(value)
 
-    def contains(self, value: str) -> Q:
-        return self._build_q("contains", value)
-
-    def icontains(self, value: str) -> Q:
-        return self._build_q("icontains", value)
-
-    def startswith(self, value: str) -> Q:
-        return self._build_q("startswith", value)
-
-    def endswith(self, value: str) -> Q:
-        return self._build_q("endswith", value)
-
 
 class EmailField[T: (str, str | None) = str](TextField[T]):
     default_validators = (validators.validate_email,)
@@ -109,7 +96,9 @@ class URLField[T: (str, str | None) = str](TextField[T]):
     default_validators = (validators.URLValidator(),)
 
 
-class RandomStringField[T: (str, str | None) = str](ColumnField[T]):
+class RandomStringField[T: (str, str | None) = str](
+    StringConditionsMixin, ColumnField[T]
+):
     """Text column whose value is a Postgres-generated random hex string.
 
     The column carries a ``DEFAULT`` that evaluates per row, so raw SQL and

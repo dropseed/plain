@@ -183,13 +183,16 @@ class Field[T](RegisterLookupMixin):
         return self._build_q("in", values)
 
     if TYPE_CHECKING:
-        # Pattern conditions are implemented on TextField, not here -- the
-        # runtime surface stays exactly as narrow as the field it belongs to,
-        # which is what where() traversal reflects. They are *declared* here
-        # so they survive the `Field[T]` annotation models carry: a model
-        # field's declared type is `Field[str]`, not `TextField[str]`, so the
-        # checker only sees what `Field` offers. The `self` annotation keeps
-        # the restriction -- a `Field[int]` still rejects `.startswith(...)`.
+        # Pattern conditions are implemented by StringConditionsMixin, not
+        # here -- the runtime surface stays exactly as narrow as the field it
+        # belongs to, which is what where() traversal reflects. They are
+        # *declared* here so they survive the `Field[T]` annotation models
+        # carry: a model field's declared type is `Field[str]`, not
+        # `TextField[str]`, so the checker only sees what `Field` offers. The
+        # `self` annotation keeps the restriction -- a `Field[int]` still
+        # rejects `.startswith(...)`. Every field that satisfies this `self`
+        # type has to mix in StringConditionsMixin, or the declaration
+        # promises a method the instance doesn't have.
         def contains(self: Field[str] | Field[str | None], value: str) -> Q: ...
 
         def icontains(self: Field[str] | Field[str | None], value: str) -> Q: ...
@@ -639,6 +642,41 @@ def validate_none_only_default(
         )
     if not allow_null:
         raise TypeError(f"{name}(default=None) requires allow_null=True.")
+
+
+class StringConditionsMixin:
+    """The pattern conditions that every string-valued field carries.
+
+    `Field` *declares* these under TYPE_CHECKING, restricted by their `self`
+    annotation to `Field[str]` / `Field[str | None]`, so they survive the
+    `Field[T]` annotation models write. This is where they are implemented,
+    and the two have to agree: a field whose value type is `str` must mix this
+    in, or the declaration promises a method that raises `AttributeError`.
+
+    That means TextField and its subclasses, and also the string-valued fields
+    that are *not* TextFields -- `RandomStringField` (a ColumnField) and
+    `GenericIPAddressField` (a DefaultableField). Non-string fields get
+    neither the declaration nor the methods, which is what keeps where()
+    traversal's surface an honest mirror of direct field access.
+
+    Must be used with Field as a co-base class.
+    """
+
+    if TYPE_CHECKING:
+        # Provided by Field, the required co-base class.
+        def _build_q(self, suffix: str, value: Any) -> Q: ...
+
+    def contains(self, value: str) -> Q:
+        return self._build_q("contains", value)
+
+    def icontains(self, value: str) -> Q:
+        return self._build_q("icontains", value)
+
+    def startswith(self, value: str) -> Q:
+        return self._build_q("startswith", value)
+
+    def endswith(self, value: str) -> Q:
+        return self._build_q("endswith", value)
 
 
 class ColumnField[T](Field[T]):
