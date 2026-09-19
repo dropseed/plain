@@ -68,7 +68,13 @@ def test_traversal_before_the_target_resolves_says_so():
     that runs at import time can land here first, and the old code dereferenced
     `str._model_meta` -- an AttributeError that `hasattr` then swallowed, so
     the symptom was a missing attribute rather than a timing problem."""
-    from plain.postgres.fields.related_typed import RelatedFieldRef
+    from plain.postgres.fields.related_typed import (
+        RelatedFieldRef,
+        UnresolvedRelationError,
+    )
 
-    with pytest.raises(AssertionError, match=r"still the string 'Tag'"):
+    with pytest.raises(UnresolvedRelationError, match=r"'Tag' hasn't been resolved"):
         RelatedFieldRef(model="Tag", prefix="tags", target_name="id")  # ty: ignore[invalid-argument-type]
+
+    # An AttributeError subclass, so the attribute protocol still holds.
+    assert issubclass(UnresolvedRelationError, AttributeError)

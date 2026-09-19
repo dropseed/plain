@@ -247,7 +247,9 @@ Post.query.where(Post.author.id.is_null())  # nullable relation
 
 `Post.author.equals(author)` raises `AttributeError` naming this spelling (an `AttributeError`, so `hasattr` and `getattr(..., default)` keep behaving). It isn't an oversight: to the type checker `Post.author` is `type[Author]`, which is what makes `Post.author.email.equals(...)` type-check, and a condition method there would be a runtime method the checker rejects.
 
-Every relation reached _through_ a traversal is a hop, many-to-many included — `WidgetTag.widget.tags.name.equals("metal")` builds `Q(widget__tags__name="metal")` — and the same rule applies to the relation itself: `WidgetTag.widget.tags.equals(tag)` points you at `.tags.id.equals(tag.id)`. (Traversal starts from a forward foreign key; class-level many-to-many access like `Widget.tags` is not a traversal entry point.)
+Traversal starts from a **forward foreign key**. Once inside one, every relation you pass through is another hop, many-to-many included — `WidgetTag.widget.tags.name.equals("metal")` builds `Q(widget__tags__name="metal")` — and the same rule applies to the relation itself: `WidgetTag.widget.tags.equals(tag)` points you at `WidgetTag.widget.tags.id.equals(tag.id)`.
+
+A class-level many-to-many (`Widget.tags`) is _not_ an entry point: it has no traversal wiring, and it is typed `ManyToManyManager[Tag]`, so it could not be typed as one either. Use the string path there — `Widget.query.filter(tags__name="metal")`. Reverse relations aren't traversable for the same reason (a reverse accessor is a `ClassVar`, so there is nothing for the related model to offer the checker), and the error says so.
 
 A traversed field _is_ the related field, carrying the relation path as its name — so it offers exactly the conditions that field offers, including an encrypted field's refusals.
 
@@ -1170,6 +1172,8 @@ book.author.name  # one query — loads the rest of the row
 ```
 
 The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `select_related()` to load related rows up front and avoid a query per row.
+
+A foreign key with no value raises `RelatedObjectDoesNotExist` on access. That attribute still lives on the descriptor at runtime, but class-level access is now typed as the related model (that is what makes `Book.author.name.equals(...)` work), so `Book.author.RelatedObjectDoesNotExist` is a type error. Catch it as `Author.DoesNotExist` — the exception subclasses both that and `AttributeError` — or as `AttributeError`.
 
 The partial-instance shortcut is safe because Plain always creates a database foreign-key constraint, so the referenced row is guaranteed to exist.
 

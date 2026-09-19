@@ -167,11 +167,11 @@ class TestTypedQueryMethodsBlocked:
 
     def test_equals_raises(self):
         with pytest.raises(TypeError, match=r"api_key.*does not support \.equals\("):
-            SecretStore.api_key.equals("anything")  # ty: ignore[invalid-argument-type]
+            SecretStore.api_key.equals("anything")  # ty: ignore[no-matching-overload]
 
     def test_not_equal_raises(self):
         with pytest.raises(TypeError, match=r"does not support \.not_equal\("):
-            SecretStore.api_key.not_equal("x")  # ty: ignore[invalid-argument-type]
+            SecretStore.api_key.not_equal("x")  # ty: ignore[no-matching-overload]
 
     @pytest.mark.parametrize("method", ["gt", "gte", "lt", "lte"])
     def test_ordering_comparison_raises(self, method):
@@ -205,9 +205,9 @@ class TestTypedQueryMethodsBlocked:
         checker are pinned to each other in one place.
         """
         with pytest.raises(TypeError):
-            SecretStore.api_key.equals("x")  # ty: ignore[invalid-argument-type]
+            SecretStore.api_key.equals("x")  # ty: ignore[no-matching-overload]
         with pytest.raises(TypeError):
-            SecretStore.api_key.not_equal("x")  # ty: ignore[invalid-argument-type]
+            SecretStore.api_key.not_equal("x")  # ty: ignore[no-matching-overload]
         with pytest.raises(TypeError):
             SecretStore.api_key.gt("x")  # ty: ignore[invalid-argument-type]
         with pytest.raises(TypeError):
@@ -233,9 +233,9 @@ class TestTypedQueryMethodsBlocked:
         rather than through getattr, because a marker can't bind to a dynamic
         call."""
         with pytest.raises(TypeError):
-            SecretStore.config.equals({"a": 1})  # ty: ignore[invalid-argument-type]
+            SecretStore.config.equals({"a": 1})  # ty: ignore[no-matching-overload]
         with pytest.raises(TypeError):
-            SecretStore.config.not_equal({"a": 1})  # ty: ignore[invalid-argument-type]
+            SecretStore.config.not_equal({"a": 1})  # ty: ignore[no-matching-overload]
         with pytest.raises(TypeError):
             SecretStore.config.is_in([{"a": 1}])  # ty: ignore[invalid-argument-type]
 
@@ -279,15 +279,11 @@ class TestKwargFilterBlocked:
     """
 
     def test_filter_non_none_raises(self, db):
-        with pytest.raises(
-            TypeError, match=r"api_key.*cannot be matched against a value"
-        ):
+        with pytest.raises(TypeError, match=r"api_key.*cannot be matched against"):
             SecretStore.query.filter(api_key="sk-test").count()
 
     def test_exclude_non_none_raises(self, db):
-        with pytest.raises(
-            TypeError, match=r"api_key.*cannot be matched against a value"
-        ):
+        with pytest.raises(TypeError, match=r"api_key.*cannot be matched against"):
             SecretStore.query.exclude(api_key="sk-test").count()
 
     def test_filter_none_still_rewrites_to_isnull(self, db):
@@ -319,9 +315,7 @@ class TestKwargFilterBlocked:
     def test_filter_against_an_expression_raises(self, db):
         """An F() right-hand side is a value comparison too — the column is
         still ciphertext, so it can never match."""
-        with pytest.raises(
-            TypeError, match=r"api_key.*cannot be matched against a value"
-        ):
+        with pytest.raises(TypeError, match=r"api_key.*cannot be matched against"):
             SecretStore.query.filter(api_key=F("name")).count()
 
 
@@ -389,3 +383,55 @@ class TestEncryptedJSONFieldDefault:
 
         with pytest.raises(TypeError, match="does not accept a persistent default"):
             EncryptedJSONField(required=False, allow_null=True, default=value)
+
+
+class TestDeterministicValuesStillMatch:
+    """The empty string is stored as plaintext `''` (that is what makes
+    `default=""` expressible as a column DEFAULT), so equality against it is
+    meaningful and must keep working -- on both the kwarg and the typed path,
+    which must agree with each other."""
+
+    def test_filter_on_empty_string_works(self, db):
+        SecretStore.query.create(name="blank", api_key="k", notes="", config=None)
+        SecretStore.query.create(name="filled", api_key="k", notes="x", config=None)
+
+        assert SecretStore.query.filter(notes="").count() == 1
+        assert SecretStore.query.exclude(notes="").count() == 1
+
+    def test_get_or_create_on_empty_string_works(self, db):
+        obj, created = SecretStore.query.get_or_create(
+            notes="", defaults={"name": "blank", "api_key": "k", "config": None}
+        )
+        assert created
+        again, created_again = SecretStore.query.get_or_create(
+            notes="", defaults={"name": "other", "api_key": "k", "config": None}
+        )
+        assert not created_again
+        assert again.id == obj.id
+
+    def test_typed_equals_matches_the_kwarg_path(self):
+        """`equals(None)` and `filter(field=None)` can't disagree, and the
+        error message advertises `=None`, so the typed path has to allow it."""
+        assert SecretStore.api_key.equals(None).children == [("api_key", None)]
+        assert SecretStore.notes.equals("").children == [("notes", "")]
+        assert SecretStore.notes.not_equal("").children == [("notes", "")]
+
+    def test_where_filters_on_the_empty_string(self, db):
+        SecretStore.query.create(name="blank", api_key="k", notes="", config=None)
+        SecretStore.query.create(name="filled", api_key="k", notes="x", config=None)
+
+        rows = list(SecretStore.query.where(SecretStore.notes.equals("")))
+        assert [r.name for r in rows] == ["blank"]
+
+    def test_a_real_value_is_still_blocked(self, db):
+        with pytest.raises(TypeError, match=r"does not support \.equals\("):
+            SecretStore.notes.equals("something")  # ty: ignore[no-matching-overload]
+        with pytest.raises(TypeError, match=r"cannot be matched against"):
+            SecretStore.query.filter(notes="something").count()
+
+    def test_json_field_allows_none_but_not_empty_string(self):
+        """Only text stores "" as plaintext; an empty string on a JSON column
+        would still be encrypted, so it stays blocked."""
+        assert SecretStore.config.equals(None).children == [("config", None)]
+        with pytest.raises(TypeError, match=r"does not support \.equals\("):
+            SecretStore.config.equals("")  # ty: ignore[no-matching-overload]

@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from functools import cache
-from typing import TYPE_CHECKING, Any, Never
+from typing import TYPE_CHECKING, Any, Literal, Never, overload
 
 try:
     from cryptography.fernet import Fernet, InvalidToken, MultiFernet
@@ -120,25 +120,27 @@ _NON_DETERMINISTIC_EXPLANATION = (
 
 
 class _EncryptedExact(Exact):
-    """An exact lookup that rejects non-None right-hand values.
+    """An exact lookup that rejects right-hand values ciphertext can't match.
 
     None passes through so the ORM's exact-None → isnull rewrite in
-    `build_lookup` still works. Any other value could only ever match nothing
-    (ciphertext is non-deterministic), so it raises instead of silently
-    returning no rows.
+    `build_lookup` still works, and so does any other value the field stores
+    deterministically (for text, the empty string, which is stored as
+    plaintext ''). Anything else could only ever match nothing, so it raises
+    instead of silently returning no rows.
     """
 
     def __init__(self, lhs: Any, rhs: Any) -> None:
-        if rhs is not None:
-            # lhs.output_field is the encrypted field itself (the lookups.py
-            # idiom). Its own sentence, not _lookup_unsupported_message's:
-            # `filter()` *is* supported here, just not against a value.
-            name = lhs.output_field.name
+        # lhs.output_field is the encrypted field itself (the lookups.py idiom),
+        # so it decides which values have a deterministic stored form.
+        field = lhs.output_field
+        if not field.matches_deterministically(rhs):
+            # Its own sentence, not _lookup_unsupported_message's: `filter()`
+            # *is* supported here, just not against an arbitrary value.
             raise TypeError(
-                f"Encrypted field {name!r} cannot be matched against a value: "
-                f"{_NON_DETERMINISTIC_EXPLANATION}. `is_null()` (or "
-                f"{name}=None) is the only condition it supports. If this came "
-                f"from get_or_create()/update_or_create(), move {name!r} into "
+                f"Encrypted field {field.name!r} cannot be matched against "
+                f"this value: {_NON_DETERMINISTIC_EXPLANATION}. "
+                f"{field.matchable_values_hint()} If this came from "
+                f"get_or_create()/update_or_create(), move {field.name!r} into "
                 f"defaults= -- it can be written, just not looked up."
             )
         super().__init__(lhs, rhs)
@@ -199,12 +201,27 @@ class EncryptedField[T](Field[T]):
         through here, so blocking the ones that compare ciphertext takes a
         single override -- including conditions that don't exist yet.
 
-        `isnull` is the only meaningful comparison: it reads the column's
-        NULL-ness, not its contents.
+        What survives is exactly what the kwarg path allows, so
+        `field.equals(None)` and `filter(field=None)` can't disagree:
+        `isnull`, and equality against a value the field stores
+        deterministically.
         """
-        if suffix != "isnull":
-            raise TypeError(self._lookup_unsupported_message(method))
-        return super()._build_q(method, suffix, value)
+        if suffix == "isnull" or (
+            suffix == "" and self.matches_deterministically(value)
+        ):
+            return super()._build_q(method, suffix, value)
+        raise TypeError(self._lookup_unsupported_message(method))
+
+    def matches_deterministically(self, value: Any) -> bool:
+        """Whether `value` has a stored form equality can actually match.
+
+        Only NULL, in general: everything else becomes ciphertext, and
+        encrypting the same plaintext twice gives different bytes.
+        """
+        return value is None
+
+    def matchable_values_hint(self) -> str:
+        return ".is_null() is the only condition it supports."
 
     if TYPE_CHECKING:
         # The static half of the same block. `Never` as the parameter type
@@ -216,9 +233,31 @@ class EncryptedField[T](Field[T]):
         # Declarations only -- `_build_q` above is what raises. Keeping them
         # here means the static block and the runtime block can't drift into
         # disagreeing about *how* to refuse, only about which methods exist.
-        def equals(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+        # equals/not_equal are narrowed rather than blocked: the value types
+        # below are exactly the ones `matches_deterministically` accepts, so
+        # the static surface and the runtime guard agree. Everything else is
+        # `Never`.
+        #
+        # The `self` restriction is what distinguishes them -- a string-valued
+        # encrypted column stores "" as plaintext, a JSON one doesn't -- and it
+        # has to live here rather than on EncryptedTextField, because models
+        # annotate the field `EncryptedField[T]` and that annotation is all the
+        # checker sees.
+        @overload
+        def equals(
+            self: EncryptedField[str] | EncryptedField[str | None],
+            value: Literal[""] | None,
+        ) -> Q: ...
+        @overload
+        def equals(self, value: None) -> Q: ...  # ty: ignore[invalid-method-override]
 
-        def not_equal(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+        @overload
+        def not_equal(
+            self: EncryptedField[str] | EncryptedField[str | None],
+            value: Literal[""] | None,
+        ) -> Q: ...
+        @overload
+        def not_equal(self, value: None) -> Q: ...  # ty: ignore[invalid-method-override]
 
         def gt(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
@@ -244,9 +283,9 @@ class EncryptedField[T](Field[T]):
             "methods can produce a meaningful error message."
         )
         return (
-            f"Encrypted field {self.name!r} does not support .{method}(): "
-            f"{_NON_DETERMINISTIC_EXPLANATION}. .is_null() is the only "
-            f"condition it supports."
+            f"Encrypted field {self.name!r} does not support .{method}() "
+            f"against this value: {_NON_DETERMINISTIC_EXPLANATION}. "
+            f"{self.matchable_values_hint()}"
         )
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
@@ -330,6 +369,21 @@ class EncryptedTextField[T: (str, str | None) = str](EncryptedField[T], TextFiel
             allow_null=allow_null,
             default=default,
             validators=validators,
+        )
+
+    def matches_deterministically(self, value: Any) -> bool:
+        # `_encrypt("")` returns "" -- the empty string is stored as plaintext,
+        # which is exactly what makes `default=""` expressible as a column
+        # DEFAULT. So equality against it is meaningful, and
+        # `exclude(token="")` (the documented "unset" check) keeps working.
+        return super().matches_deterministically(value) or (
+            isinstance(value, str) and value == ""
+        )
+
+    def matchable_values_hint(self) -> str:
+        return (
+            '.is_null() and equality against "" (stored as plaintext) are the '
+            "only conditions it supports."
         )
 
     def get_db_prep_value(
