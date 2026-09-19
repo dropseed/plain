@@ -531,25 +531,16 @@ for row in deleted:
 A row lock belongs on the read side of the write — that pairing is the job-claim pattern, and it composes in either order:
 
 ```python
-claimed = (
-    Job.query.filter(status="pending")
-    .for_update(skip_locked=True)
-    .returning()
-    .update(status="running")
-)
+with transaction.atomic():
+    claimed = (
+        Job.query.filter(status="pending")
+        .for_update(skip_locked=True)
+        .returning()
+        .update(status="running")
+    )
 ```
 
-Neither `UPDATE` nor `DELETE` takes a locking clause of its own, so a locked write is emitted as a sub-select that holds the lock:
-
-```sql
-UPDATE "jobs" SET "status" = 'running'
-WHERE "id" IN (
-    SELECT "id" FROM "jobs" WHERE "status" = 'pending' FOR UPDATE SKIP LOCKED
-)
-RETURNING ...
-```
-
-It is still one statement. A second worker running the same write skips the rows the first one holds instead of blocking on them, so each row is claimed once.
+The write needs an open `transaction.atomic()`, and it is emitted as a locking sub-select so the lock has somewhere to live — see [Row-level locking](#row-level-locking) for the shape.
 
 The values you get back are whatever the statement wrote, exactly as Postgres holds them. A set-based `update()` doesn't run Python-side field hooks, so an `update_now=True` timestamp comes back unchanged unless the `update()` set it.
 
@@ -657,6 +648,32 @@ Widget.query.for_update().distinct()  # same error, either way round
 ```
 
 `count()` and `aggregate()` are the exception — they compile to an aggregate query of their own, so they drop the lock rather than reject it.
+
+#### Locking a set-based write
+
+A lock also applies to `update()` and `delete()` on the same queryset — that pairing is the job-claim pattern. Neither statement takes a locking clause of its own, so the write is emitted as a locking sub-select:
+
+```python
+with transaction.atomic():
+    claimed = (
+        Job.query.filter(status="pending")
+        .for_update(skip_locked=True)
+        .returning()
+        .update(status="running")
+    )
+```
+
+```sql
+UPDATE "jobs" SET "status" = 'running'
+WHERE "id" IN (
+    SELECT "id" FROM "jobs" WHERE "status" = 'pending' FOR UPDATE SKIP LOCKED
+)
+RETURNING ...
+```
+
+It is still one statement. A second worker running the same write skips the rows the first one holds instead of blocking on them, so each row is claimed once.
+
+The `transaction.atomic()` is required, same as for a locked read: a locked write outside a transaction raises `TransactionManagementError`. Nothing else honors the lock — without a transaction there is nothing for it to be held until.
 
 ## Schema management
 
