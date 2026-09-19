@@ -28,7 +28,6 @@ from plain.postgres.exceptions import (
     ObjectDoesNotExist,
 )
 from plain.postgres.expressions import (
-    BaseExpression,
     Case,
     F,
     ResolvableExpression,
@@ -272,10 +271,14 @@ class SelectDataclassIterable(BaseIterable):
         queryset = self.queryset
         result_type = queryset._select_result_type
         assert result_type is not None
-        fields = dataclasses.fields(result_type)
         tuple_rows = ValuesListIterable(queryset, chunked_fetch=self.chunked_fetch)
+
+        # Decide how to call the constructor once, not once per row. A
+        # kw_only field can't be filled positionally, so those dataclasses
+        # take the slower keyword path.
+        fields = _result_type_fields(result_type)
         if any(f.kw_only for f in fields):
-            field_names = [f.name for f in fields]
+            field_names = tuple(f.name for f in fields)
             for row in tuple_rows:
                 yield result_type(**dict(zip(field_names, row, strict=True)))
         else:
@@ -1109,7 +1112,9 @@ class QuerySet[T: "Model"]:
     def values_list(self, *fields: str, flat: bool = False) -> QuerySet[Any]:
         return self._values_list(fields, flat=flat)
 
-    def _values_list(self, fields: tuple[Any, ...], *, flat: bool) -> QuerySet[Any]:
+    def _values_list(
+        self, fields: tuple[str | ResolvableExpression, ...], *, flat: bool
+    ) -> QuerySet[Any]:
         if flat and len(fields) > 1:
             raise TypeError(
                 "'flat' is not valid when values_list is called with more than one "
@@ -1151,11 +1156,6 @@ class QuerySet[T: "Model"]:
     def select[S](
         self, item: Selectable[S], /, *, flat: Literal[True]
     ) -> RowQuerySet[S]: ...
-
-    @overload
-    def select(
-        self, item: Selectable[Any], /, *, flat: Literal[True]
-    ) -> RowQuerySet[Any]: ...
 
     @overload
     def select[D](
@@ -1301,6 +1301,10 @@ class QuerySet[T: "Model"]:
     ) -> Any:
         if not items:
             raise TypeError("select() requires at least one column to select.")
+        if flat and len(items) > 1:
+            raise TypeError(
+                f"select(flat=True) takes exactly one column, got {len(items)}."
+            )
         if flat and result_type is not None:
             raise TypeError("select() cannot combine flat=True with result_type=.")
         if not isinstance(self, RowQuerySet) and self._fields is not None:
@@ -1315,15 +1319,7 @@ class QuerySet[T: "Model"]:
             dataclass_type = result_type
             _check_result_type_matches(dataclass_type, items)
 
-        # Local import: these pull in fields.related, which imports this module
-        # at load time (circular). Import once here, not per column.
-        from plain.postgres.fields.related_descriptors import (
-            ForwardForeignKeyDescriptor,
-        )
-        from plain.postgres.fields.related_typed import RelatedFieldRef
-
-        related_field_refs = (RelatedFieldRef, ForwardForeignKeyDescriptor)
-        columns = [_selectable_to_column(item, related_field_refs) for item in items]
+        columns = [_selectable_to_column(item) for item in items]
 
         clone = self._values_list(tuple(columns), flat=flat)
         clone.__class__ = RowQuerySet
@@ -1758,41 +1754,71 @@ class QuerySet[T: "Model"]:
             )
 
 
+# Why traversal is out: a column reached through a relation comes back over a
+# join, so a nullable relation yields None where the traversed field's type says
+# it can't. `Post.author.id` has the same problem as `Post.author.profile.city`
+# — the FK column is NULL when the row has no author — so both are refused
+# until select() can express that, and values_list() remains the way to spell it.
 _NO_TRAVERSAL_IN_SELECT = (
-    "select() does not support related-field traversal like User.profile.city "
-    "yet. Select columns on the queried model."
+    "a column reached through a relation is nullable in a way its type doesn't "
+    "say, so select() refuses it for now. Use values_list() with the lookup "
+    "path instead."
 )
 
 
-def _selectable_to_column(
-    item: Selectable[Any], related_field_refs: tuple[type, ...]
-) -> str | BaseExpression:
+def _selectable_to_column(item: Selectable[Any]) -> str | ResolvableExpression:
     """Turn a select() argument into something the values_list plumbing accepts.
 
     A field becomes its column name; an expression is passed through (the
     plumbing auto-aliases it). Strings and FK traversal get their own error so
     the message points at the real fix.
     """
+    # Local import: these pull in fields.related, which imports this module at
+    # load time (circular).
+    from plain.postgres.fields.related_descriptors import ForwardForeignKeyDescriptor
+    from plain.postgres.fields.related_typed import RelatedFieldRef
+
     if isinstance(item, str):
         raise TypeError(
             f"select() takes typed column references like User.email, not "
             f"strings. Got {item!r}."
         )
-    if isinstance(item, related_field_refs):
-        # The relation itself (`User.profile`) or an intermediate hop.
-        raise TypeError(_NO_TRAVERSAL_IN_SELECT)
+    if isinstance(item, RelatedFieldRef | ForwardForeignKeyDescriptor):
+        # The relation itself (`Post.author`) or an intermediate hop. Its key
+        # column is `Post.author.id`, which is refused for the same reason.
+        raise TypeError(
+            "select() takes columns, not relations, and a relation's key "
+            "column is not selectable yet either — " + _NO_TRAVERSAL_IN_SELECT
+        )
     if isinstance(item, Field):
         assert item.name
-        if LOOKUP_SEP in item.name:
+        if item.is_lookup_reference:
             # A traversed leaf: `Field.with_lookup_prefix` hands back the
             # related model's field carrying the relation path as its name.
-            raise TypeError(_NO_TRAVERSAL_IN_SELECT)
+            raise TypeError(
+                f"select() cannot select {item.name!r}: "
+                + _NO_TRAVERSAL_IN_SELECT
+                + f' Here that is values_list("{item.name}").'
+            )
         return item.name
-    if isinstance(item, BaseExpression):
+    # Matches what `_values_list` accepts, so anything values_list() can select
+    # — `F("x")` included — select() can select too.
+    if isinstance(item, ResolvableExpression):
         return item
     raise TypeError(
         f"select() takes fields and expressions, got {type(item).__name__}."
     )
+
+
+def _result_type_fields(
+    result_type: type[DataclassInstance],
+) -> tuple[dataclasses.Field[Any], ...]:
+    """The dataclass fields a row is built from — the constructor's parameters.
+
+    `init=False` fields are computed by the dataclass itself, so they are
+    neither selected nor passed.
+    """
+    return tuple(f for f in dataclasses.fields(result_type) if f.init)
 
 
 def _check_result_type_matches(
@@ -1804,7 +1830,7 @@ def _check_result_type_matches(
     field at the same position — expressions are anonymous and only need the
     position to line up.
     """
-    dataclass_fields = dataclasses.fields(result_type)
+    dataclass_fields = _result_type_fields(result_type)
     if len(dataclass_fields) != len(items):
         raise TypeError(
             f"select(result_type={result_type.__name__}) has "
@@ -1824,43 +1850,59 @@ class RowQuerySet[R](QuerySet[Any]):
     """A QuerySet in row mode, returned by `select()`.
 
     Iteration yields the selected row type `R` — a tuple, a scalar (flat), or a
-    dataclass (result_type) — never a model instance. It reuses the parent's
-    values_list machinery for SQL and row building; the overrides here only
-    refine the return types and block operations that don't make sense on rows.
+    dataclass (result_type) — never a model instance. Everything that reads
+    rows is inherited: the parent's values_list machinery builds the SQL and
+    the rows, and `update()`/`delete()` already refuse a row-mode queryset.
+
+    All this class adds at runtime is the refusal of the methods that would
+    re-enter row mode or hand back a row where a model instance is promised.
+    The rest is the `R` that the base, typed `QuerySet[Any]`, can't carry —
+    declared for the checker only, so row iteration doesn't pay for a Python
+    frame per call.
     """
 
-    def __iter__(self) -> Iterator[R]:
-        return super().__iter__()
+    if TYPE_CHECKING:
 
-    def first(self) -> R | None:
-        return super().first()
+        def __iter__(self) -> Iterator[R]: ...
 
-    def last(self) -> R | None:
-        return super().last()
+        def first(self) -> R | None: ...
 
-    def get(self, *args: Any, **kwargs: Any) -> R:
-        return super().get(*args, **kwargs)
+        def last(self) -> R | None: ...
 
-    @overload
-    def __getitem__(self, k: int) -> R: ...
+        def get(self, *args: Any, **kwargs: Any) -> R: ...
 
-    @overload
-    def __getitem__(self, k: slice) -> RowQuerySet[R]: ...
+        def iterator(self, chunk_size: int | None = None) -> Iterator[R]: ...
 
-    def __getitem__(self, k: int | slice) -> Any:
-        return super().__getitem__(k)
+        @overload
+        def __getitem__(self, k: int) -> R: ...
 
-    def update(self, **kwargs: Any) -> int:
-        raise TypeError("Cannot call update() on a select() queryset.")
+        @overload
+        def __getitem__(self, k: slice) -> RowQuerySet[R]: ...
 
-    def delete(self) -> int:
-        raise TypeError("Cannot call delete() on a select() queryset.")
+    # `Never` doesn't reject the call itself — the TypeError does that — but it
+    # does tell the checker control never returns, so a caller's trailing code
+    # reads as unreachable rather than as a QuerySet or a model instance.
 
-    def values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
+    def values(self, *fields: str, **expressions: Any) -> Never:
         raise TypeError("Cannot call values() after select().")
 
-    def values_list(self, *fields: str, flat: bool = False) -> QuerySet[Any]:
+    def values_list(self, *fields: str, flat: bool = False) -> Never:
         raise TypeError("Cannot call values_list() after select().")
+
+    def get_or_create(
+        self, defaults: dict[str, Any] | None = None, **kwargs: Any
+    ) -> Never:
+        # The base would hand back whatever get() returns on a hit — a row —
+        # and a model instance on a miss.
+        raise TypeError("Cannot call get_or_create() after select().")
+
+    def update_or_create(
+        self,
+        defaults: dict[str, Any] | None = None,
+        create_defaults: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> Never:
+        raise TypeError("Cannot call update_or_create() after select().")
 
 
 class InstanceCheckMeta(type):
