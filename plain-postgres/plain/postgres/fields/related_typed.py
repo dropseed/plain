@@ -61,7 +61,13 @@ class RelatedFieldRef:
     AttributeError pointing at the right spelling instead.
     """
 
-    def __init__(self, model: type[Model], prefix: str, target_name: str) -> None:
+    def __init__(
+        self,
+        model: type[Model],
+        prefix: str,
+        target_name: str,
+        source_model: type[Model],
+    ) -> None:
         if isinstance(model, str):
             raise unresolved_relation_error(prefix, model)
         self._model = model
@@ -69,6 +75,9 @@ class RelatedFieldRef:
         # The field on the related model that this relation targets -- the hop
         # a condition on the relation has to go through.
         self._target_name = target_name
+        # The model the traversal started from, carried unchanged through every
+        # hop: a condition on `Order.user.profile.city` belongs to `Order`.
+        self._source_model = source_model
 
     def __repr__(self) -> str:
         return f"<RelatedFieldRef {self._prefix} → {self._model.__name__}>"
@@ -138,8 +147,9 @@ class RelatedFieldRef:
                 model=field.remote_field.model,
                 prefix=f"{self._prefix}{LOOKUP_SEP}{name}",
                 target_name=field.target_field.name,
+                source_model=self._source_model,
             )
-        return field.with_lookup_prefix(self._prefix)
+        return field.with_lookup_prefix(self._prefix, self._source_model)
 
 
 def unresolved_relation_error(prefix: str, target: str) -> UnresolvedRelationError:

@@ -182,6 +182,9 @@ class ForwardForeignKeyDescriptor:
             model=model,
             prefix=self._field.name,
             target_name=self._field.target_field.name,
+            # The traversal starts here, on the model the relation is declared
+            # on -- that is the model a condition built through it belongs to.
+            source_model=self._field.model,
         )
 
     def __getattr__(self, name: str) -> Any:

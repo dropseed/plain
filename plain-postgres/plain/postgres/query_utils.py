@@ -52,6 +52,15 @@ def subclasses(cls: type) -> Generator[type]:
         yield from subclasses(subclass)
 
 
+def _source_fields_of(condition: Any) -> frozenset[tuple[type[Model], str]]:
+    """The (model, field name) pairs that built `condition`, or nothing.
+
+    `Q` combines with any object that sets `conditional = True` -- an
+    expression, for instance -- so this can't assume a `Q`.
+    """
+    return getattr(condition, "_source_fields", frozenset())
+
+
 class Q(tree.Node):
     """
     Encapsulate filters as objects that can then be combined logically (using
@@ -63,6 +72,30 @@ class Q(tree.Node):
     OR = "OR"
     default = AND
     conditional = True
+
+    # The (model, field name) pairs that built this Q, stamped by
+    # `Field._build_q` and carried through copying and combining below.
+    # `where()` reads it to reject a condition built from another model's
+    # field; a Q written by hand (`Q(name="x")`) names no source and is never
+    # checked.
+    #
+    # It lives on the node rather than on the leaves because `Node.copy()`
+    # rebuilds the object through `create()`, so an instance attribute only
+    # survives if the three methods that rebuild a Q carry it forward. Those
+    # three are right here; nothing else has to walk the tree.
+    _source_fields: frozenset[tuple[type[Model], str]] = frozenset()
+
+    def __copy__(self) -> Q:
+        obj = super().__copy__()
+        obj._source_fields = self._source_fields
+        return obj
+
+    copy = __copy__
+
+    def __deepcopy__(self, memodict: dict[int, Any]) -> Q:
+        obj = super().__deepcopy__(memodict)
+        obj._source_fields = self._source_fields
+        return obj
 
     def __init__(
         self,
@@ -88,6 +121,7 @@ class Q(tree.Node):
         obj = self.create(connector=conn)
         obj.add(self, conn)
         obj.add(other, conn)
+        obj._source_fields = self._source_fields | _source_fields_of(other)
         return obj
 
     def __or__(self, other: Any) -> Q:
