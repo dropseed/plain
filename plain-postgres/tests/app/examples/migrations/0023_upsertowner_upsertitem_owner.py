@@ -4,7 +4,7 @@ from plain import postgres
 
 
 class Migration(migrations.Migration):
-    dependencies = (("examples", "0020_upsertitem"),)
+    dependencies = (("examples", "0022_upsertitem"),)
 
     operations = (
         migrations.CreateModel(
