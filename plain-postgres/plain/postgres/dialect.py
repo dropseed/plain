@@ -309,7 +309,10 @@ def distinct_sql(
         return ["DISTINCT"], []
 
 
-LOCK_MODE_SQL = {
+# Every LockMode token and the clause it becomes. The LockMode key type rejects
+# a token that isn't in the Literal; tests/internal/test_lock_mode_sql.py is
+# what catches a token in the Literal that's missing here.
+LOCK_MODE_SQL: dict[LockMode, str] = {
     "update": "FOR UPDATE",
     "no_key_update": "FOR NO KEY UPDATE",
     "share": "FOR SHARE",
