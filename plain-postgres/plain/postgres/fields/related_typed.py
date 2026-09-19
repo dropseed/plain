@@ -72,15 +72,28 @@ class RelatedFieldRef:
     not attribute lookup, so a related field whose name collides with a public
     attribute on the FK descriptor (`field`, `is_cached`, `get_queryset`, …)
     still resolves to that field.
+
+    A relation is not itself a field, so it carries no condition methods.
+    `Child.parent.equals(obj)` is spelled `Child.parent.id.equals(obj.id)` --
+    traversal to the key the relation targets, which compiles to the same
+    `parent__id=` lookup `filter(parent=obj)` produces. This can't be smoothed
+    over by adding the methods here: to the type checker `Child.parent` is
+    `type[Parent]` (see `Field.__get__`'s model-valued overloads), which is
+    what makes chained traversal type-check, and a runtime method the checker
+    rejects would be worse than no method at all. `__getattr__` raises a
+    TypeError pointing at the right spelling instead.
     """
 
-    def __init__(self, model: type[Model], prefix: str) -> None:
+    def __init__(self, model: type[Model], prefix: str, target_name: str) -> None:
         assert not isinstance(model, str), (
             "RelatedFieldRef requires a resolved model class; the FK's "
             "remote_field.model is replaced with the class at registration."
         )
         self._model = model
         self._prefix = prefix
+        # The field on the related model that this relation targets -- the hop
+        # a condition on the relation has to go through.
+        self._target_name = target_name
 
     def __repr__(self) -> str:
         return f"<RelatedFieldRef {self._prefix} → {self._model.__name__}>"
@@ -94,13 +107,26 @@ class RelatedFieldRef:
         try:
             field = self._model._model_meta.get_forward_field(name)
         except FieldDoesNotExist:
+            # The field lookup comes first so a related model that really does
+            # have a column named `equals` (or `contains`, …) still traverses
+            # to it -- same rule as the descriptor-attribute shadowing above.
+            if name in _CONDITION_METHODS:
+                raise TypeError(
+                    f"{self._prefix}.{name}() is not available: "
+                    f"{self._prefix!r} is a relation, not a field. Build the "
+                    f"condition on the key it points at instead -- "
+                    f"{self._prefix}.{self._target_name}.{name}(...), which "
+                    f"compiles to the same SQL."
+                ) from None
             raise AttributeError(
                 f"{self._prefix}.{name} is not a traversable field or relation"
             ) from None
 
         if isinstance(field, ForeignKeyField):
             return RelatedFieldRef(
-                model=field.remote_field.model, prefix=f"{self._prefix}__{name}"
+                model=field.remote_field.model,
+                prefix=f"{self._prefix}__{name}",
+                target_name=field.target_field.name,
             )
         return PrefixedFieldRef(field=field, parent_path=self._prefix)
 

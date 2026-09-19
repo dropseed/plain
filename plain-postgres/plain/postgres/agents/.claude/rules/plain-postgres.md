@@ -98,6 +98,8 @@ Run `uv run plain docs postgres` for full workflow details.
 
 Use `Model.query` to build querysets (e.g., `User.query.filter(is_active=True)`).
 
+- `where()` takes typed conditions built off fields (`User.query.where(User.role.equals("admin"))`) instead of `filter()`'s string kwargs, so a typo or wrong value type is caught at the call site.
+- **Conditions on a relation go through its key**: `Post.query.where(Post.author.id.equals(author.id))`, `.id.is_in([...])`, `.id.is_null()` — the typed spelling of `filter(author=author)`, same SQL. `Post.author.equals(author)` raises `TypeError`: `Post.author` is `type[Author]` to the checker (which is what makes `Post.author.email.equals(...)` work), so it offers the related model's fields, not conditions.
 - Use `select_related()` for FK access in loops, `prefetch_related()` for reverse/M2N
 - A foreign key returns a partial related object: `obj.author` and `obj.author.id` are query-free; other fields load on first access. There is no `obj.author_id` — use `obj.author.id`
 - Use `.annotate(Count(...))` instead of calling `.count()` per row
