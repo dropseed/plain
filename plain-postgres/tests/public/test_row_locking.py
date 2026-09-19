@@ -191,3 +191,21 @@ def test_unlocked_writes_stay_a_flat_statement(db, capture_queries, executed_sql
         Widget.query.update(name="x")
 
     assert "IN (SELECT" not in executed_sql(queries)
+
+
+def test_bulk_update_drops_the_lock(db, capture_queries, executed_sql):
+    # bulk_update targets rows by id, so the lock has nothing to guard --
+    # the batches stay flat instead of each becoming a locking sub-select.
+    widgets = [
+        Widget(name="a", size="s").create(),
+        Widget(name="b", size="s").create(),
+    ]
+    for index, widget in enumerate(widgets):
+        widget.name = f"renamed-{index}"
+
+    with capture_queries() as queries:
+        assert Widget.query.for_update().bulk_update(widgets, ["name"]) == 2
+
+    sql = executed_sql(queries)
+    assert "IN (SELECT" not in sql
+    assert "FOR UPDATE" not in sql

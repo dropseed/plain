@@ -460,6 +460,12 @@ class Model(metaclass=ModelBase):
         the ValidationError a pre-check would raise. A hand-set id is inserted
         as given -- a collision raises IntegrityError.
         """
+        if self._state.deleted:
+            raise ValueError(
+                f"Cannot create() this {self.__class__.__name__}: it is a "
+                "snapshot of a row that returning().delete() removed, not a "
+                "live instance."
+            )
         if not self._state.adding:
             raise ValueError(
                 f"Cannot create() a {self.__class__.__name__} that is already "

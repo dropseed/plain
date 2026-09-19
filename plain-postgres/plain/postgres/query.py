@@ -880,6 +880,10 @@ class QuerySet[T: "Model"]:
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
         queryset = self._chain()
+        # Each batch targets its rows by id, which the caller already holds,
+        # so a lock on the read side has nothing left to guard -- and keeping
+        # it would push every batch through a locking sub-select for nothing.
+        queryset.sql_query.lock_mode = None
         with transaction.atomic(savepoint=False):
             for ids, update_kwargs in updates:
                 rows_updated += queryset.filter(id__in=ids).update(**update_kwargs)

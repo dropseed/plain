@@ -533,19 +533,14 @@ def test_deleted_instances_keep_their_data(db):
     assert row.payload == {"n": 1}
 
 
-@pytest.mark.parametrize(
-    ("method", "match"),
-    [
-        ("update", "snapshot of a row that returning"),
-        ("delete", "snapshot of a row that returning"),
-        ("create", "already persisted"),
-    ],
-)
-def test_deleted_instances_refuse_writes(db, method, match):
+@pytest.mark.parametrize("method", ["create", "update", "delete"])
+def test_deleted_instances_refuse_writes(db, method):
     ReturningEvent(label="gone", count=3).create()
     (row,) = ReturningEvent.query.filter(label="gone").returning().delete()
 
-    with pytest.raises(ValueError, match=match):
+    # Every write says the same thing, because there is one reason: the row
+    # this instance describes is gone.
+    with pytest.raises(ValueError, match="snapshot of a row that returning"):
         getattr(row, method)()
 
 
