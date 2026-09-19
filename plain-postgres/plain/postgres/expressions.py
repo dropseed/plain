@@ -13,7 +13,7 @@ from uuid import UUID
 
 import psycopg
 from plain.postgres import fields
-from plain.postgres.constants import LOOKUP_SEP
+from plain.postgres.constants import LOOKUP_SEP, OnConflict
 from plain.postgres.dialect import (
     CURRENT_ROW,
     FOLLOWING,
@@ -26,7 +26,12 @@ from plain.postgres.dialect import (
     window_frame_range_start_end,
     window_frame_rows_start_end,
 )
-from plain.postgres.exceptions import EmptyResultSet, FieldError, FullResultSet
+from plain.postgres.exceptions import (
+    EmptyResultSet,
+    FieldDoesNotExist,
+    FieldError,
+    FullResultSet,
+)
 from plain.postgres.query_utils import Q
 from plain.utils.deconstruct import deconstructible
 from plain.utils.hashable import make_hashable
@@ -44,6 +49,7 @@ if TYPE_CHECKING:
 __all__ = [
     "Case",
     "Combinable",
+    "Excluded",
     "Exists",
     "Expression",
     "ExpressionWrapper",
@@ -845,6 +851,87 @@ class F(Combinable):
 
     def copy(self) -> Self:
         return copy.copy(self)
+
+
+class Excluded(Combinable):
+    """The value the INSERT proposed for a column, inside a conflict update.
+
+    Only meaningful in ``upsert()``'s ``conflict_defaults``, where it compiles
+    to ``EXCLUDED."<column>"``. ``F("count")`` reads the row already stored;
+    ``Excluded("count")`` reads the row the statement tried to insert, so
+    combining them accumulates instead of overwriting::
+
+        conflict_defaults={"count": F("count") + Excluded("count")}
+    """
+
+    def __init__(self, name: str):
+        self.name = name
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.name!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Excluded):
+            return NotImplemented
+        return self.__class__ == other.__class__ and self.name == other.name
+
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.name))
+
+    def copy(self) -> Self:
+        return copy.copy(self)
+
+    def resolve_expression(
+        self,
+        query: Any = None,
+        allow_joins: bool = True,
+        reuse: Any = None,
+        summarize: bool = False,
+        for_save: bool = False,
+    ) -> ExcludedCol:
+        # EXCLUDED only exists inside an ON CONFLICT DO UPDATE clause, so any
+        # other compile context -- filter(), update(), annotate(), a plain
+        # insert -- has nothing for this to name.
+        if getattr(query, "on_conflict", None) is not OnConflict.UPDATE:
+            raise FieldError(
+                f"Excluded({self.name!r}) is only valid in upsert()'s "
+                "conflict_defaults: it names the value the INSERT proposed, "
+                "which exists only in an ON CONFLICT DO UPDATE clause."
+            )
+        assert query.model is not None
+        try:
+            target = query.model._model_meta.get_forward_field(self.name)
+        except FieldDoesNotExist:
+            raise FieldError(
+                f"Excluded({self.name!r}) does not name a column on "
+                f"{query.model.__name__}."
+            ) from None
+        return ExcludedCol(target)
+
+    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, list[Any]]:
+        raise FieldError(
+            f"Excluded({self.name!r}) was compiled without being resolved "
+            "against an ON CONFLICT DO UPDATE clause."
+        )
+
+
+class ExcludedCol(Expression):
+    """A resolved ``Excluded()`` -- the ``EXCLUDED."col"`` reference itself."""
+
+    def __init__(self, target: Field):
+        super().__init__(output_field=target)
+        self.target = target
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.target!s})"
+
+    def as_sql(
+        self, compiler: SQLCompiler, connection: DatabaseConnection
+    ) -> tuple[str, list[Any]]:
+        return f"EXCLUDED.{quote_name(self.target.column)}", []
+
+    def get_group_by_cols(self) -> list[BaseExpression]:
+        return []
 
 
 class ResolvedOuterRef(F):

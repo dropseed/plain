@@ -952,9 +952,11 @@ class QuerySet[T: "Model"]:
             unique_fields). Applied on both insert and conflict-update.
           - conflict_defaults: per-column overrides for the conflict-update SET
             only -- they never affect the inserted row. Each value may be a
-            plain value or an expression (e.g. F("count") + 1 for an atomic
-            counter). A column named here is set on conflict whether or not it
-            is otherwise being updated, and it cannot be a unique field.
+            plain value or an expression, where F("count") reads the stored row
+            and Excluded("count") reads the row the INSERT proposed, so
+            F("count") + Excluded("count") is an accumulating counter. A column
+            named here is set on conflict whether or not it is otherwise being
+            updated, and it cannot be a unique field.
 
         On conflict the SET clause covers every non-unique, non-PK column drawn
         from kwargs and defaults -- each taking the value the INSERT proposed --
@@ -963,8 +965,11 @@ class QuerySet[T: "Model"]:
         conflict_defaults names. A conflict_defaults entry replaces the
         proposed value for that column. create_defaults never take part in the
         update, and neither do columns nobody wrote (a create_now timestamp
-        keeps its original value). The merged result is not validated --
-        consistent with the other bulk write paths.
+        keeps its original value). Naming a database-owned column (create_now,
+        generate=True, RandomStringField) in kwargs or defaults is an error --
+        the conflict-update would reset it to a freshly evaluated default. The
+        merged result is not validated -- consistent with the other bulk write
+        paths.
 
         unique_fields takes field references (`Model.field`) and must name a
         UniqueConstraint declared on the model without a condition or
@@ -1032,6 +1037,18 @@ class QuerySet[T: "Model"]:
             and not field.primary_key
             and (field.name in written_names or field.auto_fills_on_save)
         ]
+        for field in update_field_objs:
+            # A database-owned value (create_now, generate=True,
+            # RandomStringField) isn't the caller's to overwrite: EXCLUDED
+            # carries a freshly evaluated default, so updating one would reset
+            # a creation timestamp on every conflict. A column that is also
+            # update_now is exempt -- rewriting it is the whole point.
+            if field.db_returning and not field.auto_fills_on_save:
+                raise ValueError(
+                    f"upsert() cannot update {self.model.__name__}.{field.name}: "
+                    "the database generates its value, so the update would "
+                    "overwrite the stored one with a fresh default."
+                )
 
         # conflict_defaults name columns the SET clause writes, so unlike the
         # other sources they must be real columns -- not properties -- and they

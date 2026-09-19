@@ -7,11 +7,19 @@ query -- and created is True on insert, False on conflict-update.
 
 from __future__ import annotations
 
+import concurrent.futures
+import threading
+from datetime import UTC
+
+import psycopg
 import pytest
 from app.examples.models.relationships import Widget
 from app.examples.models.upsert import UpsertItem, UpsertOwner
+from plain.postgres import Excluded
+from plain.postgres.db import get_connection
 from plain.postgres.exceptions import FieldError
 from plain.postgres.expressions import F
+from plain.postgres.sources import build_connection_params
 
 
 def test_upsert_inserts_new_row(db):
@@ -101,6 +109,128 @@ def test_upsert_conflict_defaults_apply_on_insert_uses_inserted_value(db):
         unique_fields=[UpsertItem.key],
     )
     assert (created, obj.value) == (True, 3)
+
+
+def test_upsert_excluded_accumulates_the_proposed_value(db):
+    """F() reads the stored row, Excluded() reads the row the INSERT proposed,
+    so combining them adds the incoming delta instead of overwriting.
+    """
+    UpsertItem(key="a", value=10).create()
+
+    obj, created = UpsertItem.query.upsert(
+        key="a",
+        value=7,
+        conflict_defaults={"value": F("value") + Excluded("value")},
+        unique_fields=[UpsertItem.key],
+    )
+
+    assert created is False
+    assert obj.value == 17
+    assert UpsertItem.query.get(key="a").value == 17
+
+
+def test_upsert_excluded_compiles_to_the_excluded_column(db, capture_queries):
+    UpsertItem(key="a", value=1).create()
+
+    with capture_queries() as queries:
+        UpsertItem.query.upsert(
+            key="a",
+            value=5,
+            conflict_defaults={"value": F("value") + Excluded("value")},
+            unique_fields=[UpsertItem.key],
+        )
+
+    assert len(queries) == 1
+    sql = queries[0]["sql"]
+    assert '"value" = ("examples_upsertitem"."value" + EXCLUDED."value")' in sql
+
+
+def test_upsert_excluded_accumulates_across_repeated_calls(db):
+    """Each call adds its own delta to whatever is stored -- the property a
+    concurrent caller relies on, exercised serially here.
+    """
+    for delta in (3, 4, 5):
+        obj, _ = UpsertItem.query.upsert(
+            key="a",
+            value=delta,
+            conflict_defaults={"value": F("value") + Excluded("value")},
+            unique_fields=[UpsertItem.key],
+        )
+
+    # 3 inserted, then +4, then +5.
+    assert obj.value == 12
+    assert UpsertItem.query.get(key="a").value == 12
+
+
+def test_excluded_outside_a_conflict_update_is_rejected(db):
+    with pytest.raises(FieldError, match="only valid in upsert"):
+        UpsertItem.query.filter(key="a").update(value=Excluded("value"))
+
+    with pytest.raises(FieldError, match="only valid in upsert"):
+        list(UpsertItem.query.filter(value=Excluded("value")))
+
+
+def test_upsert_excluded_unknown_column_is_rejected(db):
+    with pytest.raises(FieldError, match="does not name a column"):
+        UpsertItem.query.upsert(
+            key="a",
+            value=1,
+            conflict_defaults={"value": Excluded("typo_field")},
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_upsert_rejects_updating_a_database_owned_column(db):
+    from datetime import datetime
+
+    with pytest.raises(ValueError, match="the database generates its value"):
+        UpsertItem.query.upsert(
+            key="a",
+            created_at=datetime(2020, 1, 1, tzinfo=UTC),
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_upsert_excluded_increments_survive_concurrent_writers(
+    isolated_db, capture_queries
+):
+    """Concurrent callers each add their own delta -- none is lost.
+
+    The read and the write happen in one statement, under the row lock
+    Postgres takes on the conflicting tuple, so there is no read-modify-write
+    window for a second writer to slip into. The statement under test is the
+    one upsert() actually emits, captured and then replayed from several real
+    sessions at once (the test harness scopes its database to the main
+    thread, so the racing sessions have to be raw connections).
+    """
+    workers = 8
+    key = "concurrent-counter"
+    table = UpsertItem.model_options.db_table
+
+    with capture_queries() as queries:
+        UpsertItem.query.upsert(
+            key=key,
+            value=1,
+            conflict_defaults={"value": F("value") + Excluded("value")},
+            unique_fields=[UpsertItem.key],
+        )
+    increment_sql = queries[0]["sql"]
+    assert f'"value" = ("{table}"."value" + EXCLUDED."value")' in increment_sql
+
+    params = build_connection_params(get_connection().settings_dict)
+    barrier = threading.Barrier(workers)
+
+    def race(_: int) -> None:
+        with psycopg.connect(**params, autocommit=True) as session:
+            barrier.wait()
+            session.execute(increment_sql)
+
+    # Start from the row that first upsert() inserted, then race the same
+    # statement -- every session takes the conflict path.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        list(pool.map(race, range(workers)))
+
+    assert UpsertItem.query.get(key=key).value == 1 + workers
 
 
 def test_upsert_all_unique_fields_is_idempotent(db):

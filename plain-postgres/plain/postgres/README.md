@@ -537,6 +537,27 @@ view, created = PageView.query.upsert(
 )
 ```
 
+Two expressions reach two different rows inside a conflict update. `F("count")`
+reads the row already **stored**; `Excluded("count")` reads the row the INSERT
+**proposed**, compiling to `EXCLUDED."count"`. Combine them to accumulate the
+incoming value instead of overwriting it — the whole statement is one atomic
+`UPDATE`, so concurrent callers each add their own delta:
+
+```python
+from plain.postgres import Excluded, F
+
+# Add this batch's 7 views to whatever is already stored.
+view, created = PageView.query.upsert(
+    path="/home",
+    count=7,
+    conflict_defaults={"count": F("count") + Excluded("count")},
+    unique_fields=[PageView.path],
+)
+```
+
+`Excluded()` is only meaningful in a conflict update, so using it anywhere else —
+`filter()`, `update()`, `annotate()` — raises a `FieldError`.
+
 On conflict the `SET` clause covers:
 
 - every non-unique, non-PK column from `kwargs`/`defaults`, each taking the value
@@ -549,7 +570,11 @@ On conflict the `SET` clause covers:
   column is already in the `SET`, adding it when it isn't.
 
 Columns nobody wrote are left alone, and `create_defaults` never take part in the
-update. Unlike `bulk_upsert`, `upsert` derives its `SET` columns rather than
+update. Naming a **database-owned** column (`create_now`, `generate=True`,
+`RandomStringField`) in `kwargs`/`defaults` is an error rather than a silent
+reset: `EXCLUDED` carries a freshly evaluated default, so the conflict update
+would overwrite the stored creation timestamp every time. A column that's also
+`update_now` is exempt — refreshing it is the point. Unlike `bulk_upsert`, `upsert` derives its `SET` columns rather than
 taking them, so a `conflict_defaults` key may not name a unique field — that's
 the conflict target.
 
