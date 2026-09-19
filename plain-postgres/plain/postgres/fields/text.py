@@ -9,13 +9,19 @@ from plain.validators import MaxLengthValidator
 from plain import validators
 
 from .base import NOT_PROVIDED, ChoicesField, ColumnField
+from .value_types import ValueType, ValueTypeMixin
 
 if TYPE_CHECKING:
     from plain.postgres.functions.random import RandomString
 
 
-class TextField[T: (str, str | None) = str](ChoicesField[T]):
+class TextField[T: (str, str | None) = str](ValueTypeMixin, ChoicesField[T]):
     db_type_sql = "text"
+
+    # `value_type` doesn't touch the column -- it's still `text` -- so the
+    # schema editor must never read it as a reason to ALTER. `deconstruct()`
+    # leaves it out for the same reason: migration files stay free of it.
+    non_migration_attrs = (*ChoicesField.non_migration_attrs, "value_type")
 
     def __init__(
         self,
@@ -26,8 +32,15 @@ class TextField[T: (str, str | None) = str](ChoicesField[T]):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
+        value_type: type[ValueType] | None = None,
     ):
         self.max_length = max_length
+        self.value_type = value_type
+        if value_type is not None:
+            # There is no empty-string form of an opaque value, so a
+            # value-typed column omitted at construction holds None rather
+            # than "" -- the same contract every non-string column has.
+            self.empty_strings_allowed = False
         super().__init__(
             choices=choices,
             required=required,
@@ -78,12 +91,18 @@ class TextField[T: (str, str | None) = str](ChoicesField[T]):
     def _max_length_for_choices_check(self) -> int | None:
         return self.max_length
 
-    def to_python(self, value: Any) -> str | None:
+    def to_python(self, value: Any) -> Any:
+        # A value-typed column is opaque to the text field -- the value type
+        # owns its own shape, so nothing here may stringify it.
+        if self.value_type is not None:
+            return value
         if isinstance(value, str) or value is None:
             return value
         return str(value)
 
     def get_prep_value(self, value: Any) -> Any:
+        if self.value_type is not None:
+            return self.value_type_to_db(value)
         value = super().get_prep_value(value)
         return self.to_python(value)
 
