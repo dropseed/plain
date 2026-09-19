@@ -804,7 +804,7 @@ class TemporalSubtraction(CombinedExpression):
 
 
 @deconstructible(path="plain.postgres.F")
-class F(Combinable):
+class F(Combinable, Selectable[Any]):
     """An object capable of resolving references to existing query objects."""
 
     def __init__(self, name: str):
