@@ -526,6 +526,7 @@ for row in deleted:
 - **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a many-to-many field or one from another model raises an error at the `returning()` call.
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
 - `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_update()`, `get_or_create()`, `update_or_create()` — raises `TypeError` rather than quietly dropping it.
+- `returning()` keeps the queryset's own class, so a custom `QuerySet` and its methods survive it. Chain your own methods before `returning()` — a type checker sees the returning shape after it, not your subclass.
 
 A row lock belongs on the read side of the write — that pairing is the job-claim pattern, and it composes in either order:
 

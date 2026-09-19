@@ -12,8 +12,9 @@ from typing import TYPE_CHECKING, cast
 import psycopg
 import pytest
 from app.examples.models.delete import ChildCascade, DeleteParent
+from app.examples.models.querysets import CustomQuerySet, CustomQuerySetModel
 from app.examples.models.returning import ReturningEvent
-from plain.postgres import ReturningQuerySet, transaction
+from plain.postgres import transaction
 from plain.postgres.db import get_connection
 from plain.postgres.exceptions import FieldError
 from plain.postgres.sources import build_connection_params
@@ -124,11 +125,36 @@ def test_delete_returning_empty_result_is_empty_list(db):
 # ===========================================================================
 
 
-def test_returning_returns_a_returning_queryset(db):
-    assert isinstance(ReturningEvent.query.returning(), ReturningQuerySet)
-    assert isinstance(
-        ReturningEvent.query.returning(ReturningEvent.id), ReturningQuerySet
-    )
+def _seed_custom() -> None:
+    CustomQuerySetModel(name="custom one").create()
+    CustomQuerySetModel(name="other").create()
+
+
+def test_custom_queryset_method_before_returning(db):
+    _seed_custom()
+    rows = CustomQuerySetModel.query.get_custom().returning().update(name="claimed")
+
+    assert [row.name for row in rows] == ["claimed"]
+
+
+def test_custom_queryset_method_after_returning(db):
+    # returning() sets state; it does not swap the class out from under a
+    # custom QuerySet, so the model's own methods still chain after it.
+    _seed_custom()
+    qs = CustomQuerySetModel.query.returning()
+    assert isinstance(qs, CustomQuerySet)
+
+    rows = qs.get_custom().update(name="claimed")
+    assert [row.name for row in rows] == ["claimed"]
+
+
+def test_returning_state_survives_further_chaining(db):
+    _seed_events()
+    qs = ReturningEvent.query.returning(ReturningEvent.id).filter(label="a")
+    assert type(qs) is type(ReturningEvent.query)
+
+    rows = qs.update(count=2)
+    assert all(set(row) == {"id"} for row in rows)
 
 
 def test_returning_string_arg_errors(db):
@@ -273,19 +299,17 @@ def test_lock_then_returning_update(db, capture_queries):
     # must not trip _reject_returning() -- update() still hands back rows.
     _seed_events()
     qs = ReturningEvent.query.filter(label="a").for_update()
-    assert isinstance(qs.returning(), ReturningQuerySet)
     rows = qs.returning().update(count=4)
 
     assert {row.count for row in rows} == {4}
 
 
-def test_returning_then_lock_keeps_the_returning_queryset(db):
-    # The other order too: for_update() chains off a ReturningQuerySet
+def test_returning_then_lock_keeps_the_returning_state(db):
+    # The other order too: for_update() chains off a returning() queryset
     # without dropping the returning state or hitting the lock guard.
     _seed_events()
     qs = ReturningEvent.query.filter(label="a").returning().for_update()
 
-    assert isinstance(qs, ReturningQuerySet)
     rows = qs.update(count=6)
     assert {row.count for row in rows} == {6}
 

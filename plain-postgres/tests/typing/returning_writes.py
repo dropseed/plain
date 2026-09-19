@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, assert_type
 
 from app.examples.models.delete import ChildCascade
+from app.examples.models.querysets import CustomQuerySet, CustomQuerySetModel
 from app.examples.models.returning import ReturningEvent
 
 
@@ -54,3 +55,22 @@ def must_keep_the_return_shape_through_a_lock() -> None:
     assert_type(
         qs.returning(ReturningEvent.id).for_update().delete(), list[dict[str, Any]]
     )
+
+
+def must_keep_a_custom_queryset_reachable() -> None:
+    """A custom QuerySet survives returning() at runtime; statically it is
+    the declared ReturningQuerySet, so a custom method reads cleanly when
+    it comes first -- and needs narrowing when it comes after.
+
+    Runtime half: tests/public/test_returning.py, the custom-queryset tests.
+    """
+    # Custom method first, returning() on top: resolves with no narrowing.
+    # (The model type is Unknown here only because CustomQuerySet is declared
+    # unparameterized -- that is the example model's shape, not returning's.)
+    CustomQuerySetModel.query.get_custom().returning().update(name="x")
+
+    # Custom method after: the declared type is ReturningQuerySet, which
+    # carries no custom methods. isinstance() is what recovers them.
+    qs = CustomQuerySetModel.query.returning()
+    assert isinstance(qs, CustomQuerySet)
+    qs.get_custom()

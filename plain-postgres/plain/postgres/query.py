@@ -49,10 +49,11 @@ from plain.postgres.utils import resolve_callables
 from plain.utils.functional import partition
 
 # Re-exports for public API
-__all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet", "ReturningQuerySet"]
+__all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet"]
 
 if TYPE_CHECKING:
     from plain.postgres import Model
+
 
 # The maximum number of results to fetch in a get() query.
 MAX_GET_RESULTS = 21
@@ -982,9 +983,13 @@ class QuerySet[T: "Model"]:
 
         The references are validated here, so a bad one errors at the
         returning() call rather than when the write runs.
+
+        The returned queryset keeps its own class -- a custom QuerySet
+        subclass survives returning(), and its methods still chain. What
+        returning() sets is the state below; ReturningQuerySet is only the
+        static type that pins what update()/delete() hand back.
         """
         clone = self._chain()
-        clone.__class__ = ReturningQuerySet
         if fields:
             clone._returning_fields = self._validated_returning_fields(fields)
             clone._returning_instances = False
@@ -1041,6 +1046,14 @@ class QuerySet[T: "Model"]:
             columns.append(field)
         return columns
 
+    def _hydrate_returning(self, rows: list[Sequence[Any]]) -> list[Any]:
+        """Turn converted RETURNING rows into instances or dicts."""
+        assert self._returning_fields is not None
+        field_names = [field.name for field in self._returning_fields]
+        if self._returning_instances:
+            return [self.model.from_db(field_names, row) for row in rows]
+        return [dict(zip(field_names, row)) for row in rows]
+
     def _reject_returning(self, method_name: str) -> None:
         """Refuse a write that RETURNING doesn't apply to.
 
@@ -1066,9 +1079,8 @@ class QuerySet[T: "Model"]:
         """Run the DELETE.
 
         Returns the rowcount, or — when returning() set columns on this
-        queryset — the converted RETURNING rows for ReturningQuerySet.delete()
-        to hydrate. Only the target table's rows come back; cascade deletes
-        never appear in a RETURNING clause.
+        queryset — the affected rows. Only the target table's rows come
+        back; cascade deletes never appear in a RETURNING clause.
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot use 'limit' or 'offset' with delete().")
@@ -1092,7 +1104,9 @@ class QuerySet[T: "Model"]:
 
         # Clear the result cache, in case this QuerySet gets reused.
         self._result_cache = None
-        return result
+        if self._returning_fields is None:
+            return result
+        return self._hydrate_returning(result)
 
     def _raw_delete(self) -> Any:
         """
@@ -1115,8 +1129,7 @@ class QuerySet[T: "Model"]:
         """Run the UPDATE.
 
         Returns the rowcount, or — when returning() set columns on this
-        queryset — the converted RETURNING rows for ReturningQuerySet.update()
-        to hydrate.
+        queryset — the affected rows.
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
@@ -1153,7 +1166,9 @@ class QuerySet[T: "Model"]:
         with transaction.mark_for_rollback_on_error():
             result = query.get_compiler().execute_sql(CURSOR)
         self._result_cache = None
-        return result
+        if self._returning_fields is None:
+            return result
+        return self._hydrate_returning(result)
 
     def _update(self, values: Sequence[tuple[Field, Any]]) -> int:
         """
@@ -1726,27 +1741,20 @@ class QuerySet[T: "Model"]:
             )
 
 
-class ReturningQuerySet[T: "Model", R](QuerySet[T]):
-    """A QuerySet whose update()/delete() return the affected rows.
+if TYPE_CHECKING:
 
-    Produced by QuerySet.returning(); the second type parameter R is the
-    return type of update()/delete() (a list of instances or of dicts),
-    pinned by the returning() overloads.
-    """
+    class ReturningQuerySet[T: "Model", R](QuerySet[T]):
+        """The static type returning() hands back. Never instantiated.
 
-    def update(self, **kwargs: Any) -> R:  # ty: ignore[invalid-method-override]
-        return cast("R", self._hydrate_returning(self._execute_update(kwargs)))
+        returning() leaves the queryset's own class alone -- a custom
+        QuerySet subclass has to survive it -- so this exists only to pin
+        what update()/delete() give back. R is the shape the returning()
+        overloads chose: a list of instances, or of dicts.
+        """
 
-    def delete(self) -> R:  # ty: ignore[invalid-method-override]
-        return cast("R", self._hydrate_returning(self._execute_delete()))
+        def update(self, **kwargs: Any) -> R: ...  # ty: ignore[invalid-method-override]
 
-    def _hydrate_returning(self, rows: list[Sequence[Any]]) -> list[Any]:
-        """Turn converted RETURNING rows into instances or dicts."""
-        assert self._returning_fields is not None
-        field_names = [field.name for field in self._returning_fields]
-        if self._returning_instances:
-            return [self.model.from_db(field_names, row) for row in rows]
-        return [dict(zip(field_names, row)) for row in rows]
+        def delete(self) -> R: ...  # ty: ignore[invalid-method-override]
 
 
 class InstanceCheckMeta(type):
