@@ -3,9 +3,9 @@
 **Password hashing, validation, and authentication views for Plain.**
 
 - [Overview](#overview)
+- [HashedPassword](#hashedpassword)
 - [Password hashing](#password-hashing)
 - [Password validation](#password-validation)
-- [PasswordField](#passwordfield)
 - [Views](#views)
     - [Login](#login)
     - [Signup](#signup)
@@ -18,18 +18,30 @@
 
 ## Overview
 
-You can hash and verify passwords using the `hash_password` and `check_password` functions:
+A password is stored as a [`HashedPassword`](./values.py#HashedPassword) — the encoded hash, never the raw string. Declare the column with `value_type=HashedPassword`:
 
 ```python
-from plain.passwords.hashers import hash_password, check_password
+# app/users/models.py
+from plain import postgres
+from plain.postgres import Field, types
+from plain.passwords.values import HashedPassword
 
-# Hash a password for storage
-hashed = hash_password("my-secret-password")
-# Returns something like: pbkdf2_sha256$720000$abc123...$xyz789...
 
-# Verify a password against a hash
-is_valid = check_password("my-secret-password", hashed)
-# Returns True
+@postgres.register_model
+class User(postgres.Model):
+    email: Field[str] = types.EmailField()
+    password: Field[HashedPassword] = types.TextField(value_type=HashedPassword)
+```
+
+Hash a raw password with `from_raw()`, and verify one with `check()`:
+
+```python
+user = User.query.create(
+    email="user@example.com",
+    password=HashedPassword.from_raw("my-secret-password"),
+)
+
+user.password.check("my-secret-password")  # True
 ```
 
 For user authentication, you can use the built-in views. Add [`PasswordLoginView`](./views.py#PasswordLoginView) to your URLs:
@@ -44,30 +56,42 @@ urlpatterns = [
 ]
 ```
 
+## HashedPassword
+
+[`HashedPassword`](./values.py#HashedPassword) is the only form a password takes outside the form layer:
+
+- `HashedPassword.from_raw(raw)` hashes a raw password with the configured hasher
+- `password.check(raw)` tells you whether that raw password is the one behind the hash
+- `password.needs_rehash()` tells you whether the hash is stale — a different algorithm than the first entry in `PASSWORD_HASHERS`, the same algorithm with different parameters, or a hash that can't be identified at all
+- `str(password)` is the encoded hash, and `repr(password)` is deliberately opaque (`<HashedPassword>`) so a hash doesn't land in a log line or a traceback
+- `==` compares two `HashedPassword`s in constant time
+
+The column is a `value_type=` column (see [Value types](../../../plain-postgres/plain/postgres/README.md#value-types)), so the descriptor is strict and symmetric — `user.password` is a `HashedPassword`, and a `HashedPassword` is what you assign:
+
+```python
+from plain.passwords.values import HashedPassword
+
+user.password = HashedPassword.from_raw("new-password")
+user.update(fields=["password"])
+```
+
+Assigning a raw string is a type error at the call site and a `TypeError` at write time. Nothing hashes on save, and nothing inspects a value to guess whether it's hashed already:
+
+```python
+user.password = "new-password"
+user.update()  # TypeError: ... takes a HashedPassword, not a str
+```
+
+The same refusal covers `User.query.update(password="new-password")` and `User.query.filter(password="new-password")`.
+
+Two more things follow from this being an ordinary field declaration:
+
+- **`password` is required in the typed constructor.** `User(email="user@example.com")` is a type error, rather than a `NOT NULL` failure at insert time.
+- **The column is still `text`.** `value_type` never reaches a migration file, so no migration imports `HashedPassword`.
+
 ## Password hashing
 
-Passwords are hashed using PBKDF2 with SHA256 by default. The [`hash_password`](./hashers.py#hash_password) function generates a secure hash:
-
-```python
-from plain.passwords.hashers import hash_password
-
-hashed = hash_password("user-password")
-```
-
-The [`check_password`](./hashers.py#check_password) function verifies a password against a stored hash. It also handles automatic hash upgrades when the hashing algorithm changes:
-
-```python
-from plain.passwords.hashers import check_password
-
-
-def setter(new_hash):
-    # Called when the hash needs to be upgraded
-    user.password = new_hash
-    user.update()
-
-
-is_valid = check_password("user-password", stored_hash, setter=setter)
-```
+Passwords are hashed using PBKDF2 with SHA256 by default. `HashedPassword` is the interface to it — [`hash_password`](./hashers.py#hash_password) and [`check_password`](./hashers.py#check_password) are the functions underneath, for the rare case where you hold an encoded hash on its own.
 
 You can configure which hashers are available via the `PASSWORD_HASHERS` setting. The first hasher in the list is used for new passwords:
 
@@ -78,73 +102,41 @@ PASSWORD_HASHERS = [
 ]
 ```
 
+Hashes made by an older hasher keep working. Rehashing needs the raw password, so it happens right after a successful check — which is what [`check_user_password`](./core.py#check_user_password) does on every login:
+
+```python
+from plain.passwords.values import HashedPassword
+
+if user.password.check(raw_password):
+    if user.password.needs_rehash():
+        user.password = HashedPassword.from_raw(raw_password)
+        user.update(fields=["password"])
+```
+
 To create a custom hasher, subclass [`BasePasswordHasher`](./hashers.py#BasePasswordHasher) and implement the required methods.
 
 ## Password validation
 
-Three validators are included for checking password strength:
-
-- [`MinimumLengthValidator`](./validators.py#MinimumLengthValidator) - Ensures passwords meet a minimum length (default: 8 characters)
-- [`CommonPasswordValidator`](./validators.py#CommonPasswordValidator) - Rejects passwords from a list of 20,000 common passwords
-- [`NumericPasswordValidator`](./validators.py#NumericPasswordValidator) - Rejects passwords that are entirely numeric
+[`validate_raw_password`](./validators.py#validate_raw_password) checks a raw password against the shipped rules. It raises a `ValidationError` collecting every rule that failed, each carrying its own `code`:
 
 ```python
-from plain.passwords.validators import (
-    MinimumLengthValidator,
-    CommonPasswordValidator,
-    NumericPasswordValidator,
-)
 from plain.exceptions import ValidationError
+from plain.passwords.validators import validate_raw_password
 
-validators = [
-    MinimumLengthValidator(min_length=10),
-    CommonPasswordValidator(),
-    NumericPasswordValidator(),
-]
-
-password = "test"
-for validator in validators:
-    try:
-        validator(password)
-    except ValidationError as e:
-        print(e.message)
+try:
+    validate_raw_password("password")
+except ValidationError as error:
+    print(error.messages)  # ['This password is too common.']
+    print([e.code for e in error.error_list])  # ['password_too_common']
 ```
 
-## PasswordField
+The rules it runs:
 
-[`PasswordField`](./models.py#PasswordField) is a model field that automatically hashes passwords before saving. It includes all three validators by default:
+- [`MinimumLengthValidator`](./validators.py#MinimumLengthValidator) - At least 8 characters (`password_too_short`)
+- [`CommonPasswordValidator`](./validators.py#CommonPasswordValidator) - Rejects a list of 20,000 common passwords (`password_too_common`)
+- [`NumericPasswordValidator`](./validators.py#NumericPasswordValidator) - Rejects passwords that are entirely numeric (`password_entirely_numeric`)
 
-```python
-from plain import postgres
-from plain.postgres import Field, types
-from plain.passwords.models import PasswordField
-
-
-@postgres.register_model
-class User(postgres.Model):
-    email: Field[str] = types.EmailField()
-    password: Field[str] = PasswordField()
-
-    model_options = postgres.Options(
-        constraints=[
-            postgres.UniqueConstraint(fields=["email"], name="unique_email"),
-        ],
-    )
-```
-
-When you assign a raw password, it gets hashed automatically on save:
-
-```python
-user = User(email="user@example.com", password="my-password")
-user.create()
-# user.password is now a hash like: pbkdf2_sha256$720000$...
-```
-
-For better type checking support, you can import from `plain.passwords.types`:
-
-```python
-from plain.passwords.types import PasswordField
-```
+This is the only place a raw password is inspected, and you rarely call it yourself: [`NewPasswordField`](./forms.py#NewPasswordField) calls it before hashing. Past that point a password is a `HashedPassword`, and there's nothing left to validate.
 
 ## Views
 
@@ -226,11 +218,26 @@ You need to create a `password_reset` email template for [plain.email](../../../
 
 Several forms are available for building custom authentication flows:
 
-- [`PasswordLoginForm`](./forms.py#PasswordLoginForm) - Email and password login
-- [`PasswordSignupForm`](./forms.py#PasswordSignupForm) - User registration with password confirmation
-- [`PasswordSetForm`](./forms.py#PasswordSetForm) - Set a new password without the old one
-- [`PasswordChangeForm`](./forms.py#PasswordChangeForm) - Change password with current password verification
-- [`PasswordResetForm`](./forms.py#PasswordResetForm) - Request a password reset email
+- [`PasswordLoginForm`](./forms.py#PasswordLoginForm) - `email` and a raw `password` to check against the stored hash
+- [`PasswordSignupForm`](./forms.py#PasswordSignupForm) - `email`, `password`, and `confirm_password`
+- [`PasswordResetForm`](./forms.py#PasswordResetForm) - `email`, to request a reset link
+- [`PasswordSetForm`](./forms.py#PasswordSetForm) - `new_password` and `confirm_password`, for setting a password without the old one
+- [`PasswordChangeForm`](./forms.py#PasswordChangeForm) - `PasswordSetForm` plus `current_password`
+
+The `password` and `new_password` fields are [`NewPasswordField`](./forms.py#NewPasswordField), which reads the raw string, runs `validate_raw_password()`, and cleans to a `HashedPassword`. So a validated form hands you a value the column accepts:
+
+```python
+from plain.passwords.core import set_user_password
+from plain.passwords.forms import PasswordSetForm
+
+# In a view's post()
+result = self.validate_form(PasswordSetForm)
+if isinstance(result, Response):
+    return result
+set_user_password(user, result.new_password)  # a HashedPassword
+```
+
+The `confirm_password` field stays a raw text field. Two hashes of the same password use different salts, so they can never be compared to each other — each form's `check()` compares the hashed field against the raw one with `HashedPassword.check()`.
 
 ## Settings
 
@@ -262,18 +269,31 @@ class MyLoginView(PasswordLoginView):
 
 #### How do I customize password validation?
 
-Pass custom validators to `PasswordField`:
+The three shipped rules are what `validate_raw_password()` runs, and there's no setting that swaps them out. Raw passwords only exist in the form layer, so that's where you change the rules: subclass [`NewPasswordField`](./forms.py#NewPasswordField), override `clean()`, and declare it on your own form.
 
 ```python
-from plain.passwords.models import PasswordField
-from plain.passwords.validators import MinimumLengthValidator
+from typing import Any
 
-password = PasswordField(
-    validators=[
-        MinimumLengthValidator(min_length=12),
-    ]
-)
+from plain.exceptions import ValidationError
+from plain.passwords.forms import NewPasswordField, PasswordSignupForm
+from plain.passwords.values import HashedPassword
+
+
+class NoSpacesPasswordField(NewPasswordField):
+    def clean(self, value: Any) -> HashedPassword | None:
+        raw = self.parse(value)
+        if " " in raw:
+            raise ValidationError(
+                "Passwords can't contain spaces.", code="password_has_space"
+            )
+        return super().clean(value)  # runs the shipped rules, then hashes
+
+
+class MySignupForm(PasswordSignupForm):
+    password = NoSpacesPasswordField()
 ```
+
+To replace the shipped rules instead of adding to them, don't call `super().clean()` — run your own checks on `raw` and return `HashedPassword.from_raw(raw)`.
 
 #### How do I use a different hashing algorithm?
 
@@ -306,16 +326,16 @@ uv add plain.passwords
 Add the `password` field to your User model:
 
 ```python
-# app/models.py
+# app/users/models.py
 from plain import postgres
 from plain.postgres import Field, types
-from plain.passwords.models import PasswordField
+from plain.passwords.values import HashedPassword
 
 
 @postgres.register_model
 class User(postgres.Model):
     email: Field[str] = types.EmailField()
-    password: Field[str] = PasswordField()
+    password: Field[HashedPassword] = types.TextField(value_type=HashedPassword)
 
     model_options = postgres.Options(
         constraints=[
@@ -338,35 +358,41 @@ urlpatterns = [
 ]
 ```
 
-Create templates for your views. For the login view, create `templates/passwords/passwordlogin.html`:
+Create templates for your views. The views don't ship any, so subclass one and point `template_name` at yours (`class LoginView(PasswordLoginView): template_name = "login.html"`).
+
+Each view passes `form_class` and `form` to the template. Field values and errors are read through the `field_value`, `field_errors`, and `form_errors` helpers, and field metadata is on the field reference itself:
 
 ```html
 {% extends "base.html" %}
 
 {% block content %}
 <form method="post">
+    {% for error in form_errors(form) %}
+    <p>{{ error.message }}</p>
+    {% endfor %}
+
     <div>
-        <label for="{{ form.email.html_id }}">Email</label>
+        <label for="{{ form_class.email.html_id }}">Email</label>
         <input
             type="email"
-            name="{{ form.email.html_name }}"
-            id="{{ form.email.html_id }}"
-            value="{{ form.email.value }}"
-        >
-        {% for error in form.email.errors %}
-        <p>{{ error }}</p>
+            name="{{ form_class.email.name }}"
+            id="{{ form_class.email.html_id }}"
+            value="{{ field_value(form, form_class.email) }}"
+            {% if form_class.email.required %}required{% endif %}>
+        {% for error in field_errors(form, form_class.email) %}
+        <p>{{ error.message }}</p>
         {% endfor %}
     </div>
 
     <div>
-        <label for="{{ form.password.html_id }}">Password</label>
+        <label for="{{ form_class.password.html_id }}">Password</label>
         <input
             type="password"
-            name="{{ form.password.html_name }}"
-            id="{{ form.password.html_id }}"
-        >
-        {% for error in form.password.errors %}
-        <p>{{ error }}</p>
+            name="{{ form_class.password.name }}"
+            id="{{ form_class.password.html_id }}"
+            {% if form_class.password.required %}required{% endif %}>
+        {% for error in field_errors(form, form_class.password) %}
+        <p>{{ error.message }}</p>
         {% endfor %}
     </div>
 
