@@ -330,7 +330,8 @@ def test_condition_on_a_traversed_m2m_gets_the_same_advice():
 
     message = str(excinfo.value)
     assert "is a relation, not a field" in message
-    assert "widget__tags.id.equals(...)" in message
+    assert "WidgetTag.widget.tags" not in message  # the prefix, not the model
+    assert "widget.tags.id.equals(...)" in message
 
 
 def test_where_filters_through_a_foreign_key_then_an_m2m(db):
@@ -346,3 +347,15 @@ def test_where_filters_through_a_foreign_key_then_an_m2m(db):
     )
     rows = list(WidgetTag.query.where(condition))
     assert [r.widget.id for r in rows] == [cog.id]
+
+
+def test_reverse_relation_says_it_is_not_traversable():
+    """`filter(parent__childcascade_set__...)` works, so "not a traversable
+    field or relation" would be a lie -- the typed API is what can't express
+    it, and the message has to say which."""
+    with pytest.raises(AttributeError) as excinfo:
+        getattr(ChildCascade.parent, "childcascade_set")
+
+    message = str(excinfo.value)
+    assert "reverse relation" in message
+    assert "filter(parent__childcascade_set__...=...)" in message

@@ -147,6 +147,8 @@ class Field[T](RegisterLookupMixin):
         Return "package_label.model_label.field_name" for fields attached to
         models.
         """
+        if self.is_lookup_reference:
+            return f"{self.name} (lookup reference)"
         if not hasattr(self, "model"):
             return super().__str__()
         model = self.model
@@ -156,6 +158,8 @@ class Field[T](RegisterLookupMixin):
         """Display the module, class, and name of the field."""
         path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
         name = getattr(self, "name", "")
+        if self.is_lookup_reference:
+            return f"<{path} lookup reference: {name}>"
         if name:
             return f"<{path}: {name}>"
         return f"<{path}>"
@@ -265,11 +269,25 @@ class Field[T](RegisterLookupMixin):
         traversed field offers exactly what direct access offers -- including
         an encrypted field's blocks, whose error message names the full path.
 
-        The copy is not attached to a model and exists only to build a Q.
+        The copy is genuinely detached: it keeps only what building a Q needs
+        (its class, for the lookup registry, and its name). The attachment
+        state a real field carries is dropped, so it can't pass itself off as
+        a column on the related model -- `str()` would otherwise report
+        `examples.DeleteParent.parent__name`, and `__reduce__` would try to
+        look up an attribute that doesn't exist.
         """
         prefixed = copy.copy(self)
+        for attached in ("model", "column", "cached_col"):
+            prefixed.__dict__.pop(attached, None)
         prefixed.name = f"{prefix}{LOOKUP_SEP}{self.name}"
+        prefixed.__dict__["_is_lookup_reference"] = True
         return prefixed
+
+    @property
+    def is_lookup_reference(self) -> bool:
+        """True for a field handed back by `with_lookup_prefix` -- a reference
+        to a column reached through a relation, not a column on a model."""
+        return bool(self.__dict__.get("_is_lookup_reference"))
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [*self._check_field_name()]

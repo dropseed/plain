@@ -56,7 +56,11 @@ class Article(postgres.Model):
   A plain `Field[T]` hides them and the comparison only fails at runtime.
 - **JSON**: `JSONField`/`EncryptedJSONField` return `Any` from the stub (the
   runtime class isn't generic over its value shape), so the annotation is what
-  preserves typing: `Field[dict]` / `EncryptedField[dict[str, Any]]`.
+  preserves typing: `Field[dict]` / `EncryptedField[dict[str, Any]]`. Never
+  annotate a field `Field[Any]` — `Any` satisfies the model-valued `__get__`
+  overload, so class access types as `type[Any]` and the whole condition
+  surface disappears silently. Use the concrete shape, or `Field[object]` when
+  the column really does hold arbitrary JSON.
 - **Custom querysets**: declare `query: ClassVar[MyQuerySet] = MyQuerySet()`
   (`ClassVar` so it isn't treated as a field). Default-queryset models declare
   nothing — `Model.query` is typed automatically.
@@ -99,9 +103,10 @@ Run `uv run plain docs postgres` for full workflow details.
 Use `Model.query` to build querysets (e.g., `User.query.filter(is_active=True)`).
 
 - `where()` takes typed conditions built off fields (`User.query.where(User.role.equals("admin"))`) instead of `filter()`'s string kwargs, so a typo or wrong value type is caught at the call site.
-- **Conditions on a relation go through its key**: `Post.query.where(Post.author.id.equals(author.id))`, `.id.is_in([...])`, `.id.is_null()` — the typed spelling of `filter(author=author)`, same SQL. `Post.author.equals(author)` raises `AttributeError`: `Post.author` is `type[Author]` to the checker (which is what makes `Post.author.email.equals(...)` work), so it offers the related model's fields, not conditions. Many-to-many relations traverse the same way (`Widget.tags.name.equals(...)`).
+- **Conditions on a relation go through its key**: `Post.query.where(Post.author.id.equals(author.id))`, `.id.is_in([...])`, `.id.is_null()` — the typed spelling of `filter(author=author)`, same SQL. `Post.author.equals(author)` raises `AttributeError`: `Post.author` is `type[Author]` to the checker (which is what makes `Post.author.email.equals(...)` work), so it offers the related model's fields, not conditions. Traversal only _starts_ from a forward FK; a many-to-many is traversable as a later hop (`WidgetTag.widget.tags.name`), but `Widget.tags` and reverse accessors are not entry points — use `filter(tags__name=...)` there.
 - Encrypted fields can't be looked up at all: `get_or_create(secret=...)` raises — put the value in `defaults=`.
 - Use `select_related()` for FK access in loops, `prefetch_related()` for reverse/M2N
+- A foreign key with no value raises `RelatedObjectDoesNotExist`; catch it as `Related.DoesNotExist` (it subclasses that and `AttributeError`) — `Model.fk.RelatedObjectDoesNotExist` is a type error now that class access types as the related model.
 - A foreign key returns a partial related object: `obj.author` and `obj.author.id` are query-free; other fields load on first access. There is no `obj.author_id` — use `obj.author.id`
 - Use `.annotate(Count(...))` instead of calling `.count()` per row
 - Fetch all data in the view — templates should never trigger queries

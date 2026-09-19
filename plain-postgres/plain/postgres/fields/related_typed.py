@@ -19,9 +19,22 @@ from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.exceptions import FieldDoesNotExist
 from plain.postgres.fields.base import CONDITION_METHODS
 from plain.postgres.fields.related import RelatedField
+from plain.postgres.fields.reverse_descriptors import (
+    ReverseForeignKey,
+    ReverseManyToMany,
+)
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
+
+
+class UnresolvedRelationError(AttributeError):
+    """A traversal reached a relation whose target model isn't resolved yet.
+
+    An AttributeError subclass so `hasattr` and `getattr(..., default)` keep
+    working, but a distinct type so the timing problem is greppable rather
+    than looking like a typo.
+    """
 
 
 class RelatedFieldRef:
@@ -49,14 +62,8 @@ class RelatedFieldRef:
     """
 
     def __init__(self, model: type[Model], prefix: str, target_name: str) -> None:
-        assert not isinstance(model, str), (
-            f"Cannot traverse {prefix!r}: its target model is still the string "
-            f"{model!r}. Relation targets are replaced with the resolved class "
-            f"when the model is registered, so a traversal that runs at import "
-            f"time -- at module level, or in a default argument -- can land "
-            f"here before the registry is populated. Move it inside the "
-            f"function or method that needs it."
-        )
+        if isinstance(model, str):
+            raise unresolved_relation_error(prefix, model)
         self._model = model
         self._prefix = prefix
         # The field on the related model that this relation targets -- the hop
@@ -65,6 +72,27 @@ class RelatedFieldRef:
 
     def __repr__(self) -> str:
         return f"<RelatedFieldRef {self._prefix} → {self._model.__name__}>"
+
+    def _is_reverse_relation(self, name: str) -> bool:
+        """Whether `name` names a reverse accessor on the related model.
+
+        Reverse accessors live on the class as descriptors, not in the field
+        metadata, so both places are checked.
+        """
+        try:
+            self._model._model_meta.get_reverse_relation(name)
+        except FieldDoesNotExist:
+            return isinstance(
+                getattr(self._model, name, None),
+                (ReverseForeignKey, ReverseManyToMany),
+            )
+        return True
+
+    @property
+    def _attribute_path(self) -> str:
+        """The prefix spelled the way it was written -- `widget.tags`, not
+        `widget__tags` -- so error messages can be pasted back into code."""
+        return self._prefix.replace(LOOKUP_SEP, ".")
 
     def __getattr__(self, name: str) -> Any:
         if name.startswith("_"):
@@ -77,18 +105,27 @@ class RelatedFieldRef:
         except FieldDoesNotExist:
             # The field lookup comes first so a related model that really does
             # have a column named `equals` (or `contains`, …) still traverses
-            # to it. An AttributeError, not a TypeError, so `hasattr` and
-            # `getattr(..., default)` keep behaving.
+            # to it. Every failure below is an AttributeError, not a TypeError,
+            # so `hasattr` and `getattr(..., default)` keep behaving.
             if name in CONDITION_METHODS:
                 raise AttributeError(
-                    f"{self._prefix}.{name}() is not available: "
+                    f"{self._attribute_path}.{name}() is not available: "
                     f"{self._prefix!r} is a relation, not a field. Build the "
                     f"condition on the key it points at instead -- "
-                    f"{self._prefix}.{self._target_name}.{name}(...), which "
-                    f"compiles to the same SQL."
+                    f"{self._attribute_path}.{self._target_name}.{name}(...), "
+                    f"which compiles to the same SQL."
+                ) from None
+            if self._is_reverse_relation(name):
+                raise AttributeError(
+                    f"{self._attribute_path}.{name} is a reverse relation, "
+                    f"which the typed API cannot traverse: a reverse accessor "
+                    f"is a ClassVar, so there is nothing for "
+                    f"`{self._model.__name__}` to offer the type checker here. "
+                    f"Use the string path instead -- "
+                    f"filter({self._prefix}{LOOKUP_SEP}{name}{LOOKUP_SEP}...=...)."
                 ) from None
             raise AttributeError(
-                f"{self._prefix}.{name} is not a traversable field or relation"
+                f"{self._attribute_path}.{name} is not a traversable field or relation"
             ) from None
 
         if isinstance(field, RelatedField):
@@ -103,3 +140,18 @@ class RelatedFieldRef:
                 target_name=field.target_field.name,
             )
         return field.with_lookup_prefix(self._prefix)
+
+
+def unresolved_relation_error(prefix: str, target: str) -> UnresolvedRelationError:
+    """The error for a traversal that outran model registration.
+
+    Relation targets are replaced with the resolved class when the model
+    registers, so a traversal evaluated at import time -- at module level, or
+    in a default argument -- can run before the registry is populated.
+    """
+    return UnresolvedRelationError(
+        f"Cannot traverse {prefix!r}: its target model {target!r} hasn't been "
+        f"resolved yet. Relation targets are resolved when the model is "
+        f"registered, so this traversal is running too early -- move it inside "
+        f"the function or method that needs it."
+    )

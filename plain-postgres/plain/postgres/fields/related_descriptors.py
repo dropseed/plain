@@ -151,23 +151,35 @@ class ForwardForeignKeyDescriptor:
             )
         return rel_obj
 
-    @cached_property
-    def _typed_ref(self) -> Any:
+    def _build_typed_ref(self) -> Any:
         """The traversal entry point for this relation.
 
-        A `cached_property` for the same reason `RelatedObjectDoesNotExist` is
-        one: at construction time `remote_field.model` may still be a string,
-        and it is replaced with the resolved class when the model registers.
-        Built once per descriptor, so class-level traversal allocates nothing
-        and re-imports nothing.
+        Built lazily, and cached by `__getattr__` rather than by
+        `cached_property`: this can raise `UnresolvedRelationError`, and an
+        AttributeError raised inside a descriptor's `__get__` makes Python
+        fall back to `__getattr__`, which would replace the useful message
+        with a bare "no attribute '_typed_ref'".
 
         The import is local because `related_typed` reaches `fields.related`,
         which imports this module at load time.
         """
-        from plain.postgres.fields.related_typed import RelatedFieldRef
+        from plain.postgres.fields.related_typed import (
+            RelatedFieldRef,
+            unresolved_relation_error,
+        )
+
+        try:
+            model = self._field.remote_field.model
+        except TypeError:
+            # `ForeignObjectRel.model` raises TypeError while the target is
+            # still a string, which would escape __getattr__ as a TypeError and
+            # make `hasattr` raise instead of returning False.
+            raise unresolved_relation_error(
+                self._field.name, str(self._field.remote_field.model_ref)
+            ) from None
 
         return RelatedFieldRef(
-            model=self._field.remote_field.model,
+            model=model,
             prefix=self._field.name,
             target_name=self._field.target_field.name,
         )
@@ -189,7 +201,10 @@ class ForwardForeignKeyDescriptor:
         if name.startswith("_"):
             # Internals, and anything a field could never be named.
             raise AttributeError(name)
-        return getattr(self._typed_ref, name)
+        ref = self.__dict__.get("_typed_ref")
+        if ref is None:
+            ref = self.__dict__["_typed_ref"] = self._build_typed_ref()
+        return getattr(ref, name)
 
     def __set__(self, instance: Any, value: Any) -> None:
         """
