@@ -1101,6 +1101,15 @@ class QuerySet[T: "Model"]:
                     f"Invalid conflict_defaults field name for model "
                     f"{self.model.__name__}: {name!r}."
                 ) from None
+            if not isinstance(field, ColumnField):
+                # A many-to-many field is a forward field with no column of its
+                # own, so it passes the lookup above and then fails in the
+                # compiler with a bare UndefinedColumn.
+                raise FieldError(
+                    f"Cannot use {self.model.model_options.object_name}.{name} "
+                    "in upsert() conflict_defaults: only database columns can "
+                    "be set."
+                )
             conflict_default_objs[field] = value
 
         obj = self.model(**insert_values)

@@ -13,7 +13,7 @@ from datetime import UTC
 
 import psycopg
 import pytest
-from app.examples.models.relationships import Widget
+from app.examples.models.relationships import Tag, Widget
 from app.examples.models.upsert import (
     UpsertItem,
     UpsertOwner,
@@ -400,6 +400,31 @@ def test_reverse_manager_upsert_conflicts_on_the_parent_key(db):
     assert second.id == first.id
     assert second.value == 5
     assert scope.entries.query.count() == 1
+
+
+def test_upsert_conflict_defaults_rejects_a_many_to_many_field(db):
+    """A many-to-many field is a forward field with no column of its own, so
+    it passes the name lookup and used to fail in Postgres with a bare
+    UndefinedColumn.
+    """
+    Widget.query.create(name="w", size="s")
+
+    with pytest.raises(FieldError, match="only database columns can be set"):
+        Widget.query.upsert(
+            name="w",
+            size="s",
+            conflict_defaults={"tags": []},
+            unique_fields=[Widget.name, Widget.size],
+        )
+
+
+def test_upsert_conflict_defaults_rejects_a_reverse_relation_name(db):
+    with pytest.raises(FieldError, match="Invalid conflict_defaults field name"):
+        Tag.query.upsert(
+            name="t",
+            conflict_defaults={"widgets": []},
+            unique_fields=[Tag.name],
+        )
 
 
 def test_upsert_requires_unique_fields(db):
