@@ -36,6 +36,28 @@ def capture_queries():
 
 
 @pytest.fixture
+def executed_sql():
+    """Join the statements recorded by ``capture_queries`` into one string.
+
+        with capture_queries() as queries:
+            Model.query.filter(...).delete()
+        assert "FOR UPDATE" in executed_sql(queries)
+
+    Transaction control is left out, so a block wrapped in ``atomic()`` reads
+    the same as one that wasn't.
+    """
+
+    def _join(queries: list[dict]) -> str:
+        return " ".join(
+            query["sql"]
+            for query in queries
+            if query["sql"] not in ("BEGIN", "COMMIT", "ROLLBACK")
+        )
+
+    return _join
+
+
+@pytest.fixture
 def _unblock_cursor() -> None:
     """Restore the real cursor method (blocked by the autouse _db_disabled fixture)."""
     DatabaseConnection.cursor = getattr(DatabaseConnection, "_enabled_cursor")

@@ -17,10 +17,6 @@ from plain.postgres.transaction import TransactionManagementError
 from psycopg import NotSupportedError
 
 
-def _executed_sql(queries: list[dict]) -> str:
-    return " ".join(q["sql"] for q in queries)
-
-
 @pytest.mark.parametrize(
     ("method", "clause"),
     [
@@ -30,28 +26,30 @@ def _executed_sql(queries: list[dict]) -> str:
         ("for_key_share", "FOR KEY SHARE"),
     ],
 )
-def test_lock_method_emits_its_clause(db, capture_queries, method, clause):
+def test_lock_method_emits_its_clause(
+    db, capture_queries, executed_sql, method, clause
+):
     with capture_queries() as queries:
         list(getattr(Widget.query, method)())
-    assert clause in _executed_sql(queries)
+    assert clause in executed_sql(queries)
 
 
-def test_nowait_appends_nowait(db, capture_queries):
+def test_nowait_appends_nowait(db, capture_queries, executed_sql):
     with capture_queries() as queries:
         list(Widget.query.for_update(nowait=True))
-    assert "FOR UPDATE NOWAIT" in _executed_sql(queries)
+    assert "FOR UPDATE NOWAIT" in executed_sql(queries)
 
 
-def test_skip_locked_appends_skip_locked(db, capture_queries):
+def test_skip_locked_appends_skip_locked(db, capture_queries, executed_sql):
     with capture_queries() as queries:
         list(Widget.query.for_share(skip_locked=True))
-    assert "FOR SHARE SKIP LOCKED" in _executed_sql(queries)
+    assert "FOR SHARE SKIP LOCKED" in executed_sql(queries)
 
 
-def test_of_restricts_lock_to_named_table(db, capture_queries):
+def test_of_restricts_lock_to_named_table(db, capture_queries, executed_sql):
     with capture_queries() as queries:
         list(Widget.query.for_update(of=("self",)))
-    assert "FOR UPDATE OF" in _executed_sql(queries)
+    assert "FOR UPDATE OF" in executed_sql(queries)
 
 
 def test_nowait_and_skip_locked_together_raise():
@@ -59,10 +57,10 @@ def test_nowait_and_skip_locked_together_raise():
         Widget.query.for_update(nowait=True, skip_locked=True)
 
 
-def test_last_lock_mode_wins(db, capture_queries):
+def test_last_lock_mode_wins(db, capture_queries, executed_sql):
     with capture_queries() as queries:
         list(Widget.query.for_update().for_share())
-    sql = _executed_sql(queries)
+    sql = executed_sql(queries)
     assert "FOR SHARE" in sql
     assert "FOR UPDATE" not in sql
 
@@ -130,12 +128,14 @@ def test_values_aggregate_annotation_after_lock_raises(db):
         Widget.query.for_update().values("size").annotate(n=Count("id"))
 
 
-def test_non_aggregate_annotation_is_allowed_with_a_lock(db, capture_queries):
+def test_non_aggregate_annotation_is_allowed_with_a_lock(
+    db, capture_queries, executed_sql
+):
     # Only aggregation forces a GROUP BY; a plain expression annotation leaves
     # the rows mapping one-to-one onto table rows, so Postgres can lock them.
     with capture_queries() as queries:
         list(Widget.query.for_update().annotate(label=Value("x")))
-    assert "FOR UPDATE" in _executed_sql(queries)
+    assert "FOR UPDATE" in executed_sql(queries)
 
 
 def test_lock_after_window_annotation_raises(db):
@@ -148,16 +148,16 @@ def test_window_annotation_after_lock_raises(db):
         Widget.query.for_update().annotate(rn=Window(RowNumber()))
 
 
-def test_count_and_aggregate_still_drop_the_lock(db, capture_queries):
+def test_count_and_aggregate_still_drop_the_lock(db, capture_queries, executed_sql):
     # Unchanged by the up-front guards: both compile to an aggregate query of
     # their own, so the lock is dropped rather than rejected.
     with capture_queries() as queries:
         assert Widget.query.for_update().count() == 0
-    assert "FOR UPDATE" not in _executed_sql(queries)
+    assert "FOR UPDATE" not in executed_sql(queries)
 
     with capture_queries() as queries:
         assert Widget.query.for_update().aggregate(n=Count("id")) == {"n": 0}
-    assert "FOR UPDATE" not in _executed_sql(queries)
+    assert "FOR UPDATE" not in executed_sql(queries)
 
 
 # ---------------------------------------------------------------------------
@@ -168,26 +168,26 @@ def test_count_and_aggregate_still_drop_the_lock(db, capture_queries):
 # ---------------------------------------------------------------------------
 
 
-def test_locked_update_locks_in_a_subquery(db, capture_queries):
+def test_locked_update_locks_in_a_subquery(db, capture_queries, executed_sql):
     with capture_queries() as queries:
         Widget.query.for_update(skip_locked=True).update(name="x")
 
-    sql = _executed_sql(queries)
+    sql = executed_sql(queries)
     assert "IN (SELECT" in sql
     assert "FOR UPDATE SKIP LOCKED)" in sql
 
 
-def test_locked_delete_locks_in_a_subquery(db, capture_queries):
+def test_locked_delete_locks_in_a_subquery(db, capture_queries, executed_sql):
     with capture_queries() as queries:
         Widget.query.for_update(skip_locked=True).delete()
 
-    sql = _executed_sql(queries)
+    sql = executed_sql(queries)
     assert "IN (SELECT" in sql
     assert "FOR UPDATE SKIP LOCKED)" in sql
 
 
-def test_unlocked_writes_stay_a_flat_statement(db, capture_queries):
+def test_unlocked_writes_stay_a_flat_statement(db, capture_queries, executed_sql):
     with capture_queries() as queries:
         Widget.query.update(name="x")
 
-    assert "IN (SELECT" not in _executed_sql(queries)
+    assert "IN (SELECT" not in executed_sql(queries)

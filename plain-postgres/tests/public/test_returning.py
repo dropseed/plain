@@ -360,12 +360,7 @@ def test_lock_survives_into_the_subquery_of_a_joined_returning_update(
 # ===========================================================================
 
 
-def _only_sql(queries: list[dict]) -> str:
-    assert len(queries) == 1, [q["sql"] for q in queries]
-    return queries[0]["sql"]
-
-
-def test_locked_update_puts_the_lock_in_the_subquery(db, capture_queries):
+def test_locked_update_puts_the_lock_in_the_subquery(db, capture_queries, executed_sql):
     # Single table, no joins -- the case that used to skip the rewrite.
     _seed_events()
     with capture_queries() as queries:
@@ -373,43 +368,23 @@ def test_locked_update_puts_the_lock_in_the_subquery(db, capture_queries):
             skip_locked=True
         ).returning().update(count=4)
 
-    sql = _only_sql(queries)
+    sql = executed_sql(queries)
     before_returning = sql.split("RETURNING")[0]
     assert "FOR UPDATE SKIP LOCKED)" in before_returning
     assert before_returning.index("IN (SELECT") < before_returning.index("FOR UPDATE")
 
 
-def test_locked_delete_puts_the_lock_in_the_subquery(db, capture_queries):
+def test_locked_delete_puts_the_lock_in_the_subquery(db, capture_queries, executed_sql):
     _seed_events()
     with capture_queries() as queries:
         ReturningEvent.query.filter(label="a").for_update(
             skip_locked=True
         ).returning().delete()
 
-    sql = _only_sql(queries)
+    sql = executed_sql(queries)
     before_returning = sql.split("RETURNING")[0]
     assert "FOR UPDATE SKIP LOCKED)" in before_returning
     assert before_returning.index("IN (SELECT") < before_returning.index("FOR UPDATE")
-
-
-def _capture_locked_write(write) -> str:
-    """Run `write` against rows that don't exist yet and return its SQL.
-
-    The statement is what the race below replays on two raw connections --
-    the pytest harness swaps the connection per context, so a second session
-    can't go through the ORM.
-    """
-    conn = get_connection()
-    previous = conn.force_debug_cursor
-    conn.force_debug_cursor = True
-    conn.queries_log.clear()
-    try:
-        with transaction.atomic():
-            write()
-        captured = [q for q in conn.queries_log if q["sql"] not in ("BEGIN", "COMMIT")]
-    finally:
-        conn.force_debug_cursor = previous
-    return _only_sql(captured)
 
 
 def _race(sql: str) -> tuple[set, set]:
@@ -435,15 +410,19 @@ def _race(sql: str) -> tuple[set, set]:
     return claimed_first, claimed_second
 
 
-def test_locked_returning_update_claims_rows_exclusively(isolated_db):
-    sql = _capture_locked_write(
-        lambda: (
-            ReturningEvent.query.filter(label="claim")
-            .for_update(skip_locked=True)
-            .returning(ReturningEvent.id)
-            .update(count=1)
-        )
-    )
+def test_locked_returning_update_claims_rows_exclusively(
+    isolated_db, capture_queries, executed_sql
+):
+    # Capture the statement while nothing matches, so the rows the two
+    # sessions race for are still unclaimed. The race replays it on raw
+    # connections -- the harness swaps the ORM's connection per context, so
+    # a second session can't go through the ORM.
+    with capture_queries() as queries, transaction.atomic():
+        ReturningEvent.query.filter(label="claim").for_update(
+            skip_locked=True
+        ).returning(ReturningEvent.id).update(count=1)
+    sql = executed_sql(queries)
+
     for _ in range(4):
         ReturningEvent(label="claim", count=0).create()
 
@@ -454,15 +433,15 @@ def test_locked_returning_update_claims_rows_exclusively(isolated_db):
     assert not claimed_first & claimed_second
 
 
-def test_locked_returning_delete_claims_rows_exclusively(isolated_db):
-    sql = _capture_locked_write(
-        lambda: (
-            ReturningEvent.query.filter(label="claim")
-            .for_update(skip_locked=True)
-            .returning(ReturningEvent.id)
-            .delete()
-        )
-    )
+def test_locked_returning_delete_claims_rows_exclusively(
+    isolated_db, capture_queries, executed_sql
+):
+    with capture_queries() as queries, transaction.atomic():
+        ReturningEvent.query.filter(label="claim").for_update(
+            skip_locked=True
+        ).returning(ReturningEvent.id).delete()
+    sql = executed_sql(queries)
+
     for _ in range(4):
         ReturningEvent(label="claim", count=0).create()
 
