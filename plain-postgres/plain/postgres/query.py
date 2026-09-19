@@ -60,6 +60,41 @@ MAX_GET_RESULTS = 21
 REPR_OUTPUT_SIZE = 20
 
 
+def _lock_conflict_clause(query: Query) -> str | None:
+    """
+    Name the thing in `query` that Postgres refuses to combine with a row lock,
+    or None when the query is lockable.
+
+    Postgres rejects a locking clause whenever the returned rows don't map
+    one-to-one onto table rows, which is DISTINCT, GROUP BY, aggregates, and
+    window functions. It only says so at execution time, a long way from where
+    the queryset was built, so QuerySet checks both orders up front.
+    """
+    if query.distinct:
+        return "distinct()"
+    if query.group_by:
+        return "an aggregate annotation"
+    for annotation in query.annotations.values():
+        if annotation.contains_aggregate:
+            return "an aggregate annotation"
+        if annotation.contains_over_clause:
+            return "a window annotation"
+    return None
+
+
+def _lock_conflict(mode: LockMode, clause: str) -> psycopg.NotSupportedError:
+    """
+    Build the error for a row lock combined with an unlockable query shape.
+
+    The lock method's name is recoverable from the mode token -- "share" came
+    from for_share() -- so there is no second mode-to-name table to keep in sync.
+    """
+    return psycopg.NotSupportedError(
+        f"for_{mode}() cannot be combined with {clause}. Postgres can only lock "
+        "rows that map one-to-one onto table rows."
+    )
+
+
 class BaseIterable:
     def __init__(
         self,
@@ -1209,6 +1244,8 @@ class QuerySet[T: "Model"]:
         """
         if nowait and skip_locked:
             raise ValueError("The nowait option cannot be used with skip_locked.")
+        if clause := _lock_conflict_clause(self.sql_query):
+            raise _lock_conflict(mode, clause)
         obj = self._chain()
         obj.sql_query.lock_mode = mode
         obj.sql_query.lock_nowait = nowait
@@ -1288,6 +1325,11 @@ class QuerySet[T: "Model"]:
                     f"The annotation '{alias}' conflicts with a field on the model."
                 )
             clone.sql_query.add_annotation(annotation, alias)
+        if clone.sql_query.lock_mode and (
+            clause := _lock_conflict_clause(clone.sql_query)
+        ):
+            raise _lock_conflict(clone.sql_query.lock_mode, clause)
+
         for alias, annotation in clone.sql_query.annotations.items():
             if alias in annotations and annotation.contains_aggregate:
                 if clone._fields is None:
@@ -1315,6 +1357,8 @@ class QuerySet[T: "Model"]:
             raise TypeError(
                 "Cannot create distinct fields once a slice has been taken."
             )
+        if self.sql_query.lock_mode:
+            raise _lock_conflict(self.sql_query.lock_mode, "distinct()")
         obj = self._chain()
         obj.sql_query.add_distinct_fields(*field_names)
         return obj

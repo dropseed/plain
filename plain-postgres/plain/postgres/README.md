@@ -593,7 +593,14 @@ job = Job.query.for_update(skip_locked=True).filter(status="pending").first()
 
 Chaining more than one lock method keeps only the last one, options included.
 
-Postgres itself rejects a locking clause on a query that uses `DISTINCT`, `GROUP BY`, aggregates, or a set operation — those raise a database error rather than being caught up front. `count()` and `aggregate()` drop the lock instead, since they compile to an aggregate query.
+Postgres can only lock rows that map one-to-one onto table rows, so a lock can't be combined with `distinct()`, an aggregate annotation, or a window annotation. Either order raises `psycopg.NotSupportedError` when the queryset is built, naming the lock method:
+
+```python
+Widget.query.distinct().for_update()  # NotSupportedError
+Widget.query.for_update().distinct()  # same error, either way round
+```
+
+`count()` and `aggregate()` are the exception — they compile to an aggregate query of their own, so they drop the lock rather than reject it.
 
 ## Schema management
 
