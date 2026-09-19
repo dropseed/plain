@@ -8,8 +8,10 @@ fields (primary key, DB defaults) populated, matched to its row by unique key.
 from __future__ import annotations
 
 import pytest
+from app.examples.models.defaults import DBDefaultsExample
+from app.examples.models.mixins import MixinTestModel
 from app.examples.models.returning import ReturningEvent
-from app.examples.models.upsert import UpsertItem
+from app.examples.models.upsert import UpsertItem, UpsertPair
 from plain.postgres.exceptions import FieldError
 
 
@@ -77,9 +79,13 @@ def test_bulk_upsert_matches_returned_rows_by_key_not_order(db):
         UpsertItem(key="a", value=1),
         UpsertItem(key="b", value=2),
     ]
-    UpsertItem.query.bulk_upsert(
+    returned = UpsertItem.query.bulk_upsert(
         items, update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
     )
+
+    # Batches are issued in conflict-key order, but the caller gets its own
+    # order back.
+    assert [r.key for r in returned] == ["c", "a", "b"]
 
     for item in items:
         assert item.id == seeded_ids[item.key]
@@ -178,3 +184,88 @@ def test_bulk_create_no_longer_accepts_update_conflicts(db):
             [UpsertItem(key="a", value=1)],
             **removed_conflict_kwargs,  # ty: ignore[invalid-argument-type]
         )
+
+
+def test_bulk_upsert_composite_unique_fields(db):
+    UpsertPair(bucket="b1", slug="s1", value=1).create()
+    seeded_id = UpsertPair.query.get(bucket="b1", slug="s1").id
+
+    items = [
+        UpsertPair(bucket="b1", slug="s1", value=10),  # conflicts -> update
+        UpsertPair(bucket="b1", slug="s2", value=20),  # same bucket, new slug
+        UpsertPair(bucket="b2", slug="s1", value=30),  # same slug, new bucket
+    ]
+    UpsertPair.query.bulk_upsert(
+        items,
+        update_fields=[UpsertPair.value],
+        unique_fields=[UpsertPair.bucket, UpsertPair.slug],
+    )
+
+    # The conflicting row is matched back by the whole composite key.
+    assert items[0].id == seeded_id
+    assert len({item.id for item in items}) == 3
+
+    stored = {(row.bucket, row.slug): row.value for row in UpsertPair.query.all()}
+    assert stored == {("b1", "s1"): 10, ("b1", "s2"): 20, ("b2", "s1"): 30}
+
+
+def test_bulk_upsert_duplicate_keys_rejected(db):
+    # Postgres raises a cardinality violation if one statement touches a row
+    # twice, and splitting duplicates across batches would silently let the
+    # last one win -- so they are refused up front, whatever the batch size.
+    with pytest.raises(ValueError, match="more than one UpsertItem"):
+        UpsertItem.query.bulk_upsert(
+            [UpsertItem(key="a", value=1), UpsertItem(key="a", value=2)],
+            update_fields=[UpsertItem.value],
+            unique_fields=[UpsertItem.key],
+            batch_size=1,
+        )
+
+    assert UpsertItem.query.count() == 0
+
+
+def test_bulk_upsert_database_generated_unique_field_rejected(db):
+    # db_uuid is generate=True, so the objects hold a DatabaseDefault sentinel
+    # rather than a value to conflict on.
+    with pytest.raises(ValueError, match="the database generates its value"):
+        DBDefaultsExample.query.bulk_upsert(
+            [DBDefaultsExample(name="a")],
+            update_fields=[DBDefaultsExample.name],
+            unique_fields=[DBDefaultsExample.db_uuid],
+        )
+
+
+def test_bulk_upsert_validates_arguments_even_when_empty(db):
+    # An empty objs list is still a bad call if the fields are wrong.
+    with pytest.raises(TypeError, match="takes field references, not strings"):
+        UpsertItem.query.bulk_upsert(
+            [],
+            update_fields=["value"],  # ty: ignore[invalid-argument-type]
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_bulk_upsert_leaves_update_now_alone_unless_named(db):
+    MixinTestModel(name="a").create()
+    seeded = MixinTestModel.query.get(name="a")
+
+    renamed = MixinTestModel(name="b")
+    renamed.id = seeded.id
+    MixinTestModel.query.bulk_upsert(
+        [renamed],
+        update_fields=[MixinTestModel.name],
+        unique_fields=[MixinTestModel.id],
+    )
+
+    row = MixinTestModel.query.get(id=seeded.id)
+    assert row.name == "b"
+    # updated_at was not named, so the stored row keeps its old stamp.
+    assert row.updated_at == seeded.updated_at
+
+    # Name it and the row is refreshed.
+    MixinTestModel.query.bulk_upsert(
+        [renamed],
+        update_fields=[MixinTestModel.name, MixinTestModel.updated_at],
+        unique_fields=[MixinTestModel.id],
+    )
+    assert MixinTestModel.query.get(id=seeded.id).updated_at > seeded.updated_at
