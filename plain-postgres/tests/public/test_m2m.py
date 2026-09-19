@@ -38,9 +38,7 @@ def test_upsert_unique_constraint(db):
 
 
 def test_m2m_manager_upsert_adds_relationship_on_insert(db):
-    """The M2M manager's upsert() adds the through-row only when it inserts a
-    new target row -- if the target already existed the relationship does too.
-    """
+    """The M2M manager's upsert() writes the target row and relates it."""
     widget = Widget.query.create(name="Tesla", size="Model 3")
 
     tag, created = widget.tags.upsert(name="GPS", unique_fields=[Tag.name])
@@ -57,6 +55,21 @@ def test_m2m_manager_upsert_does_not_readd_on_conflict(db):
     # The tag already exists and is already related; upsert must not create a
     # duplicate through-row.
     tag, created = widget.tags.upsert(name="GPS", unique_fields=[Tag.name])
+    assert created is False
+    assert tag.id == gps.id
+    assert widget.tags.query.count() == 1
+
+
+def test_m2m_manager_upsert_relates_an_existing_unrelated_target(db):
+    """The target row can already exist without being related to this
+    instance, so upsert() must still add the through-row -- created=False is
+    about the target row, not the relationship.
+    """
+    widget = Widget.query.create(name="Tesla", size="Model 3")
+    gps = Tag.query.create(name="GPS")
+
+    tag, created = widget.tags.upsert(name="GPS", unique_fields=[Tag.name])
+
     assert created is False
     assert tag.id == gps.id
     assert widget.tags.query.count() == 1

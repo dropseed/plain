@@ -504,10 +504,10 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         **kwargs: Any,
     ) -> tuple[T, bool]:
         obj, created = self.model.query.get_or_create(defaults=defaults, **kwargs)
-        # We only need to add() if created because if we got an object back
-        # from get() then the relationship already exists.
-        if created:
-            self.add(obj, through_defaults=through_defaults)
+        # The get() isn't scoped to this relation, so an existing object may
+        # not be related to this instance yet. add() skips through-rows that
+        # are already there, so it's safe either way.
+        self.add(obj, through_defaults=through_defaults)
         return obj, created
 
     def upsert(
@@ -527,10 +527,10 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
             unique_fields=unique_fields,
             **kwargs,
         )
-        # We only need to add() if created because if the row already existed
-        # the relationship does too.
-        if created:
-            self.add(obj, through_defaults=through_defaults)
+        # upsert() writes the target row, not the relationship, and the row may
+        # already exist without being related to this instance. add() skips
+        # through-rows that are already there, so it's safe either way.
+        self.add(obj, through_defaults=through_defaults)
         return obj, created
 
     def _get_target_ids(self, target_field_name: str, objs: Any) -> builtins.set[Any]:
