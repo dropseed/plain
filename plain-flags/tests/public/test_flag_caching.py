@@ -132,3 +132,30 @@ def test_flag_is_truthy_and_supports_membership(db):
             return False
 
     assert bool(OffFlag()) is False
+
+
+def test_reused_flag_refreshes_its_timestamps(db):
+    """Evaluating a flag again refreshes the row rather than duplicating it.
+
+    ``used_at`` is written explicitly; ``updated_at`` is an
+    ``update_now=True`` column the upsert refreshes on its own.
+    """
+
+    class TimestampFlag(Flag):
+        def get_key(self):
+            return None
+
+        def get_value(self):
+            return True
+
+    TimestampFlag().value
+    row = FlagModel.query.get(name="TimestampFlag")
+    first_used_at, first_updated_at = row.used_at, row.updated_at
+
+    TimestampFlag().value
+
+    assert FlagModel.query.filter(name="TimestampFlag").count() == 1
+    row = FlagModel.query.get(name="TimestampFlag")
+    assert row.used_at > first_used_at
+    assert row.updated_at > first_updated_at
+    assert row.enabled is True

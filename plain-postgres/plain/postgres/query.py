@@ -794,9 +794,7 @@ class QuerySet[T: "Model"]:
         # Include the PK column only when it is itself the conflict key;
         # otherwise let Postgres generate the identity value.
         pk_is_unique = any(f.primary_key for f in unique_fields)
-        fields = meta.fields
-        if not pk_is_unique:
-            fields = [f for f in fields if not isinstance(f, PrimaryKeyField)]
+        fields = meta.fields if pk_is_unique else meta.non_pk_fields
 
         # RETURNING must carry the DB-returned fields (to populate the objects)
         # plus the unique fields (to match each returned row to its object).
@@ -946,27 +944,39 @@ class QuerySet[T: "Model"]:
         was inserted and False when an existing row was updated. The object is
         hydrated from the post-write row -- no second query.
 
-        Value sources:
+        Value sources, lowest precedence first -- on any overlapping key,
+        create_defaults loses to defaults, which loses to **kwargs:
+          - create_defaults: extra values applied on insert only.
+          - defaults: applied on both insert and conflict-update.
           - **kwargs: the identifying and inserted values (must include the
             unique_fields). Applied on both insert and conflict-update.
-          - defaults: applied on both insert and conflict-update.
-          - create_defaults: extra values applied on insert only.
-          - conflict_defaults: per-column overrides for the conflict-update SET.
-            Each value may be a plain value or an expression (e.g.
-            F("count") + 1 for an atomic counter). A column here is set on
-            conflict even if it isn't otherwise being updated.
+          - conflict_defaults: per-column overrides for the conflict-update SET
+            only -- they never affect the inserted row. Each value may be a
+            plain value or an expression (e.g. F("count") + 1 for an atomic
+            counter). A column named here is set on conflict whether or not it
+            is otherwise being updated, and it cannot be a unique field.
 
-        On conflict, every non-unique, non-PK column drawn from kwargs and
-        defaults is set to the value the INSERT proposed, minus any column an
-        override in conflict_defaults replaces. create_defaults never take part
-        in the update. The merged result is not validated -- consistent with
-        the other bulk write paths.
+        On conflict the SET clause covers every non-unique, non-PK column drawn
+        from kwargs and defaults -- each taking the value the INSERT proposed --
+        plus every DateTimeField(update_now=True) column, whose fresh
+        pre_save() timestamp would otherwise go stale, plus every column
+        conflict_defaults names. A conflict_defaults entry replaces the
+        proposed value for that column. create_defaults never take part in the
+        update, and neither do columns nobody wrote (a create_now timestamp
+        keeps its original value). The merged result is not validated --
+        consistent with the other bulk write paths.
 
-        unique_fields takes field references (`Model.field`) and must name the
-        primary key or a UniqueConstraint declared on the model without a
-        condition or expressions; every unique field must have a non-null value
-        (NULL never conflicts in Postgres). The value sources above stay
-        string-keyed -- they follow the kwargs idiom, not field references.
+        unique_fields takes field references (`Model.field`) and must name a
+        UniqueConstraint declared on the model without a condition or
+        expressions; every unique field must have a non-null value (NULL never
+        conflicts in Postgres). The value sources above stay string-keyed --
+        they follow the kwargs idiom, not field references.
+
+        Unlike the get/create family, this is one atomic statement: there is no
+        lookup to lose a race, but there is also no row-scoping beyond
+        unique_fields -- kwargs that aren't part of the conflict key are values
+        written to whichever row conflicts, not filters narrowing which row
+        that is.
 
         upsert() carries its own RETURNING to hydrate the object, so a prior
         returning() has nothing to add and is refused.
@@ -978,6 +988,13 @@ class QuerySet[T: "Model"]:
         self._validate_upsert_unique_fields(
             [f.name for f in unique_fields], operation_name="upsert"
         )
+        if any(f.primary_key for f in unique_fields):
+            # Postgres owns the identity primary key, so a caller can never
+            # supply the value that would conflict on it.
+            raise ValueError(
+                "upsert() cannot conflict on the primary key -- the database "
+                "generates it. Use a UniqueConstraint's fields instead."
+            )
 
         defaults = defaults or {}
         create_defaults = create_defaults or {}
@@ -1001,43 +1018,62 @@ class QuerySet[T: "Model"]:
             )
 
         # The conflict-update columns: everything from kwargs and defaults that
-        # isn't a unique field or the PK. create_defaults are insert-only, so
-        # they never appear here.
+        # isn't a unique field or the PK, plus every update_now field (pre_save
+        # already stamped a fresh value into the INSERT, so EXCLUDED carries it
+        # -- leaving it out would let the timestamp go stale on conflict).
+        # create_defaults are insert-only, so they never appear here.
+        # Built in model field order so the SET clause is stable across runs.
         unique_field_names = {f.name for f in unique_fields}
-        update_names = {
-            name for name in (*kwargs, *defaults) if name not in unique_field_names
-        }
-        update_field_objs = []
-        for name in update_names:
-            field = meta.get_forward_field(name)
-            if not field.primary_key:
-                update_field_objs.append(field)
+        written_names = {*kwargs, *defaults}
+        update_field_objs: list[Field] = [
+            field
+            for field in meta.fields
+            if field.name not in unique_field_names
+            and not field.primary_key
+            and (field.name in written_names or field.auto_fills_on_save)
+        ]
 
-        conflict_default_objs = {
-            meta.get_forward_field(name): value
-            for name, value in conflict_defaults.items()
-        }
+        # conflict_defaults name columns the SET clause writes, so unlike the
+        # other sources they must be real columns -- not properties -- and they
+        # cannot rewrite the conflict target.
+        conflict_default_objs: dict[Field, Any] = {}
+        for name, value in conflict_defaults.items():
+            if name in unique_field_names:
+                raise ValueError(
+                    f"upsert() conflict_defaults cannot name the unique field "
+                    f"{name!r} -- it is the conflict target, not something the "
+                    "conflict-update may rewrite."
+                )
+            try:
+                field = meta.get_forward_field(name)
+            except FieldDoesNotExist:
+                raise FieldError(
+                    f"Invalid conflict_defaults field name for model "
+                    f"{self.model.__name__}: {name!r}."
+                ) from None
+            conflict_default_objs[field] = value
 
         obj = self.model(**insert_values)
         obj._prepare_related_fields_for_save(operation_name="upsert")
 
-        fields = list(meta.fields)
-        if obj.id is None:
-            id_field = meta.get_forward_field("id")
-            fields = [f for f in fields if f is not id_field]
+        # The identity primary key is never supplied (the model constructor
+        # rejects it), so Postgres always generates it.
+        fields = meta.non_pk_fields
 
+        # One statement, so it needs no transaction of its own. RETURNING
+        # carries every column plus the trailing created flag, so the row we
+        # hydrate is the post-write row -- not the one we proposed.
         returning_fields: list[Field] = list(meta.fields)
-        with transaction.atomic(savepoint=False):
-            rows = self._insert(
-                [obj],
-                fields=fields,
-                returning_fields=returning_fields,
-                on_conflict=OnConflict.UPDATE,
-                update_fields=update_field_objs,
-                unique_fields=unique_fields,
-                conflict_defaults=conflict_default_objs,
-                returning_created=True,
-            )
+        rows = self._insert(
+            [obj],
+            fields=fields,
+            returning_fields=returning_fields,
+            on_conflict=OnConflict.UPDATE,
+            update_fields=update_field_objs,
+            unique_fields=unique_fields,
+            conflict_defaults=conflict_default_objs,
+            returning_created=True,
+        )
 
         assert rows is not None
         row = rows[0]

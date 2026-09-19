@@ -1,6 +1,8 @@
-"""Test fixtures for QuerySet.bulk_upsert()."""
+"""Test fixtures for QuerySet.upsert() and QuerySet.bulk_upsert()."""
 
 from __future__ import annotations
+
+from datetime import datetime
 
 from plain.postgres import Field, types
 
@@ -24,6 +26,8 @@ class UpsertItem(postgres.Model):
         required=False,
         default=None,
     )
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
 
     model_options = postgres.Options(
         constraints=[

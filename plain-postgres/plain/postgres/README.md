@@ -494,6 +494,9 @@ CacheItem.query.bulk_upsert(
   objects by that key, so it's safe to run concurrently without deadlocking on
   overlapping keys.
 
+For a single row, reach for `upsert` (below) instead — it returns the object and
+a `created` flag rather than a list.
+
 #### Use `upsert` for a single insert-or-update
 
 `upsert(*, unique_fields, defaults=None, create_defaults=None, conflict_defaults=None, **kwargs)`
@@ -515,15 +518,16 @@ flag, created = Flag.query.upsert(
 `unique_fields` takes field references (`Model.field`), like `bulk_upsert`. The
 value sources below stay string-keyed — they follow the `kwargs` idiom.
 
-Value sources:
+Value sources, lowest precedence first — where the same key appears in two of
+them, `create_defaults` loses to `defaults`, which loses to `**kwargs`:
 
-- `**kwargs` and `defaults` are applied on **both** insert and conflict-update.
-  `kwargs` carries the identifying values (including the unique fields).
 - `create_defaults` is applied on **insert only** — extras that must not change
   when the row already exists.
-- `conflict_defaults` overrides the `DO UPDATE SET` for specific columns. A value
-  can be a plain value or an expression, so `{"count": F("count") + 1}` is an
-  atomic counter that reads the existing row:
+- `defaults` and `**kwargs` are applied on **both** insert and conflict-update.
+  `kwargs` carries the identifying values (including the unique fields).
+- `conflict_defaults` applies to the `DO UPDATE SET` **only** — it never changes
+  the inserted row. A value can be a plain value or an expression, so
+  `{"count": F("count") + 1}` is an atomic counter that reads the existing row:
 
 ```python
 view, created = PageView.query.upsert(
@@ -533,11 +537,36 @@ view, created = PageView.query.upsert(
 )
 ```
 
-On conflict, every non-unique, non-PK column from `kwargs`/`defaults` is set to the
-value the INSERT proposed, minus any column a `conflict_defaults` override
-replaces. As with `bulk_upsert`, `unique_fields` must name the primary key or a
-`UniqueConstraint` (no condition, no expressions), every unique field must be
-non-null, and the merged result is not validated.
+On conflict the `SET` clause covers:
+
+- every non-unique, non-PK column from `kwargs`/`defaults`, each taking the value
+  the INSERT proposed;
+- every `DateTimeField(update_now=True)` column, whose fresh `pre_save()`
+  timestamp rides along in the INSERT and would otherwise go stale (a
+  `create_now`-only column is _not_ in the `SET`, so it keeps its original
+  value);
+- every column `conflict_defaults` names — replacing the proposed value when the
+  column is already in the `SET`, adding it when it isn't.
+
+Columns nobody wrote are left alone, and `create_defaults` never take part in the
+update. Unlike `bulk_upsert`, `upsert` derives its `SET` columns rather than
+taking them, so a `conflict_defaults` key may not name a unique field — that's
+the conflict target.
+
+`unique_fields` must name a `UniqueConstraint` declared on the model (no
+condition, no expressions) and every unique field must be non-null. It can't be
+the primary key: Postgres generates the identity value, so a caller has nothing
+to conflict on.
+
+Two things to keep in mind:
+
+- **`kwargs` are values, not filters.** A keyword that isn't part of the conflict
+  key doesn't narrow which row is matched — `unique_fields` alone decides that —
+  it's just another column written to whichever row conflicts.
+- **The merged row isn't validated**, and a constraint violation surfaces as a raw
+  `psycopg.IntegrityError`, not a `ValidationError`. `upsert` looks single-row
+  like `create()`, but it's a set-based write like `bulk_upsert` (see
+  [Validation](#validation)).
 
 #### Use queryset `.update()` / `.delete()` for mass operations
 
@@ -1381,7 +1410,7 @@ except (psycopg.IntegrityError, ValidationError):
     ...  # lost a race — reload and retry, or report it
 ```
 
-For a plain insert-or-update with no per-row logic, `bulk_upsert(objs, update_fields=[...], unique_fields=[...])` is an atomic upsert with no race to catch.
+For a plain insert-or-update with no per-row logic there's no race to catch in the first place: `upsert(**values, unique_fields=[...])` for one row and `bulk_upsert(objs, update_fields=[...], unique_fields=[...])` for many are each a single atomic statement.
 
 ### Indexes and constraints
 

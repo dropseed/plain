@@ -21,4 +21,14 @@ class Migration(migrations.Migration):
                 allow_null=True, on_delete=postgres.CASCADE, to="examples.upsertowner"
             ),
         ),
+        migrations.AddField(
+            model_name="upsertitem",
+            name="created_at",
+            field=postgres.DateTimeField(create_now=True),
+        ),
+        migrations.AddField(
+            model_name="upsertitem",
+            name="updated_at",
+            field=postgres.DateTimeField(create_now=True, update_now=True),
+        ),
     )

@@ -169,6 +169,47 @@ def test_upsert_conflict_defaults_accepts_related_instance(db):
     assert reloaded.owner.id == owner.id
 
 
+def test_upsert_bumps_update_now_on_conflict(db):
+    """A DateTimeField(update_now=True) column nobody named still advances on
+    the conflict path -- pre_save stamped it into the INSERT, so EXCLUDED
+    carries it. A create_now-only column keeps its original value.
+    """
+    first, created = UpsertItem.query.upsert(
+        key="a", value=1, unique_fields=[UpsertItem.key]
+    )
+    assert created is True
+
+    second, created = UpsertItem.query.upsert(
+        key="a", value=2, unique_fields=[UpsertItem.key]
+    )
+    assert created is False
+    assert second.updated_at > first.updated_at
+    assert second.created_at == first.created_at
+
+
+def test_upsert_conflict_defaults_rejects_unique_field(db):
+    with pytest.raises(ValueError, match="cannot name the unique field"):
+        UpsertItem.query.upsert(
+            key="a",
+            conflict_defaults={"key": "b"},
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_upsert_conflict_defaults_rejects_unknown_field_name(db):
+    with pytest.raises(FieldError, match="conflict_defaults"):
+        UpsertItem.query.upsert(
+            key="a",
+            conflict_defaults={"typo_field": 1},
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_upsert_rejects_primary_key_unique_field(db):
+    with pytest.raises(ValueError, match="cannot conflict on the primary key"):
+        UpsertItem.query.upsert(key="a", unique_fields=[UpsertItem.id])
+
+
 def test_upsert_rejects_unknown_field_name(db):
     with pytest.raises(FieldError, match="typo_field"):
         UpsertItem.query.upsert(
