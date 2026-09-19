@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import inspect
 import operator
 import warnings
 from collections.abc import Callable, Iterator, Sequence
@@ -274,13 +275,13 @@ class SelectDataclassIterable(BaseIterable):
         tuple_rows = ValuesListIterable(queryset, chunked_fetch=self.chunked_fetch)
 
         # Decide how to call the constructor once, not once per row. A
-        # kw_only field can't be filled positionally, so those dataclasses
-        # take the slower keyword path.
-        fields = _result_type_fields(result_type)
-        if any(f.kw_only for f in fields):
-            field_names = tuple(f.name for f in fields)
+        # keyword-only parameter can't be filled positionally, so those
+        # dataclasses take the slower keyword path.
+        parameters = _result_type_parameters(result_type)
+        if any(p.kind is inspect.Parameter.KEYWORD_ONLY for p in parameters):
+            names = tuple(p.name for p in parameters)
             for row in tuple_rows:
-                yield result_type(**dict(zip(field_names, row, strict=True)))
+                yield result_type(**dict(zip(names, row, strict=True)))
         else:
             for row in tuple_rows:
                 yield result_type(*row)
@@ -1810,15 +1811,29 @@ def _selectable_to_column(item: Selectable[Any]) -> str | ResolvableExpression:
     )
 
 
-def _result_type_fields(
+def _result_type_parameters(
     result_type: type[DataclassInstance],
-) -> tuple[dataclasses.Field[Any], ...]:
-    """The dataclass fields a row is built from — the constructor's parameters.
+) -> tuple[inspect.Parameter, ...]:
+    """The constructor parameters a row is built from.
 
-    `init=False` fields are computed by the dataclass itself, so they are
-    neither selected nor passed.
+    Read off the signature rather than `dataclasses.fields()`, because the two
+    disagree in both directions: an `init=False` field is computed by the
+    dataclass and can't be passed, while an `InitVar` is a constructor
+    parameter that never appears in `fields()` at all. The signature is what
+    `result_type(*row)` actually has to satisfy.
     """
-    return tuple(f for f in dataclasses.fields(result_type) if f.init)
+    parameters = tuple(inspect.signature(result_type).parameters.values())
+    for parameter in parameters:
+        if parameter.kind in (
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        ):
+            raise TypeError(
+                f"select(result_type={result_type.__name__}) needs a fixed "
+                f"constructor signature to map columns onto, but "
+                f"{result_type.__name__} takes {parameter!s}."
+            )
+    return parameters
 
 
 def _check_result_type_matches(
@@ -1826,23 +1841,23 @@ def _check_result_type_matches(
 ) -> None:
     """Validate a dataclass result_type against the selected items.
 
-    Arity must match, and each selected field's name must equal the dataclass
-    field at the same position — expressions are anonymous and only need the
-    position to line up.
+    Arity must match the constructor, and each selected field's name must
+    equal the parameter at the same position — expressions are anonymous and
+    only need the position to line up.
     """
-    dataclass_fields = _result_type_fields(result_type)
-    if len(dataclass_fields) != len(items):
+    parameters = _result_type_parameters(result_type)
+    if len(parameters) != len(items):
         raise TypeError(
-            f"select(result_type={result_type.__name__}) has "
-            f"{len(dataclass_fields)} fields but {len(items)} columns were "
-            f"selected."
+            f"select(result_type={result_type.__name__}) takes "
+            f"{len(parameters)} constructor arguments but {len(items)} "
+            f"columns were selected."
         )
-    for item, dataclass_field in zip(items, dataclass_fields, strict=True):
-        if isinstance(item, Field) and item.name != dataclass_field.name:
+    for item, parameter in zip(items, parameters, strict=True):
+        if isinstance(item, Field) and item.name != parameter.name:
             raise TypeError(
                 f"select(result_type={result_type.__name__}) maps columns "
                 f"positionally: field {item.name!r} does not match dataclass "
-                f"field {dataclass_field.name!r} at the same position."
+                f"field {parameter.name!r} at the same position."
             )
 
 
