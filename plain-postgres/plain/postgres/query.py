@@ -691,7 +691,10 @@ class QuerySet[T: "Model"]:
         update_fields: list[Field],
         unique_fields: list[Field],
     ) -> None:
-        model_name = self.model.__name__
+        object_name = self.model.model_options.object_name
+
+        self._validate_field_refs(unique_fields, where="bulk_upsert() unique_fields")
+        self._validate_field_refs(update_fields, where="bulk_upsert() update_fields")
 
         if not unique_fields:
             raise ValueError("bulk_upsert() requires unique_fields.")
@@ -700,10 +703,20 @@ class QuerySet[T: "Model"]:
         ):
             names = [f.name for f in unique_fields]
             raise ValueError(
-                f"bulk_upsert() unique_fields {names} on {model_name} must name "
+                f"bulk_upsert() unique_fields {names} on {object_name} must name "
                 "the primary key or a UniqueConstraint declared on the model "
                 "without a condition or expressions."
             )
+        for field in unique_fields:
+            # Postgres fills in every db_returning column but the primary key
+            # (create_now, generate=True, RandomStringField), so the objects
+            # never carry a value to conflict on or to match the row back by.
+            if field.db_returning and not field.primary_key:
+                raise ValueError(
+                    f"bulk_upsert() cannot use {object_name}.{field.name} in "
+                    "unique_fields: the database generates its value, so the "
+                    "objects never carry one to conflict on."
+                )
 
         if not update_fields:
             raise ValueError("bulk_upsert() requires update_fields.")
@@ -732,9 +745,13 @@ class QuerySet[T: "Model"]:
         INSERT ... ON CONFLICT (unique_fields) DO UPDATE ... RETURNING per batch.
 
         Both inserted and updated objects come back with their DB-returned
-        fields (primary key, DB defaults) populated. update_fields and
-        unique_fields take field references (`Model.field`); unique_fields must
-        name the primary key or a UniqueConstraint declared on the model.
+        fields (primary key, DB defaults) populated, in the order they were
+        passed in. update_fields and unique_fields take field references
+        (`Model.field`); unique_fields must name the primary key or a
+        UniqueConstraint declared on the model.
+
+        Only the named update_fields are written on a conflicting row -- an
+        update_now column left out of update_fields keeps its stored value.
 
         bulk_upsert() carries its own RETURNING to populate the objects, so a
         prior returning() has nothing to add and is refused.
@@ -743,24 +760,23 @@ class QuerySet[T: "Model"]:
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
 
+        self._check_bulk_upsert_options(update_fields, unique_fields)
+
         objs = list(objs)
         if not objs:
             return objs
 
-        self._validate_field_refs(unique_fields, where="bulk_upsert() unique_fields")
-        self._validate_field_refs(update_fields, where="bulk_upsert() update_fields")
-
         meta = self.model._model_meta
-        self._check_bulk_upsert_options(update_fields, unique_fields)
-
+        object_name = self.model.model_options.object_name
         self._prepare_for_bulk_create(objs)
 
-        # Compute each object's conflict key exactly once, rejecting nulls as we
-        # go (NULL never conflicts in Postgres, so it can't be upserted). Reused
-        # below to sort the batch and to match RETURNING rows back to objects.
-        keyed: list[tuple[tuple[Any, ...], T]] = []
+        # Compute each object's conflict key exactly once. Reused below to sort
+        # the batches and to match RETURNING rows back to objects, so the keys
+        # have to be usable for both: no nulls (NULL never conflicts in
+        # Postgres) and no duplicates (one statement can only touch a row once).
+        obj_by_key: dict[tuple[Any, ...], T] = {}
         for obj in objs:
-            key = []
+            key_values = []
             for field in unique_fields:
                 value = field.value_from_object(obj)
                 if value is None:
@@ -769,8 +785,16 @@ class QuerySet[T: "Model"]:
                         "object; NULL never conflicts in Postgres, so it cannot "
                         "be upserted."
                     )
-                key.append(value)
-            keyed.append((tuple(key), obj))
+                key_values.append(value)
+            key = tuple(key_values)
+            if key in obj_by_key:
+                names = [f.name for f in unique_fields]
+                raise ValueError(
+                    f"bulk_upsert() got more than one {object_name} with "
+                    f"{names} = {list(key)}. Postgres can only touch a row once "
+                    "per statement, so collapse the duplicates before calling."
+                )
+            obj_by_key[key] = obj
 
         # Include the PK column only when it is itself the conflict key;
         # otherwise let Postgres generate the identity value.
@@ -786,15 +810,15 @@ class QuerySet[T: "Model"]:
             if field not in returning_fields:
                 returning_fields.append(field)
         unique_indices = [returning_fields.index(f) for f in unique_fields]
-        db_returning_indices = list(enumerate(meta.db_returning_fields))
 
-        # Sort by the conflict key so concurrent upserts touching overlapping
-        # keys lock rows in the same order and can't deadlock each other.
-        keyed.sort(key=lambda pair: pair[0])
+        # Issue the batches in conflict-key order so concurrent upserts touching
+        # overlapping keys lock rows in the same order and can't deadlock each
+        # other. objs itself is untouched, so the caller gets its input order.
+        sorted_keys = sorted(obj_by_key)
 
         with transaction.atomic(savepoint=False):
             returned_rows = self._batched_insert(
-                [obj for _, obj in keyed],
+                [obj_by_key[key] for key in sorted_keys],
                 fields,
                 batch_size,
                 returning_fields=returning_fields,
@@ -803,18 +827,19 @@ class QuerySet[T: "Model"]:
                 unique_fields=unique_fields,
             )
 
-        # RETURNING order isn't guaranteed to match VALUES order under ON
-        # CONFLICT, so match each returned row to its object by the unique key.
-        row_by_key = {}
-        for row in returned_rows:
-            key = tuple(row[i] for i in unique_indices)
-            row_by_key[key] = row
-        for key, obj in keyed:
-            row = row_by_key[key]
-            for index, field in db_returning_indices:
-                assert field.name is not None
-                setattr(obj, field.name, row[index])
-            obj._state.adding = False
+            # RETURNING order isn't guaranteed to match VALUES order under ON
+            # CONFLICT, so match each returned row to its object by the unique
+            # key. Still inside the transaction: a row that can't be matched
+            # would leave the objects half-populated, so roll the write back.
+            assert len(returned_rows) == len(obj_by_key)
+            row_by_key = {
+                tuple(row[i] for i in unique_indices): row for row in returned_rows
+            }
+            for key, obj in obj_by_key.items():
+                row = row_by_key[key]
+                for index, field in enumerate(meta.db_returning_fields):
+                    setattr(obj, field.name, row[index])
+                obj._state.adding = False
 
         return objs
 
