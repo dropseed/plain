@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import psycopg
 from app.users.models import User
 from plain.exceptions import ValidationError
-from plain.postgres import transaction, types
+from plain.postgres import Field, transaction, types
 from plain.utils import timezone
 
 from plain import postgres
@@ -20,29 +21,31 @@ __all__ = ["OAuthConnection"]
 
 @postgres.register_model
 class OAuthConnection(postgres.Model):
-    created_at = types.DateTimeField(create_now=True)
-    updated_at = types.DateTimeField(create_now=True, update_now=True)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
 
-    user = types.ForeignKeyField(
+    user: User = types.ForeignKeyField(
         "users.User",
         on_delete=postgres.CASCADE,
     )
 
     # The key used to refer to this provider type (in settings)
-    provider_key = types.TextField(max_length=100)
+    provider_key: Field[str] = types.TextField(max_length=100)
 
     # The unique ID of the user on the provider's system
-    provider_user_id = types.TextField(max_length=100)
+    provider_user_id: Field[str] = types.TextField(max_length=100)
 
     # Token data
-    access_token = types.EncryptedTextField(max_length=2000)
-    refresh_token = types.EncryptedTextField(
+    access_token: Field[str] = types.EncryptedTextField(max_length=2000)
+    refresh_token: Field[str] = types.EncryptedTextField(
         max_length=2000, required=False, default=""
     )
-    access_token_expires_at = types.DateTimeField(required=False, allow_null=True)
-    refresh_token_expires_at = types.DateTimeField(required=False, allow_null=True)
-
-    query: postgres.QuerySet[OAuthConnection] = postgres.QuerySet()
+    access_token_expires_at: Field[datetime | None] = types.DateTimeField(
+        required=False, allow_null=True, default=None
+    )
+    refresh_token_expires_at: Field[datetime | None] = types.DateTimeField(
+        required=False, allow_null=True, default=None
+    )
 
     model_options = postgres.Options(
         indexes=[
@@ -159,6 +162,8 @@ class OAuthConnection(postgres.Model):
                 user=user,
                 provider_key=provider_key,
                 provider_user_id=oauth_user.provider_id,
+                access_token=oauth_token.access_token,
+                refresh_token=oauth_token.refresh_token,
             )
 
         connection.set_user_fields(oauth_user)

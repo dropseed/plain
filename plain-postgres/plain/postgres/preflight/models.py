@@ -70,6 +70,128 @@ class CheckAllModels(PreflightCheck):
         return errors
 
 
+def _carries_transform(klass: type) -> bool:
+    """Whether `klass` contributes its annotated attributes to the constructor
+    the type checker synthesizes -- models (via the ModelBase metaclass) and the
+    mixins that inherit ModelMixin (via its own `@dataclass_transform`)."""
+    from plain.postgres.base import ModelBase, ModelMixin
+
+    return isinstance(klass, ModelBase) or issubclass(klass, ModelMixin)
+
+
+def mixin_fields_hidden_from_constructor(model: type) -> list[tuple[str, str]]:
+    """``(field name, mixin class name)`` for fields the runtime collects but the
+    type checker can't see.
+
+    ``Meta._create_and_cache`` walks the whole MRO for field attributes, so a
+    plain-Python mixin can contribute fields to a model. PEP 681 only collects
+    synthesized constructor parameters from base classes that carry the transform
+    themselves, so those fields are missing from the checker's ``__init__`` and
+    it rejects ``Model(that=...)`` on code the runtime accepts. Inheriting
+    ``postgres.ModelMixin`` carries the transform onto the mixin and closes the
+    gap -- this reports the mixins that haven't.
+    """
+    hidden: list[tuple[str, str]] = []
+    for klass in model.__mro__:
+        # Classes carrying the transform contribute their fields already.
+        if _carries_transform(klass) or klass is object:
+            continue
+        for attr_name, attr_value in vars(klass).items():
+            if attr_name.startswith("_"):
+                continue
+            # The same test Meta._create_and_cache uses to collect a field.
+            if not inspect.isclass(attr_value) and hasattr(
+                attr_value, "contribute_to_class"
+            ):
+                hidden.append((attr_name, klass.__name__))
+    return hidden
+
+
+# Deliberately NOT a registered preflight check. Every annotated, non-``ClassVar``
+# attribute on a model becomes a parameter of the type checker's synthesized
+# ``__init__`` (via ``@dataclass_transform`` on ``ModelBase``); if such an attribute
+# isn't a real field, the checker accepts ``Model(that=...)`` while the runtime
+# rejects it. Detecting that leak from raw annotations is inherently fragile
+# (aliased ``ClassVar`` imports, annotated properties, string forward refs), and
+# the divergence is low-harm in practice -- you have to actively construct with a
+# non-field kwarg to get bitten. So rather than ship a fragile check into every
+# user app's startup, we guard Plain's *own* models by running this directly from
+# an internal test (tests/internal/test_typed_construction_preflight.py).
+class CheckTypedConstruction(PreflightCheck):
+    """Re-derives the type checker's synthesized constructor field set and
+    compares it with the model's real fields in both directions.
+
+    An annotated, non-``ClassVar`` attribute that isn't a real field *leaks* into
+    the constructor -- the checker accepts ``Model(that=...)`` and the runtime
+    raises. Framework metadata, custom querysets, and reverse-relation accessors
+    must be annotated ``ClassVar[...]`` to stay out; real column fields and M2M
+    fields (excluded via a signature-level ``init=False``) are exempt.
+
+    A field declared on a mixin that doesn't inherit ``postgres.ModelMixin`` is
+    *hidden* from the constructor -- the runtime collects it off the MRO and the
+    checker rejects passing it.
+    """
+
+    def run(self) -> list[PreflightResult]:
+        import typing
+
+        def is_classvar(ann: object) -> bool:
+            # Annotations are strings under `from __future__ import annotations`,
+            # objects otherwise -- handle both without resolving forward refs.
+            if isinstance(ann, str):
+                return ann.lstrip().startswith(("ClassVar", "typing.ClassVar"))
+            return typing.get_origin(ann) is typing.ClassVar
+
+        errors: list[PreflightResult] = []
+        for model in models_registry.get_models():
+            meta = model._model_meta
+            # Attributes that may be annotated without ClassVar: real column
+            # fields (including DB-owned init=False ones) and M2M fields.
+            real = {f.name for f in meta.fields}
+            real |= {f.name for f in meta.many_to_many}
+            for klass in model.__mro__:
+                # Only classes carrying the transform contribute synthesized
+                # params -- models, and the ModelMixin subclasses they mix in.
+                # Fields on a mixin without it are reported below instead.
+                if not _carries_transform(klass):
+                    continue
+                # eval_str=False (the default) keeps string annotations as
+                # strings, so forward refs are never resolved here.
+                for attr, ann in inspect.get_annotations(klass).items():
+                    if attr.startswith("__") or is_classvar(ann) or attr in real:
+                        continue
+                    errors.append(
+                        PreflightResult(
+                            fix=(
+                                f"'{model.__name__}.{attr}' is annotated but is not a "
+                                "model field, so the type checker treats it as a "
+                                f"constructor argument while the runtime rejects "
+                                f"{model.__name__}({attr}=...). Annotate it "
+                                "ClassVar[...] (it's a class-level accessor or "
+                                "metadata, not a field) or remove the annotation."
+                            ),
+                            obj=model,
+                            id="postgres.field_leaks_into_constructor",
+                        )
+                    )
+            for attr, mixin in mixin_fields_hidden_from_constructor(model):
+                errors.append(
+                    PreflightResult(
+                        fix=(
+                            f"'{model.__name__}.{attr}' is a field declared on "
+                            f"'{mixin}', which doesn't inherit postgres.ModelMixin, "
+                            "so the type checker leaves it out of the synthesized "
+                            f"constructor and rejects {model.__name__}({attr}=...) "
+                            "even though the runtime accepts it. Inherit "
+                            f"postgres.ModelMixin in '{mixin}'."
+                        ),
+                        obj=model,
+                        id="postgres.field_hidden_from_constructor",
+                    )
+                )
+        return errors
+
+
 def _check_lazy_references(
     models_registry: ModelsRegistry, packages_registry: Any
 ) -> list[PreflightResult]:
