@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 from app.examples.models.delete import (
     ChildCascade,
+    ChildSetNull,
     DeleteParent,
     Grandchild,
     Grandparent,
@@ -275,3 +276,104 @@ def test_shadowed_field_traversal_runs(db):
 
     rows = list(ShadowSource.query.where(ShadowSource.ref.field.equals("hit")))
     assert [r.ref.id for r in rows] == [matched.id]
+
+
+# ---------------------------------------------------------------------------
+# Conditions on the relation itself.
+#
+# A relation is not a field, so it has no condition methods -- and it can't be
+# given any. To the type checker `ChildCascade.parent` is `type[DeleteParent]`
+# (Field.__get__'s model-valued overloads), which is exactly what lets chained
+# traversal type-check; a runtime `.equals()` the checker rejects would be
+# worse than none. The spelling is traversal to the key the relation targets,
+# which compiles to the same lookup `filter(parent=obj)` produces.
+# ---------------------------------------------------------------------------
+
+
+def test_relation_key_conditions_build_q():
+    assert ChildCascade.parent.id.equals(7).children == [("parent__id", 7)]
+    assert ChildCascade.parent.id.is_in([1, 2]).children == [("parent__id__in", [1, 2])]
+    assert ChildSetNull.parent.id.is_null().children == [("parent__id__isnull", True)]
+    assert ChildCascade.parent.id.not_equal(7).children == [("parent__id", 7)]
+
+
+def test_where_filters_by_relation_key(db):
+    kept = DeleteParent.query.create(name="kept")
+    other = DeleteParent.query.create(name="other")
+    mine = ChildCascade.query.create(parent=kept)
+    ChildCascade.query.create(parent=other)
+
+    rows = list(ChildCascade.query.where(ChildCascade.parent.id.equals(kept.id)))
+    assert [r.id for r in rows] == [mine.id]
+
+
+def test_relation_key_matches_filter_on_the_relation(db):
+    """The documented equivalence: traversing to the key is the typed spelling
+    of `filter(parent=obj)`, not merely something similar."""
+    kept = DeleteParent.query.create(name="kept")
+    other = DeleteParent.query.create(name="other")
+    ChildCascade.query.create(parent=kept)
+    ChildCascade.query.create(parent=other)
+
+    typed = [
+        r.id for r in ChildCascade.query.where(ChildCascade.parent.id.equals(kept.id))
+    ]
+    untyped = [r.id for r in ChildCascade.query.filter(parent=kept)]
+    assert typed == untyped
+    assert len(typed) == 1
+
+
+def test_where_filters_by_relation_key_is_in(db):
+    a = DeleteParent.query.create(name="a")
+    b = DeleteParent.query.create(name="b")
+    c = DeleteParent.query.create(name="c")
+    for parent in (a, b, c):
+        ChildCascade.query.create(parent=parent)
+
+    rows = list(ChildCascade.query.where(ChildCascade.parent.id.is_in([a.id, c.id])))
+    assert sorted(r.parent.id for r in rows) == sorted([a.id, c.id])
+
+
+def test_where_filters_by_null_relation_key(db):
+    kept = DeleteParent.query.create(name="kept")
+    doomed = DeleteParent.query.create(name="doomed")
+    attached = ChildSetNull.query.create(parent=kept)
+    orphan = ChildSetNull.query.create(parent=doomed)
+
+    # The field is nullable but still `required`, so the null arrives the way
+    # it does in practice: SET_NULL clearing the key when the parent goes.
+    DeleteParent.query.filter(id=doomed.id).delete()
+
+    nulls = list(ChildSetNull.query.where(ChildSetNull.parent.id.is_null()))
+    assert [r.id for r in nulls] == [orphan.id]
+
+    non_nulls = list(ChildSetNull.query.where(ChildSetNull.parent.id.is_null(False)))
+    assert [r.id for r in non_nulls] == [attached.id]
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["equals", "not_equal", "gt", "gte", "lt", "lte", "is_null", "is_in", "contains"],
+)
+def test_condition_on_the_relation_itself_raises_helpful_error(method):
+    """Not the generic AttributeError -- the error has to name the spelling
+    that works, or the constraint just looks like a missing feature."""
+    with pytest.raises(TypeError) as excinfo:
+        getattr(ChildCascade.parent, method)
+
+    message = str(excinfo.value)
+    assert "is a relation, not a field" in message
+    assert f"parent.id.{method}(...)" in message
+
+
+def test_unknown_relation_attribute_still_raises_attribute_error():
+    """Only the condition names get the TypeError; a genuine typo stays an
+    AttributeError so `hasattr` and friends behave."""
+    with pytest.raises(AttributeError, match="parent.nope is not a traversable"):
+        getattr(ChildCascade.parent, "nope")
+
+
+def test_related_field_named_like_a_condition_still_traverses():
+    """The field lookup runs first, so a related model that really does have a
+    column named after a condition method still resolves to the column."""
+    assert ShadowSource.ref.field.equals("hit").children == [("ref__field", "hit")]

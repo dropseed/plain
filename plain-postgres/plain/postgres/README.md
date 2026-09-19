@@ -203,16 +203,15 @@ For more advanced querying options, see the [`QuerySet`](./query.py#QuerySet) cl
 `where()` is a typed alternative to `filter()`. Instead of string keyword lookups, you build each condition from a field, so a type checker catches a misspelled field or a wrong value type at the call site:
 
 ```python
-from plain.postgres import types
+from plain import postgres
+from plain.postgres import Field, types
 
 
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    role: str = types.TextField(max_length=20)
-    age: int = types.IntegerField(allow_null=True)
-
-    query: postgres.QuerySet[User] = postgres.QuerySet()
+    email: Field[str] = types.EmailField()
+    role: Field[str] = types.TextField(max_length=20)
+    age: Field[int | None] = types.IntegerField(allow_null=True, default=None)
 
 
 # Each argument is a condition; multiple arguments are ANDed together.
@@ -237,6 +236,16 @@ Conditions traverse foreign keys — accessing a field through a relation builds
 # Q(author__email="a@example.com")
 Post.query.where(Post.author.email.equals("a@example.com"))
 ```
+
+A relation is a path to traverse, not a field, so it carries no conditions of its own. To match on the relation itself, traverse to the key it points at — that's the typed spelling of `filter(author=author)`, and it compiles to the same SQL:
+
+```python
+Post.query.where(Post.author.id.equals(author.id))
+Post.query.where(Post.author.id.is_in([a.id for a in authors]))
+Post.query.where(Post.author.id.is_null())  # nullable relation
+```
+
+`Post.author.equals(author)` raises `TypeError` naming this spelling. It isn't an oversight: to the type checker `Post.author` is `type[Author]`, which is what makes `Post.author.email.equals(...)` type-check, and a condition method there would be a runtime method the checker rejects.
 
 A traversed field offers exactly the same conditions as the field itself — a string-only method like `contains` is available through the relation only when the related field is string-valued (any of them, not just `TextField`: `GenericIPAddressField` and `RandomStringField` carry them too).
 

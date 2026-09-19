@@ -1,3 +1,6 @@
+import inspect
+import pickle
+
 import pytest
 from app.examples.models.delete import (
     ChildCascade,
@@ -666,3 +669,26 @@ class TestForeignKeyPartialInstance:
         with pytest.raises(AttributeError):
             del child.parent
         assert fk_field.is_cached(child)  # ty: ignore[unresolved-attribute]
+
+
+class TestForwardForeignKeyDescriptorPickling:
+    """The descriptor pickles by name off its model. Class access runs
+    `__get__`, which returns a RelatedFieldRef traversal proxy, so the
+    reconstruction has to be static or the descriptor comes back as a proxy."""
+
+    def test_pickle_round_trips_to_the_descriptor(self):
+        descriptor = inspect.getattr_static(ChildCascade, "parent")
+
+        restored = pickle.loads(pickle.dumps(descriptor))
+
+        assert type(restored) is type(descriptor)
+        assert restored is descriptor  # the one attached to the model
+        assert restored.field is ChildCascade._model_meta.get_forward_field("parent")
+
+    def test_pickle_round_trips_a_nullable_relation(self):
+        descriptor = inspect.getattr_static(ChildSetNull, "parent")
+
+        restored = pickle.loads(pickle.dumps(descriptor))
+
+        assert restored is descriptor
+        assert restored.field.name == "parent"

@@ -36,6 +36,7 @@ Reverse relations must be explicitly defined using ``ReverseForeignKey`` or
 
 from __future__ import annotations
 
+import inspect
 from functools import cached_property
 from typing import Any
 
@@ -133,7 +134,9 @@ class ForwardForeignKeyDescriptor:
             from plain.postgres.fields.related_typed import RelatedFieldRef
 
             return RelatedFieldRef(
-                model=self.field.remote_field.model, prefix=self.field.name
+                model=self.field.remote_field.model,
+                prefix=self.field.name,
+                target_name=self.field.target_field.name,
             )
 
         # The related object is cached on the model state -- by select_related,
@@ -228,10 +231,14 @@ class ForwardForeignKeyDescriptor:
     def __reduce__(self) -> tuple[Any, tuple[Any, str]]:
         """
         Pickling should return the instance attached by self.field on the
-        model, not a new copy of that descriptor. Use getattr() to retrieve
-        the instance directly from the model.
+        model, not a new copy of that descriptor.
+
+        Reconstruct with ``inspect.getattr_static``, not ``getattr``: class
+        access runs ``__get__``, which returns a ``RelatedFieldRef`` traversal
+        proxy, so a plain ``getattr`` would unpickle the descriptor as a proxy.
+        Same reason the prefetch path reaches for the descriptor statically.
         """
-        return getattr, (self.field.model, self.field.name)
+        return inspect.getattr_static, (self.field.model, self.field.name)
 
 
 class ForwardManyToManyDescriptor:
