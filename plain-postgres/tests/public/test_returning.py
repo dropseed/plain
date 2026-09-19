@@ -7,11 +7,19 @@ returning(*Model.field) returns a list of dicts holding just those columns.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
+import psycopg
 import pytest
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.returning import ReturningEvent
-from plain.postgres import ReturningQuerySet
+from plain.postgres import ReturningQuerySet, transaction
+from plain.postgres.db import get_connection
 from plain.postgres.exceptions import FieldError
+from plain.postgres.sources import build_connection_params
+
+if TYPE_CHECKING:
+    from typing import LiteralString
 
 
 def _seed_events() -> None:
@@ -316,3 +324,125 @@ def test_lock_survives_into_the_subquery_of_a_joined_returning_update(
     assert "FOR UPDATE SKIP LOCKED" in sql
     assert "RETURNING" in sql
     assert [row.id for row in rows] == [child.id]
+
+
+# ===========================================================================
+# A locked write claims rows exclusively
+#
+# Neither UPDATE nor DELETE takes a locking clause of its own, so a locked
+# write has to put the lock on the sub-select that picks the rows. Without
+# that the lock is silently dropped and two workers claim the same rows.
+# ===========================================================================
+
+
+def _only_sql(queries: list[dict]) -> str:
+    assert len(queries) == 1, [q["sql"] for q in queries]
+    return queries[0]["sql"]
+
+
+def test_locked_update_puts_the_lock_in_the_subquery(db, capture_queries):
+    # Single table, no joins -- the case that used to skip the rewrite.
+    _seed_events()
+    with capture_queries() as queries:
+        ReturningEvent.query.filter(label="a").for_update(
+            skip_locked=True
+        ).returning().update(count=4)
+
+    sql = _only_sql(queries)
+    before_returning = sql.split("RETURNING")[0]
+    assert "FOR UPDATE SKIP LOCKED)" in before_returning
+    assert before_returning.index("IN (SELECT") < before_returning.index("FOR UPDATE")
+
+
+def test_locked_delete_puts_the_lock_in_the_subquery(db, capture_queries):
+    _seed_events()
+    with capture_queries() as queries:
+        ReturningEvent.query.filter(label="a").for_update(
+            skip_locked=True
+        ).returning().delete()
+
+    sql = _only_sql(queries)
+    before_returning = sql.split("RETURNING")[0]
+    assert "FOR UPDATE SKIP LOCKED)" in before_returning
+    assert before_returning.index("IN (SELECT") < before_returning.index("FOR UPDATE")
+
+
+def _capture_locked_write(write) -> str:
+    """Run `write` against rows that don't exist yet and return its SQL.
+
+    The statement is what the race below replays on two raw connections --
+    the pytest harness swaps the connection per context, so a second session
+    can't go through the ORM.
+    """
+    conn = get_connection()
+    previous = conn.force_debug_cursor
+    conn.force_debug_cursor = True
+    conn.queries_log.clear()
+    try:
+        with transaction.atomic():
+            write()
+        captured = [q for q in conn.queries_log if q["sql"] not in ("BEGIN", "COMMIT")]
+    finally:
+        conn.force_debug_cursor = previous
+    return _only_sql(captured)
+
+
+def _race(sql: str) -> tuple[set, set]:
+    """Run `sql` from two sessions, the first holding its transaction open."""
+    # psycopg types execute() as LiteralString to discourage string-built SQL;
+    # this statement came out of the ORM's own compiler.
+    statement = cast("LiteralString", sql)
+    params = build_connection_params(get_connection().settings_dict)
+    with (
+        psycopg.connect(**params) as first,
+        psycopg.connect(**params) as second,
+    ):
+        with first.cursor() as cur_first, second.cursor() as cur_second:
+            cur_first.execute(statement)
+            claimed_first = {row[0] for row in cur_first.fetchall()}
+            # Without SKIP LOCKED on the inner select the second session
+            # would block on the first session's row locks until this fires.
+            cur_second.execute("SET lock_timeout = '2s'")
+            cur_second.execute(statement)
+            claimed_second = {row[0] for row in cur_second.fetchall()}
+        first.rollback()
+        second.rollback()
+    return claimed_first, claimed_second
+
+
+def test_locked_returning_update_claims_rows_exclusively(isolated_db):
+    sql = _capture_locked_write(
+        lambda: (
+            ReturningEvent.query.filter(label="claim")
+            .for_update(skip_locked=True)
+            .returning(ReturningEvent.id)
+            .update(count=1)
+        )
+    )
+    for _ in range(4):
+        ReturningEvent(label="claim", count=0).create()
+
+    claimed_first, claimed_second = _race(sql)
+
+    assert len(claimed_first) == 4
+    assert claimed_second == set()
+    assert not claimed_first & claimed_second
+
+
+def test_locked_returning_delete_claims_rows_exclusively(isolated_db):
+    sql = _capture_locked_write(
+        lambda: (
+            ReturningEvent.query.filter(label="claim")
+            .for_update(skip_locked=True)
+            .returning(ReturningEvent.id)
+            .delete()
+        )
+    )
+    for _ in range(4):
+        ReturningEvent(label="claim", count=0).create()
+
+    claimed_first, claimed_second = _race(sql)
+
+    assert len(claimed_first) == 4
+    assert claimed_second == set()
+    assert not claimed_first & claimed_second

@@ -1591,8 +1591,15 @@ class SQLDeleteCompiler(SQLWriteCompiler):
         Create the SQL for this query. Return the SQL string and list of
         parameters.
         """
-        if self.single_alias and not self.contains_self_reference_subquery:
+        if (
+            self.single_alias
+            and not self.contains_self_reference_subquery
+            and not self.query.lock_mode
+        ):
             return self._as_sql(self.query)
+        # A DELETE takes no locking clause of its own, so a locked delete has
+        # to put the lock on the sub-select that picks the rows -- otherwise
+        # the lock is silently dropped and two workers claim the same rows.
         innerq = self.query.clone()
         innerq.__class__ = Query
         innerq.clear_select_clause()
@@ -1679,14 +1686,19 @@ class SQLUpdateCompiler(SQLWriteCompiler):
         self, with_col_aliases: bool = False
     ) -> tuple[list[Any], list[Any], list[SqlWithParams]] | None:
         """
-        If the update depends on other tables (JOINs in the WHERE clause),
-        rewrite the query so the current table is filtered by `id IN (subquery)`.
+        If the update depends on other tables (JOINs in the WHERE clause), or
+        asks for a row lock, rewrite the query so the current table is filtered
+        by `id IN (subquery)`.
+
+        An UPDATE takes no locking clause of its own, so a locked update has to
+        put the lock on the sub-select that picks the rows -- otherwise the
+        lock is silently dropped and two workers claim the same rows.
         """
         refcounts_before = self.query.alias_refcount.copy()
         # Ensure base table is in the query
         self.query.get_initial_alias()
         count = self.query.count_active_tables()
-        if count == 1:
+        if count == 1 and not self.query.lock_mode:
             return
         query = self.query.chain(klass=Query)
         query.select_related = False

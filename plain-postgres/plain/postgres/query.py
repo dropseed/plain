@@ -1078,7 +1078,9 @@ class QuerySet[T: "Model"]:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
         del_query = self._chain()
-        del_query.sql_query.lock_mode = None
+        # The lock is kept: the delete compiler moves it onto the sub-select
+        # that picks the rows, which is what makes a locked claim-and-delete
+        # safe against a second worker.
         del_query.sql_query.select_related = False
         del_query.sql_query.clear_ordering(force=True)
 

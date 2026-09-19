@@ -527,7 +527,7 @@ for row in deleted:
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
 - `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_update()`, `get_or_create()`, `update_or_create()` — raises `TypeError` rather than quietly dropping it.
 
-A row lock is fine on the read side of the write — that pairing is the job-claim pattern, and it composes in either order:
+A row lock belongs on the read side of the write — that pairing is the job-claim pattern, and it composes in either order:
 
 ```python
 claimed = (
@@ -537,6 +537,18 @@ claimed = (
     .update(status="running")
 )
 ```
+
+Neither `UPDATE` nor `DELETE` takes a locking clause of its own, so a locked write is emitted as a sub-select that holds the lock:
+
+```sql
+UPDATE "jobs" SET "status" = 'running'
+WHERE "id" IN (
+    SELECT "id" FROM "jobs" WHERE "status" = 'pending' FOR UPDATE SKIP LOCKED
+)
+RETURNING ...
+```
+
+It is still one statement. A second worker running the same write skips the rows the first one holds instead of blocking on them, so each row is claimed once.
 
 The values you get back are whatever the statement wrote, exactly as Postgres holds them. A set-based `update()` doesn't run Python-side field hooks, so an `update_now=True` timestamp comes back unchanged unless the `update()` set it.
 

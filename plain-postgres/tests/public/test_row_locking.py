@@ -158,3 +158,36 @@ def test_count_and_aggregate_still_drop_the_lock(db, capture_queries):
     with capture_queries() as queries:
         assert Widget.query.for_update().aggregate(n=Count("id")) == {"n": 0}
     assert "FOR UPDATE" not in _executed_sql(queries)
+
+
+# ---------------------------------------------------------------------------
+# Set-based writes
+#
+# Neither UPDATE nor DELETE takes a locking clause, so the lock has to move
+# onto the sub-select that picks the rows rather than being dropped.
+# ---------------------------------------------------------------------------
+
+
+def test_locked_update_locks_in_a_subquery(db, capture_queries):
+    with capture_queries() as queries:
+        Widget.query.for_update(skip_locked=True).update(name="x")
+
+    sql = _executed_sql(queries)
+    assert "IN (SELECT" in sql
+    assert "FOR UPDATE SKIP LOCKED)" in sql
+
+
+def test_locked_delete_locks_in_a_subquery(db, capture_queries):
+    with capture_queries() as queries:
+        Widget.query.for_update(skip_locked=True).delete()
+
+    sql = _executed_sql(queries)
+    assert "IN (SELECT" in sql
+    assert "FOR UPDATE SKIP LOCKED)" in sql
+
+
+def test_unlocked_writes_stay_a_flat_statement(db, capture_queries):
+    with capture_queries() as queries:
+        Widget.query.update(name="x")
+
+    assert "IN (SELECT" not in _executed_sql(queries)
