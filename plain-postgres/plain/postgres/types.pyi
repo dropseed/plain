@@ -6,8 +6,8 @@ typed *descriptor* (`XField[T]`), not the primitive `T`. Combined with
 `Field.__get__`'s overloads, this gives you:
 
     class User(postgres.Model):
-        email = types.EmailField()
-        age = types.IntegerField(allow_null=True)
+        email: Field[str] = types.EmailField()
+        age: Field[int | None] = types.IntegerField(allow_null=True, default=None)
 
     User.email   # EmailField[str]        — typed reference, has .equals(), .contains(), ...
     user.email   # str                    — the loaded value
@@ -28,6 +28,7 @@ from zoneinfo import ZoneInfo
 
 from plain.postgres.base import Model
 from plain.postgres.deletion import OnDelete
+from plain.postgres.fields.base import Field as _Field
 from plain.postgres.fields.binary import BinaryField as _BinaryField
 from plain.postgres.fields.boolean import BooleanField as _BooleanField
 from plain.postgres.fields.duration import DurationField as _DurationField
@@ -167,7 +168,7 @@ def SmallIntegerField(
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _SmallIntegerField[int]: ...
-def PrimaryKeyField() -> _PrimaryKeyField: ...
+def PrimaryKeyField(*, init: bool = False) -> _PrimaryKeyField: ...
 
 # Numeric fields
 @overload
@@ -245,10 +246,31 @@ def DateField(
 @overload
 def DateTimeField(
     *,
+    create_now: Literal[True],
+    update_now: bool = False,
+    required: bool = True,
+    allow_null: bool = False,
+    validators: Sequence[Callable[..., Any]] = (),
+    init: bool = False,
+) -> _DateTimeField[datetime]: ...
+@overload
+def DateTimeField(
+    *,
+    create_now: bool = False,
+    update_now: Literal[True],
+    required: bool = True,
+    allow_null: bool = False,
+    validators: Sequence[Callable[..., Any]] = (),
+    init: bool = False,
+) -> _DateTimeField[datetime]: ...
+@overload
+def DateTimeField(
+    *,
     create_now: bool = False,
     update_now: bool = False,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _DateTimeField[datetime | None]: ...
 @overload
@@ -310,12 +332,23 @@ def TimeZoneField(
 ) -> _TimeZoneField[ZoneInfo]: ...
 
 # Other fields
+# generate=True -> Postgres generates the value per row, so it's caller-excluded
+@overload
+def UUIDField(
+    *,
+    generate: Literal[True],
+    required: bool = True,
+    allow_null: bool = False,
+    validators: Sequence[Callable[..., Any]] = (),
+    init: bool = False,
+) -> _UUIDField[UUID]: ...
 @overload
 def UUIDField(
     *,
     generate: bool = False,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _UUIDField[UUID | None]: ...
 @overload
@@ -326,6 +359,8 @@ def UUIDField(
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _UUIDField[UUID]: ...
+
+# RandomStringField always generates its value in the DB -> caller-excluded
 @overload
 def RandomStringField(
     *,
@@ -333,6 +368,7 @@ def RandomStringField(
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
+    init: bool = False,
 ) -> _RandomStringField[str | None]: ...
 @overload
 def RandomStringField(
@@ -341,6 +377,7 @@ def RandomStringField(
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
+    init: bool = False,
 ) -> _RandomStringField[str]: ...
 @overload
 def BinaryField(
@@ -459,6 +496,7 @@ def EncryptedJSONField(
     decoder: Any = None,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> Any: ...
 @overload
@@ -476,19 +514,22 @@ def EncryptedJSONField(
 # Two overload families:
 #
 # 1. Class-argument FK (`to=SomeModel`) — T is inferred from the class.
-#    Returns `_ForeignKeyDescriptor[T, V]` whose `__get__` overloads do
-#    double duty: class-access (`Child.parent`) yields `type[T]` so the
-#    related model's typed field surface (e.g. `Child.parent.name.equals(...)`)
-#    is visible for typed where() chaining; instance-access (`child.parent`)
-#    yields V (T or T | None for nullable FKs).
+#    Returns `_ForeignKeyDescriptor[T, V]`, a `Field[V]`. `Field.__get__`
+#    does the double duty: class-access (`Child.parent`) yields `type[T]` so
+#    the related model's typed field surface (e.g.
+#    `Child.parent.name.equals(...)`) is visible for typed where() chaining;
+#    instance-access (`child.parent`) yields V (T or T | None for nullable
+#    FKs). Both survive the `Field[T]` annotation the model declares.
 #
 # 2. String-argument FK (`to="SomeModel"`, `to="self"`) — T can't be
 #    inferred from the string, so the return type falls back to bare `T`.
-#    This requires an explicit LHS annotation (`parent: TreeNode | None = …`)
-#    but preserves instance-access typing for forward references and
-#    self-references. Type-level FK traversal isn't available through
-#    string-arg FKs — the runtime `RelatedFieldRef` still resolves
-#    `Child.parent.name` regardless.
+#    This requires an explicit *value-type* LHS annotation
+#    (`parent: TreeNode | None = …`) which preserves instance-access typing
+#    for forward references and self-references, but makes class access a
+#    `TreeNode` rather than a field: type-level FK traversal isn't available
+#    through string-arg FKs. The runtime `RelatedFieldRef` still resolves
+#    `Child.parent.name` regardless. Declare the model before the FK and pass
+#    the class when you want traversal to type-check.
 #
 # `__set__` accepts the related instance, None (via V), or a bare PK
 # value (int) — matching what `ForwardForeignKeyDescriptor` already
@@ -498,11 +539,15 @@ def EncryptedJSONField(
 # type-checks here. The runtime `ForwardForeignKeyDescriptor.__set__`
 # explicitly rejects bool with `ValueError`, so this language quirk is
 # caught at runtime rather than silently coerced to PK 0/1.
-class _ForeignKeyDescriptor[T: Model, V]:
-    @overload
-    def __get__(self, instance: None, owner: type) -> type[T]: ...
-    @overload
-    def __get__(self, instance: Model, owner: type) -> V: ...
+class _ForeignKeyDescriptor[T: Model, V](_Field[V]):
+    # Subclasses Field[V] so an FK field is assignable to a `Field[V]`
+    # annotation (e.g. `org: Field[Org] = types.ForeignKeyField(Org)`) under
+    # both ty and pyright. That annotation is also what models actually carry,
+    # so `__get__` is deliberately NOT overridden here -- `Field.__get__`'s
+    # model-valued overloads already give class access `type[T]` (traversal)
+    # and instance access `V`, and they keep working through the `Field[V]`
+    # annotation, which an override here would not. Only `__set__` is
+    # widened, to accept a bare PK alongside the instance.
     def __set__(self, instance: Model, value: V | int) -> None: ...
 
 # Class-argument FK overloads
@@ -514,6 +559,7 @@ def ForeignKeyField[T: Model](
     related_query_name: str | None = None,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _ForeignKeyDescriptor[T, T | None]: ...
 @overload
@@ -536,6 +582,7 @@ def ForeignKeyField[T: Model](
     related_query_name: str | None = None,
     required: bool = True,
     allow_null: Literal[True],
+    default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> T | None: ...
 @overload
@@ -555,6 +602,7 @@ def ManyToManyField[T: Model](
     through_fields: tuple[str, str] | None = None,
     related_query_name: str | None = None,
     symmetrical: bool | None = None,
+    init: bool = False,
 ) -> ManyToManyManager[T]: ...
 
 # Reverse relation descriptors

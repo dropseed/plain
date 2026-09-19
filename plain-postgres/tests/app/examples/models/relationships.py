@@ -1,28 +1,26 @@
 from __future__ import annotations
 
-from plain.postgres import types
+from typing import ClassVar
+
+from plain.postgres import Field, types
 
 from plain import postgres
 
 
 @postgres.register_model
 class Tag(postgres.Model):
-    name = types.TextField(max_length=100)
+    name: Field[str] = types.TextField(max_length=100)
 
-    query: postgres.QuerySet[Tag] = postgres.QuerySet()
-
-    widgets: types.ReverseManyToMany[Widget] = types.ReverseManyToMany(
+    widgets: ClassVar[types.ReverseManyToMany[Widget]] = types.ReverseManyToMany(
         to="Widget", field="tags"
     )
 
 
 @postgres.register_model
 class Widget(postgres.Model):
-    name = types.TextField(max_length=100)
-    size = types.TextField(max_length=100)
+    name: Field[str] = types.TextField(max_length=100)
+    size: Field[str] = types.TextField(max_length=100)
     tags: types.ManyToManyManager[Tag] = types.ManyToManyField(Tag, through="WidgetTag")
-
-    query: postgres.QuerySet[Widget] = postgres.QuerySet()
 
     model_options = postgres.Options(
         constraints=[
@@ -33,11 +31,12 @@ class Widget(postgres.Model):
     )
 
 
+# Declared after Widget so the FK takes the model *class* rather than a string:
+# only a class-argument FK gives the stub a resolvable `T`, which is what makes
+# `WidgetTag.widget.name.equals(...)` type-check as well as run.
 @postgres.register_model
 class WidgetTag(postgres.Model):
     """Through model for Widget-Tag many-to-many relationship."""
 
-    widget = types.ForeignKeyField(Widget, on_delete=postgres.CASCADE)
-    tag = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)
-
-    query: postgres.QuerySet[WidgetTag] = postgres.QuerySet()
+    widget: Field[Widget] = types.ForeignKeyField(Widget, on_delete=postgres.CASCADE)
+    tag: Field[Tag] = types.ForeignKeyField(Tag, on_delete=postgres.CASCADE)

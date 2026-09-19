@@ -12,10 +12,10 @@ Forward accessors follow foreign keys. Reverse accessors trace them back. For
 example, with the following models::
 
     class Parent(Model):
-        children: ReverseForeignKey[Child] = ReverseForeignKey(to="Child", field="parent")
+        children: ClassVar[ReverseForeignKey[Child]] = ReverseForeignKey(to="Child", field="parent")
 
     class Child(Model):
-        parent: Parent = ForeignKeyField(Parent, on_delete=models.CASCADE)
+        parent: Field[Parent] = ForeignKeyField(Parent, on_delete=CASCADE)
 
  ``child.parent`` is a forward foreign key relation. ``parent.children`` is a
 reverse foreign key relation.
