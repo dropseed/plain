@@ -5,6 +5,7 @@ The main QuerySet implementation. This provides the public API for the ORM.
 from __future__ import annotations
 
 import copy
+import json
 import operator
 import warnings
 from collections.abc import Callable, Iterator, Sequence
@@ -52,6 +53,26 @@ __all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet", "ReturningQuerySet"]
 
 if TYPE_CHECKING:
     from plain.postgres import Model
+
+
+def conflict_key_value(field: Field, value: Any) -> Any:
+    """One component of a bulk_upsert() conflict key, in a form that hashes.
+
+    The same function runs over both sides of the match -- the value taken off
+    the object and the value Postgres handed back -- so however a column spells
+    its Python value on each side, the two meet in the same place. Preparing
+    the value is most of that: a TimeZoneField's ZoneInfo becomes its name, a
+    naive datetime becomes aware, a UUID string becomes a UUID.
+    """
+    value = field.get_prep_value(value)
+    if isinstance(value, memoryview | bytearray):
+        # psycopg hands a bytea column back as a memoryview.
+        return bytes(value)
+    if isinstance(value, dict | list):
+        # A jsonb container is unhashable, and two equal objects can be built
+        # with their keys in either order.
+        return json.dumps(value, sort_keys=True, default=str)
+    return value
 
 
 # The maximum number of results to fetch in a get() query.
@@ -815,7 +836,7 @@ class QuerySet[T: "Model"]:
                         "object; NULL never conflicts in Postgres, so it cannot "
                         "be upserted."
                     )
-                key_values.append(value)
+                key_values.append(conflict_key_value(field, value))
             key = tuple(key_values)
             if key in obj_by_key:
                 names = [f.name for f in unique_columns]
@@ -869,11 +890,17 @@ class QuerySet[T: "Model"]:
 
             # RETURNING order isn't guaranteed to match VALUES order under ON
             # CONFLICT, so match each returned row to its object by the unique
-            # key. Still inside the transaction: a row that can't be matched
-            # would leave the objects half-populated, so roll the write back.
+            # key -- run through conflict_key_value() again so both sides of the
+            # match are spelled the same way. Still inside the transaction: a
+            # row that can't be matched would leave the objects half-populated,
+            # so roll the write back.
             assert len(returned_rows) == len(obj_by_key)
             row_by_key = {
-                tuple(row[i] for i in unique_indices): row for row in returned_rows
+                tuple(
+                    conflict_key_value(field, row[index])
+                    for field, index in zip(unique_columns, unique_indices)
+                ): row
+                for row in returned_rows
             }
             for key, obj in obj_by_key.items():
                 row = row_by_key[key]

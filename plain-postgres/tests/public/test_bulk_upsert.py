@@ -7,6 +7,8 @@ fields (primary key, DB defaults) populated, matched to its row by unique key.
 
 from __future__ import annotations
 
+from zoneinfo import ZoneInfo
+
 import pytest
 from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.mixins import MixinTestModel
@@ -16,6 +18,7 @@ from app.examples.models.upsert import (
     UpsertPair,
     UpsertScoped,
     UpsertTenant,
+    UpsertValueKey,
 )
 from plain.postgres.exceptions import FieldError
 
@@ -338,3 +341,33 @@ def test_bulk_upsert_foreign_key_in_update_fields(db):
     row = UpsertScoped.query.get(id=seeded_id)
     assert row.tenant.id == second.id
     assert row.value == 2
+
+
+def test_bulk_upsert_matches_keys_that_python_cannot_hash_or_sort(db):
+    # jsonb dicts are unhashable, ZoneInfo and memoryview are unorderable --
+    # the conflict key has to survive being a dict key and being sorted.
+    chicago = ZoneInfo("America/Chicago")
+    utc = ZoneInfo("UTC")
+    UpsertValueKey(payload={"a": 1}, blob=b"x", zone=utc, value=1).create()
+    seeded_id = UpsertValueKey.query.get(value=1).id
+
+    items = [
+        # Conflicts: same key, written with its dict keys in the other order.
+        UpsertValueKey(payload={"a": 1}, blob=b"x", zone=utc, value=10),
+        UpsertValueKey(payload={"b": 2, "a": 1}, blob=b"y", zone=chicago, value=20),
+        UpsertValueKey(payload={"a": 1, "b": 2}, blob=b"z", zone=chicago, value=30),
+    ]
+    UpsertValueKey.query.bulk_upsert(
+        items,
+        update_fields=[UpsertValueKey.value],
+        unique_fields=[
+            UpsertValueKey.payload,
+            UpsertValueKey.blob,
+            UpsertValueKey.zone,
+        ],
+    )
+
+    assert items[0].id == seeded_id
+    assert len({item.id for item in items}) == 3
+    stored = {row.value for row in UpsertValueKey.query.all()}
+    assert stored == {10, 20, 30}
