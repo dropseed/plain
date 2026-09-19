@@ -527,6 +527,17 @@ for row in deleted:
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
 - `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_update()`, `get_or_create()`, `update_or_create()` — raises `TypeError` rather than quietly dropping it.
 
+A row lock is fine on the read side of the write — that pairing is the job-claim pattern, and it composes in either order:
+
+```python
+claimed = (
+    Job.query.filter(status="pending")
+    .for_update(skip_locked=True)
+    .returning()
+    .update(status="running")
+)
+```
+
 The values you get back are whatever the statement wrote, exactly as Postgres holds them. A set-based `update()` doesn't run Python-side field hooks, so an `update_now=True` timestamp comes back unchanged unless the `update()` set it.
 
 `RETURNING` only reports rows of the statement's own target table. Rows removed by a cascading `ON DELETE` are never included — a `delete()` with `returning()` gives you the parent rows you deleted, not the children Postgres cascaded.

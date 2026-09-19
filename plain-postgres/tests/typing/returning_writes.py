@@ -41,3 +41,16 @@ def must_reject_a_relation_reference() -> None:
     # Runtime half:
     # tests/public/test_returning.py::test_returning_relation_reference_errors.
     ChildCascade.query.returning(ChildCascade.parent)  # ty: ignore[invalid-argument-type]
+
+
+def must_keep_the_return_shape_through_a_lock() -> None:
+    # A lock on the read side of a write is the job-claim pattern, so the
+    # lock methods have to hand back the same queryset kind they were called
+    # on -- returning()'s pinned shape included, in either order.
+    # Runtime half: tests/public/test_returning.py, the locking section.
+    qs = ReturningEvent.query.filter(label="a")
+    assert_type(qs.for_update().returning().update(count=1), list[ReturningEvent])
+    assert_type(qs.returning().for_update().update(count=1), list[ReturningEvent])
+    assert_type(
+        qs.returning(ReturningEvent.id).for_update().delete(), list[dict[str, Any]]
+    )

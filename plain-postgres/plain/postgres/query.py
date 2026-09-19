@@ -1326,7 +1326,7 @@ class QuerySet[T: "Model"]:
         nowait: bool = False,
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
-    ) -> QuerySet[T]:
+    ) -> Self:
         """Return a new QuerySet that locks selected rows with FOR UPDATE."""
         return self._lock_rows("update", nowait, skip_locked, of)
 
@@ -1335,7 +1335,7 @@ class QuerySet[T: "Model"]:
         nowait: bool = False,
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
-    ) -> QuerySet[T]:
+    ) -> Self:
         """Return a new QuerySet that locks selected rows with FOR NO KEY UPDATE."""
         return self._lock_rows("no_key_update", nowait, skip_locked, of)
 
@@ -1344,7 +1344,7 @@ class QuerySet[T: "Model"]:
         nowait: bool = False,
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
-    ) -> QuerySet[T]:
+    ) -> Self:
         """Return a new QuerySet that locks selected rows with FOR SHARE."""
         return self._lock_rows("share", nowait, skip_locked, of)
 
@@ -1353,7 +1353,7 @@ class QuerySet[T: "Model"]:
         nowait: bool = False,
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
-    ) -> QuerySet[T]:
+    ) -> Self:
         """Return a new QuerySet that locks selected rows with FOR KEY SHARE."""
         return self._lock_rows("key_share", nowait, skip_locked, of)
 
@@ -1363,7 +1363,7 @@ class QuerySet[T: "Model"]:
         nowait: bool,
         skip_locked: bool,
         of: tuple[str, ...],
-    ) -> QuerySet[T]:
+    ) -> Self:
         """
         Build a new QuerySet carrying a row-level locking clause. Calling more
         than one lock method on a chain keeps only the last mode.

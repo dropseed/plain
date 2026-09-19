@@ -253,3 +253,66 @@ def test_returning_rejects_other_writes(db, write):
         TypeError, match="only applies to update\\(\\) and delete\\(\\)"
     ):
         write(ReturningEvent.query.returning())
+
+
+# ===========================================================================
+# row locks
+# ===========================================================================
+
+
+def test_lock_then_returning_update(db, capture_queries):
+    # Locking the read side of a write is the job-claim pattern, so a lock
+    # must not trip _reject_returning() -- update() still hands back rows.
+    _seed_events()
+    qs = ReturningEvent.query.filter(label="a").for_update()
+    assert isinstance(qs.returning(), ReturningQuerySet)
+    rows = qs.returning().update(count=4)
+
+    assert {row.count for row in rows} == {4}
+
+
+def test_returning_then_lock_keeps_the_returning_queryset(db):
+    # The other order too: for_update() chains off a ReturningQuerySet
+    # without dropping the returning state or hitting the lock guard.
+    _seed_events()
+    qs = ReturningEvent.query.filter(label="a").returning().for_update()
+
+    assert isinstance(qs, ReturningQuerySet)
+    rows = qs.update(count=6)
+    assert {row.count for row in rows} == {6}
+
+
+def test_lock_then_returning_delete(db):
+    _seed_events()
+    rows = (
+        ReturningEvent.query.filter(label="a")
+        .for_update()
+        .returning(ReturningEvent.label)
+        .delete()
+    )
+
+    assert [row["label"] for row in rows] == ["a", "a"]
+    assert ReturningEvent.query.count() == 1
+
+
+def test_lock_survives_into_the_subquery_of_a_joined_returning_update(
+    db, capture_queries
+):
+    # A join forces update() through an `id IN (SELECT ...)` rewrite. That
+    # inner select is where the lock belongs, and RETURNING rides on the
+    # outer UPDATE.
+    parent = DeleteParent(name="p").create()
+    child = ChildCascade(parent=parent).create()
+
+    with capture_queries() as queries:
+        rows = (
+            ChildCascade.query.filter(parent__name="p")
+            .for_update(skip_locked=True)
+            .returning()
+            .update(parent=parent)
+        )
+
+    sql = " ".join(q["sql"] for q in queries)
+    assert "FOR UPDATE SKIP LOCKED" in sql
+    assert "RETURNING" in sql
+    assert [row.id for row in rows] == [child.id]
