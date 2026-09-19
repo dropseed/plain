@@ -44,6 +44,12 @@ def must_reject_a_non_empty_binary_default() -> None:
     types.BinaryField(default=b"data")  # ty: ignore[no-matching-overload]
 
 
+def must_reject_a_none_default_without_allow_null() -> None:
+    # `default=None` on a NOT NULL column would fail on insert, so the stub
+    # pairs the two. Runtime half: tests/public/test_encrypted_fields.py.
+    types.EncryptedJSONField(required=False, default=None)  # ty: ignore[no-matching-overload]
+
+
 def must_reject_choices_on_an_encrypted_field() -> None:
     # Choice filtering on ciphertext silently matches nothing, so the stub
     # never inherited TextField's `choices=`.
