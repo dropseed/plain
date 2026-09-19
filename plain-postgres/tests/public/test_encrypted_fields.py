@@ -4,6 +4,7 @@ from typing import assert_type
 
 import pytest
 from app.examples.models.encrypted import SecretStore
+from plain.postgres import F
 from plain.postgres.exceptions import FieldError
 from plain.postgres.fields.encrypted import (
     _ENCRYPTED_PREFIX,
@@ -226,6 +227,21 @@ class TestTypedQueryMethodsBlocked:
         with pytest.raises(TypeError):
             SecretStore.api_key.endswith("x")  # ty: ignore[invalid-argument-type]
 
+    def test_json_field_is_rejected_statically(self):
+        """`config` is annotated `EncryptedField[dict | None]`, so class access
+        types as the field and the same static block applies. Spelled directly
+        rather than through getattr, because a marker can't bind to a dynamic
+        call."""
+        with pytest.raises(TypeError):
+            SecretStore.config.equals({"a": 1})  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.config.not_equal({"a": 1})  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            SecretStore.config.is_in([{"a": 1}])  # ty: ignore[invalid-argument-type]
+
+    def test_json_field_is_null_survives_the_block(self):
+        assert_type(SecretStore.config.is_null(), Q)
+
     def test_is_null_survives_the_block_statically(self):
         """The one condition that stays open must keep its real signature -
         no ignore marker here, so a `Never` creeping onto is_null breaks the
@@ -237,9 +253,9 @@ class TestTypedQueryMethodsBlocked:
         "method", ["equals", "not_equal", "gt", "gte", "lt", "lte", "is_in"]
     )
     def test_json_field_comparison_raises(self, method):
-        """EncryptedJSONField carries the mixin's block too. Only the runtime
-        side is assertable here - the model annotates `config` as `dict | None`,
-        so class access doesn't type as the field."""
+        """EncryptedJSONField carries the same block. This case covers the
+        runtime half; `test_json_field_is_rejected_statically` below covers
+        the static half, which needs direct call sites rather than getattr."""
         with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
             getattr(SecretStore.config, method)("x")
 
@@ -264,15 +280,13 @@ class TestKwargFilterBlocked:
 
     def test_filter_non_none_raises(self, db):
         with pytest.raises(
-            TypeError,
-            match=r"api_key.*cannot be filtered by equality against a non-None value",
+            TypeError, match=r"api_key.*cannot be matched against a value"
         ):
             SecretStore.query.filter(api_key="sk-test").count()
 
     def test_exclude_non_none_raises(self, db):
         with pytest.raises(
-            TypeError,
-            match=r"api_key.*cannot be filtered by equality against a non-None value",
+            TypeError, match=r"api_key.*cannot be matched against a value"
         ):
             SecretStore.query.exclude(api_key="sk-test").count()
 
@@ -280,6 +294,35 @@ class TestKwargFilterBlocked:
         """filter(field=None) must continue to work — ORM rewrites to isnull."""
         SecretStore.query.create(name="test", api_key="sk-test", config=None)
         assert SecretStore.query.filter(config=None).count() == 1
+
+    def test_get_or_create_on_an_encrypted_lookup_raises(self, db):
+        """A deliberate break. This used to "work": ciphertext never matched,
+        so every call created another row. Raising is the point of the block,
+        and the message has to say where the value belongs instead."""
+        with pytest.raises(TypeError, match=r"move 'api_key' into defaults="):
+            SecretStore.query.get_or_create(name="test", api_key="sk-test", config=None)
+
+    def test_get_or_create_with_the_encrypted_value_in_defaults_works(self, db):
+        """The spelling the message points at."""
+        obj, created = SecretStore.query.get_or_create(
+            name="test", defaults={"api_key": "sk-test", "config": None}
+        )
+        assert created
+        assert obj.api_key == "sk-test"
+
+        again, created_again = SecretStore.query.get_or_create(
+            name="test", defaults={"api_key": "other", "config": None}
+        )
+        assert not created_again
+        assert again.id == obj.id
+
+    def test_filter_against_an_expression_raises(self, db):
+        """An F() right-hand side is a value comparison too — the column is
+        still ciphertext, so it can never match."""
+        with pytest.raises(
+            TypeError, match=r"api_key.*cannot be matched against a value"
+        ):
+            SecretStore.query.filter(api_key=F("name")).count()
 
 
 class TestKeyRotation:

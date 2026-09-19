@@ -245,7 +245,9 @@ Post.query.where(Post.author.id.is_in([a.id for a in authors]))
 Post.query.where(Post.author.id.is_null())  # nullable relation
 ```
 
-`Post.author.equals(author)` raises `TypeError` naming this spelling. It isn't an oversight: to the type checker `Post.author` is `type[Author]`, which is what makes `Post.author.email.equals(...)` type-check, and a condition method there would be a runtime method the checker rejects.
+`Post.author.equals(author)` raises `AttributeError` naming this spelling (an `AttributeError`, so `hasattr` and `getattr(..., default)` keep behaving). It isn't an oversight: to the type checker `Post.author` is `type[Author]`, which is what makes `Post.author.email.equals(...)` type-check, and a condition method there would be a runtime method the checker rejects.
+
+Every relation reached _through_ a traversal is a hop, many-to-many included — `WidgetTag.widget.tags.name.equals("metal")` builds `Q(widget__tags__name="metal")` — and the same rule applies to the relation itself: `WidgetTag.widget.tags.equals(tag)` points you at `.tags.id.equals(tag.id)`. (Traversal starts from a forward foreign key; class-level many-to-many access like `Widget.tags` is not a traversal entry point.)
 
 A traversed field _is_ the related field, carrying the relation path as its name — so it offers exactly the conditions that field offers, including an encrypted field's refusals.
 
@@ -1121,6 +1123,14 @@ Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived
 **Limitations:**
 
 - **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported. Comparing against a value raises `TypeError` rather than silently matching nothing — both `filter(api_key="x")` and the typed [condition methods](#typed-conditions-with-where) (`equals`, `contains`, …), which are also rejected at the call site when the field is annotated `EncryptedField[T]`. `filter(api_key=None)` still rewrites to `IS NULL`.
+- **`get_or_create()` must not look up an encrypted field.** `get_or_create(api_key="k")` raises, and the error says to move the value into `defaults=`. This is a deliberate break: it previously "worked" by creating a new row on every call, because the lookup could never match existing ciphertext. An encrypted value can be written, just not looked up:
+
+    ```python
+    Integration.query.get_or_create(name="acme", defaults={"api_key": "k"})
+    ```
+
+    The same applies to `update_or_create()`, and to an expression right-hand side like `filter(api_key=F("name"))` — the column is still ciphertext.
+
 - **No indexes or constraints** — encrypted fields cannot be used in indexes or unique constraints. Preflight checks will catch this.
 - **Only `default=""`** — on `EncryptedTextField` (paired with `required=False`), the empty string is stored as plaintext `''`, so it's the one value expressible as a column `DEFAULT` (declare it to add the field to a populated table). Any other default would need ciphertext, which is non-deterministic. `EncryptedJSONField` has no persistent default at all — even `{}` serializes to text that would need ciphertext — so pair `allow_null=True` with `default=None`, which stores nothing and just marks the field optional in the constructor.
 

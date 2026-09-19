@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.exceptions import FieldDoesNotExist
 from plain.postgres.fields.base import CONDITION_METHODS
-from plain.postgres.fields.related import ForeignKeyField
+from plain.postgres.fields.related import RelatedField
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
@@ -30,7 +30,9 @@ class RelatedFieldRef:
 
     Chained traversal (`Order.user.profile.city`) builds nested
     `RelatedFieldRef` instances until a concrete field is reached, which comes
-    back as a prefixed copy of that field.
+    back as a prefixed copy of that field. Every relation is a hop -- many-to-
+    many included, since `widget__tags__name` is as valid a lookup path as
+    `widget__author__name`.
 
     Names resolve through the related model's metadata (`get_forward_field`),
     not attribute lookup, so a related field keeps resolving to the field.
@@ -48,8 +50,12 @@ class RelatedFieldRef:
 
     def __init__(self, model: type[Model], prefix: str, target_name: str) -> None:
         assert not isinstance(model, str), (
-            "RelatedFieldRef requires a resolved model class; the FK's "
-            "remote_field.model is replaced with the class at registration."
+            f"Cannot traverse {prefix!r}: its target model is still the string "
+            f"{model!r}. Relation targets are replaced with the resolved class "
+            f"when the model is registered, so a traversal that runs at import "
+            f"time -- at module level, or in a default argument -- can land "
+            f"here before the registry is populated. Move it inside the "
+            f"function or method that needs it."
         )
         self._model = model
         self._prefix = prefix
@@ -85,7 +91,12 @@ class RelatedFieldRef:
                 f"{self._prefix}.{name} is not a traversable field or relation"
             ) from None
 
-        if isinstance(field, ForeignKeyField):
+        if isinstance(field, RelatedField):
+            # Any relation is another hop, foreign key or many-to-many alike --
+            # `widget__tags__name` is as valid a lookup path as
+            # `widget__author__name`. Handing back the relation field itself
+            # would rename it to "widget__tags" and then let `.name` resolve to
+            # that string.
             return RelatedFieldRef(
                 model=field.remote_field.model,
                 prefix=f"{self._prefix}{LOOKUP_SEP}{name}",

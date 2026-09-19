@@ -79,9 +79,13 @@ if TYPE_CHECKING:
         # annotation that restricts them to string-valued fields, so they
         # survive the `Field[T]` annotation models carry without becoming
         # available on every field. The ignore marker is load-bearing — if the
-        # restriction were dropped, ty would report it as unused. These stay
-        # type-check-only because a non-text field has no such method at
-        # runtime (AttributeError), which is what traversal reflects.
+        # restriction were dropped, ty would report it as unused.
+        #
+        # These stay type-check-only because the restriction is type-only:
+        # `Contains` and friends are registered on `Field` itself, so
+        # `IntegerField.contains("9")` builds a perfectly valid lookup at
+        # runtime. The checker is the guard, which is why running these would
+        # prove nothing.
         DefaultsExample.name.startswith("a")
         DefaultsExample.note.contains("a")
         DefaultsExample.priority.startswith("a")  # ty: ignore[invalid-argument-type]

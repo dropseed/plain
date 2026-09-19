@@ -110,11 +110,12 @@ def _decrypt(value: str) -> str:
         )
 
 
-# Shared tail explaining why encrypted fields reject value comparisons — used
-# by every refusal, which all route through
-# `EncryptedField._lookup_unsupported_message`.
+# Shared tail explaining why encrypted fields reject value comparisons. Kept
+# free of advice, because the right advice differs by caller -- see the two
+# refusal sites below.
 _NON_DETERMINISTIC_EXPLANATION = (
-    "ciphertext is non-deterministic. Use .is_null() instead."
+    "encrypting the same plaintext twice produces different ciphertext, so an "
+    "equality comparison on the column can never match"
 )
 
 
@@ -131,13 +132,14 @@ class _EncryptedExact(Exact):
         if rhs is not None:
             # lhs.output_field is the encrypted field itself (the lookups.py
             # idiom). Its own sentence, not _lookup_unsupported_message's:
-            # `filter()` *is* supported here, just not against a value, and
-            # saying "does not support .filter()" would be wrong. Both share
-            # the explanation tail below.
+            # `filter()` *is* supported here, just not against a value.
+            name = lhs.output_field.name
             raise TypeError(
-                f"Encrypted field {lhs.output_field.name!r} cannot be filtered "
-                f"by equality against a non-None value — "
-                f"{_NON_DETERMINISTIC_EXPLANATION}"
+                f"Encrypted field {name!r} cannot be matched against a value: "
+                f"{_NON_DETERMINISTIC_EXPLANATION}. `is_null()` (or "
+                f"{name}=None) is the only condition it supports. If this came "
+                f"from get_or_create()/update_or_create(), move {name!r} into "
+                f"defaults= -- it can be written, just not looked up."
             )
         super().__init__(lhs, rhs)
 
@@ -242,8 +244,9 @@ class EncryptedField[T](Field[T]):
             "methods can produce a meaningful error message."
         )
         return (
-            f"Encrypted field {self.name!r} does not support .{method}() — "
-            f"{_NON_DETERMINISTIC_EXPLANATION}"
+            f"Encrypted field {self.name!r} does not support .{method}(): "
+            f"{_NON_DETERMINISTIC_EXPLANATION}. .is_null() is the only "
+            f"condition it supports."
         )
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
