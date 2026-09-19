@@ -1006,11 +1006,14 @@ class QuerySet[T: "Model"]:
         conflict_defaults = conflict_defaults or {}
 
         # The inserted row: create_defaults first, then defaults, then kwargs,
-        # so the more explicit source wins on any overlap. Callables in each are
-        # resolved (matching the rest of the get/create family).
-        insert_values: dict[str, Any] = {}
+        # so the more explicit source wins on any overlap. Merge the raw
+        # mappings first and resolve callables only for what survives -- a
+        # callable a higher-precedence source shadowed is never the value, so
+        # calling it would run a side effect nobody asked for.
+        merged: dict[str, Any] = {}
         for source in (create_defaults, defaults, kwargs):
-            insert_values.update(resolve_callables(source))
+            merged.update(source)
+        insert_values: dict[str, Any] = dict(resolve_callables(merged))
 
         # Reject typo'd keys with a clean FieldError before they fail later and
         # more confusingly, matching get_or_create()'s validation.

@@ -62,6 +62,32 @@ def test_upsert_defaults_apply_on_insert_and_update(db):
     assert (created, obj.value) == (False, 7)
 
 
+def test_upsert_does_not_call_a_shadowed_callable(db):
+    """A callable in a lower-precedence source is never the value, so it must
+    never run -- resolving it would fire a side effect nobody asked for.
+    """
+    calls = []
+
+    def shadowed():
+        calls.append("ran")
+        return 999
+
+    def also_shadowed():
+        calls.append("ran")
+        return 998
+
+    obj, created = UpsertItem.query.upsert(
+        key="a",
+        value=1,
+        defaults={"value": shadowed},
+        create_defaults={"value": also_shadowed},
+        unique_fields=[UpsertItem.key],
+    )
+
+    assert calls == []
+    assert obj.value == 1
+
+
 def test_upsert_create_defaults_apply_on_insert_only(db):
     obj, created = UpsertItem.query.upsert(
         key="a",
