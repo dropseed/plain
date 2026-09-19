@@ -76,7 +76,7 @@ def test_upsert_does_not_call_a_shadowed_callable(db):
         calls.append("ran")
         return 998
 
-    obj, created = UpsertItem.query.upsert(
+    obj, _ = UpsertItem.query.upsert(
         key="a",
         value=1,
         defaults={"value": shadowed},
