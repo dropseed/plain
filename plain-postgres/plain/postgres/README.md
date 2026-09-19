@@ -578,7 +578,7 @@ with transaction.atomic():
 | `for_share()`         | `FOR SHARE`         | You need the row to stay put while you read it, but others may also share. |
 | `for_key_share()`     | `FOR KEY SHARE`     | Weakest — only blocks changes to the row's key.                            |
 
-Locking requires an open transaction; calling any of these outside `transaction.atomic()` raises `TransactionManagementError`.
+Locking requires an open transaction. The method itself just builds the queryset — evaluating a locked queryset outside `transaction.atomic()` is what raises `TransactionManagementError`.
 
 All four accept the same options:
 
@@ -591,7 +591,9 @@ All four accept the same options:
 job = Job.query.for_update(skip_locked=True).filter(status="pending").first()
 ```
 
-Chaining more than one lock method keeps only the last one.
+Chaining more than one lock method keeps only the last one, options included.
+
+Postgres itself rejects a locking clause on a query that uses `DISTINCT`, `GROUP BY`, aggregates, or a set operation — those raise a database error rather than being caught up front. `count()` and `aggregate()` drop the lock instead, since they compile to an aggregate query.
 
 ## Schema management
 
