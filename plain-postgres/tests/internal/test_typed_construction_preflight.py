@@ -81,7 +81,8 @@ class UsesModelMixin(TransformedMixin, Model):
 
 if TYPE_CHECKING:
     # The type-level half of the fix, checked by `uv run ty check` rather than
-    # pytest: a ModelMixin field is a constructor parameter like any other. The
+    # the test runner: a ModelMixin field is a constructor parameter like any
+    # other. The
     # same call against UsesPlainMixin is an unknown-argument error, which is
     # what mixin_fields_hidden_from_constructor reports at runtime.
     UsesModelMixin(name="n", shared="s")

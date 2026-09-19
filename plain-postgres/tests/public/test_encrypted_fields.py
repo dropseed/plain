@@ -8,7 +8,7 @@ from plain.postgres.fields.encrypted import (
     _encrypt,
     _get_fernet,
 )
-from plain.test import raises
+from plain.test import cases, raises
 
 
 class TestEncryptDecryptFunctions:
@@ -193,7 +193,7 @@ class TestEncryptedJSONFieldDefault:
         assert not field.has_persistent_literal_default()
         assert not field.has_persistent_column_default()
 
-    def test_default_none_makes_the_field_omittable(self, db):
+    def test_default_none_makes_the_field_omittable(self):
         """The point of the `default=None`: `config` is declared with it on
         SecretStore, so it can be left out of the constructor entirely and the
         row still saves. The type checker agrees (`./scripts/type-check`)."""
@@ -206,14 +206,14 @@ class TestEncryptedJSONFieldDefault:
     def test_default_none_requires_allow_null(self):
         from plain.postgres.fields.encrypted import EncryptedJSONField
 
-        with pytest.raises(TypeError, match="requires allow_null=True"):
+        with raises(TypeError, match="requires allow_null=True"):
             EncryptedJSONField(required=False, default=None)
 
-    @pytest.mark.parametrize("value", [{}, {"a": 1}, [], "", 0])
+    @cases({}, {"a": 1}, [], "", 0)
     def test_literal_default_is_still_rejected(self, value):
         """Any non-None default would need ciphertext, which is
         non-deterministic — there is no literal to put in the column."""
         from plain.postgres.fields.encrypted import EncryptedJSONField
 
-        with pytest.raises(TypeError, match="does not accept a persistent default"):
+        with raises(TypeError, match="does not accept a persistent default"):
             EncryptedJSONField(required=False, allow_null=True, default=value)
