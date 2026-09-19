@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 import psycopg
 from app.users.models import User
 from plain.exceptions import ValidationError
-from plain.postgres import Field, transaction, types
+from plain.postgres import EncryptedField, Field, transaction, types
 from plain.utils import timezone
 
 from plain import postgres
@@ -36,8 +36,8 @@ class OAuthConnection(postgres.Model):
     provider_user_id: Field[str] = types.TextField(max_length=100)
 
     # Token data
-    access_token: Field[str] = types.EncryptedTextField(max_length=2000)
-    refresh_token: Field[str] = types.EncryptedTextField(
+    access_token: EncryptedField[str] = types.EncryptedTextField(max_length=2000)
+    refresh_token: EncryptedField[str] = types.EncryptedTextField(
         max_length=2000, required=False, default=""
     )
     access_token_expires_at: Field[datetime | None] = types.DateTimeField(
