@@ -36,10 +36,10 @@ Reverse relations must be explicitly defined using ``ReverseForeignKey`` or
 
 from __future__ import annotations
 
-import inspect
 from functools import cached_property
 from typing import Any
 
+from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.query import QuerySet
 from plain.utils.functional import LazyObject
 
@@ -59,38 +59,38 @@ class ForwardForeignKeyDescriptor:
     """
 
     def __init__(self, field_with_rel: Any) -> None:
-        self.field = field_with_rel
+        self._field = field_with_rel
 
     @cached_property
     def RelatedObjectDoesNotExist(self) -> type:
         # The exception can't be created at initialization time since the
-        # related model might not be resolved yet; `self.field.model` might
+        # related model might not be resolved yet; `self._field.model` might
         # still be a string model reference.
         return type(
             "RelatedObjectDoesNotExist",
-            (self.field.remote_field.model.DoesNotExist, AttributeError),
+            (self._field.remote_field.model.DoesNotExist, AttributeError),
             {
-                "__module__": self.field.model.__module__,
-                "__qualname__": f"{self.field.model.__qualname__}.{self.field.name}.RelatedObjectDoesNotExist",
+                "__module__": self._field.model.__module__,
+                "__qualname__": f"{self._field.model.__qualname__}.{self._field.name}.RelatedObjectDoesNotExist",
             },
         )
 
-    def is_cached(self, instance: Any) -> bool:
-        return self.field.is_cached(instance)
+    def _is_cached(self, instance: Any) -> bool:
+        return self._field.is_cached(instance)
 
-    def get_queryset(self) -> QuerySet:
-        qs = self.field.remote_field.model._model_meta.base_queryset
+    def _get_queryset(self) -> QuerySet:
+        qs = self._field.remote_field.model._model_meta.base_queryset
         return qs.all()
 
-    def get_prefetch_queryset(
+    def _get_prefetch_queryset(
         self, instances: list[Any], queryset: QuerySet | None = None
     ) -> tuple[QuerySet, Any, Any, bool, str, bool]:
         if queryset is None:
-            queryset = self.get_queryset()
+            queryset = self._get_queryset()
 
-        rel_obj_attr = self.field.get_foreign_related_value
-        instance_attr = self.field.get_local_related_value
-        related_field = self.field.target_field
+        rel_obj_attr = self._field.get_foreign_related_value
+        instance_attr = self._field.get_local_related_value
+        related_field = self._field.target_field
 
         # A foreign key is single-column, so prefetch with a join-less IN query.
         query = {
@@ -103,7 +103,7 @@ class ForwardForeignKeyDescriptor:
             rel_obj_attr,
             instance_attr,
             True,
-            self.field.get_cache_name(),
+            self._field.get_cache_name(),
             False,
         )
 
@@ -117,55 +117,89 @@ class ForwardForeignKeyDescriptor:
         - ``instance`` is the ``child`` instance
         - ``cls`` is the ``Child`` class (we don't need it)
 
-        Class-level access (``Child.parent``) returns a fresh
-        ``RelatedFieldRef`` traversal proxy so typed where() can walk into the
-        related model's fields:
-
-            Child.parent.name.equals("x")    →    Q(parent__name="x")
-
-        The proxy exposes only traversal machinery, so a related field whose
-        name collides with one of this descriptor's own attributes (``field``,
-        ``is_cached``, ``get_queryset`` …) still resolves to the field, not the
-        descriptor attribute. Framework code that needs the descriptor itself
-        (prefetching) reaches it with ``inspect.getattr_static`` to bypass this
-        proxy.
+        Class-level access (``Child.parent``) returns the descriptor itself,
+        the ordinary convention. Traversal for typed where() is served by
+        ``__getattr__`` below rather than by handing back a proxy.
         """
         if instance is None:
-            from plain.postgres.fields.related_typed import RelatedFieldRef
-
-            return RelatedFieldRef(
-                model=self.field.remote_field.model,
-                prefix=self.field.name,
-                target_name=self.field.target_field.name,
-            )
+            return self
 
         # The related object is cached on the model state -- by select_related,
         # prefetch, the reverse accessor, a prior access, or assignment.
         try:
-            rel_obj = self.field.get_cached_value(instance)
+            rel_obj = self._field.get_cached_value(instance)
         except KeyError:
             # _get_raw_value loads the foreign key column on demand if it was
             # deferred (.only()/.defer()), so we always see the real key here.
-            pk_value = self.field._get_raw_value(instance)
+            pk_value = self._field._get_raw_value(instance)
             rel_obj = None
             if pk_value is not None:
-                remote_model = self.field.remote_field.model
-                target_name = self.field.target_field.name
+                remote_model = self._field.remote_field.model
+                target_name = self._field.target_field.name
                 assert target_name is not None
                 # The database FK constraint guarantees the row exists, so build
                 # a partial related instance with only its primary key loaded --
                 # no query. Accessing any other field triggers the full-row
                 # deferred load.
                 rel_obj = remote_model.from_db([target_name], [pk_value])
-            self.field.set_cached_value(instance, rel_obj)
+            self._field.set_cached_value(instance, rel_obj)
 
         # Checked on every access, including a cached None: a non-nullable
         # foreign key with no value must raise consistently, not just once.
-        if rel_obj is None and not self.field.allow_null:
+        if rel_obj is None and not self._field.allow_null:
             raise self.RelatedObjectDoesNotExist(
-                f"{self.field.model.__name__} has no {self.field.name}."
+                f"{self._field.model.__name__} has no {self._field.name}."
             )
         return rel_obj
+
+    def __getattr__(self, name: str) -> Any:
+        """Walk class-level attribute access into the related model, so typed
+        where() can build joined lookups:
+
+            Child.parent.name.equals("x")    →    Q(parent__name="x")
+
+        Only names this descriptor doesn't define reach here, and every
+        attribute it does define is ``_``-prefixed -- which model fields can
+        never be (``Meta`` skips ``_``-prefixed attributes when it collects
+        them), so a related field can't be shadowed by descriptor internals.
+
+        A leaf field comes back as a copy of itself carrying the relation
+        prefix; a further foreign key hands off to ``RelatedFieldRef``, which
+        accumulates the path for hops beyond the first.
+        """
+        if name.startswith("_"):
+            # Internals, and anything a field could never be named.
+            raise AttributeError(name)
+
+        from plain.postgres.exceptions import FieldDoesNotExist
+        from plain.postgres.fields.base import CONDITION_METHODS
+        from plain.postgres.fields.related import ForeignKeyField
+        from plain.postgres.fields.related_typed import RelatedFieldRef
+
+        related_model = self._field.remote_field.model
+        prefix = self._field.name
+        try:
+            field = related_model._model_meta.get_forward_field(name)
+        except FieldDoesNotExist:
+            if name in CONDITION_METHODS:
+                raise AttributeError(
+                    f"{prefix}.{name}() is not available: {prefix!r} is a "
+                    f"relation, not a field. Build the condition on the key it "
+                    f"points at instead -- "
+                    f"{prefix}.{self._field.target_field.name}.{name}(...), "
+                    f"which compiles to the same SQL."
+                ) from None
+            raise AttributeError(
+                f"{prefix}.{name} is not a traversable field or relation"
+            ) from None
+
+        if isinstance(field, ForeignKeyField):
+            return RelatedFieldRef(
+                model=field.remote_field.model,
+                prefix=f"{prefix}{LOOKUP_SEP}{name}",
+                target_name=field.target_field.name,
+            )
+        return field.with_lookup_prefix(prefix)
 
     def __set__(self, instance: Any, value: Any) -> None:
         """
@@ -183,19 +217,19 @@ class ForwardForeignKeyDescriptor:
         if isinstance(value, LazyObject):
             value = value if value else None
 
-        name = self.field.name
+        name = self._field.name
         assert name is not None
-        remote_field = self.field.remote_field
+        remote_field = self._field.remote_field
 
         if value is None:
             instance.__dict__[name] = None
-            self.field.set_cached_value(instance, None)
+            self._field.set_cached_value(instance, None)
             return
 
         if isinstance(value, remote_field.model):
             # A related model instance: store its key, cache the object.
-            instance.__dict__[name] = getattr(value, self.field.target_field.name)
-            self.field.set_cached_value(instance, value)
+            instance.__dict__[name] = getattr(value, self._field.target_field.name)
+            self._field.set_cached_value(instance, value)
             return
 
         if isinstance(value, Model | bool):
@@ -203,42 +237,40 @@ class ForwardForeignKeyDescriptor:
             # the key 0/1 via int) -- reject rather than store a bogus key.
             raise TypeError(
                 f'Cannot assign "{value!r}": '
-                f'"{instance.model_options.object_name}.{self.field.name}" must be a '
+                f'"{instance.model_options.object_name}.{self._field.name}" must be a '
                 f'"{remote_field.model.model_options.object_name}" instance or a '
                 f"primary key value."
             )
 
         # A bare related key value (e.g. child.parent = 5).
-        new_value = self.field.to_python(value)
+        new_value = self._field.to_python(value)
         # On an actual key change, drop the now-stale forward cache.
         # Re-storing the same key (e.g. by clean_fields) keeps the cache.
-        if instance.__dict__.get(name) != new_value and self.field.is_cached(instance):
-            self.field.delete_cached_value(instance)
+        if instance.__dict__.get(name) != new_value and self._field.is_cached(instance):
+            self._field.delete_cached_value(instance)
         instance.__dict__[name] = new_value
 
     def __delete__(self, instance: Any) -> None:
         """Delete the foreign key value, clearing any cached related object."""
         try:
-            del instance.__dict__[self.field.name]
+            del instance.__dict__[self._field.name]
         except KeyError:
             raise AttributeError(
                 f"{instance.__class__.__name__!r} object has no attribute "
-                f"{self.field.name!r}"
+                f"{self._field.name!r}"
             )
-        if self.field.is_cached(instance):
-            self.field.delete_cached_value(instance)
+        if self._field.is_cached(instance):
+            self._field.delete_cached_value(instance)
 
     def __reduce__(self) -> tuple[Any, tuple[Any, str]]:
         """
-        Pickling should return the instance attached by self.field on the
+        Pickling should return the instance attached by self._field on the
         model, not a new copy of that descriptor.
 
-        Reconstruct with ``inspect.getattr_static``, not ``getattr``: class
-        access runs ``__get__``, which returns a ``RelatedFieldRef`` traversal
-        proxy, so a plain ``getattr`` would unpickle the descriptor as a proxy.
-        Same reason the prefetch path reaches for the descriptor statically.
+        Class access returns the descriptor, so ``getattr`` retrieves the
+        instance directly from the model.
         """
-        return inspect.getattr_static, (self.field.model, self.field.name)
+        return getattr, (self._field.model, self._field.name)
 
 
 class ForwardManyToManyDescriptor:

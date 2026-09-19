@@ -8,13 +8,13 @@ from plain.validators import MaxLengthValidator
 
 from plain import validators
 
-from .base import NOT_PROVIDED, ChoicesField, ColumnField, StringConditionsMixin
+from .base import NOT_PROVIDED, ChoicesField, ColumnField
 
 if TYPE_CHECKING:
     from plain.postgres.functions.random import RandomString
 
 
-class TextField[T: (str, str | None) = str](StringConditionsMixin, ChoicesField[T]):
+class TextField[T: (str, str | None) = str](ChoicesField[T]):
     db_type_sql = "text"
 
     def __init__(
@@ -96,9 +96,7 @@ class URLField[T: (str, str | None) = str](TextField[T]):
     default_validators = (validators.URLValidator(),)
 
 
-class RandomStringField[T: (str, str | None) = str](
-    StringConditionsMixin, ColumnField[T]
-):
+class RandomStringField[T: (str, str | None) = str](ColumnField[T]):
     """Text column whose value is a Postgres-generated random hex string.
 
     The column carries a ``DEFAULT`` that evaluates per row, so raw SQL and

@@ -15,8 +15,6 @@ from app.examples.models.string_conditions import StringConditionsExample
 from plain.postgres import Field
 from plain.postgres.query_utils import Q
 
-PATTERN_CONDITIONS = ["contains", "icontains", "startswith", "endswith"]
-
 
 def test_class_access_yields_typed_descriptors() -> None:
     """Class-level field access returns the descriptor, parameterized by T.
@@ -87,6 +85,9 @@ if TYPE_CHECKING:
         DefaultsExample.name.startswith("a")
         DefaultsExample.note.contains("a")
         DefaultsExample.priority.startswith("a")  # ty: ignore[invalid-argument-type]
+        DefaultsExample.priority.contains("a")  # ty: ignore[invalid-argument-type]
+        DefaultsExample.priority.icontains("a")  # ty: ignore[invalid-argument-type]
+        DefaultsExample.priority.endswith("a")  # ty: ignore[invalid-argument-type]
 
 
 def test_field_methods_return_q_objects():
@@ -192,42 +193,11 @@ def test_is_null_with_explicit_default(db):
 
 
 # ---------------------------------------------------------------------------
-# Pattern conditions on string-valued fields that aren't TextFields.
-#
-# `Field` declares contains/icontains/startswith/endswith for every
-# string-valued field (that's what carries them through the `Field[str]`
-# annotation models write), so every string-valued field has to implement them.
-# `GenericIPAddressField` is a DefaultableField and `RandomStringField` is a
-# ColumnField — neither inherits TextField's implementations, so both mix in
-# the shared implementation instead. Without it the declaration promises a
-# method that raises AttributeError.
+# Pattern conditions live on `Field`, restricted to string-valued fields by
+# their `self` annotation. So they reach every string-valued field regardless
+# of its base class — `GenericIPAddressField` is a DefaultableField and
+# `RandomStringField` is a ColumnField, and neither inherits TextField.
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("method", PATTERN_CONDITIONS)
-def test_ip_address_field_pattern_conditions_build_q(method: str) -> None:
-    q = getattr(StringConditionsExample.ip, method)("10.")
-    assert q.children == [(f"ip__{method}", "10.")]
-
-
-@pytest.mark.parametrize("method", PATTERN_CONDITIONS)
-def test_random_string_field_pattern_conditions_build_q(method: str) -> None:
-    q = getattr(StringConditionsExample.token, method)("ab")
-    assert q.children == [(f"token__{method}", "ab")]
-
-
-def test_ip_address_field_pattern_conditions_type_check() -> None:
-    """The same calls spelled statically, so ty checks them rather than going
-    through getattr. `assert_type` pins the return so a silently-Any surface
-    would fail here."""
-    assert_type(StringConditionsExample.ip.contains("0.0"), Q)
-    assert_type(StringConditionsExample.ip.icontains("0.0"), Q)
-    assert_type(StringConditionsExample.ip.startswith("10."), Q)
-    assert_type(StringConditionsExample.ip.endswith(".1"), Q)
-    assert_type(StringConditionsExample.token.contains("ab"), Q)
-    assert_type(StringConditionsExample.token.icontains("ab"), Q)
-    assert_type(StringConditionsExample.token.startswith("ab"), Q)
-    assert_type(StringConditionsExample.token.endswith("yz"), Q)
 
 
 def test_where_filters_ip_address_field_by_pattern(db):
@@ -257,13 +227,43 @@ def test_where_filters_random_string_field_by_pattern(db):
     assert [r.label for r in rows] == ["only"]
 
 
-def test_non_string_fields_have_no_pattern_conditions() -> None:
-    """The runtime surface has to stay as narrow as the declaration: a field
-    whose value type isn't a string gets neither. This is also what keeps
-    where() traversal an honest mirror of direct field access."""
-    for method in PATTERN_CONDITIONS:
-        assert hasattr(StringConditionsExample.label, method)
-        assert hasattr(StringConditionsExample.ip, method)
-        assert hasattr(StringConditionsExample.token, method)
-        assert not hasattr(StringConditionsExample.id, method)
-        assert not hasattr(DefaultsExample.priority, method)
+def test_pattern_condition_on_a_non_string_field_is_a_static_error() -> None:
+    """The `self` annotation is the whole guard, and it is a static one — the
+    load-bearing `ty: ignore` markers in the TYPE_CHECKING block above are what
+    pin it.
+
+    There is deliberately no runtime counterpart: `Contains`, `IContains`,
+    `StartsWith` and `EndsWith` are registered on `Field` itself (see
+    lookups.py), so every field has them and nothing at runtime distinguishes a
+    string field from an int one. `IntegerField.contains("9")` builds a valid
+    `priority__contains` lookup that Postgres will happily run. Same type-first
+    guard model the encrypted fields use.
+    """
+    assert DefaultsExample.priority.get_lookup("contains") is not None
+
+
+# ---------------------------------------------------------------------------
+# None operands on ordering conditions.
+#
+# There is deliberately no static pin here. On a nullable field `T` includes
+# None, and None cannot be subtracted from a TypeVar: probed against ty 0.0.80
+# and pyright 1.1.414, `self: Field[X | None], value: X` selects the intended
+# overload but solves X as `int | None`, so `.gte(None)` type-checks either
+# way. The runtime refusal below is the guard.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("method", ["gt", "gte", "lt", "lte"])
+def test_ordering_condition_rejects_none(method: str) -> None:
+    with pytest.raises(TypeError, match=rf"\.{method}\(\) has no meaning for None"):
+        getattr(DefaultsExample.note, method)(None)
+
+
+def test_ordering_condition_still_accepts_a_value_on_a_nullable_field() -> None:
+    assert DefaultsExample.note.gte("m").children == [("note__gte", "m")]
+
+
+def test_is_null_and_equals_still_accept_none() -> None:
+    """`equals(None)` is the ORM's exact-None rewrite and stays legal."""
+    assert DefaultsExample.note.equals(None).children == [("note", None)]
+    assert DefaultsExample.note.is_null().children == [("note__isnull", True)]

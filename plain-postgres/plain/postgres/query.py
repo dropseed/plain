@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-import inspect
 import operator
 import warnings
 from collections.abc import Callable, Iterator, Sequence
@@ -1309,14 +1308,14 @@ class QuerySet[T: "Model"]:
             dataclass_type = result_type
             _check_result_type_matches(dataclass_type, items)
 
-        # Local import: related_typed pulls in fields.related, which imports
-        # this module at load time (circular). Import once here, not per column.
-        from plain.postgres.fields.related_typed import (
-            PrefixedFieldRef,
-            RelatedFieldRef,
+        # Local import: these pull in fields.related, which imports this module
+        # at load time (circular). Import once here, not per column.
+        from plain.postgres.fields.related_descriptors import (
+            ForwardForeignKeyDescriptor,
         )
+        from plain.postgres.fields.related_typed import RelatedFieldRef
 
-        related_field_refs = (RelatedFieldRef, PrefixedFieldRef)
+        related_field_refs = (RelatedFieldRef, ForwardForeignKeyDescriptor)
         columns = [_selectable_to_column(item, related_field_refs) for item in items]
 
         clone = self._values_list(tuple(columns), flat=flat)
@@ -1371,7 +1370,7 @@ class QuerySet[T: "Model"]:
         type checker can reject typos and value-type mismatches at the call
         site.
         """
-        return self._filter_or_exclude(False, conditions, {})
+        return self.filter(*conditions)
 
     def _filter_or_exclude(
         self, negate: bool, args: tuple[Any, ...], kwargs: dict[str, Any]
@@ -1752,14 +1751,20 @@ class QuerySet[T: "Model"]:
             )
 
 
+_NO_TRAVERSAL_IN_SELECT = (
+    "select() does not support related-field traversal like User.profile.city "
+    "yet. Select columns on the queried model."
+)
+
+
 def _selectable_to_column(
     item: Selectable[Any], related_field_refs: tuple[type, ...]
 ) -> str | BaseExpression:
     """Turn a select() argument into something the values_list plumbing accepts.
 
     A field becomes its column name; an expression is passed through (the
-    plumbing auto-aliases it). Strings and FK-traversal refs get their own
-    error so the message points at the real fix.
+    plumbing auto-aliases it). Strings and FK traversal get their own error so
+    the message points at the real fix.
     """
     if isinstance(item, str):
         raise TypeError(
@@ -1767,12 +1772,14 @@ def _selectable_to_column(
             f"strings. Got {item!r}."
         )
     if isinstance(item, related_field_refs):
-        raise TypeError(
-            "select() does not support related-field traversal like "
-            "User.profile.city yet. Select columns on the queried model."
-        )
+        # The relation itself (`User.profile`) or an intermediate hop.
+        raise TypeError(_NO_TRAVERSAL_IN_SELECT)
     if isinstance(item, Field):
-        assert item.name is not None
+        assert item.name
+        if LOOKUP_SEP in item.name:
+            # A traversed leaf: `Field.with_lookup_prefix` hands back the
+            # related model's field carrying the relation path as its name.
+            raise TypeError(_NO_TRAVERSAL_IN_SELECT)
         return item.name
     if isinstance(item, BaseExpression):
         return item
@@ -2229,9 +2236,9 @@ def get_prefetcher(
 ) -> tuple[Any, Any, bool, Callable[[Model], bool]]:
     """
     For the attribute 'through_attr' on the given instance, find
-    an object that has a get_prefetch_queryset().
+    an object that has a _get_prefetch_queryset().
     Return a 4 tuple containing:
-    (the object with get_prefetch_queryset (or None),
+    (the object with _get_prefetch_queryset (or None),
      the descriptor object representing this relationship (or None),
      a boolean that is False if the attribute was not found at all,
      a function that takes an instance and returns a boolean that is True if
@@ -2246,26 +2253,24 @@ def get_prefetcher(
 
     # For singly related objects, we have to avoid getting the attribute
     # from the object, as this will trigger the query. So we first try
-    # on the class, in order to get the descriptor object. Use
-    # getattr_static so a forward FK yields its descriptor rather than the
-    # RelatedFieldRef traversal proxy its __get__ returns for class access.
-    rel_obj_descriptor = inspect.getattr_static(instance.__class__, through_attr, None)
+    # on the class, in order to get the descriptor object.
+    rel_obj_descriptor = getattr(instance.__class__, through_attr, None)
     if rel_obj_descriptor is None:
         attr_found = hasattr(instance, through_attr)
     else:
         attr_found = True
         if rel_obj_descriptor:
             # singly related object, descriptor object has the
-            # get_prefetch_queryset() method.
-            if hasattr(rel_obj_descriptor, "get_prefetch_queryset"):
+            # _get_prefetch_queryset() method.
+            if hasattr(rel_obj_descriptor, "_get_prefetch_queryset"):
                 prefetcher = rel_obj_descriptor
-                is_fetched = rel_obj_descriptor.is_cached
+                is_fetched = rel_obj_descriptor._is_cached
             else:
                 # descriptor doesn't support prefetching, so we go ahead and get
                 # the attribute on the instance rather than the class to
                 # support many related managers
                 rel_obj = getattr(instance, through_attr)
-                if hasattr(rel_obj, "get_prefetch_queryset"):
+                if hasattr(rel_obj, "_get_prefetch_queryset"):
                     prefetcher = rel_obj
                 if through_attr != to_attr:
                     # Special case cached_property instances because hasattr
@@ -2299,7 +2304,7 @@ def prefetch_one_level(
     Return the prefetched objects along with any additional prefetches that
     must be done due to prefetch_related lookups found from default managers.
     """
-    # prefetcher must have a method get_prefetch_queryset() which takes a list
+    # prefetcher must have a method _get_prefetch_queryset() which takes a list
     # of instances, and returns a tuple:
 
     # (queryset of instances of self.model that are related to passed in instances,
@@ -2319,7 +2324,7 @@ def prefetch_one_level(
         single,
         cache_name,
         is_descriptor,
-    ) = prefetcher.get_prefetch_queryset(instances, lookup.get_current_queryset(level))
+    ) = prefetcher._get_prefetch_queryset(instances, lookup.get_current_queryset(level))
     # We have to handle the possibility that the QuerySet we just got back
     # contains some prefetch_related lookups. We don't want to trigger the
     # prefetch_related functionality by evaluating the query. Rather, we need
