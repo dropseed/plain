@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
+from mcp_test_helpers import bare_post
 from plain.mcp.views import CLASSIC_PROTOCOL_VERSIONS
-from plain.test import Client
+from plain.test import Client, case, cases
 
 
 def classic_post(
@@ -29,7 +29,7 @@ def classic_post(
         body["id"] = msg_id
     if params is not None:
         body["params"] = params
-    return (client or Client()).post(path, data=body, content_type="application/json")
+    return bare_post(path, body, client=client)
 
 
 class TestInitialize:
@@ -44,7 +44,7 @@ class TestInitialize:
             },
         )
         assert response.status_code == 200
-        result = response.json()["result"]
+        result = response.json_data["result"]
         assert result["protocolVersion"] == "2025-06-18"
         assert result["capabilities"] == {"tools": {}}
         assert result["serverInfo"]["name"] == "public"
@@ -55,7 +55,7 @@ class TestInitialize:
         # and the client decides whether it can work with that.
         for params in ({"protocolVersion": "2024-11-05"}, {}):
             response = classic_post("/mcp", "initialize", params)
-            result = response.json()["result"]
+            result = response.json_data["result"]
             assert result["protocolVersion"] == CLASSIC_PROTOCOL_VERSIONS[0]
 
     def test_no_session_is_issued(self) -> None:
@@ -69,38 +69,37 @@ class TestInitialize:
         # `initialize` doesn't exist in 2026-07-28, so whatever a client puts
         # in its headers, an initialize without the modern `_meta` envelope
         # is a classic handshake.
-        response = Client().post(
+        response = bare_post(
             "/mcp",
-            data={
+            {
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "initialize",
                 "params": {"protocolVersion": "2025-06-18"},
             },
-            content_type="application/json",
             headers={"MCP-Protocol-Version": "2026-07-28"},
         )
         assert response.status_code == 200
-        assert response.json()["result"]["protocolVersion"] == "2025-06-18"
+        assert response.json_data["result"]["protocolVersion"] == "2025-06-18"
 
     def test_initialized_notification_is_accepted(self) -> None:
         # The handshake's second half is a notification — 202, no body, like
         # every other notification.
         response = classic_post("/mcp", "notifications/initialized", msg_id=None)
         assert response.status_code == 202
-        assert not response.content
+        assert not response.body
 
 
 class TestClassicDispatch:
     def test_ping(self) -> None:
         response = classic_post("/mcp", "ping")
         assert response.status_code == 200
-        assert response.json()["result"] == {}
+        assert response.json_data["result"] == {}
 
     def test_tools_list_is_not_stamped(self) -> None:
         response = classic_post("/mcp", "tools/list")
         assert response.status_code == 200
-        result = response.json()["result"]
+        result = response.json_data["result"]
         assert result["tools"][0]["name"] == "Echo"
         # `resultType`, `serverInfo`, and the freshness hints are 2026-07-28
         # vocabulary — a classic client never asked for them.
@@ -113,20 +112,19 @@ class TestClassicDispatch:
             "/mcp", "tools/call", {"name": "Echo", "arguments": {"text": "hi"}}
         )
         assert response.status_code == 200
-        assert response.json()["result"]["content"][0]["text"] == "hi"
+        assert response.json_data["result"]["content"][0]["text"] == "hi"
 
     def test_classic_version_header_still_routes_classic(self) -> None:
         # 2025-06-18 clients send their negotiated version in the header on
         # requests after `initialize` — only the `_meta` declaration selects
         # the modern path.
-        response = Client().post(
+        response = bare_post(
             "/mcp",
-            data={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
-            content_type="application/json",
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
             headers={"MCP-Protocol-Version": "2025-06-18"},
         )
         assert response.status_code == 200
-        assert "tools" in response.json()["result"]
+        assert "tools" in response.json_data["result"]
 
     def test_unknown_method_error_rides_200_and_names_no_version(self) -> None:
         # The spec-mandated 404 for unknown methods is 2026-07-28 vocabulary;
@@ -135,7 +133,7 @@ class TestClassicDispatch:
         # client just negotiated a classic version it's happily using.
         response = classic_post("/mcp", "prompts/list")
         assert response.status_code == 200
-        error = response.json()["error"]
+        error = response.json_data["error"]
         assert error["code"] == -32601
         assert "2026" not in error["message"]
         assert "data" not in error
@@ -143,7 +141,7 @@ class TestClassicDispatch:
     def test_invalid_params_error_rides_200(self) -> None:
         response = classic_post("/mcp", "tools/call", {})
         assert response.status_code == 200
-        assert response.json()["error"]["code"] == -32602
+        assert response.json_data["error"]["code"] == -32602
 
     def test_handler_bug_is_an_internal_error(self) -> None:
         # A handler returning a non-dict is a server bug on either path — the
@@ -151,7 +149,7 @@ class TestClassicDispatch:
         # malformed result unstamped and unnoticed.
         response = classic_post("/rpc-boom", "bad")
         assert response.status_code == 200
-        assert response.json()["error"]["code"] == -32603
+        assert response.json_data["error"]["code"] == -32603
 
 
 class TestExtraTransportHeaders:
@@ -172,9 +170,9 @@ class TestExtraTransportHeaders:
         # The observed sequence: classic initialize (with the extra
         # Mcp-Method header), then tools/list under the negotiated version
         # header plus Mcp-Method, no `_meta` anywhere.
-        response = Client().post(
+        response = bare_post(
             "/mcp",
-            data={
+            {
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "initialize",
@@ -184,34 +182,31 @@ class TestExtraTransportHeaders:
                     "clientInfo": {"name": "claude-proxy", "version": "0"},
                 },
             },
-            content_type="application/json",
             headers={"Mcp-Method": "initialize"},
         )
         assert response.status_code == 200
-        negotiated = response.json()["result"]["protocolVersion"]
+        negotiated = response.json_data["result"]["protocolVersion"]
         assert negotiated == "2025-11-25"
 
-        response = Client().post(
+        response = bare_post(
             "/mcp",
-            data={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
-            content_type="application/json",
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
             headers={
                 "MCP-Protocol-Version": negotiated,
                 "Mcp-Method": "tools/list",
             },
         )
         assert response.status_code == 200
-        result = response.json()["result"]
+        result = response.json_data["result"]
         assert result["tools"][0]["name"] == "Echo"
 
-    @pytest.mark.parametrize(
-        "headers",
-        [
-            {"Mcp-Method": "tools/list"},
-            {"MCP-Protocol-Version": "2026-01-01"},
+    @cases(
+        case({"Mcp-Method": "tools/list"}, id="mcp-method-alone"),
+        case({"MCP-Protocol-Version": "2026-01-01"}, id="unknown-version"),
+        case(
             {"MCP-Protocol-Version": "2026-01-01", "Mcp-Method": "tools/list"},
-        ],
-        ids=["mcp-method-alone", "unknown-version", "both"],
+            id="both",
+        ),
     )
     def test_never_a_modern_error_without_meta(self, headers: dict[str, str]) -> None:
         # The invariant behind the class: a request that doesn't declare the
@@ -220,14 +215,13 @@ class TestExtraTransportHeaders:
         # -32602, no -32020 header mismatch, no -32022 unsupported version —
         # whatever extra headers it carries. It's a classic request, served
         # as one.
-        response = Client().post(
+        response = bare_post(
             "/mcp",
-            data={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
-            content_type="application/json",
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
             headers=headers,
         )
         assert response.status_code == 200
-        assert "tools" in response.json()["result"]
+        assert "tools" in response.json_data["result"]
 
 
 class TestClassicAuth:

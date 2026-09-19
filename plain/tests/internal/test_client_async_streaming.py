@@ -5,8 +5,8 @@ finalization and test assertions read it afterwards."""
 
 from __future__ import annotations
 
-import pytest
 from plain.http import AsyncStreamingResponse
+from plain.test import raises
 from plain.test.client import ClientHandler
 
 
@@ -59,8 +59,8 @@ def test_client_response_wrapper_mirrors_readonly_status() -> None:
     from plain.test.client import Client, ClientResponse
 
     response = AsyncStreamingResponse(_stream(), content_type="text/event-stream")
-    wrapped = ClientResponse(response, Client())
-    with pytest.raises(AttributeError):
+    wrapped = ClientResponse(response=response, client=Client())
+    with raises(AttributeError):
         wrapped.status_code = 204
     # Test-only attributes still land on the wrapper.
     wrapped.redirect_chain = []

@@ -25,7 +25,7 @@ def test_unknown_method_is_not_allowed():
     client = Client()
 
     for method in ("GET_RESPONSE", "GET_REQUEST_HANDLER", "_ALLOWED_METHODS"):
-        request = client._request_factory.generic(method, "/")
+        request = client._request_factory.request(method=method, path="/")
         response = client.request(request)
         assert response.status_code == 405, (
             f"method={method} returned {response.status_code}"

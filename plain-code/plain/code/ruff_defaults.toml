@@ -8,7 +8,6 @@ target-version = "py313"
 [lint]
 extend-select = [
   "ISC", # flake8-implicit-str-concat
-  "PT", # pytest
 ]
 ignore = [
   "ISC001", # Implicit string concatenation (conflicts with the formatter)

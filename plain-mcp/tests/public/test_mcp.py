@@ -12,7 +12,7 @@ from plain.mcp.views import (
     META_SERVER_INFO,
     PROTOCOL_VERSION,
 )
-from plain.test import RequestFactory
+from plain.test import RequestFactory, patch, raises
 
 # Dispatch and result shapes live here; the transport around them — headers,
 # `_meta` validation, HTTP status codes — is tested in test_http.py, where a
@@ -29,7 +29,7 @@ class _Mode(enum.StrEnum):
 
 def _instantiate(cls: type[MCPView]) -> MCPView:
     """Build an MCPView instance with a stub request for unit tests."""
-    request = RequestFactory().post("/mcp", content_type="application/json")
+    request = RequestFactory().post("/mcp", body=b"", content_type="application/json")
     return cls(request=request)
 
 
@@ -46,15 +46,14 @@ def _call(
 
 
 class TestMCPProtocol:
-    def setup_method(self) -> None:
+    def _mcp(self) -> MCPView:
         class _TestMCP(MCPView):
             name = "test"
 
-        self.cls = _TestMCP
-        self.mcp = _instantiate(_TestMCP)
+        return _instantiate(_TestMCP)
 
     def test_server_discover(self) -> None:
-        response = _call(self.mcp, "server/discover")
+        response = _call(self._mcp(), "server/discover")
         assert response["jsonrpc"] == "2.0"
         assert response["id"] == 1
         assert response["result"]["supportedVersions"] == [PROTOCOL_VERSION]
@@ -73,7 +72,8 @@ class TestMCPProtocol:
     def test_client_identity_read_from_meta(self) -> None:
         # There's no handshake, so each request's `_meta` is what tells the
         # view who is calling; tools read it back through `self.mcp`.
-        version = self.mcp.load_client_identity(
+        mcp = self._mcp()
+        version = mcp.load_client_identity(
             {
                 "_meta": {
                     META_PROTOCOL_VERSION: PROTOCOL_VERSION,
@@ -83,11 +83,11 @@ class TestMCPProtocol:
             }
         )
         assert version == PROTOCOL_VERSION
-        assert self.mcp.client_info == {"name": "acme-client", "version": "3.1"}
-        assert self.mcp.client_capabilities == {"elicitation": {}}
+        assert mcp.client_info == {"name": "acme-client", "version": "3.1"}
+        assert mcp.client_capabilities == {"elicitation": {}}
 
     def test_tools_list_empty(self) -> None:
-        response = _call(self.mcp, "tools/list")
+        response = _call(self._mcp(), "tools/list")
         assert response["result"]["tools"] == []
 
 
@@ -163,7 +163,7 @@ class TestResultStamping:
     """Fields the spec requires on every result, added centrally so custom
     `rpc_` handlers get them too."""
 
-    def setup_method(self) -> None:
+    def _mcp(self) -> MCPView:
         class Note(MCPResource):
             uri = "notes://one"
             mime_type = "text/plain"
@@ -184,14 +184,14 @@ class TestResultStamping:
             def rpc_prompts_list(self, params: dict[str, Any]) -> dict[str, Any]:
                 return {"prompts": []}
 
-        self.mcp = _instantiate(_TestMCP)
+        return _instantiate(_TestMCP)
 
     def test_result_type_stamped(self) -> None:
-        result = _call(self.mcp, "tools/list")["result"]
+        result = _call(self._mcp(), "tools/list")["result"]
         assert result["resultType"] == "complete"
 
     def test_server_info_stamped_into_result_meta(self) -> None:
-        result = _call(self.mcp, "tools/list")["result"]
+        result = _call(self._mcp(), "tools/list")["result"]
         assert result["_meta"][META_SERVER_INFO] == {"name": "test", "version": "9.9"}
 
     def test_list_and_read_results_carry_cache_hints(self) -> None:
@@ -202,21 +202,21 @@ class TestResultStamping:
             ("resources/templates/list", None),
             ("resources/read", {"uri": "notes://one"}),
         ):
-            result = _call(self.mcp, method, params)["result"]
+            result = _call(self._mcp(), method, params)["result"]
             assert result["ttlMs"] == 0, method
             assert result["cacheScope"] == "private", method
 
     def test_custom_rpc_list_handler_gets_cache_hints(self) -> None:
         # `prompts/list` is implemented by the subclass, not plain.mcp — the
         # stamping is central, so it lands there too.
-        result = _call(self.mcp, "prompts/list")["result"]
+        result = _call(self._mcp(), "prompts/list")["result"]
         assert result["ttlMs"] == 0
         assert result["cacheScope"] == "private"
         assert result["resultType"] == "complete"
 
     def test_tools_call_result_has_no_cache_hints(self) -> None:
         # A tool call isn't a cacheable result — only lists and reads are.
-        result = _call(self.mcp, "tools/call", {"name": "Echo", "arguments": {}})[
+        result = _call(self._mcp(), "tools/call", {"name": "Echo", "arguments": {}})[
             "result"
         ]
         assert "ttlMs" not in result
@@ -444,7 +444,7 @@ class TestToolExecution:
         assert response["result"]["isError"] is True
         assert response["result"]["content"][0]["text"] == "Tool execution failed"
 
-    def test_tool_error_surfaces_message_without_logging(self, monkeypatch) -> None:
+    def test_tool_error_surfaces_message_without_logging(self) -> None:
         class PickyTool(MCPTool):
             def run(self) -> str:
                 raise MCPToolError("No widget named 'foo'")
@@ -453,17 +453,16 @@ class TestToolExecution:
             name = "test"
             tools = (PickyTool,)
 
-        logged: list[Any] = []
-        monkeypatch.setattr(
-            "plain.mcp.views.log_exception", lambda *a, **k: logged.append(a)
-        )
+        import plain.mcp.views as mcp_views
 
-        mcp = _instantiate(MyMCP)
-        response = _call(
-            mcp,
-            "tools/call",
-            {"name": "PickyTool", "arguments": {}},
-        )
+        logged: list[Any] = []
+        with patch(mcp_views, "log_exception", lambda *a, **k: logged.append(a)):
+            mcp = _instantiate(MyMCP)
+            response = _call(
+                mcp,
+                "tools/call",
+                {"name": "PickyTool", "arguments": {}},
+            )
         # Expected failure: the caller sees the message via isError, and it is
         # NOT logged as a server exception (unlike an unexpected error).
         assert response["result"]["isError"] is True
@@ -524,19 +523,18 @@ class TestArgumentValidation:
 
         return MyMCP
 
-    def test_wrong_type_rejected_before_run(self, monkeypatch) -> None:
+    def test_wrong_type_rejected_before_run(self) -> None:
         # A string where an integer is declared must be rejected up front —
         # NOT run through `a + b` and logged as a server exception.
-        logged: list[Any] = []
-        monkeypatch.setattr(
-            "plain.mcp.views.log_exception", lambda *a, **k: logged.append(a)
-        )
+        import plain.mcp.views as mcp_views
 
-        response = _call(
-            _instantiate(self._add_mcp()),
-            "tools/call",
-            {"name": "Add", "arguments": {"a": "x", "b": 3}},
-        )
+        logged: list[Any] = []
+        with patch(mcp_views, "log_exception", lambda *a, **k: logged.append(a)):
+            response = _call(
+                _instantiate(self._add_mcp()),
+                "tools/call",
+                {"name": "Add", "arguments": {"a": "x", "b": 3}},
+            )
         assert response["result"]["isError"] is True
         assert "'a' must be an integer" in response["result"]["content"][0]["text"]
         # The whole point: this input error is not logged as a server exception.
@@ -1589,9 +1587,7 @@ class TestResourceTemplates:
         assert response["error"]["code"] == -32602
 
     def test_setting_both_uri_and_template_is_an_error(self) -> None:
-        import pytest
-
-        with pytest.raises(TypeError, match="only one"):
+        with raises(TypeError, match="only one"):
 
             class Bad(MCPResource):
                 uri = "a://b"

@@ -4,35 +4,35 @@ error the pre-check would have raised, not a raw psycopg.IntegrityError."""
 
 from __future__ import annotations
 
-import pytest
 from app.examples.models.constraints import ConstraintExample
 from app.examples.models.delete import ChildCascade, DeleteParent
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import transaction
+from plain.test import raises
 
 
-def test_constraint_violation_reaching_db_raises_validation_error(db: None) -> None:
+def test_constraint_violation_reaching_db_raises_validation_error() -> None:
     # clean_and_validate=False bypasses the in-Python check, so the duplicate
     # reaches the database — the deterministic stand-in for a raced insert.
     ConstraintExample(name="dup", description="same").create(clean_and_validate=False)
 
-    with pytest.raises(ValidationError):
+    with raises(ValidationError):
         ConstraintExample(name="dup", description="same").create(
             clean_and_validate=False
         )
 
 
-def test_caught_violation_matches_pre_check_and_recovers_in_atomic(db: None) -> None:
+def test_caught_violation_matches_pre_check_and_recovers_in_atomic() -> None:
     ConstraintExample(name="dup", description="same").create(clean_and_validate=False)
 
     # The pre-check (validate_constraints) raises this for the duplicate...
-    with pytest.raises(ValidationError) as pre_check:
+    with raises(ValidationError) as pre_check:
         ConstraintExample(name="dup", description="same").validate_constraints()
 
     # ...and the database catch raises the same thing when the pre-check is
     # bypassed. Wrapping in atomic() rolls back to a savepoint, so the caller
     # can keep using the transaction after handling the error.
-    with pytest.raises(ValidationError) as caught, transaction.atomic():
+    with raises(ValidationError) as caught, transaction.atomic():
         ConstraintExample(name="dup", description="same").create(
             clean_and_validate=False
         )
@@ -40,51 +40,51 @@ def test_caught_violation_matches_pre_check_and_recovers_in_atomic(db: None) -> 
     # Same messages AND same routing: the database catch normalizes to the
     # dict shape validate_constraints() produces, so a composite unique lands
     # under NON_FIELD_ERRORS either way rather than as a flat error.
-    assert caught.value.messages == pre_check.value.messages
-    assert caught.value.error_dict.keys() == pre_check.value.error_dict.keys()
-    assert NON_FIELD_ERRORS in caught.value.error_dict
+    assert caught.exception.messages == pre_check.exception.messages
+    assert caught.exception.error_dict.keys() == pre_check.exception.error_dict.keys()
+    assert NON_FIELD_ERRORS in caught.exception.error_dict
 
     # The transaction is usable again after the savepoint rollback, and the
     # duplicate never landed.
     assert ConstraintExample.query.filter(name="dup").count() == 1
 
 
-def test_default_save_maps_duplicate_to_validation_error(db: None) -> None:
+def test_default_save_maps_duplicate_to_validation_error() -> None:
     """A duplicate on the default save() path (validation on) raises
     ValidationError. (That the database does the rejecting rather than a
     pre-check is what test_save_skips_constraint_pre_check_select proves; this
     pins the user-facing contract on the common path.)"""
     ConstraintExample(name="dup", description="same").create()
 
-    with pytest.raises(ValidationError), transaction.atomic():
+    with raises(ValidationError), transaction.atomic():
         ConstraintExample(name="dup", description="same").create()
 
     assert ConstraintExample.query.filter(name="dup").count() == 1
 
 
-def test_missing_foreign_key_target_raises_validation_error_on_field(db: None) -> None:
+def test_missing_foreign_key_target_raises_validation_error_on_field() -> None:
     """A foreign key pointing at a row that doesn't exist is rejected by
     Postgres at the write and surfaces as a ValidationError on that field."""
     missing_id = 10**9
 
-    with pytest.raises(ValidationError) as caught, transaction.atomic():
+    with raises(ValidationError) as caught, transaction.atomic():
         # A raw pk is deliberate here -- the runtime accepts it so the DB can
         # reject the missing target; the typed constructor wants the instance.
         ChildCascade(parent=missing_id).create()  # ty: ignore[invalid-argument-type]
 
-    assert list(caught.value.error_dict) == ["parent"]
-    assert caught.value.messages == [
+    assert list(caught.exception.error_dict) == ["parent"]
+    assert caught.exception.messages == [
         f"DeleteParent with id {missing_id} does not exist."
     ]
 
 
-def test_update_to_missing_foreign_key_target_raises_on_field(db: None) -> None:
+def test_update_to_missing_foreign_key_target_raises_on_field() -> None:
     parent = DeleteParent.query.create(name="p")
     child = ChildCascade.query.create(parent=parent)
     missing_id = 10**9
 
     child.parent = missing_id  # ty: ignore[invalid-assignment]
-    with pytest.raises(ValidationError) as caught, transaction.atomic():
+    with raises(ValidationError) as caught, transaction.atomic():
         child.update()
 
-    assert list(caught.value.error_dict) == ["parent"]
+    assert list(caught.exception.error_dict) == ["parent"]

@@ -5,52 +5,28 @@ handle_exception logging semantics.
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 
-import pytest
 from plain.http import Response
 from plain.internal.handlers.exception import response_for_exception
-from plain.test import RequestFactory
+from plain.test import CapturedLogs, RequestFactory, capture_logs, patch, raises
 from plain.views import View
 
 
-class _ListHandler(logging.Handler):
-    """Captures records into a list regardless of logger propagation.
-
-    We can't rely on pytest's `caplog` because `configure_logging` sets
-    `propagate=False` on `plain` loggers; once another test has called
-    it, records never reach caplog's root-attached handler.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(level=logging.DEBUG)
-        self.records: list[logging.LogRecord] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self.records.append(record)
-
-
-@pytest.fixture
+@contextmanager
 def request_log():
-    logger = logging.getLogger("plain.request")
-    handler = _ListHandler()
-    previous_level = logger.level
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-    try:
-        yield handler
-    finally:
-        logger.removeHandler(handler)
-        logger.setLevel(previous_level)
+    with capture_logs("plain.request") as logs:
+        yield logs
 
 
-def _has_server_error(handler: _ListHandler) -> bool:
-    return any("Server error" in r.getMessage() for r in handler.records)
+def _has_server_error(logs: CapturedLogs) -> bool:
+    return any("Server error" in message for message in logs.messages)
 
 
 class TestAfterResponseChaining:
     """Every non-base after_response override must call super() so mixins compose."""
 
-    def test_two_mixins_both_run(self, caplog):
+    def test_two_mixins_both_run(self):
         class AHeader(View):
             def after_response(self, response: Response) -> Response:
                 response = super().after_response(response)
@@ -127,49 +103,53 @@ class TestHandleExceptionLogging:
     don't each have to. Re-raising defers to the framework error renderer.
     """
 
-    def test_mapped_4xx_does_not_log_server_error(self, request_log):
-        class AppError(Exception):
-            pass
+    def test_mapped_4xx_does_not_log_server_error(self):
+        with request_log() as log:
 
-        class MappedView(View):
-            def get(self):
-                raise AppError("nope")
+            class AppError(Exception):
+                pass
 
-            def handle_exception(self, exc: Exception) -> Response:
-                if isinstance(exc, AppError):
-                    return Response("bad", status_code=400)
-                return super().handle_exception(exc)
+            class MappedView(View):
+                def get(self):
+                    raise AppError("nope")
 
-        response = MappedView(request=RequestFactory().get("/")).get_response()
+                def handle_exception(self, exc: Exception) -> Response:
+                    if isinstance(exc, AppError):
+                        return Response("bad", status_code=400)
+                    return super().handle_exception(exc)
 
-        assert response.status_code == 400
-        assert response.exception is None
-        assert not _has_server_error(request_log), (
-            "handle_exception mapping to 4xx must not emit a Server error log"
-        )
+            response = MappedView(request=RequestFactory().get("/")).get_response()
 
-    def test_mapped_5xx_logs_and_attaches_exception(self, request_log):
+            assert response.status_code == 400
+            assert response.exception is None
+            assert not _has_server_error(log), (
+                "handle_exception mapping to 4xx must not emit a Server error log"
+            )
+
+    def test_mapped_5xx_logs_and_attaches_exception(self):
         """A subclass that maps to a 5xx response gets logging and exception
         attachment from the framework — no need to call log_exception or set
         response.exception in the override."""
 
-        class AppError(Exception):
-            pass
+        with request_log() as log:
 
-        class MappedView(View):
-            def get(self):
-                raise AppError("boom")
+            class AppError(Exception):
+                pass
 
-            def handle_exception(self, exc: Exception) -> Response:
-                if isinstance(exc, AppError):
-                    return Response("oops", status_code=500)
-                return super().handle_exception(exc)
+            class MappedView(View):
+                def get(self):
+                    raise AppError("boom")
 
-        response = MappedView(request=RequestFactory().get("/")).get_response()
+                def handle_exception(self, exc: Exception) -> Response:
+                    if isinstance(exc, AppError):
+                        return Response("oops", status_code=500)
+                    return super().handle_exception(exc)
 
-        assert response.status_code == 500
-        assert isinstance(response.exception, AppError)
-        assert _has_server_error(request_log)
+            response = MappedView(request=RequestFactory().get("/")).get_response()
+
+            assert response.status_code == 500
+            assert isinstance(response.exception, AppError)
+            assert _has_server_error(log)
 
     def test_reraise_from_handle_exception_propagates(self):
         """Default handle_exception re-raises — exception escapes get_response."""
@@ -178,37 +158,37 @@ class TestHandleExceptionLogging:
             def get(self):
                 raise RuntimeError("boom")
 
-        with pytest.raises(RuntimeError, match="boom"):
+        with raises(RuntimeError, match="boom"):
             Boom(request=RequestFactory().get("/")).get_response()
 
-    def test_framework_logs_reraised_exception(self, request_log):
+    def test_framework_logs_reraised_exception(self):
         """When handle_exception re-raises and the framework catches it,
         response_for_exception logs a Server error."""
 
-        class Boom(View):
-            def get(self):
-                raise RuntimeError("boom")
+        with request_log() as log:
 
-        request = RequestFactory().get("/")
-        try:
-            Boom(request=request).get_response()
-        except Exception as exc:
-            caught = exc
-        else:
-            raise AssertionError("expected RuntimeError to propagate")
+            class Boom(View):
+                def get(self):
+                    raise RuntimeError("boom")
 
-        # Only call log_exception to avoid pulling in a real template;
-        # response_for_exception's first line is log_exception.
-        from plain.logs import log_exception
+            request = RequestFactory().get("/")
+            try:
+                Boom(request=request).get_response()
+            except Exception as exc:
+                caught = exc
+            else:
+                raise AssertionError("expected RuntimeError to propagate")
 
-        log_exception(request, caught)
+            # Only call log_exception to avoid pulling in a real template;
+            # response_for_exception's first line is log_exception.
+            from plain.logs import log_exception
 
-        server_errors = [
-            r for r in request_log.records if "Server error" in r.getMessage()
-        ]
-        assert len(server_errors) == 1
+            log_exception(request, caught)
 
-    def test_falls_back_to_plain_text_when_templates_not_registered(self, monkeypatch):
+            server_errors = [r for r in log.records if "Server error" in r.getMessage()]
+            assert len(server_errors) == 1
+
+    def test_falls_back_to_plain_text_when_templates_not_registered(self):
         """`plain.templates` importable but not in INSTALLED_PACKAGES → plain text.
 
         Pins the registry-label guard added to handle the "monorepo dev mode"
@@ -221,10 +201,9 @@ class TestHandleExceptionLogging:
         def _missing(label: str):
             raise LookupError(label)
 
-        monkeypatch.setattr(packages_registry, "get_package_config", _missing)
-
-        request = RequestFactory().get("/")
-        response = response_for_exception(request, RuntimeError("boom"))
+        with patch(packages_registry, "get_package_config", _missing):
+            request = RequestFactory().get("/")
+            response = response_for_exception(request, RuntimeError("boom"))
 
         assert response.status_code == 500
         assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
@@ -232,23 +211,22 @@ class TestHandleExceptionLogging:
         # 5xx still carries the original exception for downstream tooling.
         assert response.exception.args == ("boom",)  # ty: ignore[unresolved-attribute]
 
-    def test_log_exception_is_idempotent(self, request_log):
+    def test_log_exception_is_idempotent(self):
         """If a view calls log_exception and the framework also tries,
         the sentinel keeps it to one record."""
 
-        from plain.logs import log_exception
+        with request_log() as log:
+            from plain.logs import log_exception
 
-        exc = RuntimeError("once")
-        request = RequestFactory().get("/")
+            exc = RuntimeError("once")
+            request = RequestFactory().get("/")
 
-        log_exception(request, exc)
-        log_exception(request, exc)
-        response_for_exception(request, exc)
+            log_exception(request, exc)
+            log_exception(request, exc)
+            response_for_exception(request, exc)
 
-        server_errors = [
-            r for r in request_log.records if "Server error" in r.getMessage()
-        ]
-        assert len(server_errors) == 1
+            server_errors = [r for r in log.records if "Server error" in r.getMessage()]
+            assert len(server_errors) == 1
 
     def test_suspicious_operation_logs_at_warning_without_exc_info(self):
         """CSRF rejections and other SuspiciousOperationError400s are working-as-designed
@@ -258,38 +236,31 @@ class TestHandleExceptionLogging:
         from plain.http import SuspiciousOperationError400
         from plain.logs import log_exception
 
-        security_logger = logging.getLogger("plain.security")
-        handler = _ListHandler()
-        previous_level = security_logger.level
-        security_logger.addHandler(handler)
-        security_logger.setLevel(logging.DEBUG)
-        try:
+        with capture_logs("plain.security") as logs:
             log_exception(
                 RequestFactory().get("/api/app/config"),
                 SuspiciousOperationError400("CSRF rejected"),
             )
-        finally:
-            security_logger.removeHandler(handler)
-            security_logger.setLevel(previous_level)
 
-        assert len(handler.records) == 1
-        record = handler.records[0]
+        assert len(logs) == 1
+        record = logs[0]
         assert record.levelno == logging.WARNING
         assert record.exc_info is None
         assert record.name == "plain.security.SuspiciousOperationError400"
 
-    def test_response_exception_short_circuits_without_logging(self, request_log):
+    def test_response_exception_short_circuits_without_logging(self):
         """ResponseException is the sanctioned 'I already have a response' path."""
 
-        from plain.views.exceptions import ResponseException
+        with request_log() as log:
+            from plain.views.exceptions import ResponseException
 
-        class ViaResponseException(View):
-            def get(self):
-                raise ResponseException(Response("handled", status_code=418))
+            class ViaResponseException(View):
+                def get(self):
+                    raise ResponseException(Response("handled", status_code=418))
 
-        response = ViaResponseException(
-            request=RequestFactory().get("/")
-        ).get_response()
+            response = ViaResponseException(
+                request=RequestFactory().get("/")
+            ).get_response()
 
-        assert response.status_code == 418
-        assert not request_log.records
+            assert response.status_code == 418
+            assert not log.records

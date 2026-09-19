@@ -4,7 +4,7 @@ import re
 import time
 
 from plain.connect.identity import sign_render_token
-from plain.test import Client
+from plain.test import Client, override_settings
 
 # Must match the literal endpoint id in tests/app/templates/page.html.
 ENDPOINT_ID = "plain_sf_testid"
@@ -27,7 +27,7 @@ def _form_action(content: bytes) -> str:
     return match.group(1).decode()
 
 
-def test_fields_tag_always_renders_inputs(db):
+def test_fields_tag_always_renders_inputs():
     # Without a secret configured, values are empty but the inputs render —
     # the form is still posable, just without anti-spam scaffolding.
     response = Client().get("/")
@@ -37,39 +37,40 @@ def test_fields_tag_always_renders_inputs(db):
     assert b'name="plain_connect_check"' in response.content
 
 
-def test_url_tag_renders_endpoint_id_into_action(db):
+def test_url_tag_renders_endpoint_id_into_action():
     response = Client().get("/")
     assert _form_action(response.content).endswith(f"/{ENDPOINT_ID}")
 
 
-def test_url_tag_uses_configured_base(db, settings):
-    settings.CONNECT_CLOUD_URL = "https://custom.example"
-    response = Client().get("/")
-    assert (
-        _form_action(response.content) == f"https://custom.example/forms/{ENDPOINT_ID}"
-    )
+def test_url_tag_uses_configured_base():
+    with override_settings(CONNECT_CLOUD_URL="https://custom.example"):
+        response = Client().get("/")
+        assert (
+            _form_action(response.content)
+            == f"https://custom.example/forms/{ENDPOINT_ID}"
+        )
 
 
-def test_render_token_signs_when_secret_is_set(db, settings):
-    settings.CONNECT_SECRET_KEY = APP_SECRET
-    response = Client().get("/")
-    rendered = _input_value(response.content, "plain_connect_render_token")
-    assert rendered
+def test_render_token_signs_when_secret_is_set():
+    with override_settings(CONNECT_SECRET_KEY=APP_SECRET):
+        response = Client().get("/")
+        rendered = _input_value(response.content, "plain_connect_render_token")
+        assert rendered
 
-    ts_str, _, mac = rendered.partition(".")
-    expected = hmac.new(
-        APP_SECRET.encode(), f"render-token:{ts_str}".encode(), hashlib.sha256
-    ).hexdigest()
-    assert hmac.compare_digest(expected, mac)
-    assert abs(int(time.time()) - int(ts_str)) < 5
+        ts_str, _, mac = rendered.partition(".")
+        expected = hmac.new(
+            APP_SECRET.encode(), f"render-token:{ts_str}".encode(), hashlib.sha256
+        ).hexdigest()
+        assert hmac.compare_digest(expected, mac)
+        assert abs(int(time.time()) - int(ts_str)) < 5
 
 
-def test_render_token_is_fresh_per_render(db, settings):
-    settings.CONNECT_SECRET_KEY = APP_SECRET
-    first = _input_value(Client().get("/").content, "plain_connect_render_token")
-    time.sleep(1)
-    second = _input_value(Client().get("/").content, "plain_connect_render_token")
-    assert first != second
+def test_render_token_is_fresh_per_render():
+    with override_settings(CONNECT_SECRET_KEY=APP_SECRET):
+        first = _input_value(Client().get("/").content, "plain_connect_render_token")
+        time.sleep(1)
+        second = _input_value(Client().get("/").content, "plain_connect_render_token")
+        assert first != second
 
 
 def test_sign_render_token_shape():

@@ -33,7 +33,7 @@ KNOWN_PACKAGES = {
     "plain-oauth": "OAuth provider login",
     "plain-pages": "Serve static pages, markdown, and assets",
     "plain-passwords": "Password authentication",
-    "plain-pytest": "Test with pytest",
+    "plain-testing": "Plain's own test runner",
     "plain-scan": "Test for production best practices",
     "plain-sessions": "Database-backed sessions",
     "plain-start": "Bootstrap a new project from templates",

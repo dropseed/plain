@@ -26,7 +26,7 @@ def _toast_bytes() -> int:
         return row[0]
 
 
-def test_touch_writes_no_new_toast_chunks(db):
+def test_touch_writes_no_new_toast_chunks():
     # High-entropy ~2.7 MB value so TOAST compression can't mask the effect.
     big = {"blob": base64.b64encode(os.urandom(2_000_000)).decode()}
 

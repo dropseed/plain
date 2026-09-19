@@ -18,17 +18,19 @@ value automatically because they already share a source.
 
 from __future__ import annotations
 
-import pytest
+from contextlib import contextmanager
+
+from clients import error_client
 from opentelemetry.semconv.attributes import url_attributes
 from plain.runtime import settings
-from plain.test import Client
+from plain.test import Client, capture_logs
 from plain.test.otel import install_test_tracer
 from plain.urls.resolvers import _get_cached_resolver
 
 _span_exporter = install_test_tracer()
 
 
-@pytest.fixture
+@contextmanager
 def app_router():
     """Stand up the default app router and drain spans before the test runs."""
     original = settings.URLS_ROUTER
@@ -50,14 +52,15 @@ def _request_span(spans):
     raise AssertionError("No span with url.path attribute found")
 
 
-def test_otel_url_path_records_request_path(app_router):
+def test_otel_url_path_records_request_path():
     """`GET /` → `url.path` span attribute is `/` (request.path)."""
-    Client().get("/")
-    span = _request_span(app_router)
-    assert span.attributes[url_attributes.URL_PATH] == "/"
+    with app_router() as spans:
+        Client().get("/")
+        span = _request_span(spans)
+        assert span.attributes[url_attributes.URL_PATH] == "/"
 
 
-def test_otel_url_path_is_unnormalized(app_router):
+def test_otel_url_path_is_unnormalized():
     """`GET ///` → `url.path` records what arrives at the resolver layer.
 
     Today: the request layer collapses multiple leading slashes to one, so
@@ -65,39 +68,23 @@ def test_otel_url_path_is_unnormalized(app_router):
     and the recorded value reflects that — same final value, different
     provenance.
     """
-    Client().get("///")
-    span = _request_span(app_router)
-    assert span.attributes[url_attributes.URL_PATH] == "/"
+    with app_router() as spans:
+        Client().get("///")
+        span = _request_span(spans)
+        assert span.attributes[url_attributes.URL_PATH] == "/"
 
 
-def test_exception_log_records_request_path(error_client):
+def test_exception_log_records_request_path():
     """Exception log `path` field uses `request.path`, same source as the OTel
     span attribute (per the divergence fix that unified both).
 
     Step #3 will redefine `request.path` as the normalized canonical path
     (and add `request.raw_path` for the original); both observability sites
     automatically pick up the new value because they already share a source.
-
-    Attach via the canonical `logging.getLogger("plain.request")` lookup —
-    the framework fetches its logger the same way each request, so any
-    handler attached here reliably catches its records.
     """
-    import logging
+    with capture_logs("plain.request") as logs, error_client() as client:
+        client.get("/plain-500/")
 
-    records: list[logging.LogRecord] = []
-
-    class _Capture(logging.Handler):
-        def emit(self, record: logging.LogRecord) -> None:
-            records.append(record)
-
-    handler = _Capture(level=logging.ERROR)
-    request_logger = logging.getLogger("plain.request")
-    request_logger.addHandler(handler)
-    try:
-        error_client.get("/plain-500/")
-    finally:
-        request_logger.removeHandler(handler)
-
-    server_errors = [r for r in records if r.getMessage() == "Server error"]
+    server_errors = [r for r in logs if r.getMessage() == "Server error"]
     assert server_errors, "Expected a 'Server error' log record from plain.request"
     assert getattr(server_errors[-1], "path") == "/plain-500/"

@@ -77,7 +77,7 @@ class PlainContext(click.Context):
 
         # Follow CLICOLOR standard (http://bixense.com/clicolors/)
         # Priority: NO_COLOR > CLICOLOR_FORCE/FORCE_COLOR > CI detection > CLICOLOR > isatty
-        if os.getenv("NO_COLOR") or os.getenv("PYTEST_CURRENT_TEST"):
+        if os.getenv("NO_COLOR") or os.getenv("PLAIN_TEST_RUNNING"):
             self.color = False
         elif os.getenv("CLICOLOR_FORCE") or os.getenv("FORCE_COLOR"):
             self.color = True

@@ -8,7 +8,6 @@ the interaction between builtin and user-defined middleware.
 
 from __future__ import annotations
 
-import pytest
 from middleware_helpers import call_log
 from plain.runtime import settings
 from plain.test import Client
@@ -20,11 +19,6 @@ def _fresh_client():
     client.handler._middleware_chain = None
     client.handler.load_middleware()
     return client
-
-
-@pytest.fixture(autouse=True)
-def _clear_call_log():
-    call_log.clear()
 
 
 class TestMiddlewarePipelineBasics:
@@ -156,7 +150,7 @@ class TestHttpsRedirectMiddleware:
             settings.HTTPS_REDIRECT_ENABLED = True
             client = _fresh_client()
             # Must use secure=False to send an HTTP (not HTTPS) request
-            response = client.get("/", follow=False, secure=False)
+            response = client.get("/", follow_redirects=False, secure=False)
             assert response.status_code == 301
             assert response.headers["Location"].startswith("https://")
         finally:
@@ -204,6 +198,7 @@ class TestMiddlewareOrdering:
         Builtin before-middleware runs before user middleware.
         Host validation rejects before user middleware ever runs.
         """
+        call_log.clear()
         original_middleware = settings.MIDDLEWARE
         original_hosts = settings.ALLOWED_HOSTS
         try:
@@ -220,6 +215,7 @@ class TestMiddlewareOrdering:
 
     def test_custom_middleware_wraps_view(self):
         """User middleware should be able to wrap the view call."""
+        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = ["middleware_helpers.TrackingMiddleware"]
@@ -233,6 +229,7 @@ class TestMiddlewareOrdering:
 
     def test_multiple_custom_middleware_order(self):
         """Multiple user middleware should execute in defined order (outermost first)."""
+        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = [
@@ -254,6 +251,7 @@ class TestMiddlewareOrdering:
 
     def test_short_circuit_middleware_skips_inner(self):
         """A middleware that returns a response should prevent inner middleware from running."""
+        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = [
@@ -286,6 +284,7 @@ class TestMiddlewareUnwinding:
         a response from before_request, outer middleware's after_response still
         runs because its before_request already completed.
         """
+        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = [
@@ -312,6 +311,7 @@ class TestMiddlewareUnwinding:
         and converted to an error response. Outer middleware's after_response
         runs normally with that error response.
         """
+        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = [
@@ -336,6 +336,7 @@ class TestMiddlewareUnwinding:
         When the view raises, the exception is converted to an error response,
         and all middleware's after_response sees that response.
         """
+        call_log.clear()
         from plain.urls.resolvers import _get_cached_resolver
 
         original_middleware = settings.MIDDLEWARE
@@ -365,6 +366,7 @@ class TestMiddlewareUnwinding:
         whose before_request completed. Even when before_request short-circuits
         by returning a response, after_response still runs.
         """
+        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = [
@@ -441,6 +443,7 @@ class TestSSEViews:
 
     def test_sse_view_with_middleware_ordering(self):
         """Middleware before/after still runs correctly with SSE views."""
+        call_log.clear()
         from plain.urls.resolvers import _get_cached_resolver
 
         original_middleware = settings.MIDDLEWARE

@@ -30,10 +30,10 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-import pytest
 from plain.http import Response
 from plain.server.connection import Connection
 from plain.server.http import h1
+from plain.test import case, cases, patch
 from server_stubs import BodyLengthHandler, StubApp, h1_connect, make_worker
 
 
@@ -67,12 +67,9 @@ _CHUNKED_POST = (
 _connect = h1_connect
 
 
-@pytest.mark.parametrize(
-    "full_drain",
-    [
-        pytest.param(True, id="begin_drain"),
-        pytest.param(False, id="alive_flips_first"),
-    ],
+@cases(
+    case(True, id="begin_drain"),
+    case(False, id="reload"),
 )
 def test_request_arriving_after_shutdown_starts_is_served_with_close(
     full_drain: bool,
@@ -277,12 +274,9 @@ def test_chunked_complete_with_binary_pipelined_tail_is_framed() -> None:
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize(
-    "payload",
-    [
-        pytest.param(_REQUEST + _REQUEST, id="after_bodiless"),
-        pytest.param(_POST + _REQUEST, id="after_body"),
-    ],
+@cases(
+    case(_REQUEST + _REQUEST, id="two GETs"),
+    case(_POST + _REQUEST, id="POST then GET"),
 )
 def test_pipelined_request_gets_connection_close(payload: bytes) -> None:
     # We deliberately do NOT serve inline-pipelined requests: re-framing
@@ -374,15 +368,9 @@ def test_request_within_shutdown_grace_window_is_served() -> None:
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize(
-    "requests_before_idle",
-    [
-        pytest.param(0, id="fresh_connection"),
-        pytest.param(1, id="reused_connection"),
-    ],
-)
+@cases(0, 1)
 def test_request_after_long_idle_is_served_keepalive(
-    monkeypatch: pytest.MonkeyPatch, requests_before_idle: int
+    requests_before_idle: int,
 ) -> None:
     # The wait for a request's first byte is SERVER_KEEPALIVE_TIMEOUT,
     # not the per-recv progress timeout — for a fresh pooled connection
@@ -392,7 +380,6 @@ def test_request_after_long_idle_is_served_keepalive(
     # response, not a socket closed out from under its request (Heroku
     # H13/H18). Shrink the per-recv timeout so a regression here fails in
     # a fraction of a second instead of this test sleeping real seconds.
-    monkeypatch.setattr(h1, "RECV_PROGRESS_TIMEOUT", 0.2)
 
     async def scenario() -> None:
         worker = make_worker(handler=_Handler())
@@ -416,7 +403,8 @@ def test_request_after_long_idle_is_served_keepalive(
         finally:
             client.teardown()
 
-    asyncio.run(scenario())
+    with patch(h1, "RECV_PROGRESS_TIMEOUT", 0.2):
+        asyncio.run(scenario())
 
 
 _BIG_POST = (

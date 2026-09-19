@@ -2,7 +2,7 @@ from app.users.models import User
 from plain.test import Client
 
 
-def test_admin_access(db):
+def test_admin_access():
     client = Client()
 
     # Login required

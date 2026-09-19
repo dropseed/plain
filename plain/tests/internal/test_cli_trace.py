@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-import pytest
+import contextlib
+import io
+
 from opentelemetry import trace
 from opentelemetry.semconv.attributes.code_attributes import (
     CODE_FILE_PATH,
@@ -14,13 +16,14 @@ from opentelemetry.semconv.attributes.db_attributes import (
 )
 from opentelemetry.semconv.attributes.http_attributes import HTTP_REQUEST_METHOD
 from opentelemetry.semconv.attributes.url_attributes import URL_PATH
+from plain.cli import request as request_cli
 from plain.cli._trace import (
     CapturedTrace,
     RawSpan,
     TraceAnalysis,
     analyze_traces,
     capture_available,
-    capture_spans,
+    capture_trace_spans,
 )
 from plain.cli.request import (
     _TRACE_EMPTY,
@@ -30,14 +33,10 @@ from plain.cli.request import (
     _render_traces,
     _trace_note,
 )
+from plain.test import patch
 from plain.test.otel import install_test_tracer
 
 _span_exporter = install_test_tracer()
-
-
-@pytest.fixture
-def _otel_clean() -> None:
-    _span_exporter.clear()
 
 
 def _query_attributes(sql: str) -> dict[str, str | int]:
@@ -56,8 +55,8 @@ def _only_analysis() -> TraceAnalysis:
     return traces[0]["analysis"]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_groups_repeated_statements_with_their_call_site() -> None:
+    _span_exporter.clear()
     # Repeats are reported, not diagnosed: one entry carrying the count and
     # where it ran, for the reader to judge.
     tracer = trace.get_tracer("test")
@@ -78,8 +77,8 @@ def test_groups_repeated_statements_with_their_call_site() -> None:
     assert analysis["queries"][0]["sources"] == ["/app/views.py:10 in index"]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_distinct_statements_stay_separate_entries() -> None:
+    _span_exporter.clear()
     tracer = trace.get_tracer("test")
     with tracer.start_as_current_span("GET /"):
         for sql in ("SELECT * FROM users", "SELECT * FROM teams"):
@@ -96,8 +95,8 @@ def test_distinct_statements_stay_separate_entries() -> None:
     assert [q["count"] for q in analysis["queries"]] == [1, 1]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_each_redirect_hop_is_analyzed_on_its_own() -> None:
+    _span_exporter.clear()
     # --follow redirects produce one trace per hop. A query that runs once per
     # request must stay a 1x query in each hop's analysis rather than merging
     # into a 2x count that reads as a repeat nobody can fix.
@@ -126,8 +125,8 @@ def test_each_redirect_hop_is_analyzed_on_its_own() -> None:
         assert captured["analysis"]["query_count"] == 1
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_query_sources_dedup_distinct_call_sites() -> None:
+    _span_exporter.clear()
     # Each distinct call site is recorded once, as its raw location string —
     # the path is the information, so no classification travels with it.
     tracer = trace.get_tracer("test")
@@ -151,8 +150,8 @@ def test_query_sources_dedup_distinct_call_sites() -> None:
     ]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_transaction_statements_are_counted_apart_from_queries() -> None:
+    _span_exporter.clear()
     # Savepoint names are unique, so they never group and would otherwise fill
     # the query list on their own while telling you nothing to fix.
     tracer = trace.get_tracer("test")
@@ -179,8 +178,8 @@ def test_transaction_statements_are_counted_apart_from_queries() -> None:
     assert [q["sql"] for q in analysis["queries"]] == ["SELECT * FROM users"]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_emits_flat_raw_spans() -> None:
+    _span_exporter.clear()
     tracer = trace.get_tracer("test")
     with (
         tracer.start_as_current_span("GET /"),
@@ -199,8 +198,8 @@ def test_emits_flat_raw_spans() -> None:
     assert by_name["render template"]["parent_span_id"] == by_name["GET /"]["span_id"]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_raw_span_passes_attributes_through_and_drops_stacktrace() -> None:
+    _span_exporter.clear()
     tracer = trace.get_tracer("test")
     with tracer.start_as_current_span(
         "query",
@@ -221,13 +220,13 @@ def test_raw_span_passes_attributes_through_and_drops_stacktrace() -> None:
     assert CODE_STACKTRACE not in attributes
 
 
-@pytest.mark.usefixtures("_otel_clean")
-def test_capture_spans_isolates_other_processors() -> None:
-    # capture_spans() detaches processors an installed package attached —
+def test_capture_trace_spans_isolates_other_processors() -> None:
+    _span_exporter.clear()
+    # capture_trace_spans() detaches processors an installed package attached —
     # here, the test tracer's own exporter — so a captured span reaches
     # only the capture exporter, not the pre-existing one.
     with (
-        capture_spans() as exporter,
+        capture_trace_spans() as exporter,
         trace.get_tracer("test").start_as_current_span("inside"),
     ):
         pass
@@ -236,8 +235,8 @@ def test_capture_spans_isolates_other_processors() -> None:
     assert "inside" not in [s.name for s in _span_exporter.get_finished_spans()]
 
 
-@pytest.mark.usefixtures("_otel_clean")
 def test_captures_exceptions() -> None:
+    _span_exporter.clear()
     tracer = trace.get_tracer("test")
     try:
         with tracer.start_as_current_span("GET /boom"):
@@ -269,90 +268,95 @@ def _raw_span(*, span_id: str, parent: str | None, name: str) -> RawSpan:
     }
 
 
-def test_span_tree_nests_children_under_their_parent(capsys) -> None:
-    _render_span_tree(
-        [
-            _raw_span(span_id="a1", parent=None, name="GET /admin"),
-            _raw_span(span_id="a2", parent="a1", name="render admin.html"),
-            _raw_span(span_id="a3", parent="a2", name="SELECT users"),
-        ]
-    )
+def test_span_tree_nests_children_under_their_parent() -> None:
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        _render_span_tree(
+            [
+                _raw_span(span_id="a1", parent=None, name="GET /admin"),
+                _raw_span(span_id="a2", parent="a1", name="render admin.html"),
+                _raw_span(span_id="a3", parent="a2", name="SELECT users"),
+            ]
+        )
 
     # Parents before children, two spaces deeper per level.
-    assert capsys.readouterr().out.splitlines() == [
+    assert out.getvalue().splitlines() == [
         "        1.00ms  GET /admin  INTERNAL",
         "        1.00ms    render admin.html  INTERNAL",
         "        1.00ms      SELECT users  INTERNAL",
     ]
 
 
-def test_span_tree_keeps_spans_whose_parent_was_not_captured(capsys) -> None:
+def test_span_tree_keeps_spans_whose_parent_was_not_captured() -> None:
     # An uncaptured parent can't be nested under anything, so the orphan
     # becomes a root rather than disappearing from the tree.
-    _render_span_tree(
-        [_raw_span(span_id="child", parent="missing-parent", name="orphaned work")]
-    )
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        _render_span_tree(
+            [_raw_span(span_id="child", parent="missing-parent", name="orphaned work")]
+        )
 
-    assert capsys.readouterr().out.splitlines() == [
-        "        1.00ms  orphaned work  INTERNAL"
-    ]
+    assert out.getvalue().splitlines() == ["        1.00ms  orphaned work  INTERNAL"]
 
 
-def test_span_tree_survives_a_span_that_parents_itself(capsys) -> None:
+def test_span_tree_survives_a_span_that_parents_itself() -> None:
     # Malformed instrumentation must not hang the command or silently drop
     # spans the reported count already promised.
-    _render_span_tree(
-        [
-            _raw_span(span_id="a1", parent=None, name="GET /"),
-            _raw_span(span_id="a2", parent="a2", name="self parented"),
-        ]
-    )
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        _render_span_tree(
+            [
+                _raw_span(span_id="a1", parent=None, name="GET /"),
+                _raw_span(span_id="a2", parent="a2", name="self parented"),
+            ]
+        )
 
-    assert capsys.readouterr().out.splitlines() == [
+    assert out.getvalue().splitlines() == [
         "        1.00ms  GET /  INTERNAL",
         "        1.00ms  self parented  INTERNAL",
     ]
 
 
-def test_span_tree_survives_two_spans_sharing_an_id(capsys) -> None:
+def test_span_tree_survives_two_spans_sharing_an_id() -> None:
     # A duplicate id used to recurse until RecursionError. Both spans are
     # still shown — the count printed above the tree promises them.
-    _render_span_tree(
-        [
-            _raw_span(span_id="x", parent=None, name="root"),
-            _raw_span(span_id="x", parent="x", name="duplicate id"),
-        ]
-    )
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        _render_span_tree(
+            [
+                _raw_span(span_id="x", parent=None, name="root"),
+                _raw_span(span_id="x", parent="x", name="duplicate id"),
+            ]
+        )
 
-    assert capsys.readouterr().out.splitlines() == [
+    assert out.getvalue().splitlines() == [
         "        1.00ms  root  INTERNAL",
         "        1.00ms    duplicate id  INTERNAL",
     ]
 
 
-def test_capture_available_rejects_a_third_party_tracer_provider(monkeypatch) -> None:
-    # capture_spans mutates the provider's sampler and processor list, which
-    # only works on the SDK's own provider (or the proxy it can replace). A
-    # third-party provider must report unavailable rather than be crashed into.
+def test_capture_available_rejects_a_third_party_tracer_provider() -> None:
+    # capture_trace_spans mutates the provider's sampler and processor list,
+    # which only works on the SDK's own provider (or the proxy it can replace).
+    # A third-party provider must report unavailable rather than be crashed
+    # into.
     from opentelemetry.sdk.trace import TracerProvider
 
-    monkeypatch.setattr("plain.cli._trace.trace.get_tracer_provider", lambda: object())
-    assert capture_available() is False
+    with patch(trace, "get_tracer_provider", lambda: object()):
+        assert capture_available() is False
 
-    monkeypatch.setattr(
-        "plain.cli._trace.trace.get_tracer_provider", lambda: TracerProvider()
-    )
-    assert capture_available() is True
+    with patch(trace, "get_tracer_provider", lambda: TracerProvider()):
+        assert capture_available() is True
 
 
-def test_trace_note_states(monkeypatch) -> None:
+def test_trace_note_states() -> None:
     # Each unusable `traces` value gets exactly one truthful note, and a
     # readable trace gets none.
-    monkeypatch.setattr("plain.cli.request.capture_available", lambda: False)
-    assert _trace_note(None) == _TRACE_UNAVAILABLE
+    with patch(request_cli, "capture_available", lambda: False):
+        assert _trace_note(None) == _TRACE_UNAVAILABLE
 
-    monkeypatch.setattr("plain.cli.request.capture_available", lambda: True)
-    assert _trace_note(None) == _TRACE_NOT_REACHED
+    with patch(request_cli, "capture_available", lambda: True):
+        assert _trace_note(None) == _TRACE_NOT_REACHED
 
     assert _trace_note([]) == _TRACE_EMPTY
 
@@ -390,13 +394,11 @@ def _captured_with_queries(queries: list) -> CapturedTrace:
     }
 
 
-def test_display_cap_never_cuts_a_repeated_statement(monkeypatch, capsys) -> None:
+def test_display_cap_never_cuts_a_repeated_statement() -> None:
     # The cap trims the singleton tail only. Ordered slowest-first, a fast but
     # many-times-repeated statement would fall past the cap — the one entry
     # the reader most needs — so it is always kept and only singletons count
     # toward "+ N more".
-    monkeypatch.setattr("plain.cli.request._QUERY_LIST_LIMIT", 2)
-
     queries = [
         {
             "sql": "SELECT singleton_1",
@@ -424,9 +426,14 @@ def test_display_cap_never_cuts_a_repeated_statement(monkeypatch, capsys) -> Non
         },
     ]
 
-    _render_traces([_captured_with_queries(queries)], detailed=False)
+    out = io.StringIO()
+    with (
+        patch(request_cli, "_QUERY_LIST_LIMIT", 2),
+        contextlib.redirect_stdout(out),
+    ):
+        _render_traces([_captured_with_queries(queries)], detailed=False)
 
-    output = capsys.readouterr().out
+    output = out.getvalue()
     # The fast repeated statement survives the cap despite ranking last.
     assert "repeated_marker" in output
     # Only the one cut singleton is counted — not the kept repeat.

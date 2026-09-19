@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Generator
+from contextlib import contextmanager
 
 import psycopg
 import psycopg.errors
-import pytest
 from app.examples.models.indexes import IndexExample
 from app.examples.models.relationships import Widget
 from plain.postgres import Index, Q, get_connection
@@ -43,7 +44,8 @@ from plain.postgres.convergence.corrections import (
 )
 from plain.postgres.dialect import build_timeout_set_clauses
 from plain.postgres.sources import build_connection_params
-from plain.runtime import settings as plain_settings
+from plain.postgres.test import isolated_db
+from plain.test import override_settings, patch, raises
 
 # ---- Prelude builder ------------------------------------------------------
 
@@ -75,15 +77,15 @@ def test_build_timeout_set_clauses_rejects_malformed_values():
     produce malformed SQL at runtime (e.g. a stray single-quote escaping
     the string literal). Unitless integers are also rejected so `"1"` can't
     silently become 1ms."""
-    with pytest.raises(ValueError, match="Invalid Postgres interval"):
+    with raises(ValueError, match="Invalid Postgres interval"):
         build_timeout_set_clauses(
             lock_timeout="3s'; DROP TABLE users --", statement_timeout=None
         )
-    with pytest.raises(ValueError, match="Invalid Postgres interval"):
+    with raises(ValueError, match="Invalid Postgres interval"):
         build_timeout_set_clauses(lock_timeout="3s", statement_timeout="not a duration")
-    with pytest.raises(ValueError, match="Invalid Postgres interval"):
+    with raises(ValueError, match="Invalid Postgres interval"):
         build_timeout_set_clauses(lock_timeout="", statement_timeout=None)
-    with pytest.raises(ValueError, match="Invalid Postgres interval"):
+    with raises(ValueError, match="Invalid Postgres interval"):
         # Bare integer: Postgres would interpret as ms — but a typo shouldn't
         # silently mean "1 millisecond".
         build_timeout_set_clauses(lock_timeout="100", statement_timeout=None)
@@ -99,10 +101,12 @@ def test_build_timeout_set_clauses_accepts_valid_intervals():
     build_timeout_set_clauses(lock_timeout="3S", statement_timeout="500MS")
 
 
-def test_prelude_values_propagate_from_settings(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(plain_settings, "POSTGRES_CONVERGENCE_LOCK_TIMEOUT", "250ms")
-    monkeypatch.setattr(plain_settings, "POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT", "7s")
-    prelude = _convergence_prelude(blocking=True, local=True)
+def test_prelude_values_propagate_from_settings():
+    with override_settings(
+        POSTGRES_CONVERGENCE_LOCK_TIMEOUT="250ms",
+        POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT="7s",
+    ):
+        prelude = _convergence_prelude(blocking=True, local=True)
     assert "lock_timeout = '250ms'" in prelude
     assert "statement_timeout = '7s'" in prelude
 
@@ -124,165 +128,179 @@ class _Spy:
         self.autocommit_calls.append(sql)
 
 
-@pytest.fixture
-def spy(monkeypatch: pytest.MonkeyPatch) -> _Spy:
+@contextmanager
+def spy_fixes() -> Generator[_Spy]:
     s = _Spy()
-    monkeypatch.setattr(corrections, "_execute_and_commit", s.execute_and_commit)
-    monkeypatch.setattr(corrections, "_execute_autocommit", s.execute_autocommit)
-    return s
+    with (
+        patch(corrections, "_execute_and_commit", s.execute_and_commit),
+        patch(corrections, "_execute_autocommit", s.execute_autocommit),
+    ):
+        yield s
 
 
-def test_rebuild_index_fix_uses_autocommit_only(spy: _Spy):
-    correction = RebuildIndexCorrection(
-        table="examples_indexexample",
-        index=Index(fields=["name"], name="tmp_idx"),
-        model=IndexExample,
-    )
-    correction.apply()
-    assert spy.commit_calls == []
-    assert len(spy.autocommit_calls) == 2  # DROP + CREATE
+def test_rebuild_index_fix_uses_autocommit_only():
+    with spy_fixes() as spy:
+        correction = RebuildIndexCorrection(
+            table="examples_indexexample",
+            index=Index(fields=["name"], name="tmp_idx"),
+            model=IndexExample,
+        )
+        correction.apply()
+        assert spy.commit_calls == []
+        assert len(spy.autocommit_calls) == 2  # DROP + CREATE
 
 
-def test_create_index_fix_uses_autocommit(spy: _Spy):
-    correction = CreateIndexCorrection(
-        table="examples_indexexample",
-        index=Index(fields=["name"], name="tmp_idx"),
-        model=IndexExample,
-    )
-    correction.apply()
-    assert spy.commit_calls == []
-    assert len(spy.autocommit_calls) == 1
+def test_create_index_fix_uses_autocommit():
+    with spy_fixes() as spy:
+        correction = CreateIndexCorrection(
+            table="examples_indexexample",
+            index=Index(fields=["name"], name="tmp_idx"),
+            model=IndexExample,
+        )
+        correction.apply()
+        assert spy.commit_calls == []
+        assert len(spy.autocommit_calls) == 1
 
 
-def test_rename_index_fix_is_blocking(spy: _Spy):
-    RenameIndexCorrection(table="t", old_name="old_idx", new_name="new_idx").apply()
-    assert len(spy.commit_calls) == 1
-    assert spy.commit_calls[0][1] is True
+def test_rename_index_fix_is_blocking():
+    with spy_fixes() as spy:
+        RenameIndexCorrection(table="t", old_name="old_idx", new_name="new_idx").apply()
+        assert len(spy.commit_calls) == 1
+        assert spy.commit_calls[0][1] is True
 
 
-def test_add_constraint_unique_mixes_autocommit_and_blocking_commit(spy: _Spy):
+def test_add_constraint_unique_mixes_autocommit_and_blocking_commit():
     """Unique constraint: CONCURRENTLY index then blocking ADD CONSTRAINT USING INDEX."""
-    uc = UniqueConstraint(fields=["name", "size"], name="unique_widget_name_size")
-    correction = AddConstraintCorrection(
-        table="examples_widget", constraint=uc, model=Widget
-    )
-    correction.apply()
-    # 1 autocommit (CREATE UNIQUE INDEX CONCURRENTLY)
-    assert len(spy.autocommit_calls) == 1
-    # 1 blocking commit (ALTER TABLE ... ADD CONSTRAINT ... USING INDEX)
-    assert len(spy.commit_calls) == 1
-    assert spy.commit_calls[0][1] is True
+    with spy_fixes() as spy:
+        uc = UniqueConstraint(fields=["name", "size"], name="unique_widget_name_size")
+        correction = AddConstraintCorrection(
+            table="examples_widget", constraint=uc, model=Widget
+        )
+        correction.apply()
+        # 1 autocommit (CREATE UNIQUE INDEX CONCURRENTLY)
+        assert len(spy.autocommit_calls) == 1
+        # 1 blocking commit (ALTER TABLE ... ADD CONSTRAINT ... USING INDEX)
+        assert len(spy.commit_calls) == 1
+        assert spy.commit_calls[0][1] is True
 
 
-def test_add_constraint_check_blocking_add_then_nonblocking_validate(spy: _Spy):
-    cc = CheckConstraint(check=Q(id__gte=0), name="check_widget_id")
-    correction = AddConstraintCorrection(
-        table="examples_widget", constraint=cc, model=Widget
-    )
-    correction.apply()
-    assert spy.autocommit_calls == []
-    assert len(spy.commit_calls) == 2
-    # Step 1: ADD CONSTRAINT ... NOT VALID — blocking
-    assert spy.commit_calls[0][1] is True
-    # Step 2: VALIDATE CONSTRAINT — non-blocking
-    assert spy.commit_calls[1][1] is False
+def test_add_constraint_check_blocking_add_then_nonblocking_validate():
+    with spy_fixes() as spy:
+        cc = CheckConstraint(check=Q(id__gte=0), name="check_widget_id")
+        correction = AddConstraintCorrection(
+            table="examples_widget", constraint=cc, model=Widget
+        )
+        correction.apply()
+        assert spy.autocommit_calls == []
+        assert len(spy.commit_calls) == 2
+        # Step 1: ADD CONSTRAINT ... NOT VALID — blocking
+        assert spy.commit_calls[0][1] is True
+        # Step 2: VALIDATE CONSTRAINT — non-blocking
+        assert spy.commit_calls[1][1] is False
 
 
-def test_add_foreign_key_fix_blocking_add_then_nonblocking_validate(spy: _Spy):
-    correction = AddForeignKeyCorrection(
-        table="examples_widgettag",
-        constraint_name="fk_x",
-        column="widget_id",
-        target_table="examples_widget",
-        target_column="id",
-        on_delete_clause=" ON DELETE CASCADE",
-    )
-    correction.apply()
-    assert len(spy.commit_calls) == 2
-    # Step 1: ADD CONSTRAINT ... NOT VALID — blocking
-    assert spy.commit_calls[0][1] is True
-    # Step 2: VALIDATE CONSTRAINT — non-blocking
-    assert spy.commit_calls[1][1] is False
+def test_add_foreign_key_fix_blocking_add_then_nonblocking_validate():
+    with spy_fixes() as spy:
+        correction = AddForeignKeyCorrection(
+            table="examples_widgettag",
+            constraint_name="fk_x",
+            column="widget_id",
+            target_table="examples_widget",
+            target_column="id",
+            on_delete_clause=" ON DELETE CASCADE",
+        )
+        correction.apply()
+        assert len(spy.commit_calls) == 2
+        # Step 1: ADD CONSTRAINT ... NOT VALID — blocking
+        assert spy.commit_calls[0][1] is True
+        # Step 2: VALIDATE CONSTRAINT — non-blocking
+        assert spy.commit_calls[1][1] is False
 
 
-def test_replace_foreign_key_fix_blocking_replace_then_nonblocking_validate(
-    spy: _Spy,
-):
-    correction = ReplaceForeignKeyCorrection(
-        table="examples_widgettag",
-        constraint_name="fk_x",
-        column="widget_id",
-        target_table="examples_widget",
-        target_column="id",
-        on_delete_clause=" ON DELETE SET NULL",
-    )
-    correction.apply()
-    assert len(spy.commit_calls) == 2
-    assert spy.commit_calls[0][1] is True  # DROP+ADD
-    assert spy.commit_calls[1][1] is False  # VALIDATE
+def test_replace_foreign_key_fix_blocking_replace_then_nonblocking_validate():
+    with spy_fixes() as spy:
+        correction = ReplaceForeignKeyCorrection(
+            table="examples_widgettag",
+            constraint_name="fk_x",
+            column="widget_id",
+            target_table="examples_widget",
+            target_column="id",
+            on_delete_clause=" ON DELETE SET NULL",
+        )
+        correction.apply()
+        assert len(spy.commit_calls) == 2
+        assert spy.commit_calls[0][1] is True  # DROP+ADD
+        assert spy.commit_calls[1][1] is False  # VALIDATE
 
 
-def test_set_not_null_fix_tier_sequence(spy: _Spy):
+def test_set_not_null_fix_tier_sequence():
     """SetNotNullCorrection: cleanup(ddl), ADD CHECK(ddl), VALIDATE(nonblocking),
     SET NOT NULL + DROP CONSTRAINT (ddl, list[str])."""
-    correction = SetNotNullCorrection(table="examples_widget", column="name")
-    correction.apply()
-    assert len(spy.commit_calls) == 4
-    assert spy.commit_calls[0][1] is True  # cleanup DROP CONSTRAINT IF EXISTS
-    assert spy.commit_calls[1][1] is True  # ADD CHECK NOT VALID
-    assert spy.commit_calls[2][1] is False  # VALIDATE CONSTRAINT
-    # Step 4: combined SET NOT NULL + DROP temp check as a list
-    combined_sql, blocking = spy.commit_calls[3]
-    assert isinstance(combined_sql, list)
-    assert len(combined_sql) == 2
-    assert blocking is True
+    with spy_fixes() as spy:
+        correction = SetNotNullCorrection(table="examples_widget", column="name")
+        correction.apply()
+        assert len(spy.commit_calls) == 4
+        assert spy.commit_calls[0][1] is True  # cleanup DROP CONSTRAINT IF EXISTS
+        assert spy.commit_calls[1][1] is True  # ADD CHECK NOT VALID
+        assert spy.commit_calls[2][1] is False  # VALIDATE CONSTRAINT
+        # Step 4: combined SET NOT NULL + DROP temp check as a list
+        combined_sql, blocking = spy.commit_calls[3]
+        assert isinstance(combined_sql, list)
+        assert len(combined_sql) == 2
+        assert blocking is True
 
 
-def test_drop_not_null_fix_blocking(spy: _Spy):
-    DropNotNullCorrection(table="t", column="c").apply()
-    assert len(spy.commit_calls) == 1
-    assert spy.commit_calls[0][1] is True
+def test_drop_not_null_fix_blocking():
+    with spy_fixes() as spy:
+        DropNotNullCorrection(table="t", column="c").apply()
+        assert len(spy.commit_calls) == 1
+        assert spy.commit_calls[0][1] is True
 
 
-def test_set_column_default_fix_blocking(spy: _Spy):
-    SetColumnDefaultCorrection(table="t", column="c", default_sql="'x'").apply()
-    assert len(spy.commit_calls) == 1
-    assert spy.commit_calls[0][1] is True
+def test_set_column_default_fix_blocking():
+    with spy_fixes() as spy:
+        SetColumnDefaultCorrection(table="t", column="c", default_sql="'x'").apply()
+        assert len(spy.commit_calls) == 1
+        assert spy.commit_calls[0][1] is True
 
 
-def test_drop_column_default_fix_blocking(spy: _Spy):
-    DropColumnDefaultCorrection(table="t", column="c").apply()
-    assert len(spy.commit_calls) == 1
-    assert spy.commit_calls[0][1] is True
+def test_drop_column_default_fix_blocking():
+    with spy_fixes() as spy:
+        DropColumnDefaultCorrection(table="t", column="c").apply()
+        assert len(spy.commit_calls) == 1
+        assert spy.commit_calls[0][1] is True
 
 
-def test_rename_constraint_fix_blocking(spy: _Spy):
-    RenameConstraintCorrection(table="t", old_name="a", new_name="b").apply()
-    assert len(spy.commit_calls) == 1
-    assert spy.commit_calls[0][1] is True
+def test_rename_constraint_fix_blocking():
+    with spy_fixes() as spy:
+        RenameConstraintCorrection(table="t", old_name="a", new_name="b").apply()
+        assert len(spy.commit_calls) == 1
+        assert spy.commit_calls[0][1] is True
 
 
-def test_validate_constraint_fix_nonblocking(spy: _Spy):
-    ValidateConstraintCorrection(table="t", name="c").apply()
-    assert len(spy.commit_calls) == 1
-    assert spy.commit_calls[0][1] is False
+def test_validate_constraint_fix_nonblocking():
+    with spy_fixes() as spy:
+        ValidateConstraintCorrection(table="t", name="c").apply()
+        assert len(spy.commit_calls) == 1
+        assert spy.commit_calls[0][1] is False
 
 
-def test_drop_constraint_fix_blocking(spy: _Spy):
-    DropConstraintCorrection(table="t", name="c").apply()
-    assert len(spy.commit_calls) == 1
-    assert spy.commit_calls[0][1] is True
+def test_drop_constraint_fix_blocking():
+    with spy_fixes() as spy:
+        DropConstraintCorrection(table="t", name="c").apply()
+        assert len(spy.commit_calls) == 1
+        assert spy.commit_calls[0][1] is True
 
 
-def test_drop_index_fix_uses_autocommit(spy: _Spy):
-    DropIndexCorrection(table="t", name="idx_x").apply()
-    assert spy.commit_calls == []
-    assert len(spy.autocommit_calls) == 1
+def test_drop_index_fix_uses_autocommit():
+    with spy_fixes() as spy:
+        DropIndexCorrection(table="t", name="idx_x").apply()
+        assert spy.commit_calls == []
+        assert len(spy.autocommit_calls) == 1
 
 
-def test_autocommit_path_validates_malformed_setting(
-    isolated_db, monkeypatch: pytest.MonkeyPatch
-):
+@isolated_db
+def test_autocommit_path_validates_malformed_setting():
     """The CONCURRENTLY path must reject a malformed lock_timeout setting
     at validation time — not silently embed it in the SQL where it would
     either malform the statement or (with a stray quote) escape the literal.
@@ -291,22 +309,20 @@ def test_autocommit_path_validates_malformed_setting(
     the wrapping atomic block of the standard `db` fixture."""
     from plain.postgres.convergence.corrections import _execute_autocommit
 
-    monkeypatch.setattr(
-        plain_settings,
-        "POSTGRES_CONVERGENCE_LOCK_TIMEOUT",
-        "3s'; DROP TABLE users --",
-    )
-    with pytest.raises(ValueError, match="Invalid Postgres interval"):
+    with (
+        override_settings(
+            POSTGRES_CONVERGENCE_LOCK_TIMEOUT="3s'; DROP TABLE users --",
+        ),
+        raises(ValueError, match="Invalid Postgres interval"),
+    ):
         _execute_autocommit("SELECT 1")
 
 
 # ---- Real-PG integration: lock_timeout fires ------------------------------
 
 
-def test_convergence_fix_hits_lock_timeout(
-    isolated_db,
-    monkeypatch: pytest.MonkeyPatch,
-):
+@isolated_db
+def test_convergence_fix_hits_lock_timeout():
     """With a tiny lock_timeout, a convergence correction on a table held under
     ACCESS EXCLUSIVE by another connection raises LockNotAvailable fast —
     not an unbounded wait.
@@ -314,8 +330,6 @@ def test_convergence_fix_hits_lock_timeout(
     Uses `isolated_db` (fresh DB, no wrapping atomic block) because
     `_execute_and_commit` runs a real `COMMIT`, which `db` forbids.
     """
-    monkeypatch.setattr(plain_settings, "POSTGRES_CONVERGENCE_LOCK_TIMEOUT", "100ms")
-
     conn_params = build_connection_params(get_connection().settings_dict)
     release_lock = threading.Event()
     holder_ready = threading.Event()
@@ -343,7 +357,10 @@ def test_convergence_fix_hits_lock_timeout(
 
     try:
         start = time.perf_counter()
-        with pytest.raises(psycopg.errors.LockNotAvailable):
+        with (
+            override_settings(POSTGRES_CONVERGENCE_LOCK_TIMEOUT="100ms"),
+            raises(psycopg.errors.LockNotAvailable),
+        ):
             # SetColumnDefaultCorrection takes ACCESS EXCLUSIVE on the table —
             # conflicts with the held lock, must time out via lock_timeout.
             SetColumnDefaultCorrection(

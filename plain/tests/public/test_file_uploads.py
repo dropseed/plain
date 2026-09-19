@@ -5,7 +5,7 @@ import random
 from io import BytesIO
 
 from plain.runtime import settings
-from plain.test import Client
+from plain.test import Client, override_settings
 
 BOUNDARY = "TeStBoUnDaRy"
 MULTIPART_CONTENT_TYPE = f"multipart/form-data; boundary={BOUNDARY}"
@@ -32,7 +32,7 @@ class UploadPayload(BytesIO):
 def _upload(size: int):
     client = Client()
     return client.post(
-        "/upload", data={"upload": UploadPayload("upload.bin", b"x" * size)}
+        "/upload", files={"upload": UploadPayload("upload.bin", b"x" * size)}
     )
 
 
@@ -40,7 +40,7 @@ def _post_raw_multipart(body: bytes):
     """POST a hand-built multipart body the test client's encoder can't express."""
     client = Client()
     return client.post(
-        "/multipart-echo", data=body, content_type=MULTIPART_CONTENT_TYPE
+        "/multipart-echo", body=body, content_type=MULTIPART_CONTENT_TYPE
     )
 
 
@@ -74,7 +74,7 @@ def test_body_over_data_upload_limit_is_413():
     client = Client()
     body = b"x" * (settings.DATA_UPLOAD_MAX_MEMORY_SIZE + 1)
 
-    response = client.post("/echo-body", data=body, content_type="text/plain")
+    response = client.post("/echo-body", body=body, content_type="text/plain")
 
     assert response.status_code == 413
 
@@ -84,14 +84,14 @@ def test_multiple_files_under_distinct_field_names():
 
     response = client.post(
         "/multipart-echo",
-        data={
+        files={
             "first": UploadPayload("one.txt", b"AAA"),
             "second": UploadPayload("two.txt", b"BBBB"),
         },
     )
 
     assert response.status_code == 200
-    files = response.json()["files"]
+    files = response.json_data["files"]
     assert [(f["field_name"], f["name"], f["size"]) for f in files] == [
         ("first", "one.txt", 3),
         ("second", "two.txt", 4),
@@ -104,7 +104,7 @@ def test_multiple_files_under_one_field_name():
 
     response = client.post(
         "/multipart-echo",
-        data={
+        files={
             "attachment": [
                 UploadPayload("one.txt", b"AAA"),
                 UploadPayload("two.txt", b"BBBB"),
@@ -113,7 +113,7 @@ def test_multiple_files_under_one_field_name():
     )
 
     assert response.status_code == 200
-    files = response.json()["files"]
+    files = response.json_data["files"]
     assert [(f["field_name"], f["name"]) for f in files] == [
         ("attachment", "one.txt"),
         ("attachment", "two.txt"),
@@ -126,15 +126,12 @@ def test_files_and_form_fields_in_one_request():
 
     response = client.post(
         "/multipart-echo",
-        data={
-            "title": "Some title",
-            "tags": ["a", "b"],
-            "document": UploadPayload("doc.txt", b"contents"),
-        },
+        form_data={"title": "Some title", "tags": ["a", "b"]},
+        files={"document": UploadPayload("doc.txt", b"contents")},
     )
 
     assert response.status_code == 200
-    body = response.json()
+    body = response.json_data
     assert body["form_data"] == {"title": ["Some title"], "tags": ["a", "b"]}
     assert [(f["field_name"], f["name"]) for f in body["files"]] == [
         ("document", "doc.txt")
@@ -153,11 +150,11 @@ def test_large_file_content_round_trips_byte_for_byte():
     client = Client()
 
     response = client.post(
-        "/multipart-echo", data={"blob": UploadPayload("blob.bin", content)}
+        "/multipart-echo", files={"blob": UploadPayload("blob.bin", content)}
     )
 
     assert response.status_code == 200
-    (uploaded,) = response.json()["files"]
+    (uploaded,) = response.json_data["files"]
     assert uploaded["handler"] == "TemporaryUploadedFile"
     assert uploaded["size"] == size
     assert uploaded["sha256"] == hashlib.sha256(content).hexdigest()
@@ -169,11 +166,11 @@ def test_binary_content_with_crlf_round_trips_byte_for_byte():
     client = Client()
 
     response = client.post(
-        "/multipart-echo", data={"blob": UploadPayload("blob.bin", content)}
+        "/multipart-echo", files={"blob": UploadPayload("blob.bin", content)}
     )
 
     assert response.status_code == 200
-    (uploaded,) = response.json()["files"]
+    (uploaded,) = response.json_data["files"]
     assert uploaded["size"] == len(content)
     assert uploaded["sha256"] == hashlib.sha256(content).hexdigest()
 
@@ -182,11 +179,11 @@ def test_unicode_filename_is_preserved():
     client = Client()
 
     response = client.post(
-        "/multipart-echo", data={"doc": UploadPayload("héllo-世界.txt", b"hi")}
+        "/multipart-echo", files={"doc": UploadPayload("héllo-世界.txt", b"hi")}
     )
 
     assert response.status_code == 200
-    (uploaded,) = response.json()["files"]
+    (uploaded,) = response.json_data["files"]
     assert uploaded["name"] == "héllo-世界.txt"
 
 
@@ -195,11 +192,11 @@ def test_per_part_content_type_is_surfaced():
 
     response = client.post(
         "/multipart-echo",
-        data={"doc": UploadPayload("rows.csv", b"a,b", content_type="text/csv")},
+        files={"doc": UploadPayload("rows.csv", b"a,b", content_type="text/csv")},
     )
 
     assert response.status_code == 200
-    (uploaded,) = response.json()["files"]
+    (uploaded,) = response.json_data["files"]
     assert uploaded["content_type"] == "text/csv"
 
 
@@ -214,7 +211,7 @@ def test_per_part_charset_is_surfaced_as_bytes():
 
     response = client.post(
         "/multipart-echo",
-        data={
+        files={
             "doc": UploadPayload(
                 "rows.csv", b"a,b", content_type="text/csv; charset=utf-16"
             )
@@ -222,7 +219,7 @@ def test_per_part_charset_is_surfaced_as_bytes():
     )
 
     assert response.status_code == 200
-    (uploaded,) = response.json()["files"]
+    (uploaded,) = response.json_data["files"]
     assert uploaded["content_type"] == "text/csv"
     assert uploaded["charset_repr"] == "b'utf-16'"
 
@@ -246,7 +243,7 @@ def test_file_part_with_empty_filename_becomes_a_form_field():
     response = _post_raw_multipart(body)
 
     assert response.status_code == 200
-    assert response.json() == {"form_data": {"doc": [""]}, "files": []}
+    assert response.json_data == {"form_data": {"doc": [""]}, "files": []}
 
 
 def test_filename_of_only_path_separators_drops_the_part():
@@ -266,7 +263,7 @@ def test_filename_of_only_path_separators_drops_the_part():
     response = _post_raw_multipart(body)
 
     assert response.status_code == 200
-    assert response.json() == {"form_data": {}, "files": []}
+    assert response.json_data == {"form_data": {}, "files": []}
 
 
 def test_filename_directory_components_are_stripped():
@@ -282,82 +279,70 @@ def test_filename_directory_components_are_stripped():
     response = _post_raw_multipart(body)
 
     assert response.status_code == 200
-    (uploaded,) = response.json()["files"]
+    (uploaded,) = response.json_data["files"]
     assert uploaded["name"] == "passwd"
 
 
-def test_too_many_fields_is_400(monkeypatch):
-    monkeypatch.setattr(settings, "DATA_UPLOAD_MAX_NUMBER_FIELDS", 2)
-    client = Client()
-
-    response = client.post(
-        "/multipart-echo", data={f"field{i}": "value" for i in range(10)}
-    )
+def test_too_many_fields_is_400():
+    with override_settings(DATA_UPLOAD_MAX_NUMBER_FIELDS=2):
+        response = Client().post(
+            "/multipart-echo", form_data={f"field{i}": "value" for i in range(10)}
+        )
 
     assert response.status_code == 400
 
 
-def test_field_count_at_the_limit_is_allowed(monkeypatch):
-    monkeypatch.setattr(settings, "DATA_UPLOAD_MAX_NUMBER_FIELDS", 2)
-    client = Client()
-
-    response = client.post("/multipart-echo", data={"a": "1", "b": "2"})
+def test_field_count_at_the_limit_is_allowed():
+    with override_settings(DATA_UPLOAD_MAX_NUMBER_FIELDS=2):
+        response = Client().post("/multipart-echo", form_data={"a": "1", "b": "2"})
 
     assert response.status_code == 200
-    assert response.json()["form_data"] == {"a": ["1"], "b": ["2"]}
+    assert response.json_data["form_data"] == {"a": ["1"], "b": ["2"]}
 
 
-def test_too_many_files_is_400(monkeypatch):
-    monkeypatch.setattr(settings, "DATA_UPLOAD_MAX_NUMBER_FILES", 1)
-    client = Client()
-
-    response = client.post(
-        "/multipart-echo",
-        data={
-            "attachment": [
-                UploadPayload("one.txt", b"AAA"),
-                UploadPayload("two.txt", b"BBB"),
-            ]
-        },
-    )
+def test_too_many_files_is_400():
+    with override_settings(DATA_UPLOAD_MAX_NUMBER_FILES=1):
+        response = Client().post(
+            "/multipart-echo",
+            files={
+                "attachment": [
+                    UploadPayload("one.txt", b"AAA"),
+                    UploadPayload("two.txt", b"BBB"),
+                ]
+            },
+        )
 
     assert response.status_code == 400
 
 
-def test_file_count_at_the_limit_is_allowed(monkeypatch):
-    monkeypatch.setattr(settings, "DATA_UPLOAD_MAX_NUMBER_FILES", 1)
-    client = Client()
-
-    response = client.post(
-        "/multipart-echo", data={"attachment": UploadPayload("one.txt", b"AAA")}
-    )
+def test_file_count_at_the_limit_is_allowed():
+    with override_settings(DATA_UPLOAD_MAX_NUMBER_FILES=1):
+        response = Client().post(
+            "/multipart-echo", files={"attachment": UploadPayload("one.txt", b"AAA")}
+        )
 
     assert response.status_code == 200
-    assert len(response.json()["files"]) == 1
+    assert len(response.json_data["files"]) == 1
 
 
-def test_form_field_over_data_upload_max_memory_size_is_413(monkeypatch):
+def test_form_field_over_data_upload_max_memory_size_is_413():
     """Non-file field data is capped by DATA_UPLOAD_MAX_MEMORY_SIZE.
 
     Files are exempt — they stream to disk — so the same request with the
     payload in a file part succeeds (see the companion test below).
     """
-    monkeypatch.setattr(settings, "DATA_UPLOAD_MAX_MEMORY_SIZE", 100)
-    client = Client()
-
-    response = client.post("/multipart-echo", data={"note": "x" * 500})
+    with override_settings(DATA_UPLOAD_MAX_MEMORY_SIZE=100):
+        response = Client().post("/multipart-echo", form_data={"note": "x" * 500})
 
     assert response.status_code == 413
 
 
-def test_file_part_is_not_capped_by_data_upload_max_memory_size(monkeypatch):
-    monkeypatch.setattr(settings, "DATA_UPLOAD_MAX_MEMORY_SIZE", 100)
-    client = Client()
-
-    response = client.post(
-        "/multipart-echo", data={"doc": UploadPayload("big.txt", b"x" * 500)}
-    )
+def test_file_part_is_not_capped_by_data_upload_max_memory_size():
+    with override_settings(DATA_UPLOAD_MAX_MEMORY_SIZE=100):
+        response = Client().post(
+            "/multipart-echo", files={"doc": UploadPayload("big.txt", b"x" * 500)}
+        )
 
     assert response.status_code == 200
-    (uploaded,) = response.json()["files"]
+    (uploaded,) = response.json_data["files"]
     assert uploaded["size"] == 500

@@ -1,6 +1,7 @@
+from plain.auth.requests import get_request_user
 from plain.oauth.providers import OAuthToken, OAuthUser
-from plain.test import Client
-from tests.providers.github import GitHubOAuthProvider
+from plain.test import Client, override_settings
+from providers.github import GitHubOAuthProvider
 
 
 class DummyGitHubOAuthProvider(GitHubOAuthProvider):
@@ -20,51 +21,59 @@ class DummyGitHubOAuthProvider(GitHubOAuthProvider):
         )
 
 
-def test_github_provider(db, settings):
-    settings.OAUTH_LOGIN_PROVIDERS = {
-        "github": {
-            "class": "provider_tests.test_github.DummyGitHubOAuthProvider",
-            "kwargs": {
-                "client_id": "test_id",
-                "client_secret": "test_secret",
-                "scope": "user",
-            },
+def test_github_provider():
+    with override_settings(
+        OAUTH_LOGIN_PROVIDERS={
+            "github": {
+                "class": f"{__name__}.DummyGitHubOAuthProvider",
+                "kwargs": {
+                    "client_id": "test_id",
+                    "client_secret": "test_secret",
+                    "scope": "user",
+                },
+            }
         }
-    }
+    ):
+        client = Client()
 
-    client = Client()
+        # Login required for this view
+        response = client.get("/")
+        assert response.status_code == 302
+        assert response.url == "/login?next=/"
 
-    # Login required for this view
-    response = client.get("/")
-    assert response.status_code == 302
-    assert response.url == "/login?next=/"
+        # User clicks the login link (form submit)
+        response = client.post("/oauth/github/login")
+        assert response.status_code == 302
+        assert (
+            response.url
+            == "https://github.com/login/oauth/authorize?client_id=test_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fgithub%2Fcallback&response_type=code&scope=user&state=dummy_state"
+        )
 
-    # User clicks the login link (form submit)
-    response = client.post("/oauth/github/login")
-    assert response.status_code == 302
-    assert (
-        response.url
-        == "https://github.com/login/oauth/authorize?client_id=test_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fgithub%2Fcallback&response_type=code&scope=user&state=dummy_state"
-    )
+        # GitHub redirects to the callback url
+        response = client.get("/oauth/github/callback?code=test_code&state=dummy_state")
+        assert response.status_code == 302
+        assert response.url == "/"
 
-    # GitHub redirects to the callback url
-    response = client.get("/oauth/github/callback?code=test_code&state=dummy_state")
-    assert response.status_code == 302
-    assert response.url == "/"
+        # Now logged in
+        response = client.get("/")
+        assert response.status_code == 200
+        assert b"Hello userone!\n" in response.content
 
-    # Now logged in
-    response = client.get("/")
-    assert response.status_code == 200
-    assert b"Hello userone!\n" in response.content
-
-    # Check the user and connection that was created
-    user = response.user
-    assert user.username == "userone"
-    assert user.email == "user@example.com"
-    connections = user.oauth_connections.query.all()
-    assert len(connections) == 1
-    assert connections[0].provider_key == "github"
-    assert connections[0].provider_user_id == "99"
-    assert connections[0].access_token == "gho_key"
-    assert connections[0].refresh_token == ""
-    assert connections[0].access_token_expires_at is None
+        # Check the user and connection that was created
+        user = get_request_user(response.request)
+        assert user is not None
+        # `get_request_user` is annotated with `app.users.models.User`, and
+        # `app` is a single flat module name that every test app and the
+        # example app claim. Type-checking the workspace resolves it to the
+        # example app's model, which has neither `username` nor this
+        # package's `oauth_connections` accessor — so the reads below are
+        # correct at runtime and unresolvable at type time.
+        assert user.username == "userone"  # ty: ignore[unresolved-attribute]
+        assert user.email == "user@example.com"
+        connections = user.oauth_connections.query.all()  # ty: ignore[unresolved-attribute]
+        assert len(connections) == 1
+        assert connections[0].provider_key == "github"
+        assert connections[0].provider_user_id == "99"
+        assert connections[0].access_token == "gho_key"
+        assert connections[0].refresh_token == ""
+        assert connections[0].access_token_expires_at is None

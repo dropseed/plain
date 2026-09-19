@@ -18,7 +18,13 @@ requires-python = ">=3.13"
 plain = "plain.cli.core:cli"
 
 [dependency-groups]
-dev = ["pytest>=8.0.0", "opentelemetry-sdk>=1.34.1"]
+dev = [
+  "plain.testing<1.0.0",
+  # The tests' app settings require values from `.env.test` — plain.dev's
+  # `plain.setup` entrypoint loads it before the CLI dispatches `plain test`.
+  "plain.dev<1.0.0",
+  "opentelemetry-sdk>=1.34.1",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

@@ -15,7 +15,7 @@ from plain.utils import timezone
 SESSION_COOKIE = settings.SESSION_COOKIE_NAME
 
 
-def test_data_persists_across_requests(db):
+def test_data_persists_across_requests():
     client = Client()
 
     client.get("/set?value=hello")
@@ -25,7 +25,7 @@ def test_data_persists_across_requests(db):
     assert response.content == b"hello"
 
 
-def test_separate_clients_have_separate_sessions(db):
+def test_separate_clients_have_separate_sessions():
     first = Client()
     second = Client()
 
@@ -36,7 +36,7 @@ def test_separate_clients_have_separate_sessions(db):
     assert first.get("/get").content == b"one"
 
 
-def test_session_cookie_is_reused(db):
+def test_session_cookie_is_reused():
     client = Client()
 
     client.get("/set?value=x")
@@ -50,7 +50,7 @@ def test_session_cookie_is_reused(db):
     assert Session.query.filter(session_key=key_after_set).exists()
 
 
-def test_expired_session_is_not_loaded(db):
+def test_expired_session_is_not_loaded():
     client = Client()
     client.get("/set?value=stale")
 
@@ -60,7 +60,7 @@ def test_expired_session_is_not_loaded(db):
     assert client.get("/get").content == b"<none>"
 
 
-def test_flush_clears_data_and_deletes_row(db):
+def test_flush_clears_data_and_deletes_row():
     client = Client()
     client.get("/set?value=temp")
     assert Session.query.count() == 1

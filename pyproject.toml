@@ -31,11 +31,11 @@ dev = [
   "plain-oauthserver",
   "plain-pages",
   "plain-passwords",
-  "plain-pytest",
   "plain-scan",
   "plain-sessions",
   "plain-tailwind",
   "plain-templates",
+  "plain-testing",
   "plain-toolbar",
   "plain-tunnel",
   "plain-vendor",
@@ -78,11 +78,11 @@ package = false
 "plain-oauthserver" = { workspace = true }
 "plain-pages" = { workspace = true }
 "plain-passwords" = { workspace = true }
-"plain-pytest" = { workspace = true }
 "plain-scan" = { workspace = true }
 "plain-sessions" = { workspace = true }
 "plain-tailwind" = { workspace = true }
 "plain-templates" = { workspace = true }
+"plain-testing" = { workspace = true }
 "plain-toolbar" = { workspace = true }
 "plain-tunnel" = { workspace = true }
 "plain-vendor" = { workspace = true }
@@ -104,10 +104,18 @@ version = "1.75.0"
 exclude = ["example", "scratch", "scripts"]
 
 [tool.ty.environment]
+# Every tests root that holds helper modules the test files import. Module
+# names across these are unique on purpose (`postgres_test_helpers`, not
+# `helpers`) — they all land in one flat namespace here, and a repeated name
+# would resolve to whichever root came first.
 extra-paths = [
-  "plain-postgres/tests",
   "plain/tests",
   "plain-admin/tests",
+  "plain-cloud/tests",
+  "plain-dev/tests",
+  "plain-mcp/tests",
   "plain-oauthserver/tests",
+  "plain-postgres/tests",
+  "plain-templates/tests",
   "example",
 ]

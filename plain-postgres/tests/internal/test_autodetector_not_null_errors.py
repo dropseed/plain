@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
 from plain.postgres import types
 from plain.postgres.migrations.autodetector import MigrationAutodetector
 from plain.postgres.migrations.exceptions import MigrationSchemaError
 from plain.postgres.migrations.questioner import MigrationQuestioner
 from plain.postgres.migrations.state import ModelState, ProjectState
+from plain.test import case, cases, raises
 
 
 def _state_with(model_state: ModelState) -> ProjectState:
@@ -35,43 +35,29 @@ def _added_field_changes(field: Any) -> dict[str, Any]:
     return autodetector._detect_changes()
 
 
-@pytest.mark.parametrize(
-    "field",
-    [
-        types.TextField(max_length=50),
-        types.TextField(max_length=50, required=False),
-        types.EncryptedTextField(required=False),
-        types.BinaryField(required=False),
-    ],
-    ids=["text", "optional-text", "encrypted", "binary"],
+@cases(
+    types.TextField(max_length=50),
+    types.TextField(max_length=50, required=False),
+    types.EncryptedTextField(required=False),
+    types.BinaryField(required=False),
 )
 def test_add_not_null_field_without_default_raises(field: Any) -> None:
     """NOT NULL + no declared default can't backfill existing rows. required=False
     alone is not enough — its Python-side empty-value fill is invisible to the
     schema layer."""
-    with pytest.raises(MigrationSchemaError) as exc:
+    with raises(MigrationSchemaError) as caught:
         _added_field_changes(field)
-    msg = str(exc.value)
+    msg = str(caught.exception)
     assert "thing.added" in msg.lower()
     assert "default" in msg.lower()
 
 
-@pytest.mark.parametrize(
-    "field",
-    [
-        types.TextField(max_length=50, default="active"),
-        types.TextField(max_length=50, required=False, default=""),
-        types.EncryptedTextField(required=False, default=""),
-        types.BinaryField(required=False, default=b""),
-        types.TextField(max_length=50, allow_null=True, required=False),
-    ],
-    ids=[
-        "text-default",
-        "optional-text-empty",
-        "encrypted-empty",
-        "binary-empty",
-        "nullable",
-    ],
+@cases(
+    types.TextField(max_length=50, default="active"),
+    types.TextField(max_length=50, required=False, default=""),
+    types.EncryptedTextField(required=False, default=""),
+    types.BinaryField(required=False, default=b""),
+    types.TextField(max_length=50, allow_null=True, required=False),
 )
 def test_add_field_with_backfill_succeeds(field: Any) -> None:
     """A declared default (persistent column DEFAULT) or allow_null=True gives
@@ -88,9 +74,9 @@ def test_add_field_with_backfill_succeeds(field: Any) -> None:
 def test_backfill_error_suggests_the_empty_default_spelling() -> None:
     """For empty-only-default fields the remedy must render the exact working
     declaration — not echo something the user already wrote."""
-    with pytest.raises(MigrationSchemaError) as exc:
+    with raises(MigrationSchemaError) as caught:
         _added_field_changes(types.EncryptedTextField())
-    msg = str(exc.value)
+    msg = str(caught.exception)
     assert "types.EncryptedTextField(required=False, default='')" in msg
     assert "Choose one:" in msg
 
@@ -99,30 +85,26 @@ def test_backfill_error_placeholder_is_not_executable() -> None:
     """The general example must say default=<value>, not default=... —
     Ellipsis is valid Python, so a literally-copied `default=...` would
     construct and then persist garbage (e.g. str(Ellipsis) on a TextField)."""
-    with pytest.raises(MigrationSchemaError) as exc:
+    with raises(MigrationSchemaError) as caught:
         _added_field_changes(types.IntegerField())
-    assert "types.IntegerField(default=<value>)" in str(exc.value)
+    assert "types.IntegerField(default=<value>)" in str(caught.exception)
 
 
-@pytest.mark.parametrize(
-    "field",
-    [
-        # Not a DefaultableField at all.
-        types.DateTimeField(),
-        # A DefaultableField that can carry no persistent column DEFAULT
-        # (accepts_persistent_default=False).
-        types.EncryptedJSONField(),
-    ],
-    ids=["datetime", "encrypted-json"],
+@cases(
+    # Not a DefaultableField at all.
+    case(types.DateTimeField(), id="datetime"),
+    # A DefaultableField that can carry no persistent column DEFAULT
+    # (accepts_persistent_default=False).
+    case(types.EncryptedJSONField(), id="encrypted-json"),
 )
 def test_backfill_error_omits_default_remedy_for_non_defaultable_fields(
     field: Any,
 ) -> None:
     """Fields with no default= kwarg get only the allow_null remedy —
     suggesting a default would be advice that raises."""
-    with pytest.raises(MigrationSchemaError) as exc:
+    with raises(MigrationSchemaError) as caught:
         _added_field_changes(field)
-    msg = str(exc.value)
+    msg = str(caught.exception)
     assert "Fix:" in msg
     assert "Declare a default" not in msg
 
@@ -221,9 +203,9 @@ def test_rename_combined_with_null_change_raises() -> None:
         _state_with(to_model),
         questioner=questioner,
     )
-    with pytest.raises(MigrationSchemaError) as exc:
+    with raises(MigrationSchemaError) as exc:
         autodetector._detect_changes()
-    msg = str(exc.value).lower()
+    msg = str(exc.exception).lower()
     assert "thing.new_name" in msg
     assert "default" in msg
 
@@ -247,8 +229,8 @@ def test_multiple_new_fields_without_default_reports_first() -> None:
         ],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
-    with pytest.raises(MigrationSchemaError) as exc:
+    with raises(MigrationSchemaError) as exc:
         autodetector._detect_changes()
-    msg = str(exc.value).lower()
+    msg = str(exc.exception).lower()
     assert "thing.a_status" in msg
     assert "thing.z_status" not in msg

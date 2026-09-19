@@ -333,10 +333,10 @@ def _analyze_trace(spans: list[ReadableSpan]) -> CapturedTrace:
 
 
 def capture_available() -> bool:
-    """Whether `capture_spans` can run.
+    """Whether `capture_trace_spans` can run.
 
     Needs the OpenTelemetry SDK importable (it ships with `plain.connect`
-    and `plain.pytest`) and a global tracer provider `capture_spans` knows
+    and `plain.testing`) and a global tracer provider `capture_trace_spans` knows
     how to mutate — the SDK's own, or the proxy it can replace. A
     third-party provider is left alone rather than crashed into.
     """
@@ -349,7 +349,7 @@ def capture_available() -> bool:
 
 
 @contextmanager
-def capture_spans() -> Generator[InMemorySpanExporter]:
+def capture_trace_spans() -> Generator[InMemorySpanExporter]:
     """Capture every span emitted within the block, in isolation.
 
     For the duration of the block the active tracer provider records every

@@ -1,4 +1,4 @@
-from plain.test import Client
+from plain.test import Client, override_settings
 
 
 def test_html_page():
@@ -160,14 +160,11 @@ def test_unpaired_html_no_vary_header():
     assert "Vary" not in response.headers
 
 
-def test_paired_serve_markdown_disabled(monkeypatch):
+def test_paired_serve_markdown_disabled():
     """Paired page should return HTML when PAGES_SERVE_MARKDOWN is False, even with Accept: text/markdown."""
-    from plain.runtime import settings
-
-    monkeypatch.setattr(settings, "PAGES_SERVE_MARKDOWN", False)
-
-    client = Client()
-    response = client.get("/paired", headers={"Accept": "text/markdown"})
-    assert response.status_code == 200
-    assert b"Paired HTML" in response.content
-    assert b"<h1>" in response.content
+    with override_settings(PAGES_SERVE_MARKDOWN=False):
+        client = Client()
+        response = client.get("/paired", headers={"Accept": "text/markdown"})
+        assert response.status_code == 200
+        assert b"Paired HTML" in response.content
+        assert b"<h1>" in response.content

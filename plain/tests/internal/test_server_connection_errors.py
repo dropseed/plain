@@ -14,22 +14,18 @@ import asyncio
 import logging
 import socket
 
-import pytest
 from plain.http import Response
 from plain.server.connection import Connection
 from plain.server.http import h1
+from plain.test import capture_logs, patch
 from server_stubs import ResponseHandler, make_worker
 
 _GET = b"GET / HTTP/1.1\r\nHost: testserver\r\n\r\n"
 
 
-def test_unexpected_handler_error_is_logged_not_raised(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_unexpected_handler_error_is_logged_not_raised() -> None:
     async def broken_read_headers(worker, conn):
         raise RuntimeError("simulated handler bug")
-
-    monkeypatch.setattr(h1, "async_read_headers", broken_read_headers)
 
     async def scenario() -> None:
         worker = make_worker(
@@ -55,12 +51,15 @@ def test_unexpected_handler_error_is_logged_not_raised(
             client_writer.close()
             conn.close()
 
-    with caplog.at_level(logging.ERROR, logger="plain.server"):
+    with (
+        patch(h1, "async_read_headers", broken_read_headers),
+        capture_logs("plain.server", level=logging.ERROR) as captured,
+    ):
         asyncio.run(scenario())
 
     records = [
         record
-        for record in caplog.records
+        for record in captured
         if record.getMessage() == "Unexpected connection error"
     ]
     assert len(records) == 1

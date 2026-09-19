@@ -268,7 +268,7 @@ Add `.env.local` and `.env.*.local` to your `.gitignore` (not `.env*`, which wou
 
 `PLAIN_ENV` is set automatically by the CLI: `plain dev` → `dev`, `plain test` → `test`. `plain env` sets `dev` itself, since it runs before any app setup. Other commands leave `PLAIN_ENV` unset (only `.env.local` and `.env` load). Export `PLAIN_ENV` yourself to override.
 
-Under `PLAIN_ENV=test`, `.env.local` is skipped (matches Next.js and Rails dotenv) so test runs stay deterministic and personal credentials don't leak into the suite. `plain test` sets `PLAIN_ENV=test` for you; the pytest plugin also sets it when `pytest` is invoked directly — and opportunistically loads `.env.test*` if `plain.dev` is installed.
+Under `PLAIN_ENV=test`, `.env.local` is skipped (matches Next.js and Rails dotenv) so test runs stay deterministic and personal credentials don't leak into the suite. `plain test` sets `PLAIN_ENV=test` for you and loads `.env.test*` through this ladder.
 
 ### Encrypted values
 

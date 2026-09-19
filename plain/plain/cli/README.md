@@ -242,7 +242,7 @@ Runs core validation checks in order, stopping on first failure:
 3. `plain preflight --quiet`
 4. `plain migrations apply --check` (if DB connected)
 5. `plain migrations create --dry-run --check` (if DB connected)
-6. `plain test` (if `plain.pytest` is installed)
+6. `plain test` (if `plain.testing` is installed)
 
 Use `--skip-test` to skip tests for faster iteration.
 
@@ -274,7 +274,7 @@ Two flags control how much of the trace you see:
 - `--trace` — the complete query list plus the full span tree.
 - `--json` — response metadata and the complete trace as JSON, with no response body. This is the form to pipe into other tools.
 
-Trace capture needs the OpenTelemetry SDK, which ships with [plain.connect](../../../plain-connect/plain/connect/README.md) and [plain.pytest](../../../plain-pytest/plain/pytest/README.md). Without it the command still works and says the trace was skipped.
+Trace capture needs the OpenTelemetry SDK, which ships with [plain.connect](../../../plain-connect/plain/connect/README.md) and [plain.testing](../../../plain-testing/plain/testing/README.md). Without it the command still works and says the trace was skipped.
 
 ### `plain memory`
 

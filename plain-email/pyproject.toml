@@ -8,12 +8,12 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = ["plain>=0.143.0,<1.0.0", "plain.templates>=0.1.0,<1.0.0"]
 
-# Ships the `mailoutbox` pytest fixture (see plain/email/test/pytest.py).
-[project.entry-points."pytest11"]
-"plain.email" = "plain.email.test.pytest"
+# Test lifecycle discovered by plain.testing
+[project.entry-points."plain.testing"]
+"email" = "plain.email.test.lifecycle:EmailTestLifecycle"
 
 [dependency-groups]
-dev = ["plain.pytest<1.0.0"]
+dev = ["plain.testing<1.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

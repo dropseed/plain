@@ -5,7 +5,6 @@ must fail loudly rather than be silently skipped by getattr()/hasattr()."""
 
 from __future__ import annotations
 
-import pytest
 from plain.postgres import types
 from plain.postgres.deletion import CASCADE
 from plain.postgres.fields.related import ForeignKeyField, ManyToManyField
@@ -13,6 +12,7 @@ from plain.postgres.migrations.autodetector import MigrationAutodetector
 from plain.postgres.migrations.state import ModelState, ProjectState
 from plain.postgres.migrations.utils import field_references
 from plain.postgres.registry import ModelsRegistry
+from plain.test import raises
 
 
 def test_unresolved_model_is_not_swallowed_by_getattr():
@@ -20,11 +20,11 @@ def test_unresolved_model_is_not_swallowed_by_getattr():
     rel = field.remote_field
 
     assert rel.model_ref == "examples.Missing"
-    with pytest.raises(TypeError, match="not been resolved"):
+    with raises(TypeError, match="not been resolved"):
         _ = rel.model
     # getattr()/hasattr() only swallow AttributeError, so a probe can never
     # quietly answer "no model" for a reference that just isn't resolved yet.
-    with pytest.raises(TypeError):
+    with raises(TypeError):
         getattr(rel, "model", None)
 
 
@@ -33,9 +33,9 @@ def test_unresolved_through_is_not_swallowed_by_getattr():
     rel = field.remote_field
 
     assert rel.through_ref == "examples.MissingThrough"
-    with pytest.raises(TypeError, match="not been resolved"):
+    with raises(TypeError, match="not been resolved"):
         _ = rel.through
-    with pytest.raises(TypeError):
+    with raises(TypeError):
         hasattr(rel, "through")
 
 

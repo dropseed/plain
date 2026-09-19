@@ -5,7 +5,7 @@ from plain.postgres.expressions import F
 from plain.postgres.functions import Lower
 
 
-def test_order_by_f_expression(db):
+def test_order_by_f_expression():
     """`order_by()` accepts expressions, not just field-name strings."""
     IterationExample.query.create(name="beta", tag="b")
     IterationExample.query.create(name="alpha", tag="a")
@@ -17,7 +17,7 @@ def test_order_by_f_expression(db):
     assert names == ["alpha", "beta"]
 
 
-def test_order_by_function_expression(db):
+def test_order_by_function_expression():
     """Database functions work as ordering expressions."""
     IterationExample.query.create(name="Beta", tag="b")
     IterationExample.query.create(name="alpha", tag="a")

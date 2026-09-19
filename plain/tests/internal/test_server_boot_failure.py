@@ -16,6 +16,7 @@ import socket
 import threading
 
 from plain.server.workers import boot_failure
+from plain.test import patch
 from server_stubs import StubApp
 
 
@@ -27,7 +28,7 @@ class _StubHeartbeat:
         self.notifies += 1
 
 
-def test_serves_traceback_then_returns_on_file_change(monkeypatch) -> None:
+def test_serves_traceback_then_returns_on_file_change() -> None:
     captured: dict = {}
 
     class FakeReloader:
@@ -36,8 +37,6 @@ def test_serves_traceback_then_returns_on_file_change(monkeypatch) -> None:
 
         def start(self) -> None:
             pass
-
-    monkeypatch.setattr(boot_failure, "Reloader", FakeReloader)
 
     # Mimic an inherited listener: bound, listening, non-blocking.
     listener = socket.create_server(("127.0.0.1", 0))
@@ -77,7 +76,7 @@ def test_serves_traceback_then_returns_on_file_change(monkeypatch) -> None:
     client_thread.start()
 
     heartbeat = _StubHeartbeat()
-    # serve_boot_failure installs signal handlers; restore pytest's.
+    # serve_boot_failure installs signal handlers; restore the runner's.
     handled_signals = (
         signal.SIGTERM,
         signal.SIGINT,
@@ -87,13 +86,14 @@ def test_serves_traceback_then_returns_on_file_change(monkeypatch) -> None:
     )
     saved_handlers = {sig: signal.getsignal(sig) for sig in handled_signals}
     try:
-        boot_failure.serve_boot_failure(
-            listeners=[listener],  # ty: ignore[invalid-argument-type]
-            app=StubApp(),  # ty: ignore[invalid-argument-type]
-            heartbeat=heartbeat,  # ty: ignore[invalid-argument-type]
-            arbiter_pid=os.getppid(),
-            traceback_text="ImportError: cannot import name 'X'",
-        )
+        with patch(boot_failure, "Reloader", FakeReloader):
+            boot_failure.serve_boot_failure(
+                listeners=[listener],  # ty: ignore[invalid-argument-type]
+                app=StubApp(),  # ty: ignore[invalid-argument-type]
+                heartbeat=heartbeat,  # ty: ignore[invalid-argument-type]
+                arbiter_pid=os.getppid(),
+                traceback_text="ImportError: cannot import name 'X'",
+            )
     finally:
         for sig, handler in saved_handlers.items():
             signal.signal(sig, handler)

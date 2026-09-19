@@ -18,7 +18,7 @@ def _execute(sql: str) -> None:
 class TestIntrospectTable:
     """Boundary tests: introspect_table() against a real Postgres database."""
 
-    def test_existing_table(self, db):
+    def test_existing_table(self):
         """Widget table returns a populated TableState with columns and constraints."""
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -41,7 +41,7 @@ class TestIntrospectTable:
         assert uc.constraint_type == ConType.UNIQUE
         assert uc.validated is True
 
-    def test_nonexistent_table(self, db):
+    def test_nonexistent_table(self):
         """A table that doesn't exist returns TableState(exists=False)."""
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -51,7 +51,7 @@ class TestIntrospectTable:
         assert state.columns == {}
         assert state.indexes == {}
 
-    def test_indexes_separated_from_constraints(self, db):
+    def test_indexes_separated_from_constraints(self):
         """Indexes go to state.indexes, constraints go to state.constraints."""
         _execute(
             'CREATE INDEX "examples_widget_name_idx" ON "examples_widget" ("name")'
@@ -71,7 +71,7 @@ class TestIntrospectTable:
         assert "unique_widget_name_size" not in state.indexes
         assert "unique_widget_name_size" in state.constraints
 
-    def test_invalid_index(self, db):
+    def test_invalid_index(self):
         """An index marked INVALID in pg_catalog is reported as is_valid=False."""
         _execute('CREATE INDEX "examples_widget_bad_idx" ON "examples_widget" ("name")')
         _execute(
@@ -87,7 +87,7 @@ class TestIntrospectTable:
 
         assert state.indexes["examples_widget_bad_idx"].is_valid is False
 
-    def test_check_constraint(self, db):
+    def test_check_constraint(self):
         """Check constraints land in state.constraints with contype 'c'."""
         _execute(
             'ALTER TABLE "examples_widget" ADD CONSTRAINT "widget_id_positive" CHECK ("id" > 0)'
@@ -105,7 +105,7 @@ class TestIntrospectTable:
         assert cc.definition is not None
         assert "id" in cc.definition
 
-    def test_not_valid_constraint(self, db):
+    def test_not_valid_constraint(self):
         """A NOT VALID constraint is reported as validated=False."""
         _execute(
             'ALTER TABLE "examples_widget" ADD CONSTRAINT "widget_id_positive"'
@@ -118,7 +118,7 @@ class TestIntrospectTable:
 
         assert state.constraints["widget_id_positive"].validated is False
 
-    def test_foreign_keys(self, db):
+    def test_foreign_keys(self):
         """Foreign keys are in state.constraints with contype 'f' and target info."""
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -143,7 +143,7 @@ class TestIntrospectTable:
             assert cs.target_table is not None
             assert cs.target_column is not None
 
-    def test_primary_key_in_constraints(self, db):
+    def test_primary_key_in_constraints(self):
         """Primary key appears in constraints with contype 'p'."""
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -158,7 +158,7 @@ class TestIntrospectTable:
         pk = next(iter(pk_constraints.values()))
         assert "id" in pk.columns
 
-    def test_exclusion_constraint(self, db):
+    def test_exclusion_constraint(self):
         """Exclusion constraints land in constraints with contype 'x'."""
         _execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
         _execute(
@@ -176,7 +176,7 @@ class TestIntrospectTable:
         assert xc.validated is True
         assert xc.definition is not None
 
-    def test_hash_index(self, db):
+    def test_hash_index(self):
         """Non-btree indexes are stored with their access method."""
         _execute(
             'CREATE INDEX "examples_widget_name_hash" ON "examples_widget" USING hash ("name")'
@@ -192,7 +192,7 @@ class TestIntrospectTable:
         assert idx.is_unique is False
         assert idx.is_valid is True
 
-    def test_default_btree_index_access_method(self, db):
+    def test_default_btree_index_access_method(self):
         """A default-method index is introspected as ``access_method == "btree"``.
         The old introspection collapsed basic btree to ``Index.suffix`` ("idx");
         the rewrite returns the raw ``pg_am.amname`` and updated
@@ -210,7 +210,7 @@ class TestIntrospectTable:
         idx = state.indexes["examples_widget_name_btree"]
         assert idx.access_method == "btree"
 
-    def test_unique_index_without_constraint(self, db):
+    def test_unique_index_without_constraint(self):
         """A CREATE UNIQUE INDEX (no backing constraint) has is_unique=True."""
         _execute(
             'CREATE UNIQUE INDEX "examples_widget_name_uniq_idx"'

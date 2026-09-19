@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from app.examples.models.encrypted import SecretStore
 from plain.postgres.exceptions import FieldError
 from plain.postgres.fields.encrypted import (
@@ -9,6 +8,7 @@ from plain.postgres.fields.encrypted import (
     _encrypt,
     _get_fernet,
 )
+from plain.test import cases, raises
 
 
 class TestEncryptDecryptFunctions:
@@ -34,7 +34,7 @@ class TestEncryptDecryptFunctions:
 
     def test_decrypt_invalid_token_raises(self):
         """Corrupted encrypted data should raise a clear error."""
-        with pytest.raises(ValueError, match="Could not decrypt"):
+        with raises(ValueError, match="Could not decrypt"):
             _decrypt(_ENCRYPTED_PREFIX + "not-valid-fernet-data")
 
     def test_encrypt_empty_string(self):
@@ -57,25 +57,25 @@ class TestEncryptDecryptFunctions:
 
 
 class TestEncryptedTextField:
-    def test_create_and_read(self, db):
+    def test_create_and_read(self):
         obj = SecretStore.query.create(name="test", api_key="sk-abc123")
         obj.refresh_from_db()
         assert obj.api_key == "sk-abc123"
 
-    def test_update(self, db):
+    def test_update(self):
         obj = SecretStore.query.create(name="test", api_key="sk-old")
         obj.api_key = "sk-new"
         obj.update()
         obj.refresh_from_db()
         assert obj.api_key == "sk-new"
 
-    def test_null_not_encrypted(self, db):
+    def test_null_not_encrypted(self):
         """NULL values should stay as NULL, not get encrypted."""
         obj = SecretStore.query.create(name="test", api_key="sk-test", config=None)
         obj.refresh_from_db()
         assert obj.config is None
 
-    def test_queryset_values(self, db):
+    def test_queryset_values(self):
         """Raw DB values should be encrypted ciphertext."""
         SecretStore.query.create(name="test", api_key="sk-secret")
         raw = SecretStore.query.values_list("api_key", flat=True).first()
@@ -83,45 +83,45 @@ class TestEncryptedTextField:
         # so it should be decrypted
         assert raw == "sk-secret"
 
-    def test_long_text(self, db):
+    def test_long_text(self):
         long_text = "x" * 10000
         obj = SecretStore.query.create(name="test", api_key="sk-test", notes=long_text)
         obj.refresh_from_db()
         assert obj.notes == long_text
 
-    def test_empty_string(self, db):
+    def test_empty_string(self):
         obj = SecretStore.query.create(name="test", api_key="sk-test", notes="")
         obj.refresh_from_db()
         assert obj.notes == ""
 
 
 class TestEncryptedJSONField:
-    def test_dict(self, db):
+    def test_dict(self):
         data = {"token": "abc", "scopes": ["read", "write"]}
         obj = SecretStore.query.create(name="test", api_key="sk-test", config=data)
         obj.refresh_from_db()
         assert obj.config == data
 
-    def test_list(self, db):
+    def test_list(self):
         data = [1, 2, "three"]
         obj = SecretStore.query.create(name="test", api_key="sk-test", config=data)
         obj.refresh_from_db()
         assert obj.config == data
 
-    def test_nested(self, db):
+    def test_nested(self):
         data = {"oauth": {"access_token": "gho_xxx", "refresh_token": "ghr_yyy"}}
         obj = SecretStore.query.create(name="test", api_key="sk-test", config=data)
         obj.refresh_from_db()
         assert obj.config == data
 
-    def test_null(self, db):
+    def test_null(self):
         obj = SecretStore.query.create(name="test", api_key="sk-test", config=None)
         obj.refresh_from_db()
         assert obj.config is None
 
 
 class TestLookupBlocking:
-    def test_isnull_lookup_works(self, db):
+    def test_isnull_lookup_works(self):
         SecretStore.query.create(name="test", api_key="sk-test", config=None)
         assert SecretStore.query.filter(config__isnull=True).count() == 1
 
@@ -130,7 +130,7 @@ class TestLookupBlocking:
         field = SecretStore._model_meta.get_field("api_key")
         assert field.get_lookup("exact") is not None
 
-    def test_filter_none_works(self, db):
+    def test_filter_none_works(self):
         """filter(field=None) must work — ORM rewrites exact+None to isnull."""
         SecretStore.query.create(name="test", api_key="sk-test", config=None)
         assert SecretStore.query.filter(config=None).count() == 1
@@ -147,9 +147,9 @@ class TestLookupBlocking:
         """An unsupported lookup on an encrypted field must fail as a normal
         FieldError at query-build time — not leak into transform resolution
         (which once raised a bare TypeError via class-level get_lookups)."""
-        with pytest.raises(FieldError):
+        with raises(FieldError):
             SecretStore.query.filter(api_key__contains="x")
-        with pytest.raises(FieldError):
+        with raises(FieldError):
             SecretStore.query.filter(config__has_key="token")
 
 
@@ -193,7 +193,7 @@ class TestEncryptedJSONFieldDefault:
         assert not field.has_persistent_literal_default()
         assert not field.has_persistent_column_default()
 
-    def test_default_none_makes_the_field_omittable(self, db):
+    def test_default_none_makes_the_field_omittable(self):
         """The point of the `default=None`: `config` is declared with it on
         SecretStore, so it can be left out of the constructor entirely and the
         row still saves. The type checker agrees (`./scripts/type-check`)."""
@@ -206,14 +206,14 @@ class TestEncryptedJSONFieldDefault:
     def test_default_none_requires_allow_null(self):
         from plain.postgres.fields.encrypted import EncryptedJSONField
 
-        with pytest.raises(TypeError, match="requires allow_null=True"):
+        with raises(TypeError, match="requires allow_null=True"):
             EncryptedJSONField(required=False, default=None)
 
-    @pytest.mark.parametrize("value", [{}, {"a": 1}, [], "", 0])
+    @cases({}, {"a": 1}, [], "", 0)
     def test_literal_default_is_still_rejected(self, value):
         """Any non-None default would need ciphertext, which is
         non-deterministic — there is no literal to put in the column."""
         from plain.postgres.fields.encrypted import EncryptedJSONField
 
-        with pytest.raises(TypeError, match="does not accept a persistent default"):
+        with raises(TypeError, match="does not accept a persistent default"):
             EncryptedJSONField(required=False, allow_null=True, default=value)

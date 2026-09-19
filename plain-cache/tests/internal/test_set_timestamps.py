@@ -13,13 +13,13 @@ from plain.cache import cache
 from plain.cache.models import CachedItem
 
 
-def test_fresh_row_updated_not_before_created(db):
+def test_fresh_row_updated_not_before_created():
     cache.set("ts", "v")
     row = CachedItem.query.get(key="ts")
     assert row.updated_at >= row.created_at
 
 
-def test_overwrite_preserves_created_and_advances_updated(db):
+def test_overwrite_preserves_created_and_advances_updated():
     cache.set("ts", "v1")
     created = CachedItem.query.get(key="ts").created_at
 
@@ -29,7 +29,7 @@ def test_overwrite_preserves_created_and_advances_updated(db):
     assert row.updated_at >= created  # updated advanced
 
 
-def test_set_many_upsert_preserves_created(db):
+def test_set_many_upsert_preserves_created():
     cache.set_many({"a": 1, "b": 2})
     created = {k: CachedItem.query.get(key=k).created_at for k in ("a", "b")}
 
@@ -40,7 +40,7 @@ def test_set_many_upsert_preserves_created(db):
         assert row.updated_at >= row.created_at
 
 
-def test_touch_advances_updated_at(db):
+def test_touch_advances_updated_at():
     cache.set("tch", "v")
     before = CachedItem.query.get(key="tch").updated_at
 

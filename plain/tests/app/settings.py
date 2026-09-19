@@ -15,6 +15,6 @@ EXPLICIT_SETTING = "explicitly changed"
 EXPLICIT_OVERRIDDEN_SETTING = "explicit value"
 
 # Annotation-only custom settings — required, supplied via
-# PLAIN_APP_* env vars set in conftest.py.
+# PLAIN_APP_* env vars set in tests/.env.test.
 APP_REQUIRED_FROM_ENV: str
 APP_REQUIRED_TYPED_FROM_ENV: int

@@ -15,6 +15,6 @@ MIDDLEWARE = [
 ]
 AUTH_LOGIN_URL = "login"
 
-# In-memory email backend so the `mailoutbox` fixture can capture sent mail.
+# In-memory email backend so `plain.email.test.outbox` can capture sent mail.
 EMAIL_BACKEND = "plain.email.backends.locmem.EmailBackend"
 EMAIL_DEFAULT_FROM = "test@example.com"

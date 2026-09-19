@@ -1,9 +1,9 @@
 """Email backend that captures messages in memory for testing.
 
 Messages handed to ``send_messages`` are appended to the module-level
-``outbox`` list instead of being delivered. Pair it with the ``mailoutbox``
-pytest fixture shipped by this package, which clears ``outbox`` around each
-test.
+``outbox`` list instead of being delivered. During test runs the email test
+lifecycle routes ``EMAIL_BACKEND`` here and clears ``outbox`` around each
+test — import it via ``plain.email.test``.
 """
 
 from __future__ import annotations

@@ -1,6 +1,5 @@
 """Test that exception classes work correctly with the new type annotations."""
 
-import pytest
 from app.examples.models.delete import DeleteParent
 from app.examples.models.iteration import IterationExample
 from plain.postgres.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
@@ -25,7 +24,7 @@ def test_exception_classes_work_correctly():
     except IterationExample.DoesNotExist:
         pass  # This should work
     else:
-        pytest.fail("Should have caught DoesNotExist")
+        raise AssertionError("Should have caught DoesNotExist")
 
     # Test MultipleObjectsReturned too
     try:
@@ -33,7 +32,7 @@ def test_exception_classes_work_correctly():
     except IterationExample.MultipleObjectsReturned:
         pass  # This should work
     else:
-        pytest.fail("Should have caught MultipleObjectsReturned")
+        raise AssertionError("Should have caught MultipleObjectsReturned")
 
 
 def test_exception_classes_have_proper_names():
@@ -61,11 +60,11 @@ def test_base_exceptions_from_plain_exceptions():
     except ObjectDoesNotExist:
         pass  # Should work due to inheritance
     except Exception:
-        pytest.fail("Should have caught with base ObjectDoesNotExist")
+        raise AssertionError("Should have caught with base ObjectDoesNotExist")
 
     try:
         raise IterationExample.MultipleObjectsReturned("model-specific exception")
     except MultipleObjectsReturned:
         pass  # Should work due to inheritance
     except Exception:
-        pytest.fail("Should have caught with base MultipleObjectsReturned")
+        raise AssertionError("Should have caught with base MultipleObjectsReturned")

@@ -9,6 +9,7 @@ from click.testing import CliRunner
 from plain.cli import core
 from plain.cli.core import cli
 from plain.runtime import settings
+from plain.test import patch
 from plain.urls.resolvers import _get_cached_resolver
 
 
@@ -253,7 +254,7 @@ def test_plain_changelog_range_warning():
     assert "Warning" in result.output
 
 
-def test_plain_cli_entry_point_command_runs_without_setup(monkeypatch):
+def test_plain_cli_entry_point_command_runs_without_setup():
     """A `plain.cli` entry point command runs without plain.runtime.setup().
 
     That group is for commands you need when setting up the app is exactly what
@@ -273,13 +274,16 @@ def test_plain_cli_entry_point_command_runs_without_setup(monkeypatch):
         def load(self):
             return hello
 
-    monkeypatch.setattr(core, "entry_points", lambda group: [FakeEntryPoint()])
-
     setup_calls = []
-    monkeypatch.setattr(plain.runtime, "setup", lambda: setup_calls.append("setup"))
 
-    runner = CliRunner()
-    result = runner.invoke(core.PlainCommandCollection(), ["hello"], prog_name="plain")
+    with (
+        patch(core, "entry_points", lambda group: [FakeEntryPoint()]),
+        patch(plain.runtime, "setup", lambda: setup_calls.append("setup")),
+    ):
+        runner = CliRunner()
+        result = runner.invoke(
+            core.PlainCommandCollection(), ["hello"], prog_name="plain"
+        )
 
     assert result.exit_code == 0, result.output
     assert "hello from the entry point" in result.output
