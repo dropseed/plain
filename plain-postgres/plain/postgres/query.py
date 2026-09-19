@@ -274,17 +274,25 @@ class SelectDataclassIterable(BaseIterable):
         assert result_type is not None
         tuple_rows = ValuesListIterable(queryset, chunked_fetch=self.chunked_fetch)
 
-        # Decide how to call the constructor once, not once per row. A
-        # keyword-only parameter can't be filled positionally, so those
-        # dataclasses take the slower keyword path.
+        # Work out how to call the constructor once, not once per row.
+        # Parameter kind decides how each value has to be passed: a
+        # keyword-only one can't be filled positionally, and a positional-only
+        # one can't be filled by name. A signature always orders positionals
+        # before keyword-onlys, so the row splits at a single point.
         parameters = _result_type_parameters(result_type)
-        if any(p.kind is inspect.Parameter.KEYWORD_ONLY for p in parameters):
-            names = tuple(p.name for p in parameters)
-            for row in tuple_rows:
-                yield result_type(**dict(zip(names, row, strict=True)))
-        else:
+        keyword_names = tuple(
+            p.name for p in parameters if p.kind is inspect.Parameter.KEYWORD_ONLY
+        )
+        if not keyword_names:
             for row in tuple_rows:
                 yield result_type(*row)
+            return
+
+        split = len(parameters) - len(keyword_names)
+        for row in tuple_rows:
+            yield result_type(
+                *row[:split], **dict(zip(keyword_names, row[split:], strict=True))
+            )
 
 
 class QuerySet[T: "Model"]:
