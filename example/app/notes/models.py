@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from plain.postgres import types
+from datetime import datetime
+
+from plain.postgres import Field, types
 from plain.urls import reverse
 
 from app.users.models import User
@@ -9,17 +11,15 @@ from plain import postgres
 
 @postgres.register_model
 class Note(postgres.Model):
-    author = types.ForeignKeyField(
+    author: Field[User] = types.ForeignKeyField(
         User,
         on_delete=postgres.CASCADE,
         related_query_name="notes",
     )
-    title = types.TextField(max_length=200)
-    body = types.TextField(default="", required=False)
-    created_at = types.DateTimeField(create_now=True)
-    updated_at = types.DateTimeField(create_now=True, update_now=True)
-
-    query: postgres.QuerySet[Note] = postgres.QuerySet()
+    title: Field[str] = types.TextField(max_length=200)
+    body: Field[str] = types.TextField(default="", required=False)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
 
     model_options = postgres.Options(
         ordering=["-created_at"],

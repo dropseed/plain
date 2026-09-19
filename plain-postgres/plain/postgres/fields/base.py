@@ -577,6 +577,35 @@ class Field[T](RegisterLookupMixin):
         return getattr(obj, self.name)
 
 
+def validate_none_only_default(
+    field: Field[Any], default: Any, *, allow_null: bool
+) -> None:
+    """Enforce the `default=None`-or-nothing contract.
+
+    Some fields can't express a persistent literal column DEFAULT --
+    ColumnField-direct ones (UUIDField, DateTimeField, ForeignKeyField) have no
+    DefaultableField machinery at all, and EncryptedJSONField's ciphertext is
+    non-deterministic. They still accept `default=None` so a nullable variant
+    reads as *optional* in the typed constructor: a stock type checker treats a
+    field as omittable only when its definition passes `default=`. None is the
+    only allowed value and it requires allow_null; the caller stores nothing,
+    because a nullable column already yields None when constructed without a
+    value (see ColumnField.get_default). So `default=None` is purely a typing
+    affordance, and `has_persistent_literal_default()` stays False.
+    """
+    if default is NOT_PROVIDED:
+        return
+    name = type(field).__name__
+    if default is not None:
+        raise TypeError(
+            f"{name} does not accept a persistent default. "
+            "Only default=None is allowed (with allow_null=True), which "
+            "makes the field optional in the constructor."
+        )
+    if not allow_null:
+        raise TypeError(f"{name}(default=None) requires allow_null=True.")
+
+
 class ColumnField[T](Field[T]):
     """Base for fields backed by a column value (required/allow_null/validators)."""
 
@@ -590,10 +619,12 @@ class ColumnField[T](Field[T]):
     def __init__(
         self,
         *,
+        default: Any = NOT_PROVIDED,
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
+        validate_none_only_default(self, default, allow_null=allow_null)
         self.required = required
         self.allow_null = allow_null
         self._validators = list(validators)
@@ -693,10 +724,13 @@ class DefaultableField[T](ColumnField[T]):
 
     non_migration_attrs = (*ColumnField.non_migration_attrs, "default")
 
-    # Subclasses whose __init__ deliberately doesn't take default=
-    # (EncryptedJSONField) set this False so callers like the autodetector's
-    # error guidance don't suggest a kwarg that would raise.
-    accepts_default = True
+    # Whether this field can carry a *persistent* column DEFAULT via default=.
+    # Subclasses that can't (EncryptedJSONField) set this False so callers like
+    # the autodetector's error guidance don't suggest a kwarg that would raise.
+    # Note this is only about persistent defaults: a field with this False can
+    # still accept `default=None`, which stores nothing (see
+    # validate_none_only_default).
+    accepts_persistent_default = True
 
     # Subclasses set this when their only expressible column DEFAULT is the
     # class's `_default_empty_value` ("" / b"").

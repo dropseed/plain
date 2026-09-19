@@ -116,14 +116,14 @@ for validator in validators:
 
 ```python
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 from plain.passwords.models import PasswordField
 
 
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    password = PasswordField()
+    email: Field[str] = types.EmailField()
+    password: Field[str] = PasswordField()
 
     model_options = postgres.Options(
         constraints=[
@@ -308,14 +308,14 @@ Add the `password` field to your User model:
 ```python
 # app/models.py
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 from plain.passwords.models import PasswordField
 
 
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    password = PasswordField()
+    email: Field[str] = types.EmailField()
+    password: Field[str] = PasswordField()
 
     model_options = postgres.Options(
         constraints=[

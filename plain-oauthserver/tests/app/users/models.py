@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-from plain.postgres import types
+from plain.postgres import Field, types
 
 from plain import postgres
 
 
 @postgres.register_model
 class User(postgres.Model):
-    email = types.EmailField()
-    password = types.TextField(max_length=128, required=False, default="")
-
-    query: postgres.QuerySet[User] = postgres.QuerySet()
+    email: Field[str] = types.EmailField()
+    password: Field[str] = types.TextField(max_length=128, required=False, default="")
 
     model_options = postgres.Options(
         constraints=[

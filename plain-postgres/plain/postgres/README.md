@@ -30,20 +30,40 @@
 from datetime import datetime
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 from plain.passwords.models import PasswordField
 
 
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    password = PasswordField()
-    is_admin: bool = types.BooleanField(default=False)
-    created_at: datetime = types.DateTimeField(create_now=True)
+    email: Field[str] = types.EmailField()
+    password: Field[str] = PasswordField()
+    is_admin: Field[bool] = types.BooleanField(default=False)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
 
     def __str__(self) -> str:
         return self.email
 ```
+
+Annotate each field with `Field[T]` (the value type) — that's what gives the
+model a type-checked constructor: `User(email="a@b.com")` flags wrong value
+types, unknown field names, and missing required fields. A field is optional in
+that constructor only when its definition passes `default=` (this is general,
+not nullable-specific — a `required=False` field with no `default=` is still a
+required constructor arg), so nullable fields use `Field[T | None]` with
+`default=None`. DB-owned fields (`id`, `create_now`, generated values) are
+auto-excluded from the constructor.
+
+Field types declared outside `plain.postgres.types` — `PasswordField`, or one of
+your own — are the exception: their stub still types the value, but they are
+always _optional_ in the constructor, even when the column is `NOT NULL`. PEP
+681 recognizes a field declaration by matching the constructor against a fixed
+list, and that list is baked into `plain.postgres` where a third-party field
+type can't join it, so the checker reads the assignment as a plain default
+value. Wrong value types and unknown field names are still caught; only
+requiredness is lost, and omitting one surfaces as a `NOT NULL` error on insert
+instead. [Sharing fields across models](#sharing-fields-across-models) shows how
+a package that ships a field type can keep it required.
 
 Every model automatically includes an `id` field which serves as the primary
 key. The name `id` is reserved and can't be used for other fields.
@@ -224,11 +244,11 @@ A traversed field offers exactly the same conditions as the field itself — a t
 
 ### Custom QuerySets
 
-You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods. Define a custom QuerySet and assign it to your model's `query` attribute:
+You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods. Define a custom QuerySet and assign it to your model's `query` attribute as a `ClassVar` (so it isn't treated as a constructor field):
 
 ```python
-from typing import Self
-from plain.postgres import types
+from typing import ClassVar, Self
+from plain.postgres import Field, types
 
 
 class PublishedQuerySet(postgres.QuerySet["Article"]):
@@ -241,10 +261,10 @@ class PublishedQuerySet(postgres.QuerySet["Article"]):
 
 @postgres.register_model
 class Article(postgres.Model):
-    title: str = types.TextField(max_length=200)
-    status: str = types.TextField(max_length=20)
+    title: Field[str] = types.TextField(max_length=200)
+    status: Field[str] = types.TextField(max_length=20)
 
-    query = PublishedQuerySet()
+    query: ClassVar[PublishedQuerySet] = PublishedQuerySet()
 
 
 # Usage - all methods available on Article.query
@@ -264,24 +284,11 @@ special_qs = SpecialQuerySet.from_model(Article)
 
 ### Typing QuerySets
 
-For better type checking of query results, you can explicitly type the `query` attribute:
-
-```python
-from __future__ import annotations
-
-from plain import postgres
-from plain.postgres import types
-
-
-@postgres.register_model
-class User(postgres.Model):
-    email: str = types.EmailField()
-    is_admin: bool = types.BooleanField(default=False)
-
-    query: postgres.QuerySet[User] = postgres.QuerySet()
-```
-
-With this annotation, type checkers will know that `User.query.get()` returns a `User` instance and `User.query.filter()` returns `QuerySet[User]`. This is optional but improves IDE autocomplete and type checking.
+`Model.query` is typed automatically — `User.query.get()` returns a `User` and
+`User.query.filter()` returns `QuerySet[User]` with no extra annotation. Don't
+redeclare `query` just to type it; the base provides `QuerySet[Self]`. Declare
+`query` only when attaching a **custom** QuerySet, and then as a `ClassVar`
+(see [Custom QuerySets](#custom-querysets) above).
 
 ### Raw SQL
 
@@ -774,9 +781,9 @@ Convergence compares the indexes, constraints, foreign keys, nullability, and [s
 ```python
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    username: str = types.TextField(max_length=150)
-    age: int = types.IntegerField()
+    email: Field[str] = types.EmailField()
+    username: Field[str] = types.TextField(max_length=150)
+    age: Field[int] = types.IntegerField()
 
     model_options = postgres.Options(
         indexes=[
@@ -885,24 +892,24 @@ from decimal import Decimal
 from datetime import datetime
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 class Product(postgres.Model):
     # Text fields
-    name: str = types.TextField(max_length=200)
-    description: str = types.TextField()
+    name: Field[str] = types.TextField(max_length=200)
+    description: Field[str] = types.TextField()
 
     # Numeric fields
-    price: Decimal = types.DecimalField(max_digits=10, decimal_places=2)
-    quantity: int = types.IntegerField(default=0)
+    price: Field[Decimal] = types.DecimalField(max_digits=10, decimal_places=2)
+    quantity: Field[int] = types.IntegerField(default=0)
 
     # Boolean fields
-    is_active: bool = types.BooleanField(default=True)
+    is_active: Field[bool] = types.BooleanField(default=True)
 
     # Date and time fields
-    created_at: datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime = types.DateTimeField(update_now=True)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(update_now=True)
 ```
 
 **Text fields:**
@@ -945,42 +952,80 @@ See [Encrypted fields](#encrypted-fields) for details.
 
 For relationship fields, see [Relationships](#relationships).
 
-For nullable fields, use `| None` in the annotation:
+For nullable fields, use `| None` in the annotation and `default=None` to make
+the field optional in the constructor:
 
 ```python
-published_at: datetime | None = types.DateTimeField(allow_null=True, required=False)
+published_at: Field[datetime | None] = types.DateTimeField(
+    allow_null=True, required=False, default=None
+)
 ```
 
 ### Sharing fields across models
 
-To share common fields across multiple models, use Python classes as mixins. The final, registered model must inherit directly from `postgres.Model` and the mixins should not.
+To share common fields across multiple models, use Python classes as mixins. A mixin that declares fields must inherit `postgres.ModelMixin`, and the final, registered model must inherit directly from `postgres.Model` (the mixins must not).
 
 ```python
 from datetime import datetime
 
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, ModelMixin, types
 
 
 # Regular Python class for shared fields
-class TimestampedMixin:
-    created_at: datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime = types.DateTimeField(update_now=True)
+class TimestampedMixin(ModelMixin):
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(update_now=True)
+    source: Field[str] = types.TextField(max_length=50, required=False, default="")
 
 
 # Models inherit from the mixin AND postgres.Model
 @postgres.register_model
 class User(TimestampedMixin, postgres.Model):
-    email: str = types.EmailField()
-    password = PasswordField()
-    is_admin: bool = types.BooleanField(default=False)
+    email: Field[str] = types.EmailField()
+    password: Field[str] = PasswordField()
+    is_admin: Field[bool] = types.BooleanField(default=False)
 
 
 @postgres.register_model
 class Note(TimestampedMixin, postgres.Model):
-    content: str = types.TextField(max_length=1024)
-    liked: bool = types.BooleanField(default=False)
+    content: Field[str] = types.TextField(max_length=1024)
+    liked: Field[bool] = types.BooleanField(default=False)
 ```
+
+`ModelMixin` is what puts the mixin's fields into each model's typed
+constructor. The runtime collects fields off the whole MRO either way, but a
+mixin inheriting nothing isn't visible to PEP 681, so the checker would reject
+`Note(source="import")` on code that runs fine. `ModelMixin` carries no runtime
+behavior — it's the same transform models get, and mixins are still declarations
+you never instantiate directly.
+
+That is also the one way to keep a **custom field type** required in the
+constructor. A package that ships its own field type can declare the field on a
+mixin carrying a transform that lists its constructor, and models mixing it in
+get the field with its requiredness intact:
+
+```python
+from typing import dataclass_transform
+
+from plain.postgres import Field
+from plain.passwords.types import PasswordField
+
+
+@dataclass_transform(kw_only_default=True, field_specifiers=(PasswordField,))
+class _PasswordFieldSpec: ...
+
+
+class PasswordMixin(_PasswordFieldSpec):
+    password: Field[str] = PasswordField()
+```
+
+A model mixing in `PasswordMixin` now gets `password` as a required constructor
+argument, so `User(email="a@b.com")` is a type error again. The specifier list
+has to name every constructor the mixin's own body uses, core ones included.
+Declared in the model's own body instead, `password` stays optional to the
+checker — a model body is governed by the specifier list `plain.postgres`
+declares, which a package outside it can't extend.
 
 ### Encrypted fields
 
@@ -990,14 +1035,16 @@ This is **not** for passwords or tokens you issue — those should be hashed (on
 
 ```python
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
 class Integration(postgres.Model):
-    name: str = types.TextField(max_length=100)
-    api_key: str = types.EncryptedTextField(max_length=200)
-    credentials: dict = types.EncryptedJSONField(required=False, allow_null=True)
+    name: Field[str] = types.TextField(max_length=100)
+    api_key: Field[str] = types.EncryptedTextField(max_length=200)
+    credentials: Field[dict | None] = types.EncryptedJSONField(
+        required=False, allow_null=True, default=None
+    )
 ```
 
 Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived from `SECRET_KEY`. The `cryptography` package is required — install it with `pip install cryptography`.
@@ -1011,7 +1058,7 @@ Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived
 
 - **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported. Comparing against a value raises `TypeError` rather than silently matching nothing — both `filter(api_key="x")` and the typed [condition methods](#typed-conditions-with-where) (`equals`, `contains`, …). `filter(api_key=None)` still rewrites to `IS NULL`.
 - **No indexes or constraints** — encrypted fields cannot be used in indexes or unique constraints. Preflight checks will catch this.
-- **Only `default=""`** — on `EncryptedTextField` (paired with `required=False`), the empty string is stored as plaintext `''`, so it's the one value expressible as a column `DEFAULT` (declare it to add the field to a populated table). Any other default would need ciphertext, which is non-deterministic. `EncryptedJSONField` accepts no default at all — even `{}` serializes to text that would need ciphertext; use `allow_null=True`.
+- **Only `default=""`** — on `EncryptedTextField` (paired with `required=False`), the empty string is stored as plaintext `''`, so it's the one value expressible as a column `DEFAULT` (declare it to add the field to a populated table). Any other default would need ciphertext, which is non-deterministic. `EncryptedJSONField` has no persistent default at all — even `{}` serializes to text that would need ciphertext — so pair `allow_null=True` with `default=None`, which stores nothing and just marks the field optional in the constructor.
 
 **Key rotation:**
 
@@ -1027,12 +1074,12 @@ Use [`ForeignKeyField`](./fields/related.py#ForeignKeyField) for many-to-one and
 
 ```python
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
 class Book(postgres.Model):
-    title: str = types.TextField(max_length=200)
+    title: Field[str] = types.TextField(max_length=200)
     author: Author = types.ForeignKeyField("Author", on_delete=postgres.CASCADE)
     tags = types.ManyToManyField("Tag")
 ```
@@ -1065,21 +1112,26 @@ A migration can add a column, backfill it in `RunPython`, and drop or alter colu
 When you define a `ForeignKey` or `ManyToManyField`, Plain automatically creates a reverse accessor on the related model (like `author.book_set`). You can explicitly declare these reverse relationships using [`ReverseForeignKey`](./fields/reverse_descriptors.py#ReverseForeignKey) and [`ReverseManyToMany`](./fields/reverse_descriptors.py#ReverseManyToMany):
 
 ```python
+from typing import ClassVar
+
 from plain import postgres
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
 class Author(postgres.Model):
-    name: str = types.TextField(max_length=200)
-    # Explicit reverse accessor for all books by this author
-    books = types.ReverseForeignKey(to="Book", field="author")
+    name: Field[str] = types.TextField(max_length=200)
+    # Explicit reverse accessor for all books by this author.
+    # ClassVar keeps it out of the typed constructor (it's an accessor, not a field).
+    books: ClassVar[types.ReverseForeignKey[Book]] = types.ReverseForeignKey(
+        to="Book", field="author"
+    )
 
 
 @postgres.register_model
 class Book(postgres.Model):
-    title: str = types.TextField(max_length=200)
-    author: Author = types.ForeignKeyField(Author, on_delete=postgres.CASCADE)
+    title: Field[str] = types.TextField(max_length=200)
+    author: Field[Author] = types.ForeignKeyField(Author, on_delete=postgres.CASCADE)
 
 
 # Usage
@@ -1096,14 +1148,16 @@ For many-to-many relationships:
 ```python
 @postgres.register_model
 class Feature(postgres.Model):
-    name: str = types.TextField(max_length=100)
+    name: Field[str] = types.TextField(max_length=100)
     # Explicit reverse accessor for all cars with this feature
-    cars = types.ReverseManyToMany(to="Car", field="features")
+    cars: ClassVar[types.ReverseManyToMany[Car]] = types.ReverseManyToMany(
+        to="Car", field="features"
+    )
 
 
 @postgres.register_model
 class Car(postgres.Model):
-    model: str = types.TextField(max_length=100)
+    model: Field[str] = types.TextField(max_length=100)
     features = types.ManyToManyField(Feature)
 
 
@@ -1122,16 +1176,16 @@ for car in feature.cars.all():
 
 Reverse relations are optional — if you don't declare them, the automatic `{model}_set` accessor still works.
 
-To get type checking for custom QuerySet methods on reverse relations, specify the QuerySet type as a second parameter:
+Annotate reverse relations with `ClassVar` — they're class-level accessors, not constructor fields, so `ClassVar` keeps them out of the typed `Model(...)` constructor (same as `query`). To get type checking for custom QuerySet methods, specify the QuerySet type as a second parameter:
 
 ```python
 # Basic usage
-books: types.ReverseForeignKey[Book] = types.ReverseForeignKey(
+books: ClassVar[types.ReverseForeignKey[Book]] = types.ReverseForeignKey(
     to="Book", field="author"
 )
 
 # With custom QuerySet for proper method recognition
-books: types.ReverseForeignKey[Book, BookQuerySet] = types.ReverseForeignKey(
+books: ClassVar[types.ReverseForeignKey[Book, BookQuerySet]] = types.ReverseForeignKey(
     to="Book", field="author"
 )
 
@@ -1148,8 +1202,8 @@ author.books.query.published()
 ```python
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    age: int = types.IntegerField()
+    email: Field[str] = types.EmailField()
+    age: Field[int] = types.IntegerField()
 
     model_options = postgres.Options(
         constraints=[
@@ -1195,9 +1249,9 @@ You can optimize queries and ensure data integrity with indexes and constraints.
 
 ```python
 class User(postgres.Model):
-    email: str = types.EmailField()
-    username: str = types.TextField(max_length=150)
-    age: int = types.IntegerField()
+    email: Field[str] = types.EmailField()
+    username: Field[str] = types.TextField(max_length=150)
+    age: Field[int] = types.IntegerField()
 
     model_options = postgres.Options(
         indexes=[
@@ -1272,14 +1326,14 @@ Add indexes for columns that appear in `.filter()`, `.order_by()`, or `.exclude(
 ```python
 # Bad — full table scan on every filtered query
 class Order(postgres.Model):
-    status: str = types.TextField(max_length=20)
-    created_at: datetime = types.DateTimeField()
+    status: Field[str] = types.TextField(max_length=20)
+    created_at: Field[datetime] = types.DateTimeField()
 
 
 # Good — indexed for common queries
 class Order(postgres.Model):
-    status: str = types.TextField(max_length=20)
-    created_at: datetime = types.DateTimeField()
+    status: Field[str] = types.TextField(max_length=20)
+    created_at: Field[datetime] = types.DateTimeField()
 
     model_options = postgres.Options(
         indexes=[postgres.Index(fields=["status", "-created_at"])],
@@ -1324,10 +1378,10 @@ Use `default=""` instead of `allow_null=True` to avoid two representations of "e
 
 ```python
 # Bad — NULL and "" both mean "empty"
-nickname: str = types.TextField(max_length=50, allow_null=True)
+nickname: Field[str] = types.TextField(max_length=50, allow_null=True)
 
 # Good — single empty representation
-nickname: str = types.TextField(max_length=50, default="")
+nickname: Field[str] = types.TextField(max_length=50, default="")
 ```
 
 ## Forms

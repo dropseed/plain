@@ -5,37 +5,67 @@ paths:
 
 # Database & Models
 
-## Field Imports
+## Field Imports & Annotations
 
-Import fields via `from plain.postgres import types`. Don't add primitive
-annotations — the field stubs return typed descriptors that resolve to the
-right value type on instance access:
-
-```python
-from plain.postgres import types
-
-name = types.TextField(max_length=100)
-car = types.ForeignKeyField(Car, on_delete=postgres.CASCADE)
-```
-
-For string forward references (`"self"`, `"OtherModel"`), the type checker
-can't infer the target type from the string — annotate explicitly so
-instance access keeps its type:
+Import fields via `from plain.postgres import types`, and annotate each field
+with `Field[T]` (the value type). The annotation is what gives the model a
+type-checked constructor — `Model(field=value)` then flags wrong value types,
+unknown field names, and missing required fields:
 
 ```python
-parent: TreeNode | None = types.ForeignKeyField(
-    "self", on_delete=postgres.CASCADE, allow_null=True
-)
+from datetime import datetime
+
+from plain import postgres
+from plain.postgres import Field, types
+
+
+@postgres.register_model
+class Article(postgres.Model):
+    title: Field[str] = types.TextField(max_length=100)
+    views: Field[int] = types.IntegerField(default=0)
+    author: Field[User] = types.ForeignKeyField(User, on_delete=postgres.CASCADE)
+    published_at: Field[datetime | None] = types.DateTimeField(
+        allow_null=True, default=None
+    )
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
 ```
 
-For `JSONField` and `EncryptedJSONField`, the stub returns `Any` (the
-runtime class isn't generic over its value shape), so annotate explicitly
-to preserve typing:
-
-```python
-parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
-config: dict | None = types.EncryptedJSONField(required=False, allow_null=True)
-```
+- **Value type**: `Field[str]`, `Field[int]`, `Field[datetime]`; for an FK to a
+  model class, `Field[RelatedModel]`.
+- **Optional in the constructor = a call-site `default=`.** A stock type checker
+  treats a field as omittable only when its definition passes `default=` — this
+  is general, not nullable-specific: `IntegerField(default=0)` is optional, but a
+  `required=False` field with no `default=` is still a _required_ constructor arg.
+  Add `default=` to any field you intend to omit when constructing.
+- **Nullable** (`allow_null=True`) → `Field[T | None]`, and add `default=None` so
+  it's optional in the constructor (per the rule above). Applies to class-ref and
+  string forward-ref FKs alike.
+- **DB-owned** fields are still annotated but auto-excluded from the
+  constructor: the `id`, `create_now`/`update_now` datetimes, `generate=True`,
+  and `RandomStringField`.
+- **String forward-ref FKs** (`"self"`, `"OtherModel"`) keep a _value-type_
+  annotation — the checker can't resolve the string to a model:
+  `parent: Foo | None = types.ForeignKeyField("self", on_delete=postgres.CASCADE, allow_null=True, default=None)`.
+- **JSON**: `JSONField`/`EncryptedJSONField` return `Any` from the stub (the
+  runtime class isn't generic over its value shape), so the annotation is what
+  preserves typing: `Field[dict]` / `Field[dict[str, Any]]`.
+- **Custom querysets**: declare `query: ClassVar[MyQuerySet] = MyQuerySet()`
+  (`ClassVar` so it isn't treated as a field). Default-queryset models declare
+  nothing — `Model.query` is typed automatically.
+- **Reverse relations** are `ClassVar` too — they're class-level accessors, not
+  constructor fields:
+  `children: ClassVar[types.ReverseForeignKey[Child]] = types.ReverseForeignKey(...)`.
+  (A non-`ClassVar` accessor leaks into the synthesized constructor — the checker
+  would accept `Model(children=...)` even though the runtime rejects it.)
+- **Mixins that declare fields** must inherit `postgres.ModelMixin`. The checker
+  only collects fields from bases carrying the transform, so a plain mixin's
+  fields are missing from the synthesized constructor and `Model(shared=...)` is
+  rejected on code the runtime accepts.
+- **Custom field types** — anything outside `plain.postgres.types`, like
+  `PasswordField` — are typed by their stub but always _optional_ in the
+  constructor. PEP 681 matches field declarations against a fixed list that only
+  `plain.postgres` can declare, so omitting one is a `NOT NULL` error on insert
+  rather than a type error.
 
 Do NOT import field classes directly from `plain.postgres` or `plain.postgres.fields`.
 

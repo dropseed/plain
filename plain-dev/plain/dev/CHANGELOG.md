@@ -1,5 +1,24 @@
 # plain-dev changelog
 
+## [0.69.0](https://github.com/dropseed/plain/releases/plain-dev@0.69.0) (2026-09-18)
+
+### What's changed
+
+- The key that unlocks encrypted `.env` values now lives on each machine, in `~/.plain/env-keys/<id>` (readable by you alone), and the committed file names it with a plain `PLAIN_ENV_KEY_ID=<id>` line, where `<id>` is a short fingerprint of the key. Nothing in a working tree is a secret any more: a clone, a worktree and a fork all find the same key, and the file says which one it needs ([bf0f67e3d7](https://github.com/dropseed/plain/commit/bf0f67e3d7))
+- New `plain env` commands manage that key. `plain env init` generates a key, stores it and writes the id line. `plain env unlock` stores a key piped in on stdin (`op read "op://..." | plain env unlock`), checks it against the file's values, and writes the id line — replacing a `DEV_ENV_KEY=$(op read ...)` line from the previous version in place. `plain env lock` forgets the key. `plain env rotate` re-encrypts every value in the file under a new key and keeps the old key in the store, so branches that still name the old id keep loading with no transition window. `plain env key` is gone: a key is never printed to a terminal ([bf0f67e3d7](https://github.com/dropseed/plain/commit/bf0f67e3d7))
+- `PLAIN_ENV_KEY` replaces `DEV_ENV_KEY` as the environment variable, for the places with no machine store — a hosted agent sandbox, CI, a shell export. It has to be the key the file names; if it is for some other key and the store has the named one, the store is used, and otherwise the mismatch is an error naming both ids. The loader takes the variable out of the environment on load and never binds the id line, so after loading neither name exists in the environment: nothing spawned under `plain dev` can read the key, and preflight's unused-env-var check never sees them ([bf0f67e3d7](https://github.com/dropseed/plain/commit/bf0f67e3d7))
+- Command substitution is gone from `.env` files. `$(command)` is literal text now; a committed file must never be able to run something on someone's checkout, and fetching the key was the only thing it was used for. `$VAR` and `${VAR}` still expand, but no value may reference `PLAIN_ENV_KEY` — that is an error naming the line, so no file can capture the key into a variable ([bf0f67e3d7](https://github.com/dropseed/plain/commit/bf0f67e3d7))
+- Errors say what to do. A missing key names the id and `plain env unlock`; a leftover `DEV_ENV_KEY=$(op read ...)` line gets a migration message; a key in the environment that doesn't match the file names both ids; a corrupt or unreadable store file is blamed on the store, with its path, rather than on the `.env` file. None of them repeat a key. `plain env init` refuses a file (or a ladder) that already names a key or already holds encrypted values, and `plain env rotate` refuses when another file in the ladder holds encrypted values, since the id line governs them all ([bf0f67e3d7](https://github.com/dropseed/plain/commit/bf0f67e3d7))
+- The key store is hardened: ids are validated before they touch a path, the store directory and files are forced to `0700`/`0600` even if they already existed looser, and symlinks in either place are refused ([bf0f67e3d7](https://github.com/dropseed/plain/commit/bf0f67e3d7))
+- `parse_dotenv()` no longer returns a `PLAIN_ENV_KEY` line as an entry, and the new `plain.dev.envkeys` module holds the key store and resolution ([bf0f67e3d7](https://github.com/dropseed/plain/commit/bf0f67e3d7))
+
+### Upgrade instructions
+
+- On each machine, for each project with encrypted values, store the key once: `op read "op://<vault>/<item>/DEV_ENV_KEY" | plain env unlock` (or pipe the key from wherever it is kept). `unlock` replaces the committed `DEV_ENV_KEY=$(op read ...)` line with `PLAIN_ENV_KEY_ID=<id>`; commit that. Until then, loading fails with a message saying the same. Keep the key backed up somewhere durable that teammates can reach — the store is per machine, not a backup.
+- Anywhere `DEV_ENV_KEY` was set as an environment variable — a hosted agent sandbox, CI, a shell export, a line in a gitignored `.env.*.local` — rename it to `PLAIN_ENV_KEY`. It must be the key the file names.
+- If a `.env` file used `$(command)` for anything else, replace the line: it is literal text now.
+- `plain env key` is gone: use `plain env init` for a new project.
+
 ## [0.68.0](https://github.com/dropseed/plain/releases/plain-dev@0.68.0) (2026-09-18)
 
 ### What's changed

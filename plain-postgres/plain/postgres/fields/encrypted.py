@@ -22,7 +22,7 @@ from plain.utils.encoding import force_bytes
 
 from plain import preflight
 
-from .base import NOT_PROVIDED
+from .base import NOT_PROVIDED, validate_none_only_default
 from .json import JSONField
 from .text import TextField
 
@@ -343,10 +343,21 @@ class EncryptedJSONField(EncryptedFieldMixin, JSONField):  # ty: ignore[invalid-
 
     The JSON value is serialized to a string, encrypted, and stored as text.
     On read, it's decrypted and deserialized back to a Python object.
+
+    Deliberately narrower than JSONField: no *persistent* ``default`` — there is
+    no empty plaintext value (even ``{}`` serializes to text that would need
+    ciphertext, which is non-deterministic), so no literal column DEFAULT can be
+    expressed. ``default=None`` is accepted on a nullable field, which stores
+    nothing and only marks the field optional in the typed constructor.
     """
 
     db_type_sql = "text"
-    accepts_default = False
+
+    # Ciphertext is non-deterministic, so there is no literal to put in the
+    # column. This drives the autodetector's backfill guidance, which is only
+    # reached for non-nullable fields -- where `None` could never backfill
+    # anyway, so the `default=None` accepted below doesn't contradict it.
+    accepts_persistent_default = False
 
     def __init__(
         self,
@@ -355,12 +366,13 @@ class EncryptedJSONField(EncryptedFieldMixin, JSONField):  # ty: ignore[invalid-
         decoder: type[json.JSONDecoder] | None = None,
         required: bool = True,
         allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
     ):
-        # Deliberately narrower than JSONField: no `default` — there is no
-        # empty plaintext value (even {} serializes to text that would need
-        # ciphertext, which is non-deterministic), so no literal column
-        # DEFAULT can be expressed.
+        # None-only, and not forwarded to DefaultableField -- exactly how the
+        # ColumnField-direct fields (UUIDField, DateTimeField, ForeignKeyField)
+        # model the same affordance.
+        validate_none_only_default(self, default, allow_null=allow_null)
         super().__init__(
             encoder=encoder,
             decoder=decoder,
