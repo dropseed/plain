@@ -2,9 +2,9 @@
     id="{{ field.html_id }}"
     class="admin-input"
     type="{{ type|default('text') }}"
-    name="{{ field.html_name }}"
+    name="{{ field.name }}"
     {% if list is defined %}list="{{ list }}"{% endif %}
-    {% if field.value() != None %}value="{{ field.value() }}"{% endif %}
-    {% if field.field.required %}required{% endif %}
-    {% if field.errors %}aria-invalid="true"{% endif %}
+    value="{{ field_value(form, field) }}"
+    {% if field.required %}required{% endif %}
+    {% if field_errors(form, field) %}aria-invalid="true"{% endif %}
     >

@@ -61,7 +61,9 @@ from plain.loginlink.views import LoginLinkFormView
 
 class CustomLoginView(LoginLinkFormView):
     template_name = "login.html"
-    success_url = "/check-your-email/"
+
+    def sent_url(self, next_url):
+        return "/check-your-email/"
 ```
 
 The form includes a hidden `next` field that preserves the redirect destination after login. You can pre-populate this by adding `?next=/dashboard/` to the login URL.
@@ -84,39 +86,47 @@ Create `templates/email/loginlink.subject.txt`:
 Log in to My App
 ```
 
-For more control over how the email is sent, subclass [`LoginLinkForm`](./forms.py#LoginLinkForm) and override the [`get_template_email`](./forms.py#get_template_email) method:
+For more control over how the email is sent, override `post()` on [`LoginLinkFormView`](./views.py#LoginLinkFormView) and send it yourself instead of calling [`send_login_link`](./links.py#send_login_link):
 
 ```python
-from plain.loginlink.forms import LoginLinkForm
 from plain.email import TemplateEmail
+from plain.http import RedirectResponse, Response
+from plain.loginlink.links import generate_link_url
+from plain.loginlink.views import LoginLinkFormView
 
 
-class CustomLoginLinkForm(LoginLinkForm):
-    def get_template_email(self, *, email, context):
-        return TemplateEmail(
-            template="custom_login",
-            to=[email],
-            context=context,
-        )
+class CustomLoginView(LoginLinkFormView):
+    def post(self) -> Response:
+        result = self.validate_form(self.form_class)
+        if isinstance(result, Response):
+            return result
+        if user := User.query.filter(email__iexact=result.email).first():
+            url = generate_link_url(
+                request=self.request,
+                user=user,
+                email=result.email,
+                expires_in=self.link_expires_in,
+            )
+            TemplateEmail(
+                template="custom_login",
+                to=[result.email],
+                context={"user": user, "url": url},
+            ).send()
+        return RedirectResponse(self.sent_url(result.next or None), status_code=302)
 ```
 
 See [plain.email](/plain-email/plain/email/README.md) for more details on email templates.
 
 ## Customizing link expiration
 
-By default, login links expire after 1 hour (3600 seconds). Change it by setting [`link_expires_in`](./forms.py#LoginLinkForm) on the form:
+By default, login links expire after 1 hour (3600 seconds). Change it by setting [`link_expires_in`](./views.py#LoginLinkFormView) on the view:
 
 ```python
 from plain.loginlink.views import LoginLinkFormView
-from plain.loginlink.forms import LoginLinkForm
-
-
-class CustomLoginLinkForm(LoginLinkForm):
-    link_expires_in = 60 * 15  # 15 minutes
 
 
 class CustomLoginView(LoginLinkFormView):
-    form_class = CustomLoginLinkForm
+    link_expires_in = 60 * 15  # 15 minutes
 ```
 
 A link works for this entire window, not just once (see [Are login links single-use?](#are-login-links-single-use)), so choose a duration you're comfortable handing out for that long. Very short windows fail in practice — corporate mail can take minutes to deliver, and users get distracted mid-signup.

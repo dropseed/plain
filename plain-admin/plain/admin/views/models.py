@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from plain.exceptions import ValidationError
 from plain.postgres import Q
@@ -17,9 +17,6 @@ from .objects import (
     AdminListView,
     AdminUpdateView,
 )
-
-if TYPE_CHECKING:
-    from plain.forms import BaseForm
 
 
 def get_model_field(instance: postgres.Model, field: str) -> Any:
@@ -265,7 +262,6 @@ class AdminModelDetailView(AdminDetailView):
 
 class AdminModelCreateView(AdminCreateView):
     model: type[postgres.Model]
-    form_class: type[BaseForm] | None = None
 
     def get_title(self) -> str:
         if title := super().get_title():
@@ -283,8 +279,6 @@ class AdminModelCreateView(AdminCreateView):
 
 class AdminModelUpdateView(AdminUpdateView):
     model: type[postgres.Model]
-    form_class: type[BaseForm] | None = None
-    success_url = "."  # Redirect back to the same update page by default
 
     def get_title(self) -> str:
         if title := super().get_title():

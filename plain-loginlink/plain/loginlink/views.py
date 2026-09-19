@@ -6,8 +6,8 @@ from plain.auth import login, logout
 from plain.auth.views import AuthView
 from plain.http import RedirectResponse, Response
 from plain.runtime import settings
-from plain.templates.views import FormView, TemplateView
-from plain.urls import reverse, reverse_lazy
+from plain.templates.views import TemplateView
+from plain.urls import reverse
 from plain.views import View
 
 from .forms import LoginLinkForm
@@ -16,6 +16,7 @@ from .links import (
     LoginLinkExpired,
     LoginLinkInvalid,
     get_link_token_user,
+    send_login_link,
 )
 
 if TYPE_CHECKING:
@@ -32,29 +33,39 @@ def redirect_to_next_url(request: Request, default: str = "/") -> RedirectRespon
         return RedirectResponse(default, status_code=302)
 
 
-class LoginLinkFormView(AuthView, FormView[LoginLinkForm]):
+class LoginLinkFormView(AuthView, TemplateView):
     form_class = LoginLinkForm
-    success_url = reverse_lazy("loginlink:sent")
+
+    # How long a link stays valid, in seconds. Links work for this entire
+    # window, so pick a duration you're comfortable handing out.
+    link_expires_in: int = 60 * 60
+
+    def sent_url(self, next_url: str | None) -> str:
+        url = reverse("loginlink:sent")
+        if next_url:
+            # Keep the next URL in the query string so the sent view can
+            # redirect to it if the page is reloaded while already logged in.
+            return f"{url}?next={next_url}"
+        return url
 
     def get(self) -> Response:
         # Redirect if the user is already logged in. The form is never
         # validated on a GET, so "next" comes from the query string.
         if self.user:
             return redirect_to_next_url(self.request)
+        return self.render_form(self.form_class)
 
-        return super().get()
-
-    def form_valid(self, form: LoginLinkForm) -> Response:
-        form.maybe_send_link(self.request)
-        return super().form_valid(form)
-
-    def get_success_url(self, form: LoginLinkForm) -> str:
-        if next_url := form.cleaned_data.get("next"):
-            # Keep the next URL in the query string so the sent
-            # view can redirect to it if reloaded and logged in already.
-            return f"{self.success_url}?next={next_url}"
-        else:
-            return self.success_url
+    def post(self) -> Response:
+        result = self.validate_form(self.form_class)
+        if isinstance(result, Response):
+            return result
+        send_login_link(
+            email=result.email,
+            request=self.request,
+            next_url=result.next,
+            expires_in=self.link_expires_in,
+        )
+        return RedirectResponse(self.sent_url(result.next or None), status_code=302)
 
 
 class LoginLinkSentView(AuthView, TemplateView):

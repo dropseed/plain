@@ -1,21 +1,22 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% for error in form_errors(form) %}
+<p class="form-error">{{ error.message }}</p>
+{% endfor %}
 <form method="post">
-  {% for field in form %}
   <p>
-    <label for="{{ field.html_id }}">{{ field.html_name }}</label>
     <input
-      type="text"
-      name="{{ field.html_name }}"
-      id="{{ field.html_id }}"
-      value="{{ field.value() or '' }}"
+      type="email"
+      name="email"
+      placeholder="Email"
+      value="{{ field_value(form, form_class.email) }}"
       >
-    {% for error in field.errors %}
-    <span class="form-error" data-field-error="{{ field.html_name }}">{{ error }}</span>
+    {% for error in field_errors(form, form_class.email) %}
+    <span class="form-error">{{ error.message }}</span>
     {% endfor %}
   </p>
-  {% endfor %}
+  <input type="hidden" name="next" value="{{ field_value(form, form_class.next) }}">
   <button type="submit">Send login link</button>
 </form>
 {% endblock %}

@@ -2,23 +2,32 @@ from __future__ import annotations
 
 import hmac
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from app.users.models import User
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthView
-from plain.forms import BaseForm
+from plain.forms import Error, Invalid
 from plain.http import (
     BadRequestError400,
     RedirectResponse,
+    Response,
 )
+from plain.postgres.forms import create_from
 from plain.signing import BadSignature, SignatureExpired, TimestampSigner
-from plain.templates.views import CreateView, FormView
+from plain.templates.views import TemplateView
 from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
 from plain.utils.encoding import force_bytes
 
+from .core import (
+    authenticate,
+    check_user_password,
+    get_password_errors,
+    send_password_reset,
+    set_user_password,
+)
 from .forms import (
     PasswordChangeForm,
     PasswordLoginForm,
@@ -27,13 +36,11 @@ from .forms import (
     PasswordSignupForm,
 )
 
-if TYPE_CHECKING:
-    from plain.http import Response
 
-
-class PasswordForgotView(FormView[PasswordResetForm]):
+class PasswordForgotView(TemplateView):
     form_class = PasswordResetForm
     reset_confirm_url_name: str
+    success_url: str = ""
 
     def generate_password_reset_token(self, user: Any) -> str:
         return TimestampSigner(salt="password-reset").sign_object(
@@ -51,16 +58,23 @@ class PasswordForgotView(FormView[PasswordResetForm]):
         url = reverse(self.reset_confirm_url_name) + f"?token={token}"
         return self.request.build_absolute_uri(url)
 
-    def form_valid(self, form: PasswordResetForm) -> Response:
-        form.save(
-            generate_reset_url=self.generate_password_reset_url,
+    def get(self) -> Response:
+        return self.render_form(self.form_class)
+
+    def post(self) -> Response:
+        result = self.validate_form(self.form_class)
+        if isinstance(result, Response):
+            return result
+        send_password_reset(
+            email=result.email, generate_reset_url=self.generate_password_reset_url
         )
-        return super().form_valid(form)
+        return RedirectResponse(self.success_url or "/", status_code=302)
 
 
-class PasswordResetView(AuthView, FormView[PasswordSetForm]):
+class PasswordResetView(AuthView, TemplateView):
     form_class = PasswordSetForm
     reset_token_max_age = 60 * 60  # 1 hour
+    success_url: str = ""
     _reset_token_session_key = "_password_reset_token"
 
     def check_password_reset_token(self, token: str) -> User | None:
@@ -94,28 +108,6 @@ class PasswordResetView(AuthView, FormView[PasswordSetForm]):
 
         return user
 
-    def get(self) -> Response:
-        if self.user:
-            # Redirect if the user is already logged in
-            return RedirectResponse(
-                str(self.success_url) if self.success_url else "/", status_code=302
-            )
-
-        # Tokens are initially passed as GET parameters and we
-        # immediately store them in the session and remove it from the URL.
-        if token := self.request.query_params.get("token", ""):
-            # Store the token in the session and redirect to the
-            # password reset form at a URL without the token. That
-            # avoids the possibility of leaking the token in the
-            # HTTP Referer header.
-            self.session[self._reset_token_session_key] = token
-            # Redirect to the path itself, without the GET parameters
-            response = RedirectResponse(self.request.path, status_code=302)
-            add_never_cache_headers(response)
-            return response
-
-        return super().get()
-
     def get_user(self) -> User:
         session_token = self.session.get(self._reset_token_session_key, "")
         if not session_token:
@@ -130,38 +122,88 @@ class PasswordResetView(AuthView, FormView[PasswordSetForm]):
 
         return user
 
-    def get_form_kwargs(self) -> dict:
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.get_user()
-        return kwargs
+    def get(self) -> Response:
+        # Redirect if the user is already logged in
+        if self.user:
+            return RedirectResponse(self.success_url or "/", status_code=302)
 
-    def form_valid(self, form: PasswordSetForm) -> Response:
-        form.save()
+        # Tokens arrive as a GET parameter; stash in the session and redirect
+        # to a token-free URL so the token can't leak via the Referer header.
+        if token := self.request.query_params.get("token", ""):
+            self.session[self._reset_token_session_key] = token
+            response = RedirectResponse(self.request.path, status_code=302)
+            add_never_cache_headers(response)
+            return response
+
+        # 400s if the reset token is missing or no longer valid.
+        self.get_user()
+        return self.render_form(self.form_class)
+
+    def post(self) -> Response:
+        user = self.get_user()
+        result = self.validate_form(self.form_class)
+        if isinstance(result, Response):
+            return result
+        if password_errors := get_password_errors(
+            user, result.new_password2, field="new_password2"
+        ):
+            return self.render_form(
+                self.form_class,
+                Invalid(errors=password_errors, raw=self.request.form_data),
+            )
+        set_user_password(user, result.new_password1)
         del self.session[self._reset_token_session_key]
-        # If you wanted, you could log in the user here so they don't have to
-        # go through the log in form again.
-        return super().form_valid(form)
+        return RedirectResponse(self.success_url or "/", status_code=302)
 
 
-class PasswordChangeView(AuthView, FormView[PasswordChangeForm]):
+class PasswordChangeView(AuthView, TemplateView):
     # Change to PasswordSetForm if you want to set new passwords
     # without confirming the old one.
     form_class = PasswordChangeForm
+    success_url: str = ""
+    login_required = True
 
-    def get_form_kwargs(self) -> dict:
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.user
-        return kwargs
+    def get(self) -> Response:
+        return self.render_form(self.form_class)
 
-    def form_valid(self, form: PasswordChangeForm) -> Response:
-        form.save()
+    def post(self) -> Response:
+        # login_required = True guarantees an authenticated user here.
+        user = self.user
+        assert user is not None
+
+        result = self.validate_form(self.form_class)
+        if isinstance(result, Response):
+            return result
+        if not check_user_password(user, result.current_password):
+            return self.render_form(
+                self.form_class,
+                Invalid(
+                    errors=[
+                        Error(
+                            "Your old password was entered incorrectly. "
+                            "Please enter it again.",
+                            code="incorrect_password",
+                            field="current_password",
+                        )
+                    ],
+                    raw=self.request.form_data,
+                ),
+            )
+        if password_errors := get_password_errors(
+            user, result.new_password2, field="new_password2"
+        ):
+            return self.render_form(
+                self.form_class,
+                Invalid(errors=password_errors, raw=self.request.form_data),
+            )
+        set_user_password(user, result.new_password1)
         # Updating the password logs out all other sessions for the user
         # except the current one.
-        update_session_auth_hash(self.request, form.user)
-        return super().form_valid(form)
+        update_session_auth_hash(self.request, user)
+        return RedirectResponse(self.success_url or "/", status_code=302)
 
 
-class PasswordLoginView(AuthView, FormView[PasswordLoginForm]):
+class PasswordLoginView(AuthView, TemplateView):
     form_class = PasswordLoginForm
     success_url = "/"
 
@@ -169,22 +211,43 @@ class PasswordLoginView(AuthView, FormView[PasswordLoginForm]):
         # Redirect if the user is already logged in
         if self.user:
             return RedirectResponse(self.success_url, status_code=302)
+        return self.render_form(self.form_class)
 
-        return super().get()
+    def post(self) -> Response:
+        result = self.validate_form(self.form_class)
+        if isinstance(result, Response):
+            return result
+        user = authenticate(email=result.email, password=result.password)
+        if user is None:
+            return self.render_form(
+                self.form_class,
+                Invalid(
+                    errors=[
+                        Error(
+                            "Please enter a correct email and password. Note "
+                            "that both fields may be case-sensitive.",
+                            code="invalid_login",
+                        )
+                    ],
+                    raw=self.request.form_data,
+                ),
+            )
+        auth_login(self.request, user)
+        return RedirectResponse(self.success_url, status_code=302)
 
-    def form_valid(self, form: PasswordLoginForm) -> Response:
-        # Log the user in and redirect
-        auth_login(self.request, form.get_user())
 
-        return super().form_valid(form)
-
-
-class PasswordSignupView(CreateView):
+class PasswordSignupView(TemplateView):
     form_class = PasswordSignupForm
     success_url = "/"
 
-    def form_valid(self, form: BaseForm) -> Response:
-        # # Log the user in and redirect
-        # auth_login(self.request, form.create())
+    def get(self) -> Response:
+        return self.render_form(self.form_class)
 
-        return super().form_valid(form)
+    def post(self) -> Response:
+        result = self.validate_form(self.form_class)
+        if isinstance(result, Response):
+            return result
+        create_from(User, result)
+        # To sign the new user in immediately, capture create_from()'s
+        # return value and pass it to auth_login(self.request, user).
+        return RedirectResponse(self.success_url, status_code=302)

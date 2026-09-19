@@ -163,32 +163,30 @@ One way to handle PUT, POST, and PATCH endpoints is to use standard [forms](/pla
 
 ```python
 class UserForm(ModelForm):
-    class Meta:
-        model = User
-        fields = (
-            "username",
-            "time_zone",
-        )
+    username = model_field(User.username)
+    time_zone = model_field(User.time_zone)
 
 
 class UserView(BaseAPIView):
     def patch(self):
         from plain.auth import get_request_user
 
-        form = UserForm(
-            request=self.request,
-            instance=get_request_user(self.request),
-        )
-
-        if form.is_valid():
-            user = form.update()
-            return {
-                "uuid": user.uuid,
-                "username": user.username,
-                "time_zone": str(user.time_zone),
+        user = get_request_user(self.request)
+        result = UserForm.validate(self.request.json_data)
+        if not result:
+            return 400, {
+                "errors": [
+                    {"field": e.field, "code": e.code, "message": e.message}
+                    for e in result.errors
+                ]
             }
-        else:
-            return {"errors": form.errors}
+
+        update_from(user, result)
+        return {
+            "uuid": user.uuid,
+            "username": user.username,
+            "time_zone": str(user.time_zone),
+        }
 ```
 
 If you don't want to use Plain's forms, you could also use a third-party schema/validation library like [Pydantic](https://docs.pydantic.dev/latest/) or [Marshmallow](https://marshmallow.readthedocs.io/en/3.x-line/). But depending on your use case, you may not need to use forms or fancy validation at all!
@@ -388,13 +386,17 @@ class TeamAccountAPIView(BaseAPIView):
     @openapi.request_form(TeamAccountForm)
     @openapi.response_typed_dict(200, TeamAccountSchema)
     def patch(self):
-        form = TeamAccountForm(request=self.request, instance=self.team_account)
+        result = TeamAccountForm.validate(self.request.json_data)
+        if not result:
+            return 400, {
+                "errors": [
+                    {"field": e.field, "code": e.code, "message": e.message}
+                    for e in result.errors
+                ]
+            }
 
-        if form.is_valid():
-            team_account = form.update()
-            return TeamAccountSchema.from_team_account(team_account, self.request)
-        else:
-            return {"errors": form.errors}
+        update_from(self.team_account, result)
+        return TeamAccountSchema.from_team_account(self.team_account, self.request)
 
     @cached_property
     def team_account(self):
@@ -415,9 +417,8 @@ class TeamAccountAPIView(BaseAPIView):
 
 
 class TeamAccountForm(ModelForm):
-    class Meta:
-        model = TeamAccount
-        fields = ("is_reviewer", "is_admin")
+    is_reviewer = model_field(TeamAccount.is_reviewer)
+    is_admin = model_field(TeamAccount.is_admin)
 
 
 class TeamAccountSchema(TypedDict):
@@ -534,9 +535,34 @@ You can return status codes in several ways:
 
 - Return a tuple of `(status_code, data)`: `return 201, {"id": note.id}` — for bodiless statuses the data must be empty (`return 204, {}`), since a 204 can't carry a body
 - Return `None`: automatically returns 404
+- Return an [`Invalid`](/plain/plain/forms/README.md) from `validate()`: automatically returns 400 with the standard error body
 - Return a `Response` with a custom status code: `return Response(status_code=204)` (for no content)
 - Return a `JsonResponse` with a custom status code: `return JsonResponse({"error": "Bad request"}, status_code=400)`
 - Raise an exception: `raise NotFoundError404` or `raise ForbiddenError403`
+
+#### How do I validate a request body?
+
+Validate it with a [form](/plain/plain/forms/README.md) and return the `Invalid` straight back — it renders as the standard error body with a 400:
+
+```python
+class SignupAPIView(APIView):
+    def post(self):
+        result = SignupForm.validate(self.request.json_data)
+        if not result:
+            return result
+        user = create_from(User, result)
+        return 201, {"id": user.id}
+```
+
+The response `id` is derived from the error codes the form reported. A body whose errors are all `required` is `missing_field`; anything else is `validation_error`. Either way `errors` lists every failure as `{"field", "message"}`, with `""` for a form-level error:
+
+```json
+{
+    "id": "missing_field",
+    "message": "Missing field: age",
+    "errors": [{"field": "age", "message": "This field is required."}]
+}
+```
 
 #### How do I access the request body?
 

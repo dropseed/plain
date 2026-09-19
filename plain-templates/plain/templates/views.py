@@ -1,18 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from functools import cached_property
 from typing import Any, NoReturn
 
 from plain.exceptions import ImproperlyConfigured
-from plain.forms import BaseForm, Form
-from plain.http import (
-    NotFoundError404,
-    RedirectResponse,
-    Response,
-    status_for_exception,
-)
+from plain.forms import Form, Invalid
+from plain.http import NotFoundError404, Response, status_for_exception
 from plain.logs import get_framework_logger
 from plain.paginator import Page, Paginator
 from plain.runtime import settings
@@ -95,6 +89,73 @@ class TemplateView(View):
     def get(self) -> Response:
         return self.render()
 
+    def render_form[F: Form](
+        self,
+        form_class: type[F],
+        result: F | Invalid | None = None,
+        *,
+        values: dict[str, Any] | None = None,
+        **context: Any,
+    ) -> Response:
+        """Render the template with `form_class` and a `form` result.
+
+        The template receives `form_class` (for metadata: `form_class.email.required`)
+        and `form` (a `Form | Invalid` for per-field value/errors via
+        `field_value` / `field_errors`).
+
+        `result` is whatever `validate()` returned (success or `Invalid`), or
+        `None` for a blank render. `values` pre-fills a blank render with
+        each field's `initial` applied first.
+
+            self.render_form(NoteForm)                       # blank (GET)
+            self.render_form(NoteForm, values=initial)       # pre-filled (edit GET)
+            self.render_form(NoteForm, invalid_result)       # failed validate() (POST)
+
+        For a custom failure (e.g. an authentication rejection that ran after
+        `validate()` succeeded), construct an `Invalid` directly and pass it
+        as `result`: `render_form(LoginForm, Invalid(errors=[...], raw=data))`.
+        """
+        if result is None:
+            data: dict[str, Any] = {
+                name: field.initial
+                for name, field in form_class.fields().items()
+                if field.initial is not None
+            }
+            if values:
+                data.update(values)
+            result = form_class(**data)
+        return self.render(form_class=form_class, form=result, **context)
+
+    def validate_form[F: Form](
+        self, form_class: type[F], *, instance: Any = None
+    ) -> F | Response:
+        """Validate the request against `form_class`. Returns the typed form
+        instance on success, or a re-rendered template `Response` (with the
+        submission and its errors) on failure.
+
+            result = self.validate_form(NoteForm)
+            if isinstance(result, Response):
+                return result
+            # result is the typed NoteForm — every field cleaned
+
+        Reads `request.form_data` and `request.files`, so it covers the
+        ordinary HTML POST case without arguments. For other shapes (a JSON
+        body, or a custom failure response) call `form_class.validate()`
+        directly — this helper is the one-line case, not a wrapper.
+
+        `instance=` is for editing an existing row with a `ModelForm`: it
+        forwards to `ModelForm.validate()`, which excludes that row from the
+        uniqueness pre-check so unchanged values stay valid. A plain `Form`
+        takes no instance.
+        """
+        kwargs: dict[str, Any] = {"files": self.request.files}
+        if instance is not None:
+            kwargs["instance"] = instance
+        result = form_class.validate(self.request.form_data, **kwargs)
+        if not result:
+            return self.render_form(form_class, result)
+        return result
+
     def handle_exception(self, exc: Exception) -> Response:
         """Render `{status}.html` for the exception, falling through on missing template."""
         status = status_for_exception(exc)
@@ -133,82 +194,6 @@ class NotFoundView(TemplateView):
 
     def before_request(self) -> NoReturn:
         raise NotFoundError404
-
-
-class FormView[F: "BaseForm"](TemplateView):
-    """A view for displaying a form and rendering a template response.
-
-    Generic over the form type. Subclasses that want type-safe access to
-    their specific form should parameterize: `FormView[MyForm]`. The
-    `form_class` attribute must still be set separately at runtime.
-    """
-
-    form_class: type[F] | None = None
-    success_url: Callable | str | None = None
-
-    def get_form(self) -> F:
-        """Return an instance of the form to be used in this view."""
-        if not self.form_class:
-            raise ImproperlyConfigured(
-                f"No form class provided. Define {self.__class__.__name__}.form_class or override "
-                f"{self.__class__.__name__}.get_form()."
-            )
-        return self.form_class(**self.get_form_kwargs())
-
-    def get_form_kwargs(self) -> dict[str, Any]:
-        """Return the keyword arguments for instantiating the form."""
-        return {
-            "initial": {},
-            "request": self.request,
-        }
-
-    def get_success_url(self, form: F) -> str:
-        """Return the URL to redirect to after processing a valid form."""
-        if not self.success_url:
-            raise ImproperlyConfigured("No URL to redirect to. Provide a success_url.")
-        return str(self.success_url)  # success_url may be lazy
-
-    def form_valid(self, form: F) -> Response:
-        """If the form is valid, redirect to the supplied URL."""
-        return RedirectResponse(self.get_success_url(form), status_code=302)
-
-    def get_template_context(self) -> dict[str, Any]:
-        """Insert the form into the context dict."""
-        context = super().get_template_context()
-        context["form"] = self.get_form()
-        return context
-
-    def post(self) -> Response:
-        """Hand a valid form to `form_valid`; re-render an invalid one."""
-        form = self.get_form()
-        if form.is_valid():
-            return self.form_valid(form)
-        return self.render(form=form)
-
-
-class CreateView(FormView):
-    """
-    View for creating a new object, with a response rendered by a template.
-    """
-
-    def get_success_url(self, form: BaseForm) -> str:
-        """Return the URL to redirect to after processing a valid form."""
-        if self.success_url:
-            url = str(self.success_url).format(**self.object.__dict__)
-        else:
-            try:
-                url = self.object.get_absolute_url()
-            except AttributeError:
-                raise ImproperlyConfigured(
-                    "No URL to redirect to.  Either provide a url or define"
-                    " a get_absolute_url method on the Model."
-                )
-        return url
-
-    def form_valid(self, form: BaseForm) -> Response:
-        """If the form is valid, create the associated model."""
-        self.object = form.create()  # ty: ignore[unresolved-attribute]
-        return super().form_valid(form)
 
 
 class DetailView(TemplateView, ABC):
@@ -250,54 +235,6 @@ class DetailView(TemplateView, ABC):
         if self.context_object_name:
             context[self.context_object_name] = self.object
         return context
-
-
-class UpdateView(DetailView, FormView):
-    """View for updating an object, with a response rendered by a template."""
-
-    def get_success_url(self, form: BaseForm) -> str:
-        """Return the URL to redirect to after processing a valid form."""
-        if self.success_url:
-            url = str(self.success_url).format(**self.object.__dict__)
-        else:
-            try:
-                url = self.object.get_absolute_url()
-            except AttributeError:
-                raise ImproperlyConfigured(
-                    "No URL to redirect to.  Either provide a url or define"
-                    " a get_absolute_url method on the Model."
-                )
-        return url
-
-    def form_valid(self, form: BaseForm) -> Response:
-        """If the form is valid, update the associated model."""
-        self.object = form.update()  # ty: ignore[unresolved-attribute]
-        return super().form_valid(form)
-
-    def get_form_kwargs(self) -> dict[str, Any]:
-        """Return the keyword arguments for instantiating the form."""
-        kwargs = super().get_form_kwargs()
-        kwargs.update({"instance": self.object})
-        return kwargs
-
-
-class DeleteView(DetailView, FormView):
-    """
-    View for deleting an object retrieved with self.get_object(), with a
-    response rendered by a template.
-    """
-
-    # An empty confirmation form -- deletion is the view's job, not the
-    # form's, so it carries no fields and no model write.
-    class EmptyDeleteForm(Form):
-        pass
-
-    form_class = EmptyDeleteForm
-
-    def form_valid(self, form: BaseForm) -> Response:
-        """If the confirmation form is valid, delete the object."""
-        self.object.delete()
-        return super().form_valid(form)
 
 
 class ListView(TemplateView, ABC):
@@ -354,12 +291,8 @@ class ListView(TemplateView, ABC):
 
 
 __all__ = [
-    "CreateView",
-    "DeleteView",
     "DetailView",
-    "FormView",
     "ListView",
     "NotFoundView",
     "TemplateView",
-    "UpdateView",
 ]

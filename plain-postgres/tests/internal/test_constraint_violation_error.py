@@ -1,6 +1,12 @@
 """Tests for the `violation_error` kwarg on CheckConstraint and
-UniqueConstraint, plus the full_clean() / save() integration that surfaces
-constraint errors."""
+UniqueConstraint, plus the full_clean() / create() integration and the
+IntegrityError -> ValidationError mapper that surface constraint errors.
+
+The rebuilt `ModelForm` is a pure parser — it doesn't pre-check constraints,
+so a violation surfaces when `create_from`/`update_from` write the row (the DB
+enforces it, mapped to ValidationError). That end-to-end path is covered in
+`tests/public/test_integrity_error_mapping.py`; here we test the constraint and
+mapper mechanics directly."""
 
 from __future__ import annotations
 
@@ -12,8 +18,6 @@ from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import CheckConstraint, Q, UniqueConstraint
 from plain.postgres.constraints import BaseConstraint
 from plain.postgres.expressions import F
-from plain.postgres.forms import ModelForm
-from plain.test import RequestFactory
 
 
 def _check_constraint() -> CheckConstraint:
@@ -128,34 +132,6 @@ def test_check_constraint_skipped_for_field_that_failed_shape(
     instance.validate_constraints(exclude={"name"})
 
 
-def test_form_skips_check_constraint_over_shape_failed_field(
-    db: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Regression for #68 through the path that actually triggers it -- the form
-    auto-deriving the exclusion, not a hand-fed one. A CheckConstraint over a
-    field whose submitted value fails shape validation must not be checked
-    against the bad value (which crashed solve_lookup_type's
-    `assert self.model is not None`). _post_clean records the shape error, then
-    recomputes _get_validation_exclusions() -- which reads self._errors -- before
-    the constraint pre-check, so the failed field is excluded automatically. The
-    form surfaces the shape error and doesn't crash. If that wiring breaks, the
-    constraint runs against the bad value and is_valid() raises instead of
-    returning False."""
-    _add_check_constraint(monkeypatch)
-    name_field = ConstraintExample._model_meta.get_field("name")
-    monkeypatch.setattr(name_field, "choices", [("ok-one", "One"), ("ok-two", "Two")])
-
-    class Form(ModelForm):
-        class Meta:
-            model = ConstraintExample
-            fields = ("name", "description")
-
-    rf = RequestFactory()
-    form = Form(request=rf.post("/x/", data={"name": "bogus", "description": "d"}))
-    assert not form.is_valid()
-    assert "name" in form.errors
-
-
 def test_save_runs_full_clean_by_default(
     db: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -187,61 +163,22 @@ def test_save_clean_and_validate_false_skips_validation(
     assert ConstraintExample.query.filter(name="bad").count() == 1
 
 
-def test_check_constraint_dict_violation_error_routes_to_field(
-    db: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Dict-form violation_error attaches the error to the named field."""
+def test_check_constraint_dict_violation_error_routes_to_field(db: None) -> None:
+    """A dict-form violation_error attaches the error to the named field —
+    `validate_constraints()` surfaces it under that key in `error_dict`."""
     constraint = CheckConstraint(
         check=Q(name__startswith="ok-"),
         name="must_start_ok",
         violation_error={"name": 'Name must start with "ok-".'},
     )
-    monkeypatch.setattr(
-        ConstraintExample.model_options,
-        "constraints",
-        (*ConstraintExample.model_options.constraints, constraint),
-    )
+    instance = ConstraintExample(name="bad", description="d")
 
-    class Form(ModelForm):
-        class Meta:
-            model = ConstraintExample
-            fields = ("name", "description")
+    with pytest.raises(ValidationError) as exc_info:
+        constraint.validate(ConstraintExample, instance)
 
-    rf = RequestFactory()
-    form = Form(request=rf.post("/x/", data={"name": "bad", "description": "d"}))
-    assert not form.is_valid()
-    assert form.errors.get("name"), form.errors
-    assert "name" in form.errors
-    assert "__all__" not in form.errors
-
-
-def test_check_constraint_string_violation_error_lands_on_non_field_errors(
-    db: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A bare string violation_error on CheckConstraint goes to NON_FIELD_ERRORS
-    because the constraint can't infer which field to attach to from a Q
-    expression."""
-    constraint = CheckConstraint(
-        check=Q(name__startswith="ok-"),
-        name="must_start_ok",
-        violation_error='Name must start with "ok-".',
-    )
-    monkeypatch.setattr(
-        ConstraintExample.model_options,
-        "constraints",
-        (*ConstraintExample.model_options.constraints, constraint),
-    )
-
-    class Form(ModelForm):
-        class Meta:
-            model = ConstraintExample
-            fields = ("name", "description")
-
-    rf = RequestFactory()
-    form = Form(request=rf.post("/x/", data={"name": "bad", "description": "d"}))
-    assert not form.is_valid()
-    assert "name" not in form.errors
-    assert "__all__" in form.errors
+    err = exc_info.value
+    assert "name" in err.error_dict
+    assert err.error_dict["name"][0].message == 'Name must start with "ok-".'
 
 
 def test_unique_constraint_explicit_validation_error_dict_preserved(
@@ -273,38 +210,6 @@ def test_unique_constraint_explicit_validation_error_dict_preserved(
     assert hasattr(err, "error_dict")
     assert "description" in err.error_dict
     assert "name" not in err.error_dict
-
-
-def test_unique_constraint_single_field_string_routes_to_field(
-    db: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Single-field UniqueConstraint auto-routes a string violation_error to
-    that field (no special routing in validate_constraints — the dict-form is
-    built inside validate())."""
-    constraint = UniqueConstraint(
-        fields=["name"],
-        name="unique_name_only",
-        violation_error="That name is taken.",
-    )
-    monkeypatch.setattr(
-        ConstraintExample.model_options,
-        "constraints",
-        (*ConstraintExample.model_options.constraints, constraint),
-    )
-
-    ConstraintExample(name="dup", description="d1").create(clean_and_validate=False)
-
-    class Form(ModelForm):
-        class Meta:
-            model = ConstraintExample
-            fields = ("name", "description")
-
-    rf = RequestFactory()
-    form = Form(request=rf.post("/x/", data={"name": "dup", "description": "d2"}))
-    assert not form.is_valid()
-    assert any("That name is taken." in m for m in form.errors.get("name", [])), (
-        form.errors
-    )
 
 
 # MARK: IntegrityError -> ValidationError mapping (registry + mapper)
@@ -374,3 +279,37 @@ def test_base_constraint_db_violation_error_defaults_to_none(db: None) -> None:
     instance = ConstraintExample(name="x", description="y")
     constraint = BaseConstraint(name="some_constraint")
     assert constraint._db_violation_error(instance, ConstraintExample) is None
+
+
+def test_modelform_pre_check_routes_single_field_unique_to_that_field(
+    db: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A single-field UniqueConstraint auto-routes its violation to that field,
+    so the rebuilt ModelForm's pre-check reports it under the field rather than
+    form-level. (The composite case, which has no single owning field, lands on
+    field=None — covered in tests/public/test_modelform.py.)"""
+    from plain.postgres.forms import ModelForm, model_field
+
+    constraint = UniqueConstraint(
+        fields=["name"],
+        name="unique_name_only",
+        violation_error="That name is taken.",
+    )
+    monkeypatch.setattr(
+        ConstraintExample.model_options,
+        "constraints",
+        (*ConstraintExample.model_options.constraints, constraint),
+    )
+
+    class Form(ModelForm):
+        name = model_field(ConstraintExample.name)
+        description = model_field(ConstraintExample.description)
+
+    ConstraintExample(name="dup", description="d1").create(clean_and_validate=False)
+
+    result = Form.validate({"name": "dup", "description": "d2"})
+
+    assert not result
+    assert [(e.field, e.message) for e in result.errors] == [
+        ("name", "That name is taken.")
+    ]

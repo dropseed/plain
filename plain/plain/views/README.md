@@ -62,7 +62,7 @@ The [base `View` class](./base.py#View) provides default `options` and `head` be
 
 ## Template-rendering views
 
-Views that render Jinja templates (`TemplateView`, `FormView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `ListView`) live in the [`plain.templates`](../../../plain-templates/plain/templates/README.md) package. Install `plain.templates` and import them from `plain.templates.views`:
+Views that render Jinja templates (`TemplateView`, `DetailView`, `ListView`) live in the [`plain.templates`](../../../plain-templates/plain/templates/README.md) package. Install `plain.templates` and import them from `plain.templates.views`:
 
 ```python
 from plain.templates.views import TemplateView

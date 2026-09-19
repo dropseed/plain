@@ -1,74 +1,68 @@
+"""Widget create/update/delete over HTTP.
+
+The view-layer half of the ModelForm contract: `tests/public/test_modelform.py`
+drives `validate()` / `create_from()` / `update_from()` directly, and
+`tests/public/test_modelform_views.py` drives these views with a real client so
+the whole round-trip — render, submit, re-render on failure, redirect, write —
+is covered end to end.
+
+Written the way an app writes them: explicit `get`/`post` on a `TemplateView`,
+which is what the framework offers now that there is no generic `FormView`.
+"""
+
 from __future__ import annotations
 
-import json
-from typing import Any
-
-from plain.http import Response
-from plain.templates.views import CreateView, DeleteView, UpdateView
-
-from .forms import (
-    ChildCascadeForm,
-    DBDefaultsExampleForm,
-    FormsExampleForm,
-    SecretStoreForm,
-)
-from .models.forms import FormsExample
+from app.examples.models.relationships import Widget
+from plain.http import RedirectResponse, Response
+from plain.postgres.forms import ModelForm, create_from, model_field, update_from
+from plain.templates.views import DetailView, TemplateView
 
 
-class _NoTemplateFormView:
-    """Bypass template requirements in test views.
+class WidgetForm(ModelForm):
+    name = model_field(Widget.name)
+    size = model_field(Widget.size)
 
-    CreateView/UpdateView normally need a template for GET and for
-    rendering an invalid form. These tests only exercise POST behavior,
-    so we return plain Responses instead of rendering templates.
-    """
+
+class WidgetCreateView(TemplateView):
+    template_name = "widgets/form.html"
 
     def get(self) -> Response:
-        return Response("ok")
+        return self.render_form(WidgetForm)
 
-    def render(self, **context: Any) -> Response:
-        """Invalid-form re-render: serialize the form errors as JSON."""
-        form = context["form"]
-        errors: dict[str, list[str]] = {
-            name: [str(err) for err in errs] for name, errs in form.errors.items()
-        }
-        return Response(
-            json.dumps(errors),
-            status_code=400,
-            content_type="application/json",
-        )
+    def post(self) -> Response:
+        result = self.validate_form(WidgetForm)
+        if isinstance(result, Response):
+            return result
+        widget = create_from(Widget, result)
+        return RedirectResponse(f"/widgets/{widget.id}/edit", status_code=302)
 
 
-class FormsExampleCreateView(_NoTemplateFormView, CreateView):
-    form_class = FormsExampleForm
-    success_url = "/ok/"
+class WidgetUpdateView(DetailView):
+    template_name = "widgets/form.html"
+    context_object_name = "widget"
+
+    def get_object(self) -> Widget | None:
+        return Widget.query.filter(id=self.url_kwargs["id"]).first()
+
+    def get(self) -> Response:
+        return self.render_form(WidgetForm, values=WidgetForm.initial_from(self.object))
+
+    def post(self) -> Response:
+        # `instance=` keeps this row out of its own uniqueness check.
+        result = self.validate_form(WidgetForm, instance=self.object)
+        if isinstance(result, Response):
+            return result
+        update_from(self.object, result)
+        return RedirectResponse(f"/widgets/{self.object.id}/edit", status_code=302)
 
 
-class FormsExampleUpdateView(_NoTemplateFormView, UpdateView):
-    form_class = FormsExampleForm
-    success_url = "/ok/"
+class WidgetDeleteView(DetailView):
+    template_name = "widgets/confirm_delete.html"
+    context_object_name = "widget"
 
-    def get_object(self) -> Any:
-        return FormsExample.query.filter(id=self.url_kwargs["pk"]).first()
+    def get_object(self) -> Widget | None:
+        return Widget.query.filter(id=self.url_kwargs["id"]).first()
 
-
-class FormsExampleDeleteView(_NoTemplateFormView, DeleteView):
-    success_url = "/ok/"
-
-    def get_object(self) -> Any:
-        return FormsExample.query.filter(id=self.url_kwargs["pk"]).first()
-
-
-class ChildCascadeCreateView(_NoTemplateFormView, CreateView):
-    form_class = ChildCascadeForm
-    success_url = "/ok/"
-
-
-class DBDefaultsExampleCreateView(_NoTemplateFormView, CreateView):
-    form_class = DBDefaultsExampleForm
-    success_url = "/ok/"
-
-
-class SecretStoreCreateView(_NoTemplateFormView, CreateView):
-    form_class = SecretStoreForm
-    success_url = "/ok/"
+    def post(self) -> Response:
+        self.object.delete()
+        return RedirectResponse("/widgets/new", status_code=302)

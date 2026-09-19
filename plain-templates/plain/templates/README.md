@@ -6,8 +6,7 @@
 - [Template files](#template-files)
 - [Template-rendering views](#template-rendering-views)
     - [TemplateView](#templateview)
-    - [FormView](#formview)
-    - [DetailView, CreateView, UpdateView, DeleteView, ListView](#object-views)
+    - [DetailView, ListView](#object-views)
 - [Error views](#error-views)
 - [Template context](#template-context)
 - [Built-in globals](#built-in-globals)
@@ -92,27 +91,9 @@ class AppRouter(Router):
     ]
 ```
 
-### FormView
-
-[`FormView`](./views.py#FormView) handles displaying and processing [forms](../../../plain/plain/forms/README.md). The form is automatically available in your template as `form`:
-
-```python
-from plain.templates.views import FormView
-from .forms import ExampleForm
-
-
-class ExampleView(FormView):
-    template_name = "example.html"
-    form_class = ExampleForm
-    success_url = "."
-
-    def form_valid(self, form):
-        return super().form_valid(form)
-```
-
 ### Object views
 
-[`DetailView`](./views.py#DetailView), [`CreateView`](./views.py#CreateView), [`UpdateView`](./views.py#UpdateView), [`DeleteView`](./views.py#DeleteView), and [`ListView`](./views.py#ListView) provide standard CRUD scaffolding. Each requires you to implement `get_object()` or `get_objects()`:
+[`DetailView`](./views.py#DetailView) and [`ListView`](./views.py#ListView) render a single object or a list of objects. Each requires you to implement `get_object()` or `get_objects()`:
 
 ```python
 from plain.templates.views import DetailView
@@ -411,27 +392,28 @@ The [Jinja2 documentation](https://jinja.palletsprojects.com/en/stable/) covers 
 
 ## Forms
 
-Forms are rendered manually using the bound field attributes:
+A view calls `self.render_form(MyForm, result)` and the template reads each field through the `field_value`, `field_errors`, and `form_errors` globals (from `plain.forms`) plus the field reference on the form class:
 
 ```html
 <form method="post">
     <div>
-        <label for="{{ form.email.html_id }}">Email</label>
+        <label for="{{ form_class.email.html_id }}">Email</label>
         <input
             type="email"
-            name="{{ form.email.html_name }}"
-            id="{{ form.email.html_id }}"
-            value="{{ form.email.value }}"
+            name="{{ form_class.email.name }}"
+            id="{{ form_class.email.html_id }}"
+            value="{{ field_value(form, form_class.email) }}"
+            {% if form_class.email.required %}required{% endif %}
         >
-        {% for error in form.email.errors %}
-        <p>{{ error }}</p>
+        {% for error in field_errors(form, form_class.email) %}
+        <p>{{ error.message }}</p>
         {% endfor %}
     </div>
     <button type="submit">Submit</button>
 </form>
 ```
 
-Each bound field provides: `html_name`, `html_id`, `value`, `errors`, `field`, `initial`.
+Field metadata lives on the field reference (`form_class.email.name`, `.html_id`, `.required`, `.choices`). The helpers are typed through the field reference — `field_value(form, form_class.email)` narrows to `str | None`. See [`plain.forms`](../../../plain/plain/forms/README.md) for full patterns and the field reference.
 
 ## Installation
 

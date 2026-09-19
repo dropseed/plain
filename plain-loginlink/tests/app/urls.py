@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from plain.auth.views import AuthView
 from plain.http import Response
-from plain.loginlink.forms import LoginLinkForm
 from plain.loginlink.urls import LoginlinkRouter
 from plain.loginlink.views import LoginLinkFormView
 from plain.urls import Router, include, path
@@ -20,15 +19,11 @@ class LoginView(LoginLinkFormView):
     template_name = "loginlinkform.html"
 
 
-class AlreadyExpiredForm(LoginLinkForm):
+class AlreadyExpiredLoginView(LoginLinkFormView):
     """Mints links that are past their expiration the moment they're sent."""
 
-    link_expires_in = -3600
-
-
-class AlreadyExpiredLoginView(LoginLinkFormView):
     template_name = "loginlinkform.html"
-    form_class = AlreadyExpiredForm
+    link_expires_in = -3600
 
 
 class IndexView(View):

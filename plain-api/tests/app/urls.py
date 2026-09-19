@@ -3,7 +3,13 @@ from typing import ClassVar, TypedDict
 from plain.api.versioning import APIVersionChange, VersionedAPIView
 from plain.api.views import APIView, JsonNotFoundView
 from plain.exceptions import ValidationError
+from plain.forms import Form, types
 from plain.urls import Router, path
+
+
+class SignupForm(Form):
+    email = types.EmailField()
+    age = types.IntegerField()
 
 
 class TestView(APIView):
@@ -43,6 +49,17 @@ class ValidationErrorView(APIView):
         if shape == "dict":
             raise ValidationError({"password": ["This field is required."]})
         raise ValidationError(["List error"])
+
+
+class FormView(APIView):
+    """Returns whatever `validate()` returned — an `Invalid` renders as the
+    standard error body."""
+
+    def post(self):
+        result = SignupForm.validate(self.request.json_data)
+        if not result:
+            return result
+        return {"email": result.email, "age": result.age}
 
 
 class UnhandledExceptionView(APIView):
@@ -90,6 +107,7 @@ class AppRouter(Router):
         path("test-versioned", TestVersionedAPIView, name="test_versioned"),
         path("validation-error", ValidationErrorView, name="validation_error"),
         path("json-echo", JsonEchoView, name="json_echo"),
+        path("form", FormView, name="form"),
         path("unhandled-exception", UnhandledExceptionView, name="unhandled_exception"),
         path("missing/<path:_>", JsonNotFoundView, name="missing"),
     )

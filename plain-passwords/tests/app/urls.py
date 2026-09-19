@@ -21,28 +21,28 @@ from plain.views import View
 
 
 class LoginView(PasswordLoginView):
-    template_name = "form.html"
+    template_name = "login.html"
     success_url = "/done"
 
 
 class SignupView(PasswordSignupView):
-    template_name = "form.html"
+    template_name = "signup.html"
     success_url = "/done"
 
 
 class ForgotView(PasswordForgotView):
-    template_name = "form.html"
+    template_name = "forgot.html"
     reset_confirm_url_name = "password_reset"
     success_url = "/done"
 
 
 class ResetView(PasswordResetView):
-    template_name = "form.html"
+    template_name = "reset.html"
     success_url = "/done"
 
 
 class ChangeView(PasswordChangeView):
-    template_name = "form.html"
+    template_name = "change.html"
     success_url = "/done"
 
 
