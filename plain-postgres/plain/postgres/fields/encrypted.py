@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.lookups import Lookup, Transform
+    from plain.postgres.query_utils import Q
     from plain.preflight.results import PreflightResult
 
 __all__ = [
@@ -110,8 +111,8 @@ def _decrypt(value: str) -> str:
 
 
 # Shared tail explaining why encrypted fields reject value comparisons — used
-# by both the exact-lookup guard (_EncryptedExact) and the typed-query method
-# guard (_lookup_unsupported_message).
+# by every refusal, which all route through
+# `EncryptedField._lookup_unsupported_message`.
 _NON_DETERMINISTIC_EXPLANATION = (
     "ciphertext is non-deterministic. Use .is_null() instead."
 )
@@ -128,11 +129,14 @@ class _EncryptedExact(Exact):
 
     def __init__(self, lhs: Any, rhs: Any) -> None:
         if rhs is not None:
-            target = getattr(lhs, "target", None)
-            field_name = getattr(target, "name", None) or "<encrypted>"
+            # lhs.output_field is the encrypted field itself (the lookups.py
+            # idiom). Its own sentence, not _lookup_unsupported_message's:
+            # `filter()` *is* supported here, just not against a value, and
+            # saying "does not support .filter()" would be wrong. Both share
+            # the explanation tail below.
             raise TypeError(
-                f"Encrypted field {field_name!r} cannot be filtered by "
-                f"equality against a non-None value — "
+                f"Encrypted field {lhs.output_field.name!r} cannot be filtered "
+                f"by equality against a non-None value — "
                 f"{_NON_DETERMINISTIC_EXPLANATION}"
             )
         super().__init__(lhs, rhs)
@@ -159,6 +163,15 @@ class EncryptedField[T](Field[T]):
     (``TextField``, ``JSONField``), which supplies the column behavior.
     """
 
+    def __init__(self, **kwargs: Any) -> None:
+        # Present only for the type checker. ty resolves `super().__init__` in
+        # EncryptedJSONField through this class and lands on `Field.__init__`,
+        # which takes no arguments, so without a signature here it rejects the
+        # kwargs the concrete field forwards. At runtime this is a plain
+        # cooperative passthrough and the MRO would reach the concrete field
+        # either way.
+        super().__init__(**kwargs)
+
     # The complete lookup surface, replacing the base field's registry.
     # isnull is obviously needed. exact is required so that `filter(field=None)`
     # works — the ORM resolves "exact" first and then rewrites None to isnull.
@@ -170,10 +183,6 @@ class EncryptedField[T](Field[T]):
     # get_lookup()/get_transform() and registry consumers (e.g.
     # unsupported-lookup error suggestions) all resolve through this one dict.
     # A classmethod so both class-level and instance-level callers work.
-    def __init__(self, **kwargs: Any) -> None:
-        # Cooperative passthrough to the concrete field this is mixed with.
-        super().__init__(**kwargs)
-
     @classmethod
     def get_lookups(cls) -> dict[str, type[Lookup | Transform]]:
         return {"exact": _EncryptedExact, "isnull": IsNull}
@@ -183,54 +192,52 @@ class EncryptedField[T](Field[T]):
         # name — key transforms would operate on ciphertext, so block them.
         return None
 
-    # Block typed-query comparison methods. Ciphertext is non-deterministic,
-    # so equality/ordering against a Python value can't match anything
-    # meaningful. The parameter type is `Never` so a type checker rejects any
-    # call site; the runtime raises if someone bypasses the type checker.
-    # Return type is `Never` (not `Q`) to reflect that control never returns —
-    # `Never` is assignable to `Q` so `where(field.equals(...))` still
-    # type-checks at the use site, and the parameter error is the one that
-    # surfaces.
-    def equals(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("equals"))
+    def _build_q(self, method: str, suffix: str, value: Any) -> Q:
+        """The one runtime guard. Every condition method on `Field` funnels
+        through here, so blocking the ones that compare ciphertext takes a
+        single override -- including conditions that don't exist yet.
 
-    def not_equal(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("not_equal"))
+        `isnull` is the only meaningful comparison: it reads the column's
+        NULL-ness, not its contents.
+        """
+        if suffix != "isnull":
+            raise TypeError(self._lookup_unsupported_message(method))
+        return super()._build_q(method, suffix, value)
 
-    def gt(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("gt"))
+    if TYPE_CHECKING:
+        # The static half of the same block. `Never` as the parameter type
+        # rejects every call site; the return is `Never` (not `Q`) to reflect
+        # that control never returns, and `Never` is assignable to `Q` so
+        # `where(field.equals(...))` still type-checks at the use site with the
+        # parameter error as the one that surfaces.
+        #
+        # Declarations only -- `_build_q` above is what raises. Keeping them
+        # here means the static block and the runtime block can't drift into
+        # disagreeing about *how* to refuse, only about which methods exist.
+        def equals(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
-    def gte(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("gte"))
+        def not_equal(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
-    def lt(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("lt"))
+        def gt(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
-    def lte(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("lte"))
+        def gte(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
-    def is_in(self, values: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("is_in"))
+        def lt(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
-    # The pattern conditions are declared on Field (implemented on TextField)
-    # and are as meaningless on ciphertext as the comparisons above, so they
-    # are blocked in the same shape: `Never` rejects the call site, the raise
-    # covers anyone who bypasses the type checker. EncryptedJSONField never
-    # had them at runtime; blocking here costs it nothing.
-    def contains(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("contains"))
+        def lte(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
-    def icontains(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("icontains"))
+        def is_in(self, values: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
-    def startswith(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("startswith"))
+        def contains(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
-    def endswith(self, value: Never) -> Never:  # ty: ignore[invalid-method-override]
-        raise TypeError(self._lookup_unsupported_message("endswith"))
+        def icontains(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def startswith(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def endswith(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
     def _lookup_unsupported_message(self, method: str) -> str:
-        assert self.name is not None, (
+        assert self.name, (
             "Encrypted field must be attached to a model before its typed-query "
             "methods can produce a meaningful error message."
         )
@@ -286,14 +293,7 @@ class EncryptedField[T](Field[T]):
         return errors
 
 
-# `EncryptedField` narrows the pattern conditions `TextField` implements down to
-# `Never` — that narrowing is the type-level block, and it is exactly what the
-# base-class-conflict check objects to, so the diagnostic is suppressed here.
-# The suppression is class-wide, so any OTHER base-class conflict introduced on
-# this class has to be checked by hand.
-class EncryptedTextField[T: (str, str | None) = str](  # ty: ignore[invalid-method-override]
-    EncryptedField[T], TextField[T]
-):
+class EncryptedTextField[T: (str, str | None) = str](EncryptedField[T], TextField[T]):
     """A TextField that encrypts its value before storing in the database.
 
     Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key

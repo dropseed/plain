@@ -97,6 +97,10 @@ def _empty(of_cls: type) -> Empty:
     return new
 
 
+# Ordering conditions: the ones a None operand is meaningless for.
+_ORDERING_SUFFIXES = frozenset({"gt", "gte", "lt", "lte"})
+
+
 class Field[T](RegisterLookupMixin):
     """Base class for all field types"""
 
@@ -158,59 +162,104 @@ class Field[T](RegisterLookupMixin):
 
     # Typed query conditions. Available on every field; subclasses extend
     # with type-specific lookups (comparison on numeric, string ops on text).
+    # The names are listed once in CONDITION_METHODS below -- anything that
+    # needs the set (traversal advice, tests) imports it rather than retyping.
     def equals(self, value: T) -> Q:
-        return self._build_q("", value)
+        return self._build_q("equals", "", value)
 
     def not_equal(self, value: T) -> Q:
-        return ~self._build_q("", value)
+        return ~self._build_q("not_equal", "", value)
 
     def gt(self, value: T) -> Q:
-        return self._build_q("gt", value)
+        return self._build_q("gt", "gt", value)
 
     def gte(self, value: T) -> Q:
-        return self._build_q("gte", value)
+        return self._build_q("gte", "gte", value)
 
     def lt(self, value: T) -> Q:
-        return self._build_q("lt", value)
+        return self._build_q("lt", "lt", value)
 
     def lte(self, value: T) -> Q:
-        return self._build_q("lte", value)
+        return self._build_q("lte", "lte", value)
 
     def is_null(self, value: bool = True) -> Q:
-        return self._build_q("isnull", value)
+        return self._build_q("is_null", "isnull", value)
 
     def is_in(self, values: Iterable[T]) -> Q:
-        return self._build_q("in", values)
+        return self._build_q("is_in", "in", values)
 
-    if TYPE_CHECKING:
-        # Pattern conditions are implemented by StringConditionsMixin, not
-        # here -- the runtime surface stays exactly as narrow as the field it
-        # belongs to, which is what where() traversal reflects. They are
-        # *declared* here so they survive the `Field[T]` annotation models
-        # carry: a model field's declared type is `Field[str]`, not
-        # `TextField[str]`, so the checker only sees what `Field` offers. The
-        # `self` annotation keeps the restriction -- a `Field[int]` still
-        # rejects `.startswith(...)`. Every field that satisfies this `self`
-        # type has to mix in StringConditionsMixin, or the declaration
-        # promises a method the instance doesn't have.
-        def contains(self: Field[str] | Field[str | None], value: str) -> Q: ...
+    # Pattern conditions. They live on Field, like every other condition, so
+    # they survive the `Field[T]` annotation models carry -- a field's declared
+    # type is `Field[str]`, not `TextField[str]`, so the checker only ever sees
+    # what `Field` offers. The `self` annotation is the restriction: a
+    # `Field[int]` rejects `.startswith(...)` statically, and `_build_q`
+    # rejects it at runtime for anything that doesn't register the lookup.
+    #
+    # (`JSONField` does register a jsonb `contains`, so `Field[dict].contains`
+    # is rejected by the `self` type rather than at runtime -- the same
+    # type-first guard the encrypted fields use.)
+    def contains(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("contains", "contains", value)
 
-        def icontains(self: Field[str] | Field[str | None], value: str) -> Q: ...
+    def icontains(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("icontains", "icontains", value)
 
-        def startswith(self: Field[str] | Field[str | None], value: str) -> Q: ...
+    def startswith(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("startswith", "startswith", value)
 
-        def endswith(self: Field[str] | Field[str | None], value: str) -> Q: ...
+    def endswith(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("endswith", "endswith", value)
 
-    def _build_q(self, suffix: str, value: Any) -> Q:
+    def _build_q(self, method: str, suffix: str, value: Any) -> Q:
         """Build a Q from a lookup suffix + value. Uses Q's positional-tuple
         constructor to bypass its reserved `_connector`/`_negated` kwargs that
-        confuse the type checker on `**{name: value}` expansion."""
-        assert self.name is not None, (
+        confuse the type checker on `**{name: value}` expansion.
+
+        `method` is the condition method's own name, used only for error
+        messages -- it's what the caller wrote, so it's what an error should
+        name.
+        """
+        assert self.name, (
             "Field name must be set before building a query condition; "
             "the field must be attached to a model."
         )
-        name = f"{self.name}__{suffix}" if suffix else self.name
+        if value is None and suffix in _ORDERING_SUFFIXES:
+            # On a nullable field `T` includes None, so `age.gte(None)` gets
+            # past the type checker -- there is no way to subtract None from a
+            # TypeVar, so `self: Field[X | None], value: X` still solves X as
+            # `int | None` under both ty and pyright. Refuse here instead, at
+            # the call site, rather than letting it reach the compiler as a
+            # "Cannot use None as a query value" ValueError with no field in it.
+            raise TypeError(
+                f"{type(self).__name__} {self.name!r}: .{method}() has no "
+                f"meaning for None -- a SQL comparison against NULL is never "
+                f"true. Use .is_null() instead."
+            )
+        if suffix and not self.get_lookup(suffix):
+            # The type checker rejects most of these already (a `Field[int]`
+            # has no `.startswith`); this catches what it can't see.
+            raise TypeError(
+                f"{type(self).__name__} {self.name!r} does not support "
+                f".{method}() -- no {suffix!r} lookup is registered for it."
+            )
+        name = f"{self.name}{LOOKUP_SEP}{suffix}" if suffix else self.name
         return Q((name, value))
+
+    def with_lookup_prefix(self, prefix: str) -> Self:
+        """Return a detached copy of this field whose name carries `prefix`.
+
+        This is all where() traversal needs: `Child.parent.name` hands back the
+        related model's own `name` field renamed to `parent__name`, so the
+        field's own condition methods build `Q(parent__name=...)`. Nothing has
+        to re-implement or rewrite the field's surface, which is why a
+        traversed field offers exactly what direct access offers -- including
+        an encrypted field's blocks, whose error message names the full path.
+
+        The copy is not attached to a model and exists only to build a Q.
+        """
+        prefixed = copy.copy(self)
+        prefixed.name = f"{prefix}{LOOKUP_SEP}{self.name}"
+        return prefixed
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [*self._check_field_name()]
@@ -450,22 +499,16 @@ class Field[T](RegisterLookupMixin):
 
     # Descriptor protocol implementation
     #
-    # The first two overloads are class access on a *model-valued* field -- a
-    # foreign key. They yield `type[T]` rather than the descriptor so the
-    # related model's own typed field surface is reachable for where()
-    # traversal (`Child.parent.name.equals(...)`), matching what
-    # `ForwardForeignKeyDescriptor.__get__` returns at runtime (a
-    # `RelatedFieldRef` proxy onto the related model). They come first so they
-    # win over the plain `Self` overload for FK fields; a non-model T never
-    # matches them.
+    # The first overload is class access on a *model-valued* field -- a foreign
+    # key, nullable or not. It yields `type[T]` rather than the descriptor so
+    # the related model's own typed field surface is reachable for where()
+    # traversal (`Child.parent.name.equals(...)`), matching the traversal
+    # `ForwardForeignKeyDescriptor.__getattr__` serves at runtime. It comes
+    # first so it wins over the plain `Self` overload for FK fields; a
+    # non-model T never matches it.
     @overload
     def __get__[M: Model](
-        self: Field[M], instance: None, owner: type[Model]
-    ) -> type[M]: ...
-
-    @overload
-    def __get__[M: Model](
-        self: Field[M | None], instance: None, owner: type[Model]
+        self: Field[M] | Field[M | None], instance: None, owner: type[Model]
     ) -> type[M]: ...
 
     @overload
@@ -615,6 +658,24 @@ class Field[T](RegisterLookupMixin):
         return getattr(obj, self.name)
 
 
+# The condition methods `Field` exposes, named once. Anything that needs the
+# set rather than the methods themselves -- the relation-traversal advice in
+# related_typed.py, the tests that sweep the surface -- imports from here
+# instead of keeping its own copy in sync.
+STRING_CONDITION_METHODS = ("contains", "icontains", "startswith", "endswith")
+CONDITION_METHODS = (
+    "equals",
+    "not_equal",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "is_null",
+    "is_in",
+    *STRING_CONDITION_METHODS,
+)
+
+
 def validate_none_only_default(
     field: Field[Any], default: Any, *, allow_null: bool
 ) -> None:
@@ -642,41 +703,6 @@ def validate_none_only_default(
         )
     if not allow_null:
         raise TypeError(f"{name}(default=None) requires allow_null=True.")
-
-
-class StringConditionsMixin:
-    """The pattern conditions that every string-valued field carries.
-
-    `Field` *declares* these under TYPE_CHECKING, restricted by their `self`
-    annotation to `Field[str]` / `Field[str | None]`, so they survive the
-    `Field[T]` annotation models write. This is where they are implemented,
-    and the two have to agree: a field whose value type is `str` must mix this
-    in, or the declaration promises a method that raises `AttributeError`.
-
-    That means TextField and its subclasses, and also the string-valued fields
-    that are *not* TextFields -- `RandomStringField` (a ColumnField) and
-    `GenericIPAddressField` (a DefaultableField). Non-string fields get
-    neither the declaration nor the methods, which is what keeps where()
-    traversal's surface an honest mirror of direct field access.
-
-    Must be used with Field as a co-base class.
-    """
-
-    if TYPE_CHECKING:
-        # Provided by Field, the required co-base class.
-        def _build_q(self, suffix: str, value: Any) -> Q: ...
-
-    def contains(self, value: str) -> Q:
-        return self._build_q("contains", value)
-
-    def icontains(self, value: str) -> Q:
-        return self._build_q("icontains", value)
-
-    def startswith(self, value: str) -> Q:
-        return self._build_q("startswith", value)
-
-    def endswith(self, value: str) -> Q:
-        return self._build_q("endswith", value)
 
 
 class ColumnField[T](Field[T]):

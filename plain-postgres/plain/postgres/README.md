@@ -247,7 +247,7 @@ Post.query.where(Post.author.id.is_null())  # nullable relation
 
 `Post.author.equals(author)` raises `TypeError` naming this spelling. It isn't an oversight: to the type checker `Post.author` is `type[Author]`, which is what makes `Post.author.email.equals(...)` type-check, and a condition method there would be a runtime method the checker rejects.
 
-A traversed field offers exactly the same conditions as the field itself — a string-only method like `contains` is available through the relation only when the related field is string-valued (any of them, not just `TextField`: `GenericIPAddressField` and `RandomStringField` carry them too).
+A traversed field _is_ the related field, carrying the relation path as its name — so it offers exactly the conditions that field offers, including an encrypted field's refusals.
 
 [Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`.
 

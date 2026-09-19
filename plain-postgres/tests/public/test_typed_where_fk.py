@@ -1,8 +1,8 @@
 """Typed where() across forward foreign-key relations.
 
 `ChildCascade.parent` is a ForeignKeyField to DeleteParent. Accessing
-`.name` on the class-level descriptor should yield a PrefixedFieldRef
-whose typed-query methods build Q objects with `parent__name` paths.
+`.name` on the class-level descriptor should yield DeleteParent's own `name`
+field, renamed to `parent__name`, so its condition methods build that path.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from app.examples.models.delete import (
 from app.examples.models.encrypted import SecretStore
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.shadowing import ShadowSource, ShadowTarget
+from plain.postgres.fields.base import CONDITION_METHODS
 from plain.postgres.query_utils import Q
 
 
@@ -154,94 +155,50 @@ def test_two_hop_chain_combines_with_or(db):
 
 
 class TestEncryptedFieldTraversalBlocked:
-    """A model with an FK to an encrypted-field-bearing model. Direct access
-    (SecretStore.api_key.equals) raises TypeError. Traversal must too —
-    otherwise the typed-API guard becomes a per-call-site instead of a
-    per-field guarantee."""
+    """Traversal hands back the field itself, so an encrypted field's blocks
+    arrive with it — the guard is per-field, not per-call-site. The error even
+    names the full path, because the prefixed copy carries it as its name."""
 
-    def test_traversed_equals_raises(self, db):
-        # WidgetTag doesn't have an FK to SecretStore, so we construct a
-        # synthetic traversal via PrefixedFieldRef directly. This is the
-        # same code path Order.relation.api_key.equals(...) would use.
-        from plain.postgres.fields.related_typed import PrefixedFieldRef
-
-        ref = PrefixedFieldRef(
-            field=SecretStore._model_meta.get_forward_field("api_key"),
-            parent_path="store",
+    @pytest.fixture
+    def traversed(self):
+        # No model in the examples app has an FK to SecretStore, so prefix the
+        # field directly. This is exactly what RelatedFieldRef hands back.
+        return SecretStore._model_meta.get_forward_field("api_key").with_lookup_prefix(
+            "store"
         )
-        with pytest.raises(
-            TypeError, match=r"Encrypted field.*does not support \.equals\("
-        ):
-            ref.equals("x")
-
-    def test_traversed_ordering_raises(self):
-        from plain.postgres.fields.related_typed import PrefixedFieldRef
-
-        ref = PrefixedFieldRef(
-            field=SecretStore._model_meta.get_forward_field("api_key"),
-            parent_path="store",
-        )
-        for method in ("not_equal", "gt", "gte", "lt", "lte"):
-            with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
-                getattr(ref, method)("x")
 
     @pytest.mark.parametrize(
-        "method", ["contains", "icontains", "startswith", "endswith"]
+        "method",
+        [m for m in CONDITION_METHODS if m != "is_null"],
     )
-    def test_traversed_text_method_raises(self, method):
-        # EncryptedTextField inherits TextField's pattern conditions and blocks
-        # them, so traversal reports the same TypeError direct access does.
-        from plain.postgres.fields.related_typed import PrefixedFieldRef
+    def test_traversed_condition_raises(self, traversed, method):
+        with pytest.raises(
+            TypeError, match=rf"store__api_key.*does not support \.{method}\("
+        ):
+            getattr(traversed, method)("x")
 
-        ref = PrefixedFieldRef(
-            field=SecretStore._model_meta.get_forward_field("api_key"),
-            parent_path="store",
-        )
-        with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
-            getattr(ref, method)("x")
-
-    def test_traversed_is_in_raises(self):
-        from plain.postgres.fields.related_typed import PrefixedFieldRef
-
-        ref = PrefixedFieldRef(
-            field=SecretStore._model_meta.get_forward_field("api_key"),
-            parent_path="store",
-        )
-        with pytest.raises(TypeError, match=r"does not support \.is_in\("):
-            ref.is_in(["x", "y"])
-
-    def test_traversed_is_null_still_works(self):
-        from plain.postgres.fields.related_typed import PrefixedFieldRef
-
-        ref = PrefixedFieldRef(
-            field=SecretStore._model_meta.get_forward_field("api_key"),
-            parent_path="store",
-        )
-        q = ref.is_null()
-        assert q.children == [("store__api_key__isnull", True)]
+    def test_traversed_is_null_still_works(self, traversed):
+        assert traversed.is_null().children == [("store__api_key__isnull", True)]
 
 
-def test_traversed_surface_matches_direct_field_surface():
-    """Traversal exposes exactly the field's own condition surface. A text-only
-    method (.contains) is present when traversing to a TextField and absent when
-    traversing to a non-text field — the same as direct field access."""
-    from plain.postgres.fields.related_typed import _CONDITION_METHODS
+def test_traversal_hands_back_the_field_itself():
+    """The traversed object is the related model's own field, renamed — which
+    is what makes its surface identical to direct access by construction."""
+    direct = DeleteParent._model_meta.get_forward_field("name")
+    traversed = ChildCascade.parent.name
 
-    for field_name in ("name", "id"):
-        direct = DeleteParent._model_meta.get_forward_field(field_name)
-        traversed = getattr(ChildCascade.parent, field_name)
-        for method in _CONDITION_METHODS:
-            assert hasattr(traversed, method) == hasattr(direct, method), (
-                f"{field_name}.{method}"
-            )
+    assert type(traversed) is type(direct)
+    assert traversed.name == "parent__name"
+    assert direct.name == "name"  # the original is untouched
 
 
 # ---------------------------------------------------------------------------
-# Descriptor attribute shadowing: a related field whose name collides with a
-# public attribute on ForwardForeignKeyDescriptor (`field`, `is_cached`,
-# `get_queryset`, `get_prefetch_queryset`) must still traverse to the field.
-# `__get__` returns a RelatedFieldRef proxy for class access, so the
-# descriptor's own attributes are unreachable through the relation.
+# Descriptor attribute shadowing: these four names were once public attributes
+# on ForwardForeignKeyDescriptor, so a related field named after one of them
+# resolved to the descriptor's attribute instead of traversing. They are
+# `_`-prefixed now, and `Meta` skips `_`-prefixed attributes when it collects
+# fields, so no field name can ever collide with a descriptor attribute again.
+# These cases pin that: re-publishing any of them would fail here.
 # ---------------------------------------------------------------------------
 
 
@@ -351,19 +308,22 @@ def test_where_filters_by_null_relation_key(db):
     assert [r.id for r in non_nulls] == [attached.id]
 
 
-@pytest.mark.parametrize(
-    "method",
-    ["equals", "not_equal", "gt", "gte", "lt", "lte", "is_null", "is_in", "contains"],
-)
+@pytest.mark.parametrize("method", CONDITION_METHODS)
 def test_condition_on_the_relation_itself_raises_helpful_error(method):
-    """Not the generic AttributeError -- the error has to name the spelling
-    that works, or the constraint just looks like a missing feature."""
-    with pytest.raises(TypeError) as excinfo:
+    """An AttributeError, so `hasattr`/`getattr(..., default)` keep working --
+    but one that names the spelling that does work, or the constraint just
+    looks like a missing feature."""
+    with pytest.raises(AttributeError) as excinfo:
         getattr(ChildCascade.parent, method)
 
     message = str(excinfo.value)
     assert "is a relation, not a field" in message
     assert f"parent.id.{method}(...)" in message
+
+
+def test_condition_on_the_relation_keeps_the_attribute_protocol():
+    assert not hasattr(ChildCascade.parent, "equals")
+    assert getattr(ChildCascade.parent, "equals", "fallback") == "fallback"
 
 
 def test_unknown_relation_attribute_still_raises_attribute_error():
