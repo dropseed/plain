@@ -1,0 +1,55 @@
+---
+imports:
+  - from plain.forms import field_value
+components:
+  - components/FieldErrors
+attrs:
+  form: Any
+  field: Any
+  label: str
+  type: str = "text"
+  autofocus: bool = False
+  required: bool = False
+  autocomplete: str = ""
+  placeholder: str = ""
+  min_height: str = ""
+  value: Any = None
+---
+<div>
+    <label class="field-label" for="{{ field.html_id }}">{{ label }}</label>
+    {% if type == "textarea" %}
+    <textarea
+        class="{{ ["field-input", f"min-h-[{min_height}]" if min_height else None] }}"
+        name="{{ field.name }}"
+        id="{{ field.html_id }}"
+        required="{{ required }}"
+        autofocus="{{ autofocus }}"
+    >{{ field_value(form, field) or '' }}</textarea>
+{% endif %}{% if type == "select" %}
+        <select
+    class="field-input"
+    name="{{ field.name }}"
+    id="{{ field.html_id }}"
+    required="{{ required }}"
+>
+    {% for (value, choice_label) in field.choices %}
+        <option
+            value="{{ value }}"
+            selected="{{ str(field_value(form, field)) == str(value) }}"
+        >{{ choice_label }}</option>
+    {% endfor %}
+</select>
+    {% endif %}{% if type not in ("textarea", "select") %}
+        <input
+    class="field-input"
+    type="{{ type }}"
+    name="{{ field.name }}"
+    id="{{ field.html_id }}"
+    value="{{ field_value(form, field) or '' }}"
+    required="{{ required }}"
+    autofocus="{{ autofocus }}"
+    autocomplete="{{ autocomplete or None }}"
+    placeholder="{{ placeholder or None }}"
+>
+    {% endif %}<FieldErrors form="{{ form }}" field="{{ field }}" />
+</div>

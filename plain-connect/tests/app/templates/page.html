@@ -1,14 +1,21 @@
+---
+imports:
+  - from plain.connect.templates import connect_pageviews, connect_support_fields, connect_support_url
+  - from plain.toolbar.html import toolbar
+attrs:
+  request: Any
+---
 <!doctype html>
 <html>
-  <body>
-    {% connect_pageviews %}
+    <body>
+    {{ connect_pageviews(request) }}
     <form action="{{ connect_support_url('plain_sf_testid') }}" method="POST">
-      {% connect_support_fields %}
-      <input name="name">
+      {{ connect_support_fields(request) }}
+      <input name>
       <input name="email">
       <textarea name="message"></textarea>
       <button type="submit">Send</button>
     </form>
-    {% toolbar %}
+    {{ toolbar(request) }}
   </body>
 </html>

@@ -1,8 +1,20 @@
-{% use_elements %}
-
+---
+components:
+  - elements/admin/Label
+  - elements/admin/Select
+  - elements/admin/Help
+  - elements/admin/FieldErrors
+attrs:
+  form: Any
+  field: Any
+  label: str
+  help: str = ""
+---
 <div class="space-y-1">
-    <admin.Label field={field}>{{ label }}</admin.Label>
-    <admin.Select form={form} field={field} />
-    {% if help is defined %}<admin.Help help={help} />{% endif %}
-    <admin.FieldErrors form={form} field={field} />
+    <Label field="{{ field }}">{{ label }}</Label>
+    <Select form="{{ form }}" field="{{ field }}" />
+    {% if help %}
+        <Help help="{{ help }}" />
+    {% endif %}
+    <FieldErrors form="{{ form }}" field="{{ field }}" />
 </div>

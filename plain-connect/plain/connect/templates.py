@@ -3,10 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
-from jinja2.runtime import Context
+from plain.assets.urls import get_asset_url as _get_asset_url
+from plain.html import Markup
 from plain.runtime import settings
-from plain.templates import register_template_extension, register_template_global
-from plain.templates.jinja.extensions import InclusionTagExtension
 
 from .identity import encrypt_identity, sign_render_token
 from .tracing import current_trace
@@ -24,45 +23,44 @@ except ImportError:
         return None
 
 
-@register_template_extension
-class ConnectPageviewsExtension(InclusionTagExtension):
-    tags = {"connect_pageviews"}  # noqa: RUF012 — jinja2 types `tags` as an instance attribute; ClassVar here fails ty's LSP check
-    template_name = "connect/pageviews.html"
+def connect_pageviews(request: Any) -> Markup:
+    """Render the pageviews beacon `<script>` tag, or empty when disabled.
 
-    def get_context(
-        self, context: Context, *args: Any, **kwargs: Any
-    ) -> dict[str, Any]:
-        request = context.get("request")
-        token = settings.CONNECT_PAGEVIEWS_TOKEN
-        secret = str(settings.CONNECT_SECRET_KEY) if token else ""
-        return {
-            "request": request,
-            "connect_pageviews_token": token,
-            "connect_pageviews_url": settings.CONNECT_PAGEVIEWS_URL,
-            "connect_pageviews_identity": _identity_token(request, secret)
-            if token
-            else "",
-            "connect_pageviews_trace_id": current_trace().trace_id if token else "",
-            "connect_pageviews_route": _current_route(request) if token else "",
-        }
+    Returned as `Markup` so a template can drop it in with `{{ ... }}`.
+    """
+    token = settings.CONNECT_PAGEVIEWS_TOKEN
+    if not token:
+        return Markup("")
+
+    secret = str(settings.CONNECT_SECRET_KEY)
+    return Markup(
+        f'<script src="{_get_asset_url("connect/pageviews.js")}" '
+        f'data-token="{token}" '
+        f'data-pageviews-url="{settings.CONNECT_PAGEVIEWS_URL}" '
+        f'data-identity="{_identity_token(request, secret)}" '
+        f'data-trace-id="{current_trace().trace_id}" '
+        f'data-route="{_current_route(request)}" '
+        f'async nonce="{request.csp_nonce}"></script>'
+    )
 
 
-@register_template_extension
-class ConnectSupportFieldsExtension(InclusionTagExtension):
-    tags = {"connect_support_fields"}  # noqa: RUF012 — jinja2 types `tags` as an instance attribute; ClassVar here fails ty's LSP check
-    template_name = "connect/support_fields.html"
+def connect_support_fields(request: Any) -> Markup:
+    """Render the hidden identity / render-token inputs for a support form.
 
-    def get_context(
-        self, context: Context, *args: Any, **kwargs: Any
-    ) -> dict[str, Any]:
-        secret = str(settings.CONNECT_SECRET_KEY)
-        return {
-            "connect_support_identity": _identity_token(context.get("request"), secret),
-            "connect_support_render_token": sign_render_token(secret),
-        }
+    Returned as `Markup` so a template can drop it inside its `<form>` with
+    `{{ ... }}`.
+    """
+    secret = str(settings.CONNECT_SECRET_KEY)
+    return Markup(
+        f'<input type="hidden" name="plain_connect_render_token" '
+        f'value="{sign_render_token(secret)}">'
+        f'<input type="hidden" name="plain_connect_identity" '
+        f'value="{_identity_token(request, secret)}">'
+        '<input type="text" name="plain_connect_check" tabindex="-1" '
+        'autocomplete="off" hidden aria-hidden="true">'
+    )
 
 
-@register_template_global
 def connect_support_url(endpoint_id: str) -> str:
     """Build the form-action URL for a support endpoint."""
     base = str(settings.CONNECT_CLOUD_URL).rstrip("/")
@@ -84,6 +82,7 @@ def _current_route(request: Request | None) -> str:
 def _identity_token(request: Request | None, secret: str) -> str:
     if not secret or request is None:
         return ""
+
     user = get_request_user(request)
     if user is None:
         return ""

@@ -1,8 +1,15 @@
+---
+imports:
+  - from plain.forms import field_value
+attrs:
+  form: Any
+  field: Any
+---
 <input
     id="{{ field.html_id }}"
     class="admin-input"
     type="checkbox"
     name="{{ field.name }}"
-    {% if field_value(form, field) %}checked{% endif %}
-    {% if field.required %}required{% endif %}
-    >
+    checked="{{ bool(field_value(form, field)) }}"
+    required="{{ field.required }}"
+>

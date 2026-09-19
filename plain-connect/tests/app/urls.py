@@ -1,5 +1,5 @@
 from plain.assets.urls import AssetsRouter
-from plain.templates.views import TemplateView
+from plain.html.views import TemplateView
 from plain.urls import Router, include, path
 
 

@@ -1,25 +1,59 @@
-{% from "_macros.html" import field, field_error_list, nonfield_errors %}
-
-{{ nonfield_errors(form) }}
-{{ field(form, form_class.title, "Title", autofocus=True) }}
-{{ field(form, form_class.project, "Project", type="select") }}
-{{ field(form, form_class.notes, "Notes", type="textarea", min_height="120px") }}
-
+---
+imports:
+  - from plain.forms import field_value
+components:
+  - components/NonfieldErrors
+  - components/Field
+  - components/FieldErrors
+attrs:
+  form: Any
+  form_class: Any
+  value: Any = None
+---
+<NonfieldErrors form="{{ form }}" />
+<Field
+    form="{{ form }}"
+    field="{{ form_class.title }}"
+    label="Title"
+    autofocus="{{ True }}"
+    required="{{ True }}"
+/>
+<Field
+    form="{{ form }}"
+    field="{{ form_class.project }}"
+    label="Project"
+    type="select"
+/>
+<Field
+    form="{{ form }}"
+    field="{{ form_class.notes }}"
+    label="Notes"
+    type="textarea"
+    min_height="120px"
+/>
 <div class="grid grid-cols-2 gap-4">
-    {{ field(form, form_class.due_date, "Due date", type="date") }}
-    {{ field(form, form_class.priority, "Priority", type="select") }}
+    <Field
+        form="{{ form }}"
+        field="{{ form_class.due_date }}"
+        label="Due date"
+        type="date"
+    />
+    <Field
+        form="{{ form }}"
+        field="{{ form_class.priority }}"
+        label="Priority"
+        type="select"
+    />
 </div>
-
 <label class="flex items-center gap-2 text-sm text-body">
     <input
         type="checkbox"
         name="{{ form_class.is_complete.name }}"
         id="{{ form_class.is_complete.html_id }}"
-        {% if field_value(form, form_class.is_complete) %}checked{% endif %}
+        checked="{{ bool(field_value(form, form_class.is_complete)) }}"
     >
     Complete
 </label>
-
 <div>
     <label class="field-label" for="{{ form_class.tags.html_id }}">Tags</label>
     <select
@@ -28,11 +62,12 @@
         id="{{ form_class.tags.html_id }}"
         multiple
     >
-        {# value is a list of tag ids (prefill) or submitted strings — string both sides #}
-        {% set selected_ids = (field_value(form, form_class.tags) or []) | map('string') | list %}
-        {% for value, label in form_class.tags.choices %}
-        <option value="{{ value }}" {% if (value|string) in selected_ids %}selected{% endif %}>{{ label }}</option>
+        {% for (value, label) in form_class.tags.choices %}
+            <option
+                value="{{ value }}"
+                selected="{{ str(value) in [str(v) for v in (field_value(form, form_class.tags) or [])] }}"
+            >{{ label }}</option>
         {% endfor %}
     </select>
-    {{ field_error_list(form, form_class.tags) }}
+    <FieldErrors form="{{ form }}" field="{{ form_class.tags }}" />
 </div>

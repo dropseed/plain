@@ -66,7 +66,8 @@ class Reloader(threading.Thread):
                 ) and filename.startswith(".env"):
                     should_reload = True
 
-                # HTML files: only reload on add/delete (Jinja auto-reloads modifications)
+                # HTML files: only reload on add/delete — the template engine
+                # recompiles a modified file on its own.
                 if (
                     self._watch_html
                     and change_type

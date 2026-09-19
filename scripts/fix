@@ -3,10 +3,12 @@
 if [ "$1" = "--check" ]; then
     shift
     uv run plain-code check . "$@"
+    "$(dirname "$0")/html-format" --check
     echo "--> prettier --check..."
     npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --log-level warn --check
 else
     uv run plain-code fix . "$@"
+    "$(dirname "$0")/html-format"
     echo "--> prettier --write..."
     npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --log-level warn --write
 fi

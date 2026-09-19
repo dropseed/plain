@@ -1,0 +1,22 @@
+---
+components:
+  - htmx/HtmxFragment
+attrs:
+  name: str = ""
+  items: Any = ()
+---
+<main>
+    <HtmxFragment name="main">
+        <p>Hello {{ name }}</p>
+    </HtmxFragment>
+    {% for item in items %}
+        <HtmxFragment name="{{ "item-" + str(item["id"]) }}">
+            <span>{{ item["name"] }}</span>
+        </HtmxFragment>
+    {% endfor %}
+    <HtmxFragment name="outer">
+        <p>BEFORE</p>
+        <HtmxFragment name="inner"><b>INNER</b></HtmxFragment>
+        <p>AFTER</p>
+    </HtmxFragment>
+</main>

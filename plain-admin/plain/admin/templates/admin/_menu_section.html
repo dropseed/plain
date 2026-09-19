@@ -1,67 +1,92 @@
-{% use_elements %}
-{# Macro for rendering a menu section. #}
-{# Parameters: sections (dict), group_label (string|None), pinned_slugs (set), slug (string) #}
-{# group_label is unset for the app's own sections (the primary, everyday
+---
+imports:
+  - from plain.urls import reverse as url
+components:
+  - elements/admin/Icon
+attrs:
+  sections: dict = {}
+  group_label: str = ""
+  pinned_slugs: set = set()
+  slug: str = ""
+---
+{# `group_label` is empty for the app's own sections (the primary, everyday
    content, shown with no header) and set for the framework tooling group,
    which is separated below a divider and labeled by function (e.g. "System"). #}
-
 {% if sections %}
-<div class="menu-section data-[header=system]:mt-3 data-[header=system]:pt-3 data-[header=system]:border-t data-[header=system]:border-admin-border" data-header="{{ group_label|lower if group_label else 'app' }}">
-    {% if group_label %}
-    <div class="px-1.5 pt-1 pb-1">
-        <span class="text-[13px] font-semibold text-admin-foreground/70">{{ group_label }}</span>
-    </div>
-    {% endif %}
-    {% for section, views in sections.items() %}
-    {% if section %}
-    <div class="mt-4 mb-1.5 px-1.5 menu-subsection" data-section="{{ section|lower }}">
-        <span class="text-[10px] font-medium text-admin-muted-foreground/80 uppercase tracking-wider">{{ section }}</span>
-    </div>
-    {% endif %}
-    <div class="space-y-0.5 menu-items-group" data-section="{{ section|lower if section else '' }}">
-        {% for view in views %}
-        {% set nav_url = view.get_view_url() %}
-        {% set view_slug = view.get_slug() %}
-        {% set is_pinned = view_slug in pinned_slugs %}
-        {% set is_current = view_slug == slug %}
-        <div
-            class="menu-item group flex items-center gap-1 rounded-admin-lg transition-colors data-[current]:bg-admin-muted [&[data-current]_a]:text-admin-foreground [&[data-current]_a]:font-medium [&[data-current]_a]:hover:bg-transparent"
-            data-title="{{ view.get_nav_title()|lower }}"
-            {% if is_current %}data-current{% endif %}
-        >
-            <a
-                href="{{ nav_url }}"
-                class="flex-1 flex items-center gap-2 px-1.5 py-2 text-sm rounded-admin-lg transition-colors text-admin-foreground/85 hover:text-admin-foreground hover:bg-admin-muted/40"
-            >
-                {% if view.nav_icon %}<admin.Icon name={view.nav_icon} class="text-admin-muted-foreground/80 flex-shrink-0" />{% endif %}
-                <span>{{ view.get_nav_title() }}</span>
-            </a>
-            {% if is_pinned %}
-            <form method="POST" action="{{ url('admin:unpin') }}" class="contents">
-                <input type="hidden" name="view_slug" value="{{ view_slug }}">
-                <button
-                    type="submit"
-                    class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost mr-1"
-                    title="Unpin"
+    <div
+        class="menu-section data-[header=system]:mt-3 data-[header=system]:pt-3 data-[header=system]:border-t data-[header=system]:border-admin-border"
+        data-header="{{ group_label.lower() if group_label else "app" }}"
+    >
+        {% if group_label %}
+            <div class="px-1.5 pt-1 pb-1">
+                <span class="text-[13px] font-semibold text-admin-foreground/70">{{ group_label }}</span>
+            </div>
+        {% endif %}
+        {% for (section, views) in sections.items() %}
+            {% if section %}
+                <div
+                    class="mt-4 mb-1.5 px-1.5 menu-subsection"
+                    data-section="{{ section.lower() }}"
                 >
-                    <admin.Icon name="pin-fill" class="text-sm" />
-                </button>
-            </form>
-            {% else %}
-            <form method="POST" action="{{ url('admin:pin') }}" class="contents">
-                <input type="hidden" name="view_slug" value="{{ view_slug }}">
-                <button
-                    type="submit"
-                    class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost text-admin-muted-foreground/50 opacity-0 group-hover:opacity-100 mr-1"
-                    title="Pin to nav"
-                >
-                    <admin.Icon name="pin" class="text-sm" />
-                </button>
-            </form>
-            {% endif %}
+            <span
+                class="text-[10px] font-medium text-admin-muted-foreground/80 uppercase tracking-wider"
+            >{{ section }}</span>
         </div>
+            {% endif %}
+            <div
+                class="space-y-0.5 menu-items-group"
+                data-section="{{ section.lower() if section else "" }}"
+            >
+                {% for view in views %}
+                    <div
+                        class="menu-item group flex items-center gap-1 rounded-admin-lg transition-colors data-[current]:bg-admin-muted [&[data-current]_a]:text-admin-foreground [&[data-current]_a]:font-medium [&[data-current]_a]:hover:bg-transparent"
+                        data-title="{{ view.get_nav_title().lower() }}"
+                        data-current="{{ view.get_slug() == slug or None }}"
+                    >
+                <a
+                    href="{{ view.get_view_url() }}"
+                    class="flex-1 flex items-center gap-2 px-1.5 py-2 text-sm rounded-admin-lg transition-colors text-admin-foreground/85 hover:text-admin-foreground hover:bg-admin-muted/40"
+                >
+                    {% if view.nav_icon %}
+                    <Icon
+                        name="{{ view.nav_icon }}"
+                        class="text-admin-muted-foreground/80 flex-shrink-0"
+                    />
+                {% endif %}<span>{{ view.get_nav_title() }}</span>
+                </a>
+                {% if view.get_slug() in pinned_slugs %}
+                        <form
+                            method="POST"
+                            action="{{ url('admin:unpin') }}"
+                            class="contents"
+                        >
+                    <input type="hidden" name="view_slug" value="{{ view.get_slug() }}">
+                    <button
+                        type="submit"
+                        class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost mr-1"
+                        title="Unpin"
+                    >
+                        <Icon name="pin-fill" class="text-sm" />
+                    </button>
+                </form>
+                    {% endif %}{% if view.get_slug() not in pinned_slugs %}
+                        <form
+                            method="POST"
+                            action="{{ url('admin:pin') }}"
+                            class="contents"
+                        >
+                    <input type="hidden" name="view_slug" value="{{ view.get_slug() }}">
+                    <button
+                        type="submit"
+                        class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost text-admin-muted-foreground/50 opacity-0 group-hover:opacity-100 mr-1"
+                        title="Pin to nav"
+                    >
+                        <Icon name="pin" class="text-sm" />
+                    </button>
+                </form>
+                    {% endif %}</div>
+                {% endfor %}
+            </div>
         {% endfor %}
     </div>
-    {% endfor %}
-</div>
 {% endif %}

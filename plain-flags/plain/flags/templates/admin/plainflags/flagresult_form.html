@@ -1,13 +1,37 @@
-{% extends "admin/base.html" %}
-
-{% use_elements %}
-
-{% block content %}
-
-<form method="post" class="space-y-4">
-    <admin.InputField label="Key" field={form.key} />
-    <admin.InputField label="Value" field={form.value} />
-    <admin.Submit>Save</admin.Submit>
-</form>
-
-{% endblock %}
+---
+components:
+  - admin/base as Base
+  - elements/admin/InputField
+  - elements/admin/Submit
+attrs:
+  form: Any
+  form_class: Any
+  title: str = ""
+  app_name: str = "Plain"
+  admin_force_theme: str = ""
+  description: str = ""
+  image: Any = None
+  links: dict = {}
+  extra_links: dict = {}
+  parent_view_classes: list = []
+  object: Any = None
+  cards: tuple = ()
+---
+<Base
+    title="{{ title }}"
+    app_name="{{ app_name }}"
+    admin_force_theme="{{ admin_force_theme }}"
+    description="{{ description }}"
+    image="{{ image }}"
+    links="{{ links }}"
+    extra_links="{{ extra_links }}"
+    parent_view_classes="{{ parent_view_classes }}"
+    object="{{ object }}"
+    cards="{{ cards }}"
+>
+    <form method="post" class="space-y-4">
+        <InputField form="{{ form }}" field="{{ form_class.key }}" label="Key" />
+        <InputField form="{{ form }}" field="{{ form_class.value }}" label="Value" />
+        <Submit>Save</Submit>
+    </form>
+</Base>

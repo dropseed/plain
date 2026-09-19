@@ -1,7 +1,9 @@
-{% if value is none %}
-<span class="text-admin-muted-foreground/80 font-mono text-sm">None</span>
-{% elif value == "" %}
-<span class="text-admin-muted-foreground/50">—</span>
-{% else %}
-{{ value }}
-{% endif %}
+---
+attrs:
+  value: Any = None
+  field: Any = None
+  object: Any = None
+---
+{% if value is None %}<span class="text-admin-muted-foreground/80 font-mono text-sm">None</span>{% endif %}
+{% if value == "" %}<span class="text-admin-muted-foreground/50">—</span>{% endif %}
+{% if value is not None and value != "" %}{{ value }}{% endif %}

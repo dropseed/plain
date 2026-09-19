@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from plain.auth.views import AuthView
+from plain.html.views import TemplateView
 from plain.http import ForbiddenError403
 from plain.postgres.exceptions import FieldDoesNotExist
 from plain.preflight import get_check_counts
 from plain.runtime import settings
-from plain.templates.views import TemplateView
 from plain.urls import reverse
 from plain.utils import timezone
 

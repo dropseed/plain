@@ -1,29 +1,66 @@
-{% extends "base.html" %}
-{% from "_macros.html" import field, field_error_list, nonfield_errors, back_link %}
-
-{% block title %}Contact us{% endblock %}
-
-{% block content %}
-<div class="max-w-2xl mx-auto px-5 py-12">
-    {{ back_link(url('index'), "Back to index") }}
-
-    <h1 class="page-h1">Contact us</h1>
-    <p class="mt-3 text-sm text-muted">
-        A plain <span class="font-mono text-body">Form</span> with text, email, choice, and
-        boolean fields, a cross-field <span class="font-mono text-body">check()</span>, and an
-        optional <span class="font-mono text-body">company</span> field via
+---
+imports:
+  - from plain.forms import field_value
+  - from plain.urls import reverse as url
+components:
+  - base as Base
+  - components/BackLink
+  - components/NonfieldErrors
+  - components/Field
+  - components/FieldErrors
+attrs:
+  form: Any
+  form_class: Any
+---
+<Base>
+    {% slot "title" %}Contact us{% endslot %}
+    <div class="max-w-2xl mx-auto px-5 py-12">
+        <BackLink href="{{ url('index') }}" label="Back to index" />
+        <h1 class="page-h1">Contact us</h1>
+        <p class="mt-3 text-sm text-muted">
+        Plain <span class="font-mono text-body">forms.Form</span> with text, email, choice, boolean,
+        custom <span class="font-mono text-body">clean_email</span>, cross-field
+        <span class="font-mono text-body">clean()</span>, and a dynamic
+        <span class="font-mono text-body">company</span> field via
         <a class="body-link" href="?company=1">?company=1</a>.
     </p>
-
-    <form method="post" class="mt-6 flex flex-col gap-5">
-        {{ nonfield_errors(form) }}
-        {{ field(form, form_class.name, "Name", autofocus=True) }}
-        {{ field(form, form_class.email, "Email", type="email") }}
-        {{ field(form, form_class.subject, "Subject", type="select") }}
+        <form method="post" class="mt-6 flex flex-col gap-5">
+        <NonfieldErrors form="{{ form }}" />
+        <Field
+            form="{{ form }}"
+            field="{{ form_class.name }}"
+            label="Name"
+            autofocus="{{ True }}"
+            required="{{ True }}"
+        />
+        <Field
+            form="{{ form }}"
+            field="{{ form_class.email }}"
+            label="Email"
+            type="email"
+            required="{{ True }}"
+        />
+        <Field
+            form="{{ form }}"
+            field="{{ form_class.subject }}"
+            label="Subject"
+            type="select"
+            required="{{ True }}"
+        />
         {% if 'company' in form_class.fields() %}
-        {{ field(form, form_class.company, "Company (optional)") }}
-        {% endif %}
-        {{ field(form, form_class.message, "Message", type="textarea", min_height="160px") }}
+            <Field
+                form="{{ form }}"
+                field="{{ form_class.company }}"
+                label="Company (optional)"
+            />
+        {% endif %}<Field
+            form="{{ form }}"
+            field="{{ form_class.message }}"
+            label="Message"
+            type="textarea"
+            min_height="160px"
+            required="{{ True }}"
+        />
 
         <div>
             <label class="flex items-center gap-2 text-sm text-body">
@@ -31,19 +68,18 @@
                     type="checkbox"
                     name="{{ form_class.subscribe.name }}"
                     id="{{ form_class.subscribe.html_id }}"
-                    {% if field_value(form, form_class.subscribe) %}checked{% endif %}
+                    checked="{{ bool(field_value(form, form_class.subscribe)) }}"
                 >
                 Subscribe to the newsletter
             </label>
-            {{ field_error_list(form, form_class.subscribe) }}
+            <FieldErrors form="{{ form }}" field="{{ form_class.subscribe }}" />
         </div>
 
         <button type="submit" class="btn-primary self-start">Send</button>
     </form>
-
-    <p class="mt-8 text-sm text-muted">
+        <p class="mt-8 text-sm text-muted">
         See submitted entries in the
         <a class="body-link" href="{{ url('contacts:archive') }}">archive</a>.
     </p>
-</div>
-{% endblock %}
+    </div>
+</Base>

@@ -1,3 +1,7 @@
-{% extends "admin/base.html" %}
-
-{% block content %}{% endblock %}
+---
+components:
+  - admin/base as Base
+slots:
+  default: required
+---
+<Base>{{ children }}</Base>

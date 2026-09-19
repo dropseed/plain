@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from plain.auth.views import AuthView
+from plain.html.views import DetailView, ListView, TemplateView
 from plain.http import RedirectResponse, Response
 from plain.postgres import QuerySet
 from plain.postgres.forms import create_from, update_from
-from plain.templates.views import DetailView, ListView, TemplateView
 from plain.urls import reverse
 
 from .forms import NoteForm

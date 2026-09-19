@@ -8,6 +8,12 @@ dev = [
   # Optional runtime dep of plain-api's --validate; hoisted so ty resolves its
   # imports in every dev/CI environment.
   "openapi-spec-validator>=0.7.1",
+  # Test-only dep of plain-html's DOM-equivalence checks; hoisted for the same
+  # reason.
+  "html5lib>=1.1",
+  # plain.html does not use Jinja — this is only what plain-html/bench/render.py
+  # measures against, hoisted so ty can resolve its import.
+  "jinja2>=3.1.2",
   "plain",
   "plain-admin",
   "plain-api",
@@ -18,8 +24,8 @@ dev = [
   "plain-connect",
   "plain-code",
   "plain-dev",
-  "plain-elements",
   "plain-flags",
+  "plain-html",
   "plain-htmx",
   "plain-jobs",
   "plain-loginlink",
@@ -35,7 +41,6 @@ dev = [
   "plain-scan",
   "plain-sessions",
   "plain-tailwind",
-  "plain-templates",
   "plain-toolbar",
   "plain-tunnel",
   "plain-vendor",
@@ -65,8 +70,8 @@ package = false
 "plain-connect" = { workspace = true }
 "plain-code" = { workspace = true }
 "plain-dev" = { workspace = true }
-"plain-elements" = { workspace = true }
 "plain-flags" = { workspace = true }
+"plain-html" = { workspace = true }
 "plain-htmx" = { workspace = true }
 "plain-jobs" = { workspace = true }
 "plain-loginlink" = { workspace = true }
@@ -82,7 +87,6 @@ package = false
 "plain-scan" = { workspace = true }
 "plain-sessions" = { workspace = true }
 "plain-tailwind" = { workspace = true }
-"plain-templates" = { workspace = true }
 "plain-toolbar" = { workspace = true }
 "plain-tunnel" = { workspace = true }
 "plain-vendor" = { workspace = true }

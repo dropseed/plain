@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING, Any
 
 from plain.auth import login, logout
 from plain.auth.views import AuthView
+from plain.html.views import TemplateView
 from plain.http import RedirectResponse, Response
 from plain.runtime import settings
-from plain.templates.views import TemplateView
 from plain.urls import reverse
 from plain.views import View
 

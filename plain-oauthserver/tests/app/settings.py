@@ -4,7 +4,7 @@ INSTALLED_PACKAGES = [
     "plain.auth",
     "plain.sessions",
     "plain.postgres",
-    "plain.templates",
+    "plain.html",
     "plain.oauthserver",
     "app.users",
 ]

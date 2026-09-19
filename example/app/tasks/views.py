@@ -4,11 +4,11 @@ from typing import Any
 
 from plain.auth.views import AuthView
 from plain.forms import Form, Invalid
+from plain.html.views import DetailView, ListView, TemplateView
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
 from plain.postgres import QuerySet
 from plain.postgres.forms import create_from, update_from
-from plain.templates.views import DetailView, ListView, TemplateView
 from plain.urls import reverse
 from plain.views import View
 

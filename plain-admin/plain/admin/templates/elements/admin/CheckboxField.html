@@ -1,10 +1,22 @@
-{% use_elements %}
-
+---
+components:
+  - elements/admin/Checkbox
+  - elements/admin/Label
+  - elements/admin/Help
+  - elements/admin/FieldErrors
+attrs:
+  form: Any
+  field: Any
+  label: str
+  help: str = ""
+---
 <div>
     <div class="flex items-center space-x-2">
-        <admin.Checkbox form={form} field={field} />
-        <admin.Label field={field}>{{ label }}</admin.Label>
-        {% if help is defined %}<admin.Help help={help} />{% endif %}
+        <Checkbox form="{{ form }}" field="{{ field }}" />
+        <Label field="{{ field }}">{{ label }}</Label>
+        {% if help %}
+            <Help help="{{ help }}" />
+        {% endif %}
     </div>
-    <admin.FieldErrors form={form} field={field} />
+    <FieldErrors form="{{ form }}" field="{{ field }}" />
 </div>

@@ -1,15 +1,20 @@
+---
+imports:
+  - from plain.admin.html import get_admin_model_detail_url
+attrs:
+  value: Any = None
+  field: Any = None
+  object: Any = None
+---
 {% if value %}
-
-{% with url = value|get_admin_model_detail_url %}
-    {% if url %}
-    <a href="{{ url }}">{{ value }}</a>
-    {% elif value.get_absolute_url is defined %}
-    <a href="{{ value.get_absolute_url() }}">{{ value }}</a>
-    {% else %}
-    <div>{{ value }}</div>
+    {% if get_admin_model_detail_url(value) %}
+        <a href="{{ get_admin_model_detail_url(value) }}">{{ value }}</a>
     {% endif %}
-{% endwith %}
-
-{% else %}
-<span class="text-admin-muted-foreground/80 italic">None</span>
+    {% if not get_admin_model_detail_url(value) and hasattr(value, 'get_absolute_url') %}
+        <a href="{{ value.get_absolute_url() }}">{{ value }}</a>
+    {% endif %}
+    {% if not get_admin_model_detail_url(value) and not hasattr(value, 'get_absolute_url') %}
+        <div>{{ value }}</div>
+    {% endif %}
 {% endif %}
+{% if not value %}<span class="text-admin-muted-foreground/80 italic">None</span>{% endif %}

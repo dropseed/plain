@@ -1,12 +1,31 @@
-{% extends "admin/cards/base.html" %}
-
-{% block content %}
-<dl class="text-sm">
-    {% for label, value in items.items() %}
-    <div class="flex justify-between items-baseline gap-4 py-1 border-b border-admin-border/60 last:border-0">
-        <dt class="text-admin-muted-foreground">{{ label }}</dt>
-        <dd class="font-mono text-admin-foreground truncate">{{ value }}</dd>
-    </div>
-    {% endfor %}
-</dl>
-{% endblock %}
+---
+components:
+  - admin/cards/base as Base
+attrs:
+  slug: str
+  title: str = ""
+  description: str = ""
+  size: Any = None
+  filters: list = []
+  current_filter: str = ""
+  items: dict = {}
+---
+<Base
+    slug="{{ slug }}"
+    title="{{ title }}"
+    description="{{ description }}"
+    size="{{ size }}"
+    filters="{{ filters }}"
+    current_filter="{{ current_filter }}"
+>
+    <dl class="text-sm">
+        {% for (label, value) in items.items() %}
+            <div
+                class="flex justify-between items-baseline gap-4 py-1 border-b border-admin-border/60 last:border-0"
+            >
+                <dt class="text-admin-muted-foreground">{{ label }}</dt>
+                <dd class="font-mono text-admin-foreground truncate">{{ value }}</dd>
+            </div>
+        {% endfor %}
+    </dl>
+</Base>

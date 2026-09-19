@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from plain.html.views import TemplateView
 from plain.http import RedirectResponse, Response
-from plain.templates.views import TemplateView
 from plain.urls import reverse
 
 from .forms import ContactForm, ContactFormWithCompany

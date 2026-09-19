@@ -1,45 +1,67 @@
-{% extends "admin/cards/base.html" %}
-
-{% block content %}
-<div class="overflow-x-auto -mx-6">
-  <table class="admin-table w-full [&_th]:px-6 [&_td]:px-6 [&_th]:text-xs [&_th]:font-medium [&_th]:text-admin-muted-foreground">
-    {% if headers %}
-    <thead>
-      <tr>
-        {% for header in headers %}
-        <th>{{ header }}</th>
-        {% endfor %}
-      </tr>
-    </thead>
-    {% endif %}
-    <tbody>
-      {% for row in rows %}
-      <tr>
-        {% for cell in row %}
-        <td>{{ cell }}</td>
-        {% endfor %}
-      </tr>
-      {% endfor %}
-    </tbody>
-    {% if footers %}
-    <tfoot>
-      {% if footers[0] is sequence and footers[0] is not string %}
-      {% for footer_row in footers %}
-      <tr>
-        {% for cell in footer_row %}
-        <td>{{ cell }}</td>
-        {% endfor %}
-      </tr>
-      {% endfor %}
-      {% else %}
-      <tr>
-        {% for footer in footers %}
-        <td>{{ footer }}</td>
-        {% endfor %}
-      </tr>
-      {% endif %}
-    </tfoot>
-    {% endif %}
-  </table>
-</div>
-{% endblock %}
+---
+components:
+  - admin/cards/base as Base
+attrs:
+  slug: str
+  title: str = ""
+  description: str = ""
+  size: Any = None
+  filters: list = []
+  current_filter: str = ""
+  headers: list = []
+  rows: list = []
+  footers: list = []
+---
+<Base
+    slug="{{ slug }}"
+    title="{{ title }}"
+    description="{{ description }}"
+    size="{{ size }}"
+    filters="{{ filters }}"
+    current_filter="{{ current_filter }}"
+>
+    <div class="overflow-x-auto -mx-6">
+        <table
+            class="admin-table w-full [&_th]:px-6 [&_td]:px-6 [&_th]:text-xs [&_th]:font-medium [&_th]:text-admin-muted-foreground"
+        >
+            {% if headers %}
+                <thead>
+                    <tr>
+                        {% for header in headers %}
+                            <th>{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+            {% endif %}
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        {% for cell in row %}
+                            <td>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+            {% if footers %}
+                <tfoot>
+                    {% if footers and isinstance(footers[0], (list, tuple)) %}
+                        {% for footer_row in footers %}
+                            <tr>
+                                {% for cell in footer_row %}
+                                    <td>{{ cell }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    {% endif %}
+                    {% if footers and not isinstance(footers[0], (list, tuple)) %}
+                        <tr>
+                            {% for footer in footers %}
+                                <td>{{ footer }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endif %}
+                </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</Base>

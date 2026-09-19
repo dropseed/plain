@@ -1,8 +1,12 @@
-{% extends "base.html" %}
-
-{% block content %}
-<div class="text-center">
-    <h1 class="text-lg">OAuth Error</h1>
-    <p>{{ oauth_error.message }}</p>
-</div>
-{% endblock %}
+---
+components:
+  - base as Base
+attrs:
+  oauth_error: Any
+---
+<Base>
+    <div class="text-center">
+        <h1 class="text-lg">OAuth Error</h1>
+        <p>{{ oauth_error.message }}</p>
+    </div>
+</Base>

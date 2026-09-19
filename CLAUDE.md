@@ -18,6 +18,8 @@ Always use `./scripts/` commands from the repo root — never run `uv run plain 
 | `./scripts/server-test`       | Server conformance, load, and resilience tests               |
 | `./scripts/create-migrations` | Create database migrations (calls `plain migrations create`) |
 | `./scripts/type-check <dir>`  | Type check a directory                                       |
+| `./scripts/html-check`        | Parse + typecheck every `.html` template in the repo         |
+| `./scripts/html-format`       | Format every `.html` template (`--check` to fail instead)    |
 
 ## Scratch directory
 

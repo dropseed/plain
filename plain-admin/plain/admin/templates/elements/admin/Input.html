@@ -1,10 +1,19 @@
+---
+imports:
+  - from plain.forms import field_errors, field_value
+attrs:
+  form: Any
+  field: Any
+  type: str = "text"
+  list: str = ""
+---
 <input
     id="{{ field.html_id }}"
     class="admin-input"
-    type="{{ type|default('text') }}"
+    type="{{ type }}"
     name="{{ field.name }}"
-    {% if list is defined %}list="{{ list }}"{% endif %}
-    value="{{ field_value(form, field) }}"
-    {% if field.required %}required{% endif %}
-    {% if field_errors(form, field) %}aria-invalid="true"{% endif %}
-    >
+    list="{{ list or None }}"
+    value="{{ field_value(form, field) if field_value(form, field) is not None else None }}"
+    required="{{ field.required }}"
+    aria-invalid="{{ 'true' if field_errors(form, field) else None }}"
+>

@@ -1,0 +1,5 @@
+<ul>
+    {% for item in items if item.visible %}
+        <li>{{ item.name }}</li>
+    {% endfor %}
+</ul>

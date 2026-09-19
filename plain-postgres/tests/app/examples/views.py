@@ -13,9 +13,9 @@ which is what the framework offers now that there is no generic `FormView`.
 from __future__ import annotations
 
 from app.examples.models.relationships import Widget
+from plain.html.views import DetailView, TemplateView
 from plain.http import RedirectResponse, Response
 from plain.postgres.forms import ModelForm, create_from, model_field, update_from
-from plain.templates.views import DetailView, TemplateView
 
 
 class WidgetForm(ModelForm):

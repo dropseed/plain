@@ -1,19 +1,37 @@
-{% extends "base.html" %}
-{% from "_macros.html" import field, nonfield_errors, back_link %}
-
-{% block title %}New note{% endblock %}
-
-{% block content %}
-<div class="max-w-2xl mx-auto px-5 py-12">
-    {{ back_link(url('notes:list'), "Back to notes") }}
-
-    <h1 class="page-h1">New note</h1>
-
-    <form method="post" class="mt-6 flex flex-col gap-5">
-        {{ nonfield_errors(form) }}
-        {{ field(form, form_class.title, "Title", autofocus=True) }}
-        {{ field(form, form_class.body, "Body", type="textarea", min_height="200px") }}
+---
+imports:
+  - from plain.urls import reverse as url
+components:
+  - base as Base
+  - components/BackLink
+  - components/NonfieldErrors
+  - components/Field
+attrs:
+  form: Any
+  form_class: Any
+---
+<Base>
+    {% slot "title" %}New note{% endslot %}
+    <div class="max-w-2xl mx-auto px-5 py-12">
+        <BackLink href="{{ url('notes:list') }}" label="Back to notes" />
+        <h1 class="page-h1">New note</h1>
+        <form method="post" class="mt-6 flex flex-col gap-5">
+        <NonfieldErrors form="{{ form }}" />
+        <Field
+            form="{{ form }}"
+            field="{{ form_class.title }}"
+            label="Title"
+            autofocus="{{ True }}"
+            required="{{ True }}"
+        />
+        <Field
+            form="{{ form }}"
+            field="{{ form_class.body }}"
+            label="Body"
+            type="textarea"
+            min_height="200px"
+        />
         <button type="submit" class="btn-primary self-start">Create</button>
     </form>
-</div>
-{% endblock %}
+    </div>
+</Base>

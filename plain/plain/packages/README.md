@@ -25,7 +25,6 @@ INSTALLED_PACKAGES = [
     "plain.sessions",
     "plain.htmx",
     "plain.admin",
-    "plain.elements",
     # Local packages
     "app.users",
     "app.teams",

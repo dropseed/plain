@@ -1,0 +1,1176 @@
+"""Phase 5a compiler tests.
+
+Each emission rule gets a unit test that compiles a fragment of template
+source, exec()s the generated module, and asserts the rendered output
+against an explicit string.
+
+The final block is a small corpus parity check — every case is rendered
+both by the interpreter and the compiler with the same context, and the
+outputs must match byte-for-byte. The full repo-wide corpus parity test
+lands in a later sub-phase; this is just enough coverage to surface
+shape mismatches early.
+"""
+
+from __future__ import annotations
+
+import types
+from pathlib import Path
+from typing import Any
+
+import pytest
+from plain.html import render_source
+from plain.html.compiler import (
+    CompileError,
+    CompileSession,
+    clear_process_cache,
+)
+from plain.html.engine import render as engine_render
+
+
+def _compile_string(source: str, *, label: str = "<test>") -> str:
+    return CompileSession().compile_string(source, label=label)
+
+
+def _compile_path(path: Path):
+    return CompileSession().compile_path(path)
+
+
+def _load(source: str, *, label: str = "<test>"):
+    src = _compile_string(source, label=label)
+    mod = types.ModuleType(f"_plain_html_test_{abs(hash(source))}")
+    mod.__file__ = label
+    code = compile(src, label, "exec")
+    exec(code, mod.__dict__)  # noqa: S102 — the engine's own generated module
+    return mod.render
+
+
+# --- text + expressions ------------------------------------------------------
+
+
+def test_static_text():
+    assert _load("<p>hi</p>")() == "<p>hi</p>"
+
+
+def test_simple_expression():
+    assert _load("<p>{{ name }}</p>")(name="Dave") == "<p>Dave</p>"
+
+
+def test_expression_html_escaped():
+    assert _load("<p>{{ x }}</p>")(x="<b>") == "<p>&lt;b&gt;</p>"
+
+
+def test_none_renders_empty():
+    assert _load("<p>{{ x }}</p>")(x=None) == "<p></p>"
+
+
+def test_adjacent_text_runs_constant_fold():
+    # Two text nodes around an expression should fold into single literal append
+    # before and after, plus one expression append.
+    src = _compile_string("<p>before {{ x }} after</p>")
+    # Generated should have exactly one `_append('before ')` chunk and one
+    # `_append(' after')` chunk — quick sanity grep on the generated source.
+    assert "before " in src
+    assert " after" in src
+    assert _load("<p>before {{ x }} after</p>")(x="MID") == "<p>before MID after</p>"
+
+
+# --- attributes --------------------------------------------------------------
+
+
+def test_boolean_attr():
+    assert _load("<input disabled>")() == "<input disabled>"
+
+
+def test_static_attr():
+    assert (
+        _load('<a class="link" href="/x">go</a>')()
+        == '<a class="link" href="/x">go</a>'
+    )
+
+
+def test_static_attr_with_double_quote_swaps_to_single():
+    """Author writes literal JSON inside a single-quoted attribute. Single
+    braces are ordinary text now, so the value passes through verbatim — but
+    it contains literal `"`, so the engine must keep the `'` wrapping rather
+    than emit broken `attr="{"..."}"`."""
+    src = """<button hx-vals='{"mode": "persist"}'>x</button>"""
+    assert _load(src)() == """<button hx-vals='{"mode": "persist"}'>x</button>"""
+
+
+def test_dyn_attr_string():
+    assert _load("<a href={{ url }}>x</a>")(url="/foo") == '<a href="/foo">x</a>'
+
+
+def test_dyn_attr_true():
+    assert _load("<input disabled={{ cond }}>")(cond=True) == "<input disabled>"
+
+
+def test_dyn_attr_false():
+    assert _load("<input disabled={{ cond }}>")(cond=False) == "<input>"
+
+
+def test_dyn_attr_none():
+    assert _load("<input disabled={{ cond }}>")(cond=None) == "<input>"
+
+
+def test_dyn_attr_list_class():
+    out = _load("<a class={{ classes }}>x</a>")(classes=["btn", "", "primary"])
+    assert out == '<a class="btn primary">x</a>'
+
+
+def test_dyn_attr_list_empty_is_omitted():
+    assert _load("<a class={{ classes }}>x</a>")(classes=[]) == "<a>x</a>"
+
+
+def test_mixed_attr_segments():
+    out = _load('<a href="/u/{{ handle }}/{{ tab }}">x</a>')(handle="ada", tab="bio")
+    assert out == '<a href="/u/ada/bio">x</a>'
+
+
+# --- if / for blocks ---------------------------------------------------------
+
+
+def test_if_true():
+    assert _load("{% if show %}<p>hi</p>{% endif %}")(show=True) == "<p>hi</p>"
+
+
+def test_if_false():
+    assert _load("{% if show %}<p>hi</p>{% endif %}")(show=False) == ""
+
+
+def test_if_elif_else():
+    src = "{% if a %}<p>A</p>{% elif b %}<p>B</p>{% else %}<p>C</p>{% endif %}"
+    render = _load(src)
+    assert render(a=True, b=False) == "<p>A</p>"
+    assert render(a=False, b=True) == "<p>B</p>"
+    assert render(a=False, b=False) == "<p>C</p>"
+
+
+def test_for_simple():
+    out = _load("{% for x in items %}<li>{{ x }}</li>{% endfor %}")(items=[1, 2, 3])
+    assert out == "<li>1</li><li>2</li><li>3</li>"
+
+
+def test_for_unpacking():
+    out = _load("{% for a, b in pairs %}<li>{{ a }}={{ b }}</li>{% endfor %}")(
+        pairs=[("x", 1), ("y", 2)]
+    )
+    assert out == "<li>x=1</li><li>y=2</li>"
+
+
+def test_for_parenthesized_unpacking():
+    out = _load("{% for (a, b) in pairs %}<li>{{ a }}={{ b }}</li>{% endfor %}")(
+        pairs=[("x", 1)]
+    )
+    assert out == "<li>x=1</li>"
+
+
+def test_nested_for():
+    src = (
+        "{% for row in rows %}<tr>"
+        "{% for c in row %}<td>{{ c }}</td>{% endfor %}"
+        "</tr>{% endfor %}"
+    )
+    out = _load(src)(rows=[[1, 2], [3, 4]])
+    assert out == "<tr><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr>"
+
+
+def test_for_target_does_not_leak():
+    # The `x` loop target should not shadow an outer `x` after the loop.
+    render = _load("{% for x in items %}<a>{{ x }}</a>{% endfor %}<b>{{ x }}</b>")
+    assert render(items=[1, 2], x="OUT") == "<a>1</a><a>2</a><b>OUT</b>"
+
+
+def test_block_straddle_rejected():
+    # An element opened inside an `{% if %}` branch must close in the same
+    # branch — a straddle leaves unbalanced HTML and is a parse error.
+    from plain.html.parser import ParseError
+
+    with pytest.raises(ParseError):
+        _compile_string("{% if show %}<div>{% endif %}x</div>")
+
+
+def test_for_filter_clause():
+    out = _load("{% for x in items if x % 2 %}<li>{{ x }}</li>{% endfor %}")(
+        items=[1, 2, 3, 4, 5]
+    )
+    assert out == "<li>1</li><li>3</li><li>5</li>"
+
+
+def test_for_filter_sees_loop_target():
+    src = "{% for (i, x) in enumerate(items) if i %}<li>{{ x }}</li>{% endfor %}"
+    out = _load(src)(items=["a", "b", "c"])
+    assert out == "<li>b</li><li>c</li>"
+
+
+def test_for_multiple_filters():
+    src = "{% for x in items if x > 1 if x < 5 %}<li>{{ x }}</li>{% endfor %}"
+    out = _load(src)(items=[0, 1, 2, 3, 4, 5, 6])
+    assert out == "<li>2</li><li>3</li><li>4</li>"
+
+
+def test_for_nested_loop_clause_rejected():
+    from plain.html.parser import ParseError
+
+    with pytest.raises(ParseError, match="one `for` clause"):
+        _compile_string("{% for x in xs for y in ys %}<li>{{ x }}</li>{% endfor %}")
+
+
+# --- elements, fragments, comments, doctype ---------------------------------
+
+
+def test_template_is_ordinary_element():
+    # `<template>` is no longer a transparent fragment host — it renders as
+    # an ordinary element, tag and all.
+    assert (
+        _load("<template>{{ x }}<br></template>")(x="hi")
+        == "<template>hi<br></template>"
+    )
+
+
+def test_html_comment_preserved():
+    assert _load("<!-- note --><p>x</p>")() == "<!-- note --><p>x</p>"
+
+
+def test_template_comment_discarded():
+    assert _load("{# secret #}<p>x</p>")() == "<p>x</p>"
+
+
+def test_doctype():
+    assert _load("<!DOCTYPE html><html></html>")() == "<!DOCTYPE html><html></html>"
+
+
+def test_void_element():
+    assert _load('<img src="/x">')() == '<img src="/x">'
+
+
+def test_self_closing_normalized():
+    assert _load("<br/>")() == "<br>"
+
+
+# --- frontmatter -------------------------------------------------------------
+
+
+def test_declared_attr_defaults_to_none():
+    src = """---
+attrs:
+    name: str
+---
+{% if name %}<p>{{ name }}</p>{% endif %}{% if not name %}<span>none</span>{% endif %}"""
+    render = _load(src)
+    assert "<span>none</span>" in render()
+    assert render(name="Dave") == "<p>Dave</p>"
+
+
+def test_declared_slot_defaults_to_empty_markup():
+    src = """---
+slots:
+    header: Markup
+---
+<header>{{ header }}</header>"""
+    assert _load(src)() == "<header></header>"
+
+
+def test_keyword_attr_alias():
+    src = "{% if class_ %}<div>has class</div>{% endif %}"
+    out = _load(src)(**{"class": "btn"})
+    assert out == "<div>has class</div>"
+
+
+def test_imports_block():
+    src = """---
+imports:
+    - from itertools import chain
+---
+<p>{{ list(chain([1, 2], [3])) }}</p>"""
+    assert _load(src)() == "<p>[1, 2, 3]</p>"
+
+
+# --- name resolution ---------------------------------------------------------
+
+
+def test_caller_context_overrides_imports():
+    # `chain` comes from imports: in this template, but caller-passed `chain`
+    # wins because Python's eval looks at locals (ctx) before globals (module).
+    src = """---
+imports:
+    - from itertools import chain
+---
+<p>{{ chain }}</p>"""
+    assert _load(src)(chain="OVERRIDE") == "<p>OVERRIDE</p>"
+
+
+# --- AST rewriter edge cases -------------------------------------------------
+
+
+def test_builtin_left_alone():
+    # `len` is a builtin; rewriter must not turn it into _ctx['len'].
+    assert _load("<p>{{ len(items) }}</p>")(items=[1, 2, 3]) == "<p>3</p>"
+
+
+def test_comprehension_target_is_local():
+    # In `[x for x in items]`, the inner `x` is comp-local, the outer
+    # `items` is from _ctx. Rewriter must keep `x` bare.
+    src = "<p>{{ ', '.join(str(x*2) for x in items) }}</p>"
+    assert _load(src)(items=[1, 2, 3]) == "<p>2, 4, 6</p>"
+
+
+def test_lambda_param_is_local():
+    src = "<p>{{ (lambda v: v + 1)(n) }}</p>"
+    assert _load(src)(n=10) == "<p>11</p>"
+
+
+def test_nested_comprehension():
+    src = "<p>{{ [c for r in rows for c in r] }}</p>"
+    assert _load(src)(rows=[[1, 2], [3, 4]]) == "<p>[1, 2, 3, 4]</p>"
+
+
+def test_for_target_visible_in_inner_expression():
+    # `x` is a for-target; rewriter must leave bare references alone.
+    src = "{% for x in items %}<a>{{ x.upper() }}</a>{% endfor %}"
+    assert _load(src)(items=["a", "b"]) == "<a>A</a><a>B</a>"
+
+
+def test_attribute_access_on_ctx_name():
+    src = "<p>{{ user.name }}</p>"
+
+    class U:
+        name = "Dave"
+
+    assert _load(src)(user=U()) == "<p>Dave</p>"
+
+
+def test_no_eval_in_generated_source():
+    # 5b inlines every expression — the generated module should not contain
+    # an `eval(` call. Guard against regressing back to the 5a runtime.
+    src = _compile_string("{% if x %}<p>{{ x.upper() }}</p>{% endif %}")
+    assert "eval(" not in src
+
+
+# --- security: URL scheme, on* attrs, opaque bodies, YAML safety -----------
+
+
+def test_safe_url_scheme_passes():
+    out = _load("<a href={{ url }}>x</a>")(url="https://example.com/page")
+    assert out == '<a href="https://example.com/page">x</a>'
+
+
+def test_relative_url_passes():
+    assert (
+        _load("<a href={{ url }}>x</a>")(url="/path?q=1") == '<a href="/path?q=1">x</a>'
+    )
+
+
+def test_javascript_url_rejected():
+    # `escape_url` returns "" for non-safe schemes; `render_dyn_url_attr`
+    # then omits the attribute entirely — cleaner DOM than `href=""`.
+    out = _load("<a href={{ url }}>x</a>")(url="javascript:alert(1)")
+    assert "javascript" not in out
+    assert "alert" not in out
+    assert out == "<a>x</a>"
+
+
+def test_data_text_html_url_rejected():
+    out = _load("<a href={{ url }}>x</a>")(url="data:text/html,<script>x</script>")
+    assert "<script>" not in out
+    assert out == "<a>x</a>"
+
+
+def test_url_scheme_case_insensitive():
+    # `JaVaScRiPt:` is the same scheme — reject it.
+    out = _load("<a href={{ url }}>x</a>")(url="JaVaScRiPt:alert(1)")
+    assert "alert" not in out
+
+
+def test_mixed_segment_url_attr_validates_full():
+    # Static prefix + dynamic suffix — full URL is validated.
+    src = '<a href="/{{ path }}">x</a>'
+    out = _load(src)(path="search?q=1")
+    assert out == '<a href="/search?q=1">x</a>'
+
+
+def test_mixed_segment_url_with_evil_scheme():
+    # Author wrote `<a href="{{ scheme }}:..."` and `scheme=javascript` —
+    # composed URL has an unsafe scheme. escape_url rejects.
+    src = '<a href="{{ scheme }}:alert(1)">x</a>'
+    out = _load(src)(scheme="javascript")
+    assert "alert" not in out
+
+
+def test_src_attr_also_validated():
+    out = _load("<img src={{ u }} />")(u="javascript:alert(1)")
+    assert "alert" not in out
+
+
+def test_action_attr_also_validated():
+    out = _load("<form action={{ u }}></form>")(u="javascript:alert(1)")
+    assert "alert" not in out
+
+
+def test_event_handler_with_dynamic_value_rejected():
+    with pytest.raises(CompileError, match="event-handler"):
+        _compile_string("<a onclick={{ handler }}>x</a>")
+
+
+def test_event_handler_with_mark_safe_allowed():
+    out = _load('<a onclick={{ mark_safe("alert(1)") }}>x</a>')()
+    assert out == '<a onclick="alert(1)">x</a>'
+
+
+def test_event_handler_with_markup_allowed():
+    # `Markup(...)` is the spec-named alias for `mark_safe`; both are
+    # auto-available in every compiled module, no `imports:` needed.
+    src = "<a onclick={{ Markup(handler) }}>x</a>"
+    assert _load(src)(handler="alert(1)") == '<a onclick="alert(1)">x</a>'
+
+
+def test_event_handler_with_mixed_segments_rejected():
+    # Even with one mark_safe segment, the surrounding text could leak —
+    # safer to refuse the whole mixed shape.
+    with pytest.raises(CompileError, match="event-handler"):
+        _compile_string('<a onclick="x={{ val }}">x</a>')
+
+
+def test_static_event_handler_allowed():
+    # Literal handler in source — author wrote it, no dynamic data.
+    assert (
+        _load("<a onclick=\"alert('hi')\">x</a>")()
+        == "<a onclick=\"alert('hi')\">x</a>"
+    )
+
+
+def test_event_handler_case_insensitive():
+    # HTML attr names are case-insensitive; check `ONCLICK=` is caught too.
+    with pytest.raises(CompileError, match="event-handler"):
+        _compile_string("<a ONCLICK={{ handler }}>x</a>")
+
+
+def test_expr_inside_script_is_literal_text():
+    # Tokenizer treats <script> body as opaque — `{x}` doesn't interpolate.
+    # The risk we're guarding against: a future regression that starts parsing
+    # ExprNodes inside script body would create a JS-context injection sink.
+    src = "<script>const x = {user_data};</script>"
+    out = _load(src)(user_data="EVIL")
+    assert out == "<script>const x = {user_data};</script>"
+    assert "EVIL" not in out
+
+
+def test_expr_inside_style_is_literal_text():
+    src = "<style>.x { color: {user_color}; }</style>"
+    out = _load(src)(user_color="red")
+    assert out == "<style>.x { color: {user_color}; }</style>"
+    assert "red" not in out
+
+
+def test_yaml_frontmatter_does_not_execute_unsafe_tags(tmp_path):
+    # `python-frontmatter` must use a safe YAML loader. A malicious frontmatter
+    # with `!!python/object/apply:os.system [...]` would be RCE-on-render if
+    # the loader were `yaml.load`. We assert the side effect never happens.
+    from plain.html.frontmatter import split
+
+    marker = tmp_path / "yaml_unsafe_marker"
+    assert not marker.exists()
+    payload = (
+        f"---\n"
+        f"bomb: !!python/object/apply:os.system ['touch {marker}']\n"
+        f"---\n"
+        f"<p>body</p>\n"
+    )
+    try:
+        split(payload)
+    except Exception:
+        # safe_load raises ConstructorError on unknown tags — that's fine.
+        pass
+    assert not marker.exists(), "YAML loader executed os.system — UNSAFE"
+
+
+# --- component tags + slot composition --------------------------------------
+
+
+def _write_templates(tmp_path: Path, templates: dict[str, str]) -> dict[str, Path]:
+    """Write a set of templates to tmp_path. Returns name → Path mapping."""
+    out: dict[str, Path] = {}
+    for name, src in templates.items():
+        p = tmp_path / f"{name}.html"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(src)
+        out[name] = p
+    return out
+
+
+def test_component_no_attrs(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": "---\ncomponents:\n  - ./Child\n---\n<Child />",
+            "Child": "<p>hi</p>",
+        },
+    )
+    assert _compile_path(paths["parent"])() == "<p>hi</p>"
+
+
+def test_component_with_attrs(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": '---\ncomponents:\n  - ./Card\n---\n<Card title="Hello" />',
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{{ title }}</h1>",
+        },
+    )
+    assert _compile_path(paths["parent"])() == "<h1>Hello</h1>"
+
+
+def test_component_attr_default(tmp_path):
+    """A component invoked without an attr uses the attr's declared default."""
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": "---\ncomponents:\n  - ./Field\n---\n<Field />",
+            "Field": (
+                "---\nattrs:\n"
+                '  label: str = "Anonymous"\n'
+                "  rows: int = 3\n"
+                "---\n<p>{{ label }}/{{ rows }}</p>"
+            ),
+        },
+    )
+    assert _compile_path(paths["parent"])() == "<p>Anonymous/3</p>"
+
+
+def test_component_attr_default_overridden(tmp_path):
+    """An explicitly passed attr wins over the attr's declared default."""
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": '---\ncomponents:\n  - ./Field\n---\n<Field label="Hi" />',
+            "Field": '---\nattrs:\n  label: str = "Anonymous"\n---\n<p>{{ label }}</p>',
+        },
+    )
+    assert _compile_path(paths["parent"])() == "<p>Hi</p>"
+
+
+def test_component_with_expr_attr(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": "---\ncomponents:\n  - ./Card\n---\n<Card title={{ name }} />",
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{{ title }}</h1>",
+        },
+    )
+    assert _compile_path(paths["parent"])(name="Dave") == "<h1>Dave</h1>"
+
+
+def test_component_default_slot(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": "---\ncomponents:\n  - ./Card\n---\n<Card><p>body</p></Card>",
+            "Card": ("---\nslots:\n  default: Markup\n---\n<div>{{ children }}</div>"),
+        },
+    )
+    assert _compile_path(paths["parent"])() == "<div><p>body</p></div>"
+
+
+def test_component_named_slot(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": (
+                "---\ncomponents:\n  - ./Card\n---\n"
+                "<Card>"
+                '{% slot "header" %}H{% endslot %}'
+                "<p>body</p>"
+                "</Card>"
+            ),
+            "Card": (
+                "---\nslots:\n  header: Markup\n  default: Markup\n---\n"
+                "<div>{{ header }}|{{ children }}</div>"
+            ),
+        },
+    )
+    assert _compile_path(paths["parent"])() == "<div>H|<p>body</p></div>"
+
+
+def test_component_named_slot_on_element(tmp_path):
+    # `{% slot "header" %}<div>...</div>{% endslot %}` routes the whole div
+    # into the named slot.
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": (
+                "---\ncomponents:\n  - ./Card\n---\n"
+                '<Card>{% slot "header" %}<div>H</div>{% endslot %}</Card>'
+            ),
+            "Card": (
+                "---\nslots:\n  header: Markup\n---\n<section>{{ header }}</section>"
+            ),
+        },
+    )
+    assert _compile_path(paths["parent"])() == "<section><div>H</div></section>"
+
+
+def test_component_root_ctx_propagates(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": "---\ncomponents:\n  - ./Inner\n---\n<Inner />",
+            "Inner": "<p>{{ name }}</p>",
+        },
+    )
+    assert _compile_path(paths["parent"])(name="Dave") == "<p>Dave</p>"
+
+
+def test_component_explicit_attr_wins_over_root_ctx(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": '---\ncomponents:\n  - ./Inner\n---\n<Inner name="LOCAL" />',
+            "Inner": "<p>{{ name }}</p>",
+        },
+    )
+    assert _compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
+
+
+def test_component_promoted_attr_inherits_from_root_ctx(tmp_path):
+    """A child promotes `name` via `attrs:`, but parent omits it on the
+    component site. The child must still see the entry caller's value via
+    `_root_ctx` instead of the parameter default."""
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": "---\ncomponents:\n  - ./Inner\n---\n<Inner />",
+            "Inner": "---\nattrs:\n  name: str\n---\n<p>{{ name }}</p>",
+        },
+    )
+    assert _compile_path(paths["parent"])(name="Dave") == "<p>Dave</p>"
+
+
+def test_component_promoted_attr_explicit_pass_wins(tmp_path):
+    """If the parent passes the promoted attr explicitly, the explicit value
+    must beat the ambient `_root_ctx` value."""
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": '---\ncomponents:\n  - ./Inner\n---\n<Inner name="LOCAL" />',
+            "Inner": "---\nattrs:\n  name: str\n---\n<p>{{ name }}</p>",
+        },
+    )
+    assert _compile_path(paths["parent"])(name="ROOT") == "<p>LOCAL</p>"
+
+
+def test_component_inside_for(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": (
+                "---\ncomponents:\n  - ./Card\n---\n"
+                "{% for x in items %}<Card title={{ x }} />{% endfor %}"
+            ),
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{{ title }}</h1>",
+        },
+    )
+    assert (
+        _compile_path(paths["parent"])(items=["a", "b", "c"])
+        == "<h1>a</h1><h1>b</h1><h1>c</h1>"
+    )
+
+
+def test_component_inside_if(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": (
+                "---\ncomponents:\n  - ./Card\n---\n{% if show %}<Card />{% endif %}"
+            ),
+            "Card": "<p>shown</p>",
+        },
+    )
+    render = _compile_path(paths["parent"])
+    assert render(show=True) == "<p>shown</p>"
+    assert render(show=False) == ""
+
+
+def test_component_chain(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "A": "---\ncomponents:\n  - ./B\n---\n<B />",
+            "B": "---\ncomponents:\n  - ./C\n---\n<C />",
+            "C": "<p>leaf</p>",
+        },
+    )
+    assert _compile_path(paths["A"])() == "<p>leaf</p>"
+
+
+def test_component_cycle_detected(tmp_path):
+    paths = _write_templates(
+        tmp_path,
+        {
+            "A": "---\ncomponents:\n  - ./B\n---\n<B />",
+            "B": "---\ncomponents:\n  - ./A\n---\n<A />",
+        },
+    )
+    with pytest.raises(CompileError, match="cycle"):
+        _compile_path(paths["A"])
+
+
+def test_process_cache_returns_same_function(tmp_path):
+    from plain.html.compiler import clear_process_cache
+
+    clear_process_cache()
+    paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
+    first = _compile_path(paths["x"])
+    second = _compile_path(paths["x"])
+    # Same identity → second call hit the process cache.
+    assert first is second
+
+
+def test_compile_string_rejects_component_tag():
+    # compile_string emits a standalone module — a component-tag site has
+    # no `_inc_N` slot wired up, so emit() raises. Tells the caller to use
+    # compile_path() instead.
+    with pytest.raises(CompileError):
+        _compile_string("---\ncomponents:\n  - ./X\n---\n<X></X>")
+
+
+# --- disk cache --------------------------------------------------------------
+
+
+def _compile_with_disk_cache(path: Path) -> Any:
+    """Compile via a fresh session that uses the disk cache, bypassing the
+    process-wide in-memory cache so the cache write/load paths get exercised.
+    """
+    clear_process_cache()
+    return CompileSession(use_disk_cache=True).compile_path(path)
+
+
+def _set_cache_dir(monkeypatch, cache_dir):
+    from plain.runtime import settings
+
+    monkeypatch.setattr(settings, "HTML_CACHE_DIR", str(cache_dir))
+    monkeypatch.setattr(settings, "HTML_CACHE_DISABLED", False)
+
+
+def _disable_cache(monkeypatch):
+    from plain.runtime import settings
+
+    monkeypatch.setattr(settings, "HTML_CACHE_DISABLED", True)
+
+
+def test_disk_cache_writes_file(tmp_path, monkeypatch):
+    cache_dir = tmp_path / "cache"
+    _set_cache_dir(monkeypatch, cache_dir)
+    paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
+    _compile_with_disk_cache(paths["x"])
+    cached = list(cache_dir.glob("*__x.html.pyc"))
+    assert len(cached) == 1
+    # Marshalled code object — non-empty, opaque, not the .py source we
+    # used to write. The cache being consulted is exercised by the
+    # tamper test below.
+    assert cached[0].stat().st_size > 0
+
+
+def test_disk_cache_hit_skips_codegen(tmp_path, monkeypatch):
+    # Source unchanged → same cache key → second compile should pull from
+    # disk without re-running codegen. Verify by truncating the cache file:
+    # if the cache is consulted, the corrupt load triggers a recompile
+    # path (still succeeds, fresh codegen overwrites). If it's NOT
+    # consulted, we'd never read the bad file.
+    import marshal
+
+    cache_dir = tmp_path / "cache"
+    _set_cache_dir(monkeypatch, cache_dir)
+    paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
+    _compile_with_disk_cache(paths["x"])
+    cached = next(iter(cache_dir.glob("*__x.html.pyc")))
+    # Swap the file's bytecode for a code object that produces TAMPERED
+    # output — a successful round-trip proves the cache hit path runs.
+    tampered = compile("def render(**_): return '<p>TAMPERED</p>'", "<x>", "exec")
+    cached.write_bytes(marshal.dumps(tampered))
+    clear_process_cache()
+    r = _compile_with_disk_cache(paths["x"])
+    assert r() == "<p>TAMPERED</p>"
+
+
+def test_disk_cache_invalidates_on_source_change(tmp_path, monkeypatch):
+    cache_dir = tmp_path / "cache"
+    _set_cache_dir(monkeypatch, cache_dir)
+    paths = _write_templates(tmp_path, {"x": "<p>{{ name }}</p>"})
+    r1 = _compile_with_disk_cache(paths["x"])
+    assert r1(name="Dave") == "<p>Dave</p>"
+    # Same path, different *content* — the source hash flips, so a new
+    # cache file is written; the old one stays (no GC in this phase) but
+    # the new render reflects the new source.
+    paths["x"].write_text("<b>{{ name }}</b>")
+    r2 = _compile_with_disk_cache(paths["x"])
+    assert r2(name="Dave") == "<b>Dave</b>"
+
+
+def test_disk_cache_invalidates_transitively(tmp_path, monkeypatch):
+    # Modify the LEAF (`Child`) and confirm the PARENT recompiles. The
+    # parent's source is unchanged but its cache key folds in the child's
+    # key, so editing the child shifts both keys upward.
+    cache_dir = tmp_path / "cache"
+    _set_cache_dir(monkeypatch, cache_dir)
+    paths = _write_templates(
+        tmp_path,
+        {
+            "parent": "---\ncomponents:\n  - ./Child\n---\n<Child />",
+            "Child": "<p>v1</p>",
+        },
+    )
+    assert _compile_with_disk_cache(paths["parent"])() == "<p>v1</p>"
+    parent_files_v1 = list(cache_dir.glob("*__parent.html.pyc"))
+
+    paths["Child"].write_text("<p>v2</p>")
+    assert _compile_with_disk_cache(paths["parent"])() == "<p>v2</p>"
+    parent_files_v2 = list(cache_dir.glob("*__parent.html.pyc"))
+
+    # The parent has a NEW cache file (different key); the old one
+    # stays around (no GC yet).
+    assert len(parent_files_v2) > len(parent_files_v1)
+
+
+def test_disk_cache_disabled_via_settings(tmp_path, monkeypatch):
+    _disable_cache(monkeypatch)
+    paths = _write_templates(tmp_path, {"x": "<p>hi</p>"})
+    clear_process_cache()
+    # With the disk cache disabled, compile still works — just no on-disk
+    # artifact. cache_root() must return None for this flag to be honored.
+    from plain.html import _cache
+
+    assert _cache.cache_root() is None
+    CompileSession(use_disk_cache=True).compile_path(paths["x"])
+
+
+def test_disk_cache_disabled_flag_takes_precedence_over_dir(tmp_path, monkeypatch):
+    # Explicit disable wins even if a path is also set — the two settings
+    # have independent roles, and "disabled" is the safer default to honor.
+    cache_dir = tmp_path / "cache"
+    _set_cache_dir(monkeypatch, cache_dir)
+    _disable_cache(monkeypatch)
+    from plain.html import _cache
+
+    assert _cache.cache_root() is None
+
+
+def test_imports_mtimes_tracks_deep_module(tmp_path, monkeypatch):
+    # Regression: `from a.b.c import D` must key off `a/b/c.py`'s mtime,
+    # not just `a/__init__.py`. Edits to the leaf module should change
+    # the recorded mtime so the cache key flips.
+    pkg = tmp_path / "deeppkg"
+    (pkg / "users").mkdir(parents=True)
+    (pkg / "__init__.py").write_text("")
+    (pkg / "users" / "__init__.py").write_text("")
+    leaf = pkg / "users" / "models.py"
+    leaf.write_text("class Task:\n    pass\n")
+
+    monkeypatch.syspath_prepend(str(tmp_path))
+    # Bust importlib's caches so the freshly-written package is visible.
+    import importlib
+
+    importlib.invalidate_caches()
+
+    from plain.html import _cache
+
+    stmts = ["from deeppkg.users.models import Task"]
+    before = _cache.imports_mtimes(stmts)
+
+    # The most-specific dotted candidate must be the key — not the top-level.
+    assert "deeppkg.users.models" in before
+    assert before["deeppkg.users.models"] != 0.0
+
+    # Touch the leaf; recorded mtime should change.
+    import os
+    import time
+
+    new_mtime = before["deeppkg.users.models"] + 5
+    os.utime(leaf, (new_mtime, new_mtime))
+    # Some filesystems quantize mtimes; sleep briefly if we got the same value.
+    if os.path.getmtime(leaf) == before["deeppkg.users.models"]:
+        time.sleep(0.05)
+        leaf.write_text("class Task:\n    pass\n# touched\n")
+
+    after = _cache.imports_mtimes(stmts)
+    assert after["deeppkg.users.models"] != before["deeppkg.users.models"]
+
+
+def test_imports_mtimes_records_submodule_from_package_import(tmp_path, monkeypatch):
+    # `from a.b import c` may import the submodule `a.b.c`; that submodule
+    # is what should be stat'd so leaf edits invalidate cache keys.
+    pkg = tmp_path / "subpkg"
+    (pkg / "sub").mkdir(parents=True)
+    (pkg / "__init__.py").write_text("")
+    (pkg / "sub" / "__init__.py").write_text("")
+    leaf = pkg / "sub" / "models.py"
+    leaf.write_text("VALUE = 1\n")
+
+    monkeypatch.syspath_prepend(str(tmp_path))
+    import importlib
+
+    importlib.invalidate_caches()
+
+    from plain.html import _cache
+
+    out = _cache.imports_mtimes(["from subpkg.sub import models"])
+    assert "subpkg.sub.models" in out
+    assert out["subpkg.sub.models"] != 0.0
+
+
+def test_process_cache_evicts_lru_when_over_capacity(tmp_path, monkeypatch):
+    # Shrink the cap so we can exercise eviction without compiling 500+
+    # templates. Anything pushed in beyond the cap should bump the
+    # oldest entry out.
+    from plain.html.compiler import session as session_mod
+
+    clear_process_cache()
+    monkeypatch.setattr(session_mod, "_PROCESS_CACHE_MAX", 3)
+
+    paths = _write_templates(
+        tmp_path,
+        {
+            "a": "<p>a</p>",
+            "b": "<p>b</p>",
+            "c": "<p>c</p>",
+            "d": "<p>d</p>",
+        },
+    )
+    for name in ("a", "b", "c"):
+        _compile_path(paths[name])
+
+    # Touching "a" makes "b" the least-recently-used.
+    _compile_path(paths["a"])
+
+    # Adding "d" should now evict "b".
+    _compile_path(paths["d"])
+
+    with session_mod._PROCESS_LOCK:
+        keys = set(session_mod._PROCESS_CACHE.keys())
+
+    assert paths["b"].resolve() not in keys
+    assert paths["a"].resolve() in keys
+    assert paths["c"].resolve() in keys
+    assert paths["d"].resolve() in keys
+    assert len(keys) == 3
+
+    clear_process_cache()
+
+
+# --- component-graph render-path parity --------------------------------------
+
+
+COMPONENT_PARITY_CASES: list[tuple[dict[str, str], dict]] = [
+    # No attrs, no slot.
+    (
+        {
+            "parent": "---\ncomponents:\n  - ./Child\n---\n<Child />",
+            "Child": "<p>hi</p>",
+        },
+        {},
+    ),
+    # With attrs.
+    (
+        {
+            "parent": '---\ncomponents:\n  - ./Card\n---\n<Card title="Hello" />',
+            "Card": "---\nattrs:\n  title: str\n---\n<h1>{{ title }}</h1>",
+        },
+        {},
+    ),
+    # Default slot.
+    (
+        {
+            "parent": "---\ncomponents:\n  - ./Card\n---\n<Card><p>body</p></Card>",
+            "Card": "---\nslots:\n  default: Markup\n---\n<div>{{ children }}</div>",
+        },
+        {},
+    ),
+    # Named slot via `{% slot %}`.
+    (
+        {
+            "parent": (
+                "---\ncomponents:\n  - ./Card\n---\n"
+                "<Card>"
+                '{% slot "header" %}HDR{% endslot %}X</Card>'
+            ),
+            "Card": (
+                "---\nslots:\n  header: Markup\n  default: Markup\n---\n"
+                "<div>{{ header }}|{{ children }}</div>"
+            ),
+        },
+        {},
+    ),
+    # Root-ctx propagation through nested components.
+    (
+        {
+            "outer": "---\ncomponents:\n  - ./Middle\n---\n<Middle />",
+            "Middle": "---\ncomponents:\n  - ./Inner\n---\n<Inner />",
+            "Inner": "<p>{{ name }}</p>",
+        },
+        {"name": "Dave"},
+    ),
+]
+
+
+@pytest.mark.parametrize(("templates", "ctx"), COMPONENT_PARITY_CASES)
+def test_component_render_matches_engine_render(tmp_path, templates, ctx):
+    paths = _write_templates(tmp_path, templates)
+    entry = next(iter(paths.values()))  # the first template in the set is the entry
+    via_engine = engine_render(entry, ctx)
+    via_compile = _compile_path(entry)(**ctx)
+    assert via_compile == via_engine
+
+
+# --- parity with interpreter -------------------------------------------------
+
+
+PARITY_CASES: list[tuple[str, dict]] = [
+    ("<p>Hi, {{ name }}</p>", {"name": "Dave"}),
+    ("<p>{{ x }}</p>", {"x": "<b>bold</b>"}),  # escape
+    ("<a href={{ url }}>x</a>", {"url": "/foo?q=&"}),
+    ("<a class={{ c }}>x</a>", {"c": ["btn", "primary"]}),
+    ("<a class={{ c }}>x</a>", {"c": False}),
+    ('<a href="/u/{{ h }}/{{ t }}">x</a>', {"h": "ada", "t": "bio"}),
+    ("{% if ok %}<p>shown</p>{% endif %}", {"ok": True}),
+    ("{% if ok %}<p>shown</p>{% endif %}", {"ok": False}),
+    (
+        "<ul>{% for x in items %}<li>{{ x }}</li>{% endfor %}</ul>",
+        {"items": ["a", "b", "c"]},
+    ),
+    (
+        (
+            "{% for r in rows %}<tr>"
+            "{% for c in r %}<td>{{ c }}</td>{% endfor %}"
+            "</tr>{% endfor %}"
+        ),
+        {"rows": [[1, 2], [3, 4]]},
+    ),
+    ("<template>{{ x }}<br></template>", {"x": "hi"}),
+    ("<!-- c --><p>{{ x }}</p>", {"x": "y"}),
+    ("{# discarded #}<p>{{ x }}</p>", {"x": "y"}),
+    ("<!DOCTYPE html><html><body>{{ x }}</body></html>", {"x": "z"}),
+    ("<input disabled={{ d }}>", {"d": True}),
+    ("<input disabled={{ d }}>", {"d": None}),
+]
+
+
+@pytest.mark.parametrize(("source", "ctx"), PARITY_CASES)
+def test_parity_with_interpreter(source, ctx):
+    interp = render_source(source, ctx)
+    compiled = _load(source)(**ctx)
+    assert compiled == interp
+
+
+# --- source-mapped tracebacks ------------------------------------------------
+
+
+def test_traceback_points_at_template_line(tmp_path):
+    """A render-time AttributeError must surface as `template.html:LINE`,
+    not as a frame inside the generated `.py` cache file."""
+    import traceback as _tb
+
+    tpl = tmp_path / "broken.html"
+    tpl.write_text(
+        "<div>\n"  # line 1
+        "  <p>hello</p>\n"  # line 2
+        "  <p>broken: {{ user.no_such_attr }}</p>\n"  # line 3 — error here
+        "  <p>goodbye</p>\n"  # line 4
+        "</div>\n"
+    )
+
+    clear_process_cache()
+    render_fn = _compile_path(tpl)
+
+    class _Stub:
+        pass
+
+    try:
+        render_fn(user=_Stub())
+    except AttributeError as exc:
+        frames = _tb.extract_tb(exc.__traceback__)
+    else:
+        raise AssertionError("expected AttributeError")
+
+    # The bottom-of-stack frame should be inside our compiled `render`,
+    # pointing at the template file at the right line.
+    last = frames[-1]
+    assert last.filename == str(tpl)
+    assert last.lineno == 3
+
+
+def test_traceback_with_frontmatter_offsets_correctly(tmp_path):
+    """Frontmatter shifts the body offset — make sure the line number
+    accounts for it. An error on body line N should land at file line
+    (frontmatter_lines + N).
+    """
+    import traceback as _tb
+
+    tpl = tmp_path / "fm.html"
+    tpl.write_text(
+        "---\n"  # line 1
+        "imports:\n"  # line 2
+        "  - import os\n"  # line 3
+        "---\n"  # line 4 (frontmatter end)
+        "<p>{{ user.no_such_attr }}</p>\n"  # line 5 — error here
+    )
+
+    clear_process_cache()
+    render_fn = _compile_path(tpl)
+
+    class _Stub:
+        pass
+
+    try:
+        render_fn(user=_Stub())
+    except AttributeError as exc:
+        frames = _tb.extract_tb(exc.__traceback__)
+    else:
+        raise AssertionError("expected AttributeError")
+
+    last = frames[-1]
+    assert last.filename == str(tpl)
+    assert last.lineno == 5
+
+
+# --- fragment coalescing -----------------------------------------------------
+
+
+def test_coalesces_adjacent_fragments_into_single_append():
+    """A loop body that mixes text + expr + text should emit ONE buffer
+    operation per iteration, not three separate `_append(...)` calls.
+    """
+    src = _compile_string(
+        "<ul>{% for x in items %}<li>before {{ x }} after</li>{% endfor %}</ul>"
+    )
+    # The loop body has 3 fragments → should be `_out += (...)` for
+    # multi-frag runs.
+    assert "_out +=" in src
+    # And no leftover per-fragment `_append` calls inside the loop body
+    # (we'd see at least 2 if coalescing failed).
+    body_appends = src.count("_out.append(")
+    # `_out.append('<ul>')` and `_out.append('</ul>')` outside the loop
+    # are legitimate single-fragment runs — at most 2.
+    assert body_appends <= 2, f"expected ≤2 appends, got {body_appends}:\n{src}"
+
+
+def test_coalesces_through_component_call():
+    """A component call inside a fragment run should fold into the same
+    `_out += (...)` tuple as the surrounding text — not break the run
+    into separate appends.
+    """
+    from plain.html.compiler.emit import emit_module
+    from plain.html.parser import parse
+    from plain.html.tokenizer import tokenize
+
+    # Build the emitted source directly: component sites need an
+    # `include_renders` slot, which `compile_string` doesn't wire up.
+    tree = parse(
+        tokenize("<div>before<Row item={{ x }} />after</div>"),
+        components={"Row": "./Row"},
+    )
+    from plain.html.compiler.session import _walk_includes
+
+    include_renders = {id(n): "_inc_0" for n in _walk_includes(tree)}
+    emitted = emit_module(tree, {}, "<test>", include_renders=include_renders)
+    # The component call doesn't break the run — we should still see a
+    # multi-fragment buffer push.
+    assert "_out +=" in emitted.source

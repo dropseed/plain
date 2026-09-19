@@ -79,16 +79,18 @@ class UserDetail(DetailView):
         return User.query.get(pk=self.url_kwargs["pk"])
 ```
 
-Templates are Jinja:
+Templates are `plain.html` — HTML-aware, with components as files and real Python in `{{ }}`:
 
 ```html
-{# app/users/templates/users/detail.html #}
-{% extends "base.html" %}
-
-{% block content %}
-<h1>{{ user.display_name }}</h1>
-<p>Joined {{ user.created_at.strftime("%B %Y") }}</p>
-{% endblock %}
+---
+components:
+  - base as Base
+---
+<Base>
+    {% slot "title" %}{{ user.display_name }}{% endslot %}
+    <h1>{{ user.display_name }}</h1>
+    <p>Joined {{ user.created_at.strftime("%B %Y") }}</p>
+</Base>
 ```
 
 ## An opinionated stack
@@ -97,7 +99,7 @@ Python where you want it, JS where you need it.
 
 - **Python:** 3.13+
 - **Database:** Postgres
-- **Templates:** Jinja2
+- **Templates:** plain.html
 - **Frontend:** htmx, Tailwind CSS
 - **Python tooling:** uv (packages), ruff (lint/format), ty (type checking)
 - **JavaScript tooling:** oxc (lint/format)
@@ -153,9 +155,9 @@ plain docs --search "queryset"         # search across all packages
 
 **Frontend:**
 
+- [plain.html](https://plainframework.com/docs/plain-html/plain/html/) — HTML templates and components
 - [plain.htmx](https://plainframework.com/docs/plain-htmx/plain/htmx/) — dynamic UI
 - [plain.tailwind](https://plainframework.com/docs/plain-tailwind/plain/tailwind/) — CSS framework
-- [plain.elements](https://plainframework.com/docs/plain-elements/plain/elements/) — HTML components
 - [plain.pages](https://plainframework.com/docs/plain-pages/plain/pages/) — static pages
 
 **Development:**

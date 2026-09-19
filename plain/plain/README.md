@@ -20,7 +20,6 @@ The `plain` package includes everything you need to start handling web requests 
 - [logs](./logs/README.md) - Logging configuration and utilities.
 - [preflight](./preflight/README.md) - Preflight checks for your app.
 - [runtime](./runtime/README.md) - Runtime settings and configuration.
-- [templates](./templates/README.md) - Jinja2 templates and rendering.
 - [test](./test/README.md) - Test utilities and fixtures.
 - [urls](./urls/README.md) - URL routing and request dispatching.
 - [views](./views/README.md) - Class-based views and request handlers.
@@ -60,6 +59,6 @@ The `plain` package includes everything you need to start handling web requests 
 
 - [plain.tailwind](/plain-tailwind/plain/tailwind/README.md) - Tailwind CSS integration without Node.js.
 - [plain.htmx](/plain-htmx/plain/htmx/README.md) - HTMX integrated into views and templates.
-- [plain.elements](/plain-elements/plain/elements/README.md) - Server-side HTML components.
-- [plain.pages](/plain-pages/plain/pages/README.md) - Static pages with Markdown and Jinja2.
+- [plain.html](/plain-html/plain/html/README.md) - HTML-aware templates with components and contextual autoescape.
+- [plain.pages](/plain-pages/plain/pages/README.md) - Static pages with Markdown and plain.html.
 - [plain.vendor](/plain-vendor/plain/vendor/README.md) - Vendor JavaScript and CSS libraries.

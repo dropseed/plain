@@ -1,8 +1,36 @@
-{% extends "admin/detail.html" %}
-
-{% block actions %}
-<form method="post">
-    <input type="hidden" name="action" value="retry">
-    <button type="submit" class="admin-btn admin-btn-primary">Retry job</button>
-</form>
-{% endblock %}
+---
+components:
+  - admin/detail as Detail
+attrs:
+  object: Any
+  fields: tuple = ()
+  title: str = ""
+  app_name: str = "Plain"
+  admin_force_theme: str = ""
+  description: str = ""
+  image: Any = None
+  links: dict = {}
+  extra_links: dict = {}
+  parent_view_classes: list = []
+  cards: tuple = ()
+---
+<Detail
+    object="{{ object }}"
+    fields="{{ fields }}"
+    title="{{ title }}"
+    app_name="{{ app_name }}"
+    admin_force_theme="{{ admin_force_theme }}"
+    description="{{ description }}"
+    image="{{ image }}"
+    links="{{ links }}"
+    extra_links="{{ extra_links }}"
+    parent_view_classes="{{ parent_view_classes }}"
+    cards="{{ cards }}"
+>
+    {% slot "actions" %}
+        <form method="post">
+        <input type="hidden" name="action" value="retry">
+        <button type="submit" class="admin-btn admin-btn-primary">Retry job</button>
+    </form>
+    {% endslot %}
+</Detail>

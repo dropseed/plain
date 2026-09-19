@@ -1,25 +1,61 @@
-{% extends "admin/base.html" %}
-{% use_elements %}
-
-{% block content %}
-
-<details class="admin-card group" open>
-    <summary class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4">
-        <h3 class="text-lg font-semibold">{{ object.__class__.__name__ }} Details</h3>
-        <admin.Icon name="chevron-right" class="text-admin-muted-foreground transition-transform group-open:rotate-90" />
-    </summary>
-    <section class="px-6 pb-6">
-        <dl class="grid grid-cols-[auto_1fr] gap-x-8">
-            {% for field in fields %}
-            <dt class="whitespace-nowrap py-1.5">{{ get_field_label(field) }}</dt>
-            <dd class="py-1.5 min-w-0">
-                {% set value = get_field_value(object, field) %}
-                {% set value = format_field_value(object, field, value) %}
-                {% include get_field_value_template(object, field, value) with context %}
-            </dd>
-            {% endfor %}
-        </dl>
-    </section>
-</details>
-
-{% endblock %}
+---
+imports:
+  - from plain.admin.html import render_value_template
+components:
+  - admin/base as Base
+  - elements/admin/Icon
+attrs:
+  object: Any
+  fields: tuple = ()
+  get_field_label: Any = None
+  get_field_value: Any = None
+  format_field_value: Any = None
+  get_field_value_template: Any = None
+  title: str = ""
+  app_name: str = "Plain"
+  admin_force_theme: str = ""
+  description: str = ""
+  image: Any = None
+  links: dict = {}
+  extra_links: dict = {}
+  parent_view_classes: list = []
+  cards: tuple = ()
+slots:
+  default: optional
+  actions: optional
+---
+<Base
+    title="{{ title }}"
+    app_name="{{ app_name }}"
+    admin_force_theme="{{ admin_force_theme }}"
+    description="{{ description }}"
+    image="{{ image }}"
+    links="{{ links }}"
+    extra_links="{{ extra_links }}"
+    parent_view_classes="{{ parent_view_classes }}"
+    object="{{ object }}"
+    cards="{{ cards }}"
+>
+    {% slot "actions" %}
+        {% if actions %}{{ actions }}{% endif %}
+    {% endslot %}
+    <details class="admin-card group" open>
+        <summary
+            class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4"
+        >
+            <h3 class="text-lg font-semibold">{{ object.__class__.__name__ }} Details</h3>
+            <Icon
+                name="chevron-right"
+                class="text-admin-muted-foreground transition-transform group-open:rotate-90"
+            />
+        </summary>
+        <section class="px-6 pb-6">
+            <dl class="grid grid-cols-[auto_1fr] gap-x-8">
+                {% for field in fields %}
+                    <dt class="whitespace-nowrap py-1.5">{{ get_field_label(field) }}</dt>
+                    <dd class="py-1.5 min-w-0">{{ render_value_template(get_field_value_template(object, field, format_field_value(object, field, get_field_value(object, field))), {"object": object, "field": field, "value": format_field_value(object, field, get_field_value(object, field))}) }}</dd>
+                {% endfor %}
+            </dl>
+        </section>
+    </details>
+</Base>

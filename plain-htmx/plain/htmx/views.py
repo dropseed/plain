@@ -4,11 +4,9 @@ from collections.abc import Callable
 from http import HTTPMethod
 from typing import Any
 
+from plain.html.views import TemplateView
 from plain.http import Response
-from plain.templates.views import TemplateView
 from plain.utils.cache import patch_vary_headers
-
-from .templates import render_template_fragment
 
 __all__ = ["HTMXView"]
 
@@ -25,11 +23,13 @@ class HTMXView(TemplateView):
     def render(self, *, status_code: int = 200, **context: Any) -> Response:
         """Render the active fragment on a fragment request, the full template otherwise."""
         if self.is_htmx_request() and (fragment_name := self.get_htmx_fragment_name()):
+            # The template still renders in full — plain.html returns just
+            # the named `{% fragment %}` block's output. That is what keeps
+            # a fragment inside a loop seeing its own iteration's scope.
             return Response(
-                render_template_fragment(
-                    template=self.get_template()._jinja_template,
-                    fragment_name=fragment_name,
-                    context={**self.get_template_context(), **context},
+                self.get_template().render(
+                    {**self.get_template_context(), **context},
+                    fragment=fragment_name,
                 ),
                 status_code=status_code,
             )
@@ -85,7 +85,7 @@ class HTMXView(TemplateView):
         return self.request.headers.get("HX-Request") == "true"
 
     def get_htmx_fragment_name(self) -> str:
-        # A custom header that we pass with the {% htmxfragment %} tag
+        # Set by plainhtmx.js from the enclosing `[plain-hx-fragment]` element.
         return self.request.headers.get("Plain-HX-Fragment", "")
 
     def get_htmx_action_name(self) -> str:

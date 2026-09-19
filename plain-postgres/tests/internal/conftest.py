@@ -16,7 +16,7 @@ def temp_migrations(
 ) -> Generator[Callable[..., Path]]:
     """Point packages at migrations written under tmp_path during the test.
 
-        root = temp_migrations("examples", "plaintemplates")
+        root = temp_migrations("examples", "html")
         (root / "examples" / "0001_initial.py").write_text(...)
 
     Each label becomes an importable subpackage the loader reads instead of

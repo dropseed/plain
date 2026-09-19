@@ -15,9 +15,9 @@ members = [
     "plain-code",
     "plain-connect",
     "plain-dev",
-    "plain-elements",
     "plain-email",
     "plain-flags",
+    "plain-html",
     "plain-htmx",
     "plain-jobs",
     "plain-loginlink",
@@ -33,7 +33,6 @@ members = [
     "plain-sessions",
     "plain-start",
     "plain-tailwind",
-    "plain-templates",
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
@@ -233,9 +232,9 @@ dependencies = [
     { name = "plain-code" },
     { name = "plain-connect" },
     { name = "plain-dev" },
-    { name = "plain-elements" },
     { name = "plain-email" },
     { name = "plain-flags" },
+    { name = "plain-html" },
     { name = "plain-htmx" },
     { name = "plain-jobs" },
     { name = "plain-loginlink" },
@@ -249,7 +248,6 @@ dependencies = [
     { name = "plain-scan" },
     { name = "plain-sessions" },
     { name = "plain-tailwind" },
-    { name = "plain-templates" },
     { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
@@ -266,9 +264,9 @@ requires-dist = [
     { name = "plain-code", editable = "plain-code" },
     { name = "plain-connect", editable = "plain-connect" },
     { name = "plain-dev", editable = "plain-dev" },
-    { name = "plain-elements", editable = "plain-elements" },
     { name = "plain-email", editable = "plain-email" },
     { name = "plain-flags", editable = "plain-flags" },
+    { name = "plain-html", editable = "plain-html" },
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-jobs", editable = "plain-jobs" },
     { name = "plain-loginlink", editable = "plain-loginlink" },
@@ -282,7 +280,6 @@ requires-dist = [
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
-    { name = "plain-templates", editable = "plain-templates" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },
@@ -329,6 +326,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/26/5b/fcabf6028144a8723726318b07a32c2f3314acdff6265743cf08a344b18e/hpack-4.2.0.tar.gz", hash = "sha256:0895cfa3b5531fc65fe439c05eb65144f123bf7a394fcaa56aa423548d8e45c0", size = 51300, upload-time = "2026-06-23T18:34:46.667Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/71/b4/4a9fcfb2aef6ba44d9073ecd301443aa00b3dac95de5619f2a7de7ec8a91/hpack-4.2.0-py3-none-any.whl", hash = "sha256:858ac0b02280fa582b5080d68db0899c62a80375e0e5413a74970c5e518b6986", size = 34246, upload-time = "2026-06-23T18:34:45.472Z" },
+]
+
+[[package]]
+name = "html5lib"
+version = "1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+    { name = "webencodings" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ac/b6/b55c3f49042f1df3dcd422b7f224f939892ee94f22abcf503a9b7339eaf2/html5lib-1.1.tar.gz", hash = "sha256:b2e5b40261e20f354d198eae92afc10d750afb487ed5e50f9c4eaf07c184146f", size = 272215, upload-time = "2020-06-22T23:32:38.834Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6c/dd/a834df6482147d48e225a49515aabc28974ad5a4ca3215c18a882565b028/html5lib-1.1-py2.py3-none-any.whl", hash = "sha256:0d78f8fde1c230e99fe37986a60526d7049ed4bf8a9fadbad5f00e22e58e041d", size = 112173, upload-time = "2020-06-22T23:32:36.781Z" },
 ]
 
 [[package]]
@@ -777,10 +787,10 @@ source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
     { name = "plain-auth" },
-    { name = "plain-elements" },
+    { name = "plain-html" },
     { name = "plain-htmx" },
     { name = "plain-tailwind" },
-    { name = "plain-templates" },
+    { name = "plain-toolbar" },
 ]
 
 [package.dev-dependencies]
@@ -792,10 +802,10 @@ dev = [
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-elements", editable = "plain-elements" },
+    { name = "plain-html", editable = "plain-html" },
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
-    { name = "plain-templates", editable = "plain-templates" },
+    { name = "plain-toolbar", editable = "plain-toolbar" },
 ]
 
 [package.metadata.requires-dev]
@@ -952,8 +962,8 @@ dependencies = [
 dev = [
     { name = "plain-assets" },
     { name = "plain-auth" },
+    { name = "plain-html" },
     { name = "plain-pytest" },
-    { name = "plain-templates" },
     { name = "plain-toolbar" },
 ]
 
@@ -969,8 +979,8 @@ requires-dist = [
 dev = [
     { name = "plain-assets", editable = "plain-assets" },
     { name = "plain-auth", editable = "plain-auth" },
+    { name = "plain-html", editable = "plain-html" },
     { name = "plain-pytest", editable = "plain-pytest" },
-    { name = "plain-templates", editable = "plain-templates" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
 ]
 
@@ -1008,35 +1018,12 @@ dev = [
 ]
 
 [[package]]
-name = "plain-elements"
-version = "0.11.7"
-source = { editable = "plain-elements" }
-dependencies = [
-    { name = "plain" },
-    { name = "plain-templates" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "plain-pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-templates", editable = "plain-templates" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
-
-[[package]]
 name = "plain-email"
 version = "0.20.2"
 source = { editable = "plain-email" }
 dependencies = [
     { name = "plain" },
-    { name = "plain-templates" },
+    { name = "plain-html" },
 ]
 
 [package.dev-dependencies]
@@ -1047,7 +1034,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
-    { name = "plain-templates", editable = "plain-templates" },
+    { name = "plain-html", editable = "plain-html" },
 ]
 
 [package.metadata.requires-dev]
@@ -1077,12 +1064,43 @@ requires-dist = [
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
+name = "plain-html"
+version = "0.0.1"
+source = { editable = "plain-html" }
+dependencies = [
+    { name = "plain" },
+    { name = "python-frontmatter" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "html5lib" },
+    { name = "jinja2" },
+    { name = "plain-pytest" },
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "python-frontmatter", specifier = ">=1.1.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "html5lib", specifier = ">=1.1" },
+    { name = "jinja2", specifier = ">=3.1.2" },
+    { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "ty", specifier = ">=0.0.45" },
+]
+
+[[package]]
 name = "plain-htmx"
 version = "0.21.0"
 source = { editable = "plain-htmx" }
 dependencies = [
     { name = "plain" },
-    { name = "plain-templates" },
+    { name = "plain-html" },
 ]
 
 [package.dev-dependencies]
@@ -1093,7 +1111,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
-    { name = "plain-templates", editable = "plain-templates" },
+    { name = "plain-html", editable = "plain-html" },
 ]
 
 [package.metadata.requires-dev]
@@ -1133,7 +1151,7 @@ source = { editable = "plain-loginlink" }
 dependencies = [
     { name = "plain" },
     { name = "plain-email" },
-    { name = "plain-templates" },
+    { name = "plain-html" },
 ]
 
 [package.dev-dependencies]
@@ -1146,7 +1164,7 @@ dev = [
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-email", editable = "plain-email" },
-    { name = "plain-templates", editable = "plain-templates" },
+    { name = "plain-html", editable = "plain-html" },
 ]
 
 [package.metadata.requires-dev]
@@ -1181,8 +1199,8 @@ source = { editable = "plain-oauth" }
 dependencies = [
     { name = "plain" },
     { name = "plain-auth" },
+    { name = "plain-html" },
     { name = "plain-postgres" },
-    { name = "plain-templates" },
 ]
 
 [package.dev-dependencies]
@@ -1195,8 +1213,8 @@ dev = [
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-auth", editable = "plain-auth" },
+    { name = "plain-html", editable = "plain-html" },
     { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-templates", editable = "plain-templates" },
 ]
 
 [package.metadata.requires-dev]
@@ -1212,8 +1230,8 @@ source = { editable = "plain-oauthserver" }
 dependencies = [
     { name = "plain" },
     { name = "plain-auth" },
+    { name = "plain-html" },
     { name = "plain-postgres" },
-    { name = "plain-templates" },
 ]
 
 [package.dev-dependencies]
@@ -1225,8 +1243,8 @@ dev = [
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-auth", editable = "plain-auth" },
+    { name = "plain-html", editable = "plain-html" },
     { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-templates", editable = "plain-templates" },
 ]
 
 [package.metadata.requires-dev]
@@ -1240,7 +1258,7 @@ dependencies = [
     { name = "mistune" },
     { name = "plain" },
     { name = "plain-assets" },
-    { name = "plain-templates" },
+    { name = "plain-html" },
     { name = "pygments" },
     { name = "python-frontmatter" },
 ]
@@ -1255,7 +1273,7 @@ requires-dist = [
     { name = "mistune", specifier = ">=3.0.0" },
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
-    { name = "plain-templates", editable = "plain-templates" },
+    { name = "plain-html", editable = "plain-html" },
     { name = "pygments", specifier = ">=2.0.0" },
     { name = "python-frontmatter", specifier = ">=1.0.0" },
 ]
@@ -1269,7 +1287,7 @@ version = "0.26.9"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },
-    { name = "plain-templates" },
+    { name = "plain-html" },
 ]
 
 [package.dev-dependencies]
@@ -1282,7 +1300,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
-    { name = "plain-templates", editable = "plain-templates" },
+    { name = "plain-html", editable = "plain-html" },
 ]
 
 [package.metadata.requires-dev]
@@ -1332,8 +1350,8 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "opentelemetry-sdk" },
+    { name = "plain-html" },
     { name = "plain-pytest" },
-    { name = "plain-templates" },
 ]
 
 [package.metadata]
@@ -1346,8 +1364,8 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
+    { name = "plain-html", editable = "plain-html" },
     { name = "plain-pytest", editable = "plain-pytest" },
-    { name = "plain-templates", editable = "plain-templates" },
 ]
 
 [[package]]
@@ -1452,43 +1470,20 @@ requires-dist = [
 ]
 
 [[package]]
-name = "plain-templates"
-version = "0.6.1"
-source = { editable = "plain-templates" }
-dependencies = [
-    { name = "jinja2" },
-    { name = "plain" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "plain-pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "jinja2", specifier = ">=3.1.2" },
-    { name = "plain", editable = "plain" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
-
-[[package]]
 name = "plain-toolbar"
 version = "0.13.1"
 source = { editable = "plain-toolbar" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-html" },
     { name = "plain-tailwind" },
-    { name = "plain-templates" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
+    { name = "plain-html", editable = "plain-html" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
-    { name = "plain-templates", editable = "plain-templates" },
 ]
 
 [[package]]
@@ -1542,6 +1537,8 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "html5lib" },
+    { name = "jinja2" },
     { name = "openapi-spec-validator" },
     { name = "plain" },
     { name = "plain-admin" },
@@ -1553,9 +1550,9 @@ dev = [
     { name = "plain-code" },
     { name = "plain-connect" },
     { name = "plain-dev" },
-    { name = "plain-elements" },
     { name = "plain-email" },
     { name = "plain-flags" },
+    { name = "plain-html" },
     { name = "plain-htmx" },
     { name = "plain-jobs" },
     { name = "plain-loginlink" },
@@ -1570,7 +1567,6 @@ dev = [
     { name = "plain-scan" },
     { name = "plain-sessions" },
     { name = "plain-tailwind" },
-    { name = "plain-templates" },
     { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
@@ -1583,6 +1579,8 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "html5lib", specifier = ">=1.1" },
+    { name = "jinja2", specifier = ">=3.1.2" },
     { name = "openapi-spec-validator", specifier = ">=0.7.1" },
     { name = "plain", editable = "plain" },
     { name = "plain-admin", editable = "plain-admin" },
@@ -1594,9 +1592,9 @@ dev = [
     { name = "plain-code", editable = "plain-code" },
     { name = "plain-connect", editable = "plain-connect" },
     { name = "plain-dev", editable = "plain-dev" },
-    { name = "plain-elements", editable = "plain-elements" },
     { name = "plain-email", editable = "plain-email" },
     { name = "plain-flags", editable = "plain-flags" },
+    { name = "plain-html", editable = "plain-html" },
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-jobs", editable = "plain-jobs" },
     { name = "plain-loginlink", editable = "plain-loginlink" },
@@ -1611,7 +1609,6 @@ dev = [
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
-    { name = "plain-templates", editable = "plain-templates" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },
@@ -2215,6 +2212,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/69/c4/088825b75489cb5b6a761a4542645718893d395d8c530b38734f19da44d2/watchfiles-1.1.0-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d05686b5487cfa2e2c28ff1aa370ea3e6c5accfe6435944ddea1e10d93872147", size = 452240, upload-time = "2025-06-15T19:06:26.552Z" },
     { url = "https://files.pythonhosted.org/packages/10/8c/22b074814970eeef43b7c44df98c3e9667c1f7bf5b83e0ff0201b0bd43f9/watchfiles-1.1.0-cp314-cp314t-musllinux_1_1_aarch64.whl", hash = "sha256:d0e10e6f8f6dc5762adee7dece33b722282e1f59aa6a55da5d493a97282fedd8", size = 625607, upload-time = "2025-06-15T19:06:27.606Z" },
     { url = "https://files.pythonhosted.org/packages/32/fa/a4f5c2046385492b2273213ef815bf71a0d4c1943b784fb904e184e30201/watchfiles-1.1.0-cp314-cp314t-musllinux_1_1_x86_64.whl", hash = "sha256:af06c863f152005c7592df1d6a7009c836a247c9d8adb78fef8575a5a98699db", size = 623315, upload-time = "2025-06-15T19:06:29.076Z" },
+]
+
+[[package]]
+name = "webencodings"
+version = "0.6.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/a0/8fd707bcb776a7be556bad06a2ea5fb9bd519df78ef8e26f70ccf0f38bff/webencodings-0.6.1.tar.gz", hash = "sha256:565f9ad031c702dae404e27a099e3e09186a3ab1b9520f06d215502b651fd910", size = 15001, upload-time = "2026-08-15T14:22:57.549Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/c6/040cbc72480d789a5f40d63fb484d3106554c4dfa2d2b70ad5022057750f/webencodings-0.6.1-py3-none-any.whl", hash = "sha256:7fab6269c8bf237c657876b52058ccb182e861518d1c695c1a9aaa8c1c105d5b", size = 8745, upload-time = "2026-08-15T14:22:56.31Z" },
 ]
 
 [[package]]

@@ -1,7 +1,13 @@
+---
+components:
+  - admin/values/Model
+attrs:
+  value: Any = None
+  field: Any = None
+  object: Any = None
+---
 {% for item in value %}
-<div>
-    {% with value=item %}
-    {% include "admin/values/Model.html" %}
-    {% endwith %}
-</div>
+    <div>
+        <Model value="{{ item }}" />
+    </div>
 {% endfor %}

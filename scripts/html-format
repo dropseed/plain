@@ -1,0 +1,25 @@
+#!/bin/bash -e
+# Run `plain html format` across the whole repo template corpus.
+#
+# Same app-free, per-app shape as scripts/html-check — see that file for
+# why. Pass --check to fail instead of writing.
+
+cd "$(dirname "$0")/.."
+
+packages=()
+for dir in */plain/*/templates; do
+  [ -d "$dir" ] && packages+=(--template-dir "$dir")
+done
+
+status=0
+
+uv run plain-html format \
+  "${packages[@]}" --template-dir example/app/templates "$@" || status=1
+
+for app in */tests/app/templates; do
+  [ -d "$app" ] || continue
+  echo "--> $app"
+  uv run plain-html format "$app" "$@" || status=1
+done
+
+exit $status

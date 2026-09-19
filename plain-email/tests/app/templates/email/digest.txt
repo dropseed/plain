@@ -1,0 +1,3 @@
+Your digest, {{ user_name }}!
+
+3 new items.

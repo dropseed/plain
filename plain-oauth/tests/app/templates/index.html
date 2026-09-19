@@ -1,15 +1,29 @@
-{% extends "base.html" %}
-
-{% block content %}
+---
+imports:
+  - from plain.urls import reverse as url
+components:
+  - base as Base
+attrs:
+  user: Any
+  oauth_provider_keys: list = []
+---
+<Base>
 Hello {{ user }}!
 
 <h2>Existing connections</h2>
 <ul>
     {% for connection in user.oauth_connections.query.all() %}
-    <li>
+        <li>
         {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
-        <form action="{{ url('oauth:disconnect', provider=connection.provider_key) }}" method="post">
-            <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
+        <form
+            action="{{ url('oauth:disconnect', provider=connection.provider_key) }}"
+            method="post"
+        >
+            <input
+                type="hidden"
+                name="provider_user_id"
+                value="{{ connection.provider_user_id }}"
+            >
             <button type="submit">Disconnect</button>
         </form>
     </li>
@@ -19,13 +33,12 @@ Hello {{ user }}!
 <h2>Add a connection</h2>
 <ul>
     {% for provider_key in oauth_provider_keys %}
-    <li>
-        {{ provider_key}}
+        <li>
+        {{ provider_key }}
         <form action="{{ url('oauth:connect', provider=provider_key) }}" method="post">
             <button type="submit">Connect</button>
         </form>
     </li>
     {% endfor %}
 </ul>
-
-{% endblock %}
+</Base>

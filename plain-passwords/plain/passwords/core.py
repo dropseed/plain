@@ -96,6 +96,7 @@ def send_password_reset(
     email: str,
     generate_reset_url: Callable[[User], str],
     email_template_name: str = "password_reset",
+    email_subject: str = "Password reset",
     from_email: str = "",
     extra_email_context: dict[str, Any] | None = None,
 ) -> None:
@@ -103,6 +104,7 @@ def send_password_reset(
     for user in _reset_users(email):
         TemplateEmail(
             template=email_template_name,
+            subject=email_subject,
             context={
                 "email": email,
                 "user": user,

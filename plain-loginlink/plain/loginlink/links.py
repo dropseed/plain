@@ -64,6 +64,7 @@ def send_login_link(
 
     return TemplateEmail(
         template="loginlink",
+        subject="Your link to log in",
         to=[email],
         context={"user": user, "url": url, "expires_in": expires_in},
     ).send()
