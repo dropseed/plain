@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from plain.postgres import types
+from datetime import datetime
+
+from plain.postgres import Field, types
 
 from plain import postgres
 
@@ -9,12 +11,12 @@ __all__ = ["Session"]
 
 @postgres.register_model
 class Session(postgres.Model):
-    session_key = types.TextField(max_length=40)
-    session_data: dict = types.JSONField(default={}, required=False)
-    created_at = types.DateTimeField(create_now=True)
-    expires_at = types.DateTimeField(allow_null=True)
-
-    query: postgres.QuerySet[Session] = postgres.QuerySet()
+    session_key: Field[str] = types.TextField(max_length=40)
+    session_data: Field[dict] = types.JSONField(default={}, required=False)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    expires_at: Field[datetime | None] = types.DateTimeField(
+        allow_null=True, default=None
+    )
 
     model_options = postgres.Options(
         indexes=[

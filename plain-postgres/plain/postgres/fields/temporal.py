@@ -163,13 +163,18 @@ class DateTimeField[
         *,
         create_now: bool = False,
         update_now: bool = False,
+        default: Any = NOT_PROVIDED,
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
+        # `default` accepts only None (the nullable-optional marker, validated
+        # by ColumnField). A literal timestamp default isn't supported --
+        # create_now/update_now own the DB-side default.
         self.create_now = create_now
         self.update_now = update_now
         super().__init__(
+            default=default,
             required=required,
             allow_null=allow_null,
             validators=validators,

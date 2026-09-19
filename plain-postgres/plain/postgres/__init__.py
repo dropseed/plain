@@ -8,7 +8,7 @@ from . import (
 )
 
 # Imports that would create circular imports if sorted
-from .base import Model
+from .base import Model, ModelMixin
 from .constraints import CheckConstraint, UniqueConstraint
 from .db import get_connection, use_management_connection
 from .middleware import DatabaseConnectionMiddleware
@@ -18,6 +18,7 @@ from .enums import TextChoices
 from .fields import (
     BigIntegerField,
     BinaryField,
+    Field,
     BooleanField,
     DateField,
     DateTimeField,
@@ -70,6 +71,9 @@ __all__ = [
     "DurationField",
     "EmailField",
     "F",
+    # The typed descriptor base, for annotating model fields:
+    #   name: Field[str] = types.TextField()
+    "Field",
     "FloatField",
     "ForeignKeyField",
     "GenericIPAddressField",
@@ -78,6 +82,9 @@ __all__ = [
     "JSONField",
     "ManyToManyField",
     "Model",
+    # Base for plain-Python mixins that declare shared model fields:
+    #   class TimestampedMixin(postgres.ModelMixin): ...
+    "ModelMixin",
     "Options",
     "PrimaryKeyField",
     "Q",
