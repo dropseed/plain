@@ -10,6 +10,7 @@ under the hood and you get to decide whether it should have.
 from __future__ import annotations
 
 import pytest
+from app.examples.models.defaults import DefaultsExample
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.encrypted import SecretStore
 from plain.postgres.fields.base import CONDITION_METHODS
@@ -78,3 +79,16 @@ def test_traversal_before_the_target_resolves_says_so():
 
     # An AttributeError subclass, so the attribute protocol still holds.
     assert issubclass(UnresolvedRelationError, AttributeError)
+
+
+def test_pattern_conditions_are_registered_on_every_field():
+    """Why the string-only restriction has to be a *type* guard.
+
+    `Contains` and friends are registered on `Field` itself (see lookups.py),
+    so an IntegerField builds a perfectly valid `priority__contains` lookup
+    that Postgres will run. Nothing at runtime distinguishes a string field
+    from an int one, which is why the `self` annotation on the pattern
+    conditions is the whole guard -- pinned from the checker's side in
+    `tests/typing/conditions_value_types.py`.
+    """
+    assert DefaultsExample.priority.get_lookup("contains") is not None

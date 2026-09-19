@@ -18,7 +18,7 @@ from app.examples.models.delete import (
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.shadowing import ShadowSource, ShadowTarget
-from plain.postgres.query_utils import Q
+from plain.postgres import Q
 
 
 def test_fk_field_access_builds_prefixed_q():
