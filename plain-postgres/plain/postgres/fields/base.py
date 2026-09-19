@@ -35,12 +35,6 @@ if TYPE_CHECKING:
     from plain.postgres.sql.compiler import SQLCompiler
 
 
-class Empty(Selectable[Any]):
-    # Subclasses Selectable to stay layout-compatible with Field's clone trick;
-    # see selectable.py's module docstring.
-    pass
-
-
 class NOT_PROVIDED:
     pass
 
@@ -94,10 +88,13 @@ def _load_field(
 #                except for ForeignKeys, where the "_id" suffix is appended.
 
 
-def _empty(of_cls: type) -> Empty:
-    new = Empty()
-    new.__class__ = of_cls
-    return new
+def _empty(of_cls: type) -> Any:
+    """Build an initialized-but-unpopulated instance of `of_cls`.
+
+    Module-level (not a lambda or a method) because `__reduce__` names it as
+    the pickle reconstructor.
+    """
+    return object.__new__(of_cls)
 
 
 # Ordering conditions: the ones a None operand is meaningless for.
@@ -412,12 +409,11 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         return obj
 
     def __copy__(self) -> Self:
-        # We need to avoid hitting __reduce__, so define this
-        # slightly weird copy construct.
-        obj = Empty()
-        obj.__class__ = self.__class__
+        # Build the instance directly rather than calling the constructor,
+        # which would hit __reduce__.
+        obj = object.__new__(self.__class__)
         obj.__dict__ = self.__dict__.copy()
-        return cast(Self, obj)
+        return obj
 
     def __reduce__(
         self,

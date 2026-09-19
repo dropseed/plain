@@ -8,7 +8,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.dialect import quote_name
-from plain.postgres.selectable import Selectable
 from plain.postgres.sql.constants import INNER, LOUTER
 
 if TYPE_CHECKING:
@@ -31,12 +30,6 @@ class MultiJoin(Exception):
         self.level = names_pos
         # The path travelled, this includes the path to the multijoin.
         self.names_with_path = path_with_names
-
-
-class Empty(Selectable[Any]):
-    # Subclasses Selectable to stay layout-compatible with Query's clone trick;
-    # see selectable.py's module docstring.
-    pass
 
 
 class Join:

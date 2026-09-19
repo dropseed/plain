@@ -3,7 +3,6 @@ from __future__ import annotations
 from .base import DATABASE_DEFAULT as DATABASE_DEFAULT
 from .base import (
     NOT_PROVIDED,
-    Empty,
     Field,
 )
 from .base import ChoicesField as ChoicesField
@@ -34,7 +33,6 @@ __all__ = [
     "DecimalField",
     "DurationField",
     "EmailField",
-    "Empty",
     "Field",
     "FloatField",
     "GenericIPAddressField",
