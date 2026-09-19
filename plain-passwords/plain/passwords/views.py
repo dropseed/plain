@@ -24,7 +24,6 @@ from plain.utils.encoding import force_bytes
 from .core import (
     authenticate,
     check_user_password,
-    get_password_errors,
     send_password_reset,
     set_user_password,
 )
@@ -35,6 +34,7 @@ from .forms import (
     PasswordSetForm,
     PasswordSignupForm,
 )
+from .values import HashedPassword
 
 
 class PasswordForgotView(TemplateView):
@@ -47,7 +47,7 @@ class PasswordForgotView(TemplateView):
             {
                 "id": user.id,
                 "email": user.email,
-                "password": user.password,  # Hashed password
+                "password": str(user.password),  # The encoded hash
                 "timestamp": datetime.now(UTC).timestamp(),  # Makes each token unique
             },
             compress=True,
@@ -94,12 +94,10 @@ class PasswordResetView(AuthView, TemplateView):
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             return None
 
-        # If the password has changed since the token was generated, the token is invalid.
-        # (These are the hashed passwords, not the raw passwords.)
-        if not hmac.compare_digest(
-            force_bytes(user.password),
-            force_bytes(data["password"]),
-        ):
+        # If the password has changed since the token was generated, the
+        # token is invalid. `HashedPassword.__eq__` is a constant-time
+        # comparison of the encoded hashes.
+        if user.password != HashedPassword(data["password"]):
             return None
 
         # If the email has changed since the token was generated, the token is invalid.
@@ -144,14 +142,7 @@ class PasswordResetView(AuthView, TemplateView):
         result = self.validate_form(self.form_class)
         if isinstance(result, Response):
             return result
-        if password_errors := get_password_errors(
-            user, result.new_password2, field="new_password2"
-        ):
-            return self.render_form(
-                self.form_class,
-                Invalid(errors=password_errors, raw=self.request.form_data),
-            )
-        set_user_password(user, result.new_password1)
+        set_user_password(user, result.new_password)
         del self.session[self._reset_token_session_key]
         return RedirectResponse(self.success_url or "/", status_code=302)
 
@@ -189,14 +180,7 @@ class PasswordChangeView(AuthView, TemplateView):
                     raw=self.request.form_data,
                 ),
             )
-        if password_errors := get_password_errors(
-            user, result.new_password2, field="new_password2"
-        ):
-            return self.render_form(
-                self.form_class,
-                Invalid(errors=password_errors, raw=self.request.form_data),
-            )
-        set_user_password(user, result.new_password1)
+        set_user_password(user, result.new_password)
         # Updating the password logs out all other sessions for the user
         # except the current one.
         update_session_auth_hash(self.request, user)

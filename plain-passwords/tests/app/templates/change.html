@@ -18,20 +18,20 @@
   <p>
     <input
       type="password"
-      name="new_password1"
+      name="new_password"
       placeholder="New password"
       >
-    {% for error in field_errors(form, form_class.new_password1) %}
+    {% for error in field_errors(form, form_class.new_password) %}
     <span class="form-error">{{ error.message }}</span>
     {% endfor %}
   </p>
   <p>
     <input
       type="password"
-      name="new_password2"
+      name="confirm_password"
       placeholder="Confirm new password"
       >
-    {% for error in field_errors(form, form_class.new_password2) %}
+    {% for error in field_errors(form, form_class.confirm_password) %}
     <span class="form-error">{{ error.message }}</span>
     {% endfor %}
   </p>

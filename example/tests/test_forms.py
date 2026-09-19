@@ -15,12 +15,15 @@ from app.contacts.models import ContactSubmission
 from app.notes.models import Note
 from app.tasks.models import Project, Tag, Task
 from app.users.models import User
+from plain.passwords.values import HashedPassword
 from plain.test import Client
 
 
 @pytest.fixture
 def user(db) -> User:
-    return User.query.create(email="u@example.com", password="strongpass1")
+    return User.query.create(
+        email="u@example.com", password=HashedPassword.from_raw("strongpass1")
+    )
 
 
 @pytest.fixture

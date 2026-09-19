@@ -20,7 +20,11 @@ def unsaved_code(*, code_challenge: str) -> AuthorizationCode:
     """
     return AuthorizationCode(
         application=OAuthApplication(redirect_uris="https://app.example.com/cb"),
-        user=User(email="pkce@example.com"),
+        # Every test suite names its fixture package `app`, and they all sit
+        # on ty's `extra-paths`, so the checker resolves this `User` to the
+        # example app's -- which requires a password. The runtime imports
+        # this suite's own User, which does not.
+        user=User(email="pkce@example.com"),  # ty: ignore[missing-argument]
         redirect_uri="https://app.example.com/cb",
         expires_at=timezone.now(),
         code_challenge=code_challenge,

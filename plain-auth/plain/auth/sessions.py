@@ -49,9 +49,11 @@ def _get_session_auth_fallback_hash(user: User) -> Generator[str]:
 
 def _get_session_auth_hash(user: User, secret: str | None = None) -> str:
     key_salt = "plain.auth.get_session_auth_hash"
+    # str() explicitly: the field may carry a value type (plain.passwords
+    # stores a HashedPassword), and what's hashed is its stored form.
     return salted_hmac(
         key_salt,
-        getattr(user, settings.AUTH_USER_SESSION_HASH_FIELD),
+        str(getattr(user, settings.AUTH_USER_SESSION_HASH_FIELD)),
         secret=secret,
         algorithm="sha256",
     ).hexdigest()

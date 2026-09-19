@@ -1269,6 +1269,7 @@ version = "0.26.9"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-postgres" },
     { name = "plain-templates" },
 ]
 
@@ -1282,6 +1283,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
+    { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-templates", editable = "plain-templates" },
 ]
 

@@ -11,9 +11,10 @@ from __future__ import annotations
 import re
 
 from app.users.models import User
+from plain.passwords.values import HashedPassword
 from plain.test import Client
 
-# Passwords chosen to satisfy PasswordField's default validators
+# Passwords chosen to satisfy the shipped password rules
 # (minimum length, not a common password, not entirely numeric).
 OLD_PASSWORD = "sunflower-old-1"
 NEW_PASSWORD = "moonlight-new-2"
@@ -21,7 +22,8 @@ WRONG_PASSWORD = "incorrect-pw-9"
 
 
 def make_user(email: str = "person@example.com", password: str = OLD_PASSWORD) -> User:
-    return User.query.create(email=email, password=password)
+    # A raw password only ever becomes a stored one by being hashed.
+    return User.query.create(email=email, password=HashedPassword.from_raw(password))
 
 
 def is_logged_in(client: Client) -> bool:
@@ -151,7 +153,7 @@ class TestResetPassword:
 
         response = client.post(
             "/reset",
-            data={"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD},
+            data={"new_password": NEW_PASSWORD, "confirm_password": NEW_PASSWORD},
         )
 
         assert response.status_code == 302
@@ -176,8 +178,8 @@ class TestChangePassword:
             "/change",
             data={
                 "current_password": OLD_PASSWORD,
-                "new_password1": NEW_PASSWORD,
-                "new_password2": NEW_PASSWORD,
+                "new_password": NEW_PASSWORD,
+                "confirm_password": NEW_PASSWORD,
             },
         )
 
@@ -193,8 +195,8 @@ class TestChangePassword:
             "/change",
             data={
                 "current_password": WRONG_PASSWORD,
-                "new_password1": NEW_PASSWORD,
-                "new_password2": NEW_PASSWORD,
+                "new_password": NEW_PASSWORD,
+                "confirm_password": NEW_PASSWORD,
             },
         )
 
@@ -210,8 +212,8 @@ class TestChangePassword:
             "/change",
             data={
                 "current_password": OLD_PASSWORD,
-                "new_password1": NEW_PASSWORD,
-                "new_password2": WRONG_PASSWORD,
+                "new_password": NEW_PASSWORD,
+                "confirm_password": WRONG_PASSWORD,
             },
         )
 

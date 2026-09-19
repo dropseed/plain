@@ -5,58 +5,28 @@ from typing import Any
 
 from app.users.models import User
 from plain.email import TemplateEmail
-from plain.exceptions import ValidationError
-from plain.forms import Error
-from plain.postgres.fields.base import ColumnField
 
 from .hashers import check_password, hash_password
 from .utils import unicode_ci_compare
+from .values import HashedPassword
 
 
-def check_user_password(user: Any, password: str) -> bool:
-    # Run the default password hasher once to reduce the timing
-    # difference between an existing and a nonexistent user (#20760).
-    hash_password(password)
+def check_user_password(user: Any, raw_password: str) -> bool:
+    """Whether this raw password is the user's, rehashing it if it's stale."""
+    # Run the default password hasher once to reduce the timing difference
+    # between an existing and a nonexistent user (django #20760).
+    hash_password(raw_password)
 
-    # Update the stored hashed password if the hashing algorithm changed
-    def setter(raw_password: str) -> None:
-        user.password = raw_password
+    if not user.password.check(raw_password):
+        return False
+
+    # Rehashing needs the raw password, and this is the only moment it's in
+    # hand — so an upgraded hasher takes effect on the user's next login.
+    if user.password.needs_rehash():
+        user.password = HashedPassword.from_raw(raw_password)
         user.update(fields=["password"])
 
-    password_is_correct = check_password(password, user.password, setter)
-
-    return password_is_correct
-
-
-def get_password_errors(
-    user: Any, password: str, *, field: str | None = None
-) -> list[Error]:
-    """Validate a new password against the password field's validators.
-
-    Some validators compare the password against the user's other
-    attributes, so the user is required. Returns the validators' own
-    `Error`s — each carrying its `code` so callers can branch on which
-    rule failed — or an empty list when the password is acceptable. The
-    caller passes `field` to attach the errors to a form field.
-    """
-    password_field = user._model_meta.get_forward_field("password")
-    if not isinstance(password_field, ColumnField):
-        raise TypeError(f"{type(user).__name__}.password must be a column field")
-
-    try:
-        # Clean it as if it were being assigned to the model field directly.
-        password_field.clean(password, user)
-    except ValidationError as e:
-        errors: list[Error] = []
-        for leaf in e.error_list:
-            message = leaf.message
-            if leaf.params:
-                message %= leaf.params
-            errors.append(
-                Error(message=str(message), code=leaf.code or "invalid", field=field)
-            )
-        return errors
-    return []
+    return True
 
 
 def authenticate(*, email: str, password: str) -> User | None:
@@ -78,8 +48,12 @@ def authenticate(*, email: str, password: str) -> User | None:
     return user
 
 
-def set_user_password(user: User, password: str) -> User:
-    """Set the user's password and save."""
+def set_user_password(user: User, password: HashedPassword) -> User:
+    """Store an already-hashed password on the user and save.
+
+    Takes a `HashedPassword`, not a raw string — hashing and raw-password
+    validation both happen in the form layer.
+    """
     user.password = password
     user.update()
     return user
