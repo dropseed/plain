@@ -1127,6 +1127,18 @@ class QuerySet[T: "Model"]:
         """
         return self._filter_or_exclude(True, args, kwargs)
 
+    def where(self, *conditions: Q) -> Self:
+        """
+        Return a new QuerySet narrowed by typed field conditions.
+
+        Conditions are produced by field methods like `Model.field.equals(...)`
+        and combine with `|` and `&`. Unlike `filter()`, this accepts no
+        keyword arguments — every condition is a typed expression, so a
+        type checker can reject typos and value-type mismatches at the call
+        site.
+        """
+        return self.filter(*conditions)
+
     def _filter_or_exclude(
         self, negate: bool, args: tuple[Any, ...], kwargs: dict[str, Any]
     ) -> Self:
@@ -1920,9 +1932,9 @@ def get_prefetcher(
 ) -> tuple[Any, Any, bool, Callable[[Model], bool]]:
     """
     For the attribute 'through_attr' on the given instance, find
-    an object that has a get_prefetch_queryset().
+    an object that has a _get_prefetch_queryset().
     Return a 4 tuple containing:
-    (the object with get_prefetch_queryset (or None),
+    (the object with _get_prefetch_queryset (or None),
      the descriptor object representing this relationship (or None),
      a boolean that is False if the attribute was not found at all,
      a function that takes an instance and returns a boolean that is True if
@@ -1945,16 +1957,16 @@ def get_prefetcher(
         attr_found = True
         if rel_obj_descriptor:
             # singly related object, descriptor object has the
-            # get_prefetch_queryset() method.
-            if hasattr(rel_obj_descriptor, "get_prefetch_queryset"):
+            # _get_prefetch_queryset() method.
+            if hasattr(rel_obj_descriptor, "_get_prefetch_queryset"):
                 prefetcher = rel_obj_descriptor
-                is_fetched = rel_obj_descriptor.is_cached
+                is_fetched = rel_obj_descriptor._is_cached
             else:
                 # descriptor doesn't support prefetching, so we go ahead and get
                 # the attribute on the instance rather than the class to
                 # support many related managers
                 rel_obj = getattr(instance, through_attr)
-                if hasattr(rel_obj, "get_prefetch_queryset"):
+                if hasattr(rel_obj, "_get_prefetch_queryset"):
                     prefetcher = rel_obj
                 if through_attr != to_attr:
                     # Special case cached_property instances because hasattr
@@ -1988,7 +2000,7 @@ def prefetch_one_level(
     Return the prefetched objects along with any additional prefetches that
     must be done due to prefetch_related lookups found from default managers.
     """
-    # prefetcher must have a method get_prefetch_queryset() which takes a list
+    # prefetcher must have a method _get_prefetch_queryset() which takes a list
     # of instances, and returns a tuple:
 
     # (queryset of instances of self.model that are related to passed in instances,
@@ -2008,7 +2020,7 @@ def prefetch_one_level(
         single,
         cache_name,
         is_descriptor,
-    ) = prefetcher.get_prefetch_queryset(instances, lookup.get_current_queryset(level))
+    ) = prefetcher._get_prefetch_queryset(instances, lookup.get_current_queryset(level))
     # We have to handle the possibility that the QuerySet we just got back
     # contains some prefetch_related lookups. We don't want to trigger the
     # prefetch_related functionality by evaluating the query. Rather, we need

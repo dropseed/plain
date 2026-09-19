@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, ClassVar, Self
+from typing import ClassVar, Self
 
 from plain.postgres import Field, types
 from plain.runtime import settings
@@ -38,7 +38,13 @@ class CachedItemQuerySet(postgres.QuerySet["CachedItem"]):
 @postgres.register_model
 class CachedItem(postgres.Model):
     key: Field[str] = types.TextField(max_length=255)
-    value: Field[Any] = types.JSONField(required=False, allow_null=True, default=None)
+    # `object`, not `Any`: the cache stores any JSON-serializable value, and
+    # `Field[Any]` would make `Any` satisfy the model-valued `__get__` overload,
+    # so `CachedItem.value` would type as `type[Any]` and lose the field surface
+    # entirely.
+    value: Field[object] = types.JSONField(
+        required=False, allow_null=True, default=None
+    )
     expires_at: Field[datetime | None] = types.DateTimeField(
         required=False, allow_null=True, default=None
     )
