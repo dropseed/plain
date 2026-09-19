@@ -142,6 +142,7 @@ class TestTasks:
         assert response.status_code == 302
         task = Task.query.get(id=task.id)
         assert task.title == "New"
+        assert task.project is not None
         assert task.project.id == project.id
         assert list(task.tags.query) == [tag]
 
