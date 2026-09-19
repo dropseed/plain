@@ -484,7 +484,11 @@ CachedItem.query.bulk_upsert(
 ```
 
 - `update_fields` and `unique_fields` take field references (`Model.field`), not
-  strings.
+  strings. A foreign key is named by the relation itself — `Model.tenant`, which
+  resolves to the `tenant_id` column. (This is the one write API that takes
+  `Model.fk`. `returning()` refuses it, because there it would be ambiguous with
+  asking for the whole related object; here a column list can only mean the
+  column.)
 - `unique_fields` must name the **primary key** or a `UniqueConstraint` declared
   on the model (no condition, no expressions) — this is the conflict target. A
   unique `Index` is not enough; declare a `UniqueConstraint`.

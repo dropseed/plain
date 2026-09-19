@@ -11,7 +11,12 @@ import pytest
 from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.mixins import MixinTestModel
 from app.examples.models.returning import ReturningEvent
-from app.examples.models.upsert import UpsertItem, UpsertPair
+from app.examples.models.upsert import (
+    UpsertItem,
+    UpsertPair,
+    UpsertScoped,
+    UpsertTenant,
+)
 from plain.postgres.exceptions import FieldError
 
 
@@ -284,3 +289,52 @@ def test_bulk_upsert_update_now_unique_field_rejected(db):
             update_fields=[MixinTestModel.name],
             unique_fields=[MixinTestModel.updated_at],
         )
+
+
+def test_bulk_upsert_foreign_key_in_unique_fields(db):
+    # Model.fk is a relation descriptor, not a Field, but it is the only way to
+    # name the foreign key column -- so the write-API field lists accept it.
+    tenant = UpsertTenant(name="t1")
+    tenant.create()
+    tenant = UpsertTenant.query.get(name="t1")
+    UpsertScoped(tenant=tenant, slug="a", value=1).create()
+    seeded_id = UpsertScoped.query.get(slug="a").id
+
+    items = [
+        UpsertScoped(tenant=tenant, slug="a", value=10),  # conflicts -> update
+        UpsertScoped(tenant=tenant, slug="b", value=20),  # new -> insert
+    ]
+    UpsertScoped.query.bulk_upsert(
+        items,
+        update_fields=[UpsertScoped.value],
+        unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
+    )
+
+    assert items[0].id == seeded_id
+    assert items[1].id != seeded_id
+    stored = {row.slug: row.value for row in UpsertScoped.query.all()}
+    assert stored == {"a": 10, "b": 20}
+
+
+def test_bulk_upsert_foreign_key_in_update_fields(db):
+    first = UpsertTenant(name="t1")
+    first.create()
+    second = UpsertTenant(name="t2")
+    second.create()
+    first = UpsertTenant.query.get(name="t1")
+    second = UpsertTenant.query.get(name="t2")
+
+    UpsertScoped(tenant=first, slug="a", value=1).create()
+    seeded_id = UpsertScoped.query.get(slug="a").id
+
+    moved = UpsertScoped(tenant=second, slug="a", value=2)
+    moved.id = seeded_id
+    UpsertScoped.query.bulk_upsert(
+        [moved],
+        update_fields=[UpsertScoped.tenant, UpsertScoped.value],
+        unique_fields=[UpsertScoped.id],
+    )
+
+    row = UpsertScoped.query.get(id=seeded_id)
+    assert row.tenant.id == second.id
+    assert row.value == 2

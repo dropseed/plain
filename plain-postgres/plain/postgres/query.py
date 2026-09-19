@@ -53,6 +53,7 @@ __all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet", "ReturningQuerySet"]
 if TYPE_CHECKING:
     from plain.postgres import Model
 
+
 # The maximum number of results to fetch in a get() query.
 MAX_GET_RESULTS = 21
 
@@ -686,15 +687,22 @@ class QuerySet[T: "Model"]:
 
         return objs
 
-    def _check_bulk_upsert_options(
+    def _resolve_bulk_upsert_fields(
         self,
-        update_fields: list[Field],
-        unique_fields: list[Field],
-    ) -> None:
+        update_fields: Sequence[Any],
+        unique_fields: Sequence[Any],
+    ) -> tuple[list[Field], list[Field]]:
+        """Check both bulk_upsert() field lists and return the columns they
+        name, with any `Model.fk` reference resolved to its foreign key
+        column."""
         object_name = self.model.model_options.object_name
 
-        self._validate_field_refs(unique_fields, where="bulk_upsert() unique_fields")
-        self._validate_field_refs(update_fields, where="bulk_upsert() update_fields")
+        unique_fields = self._validate_field_refs(
+            unique_fields, where="bulk_upsert() unique_fields"
+        )
+        update_fields = self._validate_field_refs(
+            update_fields, where="bulk_upsert() update_fields"
+        )
 
         if not unique_fields:
             raise ValueError("bulk_upsert() requires unique_fields.")
@@ -748,12 +756,14 @@ class QuerySet[T: "Model"]:
                 f"{sorted(overlap)}."
             )
 
+        return update_fields, unique_fields
+
     def bulk_upsert(
         self,
         objs: Sequence[T],
         *,
-        update_fields: list[Field],
-        unique_fields: list[Field],
+        update_fields: list[Field[Any] | type[Model]],
+        unique_fields: list[Field[Any] | type[Model]],
         batch_size: int | None = None,
     ) -> list[T]:
         """
@@ -778,7 +788,9 @@ class QuerySet[T: "Model"]:
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
 
-        self._check_bulk_upsert_options(update_fields, unique_fields)
+        update_columns, unique_columns = self._resolve_bulk_upsert_fields(
+            update_fields, unique_fields
+        )
 
         objs = list(objs)
         if not objs:
@@ -795,7 +807,7 @@ class QuerySet[T: "Model"]:
         obj_by_key: dict[tuple[Any, ...], T] = {}
         for obj in objs:
             key_values = []
-            for field in unique_fields:
+            for field in unique_columns:
                 value = field.value_from_object(obj)
                 if value is None:
                     raise ValueError(
@@ -806,7 +818,7 @@ class QuerySet[T: "Model"]:
                 key_values.append(value)
             key = tuple(key_values)
             if key in obj_by_key:
-                names = [f.name for f in unique_fields]
+                names = [f.name for f in unique_columns]
                 raise ValueError(
                     f"bulk_upsert() got more than one {object_name} with "
                     f"{names} = {list(key)}. Postgres can only touch a row once "
@@ -819,14 +831,14 @@ class QuerySet[T: "Model"]:
         # Setting it from EXCLUDED on the conflict path too is what keeps the
         # stored row and the returned object agreeing -- and it's what
         # update_now means. The caller doesn't have to name it.
-        conflict_update_fields = list(update_fields)
+        conflict_update_columns = list(update_columns)
         for field in meta.fields:
-            if field.auto_fills_on_save and field not in conflict_update_fields:
-                conflict_update_fields.append(field)
+            if field.auto_fills_on_save and field not in conflict_update_columns:
+                conflict_update_columns.append(field)
 
         # Include the PK column only when it is itself the conflict key;
         # otherwise let Postgres generate the identity value.
-        pk_is_unique = any(f.primary_key for f in unique_fields)
+        pk_is_unique = any(f.primary_key for f in unique_columns)
         fields = meta.fields
         if not pk_is_unique:
             fields = [f for f in fields if not isinstance(f, PrimaryKeyField)]
@@ -834,10 +846,10 @@ class QuerySet[T: "Model"]:
         # RETURNING must carry the DB-returned fields (to populate the objects)
         # plus the unique fields (to match each returned row to its object).
         returning_fields = list(meta.db_returning_fields)
-        for field in unique_fields:
+        for field in unique_columns:
             if field not in returning_fields:
                 returning_fields.append(field)
-        unique_indices = [returning_fields.index(f) for f in unique_fields]
+        unique_indices = [returning_fields.index(f) for f in unique_columns]
 
         # Issue the batches in conflict-key order so concurrent upserts touching
         # overlapping keys lock rows in the same order and can't deadlock each
@@ -851,8 +863,8 @@ class QuerySet[T: "Model"]:
                 batch_size,
                 returning_fields=returning_fields,
                 on_conflict=OnConflict.UPDATE,
-                update_fields=conflict_update_fields,
-                unique_fields=unique_fields,
+                update_fields=conflict_update_columns,
+                unique_fields=unique_columns,
             )
 
             # RETURNING order isn't guaranteed to match VALUES order under ON
@@ -1085,14 +1097,30 @@ class QuerySet[T: "Model"]:
             clone._returning_instances = True
         return cast("ReturningQuerySet[T, Any]", clone)
 
-    def _validate_field_refs(self, fields: Sequence[Any], *, where: str) -> None:
-        """Require each item to be a Field reference on this queryset's model.
+    def _validate_field_refs(self, fields: Sequence[Any], *, where: str) -> list[Field]:
+        """Require each item to be a Field reference on this queryset's model,
+        and return the columns those references name.
+
+        `Model.fk` is a ForwardForeignKeyDescriptor rather than a Field -- that
+        is what lets where() traverse to the related model -- so there is no
+        other way to name the foreign key column. The write APIs that take
+        column lists unwrap it here. returning() is the exception and refuses
+        it outright, which it does before calling this (see
+        _validated_returning_fields).
 
         `where` names the call in the error (e.g. "returning()", "bulk_upsert()
         unique_fields") so a bad argument points the user at Model.field.
         """
+        # Local import: related_descriptors imports this module at load time.
+        from plain.postgres.fields.related_descriptors import (
+            ForwardForeignKeyDescriptor,
+        )
+
         object_name = self.model.model_options.object_name
+        columns = []
         for field in fields:
+            if isinstance(field, ForwardForeignKeyDescriptor):
+                field = field._field
             if isinstance(field, str):
                 raise TypeError(
                     f"{where} takes field references, not strings. "
@@ -1109,6 +1137,8 @@ class QuerySet[T: "Model"]:
                     f"{field.name}: it belongs to a different model, not "
                     f"{object_name}."
                 )
+            columns.append(field)
+        return columns
 
     def _validated_returning_fields(
         self, fields: tuple[Field[Any], ...]

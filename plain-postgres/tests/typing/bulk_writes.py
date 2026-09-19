@@ -1,15 +1,16 @@
 """`bulk_create()` inserts and `bulk_upsert()` insert-or-updates.
 
 Both hand back the model instances they were given. `bulk_upsert()` takes field
-references for its conflict target and its update columns, and `bulk_create()`
-no longer takes a conflict surface at all -- both are static claims.
+references for its conflict target and its update columns -- including a
+`Model.fk` reference, which types as the related model class rather than a
+Field -- and `bulk_create()` no longer takes a conflict surface at all.
 """
 
 from __future__ import annotations
 
 from typing import assert_type
 
-from app.examples.models.upsert import UpsertItem
+from app.examples.models.upsert import UpsertItem, UpsertScoped, UpsertTenant
 
 
 def must_accept_bulk_create_as_instances() -> None:
@@ -46,4 +47,16 @@ def must_reject_bulk_create_conflict_kwargs() -> None:
     UpsertItem.query.bulk_create(
         [UpsertItem(key="a", value=1)],
         update_conflicts=True,  # ty: ignore[unknown-argument]
+    )
+
+
+def must_accept_a_foreign_key_reference() -> None:
+    # Model.fk types as the related model class, not a Field, so the element
+    # type of these lists is the union. Runtime half:
+    # tests/public/test_bulk_upsert.py
+    # ::test_bulk_upsert_foreign_key_in_unique_fields.
+    UpsertScoped.query.bulk_upsert(
+        [UpsertScoped(tenant=UpsertTenant(name="t"), slug="s", value=1)],
+        update_fields=[UpsertScoped.value],
+        unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
     )
