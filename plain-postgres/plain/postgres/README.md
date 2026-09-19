@@ -525,8 +525,13 @@ for row in deleted:
 - **`returning()`** returns full model instances. For `update()` they hold the new values; for `delete()`, the rows as they were.
 - **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a many-to-many field or one from another model raises an error at the `returning()` call.
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
+- `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_update()`, `get_or_create()`, `update_or_create()` — raises `TypeError` rather than quietly dropping it.
+
+The values you get back are whatever the statement wrote, exactly as Postgres holds them. A set-based `update()` doesn't run Python-side field hooks, so an `update_now=True` timestamp comes back unchanged unless the `update()` set it.
 
 `RETURNING` only reports rows of the statement's own target table. Rows removed by a cascading `ON DELETE` are never included — a `delete()` with `returning()` gives you the parent rows you deleted, not the children Postgres cascaded.
+
+Every affected row is fetched and built into memory at once, so `returning()` belongs on writes you've already bounded by a filter. For a write that spans a whole table, take the rowcount and page through the rows separately.
 
 ## Transactions
 

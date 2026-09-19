@@ -621,6 +621,7 @@ class QuerySet[T: "Model"]:
         Create a new object with the given kwargs, saving it to the database
         and returning the created object.
         """
+        self._reject_returning("create")
         obj = self.model(**kwargs)
         obj.create()
         return obj
@@ -684,6 +685,7 @@ class QuerySet[T: "Model"]:
         save() on each of the instances. Primary keys are set on the objects
         via the PostgreSQL RETURNING clause. Multi-table models are not supported.
         """
+        self._reject_returning("bulk_create")
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
 
@@ -751,6 +753,7 @@ class QuerySet[T: "Model"]:
         """
         Update the given fields in each of the given objects in the database.
         """
+        self._reject_returning("bulk_update")
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
         if not fields:
@@ -811,6 +814,7 @@ class QuerySet[T: "Model"]:
         Return a tuple of (object, created), where created is a boolean
         specifying whether an object was created.
         """
+        self._reject_returning("get_or_create")
         # The get() needs to be targeted at the write database in order
         # to avoid potential transaction consistency problems.
         try:
@@ -850,6 +854,7 @@ class QuerySet[T: "Model"]:
         Return a tuple (object, created), where created is a boolean
         specifying whether an object was created.
         """
+        self._reject_returning("update_or_create")
         if create_defaults is None:
             update_defaults = create_defaults = defaults or {}
         else:
@@ -960,9 +965,24 @@ class QuerySet[T: "Model"]:
         self, fields: tuple[Field[Any], ...]
     ) -> list[Field]:
         """Check each returning() reference and return the columns to RETURN."""
+        # Local import: related_descriptors imports this module at load time.
+        from plain.postgres.fields.related_descriptors import (
+            ForwardForeignKeyDescriptor,
+        )
+
         object_name = self.model.model_options.object_name
         columns = []
         for field in fields:
+            if isinstance(field, ForwardForeignKeyDescriptor):
+                # Model.fk is the relation at class level, not its column --
+                # that is what lets where() traverse it. So there is no
+                # reference to name the foreign key column with here.
+                raise FieldError(
+                    f"Cannot use {object_name}.{field._field.name} in "
+                    "returning(): it is a relation, not a column reference. "
+                    "Use returning() with no arguments to get whole "
+                    "instances, which carry the foreign key."
+                )
             if isinstance(field, str):
                 raise TypeError(
                     f"returning() takes field references, not strings. "
@@ -986,6 +1006,18 @@ class QuerySet[T: "Model"]:
                 )
             columns.append(field)
         return columns
+
+    def _reject_returning(self, method_name: str) -> None:
+        """Refuse a write that RETURNING doesn't apply to.
+
+        returning() only changes what update() and delete() hand back.
+        Every other write would silently drop it, so say so instead.
+        """
+        if self._returning_fields is not None:
+            raise TypeError(
+                f"Cannot call {method_name}() on a returning() queryset. "
+                "returning() only applies to update() and delete()."
+            )
 
     def delete(self) -> int:
         """Delete the records in the current QuerySet.
