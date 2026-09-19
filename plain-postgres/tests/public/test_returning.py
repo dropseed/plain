@@ -10,8 +10,8 @@ from __future__ import annotations
 import pytest
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.returning import ReturningEvent
+from plain.postgres import ReturningQuerySet
 from plain.postgres.exceptions import FieldError
-from plain.postgres.query import ReturningQuerySet
 
 
 def _seed_events() -> None:
@@ -166,3 +166,102 @@ def test_delete_returning_excludes_cascade_deleted_children(db):
     assert len(rows) == 1
     assert rows[0] == {"id": parent.id, "name": "p"}
     assert ChildCascade.query.count() == 0
+
+
+# ===========================================================================
+# Joins — the WHERE id IN (subquery) rewrite keeps RETURNING
+# ===========================================================================
+
+
+def test_update_returning_across_a_relation(db, capture_queries):
+    keep = DeleteParent(name="keep").create()
+    move = DeleteParent(name="move").create()
+    ChildCascade(parent=move).create()
+    ChildCascade(parent=move).create()
+    ChildCascade(parent=keep).create()
+
+    with capture_queries() as queries:
+        rows = (
+            ChildCascade.query.filter(parent__name="move")
+            .returning(ChildCascade.id)
+            .update(parent=keep)
+        )
+
+    # Filtering across the FK rewrites the UPDATE to `WHERE id IN (subquery)`;
+    # RETURNING has to survive that rewrite, in one statement.
+    assert len(queries) == 1
+    assert "RETURNING" in queries[0]["sql"]
+    assert len(rows) == 2
+    assert ChildCascade.query.filter(parent=keep).count() == 3
+
+
+def test_delete_returning_across_a_relation(db, capture_queries):
+    parent = DeleteParent(name="doomed").create()
+    ChildCascade(parent=parent).create()
+    ChildCascade(parent=parent).create()
+
+    with capture_queries() as queries:
+        rows = ChildCascade.query.filter(parent__name="doomed").returning().delete()
+
+    assert len(queries) == 1
+    assert "RETURNING" in queries[0]["sql"]
+    assert len(rows) == 2
+    assert all(row.parent.id == parent.id for row in rows)
+
+
+# ===========================================================================
+# Foreign key columns
+# ===========================================================================
+
+
+def test_returning_relation_reference_errors(db):
+    # Model.fk is the relation, not the column, so it has no spelling here --
+    # say that instead of dumping the descriptor's repr.
+    with pytest.raises(FieldError, match="it is a relation, not a column"):
+        ChildCascade.query.returning(ChildCascade.parent)  # ty: ignore[invalid-argument-type]
+
+
+def test_returning_instances_carry_foreign_keys(db):
+    parent = DeleteParent(name="p").create()
+    ChildCascade(parent=parent).create()
+
+    rows = ChildCascade.query.returning().delete()
+
+    assert len(rows) == 1
+    assert rows[0].parent.id == parent.id
+
+
+# ===========================================================================
+# Writes that RETURNING doesn't apply to say so
+# ===========================================================================
+
+
+@pytest.mark.parametrize(
+    "write",
+    [
+        lambda qs: qs.create(label="x", count=1),
+        lambda qs: qs.bulk_create([ReturningEvent(label="x", count=1)]),
+        lambda qs: qs.bulk_upsert(
+            [ReturningEvent(label="x", count=1)],
+            update_fields=[ReturningEvent.count],
+            unique_fields=[ReturningEvent.id],
+        ),
+        lambda qs: qs.bulk_update(list(ReturningEvent.query), ["count"]),
+        lambda qs: qs.get_or_create(label="x", count=1),
+        lambda qs: qs.update_or_create(label="x", defaults={"count": 1}),
+    ],
+    ids=[
+        "create",
+        "bulk_create",
+        "bulk_upsert",
+        "bulk_update",
+        "get_or_create",
+        "update_or_create",
+    ],
+)
+def test_returning_rejects_other_writes(db, write):
+    ReturningEvent(label="seed", count=1).create()
+    with pytest.raises(
+        TypeError, match="only applies to update\\(\\) and delete\\(\\)"
+    ):
+        write(ReturningEvent.query.returning())

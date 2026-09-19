@@ -56,5 +56,7 @@ jobs:
         run: uv python install
       - run: uv sync
       - run: uv run plain-code check . --skip-ty
+      # Annotation coverage plus `ty check` over every fully typed path --
+      # which is what runs the typing corpora in <package>/tests/typing/.
       - run: ./scripts/type-validate
       - run: ./scripts/test-package-imports

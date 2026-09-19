@@ -1,63 +1,17 @@
-from __future__ import annotations
+"""Encrypted fields: what they store, and what they refuse to match on.
 
-from typing import assert_type
+The static half of the refusal -- every condition the type checker must
+reject, and the `is_null`/`equals(None)`/`equals("")` surface that must
+survive it -- lives in `tests/typing/conditions_encrypted.py`. The
+encrypt/decrypt primitives are in `tests/internal/test_encrypted_internals.py`.
+"""
+
+from __future__ import annotations
 
 import pytest
 from app.examples.models.encrypted import SecretStore
-from plain.postgres import F
+from plain.postgres import F, Q, types
 from plain.postgres.exceptions import FieldError
-from plain.postgres.fields.encrypted import (
-    _ENCRYPTED_PREFIX,
-    _decrypt,
-    _encrypt,
-    _get_fernet,
-)
-from plain.postgres.query_utils import Q
-
-
-class TestEncryptDecryptFunctions:
-    """Test the low-level encrypt/decrypt functions."""
-
-    def test_encrypt_returns_prefixed_string(self):
-        result = _encrypt("hello")
-        assert result.startswith(_ENCRYPTED_PREFIX)
-
-    def test_decrypt_reverses_encrypt(self):
-        encrypted = _encrypt("secret value")
-        assert _decrypt(encrypted) == "secret value"
-
-    def test_encrypt_is_nondeterministic(self):
-        """Same plaintext should produce different ciphertext each time."""
-        a = _encrypt("same input")
-        b = _encrypt("same input")
-        assert a != b
-
-    def test_decrypt_plaintext_passthrough(self):
-        """Unencrypted values pass through for migration support."""
-        assert _decrypt("just a plain string") == "just a plain string"
-
-    def test_decrypt_invalid_token_raises(self):
-        """Corrupted encrypted data should raise a clear error."""
-        with pytest.raises(ValueError, match="Could not decrypt"):
-            _decrypt(_ENCRYPTED_PREFIX + "not-valid-fernet-data")
-
-    def test_encrypt_empty_string(self):
-        encrypted = _encrypt("")
-        assert _decrypt(encrypted) == ""
-
-    def test_encrypt_unicode(self):
-        encrypted = _encrypt("hello \U0001f30d unicode")
-        assert _decrypt(encrypted) == "hello \U0001f30d unicode"
-
-    def test_fernet_is_cached(self):
-        """MultiFernet instance should be cached for same key."""
-        from plain.runtime import settings
-
-        key = settings.SECRET_KEY
-        fallbacks = tuple(settings.SECRET_KEY_FALLBACKS)
-        f1 = _get_fernet(key, fallbacks)
-        f2 = _get_fernet(key, fallbacks)
-        assert f1 is f2
 
 
 class TestEncryptedTextField:
@@ -161,8 +115,9 @@ class TestTypedQueryMethodsBlocked:
     """Encrypted fields must not expose typed-query comparison methods.
 
     The class-level overrides accept `Never`, so type checkers reject any
-    call site. The runtime also raises TypeError as a safety net for callers
-    that bypass type checking (e.g. dynamic code).
+    call site (pinned in `tests/typing/conditions_encrypted.py`). The runtime
+    also raises TypeError as a safety net for callers that bypass type
+    checking (e.g. dynamic code) -- that half is what these assert.
     """
 
     def test_equals_raises(self):
@@ -191,78 +146,16 @@ class TestTypedQueryMethodsBlocked:
         with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
             getattr(SecretStore.api_key, method)("x")
 
-    def test_every_blocked_method_is_rejected_statically(self):
-        """Pin the block from the type checker's side, not just the runtime's.
-
-        Each `ty: ignore[invalid-argument-type]` below asserts that the call
-        is a type error: ty reports an unused suppression as an error of its
-        own, so if any of these parameters ever widens away from `Never`,
-        `./scripts/type-check plain-postgres` fails here. That matters because
-        the `ty: ignore[invalid-method-override]` on EncryptedTextField is
-        class-wide and would otherwise hide a block that stopped blocking.
-
-        The same calls are asserted to raise, so the runtime and the type
-        checker are pinned to each other in one place.
-        """
-        with pytest.raises(TypeError):
-            SecretStore.api_key.equals("x")  # ty: ignore[no-matching-overload]
-        with pytest.raises(TypeError):
-            SecretStore.api_key.not_equal("x")  # ty: ignore[no-matching-overload]
-        with pytest.raises(TypeError):
-            SecretStore.api_key.gt("x")  # ty: ignore[invalid-argument-type]
-        with pytest.raises(TypeError):
-            SecretStore.api_key.gte("x")  # ty: ignore[invalid-argument-type]
-        with pytest.raises(TypeError):
-            SecretStore.api_key.lt("x")  # ty: ignore[invalid-argument-type]
-        with pytest.raises(TypeError):
-            SecretStore.api_key.lte("x")  # ty: ignore[invalid-argument-type]
-        with pytest.raises(TypeError):
-            SecretStore.api_key.is_in(["x"])  # ty: ignore[invalid-argument-type]
-        with pytest.raises(TypeError):
-            SecretStore.api_key.contains("x")  # ty: ignore[invalid-argument-type]
-        with pytest.raises(TypeError):
-            SecretStore.api_key.icontains("x")  # ty: ignore[invalid-argument-type]
-        with pytest.raises(TypeError):
-            SecretStore.api_key.startswith("x")  # ty: ignore[invalid-argument-type]
-        with pytest.raises(TypeError):
-            SecretStore.api_key.endswith("x")  # ty: ignore[invalid-argument-type]
-
-    def test_json_field_is_rejected_statically(self):
-        """`config` is annotated `EncryptedField[dict | None]`, so class access
-        types as the field and the same static block applies. Spelled directly
-        rather than through getattr, because a marker can't bind to a dynamic
-        call."""
-        with pytest.raises(TypeError):
-            SecretStore.config.equals({"a": 1})  # ty: ignore[no-matching-overload]
-        with pytest.raises(TypeError):
-            SecretStore.config.not_equal({"a": 1})  # ty: ignore[no-matching-overload]
-        with pytest.raises(TypeError):
-            SecretStore.config.is_in([{"a": 1}])  # ty: ignore[invalid-argument-type]
-
-    def test_json_field_is_null_survives_the_block(self):
-        assert_type(SecretStore.config.is_null(), Q)
-
-    def test_is_null_survives_the_block_statically(self):
-        """The one condition that stays open must keep its real signature -
-        no ignore marker here, so a `Never` creeping onto is_null breaks the
-        build."""
-        assert_type(SecretStore.api_key.is_null(), Q)
-        assert_type(SecretStore.api_key.is_null(False), Q)
-
     @pytest.mark.parametrize(
         "method", ["equals", "not_equal", "gt", "gte", "lt", "lte", "is_in"]
     )
     def test_json_field_comparison_raises(self, method):
-        """EncryptedJSONField carries the same block. This case covers the
-        runtime half; `test_json_field_is_rejected_statically` below covers
-        the static half, which needs direct call sites rather than getattr."""
+        """EncryptedJSONField carries the same block."""
         with pytest.raises(TypeError, match=rf"does not support \.{method}\("):
             getattr(SecretStore.config, method)("x")
 
     def test_is_null_returns_correct_lookup(self):
         """is_null is the one comparison that makes sense on ciphertext."""
-        from plain.postgres.query_utils import Q
-
         q = SecretStore.api_key.is_null()
         assert isinstance(q, Q)
         assert q.children == [("api_key__isnull", True)]
@@ -319,29 +212,6 @@ class TestKwargFilterBlocked:
             SecretStore.query.filter(api_key=F("name")).count()
 
 
-class TestKeyRotation:
-    def test_decrypt_with_fallback_key(self):
-        """Data encrypted with an old key should decrypt when that key is in fallbacks."""
-        old_key = "old-secret-key-for-testing"
-        new_key = "new-secret-key-for-testing"
-
-        # Encrypt with old key
-        old_fernet = _get_fernet(old_key, ())
-        token = old_fernet.encrypt(b"sensitive data")
-        encrypted_value = _ENCRYPTED_PREFIX + token.decode("ascii")
-
-        # Decrypt with new key + old key as fallback
-        new_fernet = _get_fernet(new_key, (old_key,))
-        raw_token = encrypted_value[len(_ENCRYPTED_PREFIX) :]
-        result = new_fernet.decrypt(raw_token.encode("ascii")).decode("utf-8")
-        assert result == "sensitive data"
-
-    def test_different_keys_produce_different_fernet(self):
-        f1 = _get_fernet("key-a", ())
-        f2 = _get_fernet("key-b", ())
-        assert f1 is not f2
-
-
 class TestEncryptedJSONFieldDefault:
     """`EncryptedJSONField` has no *persistent* default — ciphertext is
     non-deterministic, so no literal column DEFAULT can be expressed. It still
@@ -350,9 +220,7 @@ class TestEncryptedJSONFieldDefault:
     use to mark a field optional in the typed constructor."""
 
     def test_default_none_is_accepted_on_a_nullable_field(self):
-        from plain.postgres.fields.encrypted import EncryptedJSONField
-
-        field = EncryptedJSONField(required=False, allow_null=True, default=None)
+        field = types.EncryptedJSONField(required=False, allow_null=True, default=None)
 
         assert field.get_default() is None
         # Nothing is stored, so no DB DEFAULT and no migration churn.
@@ -362,7 +230,7 @@ class TestEncryptedJSONFieldDefault:
     def test_default_none_makes_the_field_omittable(self, db):
         """The point of the `default=None`: `config` is declared with it on
         SecretStore, so it can be left out of the constructor entirely and the
-        row still saves. The type checker agrees (`./scripts/type-check`)."""
+        row still saves."""
         obj = SecretStore(name="test", api_key="sk-omitted")
         assert obj.config is None
 
@@ -370,19 +238,16 @@ class TestEncryptedJSONFieldDefault:
         assert SecretStore.query.get(name="test").config is None
 
     def test_default_none_requires_allow_null(self):
-        from plain.postgres.fields.encrypted import EncryptedJSONField
-
+        # The stub refuses this too -- see tests/typing/field_constructors.py.
         with pytest.raises(TypeError, match="requires allow_null=True"):
-            EncryptedJSONField(required=False, default=None)
+            types.EncryptedJSONField(required=False, default=None)  # ty: ignore[no-matching-overload]
 
     @pytest.mark.parametrize("value", [{}, {"a": 1}, [], "", 0])
     def test_literal_default_is_still_rejected(self, value):
         """Any non-None default would need ciphertext, which is
         non-deterministic — there is no literal to put in the column."""
-        from plain.postgres.fields.encrypted import EncryptedJSONField
-
         with pytest.raises(TypeError, match="does not accept a persistent default"):
-            EncryptedJSONField(required=False, allow_null=True, default=value)
+            types.EncryptedJSONField(required=False, allow_null=True, default=value)
 
 
 class TestDeterministicValuesStillMatch:

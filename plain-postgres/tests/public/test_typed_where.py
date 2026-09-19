@@ -3,95 +3,17 @@
 First slice of the typed query API: field descriptors expose `equals`,
 `not_equal`, comparison and string lookup methods that return Q objects;
 `QuerySet.where()` accepts them positionally.
+
+The static half of the contract -- which calls the type checker must reject,
+and what the descriptors must keep typing as -- lives in `tests/typing/`.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, assert_type
-
 import pytest
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.string_conditions import StringConditionsExample
-from plain.postgres import Field
-from plain.postgres.query_utils import Q
-
-
-def test_class_access_yields_typed_descriptors() -> None:
-    """Class-level field access returns the descriptor, parameterized by T.
-
-    The declared type is what the checker sees — models annotate their fields
-    `Field[T]`, so that (not the concrete `TextField[T]` the stub returns) is
-    the type of a class-level access. `Field[T]` therefore has to carry the
-    whole condition surface, including the string-only conditions, which it
-    restricts to string-valued fields via the `self` annotation.
-
-    These `assert_type` calls are checked by the type checker, not at runtime
-    — but the function still has to import cleanly.
-    """
-    assert_type(DefaultsExample.name, Field[str])
-    assert_type(DefaultsExample.note, Field[str | None])
-    assert_type(DefaultsExample.priority, Field[int])
-
-
-def test_instance_access_yields_value_type() -> None:
-    """Instance access returns the value type T (with nullability preserved)."""
-    row = DefaultsExample(name="x", note=None, priority=1)
-    assert_type(row.name, str)
-    assert_type(row.note, str | None)
-    assert_type(row.priority, int)
-
-
-def test_assignment_typing_accepts_value_type() -> None:
-    """Assignment to a field instance accepts the declared value type."""
-    row = DefaultsExample(name="x", note=None, priority=1)
-    row.name = "y"  # str → str: OK
-    row.priority = 99  # int → int: OK
-    row.note = None  # None → str | None: OK (nullable)
-    row.note = "set"  # str → str | None: OK
-
-
-if TYPE_CHECKING:
-    # Type-check only: these assignments must be flagged by ty. The ignore
-    # markers are load-bearing — if Field.__set__ were typed loosely
-    # (e.g. value: Any), ty would report them as unused suppressions.
-    # Their presence here proves the type checker enforces T. We avoid
-    # running the assignments at runtime because Field.__set__ also calls
-    # to_python() which raises ValidationError on unconvertible input.
-    def _typed_check_rejects_wrong_assignment() -> None:
-        row = DefaultsExample(name="x", note=None, priority=1)
-        row.name = 123  # ty: ignore[invalid-assignment]
-        row.priority = "no"  # ty: ignore[invalid-assignment]
-        # Non-nullable field rejects None at type-check time even though the
-        # runtime would store it (and only fail later at validate/save).
-        row.name = None  # ty: ignore[invalid-assignment]
-
-    def _typed_check_is_in_element_type() -> None:
-        # is_in takes an iterable of the field's value type. A matching
-        # iterable type-checks clean; a wrong element type is flagged. The
-        # ignore marker is load-bearing — if the parameter were typed loosely
-        # (e.g. Iterable[Any]), ty would report it as an unused suppression.
-        DefaultsExample.priority.is_in([1, 2, 3])
-        DefaultsExample.name.is_in(["a", "b"])
-        DefaultsExample.priority.is_in(["no", "ints"])  # ty: ignore[invalid-argument-type]
-
-    def _typed_check_string_conditions_are_string_only() -> None:
-        # The pattern conditions are declared on Field with a `self`
-        # annotation that restricts them to string-valued fields, so they
-        # survive the `Field[T]` annotation models carry without becoming
-        # available on every field. The ignore marker is load-bearing — if the
-        # restriction were dropped, ty would report it as unused.
-        #
-        # These stay type-check-only because the restriction is type-only:
-        # `Contains` and friends are registered on `Field` itself, so
-        # `IntegerField.contains("9")` builds a perfectly valid lookup at
-        # runtime. The checker is the guard, which is why running these would
-        # prove nothing.
-        DefaultsExample.name.startswith("a")
-        DefaultsExample.note.contains("a")
-        DefaultsExample.priority.startswith("a")  # ty: ignore[invalid-argument-type]
-        DefaultsExample.priority.contains("a")  # ty: ignore[invalid-argument-type]
-        DefaultsExample.priority.icontains("a")  # ty: ignore[invalid-argument-type]
-        DefaultsExample.priority.endswith("a")  # ty: ignore[invalid-argument-type]
+from plain.postgres import Q
 
 
 def test_field_methods_return_q_objects():
@@ -231,29 +153,15 @@ def test_where_filters_random_string_field_by_pattern(db):
     assert [r.label for r in rows] == ["only"]
 
 
-def test_pattern_condition_on_a_non_string_field_is_a_static_error() -> None:
-    """The `self` annotation is the whole guard, and it is a static one — the
-    load-bearing `ty: ignore` markers in the TYPE_CHECKING block above are what
-    pin it.
-
-    There is deliberately no runtime counterpart: `Contains`, `IContains`,
-    `StartsWith` and `EndsWith` are registered on `Field` itself (see
-    lookups.py), so every field has them and nothing at runtime distinguishes a
-    string field from an int one. `IntegerField.contains("9")` builds a valid
-    `priority__contains` lookup that Postgres will happily run. Same type-first
-    guard model the encrypted fields use.
-    """
-    assert DefaultsExample.priority.get_lookup("contains") is not None
-
-
 # ---------------------------------------------------------------------------
 # None operands on ordering conditions.
 #
-# There is deliberately no static pin here. On a nullable field `T` includes
-# None, and None cannot be subtracted from a TypeVar: probed against ty 0.0.80
-# and pyright 1.1.414, `self: Field[X | None], value: X` selects the intended
-# overload but solves X as `int | None`, so `.gte(None)` type-checks either
-# way. The runtime refusal below is the guard.
+# There is deliberately no static pin for this one in tests/typing/. On a
+# nullable field `T` includes None, and None cannot be subtracted from a
+# TypeVar: probed against ty 0.0.80 and pyright 1.1.414,
+# `self: Field[X | None], value: X` selects the intended overload but solves X
+# as `int | None`, so `.gte(None)` type-checks either way. The runtime refusal
+# below is the guard.
 # ---------------------------------------------------------------------------
 
 
