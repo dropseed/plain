@@ -2,7 +2,7 @@
 returns honest rows (tuples, scalars, or dataclasses), never partial model
 instances.
 
-The static-typing contract lives alongside in test_select_typing.py.
+The static-typing contract lives in tests/typing/select_rows.py.
 """
 
 from __future__ import annotations
