@@ -65,11 +65,14 @@ from plain.postgres.query import QuerySet
 # column stores text, but the *value* is opaque, so the text-only condition
 # methods must not leak onto it. (When the typed query API lands — #84 — a
 # value-typed field's condition set is derived from `V`, not from `str`.)
+#
+# They also leave out `max_length` and `choices` for the same reason: both
+# are Python-side checks against the value, and neither means anything
+# applied to an opaque one. The column is `text` either way.
 @overload
 def TextField[V: _ValueType](
     *,
     value_type: type[V],
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -79,7 +82,6 @@ def TextField[V: _ValueType](
 def TextField[V: _ValueType](
     *,
     value_type: type[V],
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
