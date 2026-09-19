@@ -19,6 +19,7 @@ from plain.postgres.lookups import (
 from plain import exceptions
 
 from .base import DefaultableField
+from .value_types import ValueType, ValueTypeMixin
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
@@ -27,9 +28,14 @@ if TYPE_CHECKING:
 __all__ = ["JSONField"]
 
 
-class JSONField(DefaultableField):
+class JSONField(ValueTypeMixin, DefaultableField):
     db_type_sql = "jsonb"
     empty_strings_allowed = False
+
+    # `value_type` doesn't touch the column -- it's still `jsonb` -- so the
+    # schema editor must never read it as a reason to ALTER. `deconstruct()`
+    # leaves it out for the same reason: migration files stay free of it.
+    non_migration_attrs = (*DefaultableField.non_migration_attrs, "value_type")
 
     def __init__(
         self,
@@ -40,6 +46,7 @@ class JSONField(DefaultableField):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
+        value_type: type[ValueType] | None = None,
     ):
         if encoder and not callable(encoder):
             raise ValueError("The encoder parameter must be a callable object.")
@@ -47,6 +54,7 @@ class JSONField(DefaultableField):
             raise ValueError("The decoder parameter must be a callable object.")
         self.encoder = encoder
         self.decoder = decoder
+        self.value_type = value_type
         super().__init__(
             required=required,
             allow_null=allow_null,
@@ -75,6 +83,12 @@ class JSONField(DefaultableField):
         except json.JSONDecodeError:
             return value
 
+    def get_prep_value(self, value: Any) -> Any:
+        value = super().get_prep_value(value)
+        if self.value_type is not None:
+            return self.value_type_to_db(value)
+        return value
+
     def get_db_prep_value(
         self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
@@ -84,6 +98,8 @@ class JSONField(DefaultableField):
             value = value.value
         elif hasattr(value, "as_sql"):
             return value
+        if not prepared:
+            value = self.get_prep_value(value)
         return self.adapt_json_db_value(value)
 
     def adapt_json_db_value(self, value: Any) -> Any:
@@ -109,6 +125,9 @@ class JSONField(DefaultableField):
 
     def validate(self, value: Any, model_instance: Any) -> None:
         super().validate(value, model_instance)
+        if self.value_type is not None:
+            # It's the unwrapped form that has to be JSON-serializable.
+            value = self.value_type_to_db(value)
         try:
             json.dumps(value, cls=self.encoder)
         except TypeError:

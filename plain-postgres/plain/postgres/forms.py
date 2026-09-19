@@ -169,6 +169,11 @@ def _modelfield_to_formfield(modelfield: Any) -> Field[Any] | None:
     # the form so a blank submission can't fight the database default.
     if modelfield.db_returning or modelfield.auto_fills_on_save:
         return None
+    # A `value_type=` column carries an opaque Python value, and only the
+    # package that owns that type knows how to parse raw input into one.
+    # Deriving a TextField here would hand the model a raw string.
+    if getattr(modelfield, "value_type", None) is not None:
+        return None
 
     required = modelfield.required
     initial = (

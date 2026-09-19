@@ -35,6 +35,7 @@ from .fields import (
     TimeField,
     URLField,
     UUIDField,
+    ValueType,
 )
 from .fields.json import JSONField
 from .fields.timezones import TimeZoneField
@@ -100,6 +101,7 @@ __all__ = [
     "URLField",
     "UUIDField",
     "UniqueConstraint",
+    "ValueType",
     "get_connection",
     "models_registry",
     "register_model",

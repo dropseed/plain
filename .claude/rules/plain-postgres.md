@@ -61,11 +61,19 @@ class Article(postgres.Model):
   only collects fields from bases carrying the transform, so a plain mixin's
   fields are missing from the synthesized constructor and `Model(shared=...)` is
   rejected on code the runtime accepts.
-- **Custom field types** — anything outside `plain.postgres.types`, like
-  `PasswordField` — are typed by their stub but always _optional_ in the
-  constructor. PEP 681 matches field declarations against a fixed list that only
-  `plain.postgres` can declare, so omitting one is a `NOT NULL` error on insert
-  rather than a type error.
+- **Value types** — `TextField`/`JSONField` take `value_type=X`, and the column
+  round-trips an `X` instead of its primitive:
+  `password: Field[HashedPassword] = types.TextField(value_type=HashedPassword)`.
+  `X` implements two methods, `from_db(raw) -> Self` (a classmethod) and
+  `to_db() -> raw`; validation belongs at whatever boundary builds the value, not
+  in `X`. The descriptor is strict and symmetric — assigning a primitive is a
+  type error at the call site and a `TypeError` on write, which is also what
+  refuses `filter(col="raw")` and `QuerySet.update(col="raw")`. The column type
+  and the migration file are unchanged. This is the extension axis: the set of
+  field _classes_ is closed and core owns all of them, because PEP 681 only
+  honors field specifiers `plain.postgres` declares. Don't subclass a field
+  class — a field declared anywhere else is read as a plain default value and
+  silently stops being required.
 
 Do NOT import field classes directly from `plain.postgres` or `plain.postgres.fields`.
 

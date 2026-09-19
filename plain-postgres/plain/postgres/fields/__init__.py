@@ -23,6 +23,7 @@ from .primary_key import PrimaryKeyField
 from .temporal import DateField, DateTimeField, TimeField
 from .text import EmailField, RandomStringField, TextField, URLField
 from .uuid import UUIDField
+from .value_types import ValueType as ValueType
 
 __all__ = [
     "NOT_PROVIDED",
@@ -46,4 +47,5 @@ __all__ = [
     "TimeField",
     "URLField",
     "UUIDField",
+    "ValueType",
 ]
