@@ -8,6 +8,8 @@ development and CI Postgres.
 
 from __future__ import annotations
 
+import secrets
+
 import psycopg
 import pytest
 from plain.postgres.database_url import parse_database_url
@@ -24,7 +26,7 @@ from plain.postgres.databases import (
 )
 from plain.runtime import settings
 
-PREFIX = "plain_databases_test_"
+RUN_TOKEN = secrets.token_hex(4)
 
 
 @pytest.fixture
@@ -38,7 +40,11 @@ def scratch(config):
     created: list[str] = []
 
     def make(suffix: str) -> str:
-        name = f"{PREFIX}{suffix}"
+        # This checkout's test database plus a per-process token, so concurrent
+        # runs on one cluster (worktrees, CI matrix jobs, two runs of the same
+        # checkout) never drop each other's scratch databases.
+        name = f"{config['DATABASE']}_{RUN_TOKEN}_{suffix}"
+        assert len(name) <= 63, f"{name!r} exceeds Postgres's identifier limit"
         drop_database(config, name=name, force=True)
         created.append(name)
         return name
