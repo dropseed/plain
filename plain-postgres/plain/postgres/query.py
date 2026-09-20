@@ -1110,6 +1110,16 @@ class QuerySet[T: "Model"]:
                     "in upsert() conflict_defaults: only database columns can "
                     "be set."
                 )
+            # conflict_defaults land in the same SET clause as the derived
+            # update columns, so the same columns are off limits.
+            if field.primary_key:
+                raise ValueError("upsert() cannot update primary key fields.")
+            if field.db_returning and not field.auto_fills_on_save:
+                raise ValueError(
+                    f"upsert() cannot update {self.model.__name__}.{field.name}: "
+                    "the database generates its value, so the update would "
+                    "overwrite the stored one with a fresh default."
+                )
             conflict_default_objs[field] = value
 
         obj = self.model(**insert_values)

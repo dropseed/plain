@@ -170,6 +170,24 @@ def test_upsert_conflict_defaults_set_order_matches_param_order(db, capture_quer
     assert set_clause.index("'HELLO'") < set_clause.index("42")
 
 
+def test_upsert_conflict_defaults_rejects_the_primary_key(db):
+    with pytest.raises(ValueError, match="cannot update primary key fields"):
+        UpsertItem.query.upsert(
+            key="a",
+            conflict_defaults={"id": 999},
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_upsert_conflict_defaults_rejects_a_database_owned_column(db):
+    with pytest.raises(ValueError, match="the database generates its value"):
+        UpsertItem.query.upsert(
+            key="a",
+            conflict_defaults={"created_at": Excluded("created_at")},
+            unique_fields=[UpsertItem.key],
+        )
+
+
 def test_upsert_conflict_defaults_apply_on_insert_uses_inserted_value(db):
     # On insert there's no existing row, so the inserted value stands; the
     # conflict_defaults override only takes effect on a later conflict.
