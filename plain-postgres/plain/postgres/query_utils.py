@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import functools
 import inspect
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterable
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self, TypeGuard
 
 import psycopg
@@ -52,6 +52,34 @@ def subclasses(cls: type) -> Generator[type]:
         yield from subclasses(subclass)
 
 
+def condition_origins_of(condition: Any) -> frozenset[tuple[type[Model], str]]:
+    """The (model, field name) pairs that built `condition`, or nothing.
+
+    `Q` combines with any object that sets `conditional = True` -- an
+    expression, for instance -- so this can't assume a `Q`. It can't assume
+    the attribute means what we mean either: a conditional object with a
+    catch-all `__getattr__` would hand back something arbitrary and break
+    every Q construction path with an opaque error from `|=`. Anything that
+    isn't the frozenset we put there is treated as no origins at all.
+    """
+    origins = getattr(condition, "_condition_origins", None)
+    return origins if isinstance(origins, frozenset) else frozenset()
+
+
+def _collect_condition_origins(
+    children: Iterable[Any],
+) -> frozenset[tuple[type[Model], str]]:
+    """Union the sources of `children`, which are a node's immediate children.
+
+    Only one level deep: each child already carries its own subtree's sources,
+    so this never walks the tree.
+    """
+    sources: frozenset[tuple[type[Model], str]] = frozenset()
+    for child in children:
+        sources |= condition_origins_of(child)
+    return sources
+
+
 class Q(tree.Node):
     """
     Encapsulate filters as objects that can then be combined logically (using
@@ -63,6 +91,71 @@ class Q(tree.Node):
     OR = "OR"
     default = AND
     conditional = True
+
+    # The (model, field name) pairs that built this Q, stamped by
+    # `Field._build_q` and carried through wrapping, copying and combining
+    # below. `where()` reads it to reject a condition built from another
+    # model's field; a Q written by hand (`Q(name="x")`) names no source and is
+    # never checked.
+    #
+    # It lives on the node rather than on the leaves, so every method that
+    # builds or extends a Q has to carry it forward -- a guard with a way
+    # around it is not a guard. The complete set, all overridden below:
+    #
+    #   __init__     Q(cond), and the wrappers BaseExpression.__and__ builds
+    #   create()     the classmethod Node uses to rebuild a Q; it constructs a
+    #                plain Node and reassigns __class__, so __init__ never runs
+    #   add()        mutates children in place: q = Q(); q.add(cond, Q.AND)
+    #   __copy__     which ~q and Node.copy() both go through
+    #   __deepcopy__
+    #
+    # `_combine` (&, |) is built from `create` + `add` and so needs nothing of
+    # its own. Pickling preserves the instance attribute as-is. Each of these
+    # reads only its immediate children, which already carry their own
+    # subtree's sources, so nothing walks the tree. The one way left to put a
+    # condition into a Q without recording it is appending to `q.children`
+    # directly, which is reaching past the API into Node's internals.
+    _condition_origins: frozenset[tuple[type[Model], str]] = frozenset()
+
+    @classmethod
+    def create(
+        cls,
+        children: list[Any] | None = None,
+        connector: str | None = None,
+        negated: bool = False,
+    ) -> Self:
+        # `Node.create` builds a plain Node and reassigns __class__, so
+        # `Q.__init__` never runs and the children's sources would be dropped.
+        obj = super().create(children, connector, negated)
+        obj._condition_origins = _collect_condition_origins(children or ())
+        return obj
+
+    def add(self, data: Any, conn_type: str) -> Any:
+        # `Node.add` mutates `children` in place, so a Q built up by hand --
+        # `q = Q(); q.add(cond, Q.AND)` -- would otherwise never record what
+        # went into it.
+        added = super().add(data, conn_type)
+        self._condition_origins |= condition_origins_of(data)
+        return added
+
+    def __copy__(self) -> Q:
+        obj = super().__copy__()
+        # `Node.__copy__` hands the *same* children list to the copy, so
+        # `alias = base.copy(); alias.add(cond, Q.AND)` appends into `base`
+        # while only `alias` records the origin -- base would then carry a
+        # condition it doesn't know about. Give the copy its own list; the
+        # children themselves are still shared, which is what makes a copy
+        # cheap. (`__deepcopy__` already rebuilds the list.)
+        obj.children = self.children[:]
+        obj._condition_origins = self._condition_origins
+        return obj
+
+    copy = __copy__
+
+    def __deepcopy__(self, memodict: dict[int, Any]) -> Q:
+        obj = super().__deepcopy__(memodict)
+        obj._condition_origins = self._condition_origins
+        return obj
 
     def __init__(
         self,
@@ -76,6 +169,13 @@ class Q(tree.Node):
             connector=_connector,
             negated=_negated,
         )
+        # Wrapping a condition keeps its sources, the same way combining two
+        # does. `Exists(sub) & Model.field.equals(x)` runs through
+        # `BaseExpression.__and__`, which wraps both sides in `Q(...)` before
+        # combining -- without this the wrapper would report no sources and the
+        # condition's origin would be lost.
+        if sources := _collect_condition_origins(args):
+            self._condition_origins = sources
 
     def _combine(self, other: Any, conn: str) -> Q:
         if getattr(other, "conditional", False) is False:
@@ -86,6 +186,7 @@ class Q(tree.Node):
             return self.copy()
 
         obj = self.create(connector=conn)
+        # `add` collects each side's sources as it goes.
         obj.add(self, conn)
         obj.add(other, conn)
         return obj

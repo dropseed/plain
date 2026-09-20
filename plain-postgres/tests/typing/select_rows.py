@@ -178,7 +178,7 @@ def must_accept_the_row_type_surviving_every_chaining_method() -> None:
     assert_type(rows.none(), RowQuerySet[tuple[str, int]])
     assert_type(rows.distinct(), RowQuerySet[tuple[str, int]])
     assert_type(rows.order_by("name"), RowQuerySet[tuple[str, int]])
-    assert_type(rows.select_for_update(), RowQuerySet[tuple[str, int]])
+    assert_type(rows.for_update(), RowQuerySet[tuple[str, int]])
     assert_type(rows & rows, RowQuerySet[tuple[str, int]])
     assert_type(rows.all(), RowQuerySet[tuple[str, int]])
 

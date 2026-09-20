@@ -40,7 +40,7 @@ from plain.postgres.fields import (
     PrimaryKeyField,
 )
 from plain.postgres.functions import Cast
-from plain.postgres.query_utils import Q
+from plain.postgres.query_utils import Q, condition_origins_of
 from plain.postgres.selectable import Selectable
 from plain.postgres.sql import (
     AND,
@@ -48,6 +48,7 @@ from plain.postgres.sql import (
     OR,
     DeleteQuery,
     InsertQuery,
+    LockMode,
     Query,
     RawQuery,
     UpdateQuery,
@@ -67,6 +68,41 @@ MAX_GET_RESULTS = 21
 
 # The maximum number of items to display in a QuerySet.__repr__
 REPR_OUTPUT_SIZE = 20
+
+
+def _lock_conflict_clause(query: Query) -> str | None:
+    """
+    Name the thing in `query` that Postgres refuses to combine with a row lock,
+    or None when the query is lockable.
+
+    Postgres rejects a locking clause whenever the returned rows don't map
+    one-to-one onto table rows, which is DISTINCT, GROUP BY, aggregates, and
+    window functions. It only says so at execution time, a long way from where
+    the queryset was built, so QuerySet checks both orders up front.
+    """
+    if query.distinct:
+        return "distinct()"
+    if query.group_by:
+        return "an aggregate annotation"
+    for annotation in query.annotations.values():
+        if annotation.contains_aggregate:
+            return "an aggregate annotation"
+        if annotation.contains_over_clause:
+            return "a window annotation"
+    return None
+
+
+def _lock_conflict(mode: LockMode, clause: str) -> psycopg.NotSupportedError:
+    """
+    Build the error for a row lock combined with an unlockable query shape.
+
+    The lock method's name is recoverable from the mode token -- "share" came
+    from for_share() -- so there is no second mode-to-name table to keep in sync.
+    """
+    return psycopg.NotSupportedError(
+        f"for_{mode}() cannot be combined with {clause}. Postgres can only lock "
+        "rows that map one-to-one onto table rows."
+    )
 
 
 class BaseIterable:
@@ -902,9 +938,7 @@ class QuerySet[T: "Model"]:
         with transaction.atomic():
             # Lock the row so that a concurrent update is blocked until
             # update_or_create() has performed its save.
-            obj, created = self.select_for_update().get_or_create(
-                create_defaults, **kwargs
-            )
+            obj, created = self.for_update().get_or_create(create_defaults, **kwargs)
             if created:
                 return obj, created
             for k, v in resolve_callables(update_defaults):
@@ -984,7 +1018,7 @@ class QuerySet[T: "Model"]:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
         del_query = self._chain()
-        del_query.sql_query.select_for_update = False
+        del_query.sql_query.lock_mode = None
         del_query.sql_query.select_related = False
         del_query.sql_query.clear_ordering(force=True)
 
@@ -1414,11 +1448,40 @@ class QuerySet[T: "Model"]:
 
         Conditions are produced by field methods like `Model.field.equals(...)`
         and combine with `|` and `&`. Unlike `filter()`, this accepts no
-        keyword arguments — every condition is a typed expression, so a
+        keyword arguments -- every condition is a typed expression, so a
         type checker can reject typos and value-type mismatches at the call
         site.
         """
+        for condition in conditions:
+            self._check_condition_model(condition)
         return self.filter(*conditions)
+
+    def _check_condition_model(self, condition: Q) -> None:
+        """Reject a condition built from another model's fields.
+
+        `Field[T]` carries no model identity, so `Order.query.where(
+        User.email.equals("x"))` type-checks, and the lookup name `"email"`
+        then resolves against `Order` -- silently the wrong column when both
+        models happen to have one, a confusing `FieldError` when they don't.
+        Each condition records the model and field that built it, so the
+        mismatch can be named here instead.
+
+        A traversed condition records the model the traversal *started* from,
+        so `Order.query.where(Order.user.email.equals("x"))` is `Order`'s, not
+        `User`'s. A hand-written `Q(email="x")` records nothing and is not
+        checked -- it is `filter()`'s untyped spelling and behaves like it.
+        """
+        for source_model, field_name in sorted(
+            condition_origins_of(condition), key=lambda pair: pair[1]
+        ):
+            if source_model is not self.model:
+                raise TypeError(
+                    f"where() got a condition built from "
+                    f"{source_model.__name__}.{field_name}, but this is a "
+                    f"{self.model.__name__} queryset. Build the condition on "
+                    f"{self.model.__name__}'s own field, or traverse to it "
+                    f"from {self.model.__name__}."
+                )
 
     def _filter_or_exclude(
         self, negate: bool, args: tuple[Any, ...], kwargs: dict[str, Any]
@@ -1441,25 +1504,62 @@ class QuerySet[T: "Model"]:
         else:
             self._query.add_q(Q(*args, **kwargs))
 
-    def select_for_update(
+    def for_update(
         self,
         nowait: bool = False,
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
-        no_key: bool = False,
+    ) -> Self:
+        """Return a new QuerySet that locks selected rows with FOR UPDATE."""
+        return self._lock_rows("update", nowait, skip_locked, of)
+
+    def for_no_key_update(
+        self,
+        nowait: bool = False,
+        skip_locked: bool = False,
+        of: tuple[str, ...] = (),
+    ) -> Self:
+        """Return a new QuerySet that locks selected rows with FOR NO KEY UPDATE."""
+        return self._lock_rows("no_key_update", nowait, skip_locked, of)
+
+    def for_share(
+        self,
+        nowait: bool = False,
+        skip_locked: bool = False,
+        of: tuple[str, ...] = (),
+    ) -> Self:
+        """Return a new QuerySet that locks selected rows with FOR SHARE."""
+        return self._lock_rows("share", nowait, skip_locked, of)
+
+    def for_key_share(
+        self,
+        nowait: bool = False,
+        skip_locked: bool = False,
+        of: tuple[str, ...] = (),
+    ) -> Self:
+        """Return a new QuerySet that locks selected rows with FOR KEY SHARE."""
+        return self._lock_rows("key_share", nowait, skip_locked, of)
+
+    def _lock_rows(
+        self,
+        mode: LockMode,
+        nowait: bool,
+        skip_locked: bool,
+        of: tuple[str, ...],
     ) -> Self:
         """
-        Return a new QuerySet instance that will select objects with a
-        FOR UPDATE lock.
+        Build a new QuerySet carrying a row-level locking clause. Calling more
+        than one lock method on a chain keeps only the last mode.
         """
         if nowait and skip_locked:
             raise ValueError("The nowait option cannot be used with skip_locked.")
+        if clause := _lock_conflict_clause(self.sql_query):
+            raise _lock_conflict(mode, clause)
         obj = self._chain()
-        obj.sql_query.select_for_update = True
-        obj.sql_query.select_for_update_nowait = nowait
-        obj.sql_query.select_for_update_skip_locked = skip_locked
-        obj.sql_query.select_for_update_of = of
-        obj.sql_query.select_for_no_key_update = no_key
+        obj.sql_query.lock_mode = mode
+        obj.sql_query.lock_nowait = nowait
+        obj.sql_query.lock_skip_locked = skip_locked
+        obj.sql_query.lock_of = of
         return obj
 
     def select_related(self, *fields: str | None) -> Self:
@@ -1548,6 +1648,11 @@ class QuerySet[T: "Model"]:
                     f"The annotation '{alias}' conflicts with {conflicts_with}."
                 )
             clone.sql_query.add_annotation(annotation, alias)
+        if clone.sql_query.lock_mode and (
+            clause := _lock_conflict_clause(clone.sql_query)
+        ):
+            raise _lock_conflict(clone.sql_query.lock_mode, clause)
+
         for alias, annotation in clone.sql_query.annotations.items():
             if alias in annotations and annotation.contains_aggregate:
                 if clone._fields is None:
@@ -1575,6 +1680,8 @@ class QuerySet[T: "Model"]:
             raise TypeError(
                 "Cannot create distinct fields once a slice has been taken."
             )
+        if self.sql_query.lock_mode:
+            raise _lock_conflict(self.sql_query.lock_mode, "distinct()")
         obj = self._chain()
         obj.sql_query.add_distinct_fields(*field_names)
         return obj

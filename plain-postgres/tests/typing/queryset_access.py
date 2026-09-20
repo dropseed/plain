@@ -37,7 +37,7 @@ def must_accept_chaining_that_keeps_the_custom_queryset() -> None:
     assert_type(rows.distinct(), CustomQuerySet)
     assert_type(rows.only("name"), CustomQuerySet)
     assert_type(rows.defer("name"), CustomQuerySet)
-    assert_type(rows.select_for_update(), CustomQuerySet)
+    assert_type(rows.for_update(), CustomQuerySet)
     assert_type(rows[0:2], CustomQuerySet)
     assert_type(rows & rows, CustomQuerySet)
     # The custom method stays reachable through the whole chain. (It has no

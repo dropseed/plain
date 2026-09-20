@@ -257,9 +257,14 @@ class Field[T](Selectable[T], RegisterLookupMixin):
                 f".{method}() -- no {suffix!r} lookup is registered for it."
             )
         name = f"{self.name}{LOOKUP_SEP}{suffix}" if suffix else self.name
-        return Q((name, value))
+        q = Q((name, value))
+        if source := self.source_model:
+            # Which model's where() this condition belongs to, and the field
+            # that built it. See `Q._condition_origins`.
+            q._condition_origins = frozenset({(source, self.name)})
+        return q
 
-    def with_lookup_prefix(self, prefix: str) -> Self:
+    def with_lookup_prefix(self, prefix: str, source_model: type[Model]) -> Self:
         """Return a detached copy of this field whose name carries `prefix`.
 
         This is all where() traversal needs: `Child.parent.name` hands back the
@@ -275,13 +280,33 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         a column on the related model -- `str()` would otherwise report
         `examples.DeleteParent.parent__name`, and `__reduce__` would try to
         look up an attribute that doesn't exist.
+
+        `source_model` is the model the traversal *started* from, which is the
+        one a condition built here belongs to: `Order.user.email` is a
+        condition for `Order.query.where()`, not `User.query.where()`. It is
+        kept separately from `model` precisely because `model` is dropped.
         """
         prefixed = copy.copy(self)
         for attached in ("model", "column", "cached_col"):
             prefixed.__dict__.pop(attached, None)
         prefixed.name = f"{prefix}{LOOKUP_SEP}{self.name}"
         prefixed.__dict__["_is_lookup_reference"] = True
+        prefixed.__dict__["_source_model"] = source_model
         return prefixed
+
+    @property
+    def source_model(self) -> type[Model] | None:
+        """The model a condition built from this field belongs to.
+
+        For an attached field that is the model it was declared on. For a
+        traversed copy it is the root the traversal started from, not the
+        related model the column lives on. A detached field (one built for an
+        aggregate, never attached) has neither, and conditions from it go
+        unchecked.
+        """
+        if source := self.__dict__.get("_source_model"):
+            return source
+        return self.__dict__.get("model")
 
     @property
     def is_lookup_reference(self) -> bool:
