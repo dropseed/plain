@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.69.1](https://github.com/dropseed/plain/releases/plain-dev@0.69.1) (2026-09-20)
+
+### What's changed
+
+- The downloaded mkcert binary is saved as `mkcert.exe` on Windows so it can be executed ([4286f9ab96](https://github.com/dropseed/plain/commit/4286f9ab96))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.69.0](https://github.com/dropseed/plain/releases/plain-dev@0.69.0) (2026-09-18)
 
 ### What's changed
