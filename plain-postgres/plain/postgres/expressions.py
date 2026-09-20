@@ -33,6 +33,7 @@ from plain.postgres.exceptions import (
     FullResultSet,
 )
 from plain.postgres.query_utils import Q
+from plain.postgres.selectable import Selectable
 from plain.utils.deconstruct import deconstructible
 from plain.utils.hashable import make_hashable
 
@@ -220,7 +221,7 @@ class Combinable:
         return NegatedExpression(self)
 
 
-class BaseExpression:
+class BaseExpression(Selectable[Any]):
     """Base class for all query expressions."""
 
     empty_result_set_value = NotImplemented
@@ -809,7 +810,7 @@ class TemporalSubtraction(CombinedExpression):
 
 
 @deconstructible(path="plain.postgres.F")
-class F(Combinable):
+class F(Combinable, Selectable[Any]):
     """An object capable of resolving references to existing query objects."""
 
     def __init__(self, name: str):

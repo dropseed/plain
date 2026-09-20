@@ -258,6 +258,77 @@ A traversed field _is_ the related field, carrying the relation path as its name
 
 [Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`.
 
+### Selecting columns with select()
+
+`select()` pulls back specific columns as typed rows instead of model instances. You pass typed field references, and a type checker knows the exact shape of each row:
+
+```python
+from plain.postgres import Field, types
+
+
+@postgres.register_model
+class User(postgres.Model):
+    email: Field[str] = types.EmailField()
+    age: Field[int | None] = types.IntegerField(allow_null=True, default=None)
+
+
+# list-like of tuple[str, int | None], precisely typed
+rows = User.query.where(User.age.gte(18)).select(User.email, User.age)
+for email, age in rows:
+    ...
+```
+
+There are three modes:
+
+- **Tuples** (default) — one tuple per row, typed per column: `select(User.email, User.age)` yields `tuple[str, int | None]`.
+- **Flat scalars** — a single column unwrapped, with `flat=True`: `select(User.email, flat=True)` yields `str`. `flat=True` accepts exactly one column.
+- **Dataclasses** — map each column onto a dataclass with `result_type=`: `select(User.email, User.age, result_type=UserStats)` yields `UserStats`. Columns map to dataclass fields **positionally**, so the selection order must match the dataclass field order, and each selected field's name must match the dataclass field at the same position.
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass
+class UserStats:
+    email: str
+    age: int | None
+
+
+stats = User.query.select(User.email, User.age, result_type=UserStats)
+```
+
+The return value is a [`RowQuerySet`](./query.py#RowQuerySet) — that is the name to reach for when you need to annotate one:
+
+```python
+from plain.postgres import RowQuerySet
+
+
+def adults() -> RowQuerySet[tuple[str, int | None]]:
+    return User.query.where(User.age.gte(18)).select(User.email, User.age)
+```
+
+You can select expression columns too — `select(User.id, Sum("amount"))`, or an `F()` — but an expression column types as `Any` (its output type isn't tracked yet). The fields around it stay precise, so `select(User.id, Sum("amount"))` types as `tuple[int, Any]`.
+
+Per-column typing runs to **ten columns**. An eleventh is still selected and still returns rows, but the row type degrades to `tuple[Any, ...]` — reach for `result_type=` when a row is that wide.
+
+`select()` goes last in a chain: `annotate()` must come before it, because an annotation appends a column and would change the row shape out from under the type `select()` declared. `annotate()` after `select()` raises `TypeError` saying so. `prefetch_related()` is refused in both orders — a prefetch attaches related objects to a model instance's attributes, and a row has nowhere to put them; select the columns you need from the related model instead.
+
+Re-selecting replaces the **column list**, not the joins: an expression that reached through a relation (`select(Upper("tags__name"))`) leaves its join in place, so a later `select(Widget.name)` still returns one row per joined row — and `count()`/`exists()` count those. This is `annotate(...)` followed by `values_list(...)` behaving as it always has; trimming joins no queryset needs any more is out of scope here.
+
+`distinct()` with an `order_by()` on a column you didn't select returns duplicates: the ordering column has to go into the `SELECT` list for Postgres to sort by it, so `SELECT DISTINCT` deduplicates on that column too. Order by something you selected, or drop the ordering. This is `values_list()`'s behavior as well, not new to `select()`.
+
+Columns annotated `Field[Any]` are rejected by `select()`, because `Any` satisfies the model-valued `__get__` overload and class access resolves as `type[Any]` rather than a field. That's the same reason the field-annotation guidance says never to annotate a field `Field[Any]` — use the concrete type, or `Field[object]` when the column really does hold arbitrary JSON, which `select()` types as `object`.
+
+**`select()` returns rows, not partial model instances.** This is deliberate: a model instance with only some columns loaded is a type-level lie — the type checker thinks every field is present, so touching an unselected column looks fine but fails or fires a hidden query at runtime. Honest tuples/dataclasses keep the types truthful. As a result, iteration, `first()`, `get()`, `iterator()`, and slicing all return rows, and anything that would read or write model rows, or change the selected columns — `update()`, `delete()`, `get_or_create()`, `values()`, `values_list()`, `annotate()`, `prefetch_related()` — raises `TypeError`. `update()` and `delete()` refuse a queryset in row mode however it got there, `values()` and `values_list()` included.
+
+`select()` takes typed references only — a bare string like `select("email")` raises `TypeError` (use `User.email`).
+
+**A column belongs to the model whose field built it**, the same as [a condition does](#querying-with-typed-conditions): `Order.query.select(User.email)` raises `TypeError` naming both models. A type checker can't catch it — `Field[str]` is `Field[str]` whichever model declared it — and without the check the name `"email"` just resolves against `Order`, silently the wrong column when both models have one. Expressions are unaffected: `F("email")` and `Upper("email")` take a string resolved against whatever query they land in, like `filter()`'s kwargs.
+
+**Relations are not selectable yet.** `select(Post.author)` (the relation) and `select(Post.author.city)` (a column through it) both raise `TypeError`, and so does `select(Post.author.id)` — the foreign key column itself. The reason is nullability: a column reached through a relation arrives over a join, so a nullable relation yields `None` where the traversed field's type says it can't. Until `select()` can express that, `values_list("author__id", flat=True)` is the spelling, and the error message names it.
+
+**`select()` hands back a plain `RowQuerySet`, not your custom QuerySet subclass.** Chain your own methods before `select()`, not after — `User.query.active().select(...)` works, `User.query.select(...).active()` raises `AttributeError`.
+
 ### Custom QuerySets
 
 You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods. Define a custom QuerySet and assign it to your model's `query` attribute as a `ClassVar` (so it isn't treated as a constructor field):

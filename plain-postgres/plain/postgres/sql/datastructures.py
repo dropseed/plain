@@ -32,10 +32,6 @@ class MultiJoin(Exception):
         self.names_with_path = path_with_names
 
 
-class Empty:
-    pass
-
-
 class Join:
     """
     Used by sql.Query and sql.SQLCompiler to generate JOIN clauses into the

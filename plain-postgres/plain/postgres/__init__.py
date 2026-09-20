@@ -49,7 +49,7 @@ from .fields.reverse_descriptors import (
 )
 from .indexes import Index
 from .options import Options
-from .query import QuerySet
+from .query import QuerySet, RowQuerySet
 from .query_utils import Q
 from . import types
 
@@ -98,6 +98,7 @@ __all__ = [
     "RandomStringField",
     "ReverseForeignKey",
     "ReverseManyToMany",
+    "RowQuerySet",
     "SmallIntegerField",
     "TextChoices",
     "TextField",

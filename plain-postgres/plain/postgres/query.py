@@ -5,7 +5,9 @@ The main QuerySet implementation. This provides the public API for the ORM.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import datetime
+import inspect
 import json
 import operator
 import warnings
@@ -13,7 +15,7 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from decimal import Decimal
 from functools import cached_property
 from itertools import islice
-from typing import TYPE_CHECKING, Any, Never, Self, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, Never, Self, cast, overload
 
 import plain.runtime
 import psycopg
@@ -46,6 +48,7 @@ from plain.postgres.fields.base import ColumnField
 from plain.postgres.fields.json import JSONField
 from plain.postgres.functions import Cast
 from plain.postgres.query_utils import Q, condition_origins_of
+from plain.postgres.selectable import Selectable
 from plain.postgres.sql import (
     AND,
     CURSOR,
@@ -61,9 +64,10 @@ from plain.postgres.utils import resolve_callables
 from plain.utils.functional import partition
 
 # Re-exports for public API
-__all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet"]
+__all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet", "RowQuerySet"]
 
 if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
     from plain.postgres import Model
 
 
@@ -363,6 +367,41 @@ class FlatValuesListIterable(BaseIterable):
             yield row[0]
 
 
+class SelectDataclassIterable(BaseIterable):
+    """
+    Iterable returned by QuerySet.select(result_type=...) that builds one
+    dataclass instance per row. Columns map to dataclass fields positionally,
+    so the tuple rows from ValuesListIterable are zipped onto the dataclass
+    field names in order.
+    """
+
+    def __iter__(self) -> Iterator[Any]:
+        queryset = self.queryset
+        result_type = queryset._select_result_type
+        assert result_type is not None
+        tuple_rows = ValuesListIterable(queryset, chunked_fetch=self.chunked_fetch)
+
+        # Work out how to call the constructor once, not once per row.
+        # Parameter kind decides how each value has to be passed: a
+        # keyword-only one can't be filled positionally, and a positional-only
+        # one can't be filled by name. A signature always orders positionals
+        # before keyword-onlys, so the row splits at a single point.
+        parameters = _result_type_parameters(result_type)
+        keyword_names = tuple(
+            p.name for p in parameters if p.kind is inspect.Parameter.KEYWORD_ONLY
+        )
+        if not keyword_names:
+            for row in tuple_rows:
+                yield result_type(*row)
+            return
+
+        split = len(parameters) - len(keyword_names)
+        for row in tuple_rows:
+            yield result_type(
+                *row[:split], **dict(zip(keyword_names, row[split:], strict=True))
+            )
+
+
 class QuerySet[T: "Model"]:
     """
     Represent a lazy database lookup for a set of objects.
@@ -396,6 +435,8 @@ class QuerySet[T: "Model"]:
     _known_related_objects: dict[Any, dict[Any, Any]]
     _iterable_class: type[BaseIterable]
     _fields: tuple[str, ...] | None
+    # Set by select(result_type=...); drives SelectDataclassIterable.
+    _select_result_type: type[DataclassInstance] | None
     _defer_next_filter: bool
     _deferred_filter: tuple[bool, tuple[Any, ...], dict[str, Any]] | None
     # The columns to RETURN from the next update()/delete(), or None for a
@@ -422,6 +463,7 @@ class QuerySet[T: "Model"]:
         instance._known_related_objects = {}
         instance._iterable_class = ModelIterable
         instance._fields = None
+        instance._select_result_type = None
         instance._defer_next_filter = False
         instance._deferred_filter = None
         instance._returning_fields = None
@@ -627,14 +669,16 @@ class QuerySet[T: "Model"]:
                 self
                 if self.sql_query.can_filter()
                 else self.model._model_meta.base_queryset.filter(
-                    id__in=self.values("id")
+                    id__in=self._values("id")
                 )
             )
             combined = cast("Self", query._chain())
             combined._merge_known_related_objects(other)
             if not other.sql_query.can_filter():
                 other = other.model._model_meta.base_queryset.filter(
-                    id__in=other.values("id")
+                    # `_values`, not `values()`: these are subqueries, and the
+                    # public method is refused on a row-mode queryset.
+                    id__in=other._values("id")
                 )
             combined.sql_query.combine(other.sql_query, OR)
         combined._returning_fields, combined._returning_instances = returning
@@ -1737,7 +1781,12 @@ class QuerySet[T: "Model"]:
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
         if self._fields is not None:
-            raise TypeError("Cannot call update() after .values() or .values_list()")
+            # Same guard delete() carries: once the queryset is in row mode
+            # (values(), values_list(), select()) it no longer describes the
+            # model rows a write would touch.
+            raise TypeError(
+                "Cannot call update() after .values(), .values_list() or .select()"
+            )
         self._reject_related_lock_targets("update")
         query = self.sql_query.chain(UpdateQuery)
         query.add_update_values(kwargs)
@@ -1835,7 +1884,10 @@ class QuerySet[T: "Model"]:
     def _values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
         clone = self._chain()
         if expressions:
-            clone = clone.annotate(**expressions)
+            # The internal mechanism, not the public method: select() aliases
+            # its expression columns through here, and RowQuerySet refuses
+            # annotate().
+            clone = clone._annotate(**expressions)
         clone._fields = fields
         clone.sql_query.set_values(list(fields))
         return clone
@@ -1847,13 +1899,35 @@ class QuerySet[T: "Model"]:
         return clone
 
     def values_list(self, *fields: str, flat: bool = False) -> QuerySet[Any]:
+        return self._values_list(fields, flat=flat)
+
+    def _values_list(
+        self, fields: tuple[str | ResolvableExpression, ...], *, flat: bool
+    ) -> QuerySet[Any]:
         if flat and len(fields) > 1:
             raise TypeError(
                 "'flat' is not valid when values_list is called with more than one "
                 "field."
             )
 
-        field_names = {f for f in fields if not isinstance(f, ResolvableExpression)}
+        # Names an internal alias must not collide with. The newly selected
+        # columns are the obvious ones, but the counter also has to clear
+        # everything already on the query:
+        #
+        #   * `self.sql_query.annotations` -- a user's own `annotate(upper1=...)`
+        #     would otherwise be silently overwritten, quietly changing what
+        #     `order_by("upper1")` means;
+        #   * `self._fields` -- re-selecting restarts the counter, so a second
+        #     `select(Upper(...))` would regenerate the first one's alias and
+        #     collide with it.
+        taken = {f for f in fields if not isinstance(f, ResolvableExpression)}
+        taken |= set(self.sql_query.annotations)
+        # A model is free to have a column literally named `upper1` or `f1`,
+        # which an alias must not shadow even on a first select.
+        taken |= {f.name for f in self.model._model_meta.get_fields()}
+        if self._fields:
+            taken |= set(self._fields)
+
         _fields = []
         expressions = {}
         counter = 1
@@ -1865,8 +1939,9 @@ class QuerySet[T: "Model"]:
                 while True:
                     field_id = field_id_prefix + str(counter)
                     counter += 1
-                    if field_id not in field_names:
+                    if field_id not in taken:
                         break
+                taken.add(field_id)
                 expressions[field_id] = field
                 _fields.append(field_id)
             else:
@@ -1874,6 +1949,209 @@ class QuerySet[T: "Model"]:
 
         clone = self._values(*_fields, **expressions)
         clone._iterable_class = FlatValuesListIterable if flat else ValuesListIterable
+        return clone
+
+    # ---- select(): typed column selection returning honest rows ----
+    #
+    # The ladder unwraps each Selectable[T] argument to its T and reassembles
+    # the row type. The precise row rides on RowQuerySet[R], a QuerySet flavor
+    # whose iteration yields R instead of model instances. A field binds its
+    # real value type; an expression is Selectable[Any], so it contributes Any
+    # while the fields around it stay precise.
+
+    @overload
+    def select[S](
+        self, item: Selectable[S], /, *, flat: Literal[True]
+    ) -> RowQuerySet[S]: ...
+
+    @overload
+    def select[D](
+        self, *items: Selectable[Any], result_type: type[D]
+    ) -> RowQuerySet[D]: ...
+
+    @overload
+    def select[T0](
+        self, i0: Selectable[T0], /, *, flat: Literal[False] = False
+    ) -> RowQuerySet[tuple[T0]]: ...
+
+    @overload
+    def select[T0, T1](
+        self, i0: Selectable[T0], i1: Selectable[T1], /, *, flat: Literal[False] = False
+    ) -> RowQuerySet[tuple[T0, T1]]: ...
+
+    @overload
+    def select[T0, T1, T2](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6, T7](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
+        i7: Selectable[T7],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6, T7]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6, T7, T8](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
+        i7: Selectable[T7],
+        i8: Selectable[T8],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6, T7, T8]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
+        i7: Selectable[T7],
+        i8: Selectable[T8],
+        i9: Selectable[T9],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9]]: ...
+
+    @overload
+    def select(
+        self, *items: Selectable[Any], flat: Literal[False] = False
+    ) -> RowQuerySet[tuple[Any, ...]]: ...
+
+    def select(
+        self,
+        *items: Selectable[Any],
+        flat: bool = False,
+        result_type: type | None = None,
+    ) -> Any:
+        if not items:
+            raise TypeError("select() requires at least one column to select.")
+        if flat and len(items) > 1:
+            raise TypeError(
+                f"select(flat=True) takes exactly one column, got {len(items)}."
+            )
+        if flat and result_type is not None:
+            raise TypeError("select() cannot combine flat=True with result_type=.")
+        if not isinstance(self, RowQuerySet) and self._fields is not None:
+            raise TypeError("Cannot call select() after values() or values_list().")
+        if self._returning_fields is not None or self._returning_instances:
+            raise TypeError(
+                "Cannot call select() after returning() — returning() captures "
+                "the rows a write touched, and a select() queryset cannot "
+                "write. Drop the returning() call."
+            )
+        if self._prefetch_related_lookups:
+            # A prefetch hangs related objects off each result's attributes,
+            # and a row -- tuple, scalar or dataclass -- has nowhere to put
+            # them. Left alone it is silently wasted work for tuples and an
+            # AttributeError for result_type=.
+            raise TypeError(
+                "Cannot call select() after prefetch_related() — prefetched "
+                "objects are attached to model instances, and select() returns "
+                "rows. Select the columns you need from the related model "
+                "instead."
+            )
+
+        dataclass_type: type[DataclassInstance] | None = None
+        if result_type is not None:
+            if not (
+                isinstance(result_type, type) and dataclasses.is_dataclass(result_type)
+            ):
+                raise TypeError("select(result_type=...) requires a dataclass.")
+            dataclass_type = result_type
+            _check_result_type_matches(dataclass_type, items)
+
+        for item in items:
+            self._check_column_model(item)
+        columns = [_selectable_to_column(item) for item in items]
+
+        clone = self._values_list(tuple(columns), flat=flat)
+        clone.__class__ = RowQuerySet
+        clone._select_result_type = dataclass_type
+        if dataclass_type is not None:
+            clone._iterable_class = SelectDataclassIterable
         return clone
 
     def none(self) -> Self:
@@ -1924,6 +2202,36 @@ class QuerySet[T: "Model"]:
         for condition in conditions:
             self._check_condition_model(condition)
         return self.filter(*conditions)
+
+    def _check_column_model(self, item: Selectable[Any]) -> None:
+        """Reject a column built from another model's fields.
+
+        `where()`'s problem exactly, one method along: `Field[T]` carries no
+        model identity, so `Order.query.select(User.email)` type-checks and
+        the name `"email"` then resolves against `Order` -- silently the wrong
+        column when both models have one, a `FieldError` from the compiler
+        when they don't.
+
+        A traversed column reports the model its traversal started from, so
+        this fires before the traversal refusal does: being another model's
+        column is the root mistake, and "select columns on the queried model"
+        would be advice that doesn't help.
+
+        Expressions carry no origin and are left alone -- `F("email")` and
+        `Upper("email")` are strings resolved against whatever query they land
+        in, the same as `filter()`'s kwargs.
+        """
+        if not isinstance(item, Field):
+            return
+        source_model = item.source_model
+        if source_model is not None and source_model is not self.model:
+            raise TypeError(
+                f"select() got a column built from "
+                f"{source_model.__name__}.{item.name}, but this is a "
+                f"{self.model.__name__} queryset. Select "
+                f"{self.model.__name__}'s own field, or traverse to it from "
+                f"{self.model.__name__}."
+            )
 
     def _check_condition_model(self, condition: Q) -> None:
         """Reject a condition built from another model's fields.
@@ -2075,6 +2383,16 @@ class QuerySet[T: "Model"]:
         Return a query set in which the returned objects have been annotated
         with extra data or aggregations.
         """
+        return self._annotate(*args, **kwargs)
+
+    def _annotate(self, *args: Any, **kwargs: Any) -> Self:
+        """The mechanism behind `annotate()`.
+
+        Separate from the public method because `_values_list` annotates
+        internally to alias expression columns, and `RowQuerySet` refuses the
+        public `annotate()` -- selecting an expression twice must not trip a
+        guard aimed at callers adding a column to a finished row.
+        """
         self._validate_values_are_expressions(
             args + tuple(kwargs.values()), method_name="annotate"
         )
@@ -2093,14 +2411,18 @@ class QuerySet[T: "Model"]:
         annotations.update(kwargs)
 
         clone = self._chain()
+        # On a row-mode queryset the selected columns are what an alias can
+        # collide with; otherwise it is the model's own fields.
         names = self._fields
+        conflicts_with = "a selected column"
         if names is None:
             names = {field.name for field in self.model._model_meta.get_fields()}
+            conflicts_with = "a field on the model"
 
         for alias, annotation in annotations.items():
             if alias in names:
                 raise ValueError(
-                    f"The annotation '{alias}' conflicts with a field on the model."
+                    f"The annotation '{alias}' conflicts with {conflicts_with}."
                 )
             clone.sql_query.add_annotation(annotation, alias)
         if clone.sql_query.lock_mode and (
@@ -2293,6 +2615,7 @@ class QuerySet[T: "Model"]:
         c._known_related_objects = self._known_related_objects
         c._iterable_class = self._iterable_class
         c._fields = self._fields
+        c._select_result_type = self._select_result_type
         c._returning_fields = self._returning_fields
         c._returning_instances = self._returning_instances
         return c
@@ -2329,14 +2652,43 @@ class QuerySet[T: "Model"]:
         return self
 
     def _merge_sanity_check(self, other: QuerySet[T]) -> None:
-        """Check that two QuerySet classes may be merged."""
-        if self._fields is not None and (
-            set(self.sql_query.values_select) != set(other.sql_query.values_select)
+        """Check that two QuerySet classes may be merged.
+
+        Either side being in row mode is enough to matter: merging a row-mode
+        queryset with a model-mode one produces a query neither side describes,
+        and left unchecked `model_qs | row_qs` recurses until the stack runs
+        out. The guard used to look only at `self`, so it caught the merge from
+        one side and not the other.
+        """
+        if self._fields is None and other._fields is None:
+            return
+
+        if (
+            self._fields != other._fields
+            or set(self.sql_query.values_select) != set(other.sql_query.values_select)
             or set(self.sql_query.annotation_select)
             != set(other.sql_query.annotation_select)
         ):
             raise TypeError(
-                f"Merging '{self.__class__.__name__}' classes must involve the same values in each case."
+                f"Merging '{self.__class__.__name__}' and "
+                f"'{other.__class__.__name__}' classes must involve the same "
+                f"values in each case."
+            )
+
+        # Same columns is not the same rows: tuples, flat scalars and
+        # dataclasses all select identically and differ only in how each row
+        # is built. Merging two of them would quietly hand back whichever
+        # shape the left operand happened to carry.
+        if (
+            self._iterable_class is not other._iterable_class
+            or self._select_result_type is not other._select_result_type
+        ):
+            raise TypeError(
+                f"Merging '{self.__class__.__name__}' and "
+                f"'{other.__class__.__name__}' classes must produce the same "
+                f"row shape: these select the same columns but build rows "
+                f"differently (tuple, flat scalar and result_type= rows are "
+                f"not interchangeable)."
             )
 
     def _merge_known_related_objects(self, other: QuerySet[T]) -> None:
@@ -2376,6 +2728,237 @@ class QuerySet[T: "Model"]:
                     ", ".join(invalid_args),
                 )
             )
+
+
+# Why traversal is out: a column reached through a relation comes back over a
+# join, so a nullable relation yields None where the traversed field's type says
+# it can't. `Post.author.id` has the same problem as `Post.author.profile.city`
+# — the FK column is NULL when the row has no author — so both are refused
+# until select() can express that, and values_list() remains the way to spell it.
+_NO_TRAVERSAL_IN_SELECT = (
+    "a column reached through a relation is nullable in a way its type doesn't "
+    "say, so select() refuses it for now. Use values_list() with the lookup "
+    "path instead."
+)
+
+
+def _selectable_to_column(item: Selectable[Any]) -> str | ResolvableExpression:
+    """Turn a select() argument into something the values_list plumbing accepts.
+
+    A field becomes its column name; an expression is passed through (the
+    plumbing auto-aliases it). Strings and FK traversal get their own error so
+    the message points at the real fix.
+    """
+    # Local import: these pull in fields.related, which imports this module at
+    # load time (circular).
+    from plain.postgres.fields.related_descriptors import ForwardForeignKeyDescriptor
+    from plain.postgres.fields.related_typed import RelatedFieldRef
+
+    if isinstance(item, str):
+        raise TypeError(
+            f"select() takes typed column references like User.email, not "
+            f"strings. Got {item!r}."
+        )
+    if isinstance(item, RelatedFieldRef | ForwardForeignKeyDescriptor):
+        # The relation itself (`Post.author`) or an intermediate hop. Its key
+        # column is `Post.author.id`, which is refused for the same reason.
+        raise TypeError(
+            "select() takes columns, not relations, and a relation's key "
+            "column is not selectable yet either — " + _NO_TRAVERSAL_IN_SELECT
+        )
+    if isinstance(item, Field):
+        if not item.name:
+            # A field read off a mixin class rather than a model: the mixin
+            # holds the declaration, and only the model it is mixed into has
+            # an attached, named copy.
+            raise TypeError(
+                f"select() got an unattached {type(item).__name__}. Reading a "
+                f"field off a mixin class gives the declaration, which has no "
+                f"name or column yet -- read it off the model that mixes it "
+                f"in instead."
+            )
+        if item.is_lookup_reference:
+            # A traversed leaf: `Field.with_lookup_prefix` hands back the
+            # related model's field carrying the relation path as its name.
+            raise TypeError(
+                f"select() cannot select {item.name!r}: "
+                + _NO_TRAVERSAL_IN_SELECT
+                + f' Here that is values_list("{item.name}").'
+            )
+        return item.name
+    # Matches what `_values_list` accepts, so anything values_list() can select
+    # — `F("x")` included — select() can select too.
+    if isinstance(item, ResolvableExpression):
+        return item
+    raise TypeError(
+        f"select() takes fields and expressions, got {type(item).__name__}."
+    )
+
+
+def _result_type_parameters(
+    result_type: type[DataclassInstance],
+) -> tuple[inspect.Parameter, ...]:
+    """The constructor parameters a row is built from.
+
+    Read off the signature rather than `dataclasses.fields()`, because the two
+    disagree in both directions: an `init=False` field is computed by the
+    dataclass and can't be passed, while an `InitVar` is a constructor
+    parameter that never appears in `fields()` at all. The signature is what
+    `result_type(*row)` actually has to satisfy.
+    """
+    parameters = tuple(inspect.signature(result_type).parameters.values())
+    for parameter in parameters:
+        if parameter.kind in (
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        ):
+            raise TypeError(
+                f"select(result_type={result_type.__name__}) needs a fixed "
+                f"constructor signature to map columns onto, but "
+                f"{result_type.__name__} takes {parameter!s}."
+            )
+    return parameters
+
+
+def _check_result_type_matches(
+    result_type: type[DataclassInstance], items: tuple[Selectable[Any], ...]
+) -> None:
+    """Validate a dataclass result_type against the selected items.
+
+    Arity must match the constructor, and each selected field's name must
+    equal the parameter at the same position — expressions are anonymous and
+    only need the position to line up.
+    """
+    parameters = _result_type_parameters(result_type)
+    if len(parameters) != len(items):
+        raise TypeError(
+            f"select(result_type={result_type.__name__}) takes "
+            f"{len(parameters)} constructor arguments but {len(items)} "
+            f"columns were selected."
+        )
+    for item, parameter in zip(items, parameters, strict=True):
+        if isinstance(item, Field) and item.name != parameter.name:
+            raise TypeError(
+                f"select(result_type={result_type.__name__}) maps columns "
+                f"positionally: field {item.name!r} does not match dataclass "
+                f"field {parameter.name!r} at the same position."
+            )
+
+
+class RowQuerySet[R](QuerySet[Any]):
+    """A QuerySet in row mode, returned by `select()`.
+
+    Iteration yields the selected row type `R` — a tuple, a scalar (flat), or a
+    dataclass (result_type) — never a model instance. Everything that reads
+    rows is inherited: the parent's values_list machinery builds the SQL and
+    the rows, and `update()`/`delete()` already refuse a row-mode queryset.
+
+    All this class adds at runtime is the refusal of the methods that would
+    re-enter row mode or hand back a row where a model instance is promised.
+    The rest is the `R` that the base, typed `QuerySet[Any]`, can't carry —
+    declared for the checker only, so row iteration doesn't pay for a Python
+    frame per call.
+    """
+
+    if TYPE_CHECKING:
+
+        def __iter__(self) -> Iterator[R]: ...
+
+        def first(self) -> R | None: ...
+
+        def last(self) -> R | None: ...
+
+        def get(self, *args: Any, **kwargs: Any) -> R: ...
+
+        def get_or_none(self, *args: Any, **kwargs: Any) -> R | None: ...
+
+        def iterator(self, chunk_size: int | None = None) -> Iterator[R]: ...
+
+        @overload
+        def __getitem__(self, k: int) -> R: ...
+
+        @overload
+        def __getitem__(self, k: slice) -> RowQuerySet[R]: ...
+
+    # `Never` doesn't reject the call itself — the TypeError does that — but it
+    # does tell the checker control never returns, so a caller's trailing code
+    # reads as unreachable rather than as a QuerySet or a model instance.
+
+    def annotate(self, *args: Any, **kwargs: Any) -> Never:
+        # An annotation appends a column, so the rows would gain a member the
+        # declared R doesn't have — silently for tuples, as a confusing
+        # constructor error for result_type=, and silently dropped for flat.
+        raise TypeError(
+            "Cannot call annotate() after select() — an annotation adds a "
+            "column, which would change the row shape out from under the "
+            "selected type. Annotate first, then select()."
+        )
+
+    def prefetch_related(self, *lookups: str | Prefetch | None) -> Never:
+        raise TypeError(
+            "Cannot call prefetch_related() after select() — prefetched "
+            "objects are attached to model instances, and select() returns "
+            "rows. Select the columns you need from the related model instead."
+        )
+
+    def create(self, **kwargs: Any) -> Never:
+        raise TypeError("Cannot call create() on a select() queryset.")
+
+    def bulk_create(self, *args: Any, **kwargs: Any) -> Never:
+        raise TypeError("Cannot call bulk_create() on a select() queryset.")
+
+    def values(self, *fields: str, **expressions: Any) -> Never:
+        raise TypeError("Cannot call values() after select().")
+
+    def values_list(self, *fields: str, flat: bool = False) -> Never:
+        raise TypeError("Cannot call values_list() after select().")
+
+    def get_or_create(
+        self, defaults: dict[str, Any] | None = None, **kwargs: Any
+    ) -> Never:
+        # The base would hand back whatever get() returns on a hit — a row —
+        # and a model instance on a miss.
+        raise TypeError("Cannot call get_or_create() after select().")
+
+    def upsert(
+        self,
+        *_positional: Never,
+        defaults: dict[str, Any] | None = None,
+        create_defaults: dict[str, Any] | None = None,
+        conflict_defaults: dict[str, Any] | None = None,
+        unique_fields: Sequence[Field[Any] | type[Model]],
+        **kwargs: Any,
+    ) -> Never:
+        raise TypeError("Cannot call upsert() after select().")
+
+    def bulk_upsert(
+        self,
+        objs: Sequence[Any],
+        *,
+        update_fields: Sequence[Field[Any] | type[Model]],
+        unique_fields: Sequence[Field[Any] | type[Model]],
+        batch_size: int | None = None,
+    ) -> Never:
+        raise TypeError("Cannot call bulk_upsert() after select().")
+
+    def bulk_update(
+        self, objs: Sequence[Any], fields: list[str], batch_size: int | None = None
+    ) -> Never:
+        # The base would reach the same refusal, but only from the update()
+        # inside its own `transaction.atomic(savepoint=False)` -- which leaves
+        # the enclosing transaction unusable. Refusing up front keeps the
+        # failure a plain TypeError.
+        raise TypeError("Cannot call bulk_update() on a select() queryset.")
+
+    def returning(self, *fields: Field[Any]) -> Never:
+        # returning() captures the rows a write touched, and select() has
+        # already refused every write. Accepting it would be inert at runtime
+        # and a lie statically -- the checker would believe update() hands
+        # back instances.
+        raise TypeError(
+            "Cannot call returning() after select() — returning() captures the "
+            "rows a write touched, and a select() queryset cannot write."
+        )
 
 
 if TYPE_CHECKING:

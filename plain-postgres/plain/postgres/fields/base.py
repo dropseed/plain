@@ -17,6 +17,7 @@ from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import quote_name
 from plain.postgres.enums import ChoicesMeta
 from plain.postgres.query_utils import Q, RegisterLookupMixin
+from plain.postgres.selectable import Selectable
 from plain.preflight import PreflightResult
 from plain.utils.datastructures import DictWrapper
 from plain.utils.functional import Promise
@@ -32,10 +33,6 @@ if TYPE_CHECKING:
     from plain.postgres.expressions import Col, Func
     from plain.postgres.fields.reverse_related import ForeignObjectRel
     from plain.postgres.sql.compiler import SQLCompiler
-
-
-class Empty:
-    pass
 
 
 class NOT_PROVIDED:
@@ -91,17 +88,20 @@ def _load_field(
 #                except for ForeignKeys, where the "_id" suffix is appended.
 
 
-def _empty(of_cls: type) -> Empty:
-    new = Empty()
-    new.__class__ = of_cls
-    return new
+def _empty(of_cls: type) -> Any:
+    """Build an initialized-but-unpopulated instance of `of_cls`.
+
+    Module-level (not a lambda or a method) because `__reduce__` names it as
+    the pickle reconstructor.
+    """
+    return object.__new__(of_cls)
 
 
 # Ordering conditions: the ones a None operand is meaningless for.
 _ORDERING_SUFFIXES = frozenset({"gt", "gte", "lt", "lte"})
 
 
-class Field[T](RegisterLookupMixin):
+class Field[T](Selectable[T], RegisterLookupMixin):
     """Base class for all field types"""
 
     # SQL type for this field (e.g. "text", "integer", "boolean").
@@ -434,12 +434,11 @@ class Field[T](RegisterLookupMixin):
         return obj
 
     def __copy__(self) -> Self:
-        # We need to avoid hitting __reduce__, so define this
-        # slightly weird copy construct.
-        obj = Empty()
-        obj.__class__ = self.__class__
+        # Build the instance directly rather than calling the constructor,
+        # which would hit __reduce__.
+        obj = object.__new__(self.__class__)
         obj.__dict__ = self.__dict__.copy()
-        return cast(Self, obj)
+        return obj
 
     def __reduce__(
         self,

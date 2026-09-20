@@ -55,7 +55,7 @@ from plain.postgres.query_utils import (
     refs_expression,
 )
 from plain.postgres.sql.constants import INNER, LOUTER, ORDER_DIR, SINGLE
-from plain.postgres.sql.datastructures import BaseTable, Empty, Join, MultiJoin
+from plain.postgres.sql.datastructures import BaseTable, Join, MultiJoin
 from plain.postgres.sql.where import AND, OR, NothingNode, WhereNode
 from plain.utils.regex_helper import _lazy_re_compile
 
@@ -323,9 +323,7 @@ class Query(BaseExpression):
         Return a copy of the current Query. A lightweight alternative to
         deepcopy().
         """
-        obj = Empty()
-        obj.__class__ = self.__class__
-        obj = cast(Self, obj)  # Type checker doesn't understand __class__ reassignment
+        obj = object.__new__(self.__class__)
         # Copy references to everything.
         obj.__dict__ = self.__dict__.copy()
         # Clone attributes that can't use shallow copy.
