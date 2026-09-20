@@ -2116,6 +2116,12 @@ class QuerySet[T: "Model"]:
             raise TypeError("select() cannot combine flat=True with result_type=.")
         if not isinstance(self, RowQuerySet) and self._fields is not None:
             raise TypeError("Cannot call select() after values() or values_list().")
+        if self._returning_fields is not None or self._returning_instances:
+            raise TypeError(
+                "Cannot call select() after returning() — returning() captures "
+                "the rows a write touched, and a select() queryset cannot "
+                "write. Drop the returning() call."
+            )
         if self._prefetch_related_lookups:
             # A prefetch hangs related objects off each result's attributes,
             # and a row -- tuple, scalar or dataclass -- has nowhere to put
@@ -2934,6 +2940,25 @@ class RowQuerySet[R](QuerySet[Any]):
         batch_size: int | None = None,
     ) -> Never:
         raise TypeError("Cannot call bulk_upsert() after select().")
+
+    def bulk_update(
+        self, objs: Sequence[Any], fields: list[str], batch_size: int | None = None
+    ) -> Never:
+        # The base would reach the same refusal, but only from the update()
+        # inside its own `transaction.atomic(savepoint=False)` -- which leaves
+        # the enclosing transaction unusable. Refusing up front keeps the
+        # failure a plain TypeError.
+        raise TypeError("Cannot call bulk_update() on a select() queryset.")
+
+    def returning(self, *fields: Field[Any]) -> Never:
+        # returning() captures the rows a write touched, and select() has
+        # already refused every write. Accepting it would be inert at runtime
+        # and a lie statically -- the checker would believe update() hands
+        # back instances.
+        raise TypeError(
+            "Cannot call returning() after select() — returning() captures the "
+            "rows a write touched, and a select() queryset cannot write."
+        )
 
 
 if TYPE_CHECKING:

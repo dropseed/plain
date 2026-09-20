@@ -156,6 +156,8 @@ def must_accept_row_mode_refusals_as_never_returning() -> None:
     assert_type(rows.values_list("name"), Never)
     assert_type(rows.get_or_create(name="a"), Never)
     assert_type(rows.prefetch_related("tags"), Never)
+    assert_type(rows.bulk_update([], ["name"]), Never)
+    assert_type(rows.returning(), Never)
     # annotate() appends a column, which would make the declared row type
     # wrong. Runtime half: test_select.py::TestAnnotateAfterSelect.
     assert_type(rows.annotate(n=Upper("name")), Never)
@@ -234,3 +236,15 @@ def must_accept_the_readme_example() -> None:
     for email, age in rows:
         assert_type(email, str)
         assert_type(age, int | None)
+
+
+def must_accept_selecting_after_returning_because_only_runtime_sees_it() -> None:
+    """The other order is a runtime-only refusal.
+
+    `select()` after `returning()` raises, but nothing here can say so:
+    `ReturningQuerySet` is a `QuerySet` subclass, so `select()` resolves on it
+    like any other method. Only the `RowQuerySet` direction is typed (it
+    returns `Never`, asserted above). Runtime half:
+    tests/public/test_select.py::test_select_after_returning_raises.
+    """
+    assert_type(D.query.returning().select(D.name), RowQuerySet[tuple[str]])

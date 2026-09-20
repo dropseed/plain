@@ -815,6 +815,39 @@ def test_get_or_create_after_select_raises(db):
         DefaultsExample.query.select(DefaultsExample.name).get_or_create(name="x")
 
 
+def test_bulk_update_after_select_raises_before_any_sql(db):
+    """The base would reach the same refusal, but only from the update()
+    inside its own `transaction.atomic(savepoint=False)` -- which leaves the
+    enclosing transaction unusable, so the *next* query fails too."""
+    DefaultsExample.query.create(name="alpha", priority=3)
+    objs = list(DefaultsExample.query.all())
+    for obj in objs:
+        obj.name = "changed"
+
+    with pytest.raises(TypeError, match="bulk_update"):
+        DefaultsExample.query.select(DefaultsExample.name).bulk_update(objs, ["name"])
+
+    # The transaction is still usable: nothing was sent.
+    assert DefaultsExample.query.count() == 1
+    assert DefaultsExample.query.get().name == "alpha"
+
+
+def test_returning_after_select_raises(db):
+    with pytest.raises(TypeError, match="returning"):
+        DefaultsExample.query.select(DefaultsExample.name).returning()
+
+
+def test_select_after_returning_raises(db):
+    with pytest.raises(TypeError, match="after returning"):
+        DefaultsExample.query.returning().select(DefaultsExample.name)
+
+
+def test_returning_without_select_is_unaffected(db):
+    DefaultsExample.query.create(name="alpha", priority=3)
+    updated = DefaultsExample.query.returning().update(name="beta")
+    assert [obj.name for obj in updated] == ["beta"]
+
+
 def test_upsert_after_select_raises(db):
     with pytest.raises(TypeError, match="upsert"):
         DefaultsExample.query.select(DefaultsExample.name).upsert(
