@@ -52,3 +52,22 @@ def must_reject_pattern_conditions_on_a_non_string_field() -> None:
     DefaultsExample.priority.contains("a")  # ty: ignore[invalid-argument-type]
     DefaultsExample.priority.icontains("a")  # ty: ignore[invalid-argument-type]
     DefaultsExample.priority.endswith("a")  # ty: ignore[invalid-argument-type]
+
+
+def must_accept_a_condition_from_another_model_because_the_checker_cannot_see_it() -> (
+    None
+):
+    """A condition carries its value type but not its *model*.
+
+    `Field[str]` is `Field[str]` whichever model declared it, so nothing here
+    distinguishes a condition meant for `DefaultsExample.query.where()` from
+    one meant for `StringConditionsExample.query.where()`. This line has to
+    type-check clean -- that is the whole reason `where()` carries a runtime
+    check instead.
+
+    If a future `Field` ever carries model identity, this line starts erroring
+    and the runtime check can be reconsidered. Runtime half:
+    tests/public/test_typed_where.py::TestConditionsBelongToTheirModel.
+    """
+    assert_type(StringConditionsExample.label.equals("a"), Q)
+    DefaultsExample.query.where(StringConditionsExample.label.equals("a"))

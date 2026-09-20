@@ -16,9 +16,9 @@ import pytest
 from app.examples.models.relationships import Tag, Widget
 from app.examples.models.upsert import (
     UpsertItem,
-    UpsertOwner,
-    UpsertScope,
-    UpsertScopedItem,
+    UpsertScoped,
+    UpsertStamped,
+    UpsertTenant,
 )
 from plain.postgres import Excluded
 from plain.postgres.db import get_connection
@@ -328,10 +328,10 @@ def test_upsert_conflict_defaults_rejects_the_primary_key(db):
 
 def test_upsert_conflict_defaults_rejects_a_database_owned_column(db):
     with pytest.raises(ValueError, match="the database generates its value"):
-        UpsertItem.query.upsert(
+        UpsertStamped.query.upsert(
             key="a",
             conflict_defaults={"created_at": Excluded("created_at")},
-            unique_fields=[UpsertItem.key],
+            unique_fields=[UpsertStamped.key],
         )
 
 
@@ -476,10 +476,10 @@ def test_upsert_rejects_updating_a_database_owned_column(db):
     from datetime import datetime
 
     with pytest.raises(ValueError, match="the database generates its value"):
-        UpsertItem.query.upsert(
+        UpsertStamped.query.upsert(
             key="a",
             created_at=datetime(2020, 1, 1, tzinfo=UTC),
-            unique_fields=[UpsertItem.key],
+            unique_fields=[UpsertStamped.key],
         )
 
 
@@ -546,73 +546,73 @@ def test_upsert_conflicts_on_a_foreign_key(db):
     conflict target that includes a foreign key has to resolve it to the
     column. Static half: tests/typing/upsert_writes.py.
     """
-    scope = UpsertScope(name="s").create()
+    tenant = UpsertTenant(name="s").create()
 
-    first, created = UpsertScopedItem.query.upsert(
-        scope=scope,
-        key="a",
+    first, created = UpsertScoped.query.upsert(
+        tenant=tenant,
+        slug="a",
         value=1,
-        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+        unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
     )
     assert created is True
 
-    second, created = UpsertScopedItem.query.upsert(
-        scope=scope,
-        key="a",
+    second, created = UpsertScoped.query.upsert(
+        tenant=tenant,
+        slug="a",
         value=2,
-        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+        unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
     )
     assert created is False
     assert second.id == first.id
     assert second.value == 2
-    assert UpsertScopedItem.query.count() == 1
+    assert UpsertScoped.query.count() == 1
 
 
 def test_upsert_foreign_key_conflict_target_scopes_by_parent(db):
     """The same key under a different parent is a different row."""
-    one = UpsertScope(name="one").create()
-    two = UpsertScope(name="two").create()
+    one = UpsertTenant(name="one").create()
+    two = UpsertTenant(name="two").create()
 
-    UpsertScopedItem.query.upsert(
-        scope=one,
-        key="a",
+    UpsertScoped.query.upsert(
+        tenant=one,
+        slug="a",
         value=1,
-        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+        unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
     )
-    _, created = UpsertScopedItem.query.upsert(
-        scope=two,
-        key="a",
+    _, created = UpsertScoped.query.upsert(
+        tenant=two,
+        slug="a",
         value=2,
-        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+        unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
     )
 
     assert created is True
-    assert UpsertScopedItem.query.count() == 2
+    assert UpsertScoped.query.count() == 2
 
 
 def test_reverse_manager_upsert_conflicts_on_the_parent_key(db):
     """Through the reverse manager the parent is filled in automatically, so
     the conflict target still needs the foreign key column.
     """
-    scope = UpsertScope(name="s").create()
+    tenant = UpsertTenant(name="s").create()
 
-    first, created = scope.entries.upsert(
-        key="a",
+    first, created = tenant.scoped.upsert(
+        slug="a",
         value=1,
-        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+        unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
     )
     assert created is True
-    assert first.scope.id == scope.id
+    assert first.tenant.id == tenant.id
 
-    second, created = scope.entries.upsert(
-        key="a",
+    second, created = tenant.scoped.upsert(
+        slug="a",
         value=5,
-        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+        unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
     )
     assert created is False
     assert second.id == first.id
     assert second.value == 5
-    assert scope.entries.query.count() == 1
+    assert tenant.scoped.query.count() == 1
 
 
 def test_upsert_conflict_defaults_rejects_a_many_to_many_field(db):
@@ -672,22 +672,22 @@ def test_upsert_wrong_model_unique_field_rejected(db):
 def test_upsert_conflict_defaults_accepts_related_instance(db):
     # A model instance as a conflict_defaults value exercises the related-field
     # branch of assignment-value compilation (prepare_database_save).
-    owner = UpsertOwner(name="owner").create()
-    UpsertItem(key="a", value=1).create()
+    tenant = UpsertTenant(name="owner").create()
+    UpsertStamped(key="a", value=1).create()
 
-    obj, created = UpsertItem.query.upsert(
+    obj, created = UpsertStamped.query.upsert(
         key="a",
         value=2,
-        conflict_defaults={"owner": owner},
-        unique_fields=[UpsertItem.key],
+        conflict_defaults={"tenant": tenant},
+        unique_fields=[UpsertStamped.key],
     )
 
     assert created is False
-    assert obj.owner is not None
-    assert obj.owner.id == owner.id
-    reloaded = UpsertItem.query.get(key="a")
-    assert reloaded.owner is not None
-    assert reloaded.owner.id == owner.id
+    assert obj.tenant is not None
+    assert obj.tenant.id == tenant.id
+    reloaded = UpsertStamped.query.get(key="a")
+    assert reloaded.tenant is not None
+    assert reloaded.tenant.id == tenant.id
 
 
 def test_upsert_bumps_update_now_on_conflict(db):
@@ -695,13 +695,13 @@ def test_upsert_bumps_update_now_on_conflict(db):
     the conflict path -- pre_save stamped it into the INSERT, so EXCLUDED
     carries it. A create_now-only column keeps its original value.
     """
-    first, created = UpsertItem.query.upsert(
-        key="a", value=1, unique_fields=[UpsertItem.key]
+    first, created = UpsertStamped.query.upsert(
+        key="a", value=1, unique_fields=[UpsertStamped.key]
     )
     assert created is True
 
-    second, created = UpsertItem.query.upsert(
-        key="a", value=2, unique_fields=[UpsertItem.key]
+    second, created = UpsertStamped.query.upsert(
+        key="a", value=2, unique_fields=[UpsertStamped.key]
     )
     assert created is False
     assert second.updated_at > first.updated_at

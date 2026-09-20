@@ -9,19 +9,19 @@ opposite case and refuses it (see returning_writes.py).
 
 from __future__ import annotations
 
-from app.examples.models.upsert import UpsertItem, UpsertScopedItem
+from app.examples.models.upsert import UpsertItem, UpsertScoped
 
 
 def must_accept_a_foreign_key_in_the_conflict_target() -> None:
     # Runtime half:
     # tests/public/test_upsert.py::test_upsert_conflicts_on_a_foreign_key.
-    scope = UpsertScopedItem.query.first()
-    assert scope is not None
-    UpsertScopedItem.query.upsert(
-        scope=scope.scope,
-        key="a",
+    scoped = UpsertScoped.query.first()
+    assert scoped is not None
+    UpsertScoped.query.upsert(
+        tenant=scoped.tenant,
+        slug="a",
         value=1,
-        unique_fields=[UpsertScopedItem.scope, UpsertScopedItem.key],
+        unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
     )
 
 

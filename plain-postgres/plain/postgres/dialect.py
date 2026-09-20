@@ -23,6 +23,7 @@ from psycopg.types.json import Jsonb
 
 if TYPE_CHECKING:
     from plain.postgres.fields import Field
+    from plain.postgres.sql.query import LockMode
 
 # Start and end points for window expressions.
 PRECEDING: str = "PRECEDING"
@@ -308,15 +309,26 @@ def distinct_sql(
         return ["DISTINCT"], []
 
 
-def for_update_sql(
+# Every LockMode token and the clause it becomes. The LockMode key type rejects
+# a token that isn't in the Literal; tests/internal/test_lock_mode_sql.py is
+# what catches a token in the Literal that's missing here.
+LOCK_MODE_SQL: dict[LockMode, str] = {
+    "update": "FOR UPDATE",
+    "no_key_update": "FOR NO KEY UPDATE",
+    "share": "FOR SHARE",
+    "key_share": "FOR KEY SHARE",
+}
+
+
+def lock_sql(
+    mode: LockMode,
     nowait: bool = False,
     skip_locked: bool = False,
     of: tuple[str, ...] = (),
-    no_key: bool = False,
 ) -> str:
-    """Return the FOR UPDATE SQL clause to lock rows for an update operation."""
-    return "FOR{} UPDATE{}{}{}".format(
-        " NO KEY" if no_key else "",
+    """Return a row-level locking clause (FOR UPDATE, FOR SHARE, etc.)."""
+    return "{}{}{}{}".format(
+        LOCK_MODE_SQL[mode],
         " OF {}".format(", ".join(of)) if of else "",
         " NOWAIT" if nowait else "",
         " SKIP LOCKED" if skip_locked else "",

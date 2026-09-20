@@ -10,12 +10,13 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from plain.postgres.constants import LOOKUP_SEP, OnConflict
 from plain.postgres.dialect import (
+    LOCK_MODE_SQL,
     PK_DEFAULT_VALUE,
     bulk_insert_sql,
     distinct_sql,
     explain_query_prefix,
-    for_update_sql,
     limit_offset_sql,
+    lock_sql,
     on_conflict_suffix_sql,
     quote_name,
     returning_columns,
@@ -685,7 +686,7 @@ class SQLCompiler:
             assert result is not None  # SQLCompiler.pre_sql_setup always returns tuple
             extra_select, order_by, group_by = result
             assert self.select is not None  # Set by pre_sql_setup()
-            for_update_part = None
+            lock_part = None
             # Is a LIMIT/OFFSET clause needed?
             with_limit_offset = with_limits and self.query.is_sliced
             if self.qualify:
@@ -738,17 +739,18 @@ class SQLCompiler:
                     result += ["FROM", *from_]
                 params.extend(f_params)
 
-                if self.query.select_for_update:
+                if self.query.lock_mode:
                     if self.connection.get_autocommit():
                         raise TransactionManagementError(
-                            "select_for_update cannot be used outside of a transaction."
+                            f"{LOCK_MODE_SQL[self.query.lock_mode]} cannot be "
+                            "used outside of a transaction."
                         )
 
-                    for_update_part = for_update_sql(
-                        nowait=self.query.select_for_update_nowait,
-                        skip_locked=self.query.select_for_update_skip_locked,
-                        of=tuple(self.get_select_for_update_of_arguments()),
-                        no_key=self.query.select_for_no_key_update,
+                    lock_part = lock_sql(
+                        mode=self.query.lock_mode,
+                        nowait=self.query.lock_nowait,
+                        skip_locked=self.query.lock_skip_locked,
+                        of=tuple(self.get_lock_of_arguments()),
                     )
 
                 if where:
@@ -793,8 +795,8 @@ class SQLCompiler:
                     limit_offset_sql(self.query.low_mark, self.query.high_mark)
                 )
 
-            if for_update_part:
-                result.append(for_update_part)
+            if lock_part:
+                result.append(lock_part)
 
             if self.query.subquery and extra_select:
                 # If the query is used as a subquery, the extra selects would
@@ -1184,10 +1186,10 @@ class SQLCompiler:
                 )
         return related_klass_infos
 
-    def get_select_for_update_of_arguments(self) -> list[str]:
+    def get_lock_of_arguments(self) -> list[str]:
         """
-        Return a quoted list of arguments for the SELECT FOR UPDATE OF part of
-        the query.
+        Return a quoted list of arguments for the OF part of a row-level
+        locking clause (FOR UPDATE OF ..., FOR SHARE OF ..., etc.).
         """
 
         def _get_first_selected_col_from_model(klass_info: dict) -> Any | None:
@@ -1231,7 +1233,7 @@ class SQLCompiler:
             return []
         result = []
         invalid_names = []
-        for name in self.query.select_for_update_of:
+        for name in self.query.lock_of:
             klass_info = self.klass_info
             if name == "self":
                 col = _get_first_selected_col_from_model(klass_info)
@@ -1258,7 +1260,7 @@ class SQLCompiler:
                 result.append(self.quote_name_unless_alias(col.alias))
         if invalid_names:
             raise FieldError(
-                "Invalid field name(s) given in select_for_update(of=(...)): {}. "
+                "Invalid field name(s) given in the of=(...) argument: {}. "
                 "Only relational fields followed in the query are allowed. "
                 "Choices are: {}.".format(
                     ", ".join(invalid_names),
@@ -1636,12 +1638,34 @@ class SQLWriteCompiler(SQLCompiler):
 
     query: UpdateQuery | DeleteQuery
 
+    def lock_only_the_target(self, inner: Query) -> None:
+        """Point the sub-select's lock at the table being written.
+
+        A bare `FOR UPDATE` locks a row from *every* table the sub-select
+        reads, so a write whose filter spans a relation would wait on -- or,
+        with SKIP LOCKED, silently skip -- rows of a table it only joined to
+        look things up in. The write only ever changes the target table, so
+        that is all it locks.
+        """
+        if inner.lock_mode and not inner.lock_of:
+            inner.lock_of = ("self",)
+
     def execute_sql(self, result_type: str) -> Any:  # ty: ignore[invalid-method-override]
+        # A write has a rowcount or a RETURNING set, never a result set to
+        # shape, so SINGLE/MULTI have nothing to work with -- asking for one
+        # gets a psycopg "didn't produce records" error several frames from
+        # here. Say it where the mistake is. NO_RESULTS is the other honest
+        # answer: run it and keep nothing (UpdateQuery.update_batch).
+        assert result_type in (CURSOR, NO_RESULTS), (
+            f"A write is executed with CURSOR or NO_RESULTS, not "
+            f"{result_type!r} -- it has a rowcount or its RETURNING rows, "
+            "not a result set."
+        )
         cursor = super().execute_sql(result_type)
         if not cursor:
-            return [] if self.query.returning_fields else 0
+            return [] if self.query.returning_fields is not None else 0
         try:
-            if self.query.returning_fields:
+            if self.query.returning_fields is not None:
                 return convert_returning_rows(
                     cursor.fetchall(), self.query.returning_fields, self.connection
                 )
@@ -1701,14 +1725,22 @@ class SQLDeleteCompiler(SQLWriteCompiler):
         Create the SQL for this query. Return the SQL string and list of
         parameters.
         """
-        if self.single_alias and not self.contains_self_reference_subquery:
+        if (
+            self.single_alias
+            and not self.contains_self_reference_subquery
+            and not self.query.lock_mode
+        ):
             return self._as_sql(self.query)
+        # A DELETE takes no locking clause of its own, so a locked delete has
+        # to put the lock on the sub-select that picks the rows -- otherwise
+        # the lock is silently dropped and two workers claim the same rows.
         innerq = self.query.clone()
         innerq.__class__ = Query
         innerq.clear_select_clause()
         assert self.query.model is not None, "DELETE requires a model"
         id_field = self.query.model._model_meta.get_forward_field("id")
         innerq.select = (id_field.get_col(self.query.get_initial_alias()),)
+        self.lock_only_the_target(innerq)
         outerq = Query(self.query.model)
         outerq.add_filter("id__in", innerq)
         return self._as_sql(outerq)
@@ -1753,20 +1785,26 @@ class SQLUpdateCompiler(SQLWriteCompiler):
         self, with_col_aliases: bool = False
     ) -> tuple[list[Any], list[Any], list[SqlWithParams]] | None:
         """
-        If the update depends on other tables (JOINs in the WHERE clause),
-        rewrite the query so the current table is filtered by `id IN (subquery)`.
+        If the update depends on other tables (JOINs in the WHERE clause), or
+        asks for a row lock, rewrite the query so the current table is filtered
+        by `id IN (subquery)`.
+
+        An UPDATE takes no locking clause of its own, so a locked update has to
+        put the lock on the sub-select that picks the rows -- otherwise the
+        lock is silently dropped and two workers claim the same rows.
         """
         refcounts_before = self.query.alias_refcount.copy()
         # Ensure base table is in the query
         self.query.get_initial_alias()
         count = self.query.count_active_tables()
-        if count == 1:
+        if count == 1 and not self.query.lock_mode:
             return
         query = self.query.chain(klass=Query)
         query.select_related = False
         query.clear_ordering(force=True)
         query.select = ()
         query.add_fields(["id"])
+        self.lock_only_the_target(query)
         super().pre_sql_setup()
 
         # Reset the where clause and drop the tables we no longer need (they
