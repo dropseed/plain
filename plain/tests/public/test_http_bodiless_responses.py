@@ -14,6 +14,7 @@ from plain.http import (
     FileResponse,
     HTTPException,
     JsonResponse,
+    NotAllowedResponse,
     NotModifiedResponse,
     Response,
     StreamingResponse,
@@ -156,6 +157,13 @@ def test_not_modified_response_signature_is_pinned():
     # means exactly "bodiless 304".
     with pytest.raises(TypeError):
         NotModifiedResponse(status_code=200)  # ty: ignore[unknown-argument]
+
+
+def test_not_allowed_response_signature_is_pinned():
+    # No status_code parameter — this class always means exactly "405
+    # method not allowed".
+    with pytest.raises(TypeError):
+        NotAllowedResponse(["GET"], status_code=200)  # ty: ignore[unknown-argument]
 
 
 def test_setting_content_after_bodiless_status_raises():
