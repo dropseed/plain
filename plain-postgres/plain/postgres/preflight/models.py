@@ -192,6 +192,68 @@ class CheckTypedConstruction(PreflightCheck):
         return errors
 
 
+def _is_db_owned(field: Any) -> bool:
+    """Whether the database, not the caller, supplies the field's value.
+
+    These are the fields the stub declares ``init=False`` for, so they're out of
+    the synthesized constructor entirely and a missing ``default=`` can't make
+    them look required: the ``id``, ``create_now``/``update_now`` datetimes,
+    ``generate=True`` UUIDs, and ``RandomStringField``.
+    """
+    return field.primary_key or field.db_returning or field.auto_fills_on_save
+
+
+def nullable_fields_missing_default(model: type) -> list[str]:
+    """Names of `model`'s caller-supplied ``allow_null=True`` fields whose
+    declaration passed no ``default=``."""
+    return [
+        field.name
+        for field in model._model_meta.fields  # ty: ignore[unresolved-attribute]
+        if field.allow_null
+        and not field.has_declared_default()
+        and not _is_db_owned(field)
+    ]
+
+
+def nullable_default_results(model: type) -> list[PreflightResult]:
+    """A warning per field `nullable_fields_missing_default` reports on `model`."""
+    return [
+        PreflightResult(
+            fix=(
+                f"'{model.__name__}.{field_name}' is allow_null=True with no "
+                "declared default, so the runtime treats it as optional in the "
+                f"constructor but a type checker calls {model.__name__}() a "
+                "missing-argument error. Add default=None to the field to make "
+                "them agree — it changes no runtime behavior and no schema."
+            ),
+            obj=f"{model.model_options.label}.{field_name}",  # ty: ignore[unresolved-attribute]
+            id="postgres.nullable_field_without_default",
+            warning=True,
+        )
+        for field_name in nullable_fields_missing_default(model)
+    ]
+
+
+@register_check("postgres.nullable_field_without_default")
+class CheckNullableFieldWithoutDefault(PreflightCheck):
+    """Warns about ``allow_null=True`` fields whose declaration omits ``default=``.
+
+    The runtime already treats such a field as omittable -- ``get_default()``
+    returns None for a nullable column. A type checker doesn't: PEP 681 makes a
+    field optional in the synthesized constructor only when the declaration
+    passes ``default=`` at the call site. So ``Model()`` runs fine and the
+    checker calls the field a missing required argument. Adding ``default=None``
+    settles it, and persists nothing -- None is never written as a column
+    DEFAULT, so there's no migration and no schema change.
+    """
+
+    def run(self) -> list[PreflightResult]:
+        results = []
+        for model in models_registry.get_models():
+            results.extend(nullable_default_results(model))
+        return results
+
+
 def _check_lazy_references(
     models_registry: ModelsRegistry, packages_registry: Any
 ) -> list[PreflightResult]:
