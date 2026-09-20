@@ -567,3 +567,35 @@ def test_bulk_upsert_across_several_batches_out_of_key_order(db):
     assert {row.key: row.value for row in UpsertItem.query.all()} == {
         f"k{index}": index for index in range(8)
     }
+
+
+def test_bulk_upsert_repeated_update_field_rejected(db):
+    # Postgres assigns each column once per statement; naming one twice is a
+    # syntax error mid-transaction, so it's caught at the call instead.
+    with pytest.raises(ValueError, match=r"names \['value'\] more than once"):
+        UpsertItem.query.bulk_upsert(
+            [UpsertItem(key="a", value=1)],
+            update_fields=[UpsertItem.value, UpsertItem.value],
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_bulk_upsert_repeated_update_field_rejected_before_any_query(db):
+    # Validation happens at the call, so an empty objs list is checked too.
+    with pytest.raises(ValueError, match="more than once"):
+        UpsertItem.query.bulk_upsert(
+            [],
+            update_fields=[UpsertItem.value, UpsertItem.value],
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_bulk_upsert_unsaved_related_object_names_bulk_upsert(db):
+    # The guard is shared with bulk_create(); the message has to name the call
+    # the user actually made.
+    with pytest.raises(ValueError, match=r"^bulk_upsert\(\) prohibited"):
+        UpsertScoped.query.bulk_upsert(
+            [UpsertScoped(tenant=UpsertTenant(name="unsaved"), slug="s", value=1)],
+            update_fields=[UpsertScoped.value],
+            unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
+        )

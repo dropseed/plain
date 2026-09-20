@@ -685,12 +685,12 @@ class QuerySet[T: "Model"]:
         obj.create()
         return obj
 
-    def _prepare_for_bulk_create(self, objs: list[T]) -> None:
+    def _prepare_for_bulk_create(self, objs: list[T], *, operation_name: str) -> None:
         # The identity PK is the only PK type, so there's no literal Python
         # default to materialize -- obj.id stays None and the INSERT takes the
         # DB's DEFAULT path.
         for obj in objs:
-            obj._prepare_related_fields_for_save(operation_name="bulk_create")
+            obj._prepare_related_fields_for_save(operation_name=operation_name)
 
     def bulk_create(
         self,
@@ -714,7 +714,7 @@ class QuerySet[T: "Model"]:
             return objs
         meta = self.model._model_meta
         fields = meta.fields
-        self._prepare_for_bulk_create(objs)
+        self._prepare_for_bulk_create(objs, operation_name="bulk_create")
         with transaction.atomic(savepoint=False):
             objs_with_id, objs_without_id = partition(lambda o: o.id is None, objs)
             if objs_with_id:
@@ -812,6 +812,18 @@ class QuerySet[T: "Model"]:
                     "the database generates its value, so the update would "
                     "overwrite the stored one with a fresh default."
                 )
+        repeated = sorted(
+            {
+                field.name
+                for field in update_columns
+                if sum(other.name == field.name for other in update_columns) > 1
+            }
+        )
+        if repeated:
+            raise ValueError(
+                f"bulk_upsert() update_fields names {repeated} more than once; "
+                "Postgres assigns each column once per statement."
+            )
         overlap = {f.name for f in update_columns} & {f.name for f in unique_columns}
         if overlap:
             raise ValueError(
@@ -861,7 +873,7 @@ class QuerySet[T: "Model"]:
 
         meta = self.model._model_meta
         object_name = self.model.model_options.object_name
-        self._prepare_for_bulk_create(objs)
+        self._prepare_for_bulk_create(objs, operation_name="bulk_upsert")
 
         # A NULL conflict key never conflicts in Postgres, so the row would
         # always insert and the upsert would quietly be an insert.
