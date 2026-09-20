@@ -7,13 +7,16 @@ from __future__ import annotations
 
 import re
 
+import psycopg
 import pytest
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.relationships import Widget
 from plain.postgres import transaction
 from plain.postgres.aggregates import Count
+from plain.postgres.db import get_connection
 from plain.postgres.expressions import Value, Window
 from plain.postgres.functions import RowNumber
+from plain.postgres.sources import build_connection_params
 from plain.postgres.transaction import TransactionManagementError
 from psycopg import NotSupportedError
 
@@ -175,7 +178,8 @@ def test_locked_update_locks_in_a_subquery(db, capture_queries, executed_sql):
 
     sql = executed_sql(queries)
     assert "IN (SELECT" in sql
-    assert "FOR UPDATE SKIP LOCKED)" in sql
+    # OF names the written table, so the lock can't spread to a joined one.
+    assert re.search(r"FOR UPDATE OF \w+ SKIP LOCKED\)", sql)
 
 
 def test_locked_delete_locks_in_a_subquery(db, capture_queries, executed_sql):
@@ -184,7 +188,8 @@ def test_locked_delete_locks_in_a_subquery(db, capture_queries, executed_sql):
 
     sql = executed_sql(queries)
     assert "IN (SELECT" in sql
-    assert "FOR UPDATE SKIP LOCKED)" in sql
+    # OF names the written table, so the lock can't spread to a joined one.
+    assert re.search(r"FOR UPDATE OF \w+ SKIP LOCKED\)", sql)
 
 
 def test_unlocked_writes_stay_a_flat_statement(db, capture_queries, executed_sql):
@@ -222,7 +227,7 @@ def test_related_lock_target_is_refused_on_a_write(db, write):
     ChildCascade(parent=parent).create()
     qs = ChildCascade.query.filter(parent__name="p").for_update(of=("parent",))
 
-    with pytest.raises(TypeError, match=r"locks only its own rows"):
+    with pytest.raises(TypeError, match=r"locks only the rows it writes"):
         qs.update(parent=parent) if write == "update" else qs.delete()
 
 
@@ -261,3 +266,47 @@ def test_self_lock_target_works_on_a_joined_write(db, capture_queries, executed_
     assert "INNER JOIN" in sql
     assert "FOR UPDATE OF" in sql.split("RETURNING")[0]
     assert ChildCascade.query.filter(parent=other).count() == 2
+
+
+def test_locked_write_locks_only_its_own_table(db, capture_queries, executed_sql):
+    # A bare FOR UPDATE would lock a row in every table the sub-select reads,
+    # including the one the filter only joined to look a value up.
+    parent = DeleteParent(name="p").create()
+    ChildCascade(parent=parent).create()
+
+    with capture_queries() as queries:
+        ChildCascade.query.filter(parent__name="p").for_update(
+            skip_locked=True
+        ).delete()
+
+    sql = executed_sql(queries)
+    assert "INNER JOIN" in sql
+    assert "FOR UPDATE OF" in sql
+
+
+@pytest.mark.parametrize("write", ["update", "delete"])
+def test_locked_write_is_not_blocked_by_a_joined_row(isolated_db, write):
+    # The filter reads the parent; the write only touches the child. With the
+    # parent row held by someone else, the write must still claim the child
+    # rather than skip it.
+    parent = DeleteParent(name="p").create()
+    other = DeleteParent(name="other").create()
+    ChildCascade(parent=parent).create()
+
+    params = build_connection_params(get_connection().settings_dict)
+    with psycopg.connect(**params) as holder:
+        with holder.cursor() as cursor:
+            cursor.execute(
+                "SELECT id FROM \"examples_deleteparent\" WHERE name = 'p' FOR UPDATE"
+            )
+            assert cursor.fetchall()
+
+            qs = ChildCascade.query.filter(parent__name="p").for_update(
+                skip_locked=True
+            )
+            with transaction.atomic():
+                claimed = qs.update(parent=other) if write == "update" else qs.delete()
+
+        holder.rollback()
+
+    assert claimed == 1

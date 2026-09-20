@@ -669,7 +669,9 @@ Note what this is and isn't: it takes **every** row the filter matches, so it su
 
 The `transaction.atomic()` is required, same as for a locked read: a locked write outside a transaction raises `TransactionManagementError`. Nothing else honors the lock — without a transaction there is nothing for it to be held until.
 
-`of=` can only name `"self"` on a write. The sub-select reads one column — this table's id — so a related name has nothing to point at, and `update()`/`delete()` raise `TypeError` rather than let it fail deeper down. Joins the filter needs still ride along in the sub-select; to lock related rows too, take them with a separate locked read.
+**A locked write locks only the target table's rows.** When the filter spans a relation, the sub-select joins the other tables to look values up, and a bare `FOR UPDATE` would lock a row in each of them — so a write whose filter reads a parent would wait on (or, with `skip_locked=True`, silently skip) rows it never touches. The clause is emitted as `FOR UPDATE OF <target>` so that can't happen. To lock related rows as well, take them with a separate locked read.
+
+That is also why `of=` can only name `"self"` on a write: the sub-select reads one column — this table's id — so a related name has nothing to point at, and `update()`/`delete()` raise `TypeError` rather than let it fail deeper down. Dropping `of=` is the same thing; the write locks its own rows either way.
 
 ## Schema management
 

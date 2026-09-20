@@ -1146,9 +1146,9 @@ class QuerySet[T: "Model"]:
         if self.sql_query.lock_mode and related:
             raise TypeError(
                 f"Cannot call {method_name}() on a queryset locked with "
-                f"of={related} -- a locked write locks only its own rows. "
-                'Drop of=, use of=("self",), or lock the related rows with a '
-                "separate locked read."
+                f"of={related} -- a locked write locks only the rows it "
+                "writes. Drop of= (the write locks its own rows either way), "
+                "or lock the related rows with a separate locked read."
             )
 
     def delete(self) -> int:

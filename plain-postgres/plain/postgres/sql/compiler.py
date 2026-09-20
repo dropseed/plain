@@ -1526,6 +1526,18 @@ class SQLWriteCompiler(SQLCompiler):
 
     query: UpdateQuery | DeleteQuery
 
+    def lock_only_the_target(self, inner: Query) -> None:
+        """Point the sub-select's lock at the table being written.
+
+        A bare `FOR UPDATE` locks a row from *every* table the sub-select
+        reads, so a write whose filter spans a relation would wait on -- or,
+        with SKIP LOCKED, silently skip -- rows of a table it only joined to
+        look things up in. The write only ever changes the target table, so
+        that is all it locks.
+        """
+        if inner.lock_mode and not inner.lock_of:
+            inner.lock_of = ("self",)
+
     def execute_sql(self, result_type: str) -> Any:  # ty: ignore[invalid-method-override]
         # A write has a rowcount or a RETURNING set, never a result set to
         # shape, so SINGLE/MULTI have nothing to work with -- asking for one
@@ -1616,6 +1628,7 @@ class SQLDeleteCompiler(SQLWriteCompiler):
         assert self.query.model is not None, "DELETE requires a model"
         id_field = self.query.model._model_meta.get_forward_field("id")
         innerq.select = (id_field.get_col(self.query.get_initial_alias()),)
+        self.lock_only_the_target(innerq)
         outerq = Query(self.query.model)
         outerq.add_filter("id__in", innerq)
         return self._as_sql(outerq)
@@ -1715,6 +1728,7 @@ class SQLUpdateCompiler(SQLWriteCompiler):
         query.clear_ordering(force=True)
         query.select = ()
         query.add_fields(["id"])
+        self.lock_only_the_target(query)
         super().pre_sql_setup()
 
         # Reset the where clause and drop the tables we no longer need (they

@@ -8,6 +8,7 @@ returning(*Model.field) returns a list of dicts holding just those columns.
 from __future__ import annotations
 
 import operator
+import re
 from typing import TYPE_CHECKING, cast
 
 import psycopg
@@ -347,7 +348,7 @@ def test_lock_survives_into_the_subquery_of_a_joined_returning_update(
         )
 
     sql = " ".join(q["sql"] for q in queries)
-    assert "FOR UPDATE SKIP LOCKED" in sql
+    assert re.search(r"FOR UPDATE OF \w+ SKIP LOCKED", sql)
     assert "RETURNING" in sql
     assert [row.id for row in rows] == [child.id]
 
@@ -371,7 +372,7 @@ def test_locked_update_puts_the_lock_in_the_subquery(db, capture_queries, execut
 
     sql = executed_sql(queries)
     before_returning = sql.split("RETURNING")[0]
-    assert "FOR UPDATE SKIP LOCKED)" in before_returning
+    assert re.search(r"FOR UPDATE OF \w+ SKIP LOCKED\)", before_returning)
     assert before_returning.index("IN (SELECT") < before_returning.index("FOR UPDATE")
 
 
@@ -384,7 +385,7 @@ def test_locked_delete_puts_the_lock_in_the_subquery(db, capture_queries, execut
 
     sql = executed_sql(queries)
     before_returning = sql.split("RETURNING")[0]
-    assert "FOR UPDATE SKIP LOCKED)" in before_returning
+    assert re.search(r"FOR UPDATE OF \w+ SKIP LOCKED\)", before_returning)
     assert before_returning.index("IN (SELECT") < before_returning.index("FOR UPDATE")
 
 
