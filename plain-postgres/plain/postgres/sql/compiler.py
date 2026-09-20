@@ -19,7 +19,7 @@ from plain.postgres.dialect import (
     lock_sql,
     on_conflict_suffix_sql,
     quote_name,
-    return_insert_columns,
+    returning_columns,
 )
 from plain.postgres.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.postgres.expressions import (
@@ -30,7 +30,7 @@ from plain.postgres.expressions import (
     ResolvableExpression,
     Value,
 )
-from plain.postgres.fields import DATABASE_DEFAULT
+from plain.postgres.fields import DATABASE_DEFAULT, Field
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.functions import Cast, Random
 from plain.postgres.lookups import Lookup
@@ -51,7 +51,12 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
-    from plain.postgres.sql.query import AggregateQuery, InsertQuery
+    from plain.postgres.sql.query import (
+        AggregateQuery,
+        DeleteQuery,
+        InsertQuery,
+        UpdateQuery,
+    )
 
 # Type aliases for SQL compilation results
 SqlParams = tuple[Any, ...]
@@ -102,6 +107,21 @@ def apply_converters(
                 value = converter(value, expression, connection)
             row[pos] = value
         yield row
+
+
+def convert_returning_rows(
+    rows: Iterable, fields: list[Field], connection: DatabaseConnection
+) -> list[Sequence[Any]]:
+    """Apply each field's DB converters to the raw rows of a RETURNING clause.
+
+    The fields are given in the same order as the emitted RETURNING columns,
+    so each field lines up with its value in every row.
+    """
+    cols = [field.get_col(field.model.model_options.db_table) for field in fields]
+    converters = get_converters(cols, connection)
+    if converters:
+        return list(apply_converters(rows, converters, connection))
+    return list(rows)
 
 
 class SQLCompiler:
@@ -1316,7 +1336,6 @@ class SQLCompiler:
 class SQLInsertCompiler(SQLCompiler):
     query: InsertQuery
     returning_fields: list | None = None
-    returning_params: tuple = ()
 
     def field_as_sql(self, field: Any, val: Any) -> tuple[str, list]:
         """
@@ -1467,15 +1486,11 @@ class SQLInsertCompiler(SQLCompiler):
             result.append(
                 bulk_insert_sql(fields, placeholder_rows)  # ty: ignore[invalid-argument-type]
             )
-            params = param_rows
             if conflict_suffix_sql:
                 result.append(conflict_suffix_sql)
-            # Skip appending the RETURNING clause if it's an empty string.
-            r_sql, self.returning_params = return_insert_columns(self.returning_fields)
-            if r_sql:
-                result.append(r_sql)
-                params += [list(self.returning_params)]
-            return [(" ".join(result), tuple(chain.from_iterable(params)))]
+            if returning := returning_columns(self.returning_fields):
+                result.append(returning)
+            return [(" ".join(result), tuple(chain.from_iterable(param_rows)))]
 
         # Bulk insert without returning fields
         result.append(bulk_insert_sql(fields, placeholder_rows))  # ty: ignore[invalid-argument-type]
@@ -1487,7 +1502,6 @@ class SQLInsertCompiler(SQLCompiler):
         self, returning_fields: list | None = None
     ) -> list:
         assert self.query.model is not None, "INSERT execution requires a model"
-        options = self.query.model.model_options
         self.returning_fields = returning_fields
         with self.connection.cursor() as cursor:
             for sql, params in self.as_sql():
@@ -1499,14 +1513,58 @@ class SQLInsertCompiler(SQLCompiler):
                 rows = cursor.fetchall()
             else:
                 rows = [cursor.fetchone()]
-        cols = [field.get_col(options.db_table) for field in self.returning_fields]
-        converters = get_converters(cols, self.connection)
-        if converters:
-            rows = list(apply_converters(rows, converters, self.connection))
-        return rows
+        return convert_returning_rows(rows, self.returning_fields, self.connection)
 
 
-class SQLDeleteCompiler(SQLCompiler):
+class SQLWriteCompiler(SQLCompiler):
+    """Base for the UPDATE and DELETE compilers.
+
+    Both of their queries can carry returning_fields, so both run the
+    statement the same way: a rowcount normally, the converted RETURNING
+    rows when fields were asked for.
+    """
+
+    query: UpdateQuery | DeleteQuery
+
+    def lock_only_the_target(self, inner: Query) -> None:
+        """Point the sub-select's lock at the table being written.
+
+        A bare `FOR UPDATE` locks a row from *every* table the sub-select
+        reads, so a write whose filter spans a relation would wait on -- or,
+        with SKIP LOCKED, silently skip -- rows of a table it only joined to
+        look things up in. The write only ever changes the target table, so
+        that is all it locks.
+        """
+        if inner.lock_mode and not inner.lock_of:
+            inner.lock_of = ("self",)
+
+    def execute_sql(self, result_type: str) -> Any:  # ty: ignore[invalid-method-override]
+        # A write has a rowcount or a RETURNING set, never a result set to
+        # shape, so SINGLE/MULTI have nothing to work with -- asking for one
+        # gets a psycopg "didn't produce records" error several frames from
+        # here. Say it where the mistake is. NO_RESULTS is the other honest
+        # answer: run it and keep nothing (UpdateQuery.update_batch).
+        assert result_type in (CURSOR, NO_RESULTS), (
+            f"A write is executed with CURSOR or NO_RESULTS, not "
+            f"{result_type!r} -- it has a rowcount or its RETURNING rows, "
+            "not a result set."
+        )
+        cursor = super().execute_sql(result_type)
+        if not cursor:
+            return [] if self.query.returning_fields is not None else 0
+        try:
+            if self.query.returning_fields is not None:
+                return convert_returning_rows(
+                    cursor.fetchall(), self.query.returning_fields, self.connection
+                )
+            return cursor.rowcount
+        finally:
+            cursor.close()
+
+
+class SQLDeleteCompiler(SQLWriteCompiler):
+    query: DeleteQuery
+
     @cached_property
     def single_alias(self) -> bool:
         # Ensure base table is in aliases.
@@ -1534,12 +1592,19 @@ class SQLDeleteCompiler(SQLCompiler):
         )
 
     def _as_sql(self, query: Query) -> SqlWithParams:
-        delete = f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"  # ty: ignore[invalid-argument-type]
+        result = [f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"]  # ty: ignore[invalid-argument-type]
         try:
             where, params = self.compile(query.where)
         except FullResultSet:
-            return delete, ()
-        return f"{delete} WHERE {where}", tuple(params)
+            params = ()
+        else:
+            result.append(f"WHERE {where}")
+        # RETURNING comes off self.query, not the query argument: the
+        # multi-alias branch below passes in a freshly built outer Query that
+        # carries no returning_fields of its own.
+        if returning := returning_columns(self.query.returning_fields):
+            result.append(returning)
+        return " ".join(result), tuple(params)
 
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
@@ -1548,20 +1613,30 @@ class SQLDeleteCompiler(SQLCompiler):
         Create the SQL for this query. Return the SQL string and list of
         parameters.
         """
-        if self.single_alias and not self.contains_self_reference_subquery:
+        if (
+            self.single_alias
+            and not self.contains_self_reference_subquery
+            and not self.query.lock_mode
+        ):
             return self._as_sql(self.query)
+        # A DELETE takes no locking clause of its own, so a locked delete has
+        # to put the lock on the sub-select that picks the rows -- otherwise
+        # the lock is silently dropped and two workers claim the same rows.
         innerq = self.query.clone()
         innerq.__class__ = Query
         innerq.clear_select_clause()
         assert self.query.model is not None, "DELETE requires a model"
         id_field = self.query.model._model_meta.get_forward_field("id")
         innerq.select = (id_field.get_col(self.query.get_initial_alias()),)
+        self.lock_only_the_target(innerq)
         outerq = Query(self.query.model)
         outerq.add_filter("id__in", innerq)
         return self._as_sql(outerq)
 
 
-class SQLUpdateCompiler(SQLCompiler):
+class SQLUpdateCompiler(SQLWriteCompiler):
+    query: UpdateQuery
+
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
     ) -> SqlWithParams:
@@ -1626,35 +1701,34 @@ class SQLUpdateCompiler(SQLCompiler):
             params = []
         else:
             result.append(f"WHERE {where}")
+        if returning := returning_columns(self.query.returning_fields):
+            result.append(returning)
         return " ".join(result), tuple(update_params + list(params))
-
-    def execute_sql(self, result_type: str) -> int:  # ty: ignore[invalid-method-override]
-        """Execute the update and return the number of rows affected."""
-        cursor = super().execute_sql(result_type)
-        try:
-            return cursor.rowcount if cursor else 0
-        finally:
-            if cursor:
-                cursor.close()
 
     def pre_sql_setup(
         self, with_col_aliases: bool = False
     ) -> tuple[list[Any], list[Any], list[SqlWithParams]] | None:
         """
-        If the update depends on other tables (JOINs in the WHERE clause),
-        rewrite the query so the current table is filtered by `id IN (subquery)`.
+        If the update depends on other tables (JOINs in the WHERE clause), or
+        asks for a row lock, rewrite the query so the current table is filtered
+        by `id IN (subquery)`.
+
+        An UPDATE takes no locking clause of its own, so a locked update has to
+        put the lock on the sub-select that picks the rows -- otherwise the
+        lock is silently dropped and two workers claim the same rows.
         """
         refcounts_before = self.query.alias_refcount.copy()
         # Ensure base table is in the query
         self.query.get_initial_alias()
         count = self.query.count_active_tables()
-        if count == 1:
+        if count == 1 and not self.query.lock_mode:
             return
         query = self.query.chain(klass=Query)
         query.select_related = False
         query.clear_ordering(force=True)
         query.select = ()
         query.add_fields(["id"])
+        self.lock_only_the_target(query)
         super().pre_sql_setup()
 
         # Reset the where clause and drop the tables we no longer need (they

@@ -18,7 +18,7 @@ from typing import Any, Never, assert_type
 
 from app.examples.models.defaults import DefaultsExample as D
 from app.examples.models.relationships import WidgetTag
-from plain.postgres import Field, QuerySet, RowQuerySet, types
+from plain.postgres import Field, RowQuerySet, types
 from plain.postgres.expressions import F
 from plain.postgres.functions import Upper
 
@@ -185,17 +185,17 @@ def must_accept_the_row_type_surviving_every_chaining_method() -> None:
     assert_type(rows.all(), RowQuerySet[tuple[str, int]])
 
 
-def must_accept_or_degrading_because_its_clone_can_change_class() -> None:
-    """`__or__` is the one chaining method that can't be `Self`.
+def must_accept_or_keeping_the_row_type() -> None:
+    """`__or__` carries the row type too.
 
-    A sliced left operand is re-expressed as an id subquery against
-    `Meta.base_queryset`, which is a plain `QuerySet` by design -- it must
-    never be a user-defined queryset, which might filter rows out. So that
-    branch really does hand back a different class, and the annotation says so
-    rather than lying.
+    It used to be the one chaining method that couldn't be `Self`: a sliced
+    left operand is re-expressed as an id subquery against
+    `Meta.base_queryset`, which is a plain `QuerySet` by design. #85 settled
+    it with an overload pair and a cast on that branch, so the row type
+    survives here like it does everywhere else.
     """
     rows = D.query.select(D.name, D.priority)
-    assert_type(rows | rows, QuerySet[Any])
+    assert_type(rows | rows, RowQuerySet[tuple[str, int]])
 
 
 def must_accept_a_column_from_another_model_because_the_checker_cannot_see_it() -> None:

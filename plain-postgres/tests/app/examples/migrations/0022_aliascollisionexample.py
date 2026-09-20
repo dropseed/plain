@@ -6,7 +6,7 @@ from plain import postgres
 
 
 class Migration(migrations.Migration):
-    dependencies = (("examples", "0020_stringconditionsexample"),)
+    dependencies = (("examples", "0021_returningevent"),)
 
     operations = (
         migrations.CreateModel(
