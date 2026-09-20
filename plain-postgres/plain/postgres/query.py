@@ -955,7 +955,7 @@ class QuerySet[T: "Model"]:
 
     def upsert(
         self,
-        *,
+        *_positional: Never,
         defaults: dict[str, Any] | None = None,
         create_defaults: dict[str, Any] | None = None,
         conflict_defaults: dict[str, Any] | None = None,
@@ -1019,6 +1019,13 @@ class QuerySet[T: "Model"]:
         upsert() carries its own RETURNING to hydrate the object, so a prior
         returning() has nothing to add and is refused.
         """
+        if _positional:  # ty: ignore[redundant-condition]
+            # update_or_create() took defaults positionally; upsert() doesn't,
+            # and a bare "takes 1 positional argument" wouldn't say which.
+            raise TypeError(
+                "upsert() takes no positional arguments. Pass the mapping as "
+                "defaults= (or create_defaults=/conflict_defaults=)."
+            )
         self._reject_returning("upsert")
         meta = self.model._model_meta
 
@@ -1135,6 +1142,11 @@ class QuerySet[T: "Model"]:
                     f"upsert() conflict_defaults cannot name the unique field "
                     f"{name!r} -- it is the conflict target, not something the "
                     "conflict-update may rewrite."
+                )
+            if name in meta._property_names:
+                raise FieldError(
+                    f"upsert() writes columns; {self.model.__name__}.{name} is "
+                    "a property. Pass the column it sets instead."
                 )
             try:
                 field = meta.get_forward_field(name)

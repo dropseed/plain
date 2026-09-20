@@ -287,6 +287,36 @@ def test_upsert_unique_fields_error_does_not_offer_the_primary_key(db):
     assert "must name the primary key or a UniqueConstraint" in str(bulk_error.value)
 
 
+def test_upsert_rejects_a_property_name_in_create_defaults(db):
+    with pytest.raises(FieldError, match="is a property"):
+        UpsertItem.query.upsert(
+            key="a",
+            create_defaults={"label_upper": "HELLO"},
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_upsert_rejects_a_property_name_in_conflict_defaults(db):
+    with pytest.raises(FieldError, match="is a property"):
+        UpsertItem.query.upsert(
+            key="a",
+            conflict_defaults={"label_upper": "HELLO"},
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_upsert_names_defaults_when_passed_positionally(db):
+    """update_or_create() took defaults positionally; a bare "takes 1
+    positional argument" wouldn't say which keyword to use.
+    """
+    with pytest.raises(TypeError, match="Pass the mapping as defaults="):
+        UpsertItem.query.upsert(
+            {"value": 1},  # ty: ignore[invalid-argument-type]
+            key="a",
+            unique_fields=[UpsertItem.key],
+        )
+
+
 def test_upsert_conflict_defaults_rejects_the_primary_key(db):
     with pytest.raises(ValueError, match="cannot update primary key fields"):
         UpsertItem.query.upsert(

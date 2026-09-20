@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.returning import ReturningEvent
+from app.examples.models.upsert import UpsertItem
 from plain.postgres import ReturningQuerySet
 from plain.postgres.exceptions import FieldError
 
@@ -248,10 +249,14 @@ def test_returning_instances_carry_foreign_keys(db):
         ),
         lambda qs: qs.bulk_update(list(ReturningEvent.query), ["count"]),
         lambda qs: qs.get_or_create(label="x", count=1),
-        lambda qs: qs.upsert(
-            unique_fields=[ReturningEvent.id],
-            label="x",
-            count=1,
+        # ReturningEvent declares no UniqueConstraint, and upsert() refuses
+        # to conflict on the primary key, so this one case uses a model that
+        # has a real conflict target -- otherwise the call would fail for a
+        # reason other than the one under test.
+        lambda _qs: UpsertItem.query.returning().upsert(
+            key="x",
+            value=1,
+            unique_fields=[UpsertItem.key],
         ),
     ],
     ids=[
