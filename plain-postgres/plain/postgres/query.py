@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Callable, Iterator, Sequence
 from functools import cached_property
 from itertools import islice
-from typing import TYPE_CHECKING, Any, Never, Self, overload
+from typing import TYPE_CHECKING, Any, Never, Self, cast, overload
 
 import plain.runtime
 import psycopg
@@ -31,6 +31,7 @@ from plain.postgres.fields import (
     Field,
     PrimaryKeyField,
 )
+from plain.postgres.fields.base import ColumnField
 from plain.postgres.functions import Cast
 from plain.postgres.query_utils import Q, condition_origins_of
 from plain.postgres.sql import (
@@ -53,11 +54,22 @@ __all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet"]
 if TYPE_CHECKING:
     from plain.postgres import Model
 
+
 # The maximum number of results to fetch in a get() query.
 MAX_GET_RESULTS = 21
 
 # The maximum number of items to display in a QuerySet.__repr__
 REPR_OUTPUT_SIZE = 20
+
+
+def _returning_signature(fields: list[Field]) -> list[tuple[Any, str | None]]:
+    """Identify a returning() selection by the columns it names.
+
+    Two selections that mean the same thing can hold different Field
+    objects -- deepcopy() of a queryset copies them -- so comparing the
+    lists themselves would call a queryset and its own copy a mismatch.
+    """
+    return [(field.model, field.name) for field in fields]
 
 
 def _lock_conflict_clause(query: Query) -> str | None:
@@ -321,6 +333,13 @@ class QuerySet[T: "Model"]:
     _fields: tuple[str, ...] | None
     _defer_next_filter: bool
     _deferred_filter: tuple[bool, tuple[Any, ...], dict[str, Any]] | None
+    # The columns to RETURN from the next update()/delete(), or None for a
+    # plain write that returns an int rowcount. Resolved once by returning()
+    # so the write doesn't recompute them at execute time.
+    _returning_fields: list[Field] | None
+    # True when returning() was called with no arguments: hydrate the rows
+    # into model instances rather than dicts.
+    _returning_instances: bool
 
     def __init__(self):
         """Minimal init for descriptor mode. Use from_model() to create instances."""
@@ -340,6 +359,8 @@ class QuerySet[T: "Model"]:
         instance._fields = None
         instance._defer_next_filter = False
         instance._deferred_filter = None
+        instance._returning_fields = None
+        instance._returning_instances = False
         return instance
 
     @overload
@@ -375,7 +396,7 @@ class QuerySet[T: "Model"]:
     # PYTHON MAGIC METHODS #
     ########################
 
-    def __deepcopy__(self, memo: dict[int, Any]) -> QuerySet[T]:
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
         """Don't populate the QuerySet's cache."""
         obj = self.__class__.from_model(self.model)
         for k, v in self.__dict__.items():
@@ -452,9 +473,9 @@ class QuerySet[T: "Model"]:
     def __getitem__(self, k: int) -> T: ...
 
     @overload
-    def __getitem__(self, k: slice) -> QuerySet[T]: ...
+    def __getitem__(self, k: slice) -> Self: ...
 
-    def __getitem__(self, k: int | slice) -> T | QuerySet[T]:
+    def __getitem__(self, k: int | slice) -> T | Self:
         """Retrieve an item or slice from the set of results.
 
         Slicing always returns a QuerySet, even when the results are
@@ -503,36 +524,79 @@ class QuerySet[T: "Model"]:
     def __class_getitem__(cls, *args: Any, **kwargs: Any) -> type[QuerySet[Any]]:
         return cls
 
-    def __and__(self, other: QuerySet[T]) -> QuerySet[T]:
+    @overload
+    def __and__[R](self, other: ReturningQuerySet[T, R]) -> ReturningQuerySet[T, R]: ...
+
+    @overload
+    def __and__(self, other: QuerySet[T]) -> Self: ...
+
+    def __and__(self, other: QuerySet[T]) -> Any:
         self._merge_sanity_check(other)
+        returning = self._merged_returning(other)
         if isinstance(other, EmptyQuerySet):
-            return other
-        if isinstance(self, EmptyQuerySet):
-            return self
-        combined = self._chain()
-        combined._merge_known_related_objects(other)
-        combined.sql_query.combine(other.sql_query, AND)
+            combined = cast("Self", other._chain())
+        elif isinstance(self, EmptyQuerySet):
+            combined = self._chain()
+        else:
+            combined = self._chain()
+            combined._merge_known_related_objects(other)
+            combined.sql_query.combine(other.sql_query, AND)
+        combined._returning_fields, combined._returning_instances = returning
         return combined
 
-    def __or__(self, other: QuerySet[T]) -> QuerySet[T]:
+    @overload
+    def __or__[R](self, other: ReturningQuerySet[T, R]) -> ReturningQuerySet[T, R]: ...
+
+    @overload
+    def __or__(self, other: QuerySet[T]) -> Self: ...
+
+    def __or__(self, other: QuerySet[T]) -> Any:
         self._merge_sanity_check(other)
+        returning = self._merged_returning(other)
         if isinstance(self, EmptyQuerySet):
-            return other
-        if isinstance(other, EmptyQuerySet):
-            return self
-        query = (
-            self
-            if self.sql_query.can_filter()
-            else self.model._model_meta.base_queryset.filter(id__in=self.values("id"))
-        )
-        combined = query._chain()
-        combined._merge_known_related_objects(other)
-        if not other.sql_query.can_filter():
-            other = other.model._model_meta.base_queryset.filter(
-                id__in=other.values("id")
+            combined = cast("Self", other._chain())
+        elif isinstance(other, EmptyQuerySet):
+            combined = self._chain()
+        else:
+            query = (
+                self
+                if self.sql_query.can_filter()
+                else self.model._model_meta.base_queryset.filter(
+                    id__in=self.values("id")
+                )
             )
-        combined.sql_query.combine(other.sql_query, OR)
+            combined = cast("Self", query._chain())
+            combined._merge_known_related_objects(other)
+            if not other.sql_query.can_filter():
+                other = other.model._model_meta.base_queryset.filter(
+                    id__in=other.values("id")
+                )
+            combined.sql_query.combine(other.sql_query, OR)
+        combined._returning_fields, combined._returning_instances = returning
         return combined
+
+    def _merged_returning(self, other: QuerySet[T]) -> tuple[list[Field] | None, bool]:
+        """Combine two querysets' returning() state, or refuse to.
+
+        A returning write over a combined queryset is fine, and it doesn't
+        matter which side returning() was called on. What it can't do is
+        honor two different selections: the combined query emits one
+        RETURNING clause, not one per operand.
+        """
+        if other._returning_fields is None:
+            return self._returning_fields, self._returning_instances
+        if self._returning_fields is None:
+            return other._returning_fields, other._returning_instances
+        if (
+            _returning_signature(self._returning_fields)
+            != _returning_signature(other._returning_fields)
+            or self._returning_instances != other._returning_instances
+        ):
+            raise TypeError(
+                "Cannot combine two querysets with different returning() "
+                "selections -- the combined write emits one RETURNING clause."
+            )
+        return self._returning_fields, self._returning_instances
 
     ####################################
     # METHODS THAT DO DATABASE QUERIES #
@@ -647,6 +711,7 @@ class QuerySet[T: "Model"]:
         Create a new object with the given kwargs, saving it to the database
         and returning the created object.
         """
+        self._reject_returning("create")
         obj = self.model(**kwargs)
         obj.create()
         return obj
@@ -710,6 +775,7 @@ class QuerySet[T: "Model"]:
         save() on each of the instances. Primary keys are set on the objects
         via the PostgreSQL RETURNING clause. Multi-table models are not supported.
         """
+        self._reject_returning("bulk_create")
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
 
@@ -777,6 +843,7 @@ class QuerySet[T: "Model"]:
         """
         Update the given fields in each of the given objects in the database.
         """
+        self._reject_returning("bulk_update")
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
         if not fields:
@@ -824,6 +891,10 @@ class QuerySet[T: "Model"]:
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
         queryset = self._chain()
+        # Each batch targets its rows by id, which the caller already holds,
+        # so a lock on the read side has nothing left to guard -- and keeping
+        # it would push every batch through a locking sub-select for nothing.
+        queryset.sql_query.lock_mode = None
         with transaction.atomic(savepoint=False):
             for ids, update_kwargs in updates:
                 rows_updated += queryset.filter(id__in=ids).update(**update_kwargs)
@@ -837,6 +908,7 @@ class QuerySet[T: "Model"]:
         Return a tuple of (object, created), where created is a boolean
         specifying whether an object was created.
         """
+        self._reject_returning("get_or_create")
         # The get() needs to be targeted at the write database in order
         # to avoid potential transaction consistency problems.
         try:
@@ -876,6 +948,7 @@ class QuerySet[T: "Model"]:
         Return a tuple (object, created), where created is a boolean
         specifying whether an object was created.
         """
+        self._reject_returning("update_or_create")
         if create_defaults is None:
             update_defaults = create_defaults = defaults or {}
         else:
@@ -948,12 +1021,173 @@ class QuerySet[T: "Model"]:
             return obj
         return None
 
+    @overload
+    def returning(self) -> ReturningQuerySet[T, list[T]]: ...
+
+    @overload
+    def returning(
+        self, *fields: Field[Any]
+    ) -> ReturningQuerySet[T, list[dict[str, Any]]]: ...
+
+    def returning(self, *fields: Field[Any]) -> ReturningQuerySet[T, Any]:
+        """Capture the rows touched by the next update() or delete().
+
+        With no arguments, update()/delete() return the affected rows as
+        model instances (RETURNING every column). Given field
+        references (`Model.field`), they return a list of dicts holding just
+        those columns. Without returning(), update()/delete() return an int
+        rowcount.
+
+        Instances from delete() are snapshots: every value is there to read,
+        the id included, but the row is gone, so create()/update()/delete()
+        on them raise rather than target a row that no longer exists.
+
+        The references are validated here, so a bad one errors at the
+        returning() call rather than when the write runs.
+
+        The returned queryset keeps its own class -- a custom QuerySet
+        subclass survives returning(), and its methods still chain. What
+        returning() sets is the state below; ReturningQuerySet is only the
+        static type that pins what update()/delete() hand back.
+        """
+        clone = self._chain()
+        if fields:
+            clone._returning_fields = self._validated_returning_fields(fields)
+            clone._returning_instances = False
+        else:
+            # No references given: RETURN every column so the rows can be
+            # hydrated into full model instances.
+            clone._returning_fields = list(self.model._model_meta.fields)
+            clone._returning_instances = True
+        # The write path tells "no returning()" from "returning()" by
+        # `_returning_fields is None`, so an empty selection would emit no
+        # RETURNING clause and then try to read rows back from it. Neither
+        # branch above can produce one -- a model always has an id column.
+        assert clone._returning_fields, "returning() selected no columns"
+        return cast("ReturningQuerySet[T, Any]", clone)
+
+    def _validated_returning_fields(
+        self, fields: tuple[Field[Any], ...]
+    ) -> list[Field]:
+        """Check each returning() reference and return the columns to RETURN."""
+        # Local import: these modules import this one at load time.
+        from plain.postgres.fields.related_descriptors import (
+            ForwardForeignKeyDescriptor,
+            ForwardManyToManyDescriptor,
+        )
+        from plain.postgres.fields.reverse_descriptors import BaseReverseDescriptor
+
+        def relation_name(reference: Any) -> str | None:
+            """The attribute name, when `reference` is a relation not a column.
+
+            At class level a relation attribute is its descriptor -- that is
+            what lets where() traverse it -- so none of these is a column
+            reference, and each has its name in a different place.
+            """
+            if isinstance(reference, ForwardForeignKeyDescriptor):
+                return reference._field.name
+            if isinstance(reference, ForwardManyToManyDescriptor):
+                return reference.field.name
+            if isinstance(reference, BaseReverseDescriptor):
+                return reference.name
+            return None
+
+        object_name = self.model.model_options.object_name
+        columns = []
+        for field in fields:
+            if name := relation_name(field):
+                raise FieldError(
+                    f"Cannot use {object_name}.{name} in returning(): it is "
+                    "a relation, not a column reference. RETURNING reads "
+                    f"columns of {object_name}'s own table -- use returning() "
+                    "with no arguments to get whole instances."
+                )
+            if isinstance(field, str):
+                raise TypeError(
+                    f"returning() takes field references, not strings. "
+                    f"Pass {object_name}.{field} instead of {field!r}."
+                )
+            if not isinstance(field, Field):
+                raise TypeError(
+                    f"returning() takes field references like "
+                    f"{object_name}.<field>, not {field!r}."
+                )
+            if field.model is not self.model:
+                raise FieldError(
+                    f"Cannot use {field.model.model_options.object_name}."
+                    f"{field.name} in returning() for {object_name}: it "
+                    "belongs to a different model."
+                )
+            if not isinstance(field, ColumnField):
+                raise FieldError(
+                    f"Cannot use {object_name}.{field.name} in returning(): "
+                    "only database columns can be returned."
+                )
+            columns.append(field)
+        return columns
+
+    def _hydrate_returning(
+        self, rows: list[Sequence[Any]], *, deleted: bool = False
+    ) -> list[Any]:
+        """Turn converted RETURNING rows into instances or dicts.
+
+        Instances from a delete are snapshots -- the rows are gone, so they
+        are marked to refuse the write methods rather than silently target
+        a row that no longer exists.
+        """
+        assert self._returning_fields is not None
+        field_names = [field.name for field in self._returning_fields]
+        if not self._returning_instances:
+            return [dict(zip(field_names, row)) for row in rows]
+        instances = [self.model.from_db(field_names, row) for row in rows]
+        if deleted:
+            for instance in instances:
+                instance._state.deleted = True
+        return instances
+
+    def _reject_returning(self, method_name: str) -> None:
+        """Refuse a write that RETURNING doesn't apply to.
+
+        returning() only changes what update() and delete() hand back.
+        Every other write would silently drop it, so say so instead.
+        """
+        if self._returning_fields is not None:
+            raise TypeError(
+                f"Cannot call {method_name}() on a returning() queryset. "
+                "returning() only applies to update() and delete()."
+            )
+
+    def _reject_related_lock_targets(self, method_name: str) -> None:
+        """Refuse of=(...) targets a set-based write can't lock.
+
+        A locked write runs as `WHERE id IN (SELECT id ... FOR UPDATE OF ...)`,
+        and that sub-select reads one column: this table's id. `OF` is
+        resolved against the selected columns, so it can only ever name this
+        table. A related name is meaningful on the read -- it just has
+        nothing to point at here -- and left alone it surfaces as a
+        FieldError from the compiler, a long way from the call.
+        """
+        related = tuple(name for name in self.sql_query.lock_of if name != "self")
+        if self.sql_query.lock_mode and related:
+            raise TypeError(
+                f"Cannot call {method_name}() on a queryset locked with "
+                f"of={related} -- a locked write locks only the rows it "
+                "writes. Drop of= (the write locks its own rows either way), "
+                "or lock the related rows with a separate locked read."
+            )
+
     def delete(self) -> int:
         """Delete the records in the current QuerySet.
 
         Returns the number of parent rows deleted. Cascaded child rows are
         handled by Postgres via the declared `on_delete` clauses and are not
         included in the count.
+
+        After returning(), the deleted rows come back instead -- read-only
+        snapshots when returning() took no arguments, and only ever the
+        target table's rows, since a cascade never reaches the RETURNING
+        clause. The queryset is a ReturningQuerySet to a type checker by
+        then, and its delete() is declared to return them.
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot use 'limit' or 'offset' with delete().")
@@ -961,9 +1195,12 @@ class QuerySet[T: "Model"]:
             raise TypeError("Cannot call delete() after .distinct().")
         if self._fields is not None:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
+        self._reject_related_lock_targets("delete")
 
         del_query = self._chain()
-        del_query.sql_query.lock_mode = None
+        # The lock is kept: the delete compiler moves it onto the sub-select
+        # that picks the rows, which is what makes a locked claim-and-delete
+        # safe against a second worker.
         del_query.sql_query.select_related = False
         del_query.sql_query.clear_ordering(force=True)
 
@@ -971,32 +1208,40 @@ class QuerySet[T: "Model"]:
         # connection so outer atomic() blocks see the abort state even if the
         # caller catches IntegrityError themselves.
         with transaction.mark_for_rollback_on_error():
-            count = del_query._raw_delete()
+            result = del_query._raw_delete()
 
         # Clear the result cache, in case this QuerySet gets reused.
         self._result_cache = None
-        return count
+        if self._returning_fields is not None:
+            # returning() makes this a ReturningQuerySet to a type checker,
+            # and its delete() is declared to hand the rows back.
+            return cast("int", self._hydrate_returning(result, deleted=True))
+        return result
 
-    def _raw_delete(self) -> int:
+    def _raw_delete(self) -> Any:
         """
         Delete objects found from the given queryset in single direct SQL
         query. No signals are sent and there is no protection for cascades.
         """
-        query = self.sql_query.clone()
+        query = cast(DeleteQuery, self.sql_query.clone())
         query.__class__ = DeleteQuery
-        cursor = query.get_compiler().execute_sql(CURSOR)
-        if cursor:
-            with cursor:
-                return cursor.rowcount
-        return 0
+        query.returning_fields = self._returning_fields
+        return query.get_compiler().execute_sql(CURSOR)
 
     def update(self, **kwargs: Any) -> int:
         """
         Update all elements in the current QuerySet, setting all the given
         fields to the appropriate values.
+
+        Returns the rowcount -- or, after returning(), the affected rows.
+        The queryset is a ReturningQuerySet to a type checker by then, and
+        its update() is declared to return them.
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
+        if self._fields is not None:
+            raise TypeError("Cannot call update() after .values() or .values_list()")
+        self._reject_related_lock_targets("update")
         query = self.sql_query.chain(UpdateQuery)
         query.add_update_values(kwargs)
 
@@ -1022,10 +1267,17 @@ class QuerySet[T: "Model"]:
 
         # Clear any annotations so that they won't be present in subqueries.
         query.annotations = {}
+
+        query.returning_fields = self._returning_fields
+
         with transaction.mark_for_rollback_on_error():
-            rows = query.get_compiler().execute_sql(CURSOR)
+            result = query.get_compiler().execute_sql(CURSOR)
         self._result_cache = None
-        return rows
+        if self._returning_fields is not None:
+            # returning() makes this a ReturningQuerySet to a type checker,
+            # and its update() is declared to hand the rows back.
+            return cast("int", self._hydrate_returning(result))
+        return result
 
     def _update(self, values: Sequence[tuple[Field, Any]]) -> int:
         """
@@ -1127,7 +1379,7 @@ class QuerySet[T: "Model"]:
         clone._iterable_class = FlatValuesListIterable if flat else ValuesListIterable
         return clone
 
-    def none(self) -> QuerySet[T]:
+    def none(self) -> Self:
         """Return an empty QuerySet."""
         clone = self._chain()
         clone.sql_query.set_empty()
@@ -1229,7 +1481,7 @@ class QuerySet[T: "Model"]:
         nowait: bool = False,
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
-    ) -> QuerySet[T]:
+    ) -> Self:
         """Return a new QuerySet that locks selected rows with FOR UPDATE."""
         return self._lock_rows("update", nowait, skip_locked, of)
 
@@ -1238,7 +1490,7 @@ class QuerySet[T: "Model"]:
         nowait: bool = False,
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
-    ) -> QuerySet[T]:
+    ) -> Self:
         """Return a new QuerySet that locks selected rows with FOR NO KEY UPDATE."""
         return self._lock_rows("no_key_update", nowait, skip_locked, of)
 
@@ -1247,7 +1499,7 @@ class QuerySet[T: "Model"]:
         nowait: bool = False,
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
-    ) -> QuerySet[T]:
+    ) -> Self:
         """Return a new QuerySet that locks selected rows with FOR SHARE."""
         return self._lock_rows("share", nowait, skip_locked, of)
 
@@ -1256,7 +1508,7 @@ class QuerySet[T: "Model"]:
         nowait: bool = False,
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
-    ) -> QuerySet[T]:
+    ) -> Self:
         """Return a new QuerySet that locks selected rows with FOR KEY SHARE."""
         return self._lock_rows("key_share", nowait, skip_locked, of)
 
@@ -1266,7 +1518,7 @@ class QuerySet[T: "Model"]:
         nowait: bool,
         skip_locked: bool,
         of: tuple[str, ...],
-    ) -> QuerySet[T]:
+    ) -> Self:
         """
         Build a new QuerySet carrying a row-level locking clause. Calling more
         than one lock method on a chain keeps only the last mode.
@@ -1392,7 +1644,7 @@ class QuerySet[T: "Model"]:
         obj.sql_query.add_distinct_fields(*field_names)
         return obj
 
-    def reverse(self) -> QuerySet[T]:
+    def reverse(self) -> Self:
         """Reverse the ordering of the QuerySet."""
         if self.sql_query.is_sliced:
             raise TypeError("Cannot reverse a query once a slice has been taken.")
@@ -1400,7 +1652,7 @@ class QuerySet[T: "Model"]:
         clone.sql_query.standard_ordering = not clone.sql_query.standard_ordering
         return clone
 
-    def defer(self, *fields: str | None) -> QuerySet[T]:
+    def defer(self, *fields: str | None) -> Self:
         """
         Defer the loading of data for certain fields until they are accessed.
         Add the set of deferred fields to any existing set of deferred fields.
@@ -1416,7 +1668,7 @@ class QuerySet[T: "Model"]:
             clone.sql_query.add_deferred_loading(frozenset(fields))  # ty: ignore[invalid-argument-type]
         return clone
 
-    def only(self, *fields: str) -> QuerySet[T]:
+    def only(self, *fields: str) -> Self:
         """
         Essentially, the opposite of defer(). Only the fields passed into this
         method and that are not already specified as deferred are loaded
@@ -1542,6 +1794,8 @@ class QuerySet[T: "Model"]:
         c._known_related_objects = self._known_related_objects
         c._iterable_class = self._iterable_class
         c._fields = self._fields
+        c._returning_fields = self._returning_fields
+        c._returning_instances = self._returning_instances
         return c
 
     def _attach_result_cache(self, obj: Self, cache: list[T]) -> None:
@@ -1561,7 +1815,7 @@ class QuerySet[T: "Model"]:
         if self._prefetch_related_lookups and not self._prefetch_done:
             self._prefetch_related_objects()
 
-    def _next_is_sticky(self) -> QuerySet[T]:
+    def _next_is_sticky(self) -> Self:
         """
         Indicate that the next filter call and the one following that should
         be treated as a single filter. This is only important when it comes to
@@ -1623,6 +1877,31 @@ class QuerySet[T: "Model"]:
                     ", ".join(invalid_args),
                 )
             )
+
+
+if TYPE_CHECKING:
+
+    class ReturningQuerySet[T: "Model", R](QuerySet[T]):
+        """The static type returning() hands back. Never instantiated.
+
+        returning() leaves the queryset's own class alone -- a custom
+        QuerySet subclass has to survive it -- so this exists only to pin
+        what update()/delete() give back. R is the shape the returning()
+        overloads chose: a list of instances, or of dicts.
+        """
+
+        def update(self, **kwargs: Any) -> R: ...  # ty: ignore[invalid-method-override]
+
+        def delete(self) -> R: ...  # ty: ignore[invalid-method-override]
+
+else:
+    # returning()'s annotations name this, and annotations get evaluated:
+    # typing.get_type_hints() and any API-doc generator walk them, so the
+    # name has to resolve at runtime too. A type alias is what it should
+    # resolve to -- QuerySet takes one type parameter and this takes two,
+    # and unlike a placeholder class there is nothing here for someone to
+    # reach for with isinstance().
+    type ReturningQuerySet[T, R] = QuerySet[T]
 
 
 class InstanceCheckMeta(type):
