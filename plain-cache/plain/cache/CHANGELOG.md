@@ -1,5 +1,16 @@
 # plain-cache changelog
 
+## [0.31.2](https://github.com/dropseed/plain/releases/plain-cache@0.31.2) (2026-09-20)
+
+### What's changed
+
+- `set_many()` writes through `bulk_upsert()` instead of `bulk_create(update_conflicts=True)` — same single statement, and `updated_at` is refreshed on the conflict path by the ORM rather than by hand ([1132f46346](https://github.com/dropseed/plain/commit/1132f46346))
+- `CachedItem` uses the typed `Field[T]` annotations from plain-postgres 0.119; `value` is typed `object` (any JSON-serializable value) ([acae922618](https://github.com/dropseed/plain/commit/acae922618)) ([f37ab1014b](https://github.com/dropseed/plain/commit/f37ab1014b))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.31.1](https://github.com/dropseed/plain/releases/plain-cache@0.31.1) (2026-08-12)
 
 ### What's changed
