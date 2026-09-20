@@ -9,6 +9,7 @@ import json
 import operator
 import warnings
 from collections.abc import Callable, Iterator, Sequence
+from decimal import Decimal
 from functools import cached_property
 from itertools import islice
 from typing import TYPE_CHECKING, Any, Never, Self, cast, overload
@@ -82,6 +83,21 @@ def conflict_sort_value(field: Field, value: Any) -> tuple[str, str]:
         value = json.dumps(
             json.loads(get_json_dumps(field.encoder)(value)), sort_keys=True
         )
+    if isinstance(value, Decimal) and value.is_finite():
+        # Postgres numeric holds Decimal("1.0") and Decimal("1.00") equal but
+        # str() spells them differently, which would sort one logical key to
+        # two places. normalize() gives equal values one spelling. It overflows
+        # on an exponent no column could store anyway -- leave those to the
+        # write, which has the better error. NaN and infinity have no scale to
+        # strip, and normalizing a signaling NaN raises, so they skip it.
+        try:
+            value = value.normalize()
+        except ArithmeticError:
+            pass
+        if value == 0:
+            # normalize() keeps the sign on a negative zero, which Postgres
+            # and Python both hold equal to positive zero.
+            value = abs(value)
     return (type(value).__name__, str(value))
 
 
