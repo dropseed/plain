@@ -7,6 +7,7 @@ through foreign key and many-to-many relationships.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
@@ -217,7 +218,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         defaults: dict[str, Any] | None = None,
         create_defaults: dict[str, Any] | None = None,
         conflict_defaults: dict[str, Any] | None = None,
-        unique_fields: list[Field[Any] | type[Model]],
+        unique_fields: Sequence[Field[Any] | type[Model]],
         **kwargs: Any,
     ) -> tuple[T, bool]:
         self._check_fk_val()
@@ -517,7 +518,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         defaults: dict[str, Any] | None = None,
         create_defaults: dict[str, Any] | None = None,
         conflict_defaults: dict[str, Any] | None = None,
-        unique_fields: list[Field[Any] | type[Model]],
+        unique_fields: Sequence[Field[Any] | type[Model]],
         **kwargs: Any,
     ) -> tuple[T, bool]:
         obj, created = self.model.query.upsert(
