@@ -13,7 +13,7 @@ from .constraints import CheckConstraint, UniqueConstraint
 from .db import get_connection, use_management_connection
 from .middleware import DatabaseConnectionMiddleware
 from .deletion import CASCADE, RESTRICT, SET_NULL
-from .expressions import F
+from .expressions import Excluded, F
 from .enums import TextChoices
 from .fields import (
     BigIntegerField,
@@ -75,6 +75,7 @@ __all__ = [
     #   api_key: EncryptedField[str] = types.EncryptedTextField()
     # It blocks the value-comparison conditions a plain Field[T] would allow.
     "EncryptedField",
+    "Excluded",
     "F",
     # The typed descriptor base, for annotating model fields:
     #   name: Field[str] = types.TextField()

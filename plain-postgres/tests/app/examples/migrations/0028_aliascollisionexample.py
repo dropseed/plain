@@ -6,7 +6,7 @@ from plain import postgres
 
 
 class Migration(migrations.Migration):
-    dependencies = (("examples", "0021_returningevent"),)
+    dependencies = (("examples", "0027_upsertstamped"),)
 
     operations = (
         migrations.CreateModel(

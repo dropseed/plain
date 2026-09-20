@@ -1,6 +1,6 @@
 """Timestamp invariants for the set-based write paths.
 
-bulk_create fires pre_save (so updated_at's update_now bumps on its own) while
+bulk_upsert fires pre_save (so updated_at's update_now bumps on its own) while
 QuerySet.update() does not -- see core.py for why set_many stamps created_at and
 touch stamps updated_at. These pin the observable invariants those choices buy.
 """

@@ -815,9 +815,20 @@ def test_get_or_create_after_select_raises(db):
         DefaultsExample.query.select(DefaultsExample.name).get_or_create(name="x")
 
 
-def test_update_or_create_after_select_raises(db):
-    with pytest.raises(TypeError, match="update_or_create"):
-        DefaultsExample.query.select(DefaultsExample.name).update_or_create(name="x")
+def test_upsert_after_select_raises(db):
+    with pytest.raises(TypeError, match="upsert"):
+        DefaultsExample.query.select(DefaultsExample.name).upsert(
+            name="x", unique_fields=[DefaultsExample.name]
+        )
+
+
+def test_bulk_upsert_after_select_raises(db):
+    with pytest.raises(TypeError, match="bulk_upsert"):
+        DefaultsExample.query.select(DefaultsExample.name).bulk_upsert(
+            [DefaultsExample(name="x")],
+            update_fields=[DefaultsExample.priority],
+            unique_fields=[DefaultsExample.name],
+        )
 
 
 def test_select_after_values_raises(db):

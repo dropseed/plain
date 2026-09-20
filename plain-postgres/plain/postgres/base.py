@@ -588,10 +588,7 @@ class Model(metaclass=ModelBase):
         fields from RETURNING. Omits id from the INSERT when unset so Postgres
         generates the identity value."""
         meta = self._model_meta
-        fields = list(meta.fields)
-        if self.id is None:
-            id_field = meta.get_forward_field("id")
-            fields = [f for f in fields if f is not id_field]
+        fields = list(meta.fields) if self.id is not None else meta.non_pk_fields
         returning_fields = list(meta.db_returning_fields)
         results = meta.base_queryset._insert(
             [self], fields=fields, returning_fields=returning_fields or None

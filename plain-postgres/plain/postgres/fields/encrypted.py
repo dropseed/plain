@@ -140,7 +140,7 @@ class _EncryptedExact(Exact):
                 f"Encrypted field {field.name!r} cannot be matched against "
                 f"this value: {_NON_DETERMINISTIC_EXPLANATION}. "
                 f"{field.matchable_values_hint()} If this came from "
-                f"get_or_create()/update_or_create(), move {field.name!r} into "
+                f"get_or_create()/upsert(), move {field.name!r} into "
                 f"defaults= -- it can be written, just not looked up."
             )
         super().__init__(lhs, rhs)

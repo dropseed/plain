@@ -388,14 +388,23 @@ def lookup_cast(lookup_type: str, field: Field | None = None) -> str:
     return lookup
 
 
-def returning_columns(fields: list[Field] | None) -> str:
-    """Return the RETURNING clause SQL for the given fields, or "" when there are none."""
+def returning_columns(
+    fields: list[Field] | None, *, include_created: bool = False
+) -> str:
+    """Return the RETURNING clause SQL for the given fields, or "" when there are none.
+
+    With include_created, a trailing boolean column reports whether the row was
+    freshly inserted: a new tuple's xmax is 0, while a tuple an
+    ON CONFLICT DO UPDATE touched carries the updating transaction's id.
+    """
     if not fields:
         return ""
     columns = [
         f"{quote_name(field.model.model_options.db_table)}.{quote_name(field.column)}"
         for field in fields
     ]
+    if include_created:
+        columns.append("(xmax = 0)")
     return "RETURNING {}".format(", ".join(columns))
 
 
@@ -587,21 +596,21 @@ def explain_query_prefix(format: str | None = None, **options: Any) -> str:
 
 
 def on_conflict_suffix_sql(
-    fields: list[Field],
     on_conflict: OnConflict | None,
-    update_fields: Iterable[str],
     unique_fields: Iterable[str],
+    assignments: Iterable[tuple[str, str]],
 ) -> str:
-    if on_conflict == OnConflict.IGNORE:
-        return "ON CONFLICT DO NOTHING"
-    if on_conflict == OnConflict.UPDATE:
-        return "ON CONFLICT({}) DO UPDATE SET {}".format(
-            ", ".join(map(quote_name, unique_fields)),
-            ", ".join(
-                [
-                    f"{field} = EXCLUDED.{field}"
-                    for field in map(quote_name, update_fields)
-                ]
-            ),
-        )
-    return ""
+    """Format the ON CONFLICT ... DO UPDATE SET clause.
+
+    `assignments` are already-ordered (quoted column, value SQL) pairs, built
+    by the insert compiler alongside their parameters so the two cannot drift
+    apart -- a SET list ordered one way and a parameter list ordered another
+    binds values to the wrong columns.
+    """
+    if on_conflict != OnConflict.UPDATE:
+        return ""
+
+    return "ON CONFLICT({}) DO UPDATE SET {}".format(
+        ", ".join(map(quote_name, unique_fields)),
+        ", ".join(f"{column} = {value}" for column, value in assignments),
+    )

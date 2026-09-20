@@ -26,7 +26,12 @@ from plain.postgres.dialect import (
     window_frame_range_start_end,
     window_frame_rows_start_end,
 )
-from plain.postgres.exceptions import EmptyResultSet, FieldError, FullResultSet
+from plain.postgres.exceptions import (
+    EmptyResultSet,
+    FieldDoesNotExist,
+    FieldError,
+    FullResultSet,
+)
 from plain.postgres.query_utils import Q
 from plain.postgres.selectable import Selectable
 from plain.utils.deconstruct import deconstructible
@@ -45,6 +50,7 @@ if TYPE_CHECKING:
 __all__ = [
     "Case",
     "Combinable",
+    "Excluded",
     "Exists",
     "Expression",
     "ExpressionWrapper",
@@ -846,6 +852,102 @@ class F(Combinable, Selectable[Any]):
 
     def copy(self) -> Self:
         return copy.copy(self)
+
+
+class Excluded(Combinable):
+    """The value the INSERT proposed for a column, inside a conflict update.
+
+    Only meaningful in ``upsert()``'s ``conflict_defaults``, where it compiles
+    to ``EXCLUDED."<column>"``. ``F("count")`` reads the row already stored;
+    ``Excluded("count")`` reads the row the statement tried to insert, so
+    combining them accumulates instead of overwriting::
+
+        conflict_defaults={"count": F("count") + Excluded("count")}
+    """
+
+    def __init__(self, name: str):
+        self.name = name
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.name!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Excluded):
+            return NotImplemented
+        return self.__class__ == other.__class__ and self.name == other.name
+
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.name))
+
+    def copy(self) -> Self:
+        return copy.copy(self)
+
+    def resolve_expression(
+        self,
+        query: Any = None,
+        allow_joins: bool = True,
+        reuse: Any = None,
+        summarize: bool = False,
+        for_save: bool = False,
+    ) -> ExcludedCol:
+        # EXCLUDED names the row the statement is proposing, so it only means
+        # anything while the DO UPDATE SET assignments are being compiled. The
+        # insert compiler raises that flag for exactly that stretch; every
+        # other context -- the VALUES list of the same statement, filter(),
+        # update(), annotate() -- has nothing for this to refer to.
+        if not getattr(query, "compiling_conflict_assignment", False):
+            raise FieldError(
+                f"Excluded({self.name!r}) is only valid in upsert()'s "
+                "conflict_defaults: it names the value the INSERT proposed, "
+                "which exists only in an ON CONFLICT DO UPDATE assignment."
+            )
+        assert query.model is not None
+        try:
+            target = query.model._model_meta.get_forward_field(self.name)
+        except FieldDoesNotExist:
+            raise FieldError(
+                f"Excluded({self.name!r}) does not name a column on "
+                f"{query.model.__name__}."
+            ) from None
+        return ExcludedCol(target)
+
+    def as_sql(self, compiler: Any, connection: Any) -> tuple[str, list[Any]]:
+        raise FieldError(
+            f"Excluded({self.name!r}) was compiled without being resolved "
+            "against an ON CONFLICT DO UPDATE clause."
+        )
+
+
+def is_query_expression(value: Any) -> bool:
+    """True when value is a query expression rather than a plain value.
+
+    An expression is computed from a row by the database; an inserted value
+    has no row to compute from. upsert() uses this to reject one before it
+    reaches a field, which would coerce the object itself -- a text column
+    stores its repr, an integer column raises something unrecognizable. Any
+    expression built from others (F("a") + Excluded("a"), Upper("a")) is
+    itself an expression, so there is nothing to recurse into.
+    """
+    return isinstance(value, Combinable | ResolvableExpression)
+
+
+class ExcludedCol(Expression):
+    """A resolved ``Excluded()`` -- the ``EXCLUDED."col"`` reference itself."""
+
+    def __init__(self, target: Field):
+        super().__init__(output_field=target)
+        self.target = target
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.target!s})"
+
+    def as_sql(
+        self, compiler: SQLCompiler, connection: DatabaseConnection
+    ) -> tuple[str, list[Any]]:
+        return f"EXCLUDED.{quote_name(self.target.column)}", []
+
+    def get_group_by_cols(self) -> list[BaseExpression]:
+        return []
 
 
 class ResolvedOuterRef(F):

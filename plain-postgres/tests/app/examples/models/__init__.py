@@ -20,4 +20,5 @@ from . import (  # noqa: F401
     string_conditions,
     trees,
     unregistered,
+    upsert,
 )

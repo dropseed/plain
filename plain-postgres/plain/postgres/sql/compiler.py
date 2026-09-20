@@ -8,7 +8,7 @@ from functools import cached_property
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from plain.postgres.constants import LOOKUP_SEP
+from plain.postgres.constants import LOOKUP_SEP, OnConflict
 from plain.postgres.dialect import (
     LOCK_MODE_SQL,
     PK_DEFAULT_VALUE,
@@ -183,6 +183,50 @@ class SQLCompiler:
         self.has_extra_select = bool(extra_select)
         group_by = self.get_group_by(self.select + extra_select, order_by)
         return extra_select, order_by, group_by
+
+    def _compile_assignment_value(
+        self, field: Any, val: Any
+    ) -> tuple[str, Sequence[Any]]:
+        """Compile one ``SET col = <val>`` right-hand side to SQL plus params.
+
+        Shared by UPDATE ... SET and INSERT ... ON CONFLICT DO UPDATE SET so a
+        written value can be a plain value, a model instance (for a related
+        field), or an expression (e.g. F("count") + 1). Returns the RHS SQL
+        fragment; the caller prepends the target column.
+        """
+        if isinstance(val, ResolvableExpression):
+            val = val.resolve_expression(self.query, allow_joins=False, for_save=True)
+            if val.contains_aggregate:
+                raise FieldError(
+                    "Aggregate functions are not allowed in this query "
+                    f"({field.name}={val!r})."
+                )
+            if val.contains_over_clause:
+                raise FieldError(
+                    "Window expressions are not allowed in this query "
+                    f"({field.name}={val!r})."
+                )
+        elif hasattr(val, "prepare_database_save"):
+            if isinstance(field, RelatedField):
+                val = val.prepare_database_save(field)
+            else:
+                raise TypeError(
+                    f"Tried to update field {field} with a model instance, {val!r}. "
+                    f"Use a value compatible with {field.__class__.__name__}."
+                )
+        val = field.get_db_prep_save(val, connection=self.connection)
+
+        if hasattr(field, "get_placeholder"):
+            placeholder = field.get_placeholder(val, self, self.connection)
+        else:
+            placeholder = "%s"
+        if hasattr(val, "as_sql"):
+            sql, params = self.compile(val)
+            return placeholder % sql, params
+        elif val is not None:
+            return placeholder, [val]
+        else:
+            return "NULL", []
 
     def get_group_by(
         self, select: list[Any], order_by: list[Any]
@@ -1475,11 +1519,14 @@ class SQLInsertCompiler(SQLCompiler):
 
         placeholder_rows, param_rows = self.assemble_as_sql(fields, value_rows)
 
+        # The DO UPDATE SET assignments and their params come back in one
+        # order from one pass. Their params follow the VALUES params, since
+        # DO UPDATE SET comes after VALUES in the statement.
+        conflict_assignments, conflict_params = self._conflict_assignments()
         conflict_suffix_sql = on_conflict_suffix_sql(
-            fields,  # ty: ignore[invalid-argument-type]
             self.query.on_conflict,
-            (f.column for f in self.query.update_fields),
             (f.column for f in self.query.unique_fields),
+            conflict_assignments,
         )
         if self.returning_fields:
             # Use RETURNING clause to get inserted values
@@ -1488,15 +1535,80 @@ class SQLInsertCompiler(SQLCompiler):
             )
             if conflict_suffix_sql:
                 result.append(conflict_suffix_sql)
-            if returning := returning_columns(self.returning_fields):
+            if returning := returning_columns(
+                self.returning_fields, include_created=self.query.returning_created
+            ):
                 result.append(returning)
-            return [(" ".join(result), tuple(chain.from_iterable(param_rows)))]
+            params = tuple(chain.from_iterable(param_rows)) + tuple(conflict_params)
+            return [(" ".join(result), params)]
 
         # Bulk insert without returning fields
         result.append(bulk_insert_sql(fields, placeholder_rows))  # ty: ignore[invalid-argument-type]
         if conflict_suffix_sql:
             result.append(conflict_suffix_sql)
-        return [(" ".join(result), tuple(p for ps in param_rows for p in ps))]
+        params = tuple(p for ps in param_rows for p in ps) + tuple(conflict_params)
+        return [(" ".join(result), params)]
+
+    def _conflict_assignments(self) -> tuple[list[tuple[str, str]], list[Any]]:
+        """Build the ON CONFLICT DO UPDATE SET assignments and their params.
+
+        Both come out of a single pass in a single order: a SET list ordered
+        one way and a parameter list ordered another binds each value to the
+        wrong column.
+
+        Each update column takes the value the INSERT proposed, except where
+        conflict_defaults replaces it. Those overrides go through the same
+        value-compilation as UPDATE ... SET, so one can be a plain value, a
+        model instance (for a related field), or an expression (e.g.
+        F("count") + 1, which reads the target row's existing column).
+        """
+        if self.query.on_conflict != OnConflict.UPDATE:
+            return [], []
+
+        override_by_column = {
+            field.column: (field, value)
+            for field, value in self.query.conflict_defaults.items()
+        }
+        overridden: set[str] = set()
+        assignments: list[tuple[str, str]] = []
+        params: list[Any] = []
+
+        # Excluded() reads this flag to tell a DO UPDATE SET assignment from
+        # the VALUES list of the same statement.
+        self.query.compiling_conflict_assignment = True
+        try:
+            for field in self.query.update_fields:
+                quoted = quote_name(field.column)
+                if field.column in override_by_column:
+                    overridden.add(field.column)
+                    override_field, value = override_by_column[field.column]
+                    rhs, rhs_params = self._compile_assignment_value(
+                        override_field, value
+                    )
+                    assignments.append((quoted, rhs))
+                    params.extend(rhs_params)
+                else:
+                    assignments.append((quoted, f"EXCLUDED.{quoted}"))
+
+            # An override for a column that isn't otherwise being updated -- a
+            # counter, say -- has no slot above, so it goes on the end.
+            for field, value in self.query.conflict_defaults.items():
+                if field.column in overridden:
+                    continue
+                rhs, rhs_params = self._compile_assignment_value(field, value)
+                assignments.append((quote_name(field.column), rhs))
+                params.extend(rhs_params)
+        finally:
+            self.query.compiling_conflict_assignment = False
+
+        if not assignments:
+            # Postgres still requires a SET body, and only DO UPDATE (not DO
+            # NOTHING) returns the conflicting row via RETURNING. Set a unique
+            # column to itself as a no-op.
+            quoted = quote_name(self.query.unique_fields[0].column)
+            assignments.append((quoted, f"EXCLUDED.{quoted}"))
+
+        return assignments, params
 
     def execute_sql(  # ty: ignore[invalid-method-override]
         self, returning_fields: list | None = None
@@ -1651,45 +1763,9 @@ class SQLUpdateCompiler(SQLWriteCompiler):
         qn = self.quote_name_unless_alias
         values, update_params = [], []
         for field, val in query_values:
-            if isinstance(val, ResolvableExpression):
-                val = val.resolve_expression(
-                    self.query, allow_joins=False, for_save=True
-                )
-                if val.contains_aggregate:
-                    raise FieldError(
-                        "Aggregate functions are not allowed in this query "
-                        f"({field.name}={val!r})."
-                    )
-                if val.contains_over_clause:
-                    raise FieldError(
-                        "Window expressions are not allowed in this query "
-                        f"({field.name}={val!r})."
-                    )
-            elif hasattr(val, "prepare_database_save"):
-                if isinstance(field, RelatedField):
-                    val = val.prepare_database_save(field)
-                else:
-                    raise TypeError(
-                        f"Tried to update field {field} with a model instance, {val!r}. "
-                        f"Use a value compatible with {field.__class__.__name__}."
-                    )
-            val = field.get_db_prep_save(val, connection=self.connection)
-
-            # Getting the placeholder for the field.
-            if hasattr(field, "get_placeholder"):
-                placeholder = field.get_placeholder(val, self, self.connection)
-            else:
-                placeholder = "%s"
-            name = field.column
-            if hasattr(val, "as_sql"):
-                sql, params = self.compile(val)
-                values.append(f"{qn(name)} = {placeholder % sql}")
-                update_params.extend(params)
-            elif val is not None:
-                values.append(f"{qn(name)} = {placeholder}")
-                update_params.append(val)
-            else:
-                values.append(f"{qn(name)} = NULL")
+            rhs, rhs_params = self._compile_assignment_value(field, val)
+            values.append(f"{qn(field.column)} = {rhs}")
+            update_params.extend(rhs_params)
         table = self.query.base_table
         result = [
             f"UPDATE {qn(table)} SET",  # ty: ignore[invalid-argument-type]
