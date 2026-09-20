@@ -228,8 +228,6 @@ class Model(metaclass=ModelBase):
 
         # Process all fields from kwargs or use defaults
         for field in meta.fields:
-            from plain.postgres.fields.related import RelatedField
-
             is_related_object = False
             if isinstance(field, RelatedField) and isinstance(
                 field.remote_field, ForeignObjectRel
