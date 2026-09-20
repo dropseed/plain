@@ -42,9 +42,12 @@ class TestCodegen:
         assert validate_code(code)
 
     def test_generate_many_unique(self):
-        codes = {generate_code() for _ in range(200)}
-        # With ~188 words and 99 numbers the space is huge; 200 draws should be unique.
-        assert len(codes) == 200
+        codes = [generate_code() for _ in range(200)]
+        # The space is 99 numbers x 187 x 186 word pairs (~3.4 million), so
+        # 200 draws collide about once in 170 runs (birthday bound). Ten or
+        # more collisions is vanishingly unlikely, so the check is "nearly
+        # all unique", not "all unique".
+        assert len(set(codes)) >= 190
         for code in codes:
             assert validate_code(code)
 
