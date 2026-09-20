@@ -1954,6 +1954,8 @@ class RowQuerySet[R](QuerySet[Any]):
 
         def get(self, *args: Any, **kwargs: Any) -> R: ...
 
+        def get_or_none(self, *args: Any, **kwargs: Any) -> R | None: ...
+
         def iterator(self, chunk_size: int | None = None) -> Iterator[R]: ...
 
         @overload
@@ -1982,6 +1984,12 @@ class RowQuerySet[R](QuerySet[Any]):
             "objects are attached to model instances, and select() returns "
             "rows. Select the columns you need from the related model instead."
         )
+
+    def create(self, **kwargs: Any) -> Never:
+        raise TypeError("Cannot call create() on a select() queryset.")
+
+    def bulk_create(self, *args: Any, **kwargs: Any) -> Never:
+        raise TypeError("Cannot call bulk_create() on a select() queryset.")
 
     def values(self, *fields: str, **expressions: Any) -> Never:
         raise TypeError("Cannot call values() after select().")
