@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.57.4](https://github.com/dropseed/plain/releases/plain-jobs@0.57.4) (2026-09-20)
+
+### What's changed
+
+- The worker claims jobs with `for_update(skip_locked=True)`, the new name for `select_for_update()` ([97f18f0699](https://github.com/dropseed/plain/commit/97f18f0699))
+- `JobRequest`, `Job` and `JobResult` use the typed `Field[T]` annotations from plain-postgres 0.119, with their custom querysets declared as `ClassVar` ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.57.3](https://github.com/dropseed/plain/releases/plain-jobs@0.57.3) (2026-08-21)
 
 ### What's changed
