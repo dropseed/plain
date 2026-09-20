@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.35.2](https://github.com/dropseed/plain/releases/plain-api@0.35.2) (2026-09-20)
+
+### What's changed
+
+- Removed the `plain.postgres` dependency that 0.35.1 wrongly declared. `plain.api` works without `plain.postgres` by design (API keys are only available when it's installed), and the dependency pulled `psycopg` into apps that don't use them ([6f78b8ddde](https://github.com/dropseed/plain/commit/6f78b8ddde))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.35.1](https://github.com/dropseed/plain/releases/plain-api@0.35.1) (2026-09-20)
 
 ### What's changed
