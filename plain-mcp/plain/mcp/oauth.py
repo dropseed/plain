@@ -60,7 +60,7 @@ class OAuthResourceServer:
 
         class AppMCP(OAuthResourceServer, MCPView):
             name = "myapp"
-            tools = [...]
+            tools = (MyTool,)
 
             def authenticate_token(self, token):
                 at = validate_access_token(token, resource=self.oauth_resource)
