@@ -819,7 +819,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-postgres", editable = "plain-postgres" },
+]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1286,6 +1289,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
+    { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-templates", editable = "plain-templates" },
 ]
 
@@ -1325,7 +1329,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-postgres"
-version = "0.118.0"
+version = "0.119.0"
 source = { editable = "plain-postgres" }
 dependencies = [
     { name = "plain" },
