@@ -254,6 +254,8 @@ A class-level many-to-many (`Widget.tags`) is _not_ an entry point: it has no tr
 
 A traversed field _is_ the related field, carrying the relation path as its name — so it offers exactly the conditions that field offers, including an encrypted field's refusals.
 
+**A condition belongs to the model whose field built it.** `Order.query.where(User.email.equals("x"))` raises `TypeError` naming both models. A type checker can't catch this — `Field[str]` is `Field[str]` whichever model declared it — and without the check the lookup name `"email"` just resolves against `Order`, which is silently the wrong column when both models have one. A traversed condition belongs to the model the traversal _started_ from, so `Order.query.where(Order.user.email.equals("x"))` is `Order`'s, not `User`'s. A hand-written `Q(email="x")` names no model and isn't checked — it's `filter()`'s untyped spelling and behaves like it.
+
 [Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`.
 
 ### Custom QuerySets
@@ -580,10 +582,17 @@ for row in deleted:
     print(row["id"], row["payload"])  # the rows as they were deleted
 ```
 
-- **`returning()`** returns full model instances. For `update()` they hold the new values; for `delete()`, the rows as they were.
+- **`returning()`** returns full model instances. For `update()` they hold the new values and stay live. For `delete()` they are **read-only snapshots**: every value is there to read, the id included, but the row is gone, so `create()`, `update()` and `delete()` on them raise.
+    - That is the opposite of `Model.delete()`, which clears the instance's id and leaves it re-creatable — that instance is a row you still hold and may want to put back, while a snapshot is a record of one that was removed, and its id is the point.
 - **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a many-to-many field or one from another model raises an error at the `returning()` call.
+- **A foreign key can't be named here.** At class level `Model.fk` is the relation — that is what lets `where()` traverse it, as in `Child.parent.name.equals(...)` — not its column, so `returning(Child.parent)` raises `FieldError`. Foreign key columns come back through no-argument `returning()`, which hands you whole instances.
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
 - `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_upsert()`, `bulk_update()`, `get_or_create()`, `update_or_create()` — raises `TypeError` rather than quietly dropping it.
+- `returning()` keeps the queryset's own class, so a custom `QuerySet` and its methods survive it. Chain your own methods before `returning()` — a type checker sees the returning shape after it, not your subclass.
+
+A row lock belongs on the read side of the write, and it composes in either order. The write then needs an open `transaction.atomic()`, and is emitted as a locking sub-select so the lock has somewhere to live — see [Locking a set-based write](#locking-a-set-based-write).
+
+`returning()` is inert for reads. It describes what the next `update()` or `delete()` hands back, so iterating, `count()`, `first()` and `values()` on the same queryset behave exactly as they would without it — which is what lets you inspect a chain before writing it.
 
 The values you get back are whatever the statement wrote, exactly as Postgres holds them. A set-based `update()` doesn't run Python-side field hooks, so an `update_now=True` timestamp comes back unchanged unless the `update()` set it.
 
@@ -649,6 +658,81 @@ with read_only():
         pass
     User.query.count()  # still works — outer txn is healthy
 ```
+
+### Row-level locking
+
+Lock the rows a query selects so concurrent transactions can't change them until yours commits. Postgres offers four lock strengths, from strongest to weakest, each with its own QuerySet method:
+
+```python
+with transaction.atomic():
+    account = Account.query.for_update().get(id=1)  # FOR UPDATE
+    account.balance -= 100
+    account.update(fields=["balance"])
+```
+
+| Method                | SQL clause          | Use it when                                                                |
+| --------------------- | ------------------- | -------------------------------------------------------------------------- |
+| `for_update()`        | `FOR UPDATE`        | You intend to update or delete the row.                                    |
+| `for_no_key_update()` | `FOR NO KEY UPDATE` | Same, but you won't touch the primary key — lets key-share locks proceed.  |
+| `for_share()`         | `FOR SHARE`         | You need the row to stay put while you read it, but others may also share. |
+| `for_key_share()`     | `FOR KEY SHARE`     | Weakest — only blocks changes to the row's key.                            |
+
+Locking requires an open transaction. The method itself just builds the queryset — evaluating a locked queryset outside `transaction.atomic()` is what raises `TransactionManagementError`.
+
+All four accept the same options:
+
+- `nowait=True` — raise instead of waiting if a row is already locked.
+- `skip_locked=True` — skip already-locked rows instead of waiting (can't be combined with `nowait`).
+- `of=("self", "related")` — lock only the named tables in a join rather than every selected row.
+
+```python
+# Claim the next available job without blocking on rows another worker holds
+job = Job.query.for_update(skip_locked=True).filter(status="pending").first()
+```
+
+Chaining more than one lock method keeps only the last one, options included.
+
+Postgres can only lock rows that map one-to-one onto table rows, so a lock can't be combined with `distinct()`, an aggregate annotation, or a window annotation. Either order raises `psycopg.NotSupportedError` when the queryset is built, naming the lock method:
+
+```python
+Widget.query.distinct().for_update()  # NotSupportedError
+Widget.query.for_update().distinct()  # same error, either way round
+```
+
+`count()` and `aggregate()` are the exception — they compile to an aggregate query of their own, so they drop the lock rather than reject it.
+
+#### Locking a set-based write
+
+A lock also applies to `update()` and `delete()` on the same queryset. Neither statement takes a locking clause of its own, so the write is emitted as a locking sub-select:
+
+```python
+# Claim *all* pending rows matching the filter, in one statement
+with transaction.atomic():
+    claimed = (
+        Job.query.filter(status="pending")
+        .for_update(skip_locked=True)
+        .returning()
+        .update(status="running")
+    )
+```
+
+```sql
+UPDATE "jobs" SET "status" = 'running'
+WHERE "id" IN (
+    SELECT U0."id" FROM "jobs" U0 WHERE U0."status" = 'pending' FOR UPDATE OF U0 SKIP LOCKED
+)
+RETURNING ...
+```
+
+It is still one statement. A second worker running the same write skips the rows the first one holds instead of blocking on them, so each row is claimed once.
+
+Note what this is and isn't: it takes **every** row the filter matches, so it suits draining a batch, not handing one unit of work to one worker. A bounded claim would need a sliced write (`[:1]`), and `update()`/`delete()` reject a sliced queryset — so for a per-worker claim, take one row with the locked read above (`for_update(skip_locked=True)` + `first()`) and write it separately.
+
+The `transaction.atomic()` is required, same as for a locked read: a locked write outside a transaction raises `TransactionManagementError`. Nothing else honors the lock — without a transaction there is nothing for it to be held until.
+
+**A locked write locks only the target table's rows.** When the filter spans a relation, the sub-select joins the other tables to look values up, and a bare `FOR UPDATE` would lock a row in each of them — so a write whose filter reads a parent would wait on (or, with `skip_locked=True`, silently skip) rows it never touches. The clause is emitted as `FOR UPDATE OF <target>` so that can't happen. To lock related rows as well, take them with a separate locked read.
+
+That is also why `of=` can only name `"self"` on a write: the sub-select reads one column — this table's id — so a related name has nothing to point at, and `update()`/`delete()` raise `TypeError` rather than let it fail deeper down. Dropping `of=` is the same thing; the write locks its own rows either way.
 
 ## Schema management
 

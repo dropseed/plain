@@ -359,3 +359,54 @@ def test_reverse_relation_says_it_is_not_traversable():
     message = str(excinfo.value)
     assert "reverse relation" in message
     assert "filter(parent__childcascade_set__...=...)" in message
+
+
+class TestTraversedConditionsBelongToTheirRoot:
+    """A traversed condition belongs to the model the traversal *started* from,
+    not the related model the column lives on. `ChildCascade.parent.name`
+    builds `parent__name`, which only means anything to a `ChildCascade`
+    queryset -- so that is the model `where()` checks it against."""
+
+    def test_traversed_condition_passes_on_its_root(self, db):
+        parent = DeleteParent.query.create(name="p")
+        ChildCascade.query.create(parent=parent)
+        rows = ChildCascade.query.where(ChildCascade.parent.name.equals("p"))
+        assert len(list(rows)) == 1
+
+    def test_traversed_condition_raises_on_another_model(self, db):
+        """`parent__name` is meaningless to DeleteParent, and the root is what
+        the error names -- not DeleteParent, whose column it actually is."""
+        with pytest.raises(TypeError) as excinfo:
+            DeleteParent.query.where(ChildCascade.parent.name.equals("p"))
+        message = str(excinfo.value)
+        assert "ChildCascade.parent__name" in message
+        assert "DeleteParent queryset" in message
+
+    def test_traversed_condition_is_not_the_related_models(self, db):
+        """The tempting wrong answer: treating the condition as DeleteParent's
+        because that is where `name` is declared."""
+        with pytest.raises(TypeError, match="ChildCascade.parent__name"):
+            DeleteParent.query.where(ChildCascade.parent.name.equals("p"))
+
+    def test_multi_hop_traversal_keeps_the_root(self, db):
+        """Every hop carries the root unchanged, so a two-hop path is still
+        Grandchild's."""
+        grandparent = Grandparent.query.create(name="g")
+        mid = MidParent.query.create(grandparent=grandparent)
+        Grandchild.query.create(mid_parent=mid)
+
+        rows = Grandchild.query.where(
+            Grandchild.mid_parent.grandparent.name.equals("g")
+        )
+        assert len(list(rows)) == 1
+
+        with pytest.raises(TypeError, match="Grandchild.mid_parent__grandparent__name"):
+            MidParent.query.where(Grandchild.mid_parent.grandparent.name.equals("g"))
+
+    def test_traversed_and_local_conditions_combine_on_the_root(self, db):
+        parent = DeleteParent.query.create(name="p")
+        ChildCascade.query.create(parent=parent)
+        rows = ChildCascade.query.where(
+            ChildCascade.parent.name.equals("p") & ChildCascade.id.gte(1)
+        )
+        assert len(list(rows)) == 1

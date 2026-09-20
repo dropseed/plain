@@ -48,9 +48,11 @@ class TestEncryptedFieldTraversalBlocked:
     @pytest.fixture
     def traversed(self):
         # No model in the examples app has an FK to SecretStore, so prefix the
-        # field directly. This is exactly what RelatedFieldRef hands back.
+        # field directly. This is exactly what RelatedFieldRef hands back --
+        # including the source model, the root such a traversal would start
+        # from.
         return SecretStore._model_meta.get_forward_field("api_key").with_lookup_prefix(
-            "store"
+            "store", DefaultsExample
         )
 
     @pytest.mark.parametrize("method", [m for m in CONDITION_METHODS if m != "is_null"])
@@ -75,7 +77,12 @@ def test_traversal_before_the_target_resolves_says_so():
     )
 
     with pytest.raises(UnresolvedRelationError, match=r"'Tag' hasn't been resolved"):
-        RelatedFieldRef(model="Tag", prefix="tags", target_name="id")  # ty: ignore[invalid-argument-type]
+        RelatedFieldRef(
+            model="Tag",  # ty: ignore[invalid-argument-type]
+            prefix="tags",
+            target_name="id",
+            source_model=DefaultsExample,
+        )
 
     # An AttributeError subclass, so the attribute protocol still holds.
     assert issubclass(UnresolvedRelationError, AttributeError)
