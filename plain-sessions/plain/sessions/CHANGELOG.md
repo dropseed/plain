@@ -1,5 +1,16 @@
 # plain-sessions changelog
 
+## [0.46.2](https://github.com/dropseed/plain/releases/plain-sessions@0.46.2) (2026-09-20)
+
+### What's changed
+
+- Saving a session writes through `upsert()` (one `INSERT ... ON CONFLICT` statement) instead of `update_or_create()` ([49b7299275](https://github.com/dropseed/plain/commit/49b7299275))
+- `Session` uses the typed `Field[T]` annotations from plain-postgres 0.119 ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.46.1](https://github.com/dropseed/plain/releases/plain-sessions@0.46.1) (2026-08-12)
 
 ### What's changed
