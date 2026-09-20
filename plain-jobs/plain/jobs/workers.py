@@ -324,7 +324,7 @@ class Worker:
         with suppress_db_tracing(), transaction.atomic():
             job_request = (
                 JobRequest.query.ready_to_run()
-                .filter(queue__in=self.queues)
+                .where(JobRequest.queue.is_in(self.queues))
                 .for_update(skip_locked=True)
                 .order_by("-priority", "-start_at", "-created_at")
                 .first()
@@ -413,9 +413,9 @@ class Worker:
         # Lazy import - see _worker_process_initializer() comment for why
         from .models import WorkerHeartbeat
 
-        updated = WorkerHeartbeat.query.filter(worker_id=self.worker_id).update(
-            last_heartbeat_at=timezone.now()
-        )
+        updated = WorkerHeartbeat.query.where(
+            WorkerHeartbeat.worker_id.equals(self.worker_id)
+        ).update(last_heartbeat_at=timezone.now())
         if not updated:
             # Row was deleted — registration failed earlier, or another
             # rescuer claimed us as dead. Recreate so we're discoverable.
@@ -481,7 +481,9 @@ class Worker:
             # bookkeeping error during drain (e.g. future_finished_callback's
             # own convert_to_result raised) left them stranded. Don't delete
             # the heartbeat — let it go stale so rescue can pick them up.
-            if JobProcess.query.filter(worker_id=self.worker_id).exists():
+            if JobProcess.query.where(
+                JobProcess.worker_id.equals(self.worker_id)
+            ).exists():
                 logger.warning(
                     "Worker has remaining JobProcess rows at shutdown; "
                     "leaving heartbeat for rescue to claim",
@@ -489,7 +491,9 @@ class Worker:
                 )
                 return
 
-            WorkerHeartbeat.query.filter(worker_id=self.worker_id).delete()
+            WorkerHeartbeat.query.where(
+                WorkerHeartbeat.worker_id.equals(self.worker_id)
+            ).delete()
         except Exception:
             # Best effort. A leftover row will be reclaimed by rescue when its
             # heartbeat goes stale.
@@ -546,8 +550,12 @@ class Worker:
             # Depending on shutdown timing and internal behavior, this might not work
             num_proccesses = 0
 
-        jobs_requested = JobRequest.query.filter(queue__in=self.queues).count()
-        jobs_processing = JobProcess.query.filter(queue__in=self.queues).count()
+        jobs_requested = JobRequest.query.where(
+            JobRequest.queue.is_in(self.queues)
+        ).count()
+        jobs_processing = JobProcess.query.where(
+            JobProcess.queue.is_in(self.queues)
+        ).count()
 
         logger.info(
             "Job worker stats",
@@ -577,7 +585,7 @@ class Worker:
         global_hooks = rescue_stale_workers()
         own_hooks = self._rescue_own_orphans()
         self._dispatch_aborted_hooks(global_hooks + own_hooks)
-        JobResult.query.filter(queue__in=self.queues).retry_failed_jobs()
+        JobResult.query.where(JobResult.queue.is_in(self.queues)).retry_failed_jobs()
 
     def _dispatch_aborted_hooks(self, results: list[JobResult]) -> None:
         for result in results:
@@ -605,15 +613,19 @@ class Worker:
         from .models import JobProcess, JobResultStatuses
 
         with self._inflight_lock:
-            inflight_uuids = list(self._inflight_futures.values())
+            inflight = list(self._inflight_futures.values())
+
+        # The dict carries stringified uuids (they cross a process boundary);
+        # parse them back for the typed condition.
+        inflight_uuids = [uuid.UUID(value) for value in inflight]
 
         cutoff = timezone.now() - datetime.timedelta(
             seconds=settings.JOBS_HEARTBEAT_TIMEOUT
         )
-        stranded = JobProcess.query.filter(
-            worker_id=self.worker_id,
-            created_at__lt=cutoff,
-        ).exclude(uuid__in=inflight_uuids)
+        stranded = JobProcess.query.where(
+            JobProcess.created_at.lt(cutoff),
+            JobProcess.worker_id.equals(self.worker_id),
+        ).where(~JobProcess.uuid.is_in(inflight_uuids))
 
         pending_hooks: list[JobResult] = []
         for orphan in list(stranded):
@@ -646,13 +658,14 @@ def future_finished_callback(job_process_uuid: str, future: Future) -> None:
     # (fire_hook=False here, dispatch_aborted_hook below).
     aborted_result: JobResult | None = None
     try:
+        job_uuid = uuid.UUID(job_process_uuid)
         with suppress_db_tracing():
             if future.cancelled():
                 logger.warning(
                     "Job cancelled", extra={"job_process_uuid": job_process_uuid}
                 )
                 try:
-                    job = JobProcess.query.get(uuid=job_process_uuid)
+                    job = JobProcess.query.where(JobProcess.uuid.equals(job_uuid)).get()
                     aborted_result = job.convert_to_result(
                         status=JobResultStatuses.CANCELLED, fire_hook=False
                     )
@@ -668,7 +681,7 @@ def future_finished_callback(job_process_uuid: str, future: Future) -> None:
                     exc_info=exception,
                 )
                 try:
-                    job = JobProcess.query.get(uuid=job_process_uuid)
+                    job = JobProcess.query.where(JobProcess.uuid.equals(job_uuid)).get()
                     # If started_at is set, run() was actively executing when the
                     # process died — user code may have set up state it expected to
                     # tear down. Use LOST so on_aborted fires. If started_at is
@@ -697,7 +710,7 @@ def future_finished_callback(job_process_uuid: str, future: Future) -> None:
                 # blip during convert_to_result, etc.). The future completes cleanly
                 # but the JobProcess row was never converted, and since our parent
                 # is still heartbeating, rescue_stale_workers won't see it as orphaned.
-                job = JobProcess.query.filter(uuid=job_process_uuid).first()
+                job = JobProcess.query.where(JobProcess.uuid.equals(job_uuid)).first()
                 if job is None:
                     return
                 logger.warning(
@@ -737,7 +750,9 @@ def process_job(job_process_uuid: str) -> None:
     try:
         worker_pid = os.getpid()
 
-        job_process = JobProcess.query.get(uuid=job_process_uuid)
+        job_process = JobProcess.query.where(
+            JobProcess.uuid.equals(uuid.UUID(job_process_uuid))
+        ).get()
 
         logger.info(
             "Executing job",
