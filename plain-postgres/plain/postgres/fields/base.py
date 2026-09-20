@@ -260,8 +260,8 @@ class Field[T](RegisterLookupMixin):
         q = Q((name, value))
         if source := self.source_model:
             # Which model's where() this condition belongs to, and the field
-            # that built it. See `Q._source_fields`.
-            q._source_fields = frozenset({(source, self.name)})
+            # that built it. See `Q._condition_origins`.
+            q._condition_origins = frozenset({(source, self.name)})
         return q
 
     def with_lookup_prefix(self, prefix: str, source_model: type[Model]) -> Self:

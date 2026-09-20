@@ -52,16 +52,21 @@ def subclasses(cls: type) -> Generator[type]:
         yield from subclasses(subclass)
 
 
-def source_fields_of(condition: Any) -> frozenset[tuple[type[Model], str]]:
+def condition_origins_of(condition: Any) -> frozenset[tuple[type[Model], str]]:
     """The (model, field name) pairs that built `condition`, or nothing.
 
     `Q` combines with any object that sets `conditional = True` -- an
-    expression, for instance -- so this can't assume a `Q`.
+    expression, for instance -- so this can't assume a `Q`. It can't assume
+    the attribute means what we mean either: a conditional object with a
+    catch-all `__getattr__` would hand back something arbitrary and break
+    every Q construction path with an opaque error from `|=`. Anything that
+    isn't the frozenset we put there is treated as no origins at all.
     """
-    return getattr(condition, "_source_fields", frozenset())
+    origins = getattr(condition, "_condition_origins", None)
+    return origins if isinstance(origins, frozenset) else frozenset()
 
 
-def _collect_source_fields(
+def _collect_condition_origins(
     children: Iterable[Any],
 ) -> frozenset[tuple[type[Model], str]]:
     """Union the sources of `children`, which are a node's immediate children.
@@ -71,7 +76,7 @@ def _collect_source_fields(
     """
     sources: frozenset[tuple[type[Model], str]] = frozenset()
     for child in children:
-        sources |= source_fields_of(child)
+        sources |= condition_origins_of(child)
     return sources
 
 
@@ -107,10 +112,10 @@ class Q(tree.Node):
     # `_combine` (&, |) is built from `create` + `add` and so needs nothing of
     # its own. Pickling preserves the instance attribute as-is. Each of these
     # reads only its immediate children, which already carry their own
-    # subtree's sources, so nothing walks the tree. The one way left to build a
-    # Q without provenance is mutating `q.children` directly, which is reaching
-    # past the API into Node's internals.
-    _source_fields: frozenset[tuple[type[Model], str]] = frozenset()
+    # subtree's sources, so nothing walks the tree. The one way left to put a
+    # condition into a Q without recording it is appending to `q.children`
+    # directly, which is reaching past the API into Node's internals.
+    _condition_origins: frozenset[tuple[type[Model], str]] = frozenset()
 
     @classmethod
     def create(
@@ -122,7 +127,7 @@ class Q(tree.Node):
         # `Node.create` builds a plain Node and reassigns __class__, so
         # `Q.__init__` never runs and the children's sources would be dropped.
         obj = super().create(children, connector, negated)
-        obj._source_fields = _collect_source_fields(children or ())
+        obj._condition_origins = _collect_condition_origins(children or ())
         return obj
 
     def add(self, data: Any, conn_type: str) -> Any:
@@ -130,19 +135,26 @@ class Q(tree.Node):
         # `q = Q(); q.add(cond, Q.AND)` -- would otherwise never record what
         # went into it.
         added = super().add(data, conn_type)
-        self._source_fields |= source_fields_of(data)
+        self._condition_origins |= condition_origins_of(data)
         return added
 
     def __copy__(self) -> Q:
         obj = super().__copy__()
-        obj._source_fields = self._source_fields
+        # `Node.__copy__` hands the *same* children list to the copy, so
+        # `alias = base.copy(); alias.add(cond, Q.AND)` appends into `base`
+        # while only `alias` records the origin -- base would then carry a
+        # condition it doesn't know about. Give the copy its own list; the
+        # children themselves are still shared, which is what makes a copy
+        # cheap. (`__deepcopy__` already rebuilds the list.)
+        obj.children = self.children[:]
+        obj._condition_origins = self._condition_origins
         return obj
 
     copy = __copy__
 
     def __deepcopy__(self, memodict: dict[int, Any]) -> Q:
         obj = super().__deepcopy__(memodict)
-        obj._source_fields = self._source_fields
+        obj._condition_origins = self._condition_origins
         return obj
 
     def __init__(
@@ -162,8 +174,8 @@ class Q(tree.Node):
         # `BaseExpression.__and__`, which wraps both sides in `Q(...)` before
         # combining -- without this the wrapper would report no sources and the
         # condition's origin would be lost.
-        if sources := _collect_source_fields(args):
-            self._source_fields = sources
+        if sources := _collect_condition_origins(args):
+            self._condition_origins = sources
 
     def _combine(self, other: Any, conn: str) -> Q:
         if getattr(other, "conditional", False) is False:

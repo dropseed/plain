@@ -32,7 +32,7 @@ from plain.postgres.fields import (
     PrimaryKeyField,
 )
 from plain.postgres.functions import Cast
-from plain.postgres.query_utils import Q, source_fields_of
+from plain.postgres.query_utils import Q, condition_origins_of
 from plain.postgres.sql import (
     AND,
     CURSOR,
@@ -1192,7 +1192,7 @@ class QuerySet[T: "Model"]:
         checked -- it is `filter()`'s untyped spelling and behaves like it.
         """
         for source_model, field_name in sorted(
-            source_fields_of(condition), key=lambda pair: pair[1]
+            condition_origins_of(condition), key=lambda pair: pair[1]
         ):
             if source_model is not self.model:
                 raise TypeError(
