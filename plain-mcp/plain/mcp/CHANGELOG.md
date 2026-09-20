@@ -1,5 +1,15 @@
 # plain-mcp changelog
 
+## [0.7.2](https://github.com/dropseed/plain/releases/plain-mcp@0.7.2) (2026-09-20)
+
+### What's changed
+
+- The docs declare `tools` and `resources` as tuples (`tools = (Greet,)`), matching how the framework types them ([95836636f3](https://github.com/dropseed/plain/commit/95836636f3))
+
+### Upgrade instructions
+
+- If `tools = [...]` or `resources = [...]` on your `MCPView` fails type checking, write them as tuples.
+
 ## [0.7.1](https://github.com/dropseed/plain/releases/plain-mcp@0.7.1) (2026-08-21)
 
 ### What's changed
