@@ -1083,6 +1083,12 @@ class QuerySet[T: "Model"]:
                     "overwrite the stored one with a fresh default."
                 )
 
+        # Callables resolve here too, like the other value sources -- otherwise
+        # the callable itself reaches the column and a text column stores its
+        # repr. An expression (F(), Excluded()) is an object, not a callable,
+        # so it passes through untouched.
+        conflict_defaults = dict(resolve_callables(conflict_defaults))
+
         # conflict_defaults name columns the SET clause writes, so unlike the
         # other sources they must be real columns -- not properties -- and they
         # cannot rewrite the conflict target.

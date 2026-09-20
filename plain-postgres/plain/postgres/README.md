@@ -581,6 +581,8 @@ would overwrite the stored creation timestamp every time. A column that's also
 taking them, so a `conflict_defaults` key may not name a unique field — that's
 the conflict target.
 
+Every value source resolves callables.
+
 `unique_fields` must name a `UniqueConstraint` declared on the model (no
 condition, no expressions) and every unique field must be non-null. It can't be
 the primary key: Postgres generates the identity value, so a caller has nothing

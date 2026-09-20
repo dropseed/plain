@@ -170,6 +170,44 @@ def test_upsert_conflict_defaults_set_order_matches_param_order(db, capture_quer
     assert set_clause.index("'HELLO'") < set_clause.index("42")
 
 
+def test_upsert_conflict_defaults_resolve_callables(db):
+    """A callable in conflict_defaults is called, like every other value
+    source -- otherwise the callable itself reaches the column and a text
+    column stores its repr.
+    """
+    UpsertItem(key="a", value=1, label="old").create()
+
+    obj, created = UpsertItem.query.upsert(
+        key="a",
+        value=1,
+        label="old",
+        conflict_defaults={"label": lambda: "computed", "value": lambda: 42},
+        unique_fields=[UpsertItem.key],
+    )
+
+    assert created is False
+    assert (obj.label, obj.value) == ("computed", 42)
+    stored = UpsertItem.query.get(key="a")
+    assert (stored.label, stored.value) == ("computed", 42)
+
+
+def test_upsert_conflict_defaults_do_not_call_expressions(db):
+    """An expression is an object, not a callable, so callable resolution has
+    to leave it alone for the atomic-counter case to survive.
+    """
+    UpsertItem(key="a", value=10).create()
+
+    obj, created = UpsertItem.query.upsert(
+        key="a",
+        value=5,
+        conflict_defaults={"value": F("value") + Excluded("value")},
+        unique_fields=[UpsertItem.key],
+    )
+
+    assert created is False
+    assert obj.value == 15
+
+
 def test_upsert_conflict_defaults_rejects_the_primary_key(db):
     with pytest.raises(ValueError, match="cannot update primary key fields"):
         UpsertItem.query.upsert(
