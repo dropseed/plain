@@ -470,9 +470,9 @@ already exist in a single statement, use `bulk_upsert` (below).
 `bulk_upsert(objs, *, update_fields, unique_fields, batch_size=None)` issues one
 `INSERT ... ON CONFLICT (unique_fields) DO UPDATE SET ... RETURNING` per batch.
 Rows that don't exist yet are inserted; rows that collide on `unique_fields` have
-their `update_fields` overwritten. Every object comes back — inserted or updated —
-with its DB-generated fields (primary key, DB defaults) populated, in the order
-you passed them in.
+their `update_fields` overwritten. You get back the objects you passed in, in the
+order you passed them (a new list — `objs` itself is never reordered), each with
+its DB-generated fields (primary key, DB defaults) populated.
 
 ```python
 # Insert new items, refresh `value`/`expires_at` on any existing key.
@@ -492,8 +492,9 @@ CachedItem.query.bulk_upsert(
 - `unique_fields` must name the **primary key** or a `UniqueConstraint` declared
   on the model (no condition, no expressions) — this is the conflict target. A
   unique `Index` is not enough; declare a `UniqueConstraint`.
-- `update_fields` must be concrete, non-primary-key, and must not overlap
-  `unique_fields`. A column the database fills in (`create_now`,
+- `update_fields` must be concrete, non-primary-key, must not name the same
+  column twice (Postgres assigns each column once per statement), and must not
+  overlap `unique_fields`. A column the database fills in (`create_now`,
   `generate=True`, `RandomStringField`) can't be named either — the update would
   overwrite the stored value with a freshly evaluated default.
 - Every object must have a non-null value for every unique field. `NULL` never
@@ -507,9 +508,17 @@ CachedItem.query.bulk_upsert(
 - **`update_now=True` columns are refreshed on a conflict automatically.** You
   don't name them in `update_fields`; a row that gets updated gets a fresh
   stamp, and the object handed back carries the same one.
-- Batches are issued in conflict-key order, so concurrent `bulk_upsert` calls
-  over overlapping keys can't deadlock each other. Returned rows are mapped onto
-  the objects by position, exactly as `bulk_create` does.
+- **An `id` you set is kept on the insert path; on a conflict the stored row
+  wins.** A new row is written with the `id` you gave it. A conflicting one
+  already has an `id`, and that is the one hydrated back onto your object — the
+  row in the table is the truth. An `id` that collides with a _different_ row
+  raises `psycopg.errors.UniqueViolation`, like any set-based write.
+- Every object is sorted by its conflict key before anything is sent, so
+  concurrent `bulk_upsert` calls over overlapping keys lock rows in the same
+  order and can't deadlock each other. Returned rows are mapped onto the objects
+  by position, exactly as `bulk_create` does.
+- Like `bulk_create`, the write is against the table: a filter on the queryset
+  you call it from doesn't narrow or exclude anything.
 
 #### Use queryset `.update()` / `.delete()` for mass operations
 

@@ -11,8 +11,10 @@ import random
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
+import psycopg
 import pytest
 from app.examples.models.defaults import DBDefaultsExample
+from app.examples.models.indexes import IndexExample
 from app.examples.models.mixins import MixinTestModel
 from app.examples.models.returning import ReturningEvent
 from app.examples.models.upsert import (
@@ -657,3 +659,68 @@ def test_bulk_upsert_decimal_keys_at_different_scales_in_one_batch(db):
             update_fields=[UpsertDecimalKey.value],
             unique_fields=[UpsertDecimalKey.amount],
         )
+
+
+def test_bulk_upsert_conflict_hydrates_the_stored_id_over_the_caller_s(db):
+    # On the insert path a caller-set id is kept. On the conflict path the
+    # stored row is the truth: its id is what comes back, not the one passed.
+    UpsertItem(key="a", value=1).create()
+    stored_id = UpsertItem.query.get(key="a").id
+
+    item = UpsertItem(key="a", value=2)
+    item.id = 99
+    UpsertItem.query.bulk_upsert(
+        [item], update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
+    )
+
+    assert item.id == stored_id
+    assert UpsertItem.query.count() == 1
+    assert UpsertItem.query.get(key="a").value == 2
+
+
+def test_bulk_upsert_id_colliding_with_another_row_raises(db):
+    # The conflict target is `key`, so an id that collides with a different
+    # row is an ordinary primary key violation -- raised raw, like any
+    # set-based write.
+    UpsertItem(key="taken", value=1).create()
+    taken_id = UpsertItem.query.get(key="taken").id
+
+    item = UpsertItem(key="new", value=1)
+    item.id = taken_id
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        UpsertItem.query.bulk_upsert(
+            [item], update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
+        )
+
+
+def test_bulk_upsert_unique_index_is_not_a_conflict_target(db):
+    # A unique Index would work as a Postgres arbiter, but bulk_upsert asks
+    # for a declared UniqueConstraint so the target is explicit in the model.
+    with pytest.raises(ValueError, match="must name the primary key"):
+        IndexExample.query.bulk_upsert(
+            [IndexExample(name="n", description="d")],
+            update_fields=[IndexExample.description],
+            unique_fields=[IndexExample.name],
+        )
+
+
+def test_bulk_upsert_cannot_update_the_primary_key(db):
+    with pytest.raises(ValueError, match="cannot update primary key fields"):
+        UpsertItem.query.bulk_upsert(
+            [UpsertItem(key="a", value=1)],
+            update_fields=[UpsertItem.id],
+            unique_fields=[UpsertItem.key],
+        )
+
+
+def test_bulk_upsert_ignores_queryset_filters(db):
+    # Like bulk_create, the write is against the table -- a filter on the
+    # queryset it is called from does not narrow or exclude anything.
+    UpsertItem(key="a", value=1).create()
+
+    items = [UpsertItem(key="a", value=2), UpsertItem(key="b", value=3)]
+    UpsertItem.query.filter(key="nothing-matches-this").bulk_upsert(
+        items, update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
+    )
+
+    assert {row.key: row.value for row in UpsertItem.query.all()} == {"a": 2, "b": 3}
