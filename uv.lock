@@ -772,13 +772,14 @@ dev = [
 
 [[package]]
 name = "plain-admin"
-version = "0.86.2"
+version = "0.86.3"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
     { name = "plain-auth" },
     { name = "plain-elements" },
     { name = "plain-htmx" },
+    { name = "plain-postgres" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
 ]

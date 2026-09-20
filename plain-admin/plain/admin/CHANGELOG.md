@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.86.3](https://github.com/dropseed/plain/releases/plain-admin@0.86.3) (2026-09-20)
+
+### What's changed
+
+- The `get_list_url`/`get_create_url`/`get_detail_url`/`get_update_url`/`get_delete_url` methods that a viewset stamps onto its views are declared once on `AdminView` instead of repeated on every view class, and `AdminViewset.get_views()` returns `list[type[AdminView]]` ([d25edd6992](https://github.com/dropseed/plain/commit/d25edd6992))
+- `PinnedNavItem` uses the typed `Field[T]` annotations from plain-postgres 0.119 ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.86.2](https://github.com/dropseed/plain/releases/plain-admin@0.86.2) (2026-09-04)
 
 ### What's changed
