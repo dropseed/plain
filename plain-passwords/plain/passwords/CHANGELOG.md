@@ -1,5 +1,16 @@
 # plain-passwords changelog
 
+## [0.26.10](https://github.com/dropseed/plain/releases/plain-passwords@0.26.10) (2026-09-20)
+
+### What's changed
+
+- The `PasswordField()` stub returns the typed descriptor `Field[str]` (or `Field[str | None]` with `allow_null=True`), matching plain-postgres 0.119's core field stubs, so a model annotates it `password: Field[str] = PasswordField()` ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+- If you annotated the field as `password: str = PasswordField()`, change it to `password: Field[str] = PasswordField()` (`from plain.postgres import Field`).
+
 ## [0.26.9](https://github.com/dropseed/plain/releases/plain-passwords@0.26.9) (2026-09-04)
 
 ### What's changed

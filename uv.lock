@@ -1268,10 +1268,11 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-passwords"
-version = "0.26.9"
+version = "0.26.10"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-postgres" },
     { name = "plain-templates" },
 ]
 
