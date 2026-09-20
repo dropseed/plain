@@ -5,6 +5,7 @@ The main QuerySet implementation. This provides the public API for the ORM.
 from __future__ import annotations
 
 import copy
+import datetime
 import json
 import operator
 import warnings
@@ -58,47 +59,57 @@ if TYPE_CHECKING:
     from plain.postgres import Model
 
 
-def conflict_sort_value(field: Field, value: Any) -> tuple[str, str]:
+def conflict_sort_value(field: Field, value: Any) -> str:
     """One component of the order bulk_upsert() sends its batches in.
 
     Concurrent callers only have to agree on an order, not on a meaningful
-    one, so this is built for two properties and no others: the same logical
-    key always produces the same result, and it can never raise. Preparing the
-    value the way the column will see it gets the first (a TimeZoneField's
-    ZoneInfo becomes its name, a naive datetime becomes aware), and reducing to
-    strings gets the second -- str() orders a NaN, a memoryview or a ZoneInfo
-    just as happily as an int, where `<` on any of them raises.
+    one, so the requirement is narrow: two callers holding the same logical
+    key must render it the same way, and comparing the results must never
+    raise. Everything here serves that.
 
-    Leading with the type's name keeps a polymorphic column from interleaving:
-    a jsonb column holding an object in one row and a number in the next would
-    otherwise sort "7" next to "[7]".
+    The value arrives already through `get_prep_value`, which settles most of
+    it -- a TimeZoneField's ZoneInfo is its name by then, a UUID string is a
+    UUID, a naive datetime is aware. What is left is the spellings Postgres
+    holds equal that `str()` would not: a str subclass that renders itself
+    some other way, a bytea handed back as a memoryview, the same instant
+    written at two offsets, a signed zero, a decimal's scale.
     """
-    value = field.get_prep_value(value)
     if isinstance(field, JSONField):
         # Encode with the field's own encoder, which stringifies non-string
         # object keys, and only then re-parse and dump with the keys sorted --
         # sorting them first would compare an int key against a str one and
-        # raise. Two equal objects written with their keys in either order then
-        # sort to the same place.
-        value = json.dumps(
+        # raise. Two equal objects written with their keys in either order
+        # then render the same.
+        return json.dumps(
             json.loads(get_json_dumps(field.encoder)(value)), sort_keys=True
         )
-    if isinstance(value, Decimal) and value.is_finite():
-        # Postgres numeric holds Decimal("1.0") and Decimal("1.00") equal but
-        # str() spells them differently, which would sort one logical key to
-        # two places. normalize() gives equal values one spelling. It overflows
-        # on an exponent no column could store anyway -- leave those to the
-        # write, which has the better error. NaN and infinity have no scale to
-        # strip, and normalizing a signaling NaN raises, so they skip it.
+    if isinstance(value, str):
+        # A StrEnum member or a SafeString compares equal to the plain string,
+        # which is all the column holds, but renders itself differently.
+        # str.__str__ goes around the override.
+        return str.__str__(value)
+    if isinstance(value, memoryview | bytearray):
+        # psycopg hands a bytea column back as a memoryview, whose str() is
+        # where it happens to sit in memory.
+        return str(bytes(value))
+    if isinstance(value, datetime.datetime) and value.tzinfo is not None:
+        # timestamptz stores the instant, not the offset it was written at.
+        return str(value.astimezone(datetime.UTC))
+    if isinstance(value, float):
+        # Postgres holds -0.0 and 0.0 equal; adding zero folds the sign.
+        return repr(value + 0.0)
+    if isinstance(value, Decimal):
+        # numeric holds Decimal("1.0") and Decimal("1.00") equal. normalize()
+        # gives them one spelling, and abs() folds the negative zero it keeps.
+        # An exponent too large to normalize is left as it is -- Postgres
+        # rejects it on write, with the better error.
         try:
             value = value.normalize()
+            if value == 0:
+                value = abs(value)
         except ArithmeticError:
             pass
-        if value == 0:
-            # normalize() keeps the sign on a negative zero, which Postgres
-            # and Python both hold equal to positive zero.
-            value = abs(value)
-    return (type(value).__name__, str(value))
+    return str(value)
 
 
 # The maximum number of results to fetch in a get() query.
@@ -858,7 +869,9 @@ class QuerySet[T: "Model"]:
         for obj in objs:
             key = []
             for field in unique_columns:
-                value = field.value_from_object(obj)
+                # Prepared once here and handed to the sort key, rather than
+                # prepared again inside it.
+                value = field.get_prep_value(field.value_from_object(obj))
                 if value is None:
                     raise ValueError(
                         f"bulk_upsert() requires a non-null {field.name} on every "
