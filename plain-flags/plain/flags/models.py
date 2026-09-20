@@ -17,26 +17,6 @@ def validate_flag_name(value: str) -> None:
 
 
 @postgres.register_model
-class FlagResult(postgres.Model):
-    created_at: Field[datetime] = types.DateTimeField(create_now=True)
-    updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
-    flag: Flag = types.ForeignKeyField("Flag", on_delete=postgres.CASCADE)
-    key: Field[str] = types.TextField(max_length=255)
-    value: Field[dict] = types.JSONField()
-
-    model_options = postgres.Options(
-        constraints=[
-            postgres.UniqueConstraint(
-                fields=["flag", "key"], name="plainflags_flagresult_unique_key"
-            ),
-        ],
-    )
-
-    def __str__(self) -> str:
-        return self.key
-
-
-@postgres.register_model
 class Flag(postgres.Model):
     created_at: Field[datetime] = types.DateTimeField(create_now=True)
     updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
@@ -64,3 +44,23 @@ class Flag(postgres.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+@postgres.register_model
+class FlagResult(postgres.Model):
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
+    flag: Field[Flag] = types.ForeignKeyField(Flag, on_delete=postgres.CASCADE)
+    key: Field[str] = types.TextField(max_length=255)
+    value: Field[dict] = types.JSONField()
+
+    model_options = postgres.Options(
+        constraints=[
+            postgres.UniqueConstraint(
+                fields=["flag", "key"], name="plainflags_flagresult_unique_key"
+            ),
+        ],
+    )
+
+    def __str__(self) -> str:
+        return self.key
