@@ -598,3 +598,24 @@ def test_locked_write_outside_a_transaction_raises(isolated_db, write):
     # The row is untouched, and the same write inside atomic() goes through.
     with transaction.atomic():
         assert ReturningEvent.query.filter(label="a").for_update().update(count=2) == 1
+
+
+@pytest.mark.parametrize(
+    "narrow",
+    [
+        lambda qs: qs.defer("payload"),
+        lambda qs: qs.only("label"),
+        lambda qs: qs.reverse(),
+    ],
+    ids=["defer", "only", "reverse"],
+)
+def test_column_selection_keeps_the_returning_state(db, narrow):
+    # defer()/only()/reverse() shape a read; the write after them still
+    # hands back rows, and whole ones -- no-arg returning() selects every
+    # column regardless of what was deferred.
+    _seed_events()
+    rows = narrow(ReturningEvent.query.filter(label="a").returning()).update(count=8)
+
+    assert len(rows) == 2
+    assert {row.count for row in rows} == {8}
+    assert all(row.payload is not None for row in rows)

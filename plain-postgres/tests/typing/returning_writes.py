@@ -94,3 +94,20 @@ def must_keep_the_return_shape_through_a_combination() -> None:
 
     # No returning() on either side stays an int.
     assert_type((left | right).update(count=1), int)
+
+
+def must_keep_the_return_shape_through_column_selection() -> None:
+    """defer(), only() and reverse() narrow or reorder a read; none of them
+    changes what a following write hands back.
+
+    They all return the queryset they were called on, so they have to say
+    `Self` -- annotated `QuerySet[T]` they collapsed the returning() shape
+    and the write read back as an int.
+
+    Runtime half: tests/public/test_returning.py.
+    """
+    qs = ReturningEvent.query.filter(label="a").returning()
+
+    assert_type(qs.defer("payload").update(count=1), list[ReturningEvent])
+    assert_type(qs.only("label").update(count=1), list[ReturningEvent])
+    assert_type(qs.reverse().delete(), list[ReturningEvent])
