@@ -809,7 +809,6 @@ version = "0.35.1"
 source = { editable = "plain-api" }
 dependencies = [
     { name = "plain" },
-    { name = "plain-postgres" },
 ]
 
 [package.dev-dependencies]
@@ -819,10 +818,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "plain-postgres", editable = "plain-postgres" },
-]
+requires-dist = [{ name = "plain", editable = "plain" }]
 
 [package.metadata.requires-dev]
 dev = [
