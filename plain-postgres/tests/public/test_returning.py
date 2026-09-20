@@ -290,11 +290,23 @@ def test_returning_instances_carry_foreign_keys(db):
     [
         lambda qs: qs.create(label="x", count=1),
         lambda qs: qs.bulk_create([ReturningEvent(label="x", count=1)]),
+        lambda qs: qs.bulk_upsert(
+            [ReturningEvent(label="x", count=1)],
+            update_fields=[ReturningEvent.count],
+            unique_fields=[ReturningEvent.id],
+        ),
         lambda qs: qs.bulk_update(list(ReturningEvent.query), ["count"]),
         lambda qs: qs.get_or_create(label="x", count=1),
         lambda qs: qs.update_or_create(label="x", defaults={"count": 1}),
     ],
-    ids=["create", "bulk_create", "bulk_update", "get_or_create", "update_or_create"],
+    ids=[
+        "create",
+        "bulk_create",
+        "bulk_upsert",
+        "bulk_update",
+        "get_or_create",
+        "update_or_create",
+    ],
 )
 def test_returning_rejects_other_writes(db, write):
     ReturningEvent(label="seed", count=1).create()

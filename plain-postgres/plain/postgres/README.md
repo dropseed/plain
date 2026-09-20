@@ -464,6 +464,64 @@ for name in names:
 Tag.query.bulk_create([Tag(name=name) for name in names])
 ```
 
+`bulk_create` is insert-only. To insert new rows and update the ones that
+already exist in a single statement, use `bulk_upsert` (below).
+
+#### Use `bulk_upsert` to insert-or-update in one statement
+
+`bulk_upsert(objs, *, update_fields, unique_fields, batch_size=None)` issues one
+`INSERT ... ON CONFLICT (unique_fields) DO UPDATE SET ... RETURNING` per batch.
+Rows that don't exist yet are inserted; rows that collide on `unique_fields` have
+their `update_fields` overwritten. You get back the objects you passed in, in the
+order you passed them (a new list — `objs` itself is never reordered), each with
+its DB-generated fields (primary key, DB defaults) populated.
+
+```python
+# Insert new items, refresh `value`/`expires_at` on any existing key.
+CachedItem.query.bulk_upsert(
+    [CachedItem(key=k, value=v, expires_at=exp) for k, v in items],
+    update_fields=[CachedItem.value, CachedItem.expires_at],
+    unique_fields=[CachedItem.key],
+)
+```
+
+- `update_fields` and `unique_fields` take field references (`Model.field`), not
+  strings. A foreign key is named by the relation itself — `Model.tenant`, which
+  resolves to the `tenant_id` column. (This is the one write API that takes
+  `Model.fk`. `returning()` refuses it, because there it would be ambiguous with
+  asking for the whole related object; here a column list can only mean the
+  column.)
+- `unique_fields` must name the **primary key** or a `UniqueConstraint` declared
+  on the model (no condition, no expressions) — this is the conflict target. A
+  unique `Index` is not enough; declare a `UniqueConstraint`.
+- `update_fields` must be concrete, non-primary-key, must not name the same
+  column twice (Postgres assigns each column once per statement), and must not
+  overlap `unique_fields`. A column the database fills in (`create_now`,
+  `generate=True`, `RandomStringField`) can't be named either — the update would
+  overwrite the stored value with a freshly evaluated default.
+- Every object must have a non-null value for every unique field. `NULL` never
+  conflicts in Postgres, so it can't be upserted. A database-generated column
+  (`create_now`, `generate=True`, `RandomStringField`) can't be a unique field
+  either — your objects never hold its value, so it could never conflict. Nor
+  can an `update_now=True` column, which is stamped again on every write.
+- **Two objects with the same unique key in one batch raise `ValueError`.**
+  Postgres won't touch a row twice in one statement. Split across batches it's
+  allowed — the first inserts, the second updates, and the later write wins.
+- **`update_now=True` columns are refreshed on a conflict automatically.** You
+  don't name them in `update_fields`; a row that gets updated gets a fresh
+  stamp, and the object handed back carries the same one.
+- **An `id` you set is kept on the insert path; on a conflict the stored row
+  wins.** A new row is written with the `id` you gave it. A conflicting one
+  already has an `id`, and that is the one hydrated back onto your object — the
+  row in the table is the truth. An `id` that collides with a _different_ row
+  raises `psycopg.errors.UniqueViolation`, like any set-based write.
+- Every object is sorted by its conflict key before anything is sent, so
+  concurrent `bulk_upsert` calls over overlapping keys lock rows in the same
+  order and can't deadlock each other. Returned rows are mapped onto the objects
+  by position, exactly as `bulk_create` does.
+- Like `bulk_create`, the write is against the table: a filter on the queryset
+  you call it from doesn't narrow or exclude anything.
+
 #### Use queryset `.update()` / `.delete()` for mass operations
 
 ```python
@@ -529,7 +587,7 @@ for row in deleted:
 - **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a many-to-many field or one from another model raises an error at the `returning()` call.
 - **A foreign key can't be named here.** At class level `Model.fk` is the relation — that is what lets `where()` traverse it, as in `Child.parent.name.equals(...)` — not its column, so `returning(Child.parent)` raises `FieldError`. Foreign key columns come back through no-argument `returning()`, which hands you whole instances.
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
-- `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_update()`, `get_or_create()`, `update_or_create()` — raises `TypeError` rather than quietly dropping it.
+- `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_upsert()`, `bulk_update()`, `get_or_create()`, `update_or_create()` — raises `TypeError` rather than quietly dropping it.
 - `returning()` keeps the queryset's own class, so a custom `QuerySet` and its methods survive it. Chain your own methods before `returning()` — a type checker sees the returning shape after it, not your subclass.
 
 A row lock belongs on the read side of the write, and it composes in either order. The write then needs an open `transaction.atomic()`, and is emitted as a locking sub-select so the lock has somewhere to live — see [Locking a set-based write](#locking-a-set-based-write).
@@ -1388,7 +1446,7 @@ except (psycopg.IntegrityError, ValidationError):
     ...  # lost a race — reload and retry, or report it
 ```
 
-For a plain insert-or-update with no per-row logic, `bulk_create(..., update_conflicts=True, unique_fields=[...])` is an atomic upsert with no race to catch.
+For a plain insert-or-update with no per-row logic, `bulk_upsert(objs, update_fields=[...], unique_fields=[...])` is an atomic upsert with no race to catch.
 
 ### Indexes and constraints
 
