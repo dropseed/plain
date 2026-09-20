@@ -1,5 +1,17 @@
 # plain-code changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-code@0.25.0) (2026-09-20)
+
+### What's changed
+
+- `plain fix --skip-oxc` skips oxlint and oxfmt, for environments that can't reach GitHub to download them ([327bf597bb](https://github.com/dropseed/plain/commit/327bf597bb))
+- A failure to look up or download the oxlint/oxfmt release from github.com is reported as a clear error that names the fix (pin a version under `[tool.plain.code.oxc]` or pass `--skip-oxc`) instead of a raw `httpx` traceback ([327bf597bb](https://github.com/dropseed/plain/commit/327bf597bb))
+- On Windows, installing a downloaded binary into the machine-wide cache tolerates the `PermissionError` raised when another process (another checkout sharing the cache) has that binary open — if the file is already there, the install is done ([8766bb72ce](https://github.com/dropseed/plain/commit/8766bb72ce))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-code@0.24.0) (2026-08-12)
 
 ### What's changed
