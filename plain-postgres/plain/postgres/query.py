@@ -578,13 +578,15 @@ class QuerySet[T: "Model"]:
         query = (
             self
             if self.sql_query.can_filter()
-            else self.model._model_meta.base_queryset.filter(id__in=self.values("id"))
+            # `_values`, not `values()`: this is a subquery, and the public
+            # method is refused on a row-mode queryset.
+            else self.model._model_meta.base_queryset.filter(id__in=self._values("id"))
         )
         combined = query._chain()
         combined._merge_known_related_objects(other)
         if not other.sql_query.can_filter():
             other = other.model._model_meta.base_queryset.filter(
-                id__in=other.values("id")
+                id__in=other._values("id")
             )
         combined.sql_query.combine(other.sql_query, OR)
         return combined
@@ -1186,6 +1188,9 @@ class QuerySet[T: "Model"]:
         #     collide with it.
         taken = {f for f in fields if not isinstance(f, ResolvableExpression)}
         taken |= set(self.sql_query.annotations)
+        # A model is free to have a column literally named `upper1` or `f1`,
+        # which an alias must not shadow even on a first select.
+        taken |= {f.name for f in self.model._model_meta.get_fields()}
         if self._fields:
             taken |= set(self._fields)
 
@@ -1911,7 +1916,10 @@ class QuerySet[T: "Model"]:
         out. The guard used to look only at `self`, so it caught the merge from
         one side and not the other.
         """
-        if (self._fields is not None or other._fields is not None) and (
+        if self._fields is None and other._fields is None:
+            return
+
+        if (
             self._fields != other._fields
             or set(self.sql_query.values_select) != set(other.sql_query.values_select)
             or set(self.sql_query.annotation_select)
@@ -1921,6 +1929,22 @@ class QuerySet[T: "Model"]:
                 f"Merging '{self.__class__.__name__}' and "
                 f"'{other.__class__.__name__}' classes must involve the same "
                 f"values in each case."
+            )
+
+        # Same columns is not the same rows: tuples, flat scalars and
+        # dataclasses all select identically and differ only in how each row
+        # is built. Merging two of them would quietly hand back whichever
+        # shape the left operand happened to carry.
+        if (
+            self._iterable_class is not other._iterable_class
+            or self._select_result_type is not other._select_result_type
+        ):
+            raise TypeError(
+                f"Merging '{self.__class__.__name__}' and "
+                f"'{other.__class__.__name__}' classes must produce the same "
+                f"row shape: these select the same columns but build rows "
+                f"differently (tuple, flat scalar and result_type= rows are "
+                f"not interchangeable)."
             )
 
     def _merge_known_related_objects(self, other: QuerySet[T]) -> None:
@@ -1999,7 +2023,16 @@ def _selectable_to_column(item: Selectable[Any]) -> str | ResolvableExpression:
             "column is not selectable yet either — " + _NO_TRAVERSAL_IN_SELECT
         )
     if isinstance(item, Field):
-        assert item.name
+        if not item.name:
+            # A field read off a mixin class rather than a model: the mixin
+            # holds the declaration, and only the model it is mixed into has
+            # an attached, named copy.
+            raise TypeError(
+                f"select() got an unattached {type(item).__name__}. Reading a "
+                f"field off a mixin class gives the declaration, which has no "
+                f"name or column yet -- read it off the model that mixes it "
+                f"in instead."
+            )
         if item.is_lookup_reference:
             # A traversed leaf: `Field.with_lookup_prefix` hands back the
             # related model's field carrying the relation path as its name.

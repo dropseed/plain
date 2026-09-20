@@ -262,15 +262,13 @@ A traversed field _is_ the related field, carrying the relation path as its name
 `select()` pulls back specific columns as typed rows instead of model instances. You pass typed field references, and a type checker knows the exact shape of each row:
 
 ```python
-from plain.postgres import types
+from plain.postgres import Field, types
 
 
 @postgres.register_model
 class User(postgres.Model):
-    email: str = types.EmailField()
-    age: int = types.IntegerField(allow_null=True)
-
-    query: postgres.QuerySet[User] = postgres.QuerySet()
+    email: Field[str] = types.EmailField()
+    age: Field[int | None] = types.IntegerField(allow_null=True, default=None)
 
 
 # list-like of tuple[str, int | None], precisely typed
@@ -313,6 +311,8 @@ You can select expression columns too — `select(User.id, Sum("amount"))`, or a
 Per-column typing runs to **ten columns**. An eleventh is still selected and still returns rows, but the row type degrades to `tuple[Any, ...]` — reach for `result_type=` when a row is that wide.
 
 `select()` goes last in a chain: `annotate()` must come before it, because an annotation appends a column and would change the row shape out from under the type `select()` declared. `annotate()` after `select()` raises `TypeError` saying so. `prefetch_related()` is refused in both orders — a prefetch attaches related objects to a model instance's attributes, and a row has nowhere to put them; select the columns you need from the related model instead.
+
+Re-selecting replaces the **column list**, not the joins: an expression that reached through a relation (`select(Upper("tags__name"))`) leaves its join in place, so a later `select(Widget.name)` still returns one row per joined row — and `count()`/`exists()` count those. This is `annotate(...)` followed by `values_list(...)` behaving as it always has; trimming joins no queryset needs any more is out of scope here.
 
 `distinct()` with an `order_by()` on a column you didn't select returns duplicates: the ordering column has to go into the `SELECT` list for Postgres to sort by it, so `SELECT DISTINCT` deduplicates on that column too. Order by something you selected, or drop the ordering. This is `values_list()`'s behavior as well, not new to `select()`.
 

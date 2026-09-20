@@ -10,7 +10,9 @@ from __future__ import annotations
 from dataclasses import InitVar, dataclass, field, fields
 
 import pytest
+from app.examples.models.alias_collisions import AliasCollisionExample
 from app.examples.models.defaults import DefaultsExample
+from app.examples.models.mixins import MixinTestModel, TimestampMixin
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.postgres import RowQuerySet
 from plain.postgres.aggregates import Count
@@ -587,6 +589,37 @@ class TestColumnsBelongToTheirModel:
             DefaultsExample.query.select(DefaultsExample.priority, Widget.name)
 
 
+def test_select_rejects_a_field_read_off_a_mixin(db):
+    """The mixin holds the declaration; only the model that mixes it in has an
+    attached, named copy. This used to surface as a bare AssertionError.
+
+    A checker rejects the access too (`__get__` wants `owner: type[Model]`,
+    and a mixin isn't one), so this is the backstop for an untyped call site
+    rather than the only guard.
+    """
+    with pytest.raises(TypeError, match="unattached"):
+        MixinTestModel.query.select(TimestampMixin.created_at)  # ty: ignore[invalid-attribute-access]
+
+
+def test_select_accepts_the_same_field_off_the_model(db):
+    MixinTestModel.query.create(name="a")
+    assert len(list(MixinTestModel.query.select(MixinTestModel.created_at))) == 1
+
+
+def test_select_alias_skips_a_column_that_looks_like_one(db):
+    """A model is free to have columns named `upper1` and `f1`; a generated
+    alias must step over them rather than shadow a real column."""
+    AliasCollisionExample.query.create(name="a", upper1="real-upper1", f1="real-f1")
+
+    result = AliasCollisionExample.query.select(
+        AliasCollisionExample.upper1, Upper("name")
+    )
+    assert list(result) == [("real-upper1", "A")]
+
+    result = AliasCollisionExample.query.select(AliasCollisionExample.f1, F("name"))
+    assert list(result) == [("real-f1", "a")]
+
+
 class TestMergingRowAndModelQuerysets:
     """Merging a row-mode queryset with a model-mode one produces a query
     neither side describes. The guard only looked at the left operand, so
@@ -610,6 +643,46 @@ class TestMergingRowAndModelQuerysets:
             DefaultsExample.query.all() & DefaultsExample.query.select(
                 DefaultsExample.name
             )
+
+    def test_sliced_row_queryset_merges(self, rows):
+        """A sliced left operand is re-expressed as an id subquery, which used
+        to call the public values() and hit select()'s own refusal."""
+        r = DefaultsExample.query.order_by("name").select(DefaultsExample.name)
+        assert len(list(r[0:1] | r)) == 3
+        assert len(list(r | r[0:1])) == 3
+
+    def test_different_row_shapes_do_not_merge(self, rows):
+        """Same columns, different rows: tuple, flat and result_type= select
+        identically and differ only in how each row is built, so a merge used
+        to hand back whichever shape the left operand carried."""
+
+        @dataclass
+        class NameOnly:
+            name: str
+
+        tuples = DefaultsExample.query.select(DefaultsExample.name)
+        flat = DefaultsExample.query.select(DefaultsExample.name, flat=True)
+        dataclasses_ = DefaultsExample.query.select(
+            DefaultsExample.name, result_type=NameOnly
+        )
+
+        for left, right in (
+            (dataclasses_, tuples),
+            (tuples, dataclasses_),
+            (tuples, flat),
+            (flat, tuples),
+        ):
+            with pytest.raises(TypeError, match="same row shape"):
+                left | right
+
+    def test_matching_row_shapes_still_merge(self, rows):
+        @dataclass
+        class NameOnly:
+            name: str
+
+        left = DefaultsExample.query.select(DefaultsExample.name, result_type=NameOnly)
+        right = DefaultsExample.query.select(DefaultsExample.name, result_type=NameOnly)
+        assert len(list(left | right)) == 3
 
     def test_matching_sides_still_merge(self, rows):
         model = DefaultsExample.query.all() | DefaultsExample.query.all()

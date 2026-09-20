@@ -18,9 +18,11 @@ from typing import Any, Never, assert_type
 
 from app.examples.models.defaults import DefaultsExample as D
 from app.examples.models.relationships import WidgetTag
-from plain.postgres import QuerySet, RowQuerySet
+from plain.postgres import Field, QuerySet, RowQuerySet, types
 from plain.postgres.expressions import F
 from plain.postgres.functions import Upper
+
+from plain import postgres
 
 
 @dataclass
@@ -209,3 +211,26 @@ def must_accept_a_column_from_another_model_because_the_checker_cannot_see_it() 
     tests/public/test_select.py::TestColumnsBelongToTheirModel.
     """
     assert_type(D.query.select(WidgetTag.id), RowQuerySet[tuple[int]])
+
+
+@postgres.register_model
+class ReadmeUser(postgres.Model):
+    """The README's lead `select()` example, so it can't rot.
+
+    Mirrors `plain/postgres/README.md`'s "Selecting columns with select()"
+    block: the field annotations and the row type it claims have to keep
+    type-checking exactly as written there.
+    """
+
+    email: Field[str] = types.EmailField()
+    age: Field[int | None] = types.IntegerField(allow_null=True, default=None)
+
+
+def must_accept_the_readme_example() -> None:
+    rows = ReadmeUser.query.where(ReadmeUser.age.gte(18)).select(
+        ReadmeUser.email, ReadmeUser.age
+    )
+    assert_type(rows, RowQuerySet[tuple[str, int | None]])
+    for email, age in rows:
+        assert_type(email, str)
+        assert_type(age, int | None)
