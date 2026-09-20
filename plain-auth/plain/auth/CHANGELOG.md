@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.29.9](https://github.com/dropseed/plain/releases/plain-auth@0.29.9) (2026-09-20)
+
+### What's changed
+
+- The README's `User` model example uses the typed `Field[T]` annotations from plain-postgres 0.119 ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.29.8](https://github.com/dropseed/plain/releases/plain-auth@0.29.8) (2026-09-04)
 
 ### What's changed
