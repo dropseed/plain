@@ -8,6 +8,7 @@ fields (primary key, DB defaults) populated from the row at its own position.
 from __future__ import annotations
 
 import random
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -15,6 +16,7 @@ from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.mixins import MixinTestModel
 from app.examples.models.returning import ReturningEvent
 from app.examples.models.upsert import (
+    UpsertDecimalKey,
     UpsertFloatKey,
     UpsertItem,
     UpsertPair,
@@ -598,4 +600,60 @@ def test_bulk_upsert_unsaved_related_object_names_bulk_upsert(db):
             [UpsertScoped(tenant=UpsertTenant(name="unsaved"), slug="s", value=1)],
             update_fields=[UpsertScoped.value],
             unique_fields=[UpsertScoped.tenant, UpsertScoped.slug],
+        )
+
+
+def test_bulk_upsert_decimal_key_conflicts_across_scales(db):
+    # numeric(12,4) stores 1.0 and 1.00 as the same value, so the second call
+    # has to find the first one's row rather than insert beside it.
+    first = [UpsertDecimalKey(amount=Decimal("1.0"), value=1)]
+    UpsertDecimalKey.query.bulk_upsert(
+        first,
+        update_fields=[UpsertDecimalKey.value],
+        unique_fields=[UpsertDecimalKey.amount],
+    )
+
+    second = [UpsertDecimalKey(amount=Decimal("1.00"), value=2)]
+    UpsertDecimalKey.query.bulk_upsert(
+        second,
+        update_fields=[UpsertDecimalKey.value],
+        unique_fields=[UpsertDecimalKey.amount],
+    )
+
+    assert second[0].id == first[0].id
+    assert UpsertDecimalKey.query.count() == 1
+    assert UpsertDecimalKey.query.get(id=first[0].id).value == 2
+
+
+def test_bulk_upsert_decimal_key_conflicts_across_signed_zero(db):
+    zero = [UpsertDecimalKey(amount=Decimal("0.0"), value=1)]
+    UpsertDecimalKey.query.bulk_upsert(
+        zero,
+        update_fields=[UpsertDecimalKey.value],
+        unique_fields=[UpsertDecimalKey.amount],
+    )
+
+    negative_zero = [UpsertDecimalKey(amount=Decimal("-0.00"), value=2)]
+    UpsertDecimalKey.query.bulk_upsert(
+        negative_zero,
+        update_fields=[UpsertDecimalKey.value],
+        unique_fields=[UpsertDecimalKey.amount],
+    )
+
+    assert negative_zero[0].id == zero[0].id
+    assert UpsertDecimalKey.query.count() == 1
+
+
+def test_bulk_upsert_decimal_keys_at_different_scales_in_one_batch(db):
+    # Postgres holds these equal, so they are the same row twice in one
+    # statement -- the sort renders them identically, and the cardinality
+    # violation is reported as the duplicate it is.
+    with pytest.raises(ValueError, match=r"same \['amount'\] in one statement"):
+        UpsertDecimalKey.query.bulk_upsert(
+            [
+                UpsertDecimalKey(amount=Decimal("1.0"), value=1),
+                UpsertDecimalKey(amount=Decimal("1.000"), value=2),
+            ],
+            update_fields=[UpsertDecimalKey.value],
+            unique_fields=[UpsertDecimalKey.amount],
         )

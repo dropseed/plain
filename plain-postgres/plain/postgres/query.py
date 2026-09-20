@@ -881,8 +881,9 @@ class QuerySet[T: "Model"]:
         for obj in objs:
             key = []
             for field in unique_columns:
-                # Prepared once here and handed to the sort key, rather than
-                # prepared again inside it.
+                # Prepared once here and handed to the sort key, rather
+                # than prepared again inside it. A malformed value is rejected
+                # at this point, before any statement goes out.
                 value = field.get_prep_value(field.value_from_object(obj))
                 if value is None:
                     raise ValueError(

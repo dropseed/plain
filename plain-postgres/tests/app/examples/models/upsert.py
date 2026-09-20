@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from plain.postgres import Field, types
@@ -95,6 +96,23 @@ class UpsertFloatKey(postgres.Model):
         constraints=[
             postgres.UniqueConstraint(
                 fields=["score"], name="upsertfloatkey_score_unique"
+            ),
+        ]
+    )
+
+
+@postgres.register_model
+class UpsertDecimalKey(postgres.Model):
+    """A numeric conflict key -- the column type whose scale Python keeps and
+    Postgres does not."""
+
+    amount: Field[Decimal] = types.DecimalField(max_digits=12, decimal_places=4)
+    value: Field[int] = types.IntegerField(default=0)
+
+    model_options = postgres.Options(
+        constraints=[
+            postgres.UniqueConstraint(
+                fields=["amount"], name="upsertdecimalkey_amount_unique"
             ),
         ]
     )
