@@ -15,7 +15,7 @@ from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.postgres import RowQuerySet
 from plain.postgres.aggregates import Count
 from plain.postgres.expressions import F, Value
-from plain.postgres.functions import Upper
+from plain.postgres.functions import Lower, Upper
 
 
 @pytest.fixture
@@ -390,6 +390,181 @@ def test_select_result_type_rejects_a_variadic_constructor(rows):
         DefaultsExample.query.select(DefaultsExample.name, result_type=Variadic)
 
 
+class TestSelectTwiceIsAlwaysLastWins:
+    """Re-selecting replaces the columns, whatever either side is made of.
+
+    The internal alias a selected expression gets used to restart its counter
+    from 1 on every select(), so a second expression column regenerated the
+    first one's alias and collided with it -- a ValueError blaming "a field on
+    the model" that named neither the real cause nor a real field.
+    """
+
+    @pytest.fixture
+    def ordered(self, db):
+        # LOWER(name) and UPPER(status) disagree about order, so a test can
+        # tell which one a query actually used.
+        DefaultsExample.query.create(name="zzz", priority=1, status="aaa")
+        DefaultsExample.query.create(name="aaa", priority=2, status="zzz")
+
+    def test_field_then_field(self, ordered):
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(DefaultsExample.name)
+            .select(DefaultsExample.priority)
+        )
+        assert list(result) == [(2,), (1,)]
+
+    def test_field_then_expression(self, ordered):
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(DefaultsExample.name)
+            .select(Upper("name"))
+        )
+        assert list(result) == [("AAA",), ("ZZZ",)]
+
+    def test_expression_then_field(self, ordered):
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(Upper("name"))
+            .select(DefaultsExample.name)
+        )
+        assert list(result) == [("aaa",), ("zzz",)]
+
+    def test_expression_then_same_expression_function(self, ordered):
+        """The reported crash: both aliases wanted to be 'upper1'."""
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(Upper("name"))
+            .select(Upper("status"))
+        )
+        assert list(result) == [("ZZZ",), ("AAA",)]
+
+    def test_expression_then_different_expression_function(self, ordered):
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(Upper("name"))
+            .select(Lower("status"))
+        )
+        assert list(result) == [("zzz",), ("aaa",)]
+
+    def test_f_then_f(self, ordered):
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(F("priority"))
+            .select(F("name"))
+        )
+        assert list(result) == [("aaa",), ("zzz",)]
+
+    def test_mixed_list_then_mixed_list(self, ordered):
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(DefaultsExample.name, Upper("status"))
+            .select(DefaultsExample.priority, Lower("name"))
+        )
+        assert list(result) == [(2, "aaa"), (1, "zzz")]
+
+    def test_flat_then_flat(self, ordered):
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(Upper("name"), flat=True)
+            .select(Upper("status"), flat=True)
+        )
+        assert list(result) == ["ZZZ", "AAA"]
+
+    def test_expression_then_result_type(self, ordered):
+        @dataclass
+        class NameAndUpper:
+            name: str
+            upper: str
+
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(Upper("name"))
+            .select(DefaultsExample.name, Upper("status"), result_type=NameAndUpper)
+        )
+        assert list(result) == [
+            NameAndUpper(name="aaa", upper="ZZZ"),
+            NameAndUpper(name="zzz", upper="AAA"),
+        ]
+
+    def test_three_selects_in_a_row(self, ordered):
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(Upper("name"))
+            .select(Upper("status"))
+            .select(Upper("name"))
+        )
+        assert list(result) == [("AAA",), ("ZZZ",)]
+
+    def test_aggregates_still_work_after_re_selecting(self, ordered):
+        rows = DefaultsExample.query.select(Upper("name")).select(Upper("status"))
+        assert rows.count() == 2
+        assert rows.exists() is True
+
+
+class TestInternalAliasesNeverClobberUserAnnotations:
+    """A selected expression gets an internal alias, and that alias must not
+    land on one the caller already chose -- doing so silently redefines what
+    order_by()/filter() on that name mean."""
+
+    @pytest.fixture
+    def ordered(self, db):
+        DefaultsExample.query.create(name="zzz", priority=1, status="aaa")
+        DefaultsExample.query.create(name="aaa", priority=2, status="zzz")
+
+    def test_order_by_a_user_annotation_keeps_its_meaning(self, ordered):
+        """'upper1' is what the generator would have produced for Upper(...),
+        so an unguarded generator overwrote LOWER(name) with UPPER(status) and
+        silently reversed the order."""
+        result = (
+            DefaultsExample.query.annotate(upper1=Lower("name"))
+            .order_by("upper1")
+            .select(DefaultsExample.name, Upper("status"))
+        )
+        assert [row[0] for row in result] == ["aaa", "zzz"]
+
+    def test_filter_on_a_user_annotation_keeps_its_meaning(self, ordered):
+        result = (
+            DefaultsExample.query.annotate(upper1=Lower("name"))
+            .filter(upper1="aaa")
+            .select(DefaultsExample.name, Upper("status"))
+        )
+        assert list(result) == [("aaa", "ZZZ")]
+
+
+class TestMergingRowAndModelQuerysets:
+    """Merging a row-mode queryset with a model-mode one produces a query
+    neither side describes. The guard only looked at the left operand, so
+    `model_qs | row_qs` recursed until the stack ran out."""
+
+    def test_model_or_row_raises(self, rows):
+        with pytest.raises(TypeError, match="must involve the same values"):
+            DefaultsExample.query.all() | DefaultsExample.query.select(
+                DefaultsExample.name
+            )
+
+    def test_row_or_model_raises(self, rows):
+        with pytest.raises(TypeError, match="must involve the same values"):
+            (
+                DefaultsExample.query.select(DefaultsExample.name)
+                | DefaultsExample.query.all()
+            )
+
+    def test_model_and_row_raises(self, rows):
+        with pytest.raises(TypeError, match="must involve the same values"):
+            DefaultsExample.query.all() & DefaultsExample.query.select(
+                DefaultsExample.name
+            )
+
+    def test_matching_sides_still_merge(self, rows):
+        model = DefaultsExample.query.all() | DefaultsExample.query.all()
+        assert len(list(model)) == 3
+        row = DefaultsExample.query.select(
+            DefaultsExample.name
+        ) | DefaultsExample.query.select(DefaultsExample.name)
+        assert len(list(row)) == 3
+
+
 class TestSelectTwiceWithExpressions:
     """`select()` twice is last-wins, and that has to hold for expression
     columns too. `_values_list` aliases an expression by annotating
@@ -525,6 +700,18 @@ def test_select_after_values_raises(db):
 def test_values_after_select_raises(db):
     with pytest.raises(TypeError, match="after select"):
         DefaultsExample.query.select(DefaultsExample.name).values("name")
+
+
+def test_create_after_select_raises(db):
+    with pytest.raises(TypeError, match="create"):
+        DefaultsExample.query.select(DefaultsExample.name).create(name="x")
+
+
+def test_bulk_create_after_select_raises(db):
+    with pytest.raises(TypeError, match="bulk_create"):
+        DefaultsExample.query.select(DefaultsExample.name).bulk_create(
+            [DefaultsExample(name="x")]
+        )
 
 
 def test_update_after_select_raises(db):

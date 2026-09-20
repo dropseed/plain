@@ -110,6 +110,9 @@ def must_accept_the_row_type_flowing_out_of_the_queryset() -> None:
         assert_type(row, tuple[str, int])
     assert_type(D.query.select(D.name, D.priority).first(), tuple[str, int] | None)
     assert_type(D.query.select(D.name, D.priority).get(), tuple[str, int])
+    assert_type(
+        D.query.select(D.name, D.priority).get_or_none(), tuple[str, int] | None
+    )
     for value in D.query.select(D.name, flat=True):
         assert_type(value, str)
 
