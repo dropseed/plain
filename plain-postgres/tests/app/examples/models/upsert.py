@@ -36,6 +36,15 @@ class UpsertItem(postgres.Model):
         ]
     )
 
+    @property
+    def label_upper(self) -> str:
+        """A settable property, to pin that upsert() refuses to write one."""
+        return self.label.upper()
+
+    @label_upper.setter
+    def label_upper(self, value: str) -> None:
+        self.label = value.lower()
+
 
 # NOTE: #86 grows an equivalent UpsertTenant/UpsertScoped pair; collapse onto
 # whichever survives the merge.

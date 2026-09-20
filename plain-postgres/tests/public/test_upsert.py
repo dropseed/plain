@@ -208,6 +208,25 @@ def test_upsert_conflict_defaults_do_not_call_expressions(db):
     assert obj.value == 15
 
 
+def test_upsert_rejects_a_property_name(db):
+    """upsert() derives its SET clause from columns, so a settable property
+    would be written on insert and silently dropped on conflict.
+    """
+    with pytest.raises(FieldError, match="is a property"):
+        UpsertItem.query.upsert(
+            key="a", label_upper="HELLO", unique_fields=[UpsertItem.key]
+        )
+
+
+def test_upsert_rejects_a_property_name_in_defaults(db):
+    with pytest.raises(FieldError, match="is a property"):
+        UpsertItem.query.upsert(
+            key="a",
+            defaults={"label_upper": "HELLO"},
+            unique_fields=[UpsertItem.key],
+        )
+
+
 def test_upsert_conflict_defaults_rejects_the_primary_key(db):
     with pytest.raises(ValueError, match="cannot update primary key fields"):
         UpsertItem.query.upsert(

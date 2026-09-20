@@ -581,7 +581,9 @@ would overwrite the stored creation timestamp every time. A column that's also
 taking them, so a `conflict_defaults` key may not name a unique field — that's
 the conflict target.
 
-Every value source resolves callables.
+Every value source resolves callables, and every key must name a **column** — a
+settable property is refused, since the `SET` clause is derived from columns and
+a property could only ever be written on the insert half.
 
 `unique_fields` must name a `UniqueConstraint` declared on the model (no
 condition, no expressions) and every unique field must be non-null. It can't be

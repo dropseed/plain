@@ -971,6 +971,10 @@ class QuerySet[T: "Model"]:
             named here is set on conflict whether or not it is otherwise being
             updated, and it cannot be a unique field.
 
+        Every source resolves callables, and every key must name a column: a
+        settable property is refused, because the SET clause is derived from
+        columns and a property could only ever be written on the insert half.
+
         On conflict the SET clause covers every non-unique, non-PK column drawn
         from kwargs and defaults -- each taking the value the INSERT proposed --
         plus every DateTimeField(update_now=True) column, whose fresh
@@ -1036,6 +1040,18 @@ class QuerySet[T: "Model"]:
         # Reject typo'd keys with a clean FieldError before they fail later and
         # more confusingly, matching get_or_create()'s validation.
         self._validate_model_field_names(insert_values)
+
+        # That check also admits settable properties, which get_or_create() can
+        # honour because it writes through the instance. upsert() derives its
+        # SET clause from columns, so a property would be written on insert and
+        # silently dropped on conflict -- refuse it rather than do half the job.
+        properties = sorted(meta._property_names & set(insert_values))
+        if properties:
+            names = ", ".join(f"{self.model.__name__}.{name}" for name in properties)
+            raise FieldError(
+                f"upsert() writes columns; {names} is a property. Pass the "
+                "column it sets instead."
+            )
 
         # Excluded() names the row this INSERT is proposing, so it can't be one
         # of that row's values. Catch it here, before the value is assigned to
