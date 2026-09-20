@@ -108,7 +108,7 @@ class AdminModelListView(AdminListView):
         if isinstance(self.filters, dict) and self.filter:
             q = self.filters.get(self.filter)
             if q is not None:
-                return queryset.filter(q)
+                return queryset.where(q)
         return queryset
 
     def search_objects(
@@ -134,16 +134,17 @@ class AdminModelListView(AdminListView):
             return super().select_objects_by_id(objects, ids)
         # get_object_id() returns the primary key, so we match on it and keep
         # the queryset lazy. Coerce each id through the pk field and drop the
-        # ones it rejects, so a stale or malformed id is ignored (per the base
-        # contract) rather than raising.
-        pk_field = self.model._model_meta.get_forward_field("id")
-        valid_ids = []
+        # ones it won't turn into a primary key, so a stale or malformed id is
+        # ignored (per the base contract) rather than raising.
+        valid_ids: list[int] = []
         for raw_id in ids:
             try:
-                valid_ids.append(pk_field.to_python(raw_id))
+                coerced = self.model.id.to_python(raw_id)
             except ValidationError:
                 continue
-        return objects.filter(id__in=valid_ids)
+            if coerced is not None:
+                valid_ids.append(coerced)
+        return objects.where(self.model.id.is_in(valid_ids))
 
     def order_objects(
         self, objects: postgres.QuerySet | list[Any]
@@ -260,7 +261,7 @@ class AdminModelDetailView(AdminDetailView):
             return get_model_field(obj, field)
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.get(id=self.url_kwargs["id"])
+        return self.model.query.where(self.model.id.equals(self.url_kwargs["id"])).get()
 
 
 class AdminModelCreateView(AdminCreateView):
@@ -300,7 +301,7 @@ class AdminModelUpdateView(AdminUpdateView):
         return f"{cls.model.model_options.model_name}/<int:id>/edit/"
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.get(id=self.url_kwargs["id"])
+        return self.model.query.where(self.model.id.equals(self.url_kwargs["id"])).get()
 
 
 class AdminModelDeleteView(AdminDeleteView):
@@ -317,4 +318,4 @@ class AdminModelDeleteView(AdminDeleteView):
         return f"{cls.model.model_options.model_name}/<int:id>/delete/"
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.get(id=self.url_kwargs["id"])
+        return self.model.query.where(self.model.id.equals(self.url_kwargs["id"])).get()
