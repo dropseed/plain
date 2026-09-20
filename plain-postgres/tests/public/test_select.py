@@ -532,6 +532,61 @@ class TestInternalAliasesNeverClobberUserAnnotations:
         assert list(result) == [("aaa", "ZZZ")]
 
 
+class TestColumnsBelongToTheirModel:
+    """`select()`'s half of the guard `where()` carries.
+
+    `Field[T]` carries no model identity, so nothing stops one model's field
+    being handed to another model's `select()`. The name then resolves against
+    the queried model -- silently the wrong column when both have one.
+    `Widget` is the other model here because it also has a `name`.
+    """
+
+    def test_same_model_column_passes(self, rows):
+        result = DefaultsExample.query.order_by("name").select(
+            DefaultsExample.name, flat=True
+        )
+        assert list(result) == ["alpha", "beta", "gamma"]
+
+    def test_other_model_column_raises_although_the_name_exists(self, rows):
+        """The dangerous case: both models have a `name`, so without the check
+        this quietly selected DefaultsExample.name."""
+        with pytest.raises(TypeError) as excinfo:
+            DefaultsExample.query.select(Widget.name)
+        message = str(excinfo.value)
+        assert "Widget.name" in message
+        assert "DefaultsExample queryset" in message
+
+    def test_other_model_column_raises_when_the_name_does_not_exist(self, rows):
+        """Previously a FieldError from deep in the compiler."""
+        with pytest.raises(TypeError, match="Widget.size"):
+            DefaultsExample.query.select(Widget.size)
+
+    def test_traversed_column_rooted_elsewhere_raises_as_cross_model(self, rows):
+        """Being another model's column is the root mistake, so it is named
+        ahead of the traversal refusal -- "select columns on the queried
+        model" would be advice that doesn't help here."""
+        with pytest.raises(TypeError, match="WidgetTag.widget__name"):
+            DefaultsExample.query.select(WidgetTag.widget.name)
+
+    def test_traversed_column_on_its_own_root_still_reports_traversal(self, db):
+        with pytest.raises(TypeError, match="reached through a relation"):
+            WidgetTag.query.select(WidgetTag.widget.name)
+
+    def test_expressions_are_unaffected(self, rows):
+        """An expression takes a string resolved against whatever query it
+        lands in, like filter()'s kwargs -- there is no origin to check."""
+        assert list(
+            DefaultsExample.query.order_by("name").select(F("priority"), flat=True)
+        ) == [3, 1, 2]
+        assert list(
+            DefaultsExample.query.order_by("name").select(Upper("name"), flat=True)
+        ) == ["ALPHA", "BETA", "GAMMA"]
+
+    def test_mixed_list_with_one_foreign_column_raises(self, rows):
+        with pytest.raises(TypeError, match="Widget.name"):
+            DefaultsExample.query.select(DefaultsExample.priority, Widget.name)
+
+
 class TestMergingRowAndModelQuerysets:
     """Merging a row-mode queryset with a model-mode one produces a query
     neither side describes. The guard only looked at the left operand, so

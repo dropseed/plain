@@ -194,3 +194,18 @@ def must_accept_or_degrading_because_its_clone_can_change_class() -> None:
     """
     rows = D.query.select(D.name, D.priority)
     assert_type(rows | rows, QuerySet[Any])
+
+
+def must_accept_a_column_from_another_model_because_the_checker_cannot_see_it() -> None:
+    """A column carries its value type but not its *model*.
+
+    `Field[str]` is `Field[str]` whichever model declared it, so nothing here
+    distinguishes a column meant for `DefaultsExample.query.select()` from one
+    meant for `WidgetTag.query.select()`. This line has to type-check clean --
+    that is the whole reason `select()` carries a runtime check instead,
+    mirroring `where()`'s in tests/typing/conditions_value_types.py.
+
+    Runtime half:
+    tests/public/test_select.py::TestColumnsBelongToTheirModel.
+    """
+    assert_type(D.query.select(WidgetTag.id), RowQuerySet[tuple[int]])

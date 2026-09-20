@@ -1398,6 +1398,8 @@ class QuerySet[T: "Model"]:
             dataclass_type = result_type
             _check_result_type_matches(dataclass_type, items)
 
+        for item in items:
+            self._check_column_model(item)
         columns = [_selectable_to_column(item) for item in items]
 
         clone = self._values_list(tuple(columns), flat=flat)
@@ -1455,6 +1457,36 @@ class QuerySet[T: "Model"]:
         for condition in conditions:
             self._check_condition_model(condition)
         return self.filter(*conditions)
+
+    def _check_column_model(self, item: Selectable[Any]) -> None:
+        """Reject a column built from another model's fields.
+
+        `where()`'s problem exactly, one method along: `Field[T]` carries no
+        model identity, so `Order.query.select(User.email)` type-checks and
+        the name `"email"` then resolves against `Order` -- silently the wrong
+        column when both models have one, a `FieldError` from the compiler
+        when they don't.
+
+        A traversed column reports the model its traversal started from, so
+        this fires before the traversal refusal does: being another model's
+        column is the root mistake, and "select columns on the queried model"
+        would be advice that doesn't help.
+
+        Expressions carry no origin and are left alone -- `F("email")` and
+        `Upper("email")` are strings resolved against whatever query they land
+        in, the same as `filter()`'s kwargs.
+        """
+        if not isinstance(item, Field):
+            return
+        source_model = item.source_model
+        if source_model is not None and source_model is not self.model:
+            raise TypeError(
+                f"select() got a column built from "
+                f"{source_model.__name__}.{item.name}, but this is a "
+                f"{self.model.__name__} queryset. Select "
+                f"{self.model.__name__}'s own field, or traverse to it from "
+                f"{self.model.__name__}."
+            )
 
     def _check_condition_model(self, condition: Q) -> None:
         """Reject a condition built from another model's fields.

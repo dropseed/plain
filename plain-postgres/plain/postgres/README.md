@@ -322,6 +322,8 @@ Columns annotated `Field[Any]` are rejected by `select()`, because `Any` satisfi
 
 `select()` takes typed references only — a bare string like `select("email")` raises `TypeError` (use `User.email`).
 
+**A column belongs to the model whose field built it**, the same as [a condition does](#querying-with-typed-conditions): `Order.query.select(User.email)` raises `TypeError` naming both models. A type checker can't catch it — `Field[str]` is `Field[str]` whichever model declared it — and without the check the name `"email"` just resolves against `Order`, silently the wrong column when both models have one. Expressions are unaffected: `F("email")` and `Upper("email")` take a string resolved against whatever query they land in, like `filter()`'s kwargs.
+
 **Relations are not selectable yet.** `select(Post.author)` (the relation) and `select(Post.author.city)` (a column through it) both raise `TypeError`, and so does `select(Post.author.id)` — the foreign key column itself. The reason is nullability: a column reached through a relation arrives over a join, so a nullable relation yields `None` where the traversed field's type says it can't. Until `select()` can express that, `values_list("author__id", flat=True)` is the spelling, and the error message names it.
 
 **`select()` hands back a plain `RowQuerySet`, not your custom QuerySet subclass.** Chain your own methods before `select()`, not after — `User.query.active().select(...)` works, `User.query.select(...).active()` raises `AttributeError`.
