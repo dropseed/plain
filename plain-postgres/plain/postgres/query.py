@@ -1764,14 +1764,24 @@ class QuerySet[T: "Model"]:
         return self
 
     def _merge_sanity_check(self, other: QuerySet[T]) -> None:
-        """Check that two QuerySet classes may be merged."""
-        if self._fields is not None and (
-            set(self.sql_query.values_select) != set(other.sql_query.values_select)
+        """Check that two QuerySet classes may be merged.
+
+        Either side being in row mode is enough to matter: merging a row-mode
+        queryset with a model-mode one produces a query neither side describes,
+        and left unchecked `model_qs | row_qs` recurses until the stack runs
+        out. The guard used to look only at `self`, so it caught the merge from
+        one side and not the other.
+        """
+        if (self._fields is not None or other._fields is not None) and (
+            self._fields != other._fields
+            or set(self.sql_query.values_select) != set(other.sql_query.values_select)
             or set(self.sql_query.annotation_select)
             != set(other.sql_query.annotation_select)
         ):
             raise TypeError(
-                f"Merging '{self.__class__.__name__}' classes must involve the same values in each case."
+                f"Merging '{self.__class__.__name__}' and "
+                f"'{other.__class__.__name__}' classes must involve the same "
+                f"values in each case."
             )
 
     def _merge_known_related_objects(self, other: QuerySet[T]) -> None:
