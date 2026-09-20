@@ -54,7 +54,7 @@ from plain.postgres.utils import resolve_callables
 from plain.utils.functional import partition
 
 # Re-exports for public API
-__all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet", "ReturningQuerySet"]
+__all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet"]
 
 if TYPE_CHECKING:
     from plain.postgres import Model
