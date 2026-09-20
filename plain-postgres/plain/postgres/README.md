@@ -661,7 +661,7 @@ with transaction.atomic():
 ```sql
 UPDATE "jobs" SET "status" = 'running'
 WHERE "id" IN (
-    SELECT "id" FROM "jobs" WHERE "status" = 'pending' FOR UPDATE SKIP LOCKED
+    SELECT U0."id" FROM "jobs" U0 WHERE U0."status" = 'pending' FOR UPDATE OF U0 SKIP LOCKED
 )
 RETURNING ...
 ```
