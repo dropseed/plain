@@ -68,6 +68,23 @@ class AdminView(AuthView, TemplateView):
     # Set dynamically by AdminViewset.get_views()
     viewset: type[AdminViewset] | None = None
 
+    # Set dynamically by AdminViewset.get_views() to the sibling view's
+    # get_view_url, when that sibling view exists on the viewset.
+    def get_list_url(self) -> str:
+        return ""
+
+    def get_create_url(self) -> str:
+        return ""
+
+    def get_detail_url(self, obj: Any) -> str:
+        return ""
+
+    def get_update_url(self, obj: Any) -> str:
+        return ""
+
+    def get_delete_url(self, obj: Any) -> str:
+        return ""
+
     template_name = "admin/page.html"
     cards: tuple[Card, ...] = ()
 
