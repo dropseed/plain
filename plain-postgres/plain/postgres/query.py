@@ -1114,7 +1114,10 @@ class QuerySet[T: "Model"]:
     def _values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
         clone = self._chain()
         if expressions:
-            clone = clone.annotate(**expressions)
+            # The internal mechanism, not the public method: select() aliases
+            # its expression columns through here, and RowQuerySet refuses
+            # annotate().
+            clone = clone._annotate(**expressions)
         clone._fields = fields
         clone.sql_query.set_values(list(fields))
         return clone
@@ -1476,6 +1479,16 @@ class QuerySet[T: "Model"]:
         """
         Return a query set in which the returned objects have been annotated
         with extra data or aggregations.
+        """
+        return self._annotate(*args, **kwargs)
+
+    def _annotate(self, *args: Any, **kwargs: Any) -> Self:
+        """The mechanism behind `annotate()`.
+
+        Separate from the public method because `_values_list` annotates
+        internally to alias expression columns, and `RowQuerySet` refuses the
+        public `annotate()` -- selecting an expression twice must not trip a
+        guard aimed at callers adding a column to a finished row.
         """
         self._validate_values_are_expressions(
             args + tuple(kwargs.values()), method_name="annotate"
