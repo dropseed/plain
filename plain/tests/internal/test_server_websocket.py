@@ -235,6 +235,7 @@ def test_view_exception_closes_1011_and_is_logged_on_a_span(
     assert span.kind == trace.SpanKind.SERVER
     assert span.name == "WEBSOCKET /websocket/raises"
     assert span.status.status_code == trace.StatusCode.ERROR
+    assert span.attributes is not None
     assert span.attributes["error.type"] == "RuntimeError"
     assert span.attributes["http.response.status_code"] == 101
     assert len(span.links) == 1

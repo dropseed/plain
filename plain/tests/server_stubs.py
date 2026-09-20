@@ -182,7 +182,7 @@ class LogCapture(logging.Handler):
         self.records: list[logging.LogRecord] = []
 
     def emit(self, record: logging.LogRecord) -> None:
-        record.captured_span_id = trace.get_current_span().get_span_context().span_id  # ty: ignore[unresolved-attribute]
+        record.captured_span_id = trace.get_current_span().get_span_context().span_id
         self.records.append(record)
 
 
