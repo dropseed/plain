@@ -1,5 +1,22 @@
 # plain changelog
 
+## [0.164.0](https://github.com/dropseed/plain/releases/plain@0.164.0) (2026-09-20)
+
+### What's changed
+
+- WebSockets. A view handles a socket by defining `async def websocket(self, ws)`. The RFC 6455 upgrade runs through the normal pipeline — middleware, `before_request`, URL kwargs — so auth checks reject the handshake with their usual 403 or redirect, and the same URL keeps serving its page from `get()`. `ws` is the whole surface: `async for message in ws` yields complete `str`/`bytes` messages, `await ws.send(...)`, `await ws.close(code, reason)`, `ws.subprotocol`, `ws.closed`/`ws.close_code`/`ws.close_reason`. Returning from `websocket()` closes the socket. A peer leaving is a normal ending: iteration stops and `send()` raises `WebSocketClosed`; any other exception is logged like a 500 and closes with 1011. `websocket_subprotocols` declares the subprotocols a view accepts and `websocket_max_message_size` (1 MiB) caps inbound messages. `plain.http` exports `WebSocket`, `WebSocketClosed` and the framework-built 101 `WebSocketResponse` ([0a36f92e50](https://github.com/dropseed/plain/commit/0a36f92e50))
+- The server frames an accepted upgrade as a headers-only 101 and runs the view's coroutine on the event loop for the life of the socket, in the request's context, under a socket-lifetime SERVER span with an access log line at close. Keepalive is automatic (a ping every 20 seconds, 1001 if no pong within 20 seconds). Worker shutdown is cooperative: draining sends every open socket a 1001 close and cancels its coroutine. A handshake that arrives while draining, or with bytes queued behind it, is refused with 503 ([0a36f92e50](https://github.com/dropseed/plain/commit/0a36f92e50))
+- A cross-origin websocket handshake is refused with 403 by the same origin decision the CSRF middleware makes; `CSRF_TRUSTED_ORIGINS` allows one (`CSRF_EXEMPT_PATHS` does not apply to upgrades). That decision now lives in `plain.csrf.origin.check_cross_origin` ([0a36f92e50](https://github.com/dropseed/plain/commit/0a36f92e50))
+- `Client.websocket(path, subprotocols=...)` in `plain.test` drives a view's `websocket()` in-process: `ws.send()`, `ws.receive(timeout=...)`, `ws.close()`, `ws.subprotocol`, `ws.response`. A handshake that doesn't produce a socket raises `WebSocketRejected` carrying the response; a view that closes makes `receive()` raise `WebSocketClosed`. The view runs on the test's thread inside a copy of its context, so the test database transaction is visible to it ([0a36f92e50](https://github.com/dropseed/plain/commit/0a36f92e50))
+- Every response the handler returns carries `request_context`, the per-request `contextvars.Context` the pipeline ran in, so work that continues after the pipeline — a websocket's `websocket()` coroutine — sees the same context-local state middleware set up ([0a36f92e50](https://github.com/dropseed/plain/commit/0a36f92e50))
+- `Paginator` raises `ValueError` at construction when `per_page` is less than 1, instead of failing later during pagination ([788d2a7367](https://github.com/dropseed/plain/commit/788d2a7367))
+- `NotAllowedResponse` no longer accepts a `status_code` argument — it always means exactly 405 ([b31d4d7a4e](https://github.com/dropseed/plain/commit/b31d4d7a4e))
+
+### Upgrade instructions
+
+- If you passed `status_code=` to `NotAllowedResponse`, remove it (or construct a plain `Response` with the status you want).
+- If you construct a `Paginator` with `per_page=0`, that now raises immediately — pass at least 1.
+
 ## [0.163.1](https://github.com/dropseed/plain/releases/plain@0.163.1) (2026-09-18)
 
 ### What's changed
