@@ -130,6 +130,46 @@ def test_upsert_conflict_defaults_increment_counter_atomically(db):
     assert UpsertItem.query.get(key="a").value == 11
 
 
+def test_upsert_conflict_defaults_bind_to_their_own_columns(db):
+    """The SET clause is emitted in model field order while conflict_defaults
+    is a dict in the caller's order, so the assignments and their parameters
+    have to be built in one pass -- otherwise each value binds to the wrong
+    column. Declared value-then-label against a model that has label first.
+    """
+    UpsertItem(key="a", value=1, label="old").create()
+
+    obj, created = UpsertItem.query.upsert(
+        key="a",
+        value=1,
+        label="old",
+        conflict_defaults={"value": 42, "label": "HELLO"},
+        unique_fields=[UpsertItem.key],
+    )
+
+    assert created is False
+    assert (obj.value, obj.label) == (42, "HELLO")
+    stored = UpsertItem.query.get(key="a")
+    assert (stored.value, stored.label) == (42, "HELLO")
+
+
+def test_upsert_conflict_defaults_set_order_matches_param_order(db, capture_queries):
+    UpsertItem(key="a", value=1, label="old").create()
+
+    with capture_queries() as queries:
+        UpsertItem.query.upsert(
+            key="a",
+            value=1,
+            label="old",
+            conflict_defaults={"value": 42, "label": "HELLO"},
+            unique_fields=[UpsertItem.key],
+        )
+
+    set_clause = queries[0]["sql"].split("DO UPDATE SET ")[1].split(" RETURNING")[0]
+    # label precedes value in the model, so the literals must appear that way
+    # round too -- the parameters are interpolated in the order they were sent.
+    assert set_clause.index("'HELLO'") < set_clause.index("42")
+
+
 def test_upsert_conflict_defaults_apply_on_insert_uses_inserted_value(db):
     # On insert there's no existing row, so the inserted value stands; the
     # conflict_defaults override only takes effect on a later conflict.

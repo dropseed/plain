@@ -585,42 +585,20 @@ def explain_query_prefix(format: str | None = None, **options: Any) -> str:
 
 def on_conflict_suffix_sql(
     on_conflict: OnConflict | None,
-    update_fields: Iterable[str],
     unique_fields: Iterable[str],
-    conflict_overrides: dict[str, str] | None = None,
+    assignments: Iterable[tuple[str, str]],
 ) -> str:
+    """Format the ON CONFLICT ... DO UPDATE SET clause.
+
+    `assignments` are already-ordered (quoted column, value SQL) pairs, built
+    by the insert compiler alongside their parameters so the two cannot drift
+    apart -- a SET list ordered one way and a parameter list ordered another
+    binds values to the wrong columns.
+    """
     if on_conflict != OnConflict.UPDATE:
         return ""
 
-    conflict_overrides = conflict_overrides or {}
-    unique_columns = list(unique_fields)
-    update_columns = list(update_fields)
-
-    # Each base update column is set to its EXCLUDED value (the value the
-    # INSERT proposed), except where conflict_overrides supplies a per-column
-    # SQL fragment (e.g. an atomic "count = count + 1" counter).
-    assignments = []
-    for column in update_columns:
-        quoted = quote_name(column)
-        if column in conflict_overrides:
-            assignments.append(f"{quoted} = {conflict_overrides[column]}")
-        else:
-            assignments.append(f"{quoted} = EXCLUDED.{quoted}")
-
-    # Override-only columns aren't among the EXCLUDED update columns, so append
-    # them after (a counter column, say, that isn't otherwise being set).
-    for column, fragment in conflict_overrides.items():
-        if column not in update_columns:
-            assignments.append(f"{quote_name(column)} = {fragment}")
-
-    if not assignments:
-        # Nothing to update -- Postgres still requires a DO UPDATE SET body,
-        # and only DO UPDATE (not DO NOTHING) returns the conflicting row via
-        # RETURNING. Set a unique column to itself as a no-op.
-        first = quote_name(unique_columns[0])
-        assignments.append(f"{first} = EXCLUDED.{first}")
-
     return "ON CONFLICT({}) DO UPDATE SET {}".format(
-        ", ".join(map(quote_name, unique_columns)),
-        ", ".join(assignments),
+        ", ".join(map(quote_name, unique_fields)),
+        ", ".join(f"{column} = {value}" for column, value in assignments),
     )

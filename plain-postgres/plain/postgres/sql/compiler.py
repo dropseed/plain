@@ -8,7 +8,7 @@ from functools import cached_property
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from plain.postgres.constants import LOOKUP_SEP
+from plain.postgres.constants import LOOKUP_SEP, OnConflict
 from plain.postgres.dialect import (
     PK_DEFAULT_VALUE,
     bulk_insert_sql,
@@ -1517,16 +1517,14 @@ class SQLInsertCompiler(SQLCompiler):
 
         placeholder_rows, param_rows = self.assemble_as_sql(fields, value_rows)
 
-        # conflict_defaults compile to per-column SQL fragments (with their own
-        # params) that override the default "col = EXCLUDED.col" assignment.
-        # Their params follow the VALUES params, since DO UPDATE SET comes after
-        # VALUES in the statement.
-        conflict_overrides, conflict_params = self._conflict_override_sql()
+        # The DO UPDATE SET assignments and their params come back in one
+        # order from one pass. Their params follow the VALUES params, since
+        # DO UPDATE SET comes after VALUES in the statement.
+        conflict_assignments, conflict_params = self._conflict_assignments()
         conflict_suffix_sql = on_conflict_suffix_sql(
             self.query.on_conflict,
-            (f.column for f in self.query.update_fields),
             (f.column for f in self.query.unique_fields),
-            conflict_overrides,
+            conflict_assignments,
         )
         if self.returning_fields:
             # Use RETURNING clause to get inserted values
@@ -1549,27 +1547,66 @@ class SQLInsertCompiler(SQLCompiler):
         params = tuple(p for ps in param_rows for p in ps) + tuple(conflict_params)
         return [(" ".join(result), params)]
 
-    def _conflict_override_sql(self) -> tuple[dict[str, str], list[Any]]:
-        """Compile conflict_defaults into {column: SQL fragment} plus params.
+    def _conflict_assignments(self) -> tuple[list[tuple[str, str]], list[Any]]:
+        """Build the ON CONFLICT DO UPDATE SET assignments and their params.
 
-        Reuses the same value-compilation as UPDATE ... SET so an override can
-        be a plain value, a model instance (for a related field), or an
-        expression (e.g. F("count") + 1, which resolves to the target row's
-        existing column for an atomic counter).
+        Both come out of a single pass in a single order: a SET list ordered
+        one way and a parameter list ordered another binds each value to the
+        wrong column.
+
+        Each update column takes the value the INSERT proposed, except where
+        conflict_defaults replaces it. Those overrides go through the same
+        value-compilation as UPDATE ... SET, so one can be a plain value, a
+        model instance (for a related field), or an expression (e.g.
+        F("count") + 1, which reads the target row's existing column).
         """
-        overrides: dict[str, str] = {}
+        if self.query.on_conflict != OnConflict.UPDATE:
+            return [], []
+
+        override_by_column = {
+            field.column: (field, value)
+            for field, value in self.query.conflict_defaults.items()
+        }
+        overridden: set[str] = set()
+        assignments: list[tuple[str, str]] = []
         params: list[Any] = []
+
         # Excluded() reads this flag to tell a DO UPDATE SET assignment from
         # the VALUES list of the same statement.
         self.query.compiling_conflict_assignment = True
         try:
-            for field, val in self.query.conflict_defaults.items():
-                rhs, rhs_params = self._compile_assignment_value(field, val)
-                overrides[field.column] = rhs
+            for field in self.query.update_fields:
+                quoted = quote_name(field.column)
+                if field.column in override_by_column:
+                    overridden.add(field.column)
+                    override_field, value = override_by_column[field.column]
+                    rhs, rhs_params = self._compile_assignment_value(
+                        override_field, value
+                    )
+                    assignments.append((quoted, rhs))
+                    params.extend(rhs_params)
+                else:
+                    assignments.append((quoted, f"EXCLUDED.{quoted}"))
+
+            # An override for a column that isn't otherwise being updated -- a
+            # counter, say -- has no slot above, so it goes on the end.
+            for field, value in self.query.conflict_defaults.items():
+                if field.column in overridden:
+                    continue
+                rhs, rhs_params = self._compile_assignment_value(field, value)
+                assignments.append((quote_name(field.column), rhs))
                 params.extend(rhs_params)
         finally:
             self.query.compiling_conflict_assignment = False
-        return overrides, params
+
+        if not assignments:
+            # Postgres still requires a SET body, and only DO UPDATE (not DO
+            # NOTHING) returns the conflicting row via RETURNING. Set a unique
+            # column to itself as a no-op.
+            quoted = quote_name(self.query.unique_fields[0].column)
+            assignments.append((quoted, f"EXCLUDED.{quoted}"))
+
+        return assignments, params
 
     def execute_sql(  # ty: ignore[invalid-method-override]
         self, returning_fields: list | None = None
