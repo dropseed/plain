@@ -523,6 +523,7 @@ for row in deleted:
 ```
 
 - **`returning()`** returns full model instances. For `update()` they hold the new values and stay live. For `delete()` they are **read-only snapshots**: every value is there to read, the id included, but the row is gone, so `create()`, `update()` and `delete()` on them raise.
+    - That is the opposite of `Model.delete()`, which clears the instance's id and leaves it re-creatable — that instance is a row you still hold and may want to put back, while a snapshot is a record of one that was removed, and its id is the point.
 - **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a many-to-many field or one from another model raises an error at the `returning()` call.
 - **A foreign key can't be named here.** At class level `Model.fk` is the relation — that is what lets `where()` traverse it, as in `Child.parent.name.equals(...)` — not its column, so `returning(Child.parent)` raises `FieldError`. Foreign key columns come back through no-argument `returning()`, which hands you whole instances.
 - Without `returning()`, `update()`/`delete()` return an `int` as before.

@@ -62,6 +62,16 @@ MAX_GET_RESULTS = 21
 REPR_OUTPUT_SIZE = 20
 
 
+def _returning_signature(fields: list[Field]) -> list[tuple[Any, str | None]]:
+    """Identify a returning() selection by the columns it names.
+
+    Two selections that mean the same thing can hold different Field
+    objects -- deepcopy() of a queryset copies them -- so comparing the
+    lists themselves would call a queryset and its own copy a mismatch.
+    """
+    return [(field.model, field.name) for field in fields]
+
+
 def _lock_conflict_clause(query: Query) -> str | None:
     """
     Name the thing in `query` that Postgres refuses to combine with a row lock,
@@ -578,7 +588,8 @@ class QuerySet[T: "Model"]:
         if self._returning_fields is None:
             return other._returning_fields, other._returning_instances
         if (
-            self._returning_fields != other._returning_fields
+            _returning_signature(self._returning_fields)
+            != _returning_signature(other._returning_fields)
             or self._returning_instances != other._returning_instances
         ):
             raise TypeError(
@@ -1059,23 +1070,37 @@ class QuerySet[T: "Model"]:
         self, fields: tuple[Field[Any], ...]
     ) -> list[Field]:
         """Check each returning() reference and return the columns to RETURN."""
-        # Local import: related_descriptors imports this module at load time.
+        # Local import: these modules import this one at load time.
         from plain.postgres.fields.related_descriptors import (
             ForwardForeignKeyDescriptor,
+            ForwardManyToManyDescriptor,
         )
+        from plain.postgres.fields.reverse_descriptors import BaseReverseDescriptor
+
+        def relation_name(reference: Any) -> str | None:
+            """The attribute name, when `reference` is a relation not a column.
+
+            At class level a relation attribute is its descriptor -- that is
+            what lets where() traverse it -- so none of these is a column
+            reference, and each has its name in a different place.
+            """
+            if isinstance(reference, ForwardForeignKeyDescriptor):
+                return reference._field.name
+            if isinstance(reference, ForwardManyToManyDescriptor):
+                return reference.field.name
+            if isinstance(reference, BaseReverseDescriptor):
+                return reference.name
+            return None
 
         object_name = self.model.model_options.object_name
         columns = []
         for field in fields:
-            if isinstance(field, ForwardForeignKeyDescriptor):
-                # Model.fk is the relation at class level, not its column --
-                # that is what lets where() traverse it. So there is no
-                # reference to name the foreign key column with here.
+            if name := relation_name(field):
                 raise FieldError(
-                    f"Cannot use {object_name}.{field._field.name} in "
-                    "returning(): it is a relation, not a column reference. "
-                    "Use returning() with no arguments to get whole "
-                    "instances, which carry the foreign key."
+                    f"Cannot use {object_name}.{name} in returning(): it is "
+                    "a relation, not a column reference. RETURNING reads "
+                    f"columns of {object_name}'s own table -- use returning() "
+                    "with no arguments to get whole instances."
                 )
             if isinstance(field, str):
                 raise TypeError(

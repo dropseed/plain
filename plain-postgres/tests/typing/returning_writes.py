@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from typing import Any, assert_type
 
-from app.examples.models.delete import ChildCascade
+from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.querysets import CustomQuerySet, CustomQuerySetModel
+from app.examples.models.relationships import Widget
 from app.examples.models.returning import ReturningEvent
 
 
@@ -38,10 +39,13 @@ def must_reject_string_field_names() -> None:
 
 
 def must_reject_a_relation_reference() -> None:
-    # Model.fk is the relation descriptor, not a column.
+    # At class level a relation attribute is its descriptor, not a column --
+    # forward FK, many-to-many and reverse FK alike.
     # Runtime half:
     # tests/public/test_returning.py::test_returning_relation_reference_errors.
     ChildCascade.query.returning(ChildCascade.parent)  # ty: ignore[invalid-argument-type]
+    Widget.query.returning(Widget.tags)  # ty: ignore[invalid-argument-type]
+    DeleteParent.query.returning(DeleteParent.childcascade_set)  # ty: ignore[invalid-argument-type]
 
 
 def must_keep_the_return_shape_through_a_lock() -> None:

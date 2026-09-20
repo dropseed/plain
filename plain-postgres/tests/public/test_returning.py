@@ -7,6 +7,7 @@ returning(*Model.field) returns a list of dicts holding just those columns.
 
 from __future__ import annotations
 
+import copy
 import operator
 import re
 from typing import TYPE_CHECKING, cast
@@ -15,6 +16,7 @@ import psycopg
 import pytest
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.querysets import CustomQuerySet, CustomQuerySetModel
+from app.examples.models.relationships import Widget
 from app.examples.models.returning import ReturningEvent
 from plain.postgres import transaction
 from plain.postgres.db import get_connection
@@ -251,11 +253,21 @@ def test_delete_returning_across_a_relation(db, capture_queries):
 # ===========================================================================
 
 
-def test_returning_relation_reference_errors(db):
-    # Model.fk is the relation, not the column, so it has no spelling here --
-    # say that instead of dumping the descriptor's repr.
+@pytest.mark.parametrize(
+    "reference",
+    [
+        lambda: ChildCascade.parent,
+        lambda: Widget.tags,
+        lambda: DeleteParent.childcascade_set,
+    ],
+    ids=["forward_fk", "many_to_many", "reverse_fk"],
+)
+def test_returning_relation_reference_errors(db, reference):
+    # At class level a relation attribute is its descriptor -- that is what
+    # lets where() traverse it -- so none of them is a column reference. Say
+    # that, for every kind, instead of dumping the descriptor's repr.
     with pytest.raises(FieldError, match="it is a relation, not a column"):
-        ChildCascade.query.returning(ChildCascade.parent)  # ty: ignore[invalid-argument-type]
+        ChildCascade.query.returning(reference())
 
 
 def test_returning_instances_carry_foreign_keys(db):
@@ -620,3 +632,15 @@ def test_column_selection_keeps_the_returning_state(db, narrow):
     assert len(rows) == 2
     assert {row.count for row in rows} == {8}
     assert all(row.payload is not None for row in rows)
+
+
+def test_deepcopy_of_a_returning_queryset_still_combines(db):
+    # deepcopy() copies the Field objects, so comparing the selections by
+    # identity called a queryset and its own copy a mismatch.
+    _seed_events()
+    qs = ReturningEvent.query.filter(label="a").returning()
+
+    combined = copy.deepcopy(qs) | qs
+
+    rows = combined.update(count=5)
+    assert {row.count for row in rows} == {5}
