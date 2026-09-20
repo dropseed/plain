@@ -7,6 +7,7 @@ fields (primary key, DB defaults) populated from the row at its own position.
 
 from __future__ import annotations
 
+import random
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -500,3 +501,69 @@ def test_bulk_upsert_accepts_any_sequence_of_field_references(db):
 
     assert items[0].id is not None
     assert UpsertPair.query.get(bucket="b", slug="s").value == 1
+
+
+def test_bulk_upsert_honors_an_id_the_caller_set(db):
+    # An explicitly set id is the caller's choice, not ours to discard for a
+    # generated one -- bulk_create() honors it, and so does this.
+    item = UpsertItem(key="a", value=1)
+    item.id = 5
+    UpsertItem.query.bulk_upsert(
+        [item], update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
+    )
+
+    assert item.id == 5
+    assert UpsertItem.query.get(key="a").id == 5
+
+
+def test_bulk_upsert_mixes_objects_with_and_without_ids(db):
+    # The two go out as separate statements; both still come back hydrated
+    # from their own row.
+    with_id = UpsertItem(key="a", value=1)
+    with_id.id = 5
+    without_id = UpsertItem(key="b", value=2)
+    UpsertItem.query.bulk_upsert(
+        [with_id, without_id],
+        update_fields=[UpsertItem.value],
+        unique_fields=[UpsertItem.key],
+    )
+
+    assert with_id.id == 5
+    assert without_id.id is not None
+    assert without_id.id != 5
+    assert {row.key: row.id for row in UpsertItem.query.all()} == {
+        "a": 5,
+        "b": without_id.id,
+    }
+
+
+def test_bulk_upsert_across_several_batches_out_of_key_order(db):
+    # Every other key already exists, the input is shuffled, and the batches
+    # are smaller than the input -- so inserts and updates interleave across
+    # statements and the sort reorders them. Each object still has to come
+    # back hydrated from its own row.
+    for index in range(0, 8, 2):
+        UpsertItem(key=f"k{index}", value=0).create()
+    seeded = {row.key: row.id for row in UpsertItem.query.all()}
+
+    keys = [f"k{index}" for index in range(8)]
+    random.Random(0).shuffle(keys)
+    items = [UpsertItem(key=key, value=int(key[1:])) for key in keys]
+
+    UpsertItem.query.bulk_upsert(
+        items,
+        update_fields=[UpsertItem.value],
+        unique_fields=[UpsertItem.key],
+        batch_size=2,
+    )
+
+    assert [item.key for item in items] == keys  # caller's order preserved
+    for item in items:
+        if item.key in seeded:
+            assert item.id == seeded[item.key]
+        assert item.id is not None
+
+    assert UpsertItem.query.count() == 8
+    assert {row.key: row.value for row in UpsertItem.query.all()} == {
+        f"k{index}": index for index in range(8)
+    }

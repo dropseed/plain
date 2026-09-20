@@ -891,50 +891,68 @@ class QuerySet[T: "Model"]:
             if field.auto_fills_on_save and field not in conflict_update_columns:
                 conflict_update_columns.append(field)
 
-        # Include the PK column only when it is itself the conflict key;
-        # otherwise let Postgres generate the identity value.
-        pk_is_unique = any(f.primary_key for f in unique_columns)
+        # An object that already carries an id inserts with it; one that
+        # doesn't lets Postgres generate the identity value. bulk_create()
+        # splits the same way -- an id the caller set is theirs, not ours to
+        # throw away. When the primary key *is* the conflict target every
+        # object has one, so there is nothing to split.
         fields = meta.fields
-        if not pk_is_unique:
-            fields = [f for f in fields if not isinstance(f, PrimaryKeyField)]
-
-        # Issue the batches in conflict-key order so concurrent upserts touching
-        # overlapping keys lock rows in the same order and can't deadlock each
-        # other. sorted() is stable, so equal keys keep their input order and
-        # the objects themselves are never compared. objs is left alone, so the
-        # caller gets its own order back.
-        order = sorted(range(len(objs)), key=lambda position: sort_keys[position])
-        ordered_objs = [objs[position] for position in order]
+        fields_without_pk = [f for f in fields if not isinstance(f, PrimaryKeyField)]
+        pk_is_unique = any(f.primary_key for f in unique_columns)
+        if pk_is_unique:
+            partitions = [(list(range(len(objs))), fields)]
+        else:
+            partitions = [
+                ([p for p, obj in enumerate(objs) if obj.id is not None], fields),
+                (
+                    [p for p, obj in enumerate(objs) if obj.id is None],
+                    fields_without_pk,
+                ),
+            ]
 
         with transaction.atomic(savepoint=False):
-            try:
-                returned_rows = self._batched_insert(
-                    ordered_objs,
-                    fields,
-                    batch_size,
-                    on_conflict=OnConflict.UPDATE,
-                    update_fields=conflict_update_columns,
-                    unique_fields=unique_columns,
-                )
-            except psycopg.errors.CardinalityViolation as exc:
-                names = [f.name for f in unique_columns]
-                raise ValueError(
-                    f"bulk_upsert() sent two {object_name} objects with the same "
-                    f"{names} in one statement, which Postgres refuses -- it can "
-                    "only touch a row once per statement. Collapse the duplicates "
-                    "before calling."
-                ) from exc
+            for positions, insert_fields in partitions:
+                if not positions:
+                    continue
 
-            # Postgres emits one RETURNING row per VALUES row, in order, on the
-            # DO UPDATE path as much as the insert path, so the rows come back
-            # in the order the objects were sent. bulk_create() maps its rows
-            # onto objects by position for the same reason -- the two stand or
-            # fall together, and tests/internal/test_returning_order.py pins it.
-            assert len(returned_rows) == len(ordered_objs)
-            for obj, row in zip(ordered_objs, returned_rows):
-                for index, field in enumerate(meta.db_returning_fields):
-                    setattr(obj, field.name, row[index])
-                obj._state.adding = False
+                # Issue the batches in conflict-key order so concurrent upserts
+                # touching overlapping keys lock rows in the same order and
+                # can't deadlock each other. sorted() is stable, so equal keys
+                # keep their input order and the objects themselves are never
+                # compared. objs is left alone, so the caller gets its own
+                # order back.
+                positions = sorted(positions, key=lambda p: sort_keys[p])
+                sent_objs = [objs[position] for position in positions]
+
+                try:
+                    returned_rows = self._batched_insert(
+                        sent_objs,
+                        insert_fields,
+                        batch_size,
+                        on_conflict=OnConflict.UPDATE,
+                        update_fields=conflict_update_columns,
+                        unique_fields=unique_columns,
+                    )
+                except psycopg.errors.CardinalityViolation as exc:
+                    names = [f.name for f in unique_columns]
+                    raise ValueError(
+                        f"bulk_upsert() sent two {object_name} objects with the "
+                        f"same {names} in one statement, which Postgres refuses "
+                        "-- it can only touch a row once per statement. Collapse "
+                        "the duplicates before calling."
+                    ) from exc
+
+                # Postgres emits one RETURNING row per VALUES row, in order, on
+                # the DO UPDATE path as much as the insert path, so the rows
+                # come back in the order the objects were sent. bulk_create()
+                # maps its rows onto objects by position for the same reason --
+                # the two stand or fall together, and
+                # tests/internal/test_returning_order.py pins it.
+                assert len(returned_rows) == len(sent_objs)
+                for obj, row in zip(sent_objs, returned_rows):
+                    for index, field in enumerate(meta.db_returning_fields):
+                        setattr(obj, field.name, row[index])
+                    obj._state.adding = False
 
         return objs
 
