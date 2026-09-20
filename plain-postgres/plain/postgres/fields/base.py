@@ -682,8 +682,24 @@ class Field[T](Selectable[T], RegisterLookupMixin):
     # construction). BinaryField overrides with b"".
     _default_empty_value: Any = ""
 
+    # Set to True by validate_none_only_default for the fields that accept
+    # `default=None` without storing it (UUIDField, DateTimeField,
+    # ForeignKeyField, EncryptedJSONField).
+    _declared_default_none: bool = False
+
     def has_default(self) -> bool:
         return False
+
+    def has_declared_default(self) -> bool:
+        """Whether the declaration passed ``default=`` at the call site.
+
+        Different question from ``has_default()``, which asks whether a default
+        *value* is stored: the fields validated by ``validate_none_only_default``
+        accept ``default=None`` and store nothing. PEP 681 reads the call site,
+        so both spellings make the field optional in the synthesized
+        constructor.
+        """
+        return self.has_default() or self._declared_default_none
 
     def has_persistent_literal_default(self) -> bool:
         return False
@@ -755,6 +771,10 @@ def validate_none_only_default(
         )
     if not allow_null:
         raise TypeError(f"{name}(default=None) requires allow_null=True.")
+    # Nothing stores the value, so record that the call site declared it --
+    # that's what `has_declared_default()` (and the preflight check that uses
+    # it) needs to know.
+    field._declared_default_none = True
 
 
 class ColumnField[T](Field[T]):

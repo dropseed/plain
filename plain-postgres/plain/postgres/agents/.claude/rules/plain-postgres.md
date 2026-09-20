@@ -30,6 +30,11 @@ class Article(postgres.Model):
     created_at: Field[datetime] = types.DateTimeField(create_now=True)
 ```
 
+- **Every model, not just some.** `postgres.Model` carries the transform, so the
+  checker builds each subclass's constructor out of its annotated attributes and
+  nothing else. An unannotated `name = types.TextField()` isn't a constructor
+  argument at all, and `Model(name="x")` is rejected as an unknown argument. The
+  runtime is unaffected — but a type-checked app has to annotate every model.
 - **Value type**: `Field[str]`, `Field[int]`, `Field[datetime]`; for an FK to a
   model class, `Field[RelatedModel]`.
 - **Optional in the constructor = a call-site `default=`.** A stock type checker
@@ -38,8 +43,12 @@ class Article(postgres.Model):
   `required=False` field with no `default=` is still a _required_ constructor arg.
   Add `default=` to any field you intend to omit when constructing.
 - **Nullable** (`allow_null=True`) → `Field[T | None]`, and add `default=None` so
-  it's optional in the constructor (per the rule above). Applies to class-ref and
-  string forward-ref FKs alike.
+  it's optional in the constructor (per the rule above). The runtime already
+  treats it as optional — constructing without it yields `None` — so
+  `default=None` is purely for the checker: it persists nothing and changes no
+  schema. `plain preflight` lists the ones still missing it
+  (`postgres.nullable_field_without_default`). Applies to class-ref and string
+  forward-ref FKs alike.
 - **DB-owned** fields are still annotated but auto-excluded from the
   constructor: the `id`, `create_now`/`update_now` datetimes, `generate=True`,
   and `RandomStringField`.
