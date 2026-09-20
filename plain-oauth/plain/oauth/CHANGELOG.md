@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.50.5](https://github.com/dropseed/plain/releases/plain-oauth@0.50.5) (2026-09-20)
+
+### What's changed
+
+- `OAuthConnection` uses the typed annotations from plain-postgres 0.119 — `Field[T]` for its columns and `EncryptedField[str]` for the access and refresh tokens ([acae922618](https://github.com/dropseed/plain/commit/acae922618)) ([f37ab1014b](https://github.com/dropseed/plain/commit/f37ab1014b))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.50.4](https://github.com/dropseed/plain/releases/plain-oauth@0.50.4) (2026-08-21)
 
 ### What's changed
