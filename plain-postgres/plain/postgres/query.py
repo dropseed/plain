@@ -908,35 +908,34 @@ class QuerySet[T: "Model"]:
         # doesn't lets Postgres generate the identity value. bulk_create()
         # splits the same way -- an id the caller set is theirs, not ours to
         # throw away. When the primary key *is* the conflict target every
-        # object has one, so there is nothing to split.
+        # object has one, so every row has the same shape.
         fields = meta.fields
         fields_without_pk = [f for f in fields if not isinstance(f, PrimaryKeyField)]
         pk_is_unique = any(f.primary_key for f in unique_columns)
-        if pk_is_unique:
-            partitions = [(list(range(len(objs))), fields)]
-        else:
-            partitions = [
-                ([p for p, obj in enumerate(objs) if obj.id is not None], fields),
-                (
-                    [p for p, obj in enumerate(objs) if obj.id is None],
-                    fields_without_pk,
-                ),
-            ]
+
+        # Lock rows in conflict-key order, so two callers touching overlapping
+        # keys can't deadlock each other. sorted() is stable, so equal keys keep
+        # their input order and the objects themselves are never compared. objs
+        # is left alone -- the caller gets its own order back.
+        #
+        # The sort has to span *every* object rather than each shape on its own:
+        # two callers holding the same keys but different ids would otherwise
+        # lock them in different orders, which is the deadlock this exists to
+        # avoid. So walk the sorted objects and start a new statement only where
+        # the shape changes -- an extra statement only where ids interleave.
+        runs: list[tuple[list[T], Sequence[Field]]] = []
+        for position in sorted(range(len(objs)), key=lambda p: sort_keys[p]):
+            obj = objs[position]
+            insert_fields = (
+                fields if pk_is_unique or obj.id is not None else fields_without_pk
+            )
+            if runs and runs[-1][1] is insert_fields:
+                runs[-1][0].append(obj)
+            else:
+                runs.append(([obj], insert_fields))
 
         with transaction.atomic(savepoint=False):
-            for positions, insert_fields in partitions:
-                if not positions:
-                    continue
-
-                # Issue the batches in conflict-key order so concurrent upserts
-                # touching overlapping keys lock rows in the same order and
-                # can't deadlock each other. sorted() is stable, so equal keys
-                # keep their input order and the objects themselves are never
-                # compared. objs is left alone, so the caller gets its own
-                # order back.
-                positions = sorted(positions, key=lambda p: sort_keys[p])
-                sent_objs = [objs[position] for position in positions]
-
+            for sent_objs, insert_fields in runs:
                 try:
                     returned_rows = self._batched_insert(
                         sent_objs,
