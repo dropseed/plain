@@ -20,4 +20,5 @@ def test_windows_binary_gets_exe_extension(tmp_path, monkeypatch):
     manager = MkcertManager()
     manager.setup_mkcert()
 
+    assert manager.mkcert_bin is not None
     assert manager.mkcert_bin.endswith(".exe")
