@@ -1328,6 +1328,17 @@ class QuerySet[T: "Model"]:
             raise TypeError("select() cannot combine flat=True with result_type=.")
         if not isinstance(self, RowQuerySet) and self._fields is not None:
             raise TypeError("Cannot call select() after values() or values_list().")
+        if self._prefetch_related_lookups:
+            # A prefetch hangs related objects off each result's attributes,
+            # and a row -- tuple, scalar or dataclass -- has nowhere to put
+            # them. Left alone it is silently wasted work for tuples and an
+            # AttributeError for result_type=.
+            raise TypeError(
+                "Cannot call select() after prefetch_related() — prefetched "
+                "objects are attached to model instances, and select() returns "
+                "rows. Select the columns you need from the related model "
+                "instead."
+            )
 
         dataclass_type: type[DataclassInstance] | None = None
         if result_type is not None:
@@ -1934,6 +1945,13 @@ class RowQuerySet[R](QuerySet[Any]):
             "Cannot call annotate() after select() — an annotation adds a "
             "column, which would change the row shape out from under the "
             "selected type. Annotate first, then select()."
+        )
+
+    def prefetch_related(self, *lookups: str | Prefetch | None) -> Never:
+        raise TypeError(
+            "Cannot call prefetch_related() after select() — prefetched "
+            "objects are attached to model instances, and select() returns "
+            "rows. Select the columns you need from the related model instead."
         )
 
     def values(self, *fields: str, **expressions: Any) -> Never:

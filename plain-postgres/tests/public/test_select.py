@@ -11,7 +11,7 @@ from dataclasses import InitVar, dataclass, field, fields
 
 import pytest
 from app.examples.models.defaults import DefaultsExample
-from app.examples.models.relationships import WidgetTag
+from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.postgres import RowQuerySet
 from plain.postgres.aggregates import Count
 from plain.postgres.expressions import F, Value
@@ -388,6 +388,89 @@ def test_select_result_type_rejects_a_variadic_constructor(rows):
 
     with pytest.raises(TypeError, match="fixed constructor signature"):
         DefaultsExample.query.select(DefaultsExample.name, result_type=Variadic)
+
+
+class TestSelectTwiceWithExpressions:
+    """`select()` twice is last-wins, and that has to hold for expression
+    columns too. `_values_list` aliases an expression by annotating
+    internally, which used to call the *public* annotate() and so trip
+    RowQuerySet's guard -- a guard meant for callers adding a column to a
+    finished row, not for select() rebuilding one."""
+
+    def test_replacing_fields_with_an_expression(self, rows):
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(DefaultsExample.name)
+            .select(F("priority"))
+        )
+        assert list(result) == [(3,), (1,), (2,)]
+
+    def test_replacing_fields_with_a_flat_expression(self, rows):
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(DefaultsExample.name)
+            .select(F("priority"), flat=True)
+        )
+        assert list(result) == [3, 1, 2]
+
+    def test_replacing_fields_with_an_expression_and_result_type(self, rows):
+        @dataclass
+        class NameAndExpr:
+            name: str
+            upper: str
+
+        result = (
+            DefaultsExample.query.order_by("name")
+            .select(DefaultsExample.priority)
+            .select(DefaultsExample.name, Upper("name"), result_type=NameAndExpr)
+            .first()
+        )
+        assert result == NameAndExpr(name="alpha", upper="ALPHA")
+
+    def test_annotate_is_still_refused_for_callers(self, rows):
+        """The guard the internal path now bypasses is still there."""
+        with pytest.raises(TypeError, match="Annotate first, then select"):
+            DefaultsExample.query.select(DefaultsExample.name).annotate(x=Value(1))
+
+
+class TestPrefetchRelatedAndSelect:
+    """A prefetch hangs related objects off each result's attributes, and a
+    row has nowhere to put them: it was silently wasted work for tuples and
+    scalars, and an AttributeError for result_type=. Refused in both orders,
+    the same as select_related()."""
+
+    @pytest.fixture
+    def widget(self, db):
+        w = Widget.query.create(name="w", size="s")
+        tag = Tag.query.create(name="t")
+        w.tags.add(tag)
+        return w
+
+    def test_select_after_prefetch_raises_in_tuple_mode(self, widget):
+        with pytest.raises(TypeError, match="after prefetch_related"):
+            Widget.query.prefetch_related("tags").select(Widget.name)
+
+    def test_select_after_prefetch_raises_in_flat_mode(self, widget):
+        with pytest.raises(TypeError, match="after prefetch_related"):
+            Widget.query.prefetch_related("tags").select(Widget.name, flat=True)
+
+    def test_select_after_prefetch_raises_in_result_type_mode(self, widget):
+        @dataclass
+        class NameRow:
+            name: str
+
+        with pytest.raises(TypeError, match="after prefetch_related"):
+            Widget.query.prefetch_related("tags").select(
+                Widget.name, result_type=NameRow
+            )
+
+    def test_prefetch_after_select_raises(self, widget):
+        with pytest.raises(TypeError, match="after select"):
+            Widget.query.select(Widget.name).prefetch_related("tags")
+
+    def test_prefetch_without_select_is_unaffected(self, widget):
+        widgets = list(Widget.query.prefetch_related("tags"))
+        assert [t.name for t in widgets[0].tags.query.all()] == ["t"]
 
 
 class TestAnnotateAfterSelect:
