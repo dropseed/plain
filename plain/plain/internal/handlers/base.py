@@ -297,6 +297,7 @@ class BaseHandler:
                 response = result
 
             response._resource_closers.append(request.close)
+            response.request_context = request_ctx
             self._finalize_span(span, response)
 
             duration_s = time.perf_counter() - start

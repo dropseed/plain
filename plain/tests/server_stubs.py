@@ -8,16 +8,19 @@ h1.handle_connection over a socketpair with H1Client/h1_connect.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import socket
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from typing import Any
 
 import h2.config
 import h2.connection
 import h2.events
 import h2.exceptions
+from opentelemetry import trace
 from plain.http import ContentTooLargeError413, Response
 from plain.runtime import settings
 from plain.server.connection import Connection
@@ -149,18 +152,56 @@ class H1Client:
         self.worker.tpool.shutdown(wait=False)
 
 
-async def h1_connect(worker: Worker) -> H1Client:
+async def socketpair_connection(
+    app: Any,
+) -> tuple[Connection, asyncio.StreamReader, asyncio.StreamWriter]:
+    """A server `Connection` over one end of a socketpair, plus the client end."""
     server_sock, client_sock = socket.socketpair()
     server_reader, server_writer = await asyncio.open_connection(sock=server_sock)
     client_reader, client_writer = await asyncio.open_connection(sock=client_sock)
-
     conn = Connection(
-        worker.app,
+        app,
         server_reader,
         server_writer,
         ("127.0.0.1", 12345),
         ("127.0.0.1", 80),
     )
+    return conn, client_reader, client_writer
+
+
+class LogCapture(logging.Handler):
+    """Collects records from one logger; `records` is what tests assert on.
+
+    Each record is stamped with the span that was current when it was
+    made (`captured_span_id`), which is what the OTel log exporter would
+    attach in production.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        record.captured_span_id = trace.get_current_span().get_span_context().span_id  # ty: ignore[unresolved-attribute]
+        self.records.append(record)
+
+
+@contextmanager
+def capture_logger(name: str, *, level: int = logging.INFO) -> Iterator[LogCapture]:
+    logger = logging.getLogger(name)
+    handler = LogCapture()
+    original_level = logger.level
+    logger.addHandler(handler)
+    logger.setLevel(level)
+    try:
+        yield handler
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(original_level)
+
+
+async def h1_connect(worker: Worker) -> H1Client:
+    conn, client_reader, client_writer = await socketpair_connection(worker.app)
     server_task = asyncio.get_running_loop().create_task(
         h1.handle_connection(worker, conn)
     )

@@ -123,6 +123,11 @@ else
   bold "Running h2-worker-test"
   tools/h2-worker-test
 
+  # WebSocket worker behavior tests
+  echo
+  bold "Running ws-worker-test"
+  tools/ws-worker-test
+
   # Graceful shutdown behavior
   echo
   bold "Running shutdown-test"

@@ -46,12 +46,18 @@ if command -v h2spec &>/dev/null; then
 else
     skip "H2 conformance (h2spec)" h2spec "brew install h2spec"
 fi
+if command -v docker &>/dev/null; then
+    run "WebSocket conformance (Autobahn)" "$REPO_ROOT/tools/autobahn-wstest"
+else
+    skip "WebSocket conformance (Autobahn)" docker "install Docker"
+fi
 run "OpenAPI conformance (schemathesis)" \
     "$REPO_ROOT/plain-api/tests/conformance/run"
 
 # Worker behavior
 run "H1 worker behavior"            "$REPO_ROOT/tools/server-worker-test"
 run "H2 worker behavior"            "$REPO_ROOT/tools/h2-worker-test"
+run "WebSocket worker behavior"     "$REPO_ROOT/tools/ws-worker-test"
 run "H1 graceful shutdown (SIGTERM)" "$REPO_ROOT/tools/shutdown-test"
 run "H2 graceful shutdown (SIGTERM)" "$REPO_ROOT/tools/h2-shutdown-test"
 

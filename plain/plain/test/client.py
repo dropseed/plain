@@ -13,6 +13,7 @@ from plain.http import (
     QueryDict,
     Request,
     StreamingResponse,
+    WebSocketResponse,
     content_length_forbidden,
     response_omits_body,
 )
@@ -31,6 +32,8 @@ from .exceptions import RedirectCycleError
 if TYPE_CHECKING:
     from plain.http import Response
     from plain.urls import ResolverMatch
+
+    from .websocket import WebSocketTestConnection
 
 __all__ = [
     "Client",
@@ -209,6 +212,39 @@ class ClientHandler(BaseHandler):
     """
 
     def __call__(self, request: Request) -> Response:
+        response = self.run_pipeline(request)
+
+        # Collect async streaming content so tests can use response.content.
+        # Bodiless responses (HEAD, 204/304) never consume the stream —
+        # mirroring the server writers, since an SSE generator may
+        # never terminate.
+        if isinstance(response, AsyncStreamingResponse):
+            response = self._collect_async_streaming(
+                response,
+                consume=not response_omits_body(
+                    method=request.method, status_code=response.status_code
+                ),
+            )
+
+        # Simulate behaviors of most web servers.
+        _conditional_content_removal(request, response)
+
+        # Attach the originating request to the response so that it could be
+        # later retrieved.
+        setattr(response, "request", request)
+
+        # Emulate a server by calling the close method on completion.
+        response.close()
+
+        return response
+
+    def run_pipeline(self, request: Request) -> Response:
+        """Run the request through middleware and the view; return the raw response.
+
+        What `__call__` does before it materializes streams and closes the
+        response — also the handshake half of `Client.websocket()`, whose
+        response must stay open for the socket that follows.
+        """
         # Set up middleware if needed. We couldn't do this earlier, because
         # settings weren't available.
         if self._middleware_chain is None:
@@ -227,32 +263,9 @@ class ClientHandler(BaseHandler):
             else:
                 response = result
 
-            # Collect async streaming content so tests can use response.content.
-            # Bodiless responses (HEAD, 204/304) never consume the stream —
-            # mirroring the server writers, since an SSE generator may
-            # never terminate.
-            if isinstance(response, AsyncStreamingResponse):
-                response = self._collect_async_streaming(
-                    response,
-                    consume=not response_omits_body(
-                        method=request.method, status_code=response.status_code
-                    ),
-                )
-
             self._finalize_span(span, response)
 
         response._resource_closers.append(request.close)
-
-        # Simulate behaviors of most web servers.
-        _conditional_content_removal(request, response)
-
-        # Attach the originating request to the response so that it could be
-        # later retrieved.
-        setattr(response, "request", request)
-
-        # Emulate a server by calling the close method on completion.
-        response.close()
-
         return response
 
     def _collect_async_streaming(
@@ -655,6 +668,45 @@ class Client:
         if follow:
             response = self._handle_redirects(response, data=data, headers=headers)
         return response
+
+    def websocket(
+        self,
+        path: str,
+        *,
+        subprotocols: tuple[str, ...] = (),
+        headers: dict[str, str] | None = None,
+        secure: bool = True,
+        timeout: float = 5.0,
+    ) -> WebSocketTestConnection:
+        """Open a websocket to `path` and drive the view's `websocket()` in-process.
+
+            with client.websocket("/live/", subprotocols=("binary",)) as ws:
+                ws.send(b"...")
+                assert ws.receive() == b"..."
+
+        The handshake runs through the normal pipeline with this client's
+        cookies, so auth applies. A response other than the 101 raises
+        `WebSocketRejected` carrying it. Every call on the connection has
+        a timeout (default 5 s) and raises `TimeoutError` when it elapses.
+        """
+        from .websocket import (
+            WebSocketRejected,
+            WebSocketTestConnection,
+            handshake_headers,
+        )
+
+        handshake = handshake_headers(subprotocols=subprotocols)
+        if headers:
+            handshake.update(headers)
+
+        request = self._request_factory.get(path, secure=secure, headers=handshake)
+        response = self.handler.run_pipeline(request)
+        if response.cookies:
+            self.cookies.update(response.cookies)
+        if not isinstance(response, WebSocketResponse):
+            response.close()
+            raise WebSocketRejected(response)
+        return WebSocketTestConnection(response, timeout=timeout)
 
     def post(
         self,

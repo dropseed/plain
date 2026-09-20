@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextvars
 import datetime
 import io
 import json
@@ -160,6 +161,13 @@ class Response:
 
     streaming = False
     _default_status_code = 200
+
+    # The per-request `contextvars.Context` the pipeline ran in, set by the
+    # handler on every response it returns. Read by responses whose work
+    # continues after the pipeline (a websocket's `websocket()` coroutine
+    # runs in it) so ContextVars middleware set — the database connection
+    # wrapper, the session — are what that later work sees too.
+    request_context: contextvars.Context | None = None
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)

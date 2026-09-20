@@ -88,6 +88,29 @@ class StreamingDBQueryView(View):
         return StreamingResponse(generate())
 
 
+class WebSocketDBQueryView(View):
+    """Queries only inside the socket, from a thread — a copied context."""
+
+    async def websocket(self, ws) -> None:
+        result = await asyncio.to_thread(_sync_db_query)
+        await ws.send(str(result))
+
+
+class HandshakeDBWebSocketView(View):
+    """Queries during the handshake, then reports the wrapper's state
+    from inside the socket and queries again."""
+
+    def before_request(self) -> None:
+        _sync_db_query()
+
+    async def websocket(self, ws) -> None:
+        conn = _db_conn.get()
+        assert conn is not None
+        held = "held" if conn.connection is not None else "returned"
+        await ws.send(held)
+        await ws.send(str(await asyncio.to_thread(_sync_db_query)))
+
+
 class TestRouter(Router):
     namespace = ""
     urls = (
@@ -95,6 +118,8 @@ class TestRouter(Router):
         path("async-db-query", AsyncDBQueryView, name="async_db_query"),
         path("sse-db-query", DBQuerySSEView, name="sse_db_query"),
         path("streaming-db-query", StreamingDBQueryView, name="streaming_db_query"),
+        path("ws-db-query", WebSocketDBQueryView, name="ws_db_query"),
+        path("ws-handshake-db", HandshakeDBWebSocketView, name="ws_handshake_db"),
     )
 
 
@@ -380,3 +405,40 @@ class TestStreamingResponseCleanup:
                 )
         finally:
             settings.MIDDLEWARE = original_middleware
+
+
+@pytest.mark.usefixtures(
+    "_unblock_cursor", "_clean_connection", "_test_router", "_with_db_middleware"
+)
+class TestWebSocketConnectionLifecycle:
+    """A websocket holds no database connection it is not using."""
+
+    def test_socket_only_query_is_returned_when_the_socket_ends(self, setup_db):
+        calls: list[DatabaseConnection | None] = []
+        original_return = plain.postgres.middleware.return_database_connection
+
+        def tracking_return(conn: DatabaseConnection | None = None) -> None:
+            calls.append(conn)
+            original_return(conn)
+
+        with (
+            patch.object(
+                plain.postgres.middleware, "return_database_connection", tracking_return
+            ),
+            _fresh_client().websocket("/ws-db-query") as ws,
+        ):
+            assert ws.receive() == "1"
+
+        # Returned once at the handshake (a no-op on an unused wrapper) and
+        # once by the closer when the socket ended; the same wrapper both
+        # times, and the socket's query acquired through it — so it is
+        # released now.
+        assert len(calls) == 2
+        assert calls[0] is calls[1]
+        assert calls[0] is not None
+        assert calls[0].connection is None
+
+    def test_handshake_connection_is_returned_before_the_socket_starts(self, setup_db):
+        with _fresh_client().websocket("/ws-handshake-db") as ws:
+            assert ws.receive() == "returned"
+            assert ws.receive() == "1"

@@ -35,6 +35,7 @@ from .response import (
     response_omits_body,
     status_omits_body,
 )
+from .websocket import WebSocket, WebSocketClosed, WebSocketResponse
 
 __all__ = [
     "AsyncStreamingResponse",
@@ -63,6 +64,9 @@ __all__ = [
     "TooManyFilesSentError400",
     "UnreadablePostError",
     "UnsupportedMediaTypeError415",
+    "WebSocket",
+    "WebSocketClosed",
+    "WebSocketResponse",
     "content_length_forbidden",
     "parse_cookie",
     "response_omits_body",

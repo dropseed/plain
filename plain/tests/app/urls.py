@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import os
 from io import BytesIO
@@ -14,7 +15,13 @@ from opentelemetry.semconv.attributes.db_attributes import (
     DB_OPERATION_NAME,
     DB_QUERY_TEXT,
 )
-from plain.http import JsonResponse, Response, StreamingResponse
+from plain.http import (
+    ForbiddenError403,
+    JsonResponse,
+    Response,
+    StreamingResponse,
+    WebSocket,
+)
 from plain.urls import Router, path
 from plain.views import View
 
@@ -146,10 +153,68 @@ class BoomView(View):
         raise ValueError("kaboom")
 
 
+class EchoWebSocketView(View):
+    """Serves a page on GET and echoes every message on its socket."""
+
+    websocket_subprotocols = ("echo", "binary")
+
+    def get(self):
+        return Response("websocket page")
+
+    async def websocket(self, ws: WebSocket) -> None:
+        async for message in ws:
+            await ws.send(message)
+
+
+class SmallLimitWebSocketView(EchoWebSocketView):
+    websocket_max_message_size = 16
+
+
+class RaisingWebSocketView(View):
+    async def websocket(self, ws: WebSocket) -> None:
+        raise RuntimeError("websocket view boom")
+
+
+class SleepingWebSocketView(View):
+    """Never reads the socket — what a push-only view looks like when idle."""
+
+    async def websocket(self, ws: WebSocket) -> None:
+        await asyncio.sleep(3600)
+
+
+class TalkingWebSocketView(View):
+    """Keeps sending after the peer has gone; `send` must raise, not log."""
+
+    async def websocket(self, ws: WebSocket) -> None:
+        async for _ in ws:
+            pass
+        await ws.send("still here?")
+
+
+class ClosingWebSocketView(View):
+    """Closes the socket itself, with an application code."""
+
+    async def websocket(self, ws: WebSocket) -> None:
+        await ws.send("bye")
+        await ws.close(4000, "done here")
+
+
+class ForbiddenWebSocketView(EchoWebSocketView):
+    def before_request(self) -> None:
+        raise ForbiddenError403("not for you")
+
+
 class AppRouter(Router):
     namespace = ""
     urls = (
         path("", TestView, name="index"),
+        path("websocket/echo", EchoWebSocketView, name="websocket_echo"),
+        path("websocket/small", SmallLimitWebSocketView, name="websocket_small"),
+        path("websocket/raises", RaisingWebSocketView, name="websocket_raises"),
+        path("websocket/sleeps", SleepingWebSocketView, name="websocket_sleeps"),
+        path("websocket/talks", TalkingWebSocketView, name="websocket_talks"),
+        path("websocket/closes", ClosingWebSocketView, name="websocket_closes"),
+        path("websocket/forbidden", ForbiddenWebSocketView, name="websocket_forbidden"),
         path("stream", StreamView, name="stream"),
         path("upload", UploadView, name="upload"),
         path("echo-body", EchoBodyView, name="echo_body"),

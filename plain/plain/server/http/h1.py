@@ -28,11 +28,13 @@ from .errors import (
     ObsoleteFolding,
     ParseException,
     UnsupportedTransferCoding,
+    UpgradeRefused,
 )
 from .message import LIMIT_REQUEST_FIELD_SIZE, LIMIT_REQUEST_FIELDS, Request
 from .request import create_request
 from .response import Response
 from .sink import BodyRateFloor, BodySink, ChunkedDecoder
+from .websocket import run_websocket
 
 if TYPE_CHECKING:
     from ..workers.worker import Worker
@@ -100,6 +102,13 @@ LINGER_CLOSE_MAX_BYTES = 4 * 1024 * 1024
 # body phase is the throughput floor (SERVER_BODY_MIN_BYTES_PER_SECOND),
 # not this per-recv bound.
 BODY_RECV_TIMEOUT = 15.0
+
+
+# How long a websocket's closing handshake waits for the peer's CLOSE
+# before the transport is closed anyway; tightened by the drain deadline
+# through _recv_timeout so a socket ending during shutdown still finishes
+# with a FIN instead of being cancelled mid-wait.
+WEBSOCKET_CLOSE_TIMEOUT = 5.0
 
 
 def _recv_timeout(worker: Worker, base: float = RECV_PROGRESS_TIMEOUT) -> float:
@@ -430,7 +439,15 @@ async def async_handle_error(
     """Handle request errors, sending an appropriate HTTP error response."""
     request_start = datetime.now(UTC)
     addr = conn.client or ("", -1)  # unix socket case
-    if isinstance(
+    if isinstance(exc, UpgradeRefused):
+        # Not a malformed request — the server is declining to hold a
+        # socket right now (draining, or bytes arrived behind the
+        # handshake). The client fails the connection and retries.
+        status_int = 503
+        reason = "Service Unavailable"
+        mesg = str(exc)
+        worker.log.debug("Upgrade refused", extra={"ip": addr[0], "error": str(exc)})
+    elif isinstance(
         exc,
         InvalidRequestLine
         | InvalidRequestMethod
@@ -586,6 +603,9 @@ async def dispatch(
     http_request: Any,
     resp: Response,
     request_start: datetime,
+    *,
+    pipelined: bool,
+    shutdown_wait: asyncio.Task[bool],
 ) -> bool:
     """Dispatch a request through the handler and write the response."""
     try:
@@ -598,9 +618,32 @@ async def dispatch(
         if not worker.alive:
             resp.force_close()
 
-        # Check for async streaming response (SSE, etc.)
-        from plain.http import AsyncStreamingResponse
+        from plain.http import AsyncStreamingResponse, WebSocketResponse
 
+        if isinstance(http_response, WebSocketResponse):
+            # Two refusals, checked directly rather than through
+            # resp.must_close (which the keep-alive budget also sets, and
+            # an upgrade under connection pressure should still succeed):
+            # a draining worker would close the socket again within the
+            # graceful window, and bytes behind the handshake are not
+            # frames — nothing speaks before the 101.
+            if not worker.alive or pipelined:
+                http_response.close()
+                why = (
+                    "worker is shutting down"
+                    if not worker.alive
+                    else "bytes received before the upgrade completed"
+                )
+                await async_handle_error(worker, req, conn, UpgradeRefused(why))
+                # The client may still be sending frames; closing under
+                # them would RST-clobber the 503 (see LINGER_CLOSE_TIMEOUT).
+                await _linger_discard(worker, conn)
+                return False
+            return await serve_websocket(
+                worker, req, conn, resp, http_response, request_start, shutdown_wait
+            )
+
+        # Check for async streaming response (SSE, etc.)
         if isinstance(http_response, AsyncStreamingResponse):
             return await stream_async_response(req, resp, http_response, request_start)
 
@@ -608,6 +651,48 @@ async def dispatch(
         return await async_finish_request(req, resp, http_response, request_start)
     except Exception as exc:
         return await async_handle_dispatch_error(worker, req, resp, conn, exc)
+
+
+async def serve_websocket(
+    worker: Worker,
+    req: Any,
+    conn: Connection,
+    resp: Response,
+    http_response: Any,
+    request_start: datetime,
+    shutdown_wait: asyncio.Task[bool],
+) -> bool:
+    """Frame the 101, then run the view's `websocket()` over the connection.
+
+    The header block goes out through the ordinary writer (which frames
+    a 101 as headers-only with `Connection: Upgrade`); after that the
+    connection is the socket's, never the keep-alive loop's again. One
+    access-log line is written when the socket closes, status 101, with
+    the socket's lifetime as its duration.
+    """
+    try:
+        resp.prepare_response(http_response)
+        await resp.async_send_headers()
+    except OSError:
+        http_response.close()
+        return False
+    except Exception:
+        # A middleware header the writer refuses: the view's closers still
+        # run, and dispatch's error path answers the request.
+        http_response.close()
+        raise
+
+    try:
+        await run_websocket(
+            http_response,
+            conn,
+            shutdown_wait=shutdown_wait,
+            close_timeout=lambda: _recv_timeout(worker, WEBSOCKET_CLOSE_TIMEOUT),
+        )
+    finally:
+        if http_response.log_access:
+            log_access(resp, req, datetime.now(UTC) - request_start)
+    return False
 
 
 async def stream_async_response(
@@ -858,7 +943,14 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
 
                 try:
                     keepalive = await dispatch(
-                        worker, req, conn, http_request, resp, request_start
+                        worker,
+                        req,
+                        conn,
+                        http_request,
+                        resp,
+                        request_start,
+                        pipelined=pipelined,
+                        shutdown_wait=shutdown_wait,
                     )
                 except asyncio.CancelledError:
                     # A cancelled dispatch (client RST, shutdown) leaves

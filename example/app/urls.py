@@ -17,6 +17,7 @@ from app.tasks.urls import TasksRouter
 from app.views.api import APIRouter
 from app.views.jobs import RunExampleJobView
 from app.views.sse import ClockView, StockTickerView
+from app.views.websocket import EchoWebSocketView, WebSocketDemoView
 
 
 class LoginView(PasswordLoginView):
@@ -56,6 +57,8 @@ class AppRouter(Router):
         path("sse", SSEDemoView, name="sse_demo"),
         path("sse/clock", ClockView, name="sse_clock"),
         path("sse/ticker", StockTickerView, name="sse_ticker"),
+        path("websocket", WebSocketDemoView, name="websocket_demo"),
+        path("websocket/echo", EchoWebSocketView, name="websocket_echo"),
         path("jobs/run", RunExampleJobView, name="run_example_job"),
         path("", IndexView, name="index"),
         path("<path:_>", NotFoundView),

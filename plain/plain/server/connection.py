@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import errno
+import ssl
 from typing import TYPE_CHECKING
 
 from . import util
@@ -20,6 +22,22 @@ RECV_PROGRESS_TIMEOUT = 2
 # as a router's pooled connection does) is always drained rather than
 # dropped by a zero-length timeout.
 DRAIN_MIN_RECV = 0.5
+
+
+# Socket errnos that mean "the client's side of the connection is gone"
+# without mapping to a ConnectionError subclass — ENOTCONN from a
+# torn-down transport, ESHUTDOWN after half-close, ETIMEDOUT when TCP
+# gives up retransmitting to a dead peer. EBADF is deliberately NOT
+# here: peer disconnects surface as ConnectionError, so EBADF means a
+# server-side bug (double close, write after teardown) that must stay
+# loud.
+_CLIENT_SOCKET_ERRNOS = frozenset({errno.ENOTCONN, errno.ESHUTDOWN, errno.ETIMEDOUT})
+
+
+def is_client_socket_noise(exc: OSError) -> bool:
+    if isinstance(exc, (ConnectionError, ssl.SSLError)):
+        return True
+    return exc.errno in _CLIENT_SOCKET_ERRNOS
 
 
 class Connection:
@@ -62,6 +80,15 @@ class Connection:
     def close(self) -> None:
         if not self.writer.is_closing():
             self.writer.close()
+
+    def abort(self) -> None:
+        """Drop the connection now, discarding anything still unsent.
+
+        `close()` waits for the write buffer to flush, which never happens
+        to a peer that has stopped reading — and leaves a `drain()` waiting
+        on it stuck. Aborting wakes that writer with an error.
+        """
+        self.writer.transport.abort()
 
     async def recv(self, n: int) -> bytes:
         """Read up to n bytes from a connection."""

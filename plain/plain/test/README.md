@@ -157,6 +157,37 @@ response = client.get("/cart/")
 assert "abc123" in response.content.decode()
 ```
 
+## WebSockets
+
+`Client.websocket()` runs the handshake through the same pipeline as any request (cookies and auth included), then drives the view's `websocket()` in-process:
+
+```python
+import pytest
+from plain.test import Client, WebSocketRejected
+
+
+def test_echo():
+    with Client().websocket("/live/", subprotocols=("binary",)) as ws:
+        assert ws.subprotocol == "binary"
+        ws.send("hello")
+        assert ws.receive() == "echo: hello"
+
+
+def test_login_required():
+    with pytest.raises(WebSocketRejected) as excinfo:
+        Client().websocket("/live/")
+    assert excinfo.value.response.status_code == 403
+```
+
+- `ws.send(message)` sends one message to the view; `ws.receive()` returns the next one it sends.
+- `ws.close(code=1000, reason="")` closes from the client side and waits for the view to finish. Leaving the `with` block closes it if the test didn't.
+- `ws.subprotocol` is the negotiated subprotocol and `ws.response` is the 101 itself, for asserting on its headers and cookies.
+- Every call has a timeout (5 seconds by default, `receive(timeout=...)` per call) and raises `TimeoutError` when it elapses.
+- An exception raised by the view surfaces from `receive()` and again when the `with` block exits; a view that closes the socket makes `receive()` raise `WebSocketClosed` with its code and reason.
+- A handshake that doesn't produce a socket — a 403, a redirect — raises `WebSocketRejected` carrying the response as `.response`.
+
+The view runs on the test's own thread, inside a copy of the test's context, so the test database transaction is visible to it. Because the connection steps its own event loop, `Client.websocket()` is for synchronous tests, not `async def` ones.
+
 ## RequestFactory
 
 Use [`RequestFactory`](./client.py#RequestFactory) to create request objects directly without going through the middleware stack. This is useful for testing views in isolation.

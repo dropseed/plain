@@ -82,7 +82,7 @@ def test_trusted_origins(
     rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    with patch("plain.csrf.middleware.settings") as mock_settings:
+    with patch("plain.csrf.origin.settings") as mock_settings:
         mock_settings.CSRF_TRUSTED_ORIGINS = trusted_origins
 
         request = rf.post("/test/", headers={"Origin": origin})

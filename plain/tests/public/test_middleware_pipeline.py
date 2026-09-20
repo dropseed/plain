@@ -9,17 +9,9 @@ the interaction between builtin and user-defined middleware.
 from __future__ import annotations
 
 import pytest
-from middleware_helpers import call_log
+from middleware_helpers import call_log, fresh_client
 from plain.runtime import settings
 from plain.test import Client
-
-
-def _fresh_client():
-    """Create a Client with a fresh middleware chain."""
-    client = Client(raise_request_exception=False)
-    client.handler._middleware_chain = None
-    client.handler.load_middleware()
-    return client
 
 
 @pytest.fixture(autouse=True)
@@ -59,7 +51,7 @@ class TestHostValidationMiddleware:
         original = settings.ALLOWED_HOSTS
         try:
             settings.ALLOWED_HOSTS = ["example.com"]
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/", headers={"Host": "evil.com"})
             assert response.status_code == 400
         finally:
@@ -70,7 +62,7 @@ class TestHostValidationMiddleware:
         original = settings.ALLOWED_HOSTS
         try:
             settings.ALLOWED_HOSTS = []
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
         finally:
@@ -87,7 +79,7 @@ class TestDefaultHeadersMiddleware:
             settings.DEFAULT_RESPONSE_HEADERS = {
                 "X-Test-Header": "test-value",
             }
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.headers["X-Test-Header"] == "test-value"
         finally:
@@ -100,7 +92,7 @@ class TestDefaultHeadersMiddleware:
             settings.DEFAULT_RESPONSE_HEADERS = {
                 "Content-Type": "text/html; charset=utf-8",
             }
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             # The view sets Content-Type, so the default should not override it
             assert "Content-Type" in response.headers
@@ -127,7 +119,7 @@ class TestCsrfMiddleware:
 
     def test_cross_origin_post_blocked(self):
         """POST with cross-site Sec-Fetch-Site should return 400."""
-        client = _fresh_client()
+        client = fresh_client()
         response = client.post(
             "/",
             headers={"Sec-Fetch-Site": "cross-site"},
@@ -143,7 +135,7 @@ class TestHttpsRedirectMiddleware:
         original = settings.HTTPS_REDIRECT_ENABLED
         try:
             settings.HTTPS_REDIRECT_ENABLED = False
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
         finally:
@@ -154,7 +146,7 @@ class TestHttpsRedirectMiddleware:
         original = settings.HTTPS_REDIRECT_ENABLED
         try:
             settings.HTTPS_REDIRECT_ENABLED = True
-            client = _fresh_client()
+            client = fresh_client()
             # Must use secure=False to send an HTTP (not HTTPS) request
             response = client.get("/", follow=False, secure=False)
             assert response.status_code == 301
@@ -175,7 +167,7 @@ class TestExceptionHandling:
             settings.URLS_ROUTER = "middleware_helpers.ErrorRouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 500
         finally:
@@ -189,7 +181,7 @@ class TestExceptionHandling:
             settings.MIDDLEWARE = [
                 "middleware_helpers.ExplodingMiddleware",
             ]
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 500
         finally:
@@ -210,7 +202,7 @@ class TestMiddlewareOrdering:
             settings.MIDDLEWARE = ["middleware_helpers.LoggingMiddleware"]
             settings.ALLOWED_HOSTS = ["example.com"]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/", headers={"Host": "evil.com"})
             assert response.status_code == 400
             assert "user_middleware" not in call_log
@@ -224,7 +216,7 @@ class TestMiddlewareOrdering:
         try:
             settings.MIDDLEWARE = ["middleware_helpers.TrackingMiddleware"]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
             assert call_log == ["before", "after"]
@@ -240,7 +232,7 @@ class TestMiddlewareOrdering:
                 "middleware_helpers.SecondMiddleware",
             ]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
             assert call_log == [
@@ -261,7 +253,7 @@ class TestMiddlewareOrdering:
                 "middleware_helpers.InnerMiddleware",
             ]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 403
             assert response.content == b"blocked"
@@ -293,7 +285,7 @@ class TestMiddlewareUnwinding:
                 "middleware_helpers.BlockingMiddleware",
             ]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 403
             # Outer called get_response which returned the 403 from Blocking,
@@ -319,7 +311,7 @@ class TestMiddlewareUnwinding:
                 "middleware_helpers.InnerExplodingMiddleware",
             ]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 500
             # Inner raised, converted to 500 response, outer sees it
@@ -347,7 +339,7 @@ class TestMiddlewareUnwinding:
             settings.URLS_ROUTER = "middleware_helpers.ErrorRouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 500
             assert call_log == [
@@ -372,7 +364,7 @@ class TestMiddlewareUnwinding:
             ]
 
             # Normal request — both setup and teardown run
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
             assert call_log == ["setup", "teardown"]
@@ -402,7 +394,7 @@ class TestMiddlewareUnwinding:
             settings.URLS_ROUTER = "middleware_helpers.ErrorRouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 500
             assert response.headers["X-Modified-By"] == "ResponseModifyingMiddleware"
@@ -424,7 +416,7 @@ class TestSSEViews:
             settings.URLS_ROUTER = "middleware_helpers.SSERouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
             assert "text/event-stream" in response.headers["Content-Type"]
@@ -450,7 +442,7 @@ class TestSSEViews:
             settings.URLS_ROUTER = "middleware_helpers.SSERouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
             assert call_log == ["before", "after"]
@@ -470,7 +462,7 @@ class TestSSEViews:
             settings.URLS_ROUTER = "middleware_helpers.SSERouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 403
             assert response.content == b"blocked"

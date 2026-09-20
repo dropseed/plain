@@ -4,13 +4,18 @@ import inspect
 from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 
+from plain.csrf.origin import check_cross_origin
 from plain.http import (
+    ForbiddenError403,
     NotAllowedResponse,
     Request,
     Response,
+    WebSocket,
+    WebSocketResponse,
     status_for_exception,
     status_omits_body,
 )
+from plain.http.websocket import is_websocket_upgrade, select_subprotocol
 from plain.logs import get_framework_logger, log_exception
 
 from .exceptions import ResponseException
@@ -30,6 +35,15 @@ class View[HandlerResult = Response]:
 
     implemented_methods: ClassVar[frozenset[str]] = frozenset()
 
+    # WebSockets: a view that overrides `websocket()` answers an RFC 6455
+    # upgrade on the same URL it serves with `get()`. Not an HTTP method,
+    # so it is tracked apart from `implemented_methods` (and never in
+    # `Allow`). The subprotocols are matched case-sensitively against
+    # what the client offers; the size cap is on inbound messages only.
+    implements_websocket: ClassVar[bool] = False
+    websocket_subprotocols: ClassVar[tuple[str, ...]] = ()
+    websocket_max_message_size: ClassVar[int] = 1024 * 1024
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         cls.implemented_methods = frozenset(
@@ -37,6 +51,14 @@ class View[HandlerResult = Response]:
             for name in _HANDLER_NAMES
             if getattr(cls, name, None) is not getattr(View, name, None)
         )
+        cls.implements_websocket = cls.websocket is not View.websocket
+        if cls.implements_websocket and not inspect.iscoroutinefunction(cls.websocket):
+            raise TypeError(
+                f"{cls.__qualname__}.websocket() must be `async def`: it runs on "
+                "the server's event loop for the life of the socket. (A wrapped "
+                "coroutine function can declare itself with "
+                "inspect.markcoroutinefunction.)"
+            )
 
     def get(self) -> HandlerResult:
         raise NotImplementedError
@@ -54,6 +76,17 @@ class View[HandlerResult = Response]:
         raise NotImplementedError
 
     def head(self) -> HandlerResult:
+        raise NotImplementedError
+
+    async def websocket(self, ws: WebSocket) -> None:
+        """Handle an accepted WebSocket for as long as it is open.
+
+        Runs on the server's event loop after the 101 has been sent.
+        Iterate `ws` for messages, `await ws.send(...)` to reply; return
+        (or `await ws.close()`) to end the socket. A peer that goes away
+        ends the iteration quietly and makes `send` raise
+        `WebSocketClosed` — neither is an error.
+        """
         raise NotImplementedError
 
     def __init__(
@@ -117,24 +150,53 @@ class View[HandlerResult = Response]:
         try:
             self.before_request()
 
-            handler = self.get_request_handler()
-            if not handler:
-                logger.warning(
-                    "Method not allowed",
-                    extra={
-                        "method": self.request.method,
-                        "path": self.request.path,
-                        "status_code": 405,
-                    },
-                )
-                response: Response = NotAllowedResponse(self._allowed_methods())
-            elif inspect.iscoroutinefunction(handler):
-                return self._dispatch_handler_async(handler)  # ty: ignore[invalid-return-type]
+            if self.implements_websocket and is_websocket_upgrade(self.request):
+                response: Response = self._accept_websocket()
             else:
-                response = self.convert_result_to_response(handler())
+                handler = self.get_request_handler()
+                if not handler:
+                    logger.warning(
+                        "Method not allowed",
+                        extra={
+                            "method": self.request.method,
+                            "path": self.request.path,
+                            "status_code": 405,
+                        },
+                    )
+                    response = NotAllowedResponse(self._allowed_methods())
+                elif inspect.iscoroutinefunction(handler):
+                    return self._dispatch_handler_async(handler)  # ty: ignore[invalid-return-type]
+                else:
+                    response = self.convert_result_to_response(handler())
         except Exception as e:
             response = self._respond_to_exception(e)
         return self.after_response(response)
+
+    def _accept_websocket(self) -> WebSocketResponse:
+        """Turn a well-formed upgrade into the 101 the server will frame.
+
+        Session cookies ride along on a websocket handshake exactly as on
+        a POST, so a cross-origin one is refused by the same decision the
+        CSRF middleware makes — `CSRF_TRUSTED_ORIGINS`, `Sec-Fetch-Site`,
+        then Origin against Host. Nothing about the socket has started
+        yet, so a 403 here is an ordinary response.
+        """
+        allowed, reason = check_cross_origin(self.request)
+        if not allowed:
+            logger.warning(
+                "Cross-origin WebSocket handshake refused",
+                extra={"path": self.request.path, "reason": reason},
+            )
+            raise ForbiddenError403("Cross-origin WebSocket handshake refused")
+        return WebSocketResponse(
+            request=self.request,
+            handler=self.websocket,
+            subprotocol=select_subprotocol(
+                self.request.headers.get("Sec-WebSocket-Protocol"),
+                self.websocket_subprotocols,
+            ),
+            max_message_size=self.websocket_max_message_size,
+        )
 
     async def _dispatch_handler_async(
         self, handler: Callable[[], Awaitable[HandlerResult]]

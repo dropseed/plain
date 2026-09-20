@@ -115,6 +115,23 @@ class BodyBudgetExceeded(ParseException):
         return f"In-flight request bodies exceeded {self.limit} bytes"
 
 
+class UpgradeRefused(Exception):
+    """A WebSocket upgrade the server will not perform right now.
+
+    Raised for a draining worker (the socket would be closed again
+    within the graceful window) and for a client that sent bytes behind
+    its handshake (nothing waits for the 101 before speaking, so those
+    bytes are not frames). Answered with a 503 so the client fails the
+    connection and retries against a healthy worker.
+    """
+
+    def __init__(self, why: str):
+        self.why = why
+
+    def __str__(self) -> str:
+        return f"Upgrade refused: {self.why}"
+
+
 class LimitRequestLine(ParseException):
     def __init__(self, size: int, max_size: int):
         self.size = size

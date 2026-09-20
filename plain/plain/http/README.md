@@ -221,6 +221,10 @@ return AsyncStreamingResponse(generate_data(), content_type="text/plain")
 
 Other response types include [`NotModifiedResponse`](./response.py#NotModifiedResponse) (304) and [`NotAllowedResponse`](./response.py#NotAllowedResponse) (405).
 
+### WebSocket responses
+
+A view with an `async def websocket(self, ws)` handler answers an RFC 6455 upgrade with a [`WebSocketResponse`](./websocket.py#WebSocketResponse), a bodiless 101 the framework constructs; application code never builds one. The view then holds a [`WebSocket`](./websocket.py#WebSocket) for the life of the socket (`async for`, `send`, `close`, `subprotocol`), and `send` on a closed socket raises [`WebSocketClosed`](./websocket.py#WebSocketClosed). See [WebSockets in the views docs](../views/README.md#websockets).
+
 ### Access log control
 
 Set `log_access` to `False` on a response to exclude it from the server access log.

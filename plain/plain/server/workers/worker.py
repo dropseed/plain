@@ -19,7 +19,6 @@ from __future__ import annotations
 #   Keepalive waits race the next request against worker shutdown
 #   (see h1.handle_connection).
 import asyncio
-import errno
 import logging
 import os
 import random
@@ -37,7 +36,7 @@ from plain.internal.reloader import Reloader
 from plain.logs import get_framework_logger
 
 from .. import sock, util
-from ..connection import Connection
+from ..connection import Connection, is_client_socket_noise
 from ..http import h1
 from ..http.h2 import async_handle_h2_connection
 from ..http.sink import BodyBudget
@@ -75,22 +74,6 @@ def check_worker_config(threads: int, connections: int, log: logging.Logger) -> 
             "No keepalived connections can be handled. "
             "Check the number of worker connections and threads."
         )
-
-
-# Socket errnos that mean "the client's side of the connection is gone"
-# without mapping to a ConnectionError subclass — ENOTCONN from a
-# torn-down transport, ESHUTDOWN after half-close, ETIMEDOUT when TCP
-# gives up retransmitting to a dead peer. EBADF is deliberately NOT
-# here: peer disconnects surface as ConnectionError, so EBADF means a
-# server-side bug (double close, write after teardown) that must stay
-# loud.
-_CLIENT_SOCKET_ERRNOS = frozenset({errno.ENOTCONN, errno.ESHUTDOWN, errno.ETIMEDOUT})
-
-
-def _is_client_socket_noise(exc: OSError) -> bool:
-    if isinstance(exc, (ConnectionError, ssl.SSLError)):
-        return True
-    return exc.errno in _CLIENT_SOCKET_ERRNOS
 
 
 class Worker:
@@ -475,7 +458,7 @@ class Worker:
         try:
             await self._handle_connection(conn)
         except OSError as e:
-            if not _is_client_socket_noise(e):
+            if not is_client_socket_noise(e):
                 # Server-side OSErrors (ENOSPC from a body spool, EMFILE)
                 # and non-socket TimeoutErrors are real problems — treat
                 # them like any unexpected bug.

@@ -1,0 +1,121 @@
+#!/bin/bash -e
+
+# Run the Autobahn WebSocket fuzzing testsuite against the Plain example app.
+#
+# Requires: docker (the crossbario/autobahn-testsuite image)
+#
+# The image runs as a fuzzing client against the example app's echo endpoint
+# and covers hundreds of RFC 6455 cases: framing, fragmentation, UTF-8
+# validation, close codes, control frames, and size limits.
+#
+# Cases default to groups 1 through 10, and 12.*/13.* are always excluded
+# (even when --cases is given), because those groups only test
+# permessage-deflate and Plain never negotiates the extension — a server that
+# does not advertise it gets uncompressed frames from every client.
+#
+# The 6.4.* cases test fail-fast UTF-8 validation: Plain validates a text
+# message once it is reassembled rather than incrementally, so those cases
+# report NON-STRICT. That is a pass — the connection still closes with 1007.
+#
+# Usage:
+#   ./tools/autobahn-wstest                    # starts example server automatically
+#   ./tools/autobahn-wstest host:port          # test against an already-running server
+#   ./tools/autobahn-wstest --cases "1.*,2.*"  # run specific test case groups
+#   ./tools/autobahn-wstest --exclude "9.*"    # skip case groups
+
+if ! command -v docker &>/dev/null; then
+    echo "docker not found. Install Docker: https://docs.docker.com/get-docker/" >&2
+    exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+TARGET=""
+CASES="1.*,2.*,3.*,4.*,5.*,6.*,7.*,9.*,10.*"
+EXCLUDE_CASES="12.*,13.*"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --cases=*) CASES="${1#--cases=}" ;;
+        --cases)   shift; CASES="$1" ;;
+        --exclude=*) EXCLUDE_CASES="${1#--exclude=}" ;;
+        --exclude)   shift; EXCLUDE_CASES="$1" ;;
+        *:*)       TARGET="$1" ;;
+    esac
+    shift
+done
+
+# Results are rebuilt on every run and live in the gitignored scratch dir.
+RESULTS_DIR="$REPO_ROOT/scratch/autobahn-results"
+rm -rf "$RESULTS_DIR"
+mkdir -p "$RESULTS_DIR"
+
+if [ -z "$TARGET" ]; then
+    # Disable HTTPS redirect — WebSocket tests use plain HTTP
+    export PLAIN_HTTPS_REDIRECT_ENABLED=false
+
+    # The loop above consumed every argument, so start-example-server
+    # inherits an empty "$@" and starts the server with its defaults.
+    source "$REPO_ROOT/tools/start-example-server"
+
+    # The container reaches the host through host.docker.internal
+    # Docker Desktop (macOS/Windows) reaches the host's loopback through
+    # host.docker.internal. On Linux the host gateway is the bridge, which
+    # a loopback-bound server never accepts on, so share the host network.
+    if [ "$(uname -s)" = "Linux" ]; then
+        WS_HOST="127.0.0.1"
+        DOCKER_NETWORK_ARGS=(--network=host)
+    else
+        WS_HOST="host.docker.internal"
+        DOCKER_NETWORK_ARGS=(--add-host=host.docker.internal:host-gateway)
+    fi
+    WS_PORT="$PORT"
+else
+    WS_HOST="${TARGET%%:*}"
+    DOCKER_NETWORK_ARGS=(--add-host=host.docker.internal:host-gateway)
+    WS_PORT="${TARGET##*:}"
+fi
+
+echo ""
+echo "Autobahn WebSocket Fuzzing Testsuite"
+echo "====================================="
+echo "Target:   ws://$WS_HOST:$WS_PORT/websocket/echo"
+echo "Cases:    $CASES"
+echo "Excluded: ${EXCLUDE_CASES:-(none)}"
+echo ""
+
+# The case lists are comma-separated here but JSON arrays in the config file.
+RESULTS_DIR="$RESULTS_DIR" WS_HOST="$WS_HOST" WS_PORT="$WS_PORT" \
+CASES="$CASES" EXCLUDE_CASES="$EXCLUDE_CASES" \
+    uv run python - <<'PYTHON'
+import json
+import os
+
+ws_host = os.environ["WS_HOST"]
+ws_port = os.environ["WS_PORT"]
+
+config = {
+    "outdir": "/results",
+    "servers": [
+        {
+            "agent": "Plain",
+            "url": f"ws://{ws_host}:{ws_port}/websocket/echo",
+        }
+    ],
+    "cases": [case for case in os.environ["CASES"].split(",") if case],
+    "exclude-cases": [case for case in os.environ["EXCLUDE_CASES"].split(",") if case],
+    "exclude-agent-cases": {},
+}
+
+with open(os.path.join(os.environ["RESULTS_DIR"], "fuzzingclient.json"), "w") as f:
+    json.dump(config, f, indent=2)
+PYTHON
+
+docker run --rm \
+    -v "$RESULTS_DIR:/results" \
+    "${DOCKER_NETWORK_ARGS[@]}" \
+    crossbario/autobahn-testsuite \
+    wstest -m fuzzingclient -s /results/fuzzingclient.json
+
+echo ""
+uv run python "$REPO_ROOT/tools/autobahn-report.py" "$RESULTS_DIR"

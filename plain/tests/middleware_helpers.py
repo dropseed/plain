@@ -7,8 +7,18 @@ from contextvars import ContextVar
 
 from opentelemetry import trace
 from plain.http import HttpMiddleware, Response
+from plain.test import Client
 from plain.urls import Router, path
 from plain.views import ServerSentEvent, ServerSentEventsView, View
+
+
+def fresh_client() -> Client:
+    """A Client whose middleware chain is rebuilt from the current settings."""
+    client = Client(raise_request_exception=False)
+    client.handler._middleware_chain = None
+    client.handler.load_middleware()
+    return client
+
 
 # Shared log that tests can inspect and clear
 call_log: list[str] = []
@@ -183,3 +193,12 @@ class FiniteServerSentEventsView(ServerSentEventsView):
 class SSERouter(Router):
     namespace = ""
     urls = (path("", FiniteServerSentEventsView, name="index"),)
+
+
+class StampingMiddleware(HttpMiddleware):
+    """Marks every response in `after_response` — a header and a cookie."""
+
+    def after_response(self, request, response):
+        response.headers["X-Stamped"] = "yes"
+        response.set_cookie("stamped", "1")
+        return response

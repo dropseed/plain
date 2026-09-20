@@ -149,9 +149,18 @@ class Response:
 
     def default_headers(self) -> list[str]:
         # Set the connection header and latch the close decision so the
-        # keepalive loop follows what the client was actually told.
-        close = self.should_close()
-        connection = "close" if close else "keep-alive"
+        # keepalive loop follows what the client was actually told. A 101
+        # leaves HTTP after this header block and never returns to the
+        # loop, so it latches as a close; `Upgrade` is hop-by-hop and the
+        # app cannot set it (see util.hop_headers), so the server names the
+        # one protocol it switches to itself.
+        switching_protocols = self.status_code == 101
+        if switching_protocols:
+            close = True
+            connection = "Upgrade"
+        else:
+            close = self.should_close()
+            connection = "close" if close else "keep-alive"
 
         self.framed_close = close
 
@@ -161,7 +170,9 @@ class Response:
             f"Date: {util.http_date()}\r\n",
             f"Connection: {connection}\r\n",
         ]
-        if self.chunked:
+        if switching_protocols:
+            headers.append("Upgrade: websocket\r\n")
+        elif self.chunked:
             headers.append("Transfer-Encoding: chunked\r\n")
         return headers
 
