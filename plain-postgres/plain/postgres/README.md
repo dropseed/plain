@@ -48,12 +48,24 @@ class User(postgres.Model):
 
 Annotate each field with `Field[T]` (the value type) — that's what gives the
 model a type-checked constructor: `User(email="a@b.com")` flags wrong value
-types, unknown field names, and missing required fields. A field is optional in
-that constructor only when its definition passes `default=` (this is general,
-not nullable-specific — a `required=False` field with no `default=` is still a
-required constructor arg), so nullable fields use `Field[T | None]` with
-`default=None`. DB-owned fields (`id`, `create_now`, generated values) are
-auto-excluded from the constructor.
+types, unknown field names, and missing required fields.
+
+Annotating is not per-model opt-in. `postgres.Model` carries the transform, so
+the checker synthesizes every subclass's constructor from its annotated
+attributes and nothing else. Drop the annotation from `email` above and it stops
+being a constructor argument at all — `User(email="a@b.com")` is then rejected as
+an unknown argument. The runtime doesn't care either way, but if you run a type
+checker, every model has to be annotated.
+
+A field is optional in that constructor only when its definition passes
+`default=` (this is general, not nullable-specific — a `required=False` field
+with no `default=` is still a required constructor arg), so nullable fields use
+`Field[T | None]` with `default=None`. The runtime already treats a nullable
+field as optional — constructing without it yields `None` — so `default=None`
+exists for the checker; it persists nothing and changes no schema.
+`plain preflight` lists the nullable fields still missing one
+(`postgres.nullable_field_without_default`). DB-owned fields (`id`,
+`create_now`, generated values) are auto-excluded from the constructor.
 
 Field types declared outside `plain.postgres.types` — `PasswordField`, or one of
 your own — are the exception: their stub still types the value, but they are
