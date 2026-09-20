@@ -669,6 +669,8 @@ Note what this is and isn't: it takes **every** row the filter matches, so it su
 
 The `transaction.atomic()` is required, same as for a locked read: a locked write outside a transaction raises `TransactionManagementError`. Nothing else honors the lock — without a transaction there is nothing for it to be held until.
 
+`of=` can only name `"self"` on a write. The sub-select reads one column — this table's id — so a related name has nothing to point at, and `update()`/`delete()` raise `TypeError` rather than let it fail deeper down. Joins the filter needs still ride along in the sub-select; to lock related rows too, take them with a separate locked read.
+
 ## Schema management
 
 Schema changes fall into three categories, each with a different author and apply model:

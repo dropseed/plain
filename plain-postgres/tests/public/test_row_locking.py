@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 
 import pytest
+from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.relationships import Widget
 from plain.postgres import transaction
 from plain.postgres.aggregates import Count
@@ -209,3 +210,54 @@ def test_bulk_update_drops_the_lock(db, capture_queries, executed_sql):
     sql = executed_sql(queries)
     assert "IN (SELECT" not in sql
     assert "FOR UPDATE" not in sql
+
+
+@pytest.mark.parametrize("write", ["update", "delete"])
+def test_related_lock_target_is_refused_on_a_write(db, write):
+    # A locked write runs as `id IN (SELECT id ... FOR UPDATE OF ...)`, and
+    # that sub-select reads one column: this table's id. There is nothing for
+    # OF to name but this table -- say so here rather than let the compiler
+    # raise FieldError a long way from the call.
+    parent = DeleteParent(name="p").create()
+    ChildCascade(parent=parent).create()
+    qs = ChildCascade.query.filter(parent__name="p").for_update(of=("parent",))
+
+    with pytest.raises(TypeError, match=r"locks only its own rows"):
+        qs.update(parent=parent) if write == "update" else qs.delete()
+
+
+def test_related_lock_target_is_still_fine_on_a_read(db, capture_queries, executed_sql):
+    # Only the write is narrowed -- the read still locks the parent rows.
+    parent = DeleteParent(name="p").create()
+    ChildCascade(parent=parent).create()
+
+    with capture_queries() as queries:
+        list(
+            ChildCascade.query.select_related("parent")
+            .filter(parent__name="p")
+            .for_update(of=("parent",))
+        )
+
+    assert 'FOR UPDATE OF "examples_deleteparent"' in executed_sql(queries)
+
+
+def test_self_lock_target_works_on_a_joined_write(db, capture_queries, executed_sql):
+    parent = DeleteParent(name="p").create()
+    other = DeleteParent(name="other").create()
+    ChildCascade(parent=parent).create()
+    ChildCascade(parent=parent).create()
+
+    with capture_queries() as queries:
+        moved = (
+            ChildCascade.query.filter(parent__name="p")
+            .for_update(of=("self",))
+            .update(parent=other)
+        )
+
+    assert moved == 2
+    sql = executed_sql(queries)
+    # The join the filter needed rides along in the sub-select, and OF names
+    # the outer table's alias inside it.
+    assert "INNER JOIN" in sql
+    assert "FOR UPDATE OF" in sql.split("RETURNING")[0]
+    assert ChildCascade.query.filter(parent=other).count() == 2

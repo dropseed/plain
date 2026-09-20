@@ -1132,6 +1132,25 @@ class QuerySet[T: "Model"]:
                 "returning() only applies to update() and delete()."
             )
 
+    def _reject_related_lock_targets(self, method_name: str) -> None:
+        """Refuse of=(...) targets a set-based write can't lock.
+
+        A locked write runs as `WHERE id IN (SELECT id ... FOR UPDATE OF ...)`,
+        and that sub-select reads one column: this table's id. `OF` is
+        resolved against the selected columns, so it can only ever name this
+        table. A related name is meaningful on the read -- it just has
+        nothing to point at here -- and left alone it surfaces as a
+        FieldError from the compiler, a long way from the call.
+        """
+        related = tuple(name for name in self.sql_query.lock_of if name != "self")
+        if self.sql_query.lock_mode and related:
+            raise TypeError(
+                f"Cannot call {method_name}() on a queryset locked with "
+                f"of={related} -- a locked write locks only its own rows. "
+                'Drop of=, use of=("self",), or lock the related rows with a '
+                "separate locked read."
+            )
+
     def delete(self) -> int:
         """Delete the records in the current QuerySet.
 
@@ -1151,6 +1170,7 @@ class QuerySet[T: "Model"]:
             raise TypeError("Cannot call delete() after .distinct().")
         if self._fields is not None:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
+        self._reject_related_lock_targets("delete")
 
         del_query = self._chain()
         # The lock is kept: the delete compiler moves it onto the sub-select
@@ -1196,6 +1216,7 @@ class QuerySet[T: "Model"]:
             raise TypeError("Cannot update a query once a slice has been taken.")
         if self._fields is not None:
             raise TypeError("Cannot call update() after .values() or .values_list()")
+        self._reject_related_lock_targets("update")
         query = self.sql_query.chain(UpdateQuery)
         query.add_update_values(kwargs)
 
