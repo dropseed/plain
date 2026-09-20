@@ -917,19 +917,17 @@ class Excluded(Combinable):
         )
 
 
-def contains_excluded(value: Any) -> bool:
-    """True when value is an Excluded() reference or contains one.
+def is_query_expression(value: Any) -> bool:
+    """True when value is a query expression rather than a plain value.
 
-    upsert() uses this to reject Excluded() in an inserted value before the
-    value reaches a field, which would coerce it (a TextField would stringify
-    the repr straight into the row) long before any compiler sees it.
+    An expression is computed from a row by the database; an inserted value
+    has no row to compute from. upsert() uses this to reject one before it
+    reaches a field, which would coerce the object itself -- a text column
+    stores its repr, an integer column raises something unrecognizable. Any
+    expression built from others (F("a") + Excluded("a"), Upper("a")) is
+    itself an expression, so there is nothing to recurse into.
     """
-    if isinstance(value, Excluded):
-        return True
-    get_source_expressions = getattr(value, "get_source_expressions", None)
-    if get_source_expressions is None:
-        return False
-    return any(contains_excluded(source) for source in get_source_expressions())
+    return isinstance(value, Combinable | ResolvableExpression)
 
 
 class ExcludedCol(Expression):

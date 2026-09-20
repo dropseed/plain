@@ -32,7 +32,7 @@ from plain.postgres.expressions import (
     ResolvableExpression,
     Value,
     When,
-    contains_excluded,
+    is_query_expression,
 )
 from plain.postgres.fields import (
     Field,
@@ -694,7 +694,10 @@ class QuerySet[T: "Model"]:
         return objs
 
     def _validate_upsert_unique_fields(
-        self, unique_field_names: Sequence[str | None], *, operation_name: str
+        self,
+        unique_field_names: Sequence[str | None],
+        *,
+        operation_name: str,
     ) -> None:
         """Require unique_fields, and that they match a usable model constraint.
 
@@ -733,7 +736,8 @@ class QuerySet[T: "Model"]:
         unique_fields: list[Field],
     ) -> None:
         self._validate_upsert_unique_fields(
-            [f.name for f in unique_fields], operation_name="bulk_upsert"
+            [f.name for f in unique_fields],
+            operation_name="bulk_upsert",
         )
 
         if not update_fields:
@@ -1017,7 +1021,8 @@ class QuerySet[T: "Model"]:
             unique_fields, where="upsert() unique_fields"
         )
         self._validate_upsert_unique_fields(
-            [f.name for f in unique_columns], operation_name="upsert"
+            [f.name for f in unique_columns],
+            operation_name="upsert",
         )
         if any(f.primary_key for f in unique_columns):
             # Postgres owns the identity primary key, so a caller can never
@@ -1057,16 +1062,18 @@ class QuerySet[T: "Model"]:
                 "column it sets instead."
             )
 
-        # Excluded() names the row this INSERT is proposing, so it can't be one
-        # of that row's values. Catch it here, before the value is assigned to
-        # a field -- field coercion runs first and would either raise something
-        # unrecognizable or, on a text column, write the repr into the row.
+        # An expression is computed from a row, and the row this INSERT
+        # proposes doesn't exist yet -- Excluded() names that very row. Catch
+        # it here, after callables have resolved and before the value is
+        # assigned to a field: field coercion runs first and would either raise
+        # something unrecognizable or, on a text column, write the repr into
+        # the row.
         for name, value in insert_values.items():
-            if contains_excluded(value):
+            if is_query_expression(value):
                 raise FieldError(
-                    f"Excluded() cannot be an inserted value ({name}=...): it "
-                    "names the row the INSERT proposes, which is the row being "
-                    "written. Move it to conflict_defaults."
+                    f"{value!r} cannot be an inserted value ({name}=...): an "
+                    "expression is computed from a row, and the insert has no "
+                    "row to compute from. Move it to conflict_defaults."
                 )
 
         for field in unique_columns:

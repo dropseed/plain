@@ -24,6 +24,7 @@ from plain.postgres import Excluded
 from plain.postgres.db import get_connection
 from plain.postgres.exceptions import FieldError
 from plain.postgres.expressions import F
+from plain.postgres.functions import Upper
 from plain.postgres.sources import build_connection_params
 
 
@@ -243,6 +244,31 @@ def test_upsert_ignores_queryset_filters(db):
     assert UpsertItem.query.count() == 1
 
 
+def test_expression_as_an_inserted_value_on_a_text_column_is_rejected(db):
+    """A text column coerces anything to str, so it would store the
+    expression's repr rather than fail -- the check can't rely on coercion.
+    """
+    for call in (
+        lambda: UpsertItem.query.upsert(
+            key="a", label=F("label"), unique_fields=[UpsertItem.key]
+        ),
+        lambda: UpsertItem.query.upsert(
+            key="a",
+            defaults={"label": Upper("label")},
+            unique_fields=[UpsertItem.key],
+        ),
+        lambda: UpsertItem.query.upsert(
+            key="a",
+            create_defaults={"label": lambda: F("label")},
+            unique_fields=[UpsertItem.key],
+        ),
+    ):
+        with pytest.raises(FieldError, match="cannot be an inserted value"):
+            call()
+
+    assert UpsertItem.query.count() == 0
+
+
 def test_upsert_conflict_defaults_rejects_the_primary_key(db):
     with pytest.raises(ValueError, match="cannot update primary key fields"):
         UpsertItem.query.upsert(
@@ -334,8 +360,15 @@ def test_excluded_outside_a_conflict_update_is_rejected(db):
 
 @pytest.mark.parametrize(
     "expression",
-    [Excluded("value"), F("value") + Excluded("value")],
-    ids=["bare", "nested"],
+    [
+        Excluded("value"),
+        F("value") + Excluded("value"),
+        F("value"),
+        F("value") + 1,
+        Upper("label"),
+        lambda: F("value"),
+    ],
+    ids=["excluded", "excluded-nested", "f", "f-combined", "func", "callable"],
 )
 @pytest.mark.parametrize(
     "upsert_with",
@@ -357,9 +390,10 @@ def test_excluded_outside_a_conflict_update_is_rejected(db):
 def test_excluded_as_an_inserted_value_is_rejected(
     db, capture_queries, upsert_with, expression
 ):
-    """Excluded() names the row being proposed, so it can't be one of that
-    row's own values -- in any of the three value sources, bare or nested, and
-    before any SQL is emitted.
+    """An expression is computed from a row, and the row an INSERT proposes
+    doesn't exist yet -- Excluded() names that very row. Rejected in any of the
+    three value sources, however it's spelled, including behind a callable,
+    and before any SQL is emitted.
     """
     with (
         capture_queries() as queries,
