@@ -118,13 +118,21 @@ class OxcTool:
     @staticmethod
     def get_latest_version() -> str:
         """Find the latest apps_v release tag via the GitHub API."""
-        resp = httpx.get(
-            "https://api.github.com/repos/oxc-project/oxc/releases",
-            params={"per_page": 20},
-            headers={"Accept": "application/vnd.github+json"},
-            follow_redirects=True,
-        )
-        resp.raise_for_status()
+        try:
+            resp = httpx.get(
+                "https://api.github.com/repos/oxc-project/oxc/releases",
+                params={"per_page": 20},
+                headers={"Accept": "application/vnd.github+json"},
+                follow_redirects=True,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            raise click.ClickException(
+                "Couldn't reach github.com to look up the latest oxlint/oxfmt "
+                f"release ({e}). If this environment can't reach GitHub, pin a "
+                "version in pyproject.toml under [tool.plain.code.oxc], or pass "
+                "--skip-oxc."
+            ) from e
         for release in resp.json():
             tag = release["tag_name"]
             if tag.startswith(TAG_PREFIX):
@@ -143,21 +151,27 @@ class OxcTool:
 
         # Download into memory for extraction
         data = io.BytesIO()
-        with httpx.stream("GET", url, follow_redirects=True) as resp:
-            resp.raise_for_status()
-            total = int(resp.headers.get("Content-Length", 0))
-            if total:
-                with click.progressbar(
-                    length=total,
-                    label=f"Downloading {self.name}",
-                    width=0,
-                ) as bar:
+        try:
+            with httpx.stream("GET", url, follow_redirects=True) as resp:
+                resp.raise_for_status()
+                total = int(resp.headers.get("Content-Length", 0))
+                if total:
+                    with click.progressbar(
+                        length=total,
+                        label=f"Downloading {self.name}",
+                        width=0,
+                    ) as bar:
+                        for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
+                            data.write(chunk)
+                            bar.update(len(chunk))
+                else:
                     for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
                         data.write(chunk)
-                        bar.update(len(chunk))
-            else:
-                for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
-                    data.write(chunk)
+        except httpx.HTTPError as e:
+            raise click.ClickException(
+                f"Couldn't download {self.name} from github.com ({e}). If this "
+                "environment can't reach GitHub, pass --skip-oxc."
+            ) from e
 
         data.seek(0)
 
