@@ -1452,16 +1452,6 @@ class QuerySet[T: "Model"]:
         clause. The queryset is a ReturningQuerySet to a type checker by
         then, and its delete() is declared to return them.
         """
-        return self._execute_delete()
-
-    def _execute_delete(self) -> Any:
-        """Run the DELETE.
-
-        Returns the rowcount, or — when returning() set columns on this
-        queryset — the converted RETURNING rows for ReturningQuerySet.delete()
-        to hydrate. Only the target table's rows come back; cascade deletes
-        never appear in a RETURNING clause.
-        """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot use 'limit' or 'offset' with delete().")
         if self.sql_query.distinct or self.sql_query.distinct_fields:
@@ -1509,15 +1499,6 @@ class QuerySet[T: "Model"]:
         Returns the rowcount -- or, after returning(), the affected rows.
         The queryset is a ReturningQuerySet to a type checker by then, and
         its update() is declared to return them.
-        """
-        return self._execute_update(kwargs)
-
-    def _execute_update(self, kwargs: dict[str, Any]) -> Any:
-        """Run the UPDATE.
-
-        Returns the rowcount, or — when returning() set columns on this
-        queryset — the converted RETURNING rows for ReturningQuerySet.update()
-        to hydrate.
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
