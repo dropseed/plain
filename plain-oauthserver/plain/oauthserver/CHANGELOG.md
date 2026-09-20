@@ -1,5 +1,16 @@
 # plain-oauthserver changelog
 
+## [0.1.5](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.5) (2026-09-20)
+
+### What's changed
+
+- The token endpoint locks authorization codes and refresh tokens with `for_update()`, the new name for `select_for_update()` ([97f18f0699](https://github.com/dropseed/plain/commit/97f18f0699))
+- The application, authorization code, access token and refresh token models use the typed `Field[T]` annotations from plain-postgres 0.119 ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.1.4](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.4) (2026-08-12)
 
 ### What's changed
