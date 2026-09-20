@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import functools
 import inspect
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterable
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self, TypeGuard
 
 import psycopg
@@ -61,6 +61,20 @@ def source_fields_of(condition: Any) -> frozenset[tuple[type[Model], str]]:
     return getattr(condition, "_source_fields", frozenset())
 
 
+def _collect_source_fields(
+    children: Iterable[Any],
+) -> frozenset[tuple[type[Model], str]]:
+    """Union the sources of `children`, which are a node's immediate children.
+
+    Only one level deep: each child already carries its own subtree's sources,
+    so this never walks the tree.
+    """
+    sources: frozenset[tuple[type[Model], str]] = frozenset()
+    for child in children:
+        sources |= source_fields_of(child)
+    return sources
+
+
 class Q(tree.Node):
     """
     Encapsulate filters as objects that can then be combined logically (using
@@ -79,13 +93,45 @@ class Q(tree.Node):
     # model's field; a Q written by hand (`Q(name="x")`) names no source and is
     # never checked.
     #
-    # It lives on the node rather than on the leaves because `Node.copy()`
-    # rebuilds the object through `create()`, so an instance attribute only
-    # survives if every method that builds a Q carries it forward. Those are
-    # `__init__`, `__copy__`, `__deepcopy__` and `_combine`, all right here --
-    # and each reads only its immediate children, which already carry their own
-    # subtree's sources. Nothing walks the tree.
+    # It lives on the node rather than on the leaves, so every method that
+    # builds or extends a Q has to carry it forward -- a guard with a way
+    # around it is not a guard. The complete set, all overridden below:
+    #
+    #   __init__     Q(cond), and the wrappers BaseExpression.__and__ builds
+    #   create()     the classmethod Node uses to rebuild a Q; it constructs a
+    #                plain Node and reassigns __class__, so __init__ never runs
+    #   add()        mutates children in place: q = Q(); q.add(cond, Q.AND)
+    #   __copy__     which ~q and Node.copy() both go through
+    #   __deepcopy__
+    #
+    # `_combine` (&, |) is built from `create` + `add` and so needs nothing of
+    # its own. Pickling preserves the instance attribute as-is. Each of these
+    # reads only its immediate children, which already carry their own
+    # subtree's sources, so nothing walks the tree. The one way left to build a
+    # Q without provenance is mutating `q.children` directly, which is reaching
+    # past the API into Node's internals.
     _source_fields: frozenset[tuple[type[Model], str]] = frozenset()
+
+    @classmethod
+    def create(
+        cls,
+        children: list[Any] | None = None,
+        connector: str | None = None,
+        negated: bool = False,
+    ) -> Self:
+        # `Node.create` builds a plain Node and reassigns __class__, so
+        # `Q.__init__` never runs and the children's sources would be dropped.
+        obj = super().create(children, connector, negated)
+        obj._source_fields = _collect_source_fields(children or ())
+        return obj
+
+    def add(self, data: Any, conn_type: str) -> Any:
+        # `Node.add` mutates `children` in place, so a Q built up by hand --
+        # `q = Q(); q.add(cond, Q.AND)` -- would otherwise never record what
+        # went into it.
+        added = super().add(data, conn_type)
+        self._source_fields |= source_fields_of(data)
+        return added
 
     def __copy__(self) -> Q:
         obj = super().__copy__()
@@ -115,12 +161,8 @@ class Q(tree.Node):
         # does. `Exists(sub) & Model.field.equals(x)` runs through
         # `BaseExpression.__and__`, which wraps both sides in `Q(...)` before
         # combining -- without this the wrapper would report no sources and the
-        # condition's origin would be lost. Only the immediate children are
-        # read; each of them already carries its own subtree's sources.
-        sources: frozenset[tuple[type[Model], str]] = frozenset()
-        for arg in args:
-            sources |= source_fields_of(arg)
-        if sources:
+        # condition's origin would be lost.
+        if sources := _collect_source_fields(args):
             self._source_fields = sources
 
     def _combine(self, other: Any, conn: str) -> Q:
@@ -132,9 +174,9 @@ class Q(tree.Node):
             return self.copy()
 
         obj = self.create(connector=conn)
+        # `add` collects each side's sources as it goes.
         obj.add(self, conn)
         obj.add(other, conn)
-        obj._source_fields = self._source_fields | source_fields_of(other)
         return obj
 
     def __or__(self, other: Any) -> Q:

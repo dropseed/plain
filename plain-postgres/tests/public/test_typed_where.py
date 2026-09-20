@@ -10,6 +10,9 @@ and what the descriptors must keep typing as -- lives in `tests/typing/`.
 
 from __future__ import annotations
 
+import copy
+import pickle
+
 import pytest
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.relationships import Widget
@@ -307,3 +310,66 @@ class TestProvenanceSurvivesWrapping:
         subquery = Widget.query.filter(name="x")
         rows = DefaultsExample.query.where(Exists(subquery))  # ty: ignore[invalid-argument-type]
         assert [r.name for r in rows] == ["alice"]
+
+
+class TestEveryQConstructionPathCarriesProvenance:
+    """A guard with a way around it is not a guard.
+
+    `_source_fields` lives on the node, so every path that builds or extends
+    a `Q` has to carry it. These pin the full set -- if `tree.Node` grows
+    another way to make one, this is what should fail.
+    """
+
+    def test_constructor(self):
+        bad = Widget.name.equals("x")
+        assert Q(bad)._source_fields == bad._source_fields
+
+    def test_create_classmethod(self):
+        """`Node.create` builds a plain Node and reassigns __class__, so
+        `Q.__init__` never runs."""
+        bad = Widget.name.equals("x")
+        assert Q.create(children=[bad])._source_fields == bad._source_fields
+
+    def test_add_mutates_in_place(self):
+        """A Q built up by hand rather than with the operators."""
+        bad = Widget.name.equals("x")
+        q = Q()
+        q.add(bad, Q.AND)
+        assert q._source_fields == bad._source_fields
+
+    def test_add_accumulates_across_calls(self):
+        q = Q()
+        q.add(Widget.name.equals("x"), Q.AND)
+        q.add(DefaultsExample.priority.gte(1), Q.AND)
+        assert len(q._source_fields) == 2
+
+    def test_copy_and_node_copy(self):
+        bad = Q(Widget.name.equals("x"))
+        assert bad.copy()._source_fields == bad._source_fields
+        assert copy.copy(bad)._source_fields == bad._source_fields
+        assert copy.deepcopy(bad)._source_fields == bad._source_fields
+
+    def test_negation_and_combination(self):
+        bad = Q(Widget.name.equals("x"))
+        assert (~bad)._source_fields == bad._source_fields
+        assert (bad & Q(name="a"))._source_fields == bad._source_fields
+        assert (bad | Q(name="a"))._source_fields == bad._source_fields
+
+    def test_pickling(self):
+        bad = Q(Widget.name.equals("x"))
+        assert pickle.loads(pickle.dumps(bad))._source_fields == bad._source_fields
+
+    def test_where_rejects_each_path(self, db):
+        bad = Widget.name.equals("x")
+
+        built_by_create = Q.create(children=[bad])
+        with pytest.raises(TypeError, match="Widget.name"):
+            DefaultsExample.query.where(built_by_create)
+
+        built_by_add = Q()
+        built_by_add.add(bad, Q.AND)
+        with pytest.raises(TypeError, match="Widget.name"):
+            DefaultsExample.query.where(built_by_add)
+
+        with pytest.raises(TypeError, match="Widget.name"):
+            DefaultsExample.query.where(Q(bad).copy())
