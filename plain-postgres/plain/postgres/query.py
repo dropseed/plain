@@ -698,22 +698,29 @@ class QuerySet[T: "Model"]:
         unique_field_names: Sequence[str | None],
         *,
         operation_name: str,
+        allow_primary_key: bool,
     ) -> None:
         """Require unique_fields, and that they match a usable model constraint.
 
         Shared by upsert() and bulk_upsert(); operation_name names the caller in
-        the error messages.
+        the error messages. allow_primary_key keeps the message honest: only
+        bulk_upsert() can conflict on the primary key, because only its caller
+        holds the value.
         """
         if not unique_field_names:
             raise ValueError(f"{operation_name}() requires unique_fields.")
         if not self.model.model_options.unique_fields_match_constraint(
             set(unique_field_names)
         ):
+            target = (
+                "the primary key or a UniqueConstraint"
+                if allow_primary_key
+                else "a UniqueConstraint"
+            )
             raise ValueError(
                 f"{operation_name}() unique_fields {unique_field_names} on "
-                f"{self.model.__name__} must name the primary key or a "
-                "UniqueConstraint declared on the model without a condition or "
-                "expressions."
+                f"{self.model.__name__} must name {target} declared on the "
+                "model without a condition or expressions."
             )
 
     def _reject_null_upsert_key(
@@ -738,6 +745,7 @@ class QuerySet[T: "Model"]:
         self._validate_upsert_unique_fields(
             [f.name for f in unique_fields],
             operation_name="bulk_upsert",
+            allow_primary_key=True,
         )
 
         if not update_fields:
@@ -1023,6 +1031,7 @@ class QuerySet[T: "Model"]:
         self._validate_upsert_unique_fields(
             [f.name for f in unique_columns],
             operation_name="upsert",
+            allow_primary_key=False,
         )
         if any(f.primary_key for f in unique_columns):
             # Postgres owns the identity primary key, so a caller can never

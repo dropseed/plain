@@ -269,6 +269,24 @@ def test_expression_as_an_inserted_value_on_a_text_column_is_rejected(db):
     assert UpsertItem.query.count() == 0
 
 
+def test_upsert_unique_fields_error_does_not_offer_the_primary_key(db):
+    """upsert() refuses a primary-key conflict target, so its message must not
+    advertise one. bulk_upsert() does allow it, and still says so.
+    """
+    with pytest.raises(ValueError, match="must name") as upsert_error:
+        UpsertItem.query.upsert(key="a", value=1, unique_fields=[UpsertItem.value])
+    assert "must name a UniqueConstraint" in str(upsert_error.value)
+    assert "primary key" not in str(upsert_error.value)
+
+    with pytest.raises(ValueError, match="must name") as bulk_error:
+        UpsertItem.query.bulk_upsert(
+            [UpsertItem(key="a")],
+            update_fields=[UpsertItem.label],
+            unique_fields=[UpsertItem.value],
+        )
+    assert "must name the primary key or a UniqueConstraint" in str(bulk_error.value)
+
+
 def test_upsert_conflict_defaults_rejects_the_primary_key(db):
     with pytest.raises(ValueError, match="cannot update primary key fields"):
         UpsertItem.query.upsert(
@@ -598,7 +616,7 @@ def test_upsert_requires_unique_fields(db):
 
 
 def test_upsert_unique_fields_must_match_a_constraint(db):
-    with pytest.raises(ValueError, match="must name the primary key"):
+    with pytest.raises(ValueError, match="must name a UniqueConstraint"):
         UpsertItem.query.upsert(key="a", value=1, unique_fields=[UpsertItem.value])
 
 
