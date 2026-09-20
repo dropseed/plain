@@ -998,7 +998,11 @@ class QuerySet[T: "Model"]:
         lookup to lose a race, but there is also no row-scoping beyond
         unique_fields -- kwargs that aren't part of the conflict key are values
         written to whichever row conflicts, not filters narrowing which row
-        that is.
+        that is. The queryset's own filters don't scope it either: the conflict
+        constraint decides which row is touched, so
+        qs.filter(...).upsert(...) writes the conflicting row whether or not it
+        matches the filter (the related-manager wrappers depend on this, which
+        is why it isn't refused).
 
         upsert() carries its own RETURNING to hydrate the object, so a prior
         returning() has nothing to add and is refused.

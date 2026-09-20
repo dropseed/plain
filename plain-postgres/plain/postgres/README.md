@@ -590,11 +590,17 @@ condition, no expressions) and every unique field must be non-null. It can't be
 the primary key: Postgres generates the identity value, so a caller has nothing
 to conflict on.
 
-Two things to keep in mind:
+Three things to keep in mind:
 
 - **`kwargs` are values, not filters.** A keyword that isn't part of the conflict
   key doesn't narrow which row is matched — `unique_fields` alone decides that —
   it's just another column written to whichever row conflicts.
+- **The queryset's filters don't scope it either.** `qs.filter(...).upsert(...)`
+  writes the conflicting row whether or not it matches the filter — the conflict
+  constraint decides which row is touched. It isn't refused because the
+  related-manager wrappers call through a filtered queryset. To scope an upsert,
+  fold the scoping column into `unique_fields` (and into the constraint), or do a
+  locked read and write instead.
 - **The merged row isn't validated**, and a constraint violation surfaces as a raw
   `psycopg.IntegrityError`, not a `ValidationError`. `upsert` looks single-row
   like `create()`, but it's a set-based write like `bulk_upsert` (see

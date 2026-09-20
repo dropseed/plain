@@ -227,6 +227,22 @@ def test_upsert_rejects_a_property_name_in_defaults(db):
         )
 
 
+def test_upsert_ignores_queryset_filters(db):
+    """upsert() targets the conflict constraint, never the queryset's filters
+    -- the related-manager wrappers rely on calling through a filtered
+    queryset, so this is documented rather than guarded.
+    """
+    UpsertItem(key="a", value=1).create()
+
+    obj, created = UpsertItem.query.filter(value=99999).upsert(
+        key="a", value=7, unique_fields=[UpsertItem.key]
+    )
+
+    assert created is False
+    assert obj.value == 7
+    assert UpsertItem.query.count() == 1
+
+
 def test_upsert_conflict_defaults_rejects_the_primary_key(db):
     with pytest.raises(ValueError, match="cannot update primary key fields"):
         UpsertItem.query.upsert(
