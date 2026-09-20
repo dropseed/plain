@@ -1,8 +1,10 @@
-"""Test fixtures for QuerySet.bulk_upsert()."""
+"""Test fixtures for QuerySet.upsert() and QuerySet.bulk_upsert()."""
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
+from typing import ClassVar
 from zoneinfo import ZoneInfo
 
 from plain.postgres import Field, types
@@ -21,6 +23,15 @@ class UpsertItem(postgres.Model):
             postgres.UniqueConstraint(fields=["key"], name="upsertitem_key_unique"),
         ]
     )
+
+    @property
+    def label_upper(self) -> str:
+        """A settable property, to pin that upsert() refuses to write one."""
+        return self.label.upper()
+
+    @label_upper.setter
+    def label_upper(self, value: str) -> None:
+        self.label = value.lower()
 
 
 @postgres.register_model
@@ -43,6 +54,10 @@ class UpsertPair(postgres.Model):
 @postgres.register_model
 class UpsertTenant(postgres.Model):
     name: Field[str] = types.TextField(max_length=100)
+
+    scoped: ClassVar[types.ReverseForeignKey[UpsertScoped]] = types.ReverseForeignKey(
+        to="UpsertScoped", field="tenant"
+    )
 
 
 @postgres.register_model
@@ -114,5 +129,32 @@ class UpsertDecimalKey(postgres.Model):
             postgres.UniqueConstraint(
                 fields=["amount"], name="upsertdecimalkey_amount_unique"
             ),
+        ]
+    )
+
+
+@postgres.register_model
+class UpsertStamped(postgres.Model):
+    """Timestamp columns nobody names: update_now has to be refreshed by the
+    conflict update, create_now has to be left alone. Also carries a foreign
+    key that is *not* part of the conflict key, which is the only place a
+    related instance can be a conflict_defaults value.
+    """
+
+    key: Field[str] = types.TextField(max_length=100)
+    value: Field[int] = types.IntegerField(default=0)
+    tenant: Field[UpsertTenant | None] = types.ForeignKeyField(
+        UpsertTenant,
+        on_delete=postgres.CASCADE,
+        allow_null=True,
+        required=False,
+        default=None,
+    )
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
+
+    model_options = postgres.Options(
+        constraints=[
+            postgres.UniqueConstraint(fields=["key"], name="upsertstamped_key_unique"),
         ]
     )

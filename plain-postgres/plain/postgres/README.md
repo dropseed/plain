@@ -522,6 +522,118 @@ CachedItem.query.bulk_upsert(
 - Like `bulk_create`, the write is against the table: a filter on the queryset
   you call it from doesn't narrow or exclude anything.
 
+For a single row, reach for `upsert` (below) instead — it returns the object and
+a `created` flag rather than a list.
+
+#### Use `upsert` for a single insert-or-update
+
+`upsert(*, unique_fields, defaults=None, create_defaults=None, conflict_defaults=None, **kwargs)`
+is the single-row counterpart to `bulk_upsert`. It runs one
+`INSERT ... ON CONFLICT (unique_fields) DO UPDATE SET ... RETURNING` statement and
+returns `(obj, created)` — `created` is `True` when a new row was inserted,
+`False` when the conflicting row was updated. The object is hydrated from the
+post-write row, so there's no second query.
+
+```python
+# Insert the flag, or refresh used_at on the existing one.
+flag, created = Flag.query.upsert(
+    name="beta-dashboard",
+    defaults={"used_at": timezone.now()},
+    unique_fields=[Flag.name],
+)
+```
+
+`unique_fields` takes field references (`Model.field`), like `bulk_upsert`. The
+value sources below stay string-keyed — they follow the `kwargs` idiom.
+
+Value sources, lowest precedence first — where the same key appears in two of
+them, `create_defaults` loses to `defaults`, which loses to `**kwargs`:
+
+- `create_defaults` is applied on **insert only** — extras that must not change
+  when the row already exists.
+- `defaults` and `**kwargs` are applied on **both** insert and conflict-update.
+  `kwargs` carries the identifying values (including the unique fields).
+- `conflict_defaults` applies to the `DO UPDATE SET` **only** — it never changes
+  the inserted row. A value can be a plain value or an expression, so
+  `{"count": F("count") + 1}` is an atomic counter that reads the existing row:
+
+```python
+view, created = PageView.query.upsert(
+    path="/home",
+    conflict_defaults={"count": F("count") + 1},
+    unique_fields=[PageView.path],
+)
+```
+
+Two expressions reach two different rows inside a conflict update. `F("count")`
+reads the row already **stored**; `Excluded("count")` reads the row the INSERT
+**proposed**, compiling to `EXCLUDED."count"`. Combine them to accumulate the
+incoming value instead of overwriting it — the whole statement is one atomic
+`UPDATE`, so concurrent callers each add their own delta:
+
+```python
+from plain.postgres import Excluded, F
+
+# Add this batch's 7 views to whatever is already stored.
+view, created = PageView.query.upsert(
+    path="/home",
+    count=7,
+    conflict_defaults={"count": F("count") + Excluded("count")},
+    unique_fields=[PageView.path],
+)
+```
+
+`Excluded()` is only meaningful while the conflict update's assignments are
+being built. Anywhere else raises a `FieldError` — including as an inserted
+value in `kwargs`/`defaults`/`create_defaults` of the very same call, where it
+would be naming the row being written, and in `filter()`, `update()` or
+`annotate()`.
+
+On conflict the `SET` clause covers:
+
+- every non-unique, non-PK column from `kwargs`/`defaults`, each taking the value
+  the INSERT proposed;
+- every `DateTimeField(update_now=True)` column, whose fresh `pre_save()`
+  timestamp rides along in the INSERT and would otherwise go stale (a
+  `create_now`-only column is _not_ in the `SET`, so it keeps its original
+  value);
+- every column `conflict_defaults` names — replacing the proposed value when the
+  column is already in the `SET`, adding it when it isn't.
+
+Columns nobody wrote are left alone, and `create_defaults` never take part in the
+update. Naming a **database-owned** column (`create_now`, `generate=True`,
+`RandomStringField`) in `kwargs`/`defaults` is an error rather than a silent
+reset: `EXCLUDED` carries a freshly evaluated default, so the conflict update
+would overwrite the stored creation timestamp every time. A column that's also
+`update_now` is exempt — refreshing it is the point. Unlike `bulk_upsert`, `upsert` derives its `SET` columns rather than
+taking them, so a `conflict_defaults` key may not name a unique field — that's
+the conflict target.
+
+Every value source resolves callables, and every key must name a **column** — a
+settable property is refused, since the `SET` clause is derived from columns and
+a property could only ever be written on the insert half.
+
+`unique_fields` must name a `UniqueConstraint` declared on the model (no
+condition, no expressions) and every unique field must be non-null. It can't be
+the primary key: Postgres generates the identity value, so a caller has nothing
+to conflict on.
+
+Three things to keep in mind:
+
+- **`kwargs` are values, not filters.** A keyword that isn't part of the conflict
+  key doesn't narrow which row is matched — `unique_fields` alone decides that —
+  it's just another column written to whichever row conflicts.
+- **The queryset's filters don't scope it either.** `qs.filter(...).upsert(...)`
+  writes the conflicting row whether or not it matches the filter — the conflict
+  constraint decides which row is touched. It isn't refused because the
+  related-manager wrappers call through a filtered queryset. To scope an upsert,
+  fold the scoping column into `unique_fields` (and into the constraint), or do a
+  locked read and write instead.
+- **The merged row isn't validated**, and a constraint violation surfaces as a raw
+  `psycopg.IntegrityError`, not a `ValidationError`. `upsert` looks single-row
+  like `create()`, but it's a set-based write like `bulk_upsert` (see
+  [Validation](#validation)).
+
 #### Use queryset `.update()` / `.delete()` for mass operations
 
 ```python
@@ -587,7 +699,7 @@ for row in deleted:
 - **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a many-to-many field or one from another model raises an error at the `returning()` call.
 - **A foreign key can't be named here.** At class level `Model.fk` is the relation — that is what lets `where()` traverse it, as in `Child.parent.name.equals(...)` — not its column, so `returning(Child.parent)` raises `FieldError`. Foreign key columns come back through no-argument `returning()`, which hands you whole instances.
 - Without `returning()`, `update()`/`delete()` return an `int` as before.
-- `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_upsert()`, `bulk_update()`, `get_or_create()`, `update_or_create()` — raises `TypeError` rather than quietly dropping it.
+- `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_upsert()`, `bulk_update()`, `get_or_create()`, `upsert()` — raises `TypeError` rather than quietly dropping it.
 - `returning()` keeps the queryset's own class, so a custom `QuerySet` and its methods survive it. Chain your own methods before `returning()` — a type checker sees the returning shape after it, not your subclass.
 
 A row lock belongs on the read side of the write, and it composes in either order. The write then needs an open `transaction.atomic()`, and is emitted as a locking sub-select so the lock has somewhere to live — see [Locking a set-based write](#locking-a-set-based-write).
@@ -1258,7 +1370,7 @@ Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived
     Integration.query.get_or_create(name="acme", defaults={"api_key": "k"})
     ```
 
-    The same applies to `update_or_create()`, and to an expression right-hand side like `filter(api_key=F("name"))` — the column is still ciphertext.
+    The same applies to `upsert()`, and to an expression right-hand side like `filter(api_key=F("name"))` — the column is still ciphertext.
 
 - **No indexes or constraints** — encrypted fields cannot be used in indexes or unique constraints. Preflight checks will catch this.
 - **Only `default=""`** — on `EncryptedTextField` (paired with `required=False`), the empty string is stored as plaintext `''`, so it's the one value expressible as a column `DEFAULT` (declare it to add the field to a populated table). Any other default would need ciphertext, which is non-deterministic. `EncryptedJSONField` has no persistent default at all — even `{}` serializes to text that would need ciphertext — so pair `allow_null=True` with `default=None`, which stores nothing and just marks the field optional in the constructor.
@@ -1446,7 +1558,7 @@ except (psycopg.IntegrityError, ValidationError):
     ...  # lost a race — reload and retry, or report it
 ```
 
-For a plain insert-or-update with no per-row logic, `bulk_upsert(objs, update_fields=[...], unique_fields=[...])` is an atomic upsert with no race to catch.
+For a plain insert-or-update with no per-row logic there's no race to catch in the first place: `upsert(**values, unique_fields=[...])` for one row and `bulk_upsert(objs, update_fields=[...], unique_fields=[...])` for many are each a single atomic statement.
 
 ### Indexes and constraints
 

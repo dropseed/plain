@@ -9,7 +9,7 @@ import datetime
 import json
 import operator
 import warnings
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from decimal import Decimal
 from functools import cached_property
 from itertools import islice
@@ -30,7 +30,14 @@ from plain.postgres.exceptions import (
     FieldError,
     ObjectDoesNotExist,
 )
-from plain.postgres.expressions import Case, F, ResolvableExpression, Value, When
+from plain.postgres.expressions import (
+    Case,
+    F,
+    ResolvableExpression,
+    Value,
+    When,
+    is_query_expression,
+)
 from plain.postgres.fields import (
     Field,
     PrimaryKeyField,
@@ -839,6 +846,72 @@ class QuerySet[T: "Model"]:
 
         return objs
 
+    def _validate_upsert_unique_columns(
+        self,
+        unique_columns: Sequence[Field],
+        *,
+        operation_name: str,
+        allow_primary_key: bool,
+    ) -> None:
+        """Require a conflict key the caller controls and the model declares.
+
+        Shared by upsert() and bulk_upsert(). allow_primary_key keeps the
+        message honest: only bulk_upsert() can conflict on the primary key,
+        because only its caller holds the value.
+        """
+        object_name = self.model.model_options.object_name
+
+        if not unique_columns:
+            raise ValueError(f"{operation_name}() requires unique_fields.")
+        # A conflict key the caller doesn't control can never actually conflict,
+        # so the upsert would silently be an insert every time.
+        for field in unique_columns:
+            if field.db_returning and not field.primary_key:
+                raise ValueError(
+                    f"{operation_name}() cannot use {object_name}.{field.name} "
+                    "in unique_fields: the database generates its value, so "
+                    "there is never one to conflict on."
+                )
+            if field.auto_fills_on_save:
+                raise ValueError(
+                    f"{operation_name}() cannot use {object_name}.{field.name} "
+                    "in unique_fields: it is stamped again on every write, so "
+                    "it can never be a stable conflict key."
+                )
+        if not self.model.model_options.unique_fields_match_constraint(
+            {f.name for f in unique_columns}
+        ):
+            names = [f.name for f in unique_columns]
+            target = (
+                "the primary key or a UniqueConstraint"
+                if allow_primary_key
+                else "a UniqueConstraint"
+            )
+            raise ValueError(
+                f"{operation_name}() unique_fields {names} on {object_name} "
+                f"must name {target} declared on the model without a condition "
+                "or expressions."
+            )
+
+    def _reject_database_owned_update(
+        self, field: Field, *, operation_name: str
+    ) -> None:
+        """Refuse to overwrite a column the database owns.
+
+        Shared by upsert() and bulk_upsert(). A database-owned value
+        (create_now, generate=True, RandomStringField) isn't the caller's to
+        overwrite: EXCLUDED carries a freshly evaluated default, so updating
+        one would reset a creation timestamp on every conflict. A column that
+        is also update_now is exempt -- rewriting it is the whole point.
+        """
+        if field.db_returning and not field.auto_fills_on_save:
+            raise ValueError(
+                f"{operation_name}() cannot update "
+                f"{self.model.model_options.object_name}.{field.name}: the "
+                "database generates its value, so the update would overwrite "
+                "the stored one with a fresh default."
+            )
+
     def _resolve_bulk_upsert_fields(
         self,
         update_fields: Sequence[Field[Any] | type[Model]],
@@ -847,8 +920,6 @@ class QuerySet[T: "Model"]:
         """Check both bulk_upsert() field lists and return the columns they
         name, with any `Model.fk` reference resolved to its foreign key
         column."""
-        object_name = self.model.model_options.object_name
-
         unique_columns = self._validate_field_refs(
             unique_fields, where="bulk_upsert() unique_fields"
         )
@@ -856,32 +927,9 @@ class QuerySet[T: "Model"]:
             update_fields, where="bulk_upsert() update_fields"
         )
 
-        if not unique_columns:
-            raise ValueError("bulk_upsert() requires unique_fields.")
-        # A conflict key the caller doesn't control can never actually conflict,
-        # so the upsert would silently be an insert every time.
-        for field in unique_columns:
-            if field.db_returning and not field.primary_key:
-                raise ValueError(
-                    f"bulk_upsert() cannot use {object_name}.{field.name} in "
-                    "unique_fields: the database generates its value, so the "
-                    "objects never carry one to conflict on."
-                )
-            if field.auto_fills_on_save:
-                raise ValueError(
-                    f"bulk_upsert() cannot use {object_name}.{field.name} in "
-                    "unique_fields: it is stamped again on every write, so it "
-                    "can never be a stable conflict key."
-                )
-        if not self.model.model_options.unique_fields_match_constraint(
-            {f.name for f in unique_columns}
-        ):
-            names = [f.name for f in unique_columns]
-            raise ValueError(
-                f"bulk_upsert() unique_fields {names} on {object_name} must name "
-                "the primary key or a UniqueConstraint declared on the model "
-                "without a condition or expressions."
-            )
+        self._validate_upsert_unique_columns(
+            unique_columns, operation_name="bulk_upsert", allow_primary_key=True
+        )
 
         if not update_columns:
             raise ValueError("bulk_upsert() requires update_fields.")
@@ -890,17 +938,7 @@ class QuerySet[T: "Model"]:
         if any(f.primary_key for f in update_columns):
             raise ValueError("bulk_upsert() cannot update primary key fields.")
         for field in update_columns:
-            # A database-owned value (create_now, generate=True,
-            # RandomStringField) isn't the caller's to overwrite: EXCLUDED
-            # carries a freshly evaluated default, so naming one here would
-            # reset a creation timestamp on every update. A column that is also
-            # update_now is exempt -- rewriting it is the whole point.
-            if field.db_returning and not field.auto_fills_on_save:
-                raise ValueError(
-                    f"bulk_upsert() cannot update {object_name}.{field.name}: "
-                    "the database generates its value, so the update would "
-                    "overwrite the stored one with a fresh default."
-                )
+            self._reject_database_owned_update(field, operation_name="bulk_upsert")
         repeated = sorted(
             {
                 field.name
@@ -1154,51 +1192,243 @@ class QuerySet[T: "Model"]:
                     pass
                 raise
 
-    def update_or_create(
+    def upsert(
         self,
+        *_positional: Never,
         defaults: dict[str, Any] | None = None,
         create_defaults: dict[str, Any] | None = None,
+        conflict_defaults: dict[str, Any] | None = None,
+        unique_fields: Sequence[Field[Any] | type[Model]],
         **kwargs: Any,
     ) -> tuple[T, bool]:
         """
-        Look up an object with the given kwargs, updating one with defaults
-        if it exists, otherwise create a new one. Optionally, an object can
-        be created with different values than defaults by using
-        create_defaults.
-        Return a tuple (object, created), where created is a boolean
-        specifying whether an object was created.
-        """
-        self._reject_returning("update_or_create")
-        if create_defaults is None:
-            update_defaults = create_defaults = defaults or {}
-        else:
-            update_defaults = defaults or {}
-        with transaction.atomic():
-            # Lock the row so that a concurrent update is blocked until
-            # update_or_create() has performed its save.
-            obj, created = self.for_update().get_or_create(create_defaults, **kwargs)
-            if created:
-                return obj, created
-            for k, v in resolve_callables(update_defaults):
-                setattr(obj, k, v)
+        Insert a row, or update the existing row that conflicts on
+        unique_fields, in a single INSERT ... ON CONFLICT DO UPDATE statement.
+        Return a tuple (object, created), where created is True when a new row
+        was inserted and False when an existing row was updated. The object is
+        hydrated from the post-write row -- no second query.
 
-            update_fields = set(update_defaults)
-            field_names = self.model._model_meta._non_pk_field_names
-            # update_fields only supports column-backed fields.
-            if field_names.issuperset(update_fields):
-                # Add fields which are set on pre_save(), e.g. update_now fields.
-                # This is to maintain backward compatibility as these fields
-                # are not updated unless explicitly specified in the
-                # update_fields list.
-                for field in self.model._model_meta.fields:
-                    if not (
-                        field.primary_key or field.__class__.pre_save is Field.pre_save
-                    ):
-                        update_fields.add(field.name)
-                obj.update(fields=update_fields)
-            else:
-                obj.update()
-        return obj, False
+        Value sources, lowest precedence first -- on any overlapping key,
+        create_defaults loses to defaults, which loses to **kwargs:
+          - create_defaults: extra values applied on insert only.
+          - defaults: applied on both insert and conflict-update.
+          - **kwargs: the identifying and inserted values (must include the
+            unique_fields). Applied on both insert and conflict-update.
+          - conflict_defaults: per-column overrides for the conflict-update SET
+            only -- they never affect the inserted row. Each value may be a
+            plain value or an expression, where F("count") reads the stored row
+            and Excluded("count") reads the row the INSERT proposed, so
+            F("count") + Excluded("count") is an accumulating counter. A column
+            named here is set on conflict whether or not it is otherwise being
+            updated, and it cannot be a unique field.
+
+        Every source resolves callables, and every key must name a column: a
+        settable property is refused, because the SET clause is derived from
+        columns and a property could only ever be written on the insert half.
+
+        On conflict the SET clause covers every non-unique, non-PK column drawn
+        from kwargs and defaults -- each taking the value the INSERT proposed --
+        plus every DateTimeField(update_now=True) column, whose fresh
+        pre_save() timestamp would otherwise go stale, plus every column
+        conflict_defaults names. A conflict_defaults entry replaces the
+        proposed value for that column. create_defaults never take part in the
+        update, and neither do columns nobody wrote (a create_now timestamp
+        keeps its original value). Naming a database-owned column (create_now,
+        generate=True, RandomStringField) in kwargs or defaults is an error --
+        the conflict-update would reset it to a freshly evaluated default. The
+        merged result is not validated -- consistent with the other bulk write
+        paths.
+
+        unique_fields takes field references (`Model.field`) and must name a
+        UniqueConstraint declared on the model without a condition or
+        expressions; every unique field must have a non-null value (NULL never
+        conflicts in Postgres). The value sources above stay string-keyed --
+        they follow the kwargs idiom, not field references.
+
+        Unlike the get/create family, this is one atomic statement: there is no
+        lookup to lose a race, but there is also no row-scoping beyond
+        unique_fields -- kwargs that aren't part of the conflict key are values
+        written to whichever row conflicts, not filters narrowing which row
+        that is. The queryset's own filters don't scope it either: the conflict
+        constraint decides which row is touched, so
+        qs.filter(...).upsert(...) writes the conflicting row whether or not it
+        matches the filter (the related-manager wrappers depend on this, which
+        is why it isn't refused).
+
+        upsert() carries its own RETURNING to hydrate the object, so a prior
+        returning() has nothing to add and is refused.
+        """
+        if _positional:  # ty: ignore[redundant-condition]
+            # update_or_create() took defaults positionally; upsert() doesn't,
+            # and a bare "takes 1 positional argument" wouldn't say which.
+            raise TypeError(
+                "upsert() takes no positional arguments. Pass the mapping as "
+                "defaults= (or create_defaults=/conflict_defaults=)."
+            )
+        self._reject_returning("upsert")
+        meta = self.model._model_meta
+
+        # A foreign key is named as Model.fk, which is the relation descriptor
+        # rather than the column -- _validate_field_refs resolves it, so work
+        # from what it hands back rather than what the caller passed.
+        unique_columns = self._validate_field_refs(
+            unique_fields, where="upsert() unique_fields"
+        )
+        self._validate_upsert_unique_columns(
+            unique_columns, operation_name="upsert", allow_primary_key=False
+        )
+        if any(f.primary_key for f in unique_columns):
+            # Postgres owns the identity primary key, so a caller can never
+            # supply the value that would conflict on it.
+            raise ValueError(
+                "upsert() cannot conflict on the primary key -- the database "
+                "generates it. Use a UniqueConstraint's fields instead."
+            )
+
+        defaults = defaults or {}
+        create_defaults = create_defaults or {}
+        conflict_defaults = conflict_defaults or {}
+
+        # The inserted row: create_defaults first, then defaults, then kwargs,
+        # so the more explicit source wins on any overlap. Merge the raw
+        # mappings first and resolve callables only for what survives -- a
+        # callable a higher-precedence source shadowed is never the value, so
+        # calling it would run a side effect nobody asked for.
+        merged: dict[str, Any] = {}
+        for source in (create_defaults, defaults, kwargs):
+            merged.update(source)
+        insert_values: dict[str, Any] = dict(resolve_callables(merged))
+
+        # Reject typo'd keys with a clean FieldError before they fail later and
+        # more confusingly, matching get_or_create()'s validation.
+        self._validate_model_field_names(insert_values)
+
+        # That check also admits settable properties, which get_or_create() can
+        # honour because it writes through the instance. upsert() derives its
+        # SET clause from columns, so a property would be written on insert and
+        # silently dropped on conflict -- refuse it rather than do half the job.
+        properties = sorted(meta._property_names & set(insert_values))
+        if properties:
+            names = ", ".join(f"{self.model.__name__}.{name}" for name in properties)
+            raise FieldError(
+                f"upsert() writes columns; {names} is a property. Pass the "
+                "column it sets instead."
+            )
+
+        # An expression is computed from a row, and the row this INSERT
+        # proposes doesn't exist yet -- Excluded() names that very row. Catch
+        # it here, after callables have resolved and before the value is
+        # assigned to a field: field coercion runs first and would either raise
+        # something unrecognizable or, on a text column, write the repr into
+        # the row.
+        for name, value in insert_values.items():
+            if is_query_expression(value):
+                raise FieldError(
+                    f"{value!r} cannot be an inserted value ({name}=...): an "
+                    "expression is computed from a row, and the insert has no "
+                    "row to compute from. Move it to conflict_defaults."
+                )
+
+        for field in unique_columns:
+            assert field.name is not None
+            if insert_values.get(field.name) is None:
+                raise ValueError(
+                    f"upsert() requires a non-null {field.name}; NULL never "
+                    "conflicts in Postgres, so it cannot be upserted."
+                )
+
+        # The conflict-update columns: everything from kwargs and defaults that
+        # isn't a unique field or the PK, plus every update_now field (pre_save
+        # already stamped a fresh value into the INSERT, so EXCLUDED carries it
+        # -- leaving it out would let the timestamp go stale on conflict).
+        # create_defaults are insert-only, so they never appear here.
+        # Built in model field order so the SET clause is stable across runs.
+        unique_field_names = {f.name for f in unique_columns}
+        written_names = {*kwargs, *defaults}
+        update_field_objs: list[Field] = [
+            field
+            for field in meta.fields
+            if field.name not in unique_field_names
+            and not field.primary_key
+            and (field.name in written_names or field.auto_fills_on_save)
+        ]
+        for field in update_field_objs:
+            self._reject_database_owned_update(field, operation_name="upsert")
+
+        # Callables resolve here too, like the other value sources -- otherwise
+        # the callable itself reaches the column and a text column stores its
+        # repr. An expression (F(), Excluded()) is an object, not a callable,
+        # so it passes through untouched.
+        conflict_defaults = dict(resolve_callables(conflict_defaults))
+
+        # conflict_defaults name columns the SET clause writes, so unlike the
+        # other sources they must be real columns -- not properties -- and they
+        # cannot rewrite the conflict target.
+        conflict_default_objs: dict[Field, Any] = {}
+        for name, value in conflict_defaults.items():
+            if name in unique_field_names:
+                raise ValueError(
+                    f"upsert() conflict_defaults cannot name the unique field "
+                    f"{name!r} -- it is the conflict target, not something the "
+                    "conflict-update may rewrite."
+                )
+            if name in meta._property_names:
+                raise FieldError(
+                    f"upsert() writes columns; {self.model.__name__}.{name} is "
+                    "a property. Pass the column it sets instead."
+                )
+            try:
+                field = meta.get_forward_field(name)
+            except FieldDoesNotExist:
+                raise FieldError(
+                    f"Invalid conflict_defaults field name for model "
+                    f"{self.model.__name__}: {name!r}."
+                ) from None
+            if not isinstance(field, ColumnField):
+                # A many-to-many field is a forward field with no column of its
+                # own, so it passes the lookup above and then fails in the
+                # compiler with a bare UndefinedColumn.
+                raise FieldError(
+                    f"Cannot use {self.model.model_options.object_name}.{name} "
+                    "in upsert() conflict_defaults: only database columns can "
+                    "be set."
+                )
+            # conflict_defaults land in the same SET clause as the derived
+            # update columns, so the same columns are off limits.
+            if field.primary_key:
+                raise ValueError("upsert() cannot update primary key fields.")
+            self._reject_database_owned_update(field, operation_name="upsert")
+            conflict_default_objs[field] = value
+
+        obj = self.model(**insert_values)
+        obj._prepare_related_fields_for_save(operation_name="upsert")
+
+        # The identity primary key is never supplied (the model constructor
+        # rejects it), so Postgres always generates it.
+        fields = meta.non_pk_fields
+
+        # One statement, so it needs no transaction of its own. RETURNING
+        # carries every column plus the trailing created flag, so the row we
+        # hydrate is the post-write row -- not the one we proposed.
+        returning_fields: list[Field] = list(meta.fields)
+        rows = self._insert(
+            [obj],
+            fields=fields,
+            returning_fields=returning_fields,
+            on_conflict=OnConflict.UPDATE,
+            update_fields=update_field_objs,
+            unique_fields=unique_columns,
+            conflict_defaults=conflict_default_objs,
+            returning_created=True,
+        )
+
+        assert rows is not None
+        row = rows[0]
+        created = bool(row[-1])
+        result = self.model.from_db(
+            (f.name for f in returning_fields), row[: len(returning_fields)]
+        )
+        return cast(T, result), created
 
     def _extract_model_params(
         self, defaults: dict[str, Any] | None, **kwargs: Any
@@ -1210,9 +1440,14 @@ class QuerySet[T: "Model"]:
         defaults = defaults or {}
         params = {k: v for k, v in kwargs.items() if LOOKUP_SEP not in k}
         params.update(defaults)
+        self._validate_model_field_names(params)
+        return params
+
+    def _validate_model_field_names(self, names: Iterable[str]) -> None:
+        """Raise FieldError if any name isn't a model field or settable property."""
         property_names = self.model._model_meta._property_names
         invalid_params = []
-        for param in params:
+        for param in names:
             try:
                 self.model._model_meta.get_field(param)
             except FieldDoesNotExist:
@@ -1226,7 +1461,6 @@ class QuerySet[T: "Model"]:
                     "', '".join(sorted(invalid_params)),
                 )
             )
-        return params
 
     def first(self) -> T | None:
         """Return the first object of a query or None if no match is found."""
@@ -1983,6 +2217,8 @@ class QuerySet[T: "Model"]:
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
+        conflict_defaults: dict[Field, Any] | None = None,
+        returning_created: bool = False,
     ) -> list[tuple[Any, ...]] | None:
         """
         Insert a new record for the given model. This provides an interface to
@@ -1993,6 +2229,8 @@ class QuerySet[T: "Model"]:
             on_conflict=on_conflict if on_conflict else None,
             update_fields=update_fields,
             unique_fields=unique_fields,
+            conflict_defaults=conflict_defaults,
+            returning_created=returning_created,
         )
         query.insert_values(fields, objs)
         # InsertQuery returns SQLInsertCompiler which has different execute_sql signature
