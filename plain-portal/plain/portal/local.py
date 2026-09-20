@@ -31,10 +31,34 @@ from .protocol import (
 
 @functools.lru_cache
 def _portal_dir() -> str:
-    """Return .plain/portal/ in the project root, creating it if needed."""
-    from plain.runtime import PLAIN_TEMP_PATH
+    """Return this checkout's portal state dir, creating it if needed.
 
-    d = os.path.join(PLAIN_TEMP_PATH, "portal")
+    The socket and lock are facts about a live process, not artifacts, so
+    they're kept beside the rest of the checkout's state rather than in
+    `.plain/` — a working tree (and its `.plain/`) can be symlinked or copied
+    between checkouts, which two live sockets can't survive.
+
+    Named by a hash of the checkout id alone, not `checkout_state_path`'s
+    readable directory name — a Unix socket path is capped at roughly 100
+    bytes by the kernel, and `checkout_state_path` embeds the full checkout
+    directory name, which can push the socket path over that limit for a
+    long-named project.
+
+    Rooted at the system temp dir rather than `PLAIN_CACHE_PATH` for the same
+    length-limit reason — `PLAIN_CACHE_PATH` is user-configurable (env var or
+    `XDG_CACHE_HOME`) and can itself be long enough to blow the budget even
+    with a fixed-length digest appended.
+    """
+    import hashlib
+    import tempfile
+    from pathlib import Path
+
+    from plain.runtime import checkout_id, find_project_root
+
+    digest = hashlib.sha256(
+        checkout_id(find_project_root(Path.cwd())).encode()
+    ).hexdigest()[:16]
+    d = os.path.join(tempfile.gettempdir(), "plain-portal", digest)
     os.makedirs(d, exist_ok=True)
     return d
 
