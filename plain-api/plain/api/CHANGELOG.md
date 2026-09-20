@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.35.1](https://github.com/dropseed/plain/releases/plain-api@0.35.1) (2026-09-20)
+
+### What's changed
+
+- `APIKey` and the API request models use the typed `Field[T]` annotations from plain-postgres 0.119, and the README examples follow ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.35.0](https://github.com/dropseed/plain/releases/plain-api@0.35.0) (2026-08-21)
 
 ### What's changed
