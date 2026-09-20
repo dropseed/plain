@@ -6,11 +6,9 @@ from __future__ import annotations
 
 import copy
 import json
-import math
 import operator
 import warnings
 from collections.abc import Callable, Iterator, Sequence
-from decimal import Decimal
 from functools import cached_property
 from itertools import islice
 from typing import TYPE_CHECKING, Any, Never, Self, cast, overload
@@ -59,60 +57,32 @@ if TYPE_CHECKING:
     from plain.postgres import Model
 
 
-# What a NaN conflict key normalizes to. Any value a float or numeric column
-# can otherwise hold is a number, so a string can't collide with one.
-NAN_CONFLICT_KEY = "<nan>"
+def conflict_sort_value(field: Field, value: Any) -> tuple[str, str]:
+    """One component of the order bulk_upsert() sends its batches in.
 
+    Concurrent callers only have to agree on an order, not on a meaningful
+    one, so this is built for two properties and no others: the same logical
+    key always produces the same result, and it can never raise. Preparing the
+    value the way the column will see it gets the first (a TimeZoneField's
+    ZoneInfo becomes its name, a naive datetime becomes aware), and reducing to
+    strings gets the second -- str() orders a NaN, a memoryview or a ZoneInfo
+    just as happily as an int, where `<` on any of them raises.
 
-def conflict_key_value(field: Field, value: Any) -> Any:
-    """One component of a bulk_upsert() conflict key, in a form that hashes.
-
-    The same function runs over both sides of the match -- the value taken off
-    the object and the value Postgres handed back -- so however a column spells
-    its Python value on each side, the two meet in the same place. Preparing
-    the value is most of that: a TimeZoneField's ZoneInfo becomes its name, a
-    naive datetime becomes aware, a UUID string becomes a UUID.
-
-    Values that already compare and hash alike need no help here, and several
-    near-misses turn out to be in that group: Decimal("1.0") and
-    Decimal("1.00"), -0.0 and 0.0, and two aware datetimes naming the same
-    instant in different zones. Postgres collapses each of those pairs to one
-    row as well, so Python and the database agree without being told to. NaN is
-    the one place they disagree.
+    Leading with the type's name keeps a polymorphic column from interleaving:
+    a jsonb column holding an object in one row and a number in the next would
+    otherwise sort "7" next to "[7]".
     """
     value = field.get_prep_value(value)
     if isinstance(field, JSONField):
-        # Canonicalize the value the way the column will store it: encode with
-        # the field's own encoder, which stringifies non-string object keys,
-        # and only then re-parse and dump with the keys sorted. Sorting before
-        # the encode would compare an int key against a str one and raise. A
-        # jsonb column keys as a string either way, scalars included, which is
-        # also what makes an otherwise unhashable object usable as a key.
-        return json.dumps(
+        # Encode with the field's own encoder, which stringifies non-string
+        # object keys, and only then re-parse and dump with the keys sorted --
+        # sorting them first would compare an int key against a str one and
+        # raise. Two equal objects written with their keys in either order then
+        # sort to the same place.
+        value = json.dumps(
             json.loads(get_json_dumps(field.encoder)(value)), sort_keys=True
         )
-    if isinstance(value, memoryview | bytearray):
-        # psycopg hands a bytea column back as a memoryview.
-        return bytes(value)
-    if (isinstance(value, float) and math.isnan(value)) or (
-        isinstance(value, Decimal) and value.is_nan()
-    ):
-        # Postgres holds NaN equal to NaN for uniqueness. Python doesn't, and
-        # every NaN hashes differently, so a NaN key would never match its own
-        # row back and two of them would walk past the duplicate check.
-        return NAN_CONFLICT_KEY
-    return value
-
-
-def conflict_key_order(key: tuple[Any, ...]) -> tuple[tuple[str, Any], ...]:
-    """The sort key for a bulk_upsert() conflict key.
-
-    The deadlock ordering only has to be the *same* order for every caller, not
-    a meaningful one, and one column can hold values that don't compare to each
-    other -- a jsonb column with an object in one row and a number in the next.
-    Leading with the type's name keeps every comparison inside a single type.
-    """
-    return tuple((type(value).__name__, value) for value in key)
+    return (type(value).__name__, str(value))
 
 
 # The maximum number of results to fetch in a get() query.
@@ -740,6 +710,11 @@ class QuerySet[T: "Model"]:
                     fields,
                     batch_size,
                 )
+                # Postgres emits one RETURNING row per VALUES row, in order, so
+                # the rows can be zipped straight onto the objects. bulk_upsert()
+                # relies on the same guarantee for its ON CONFLICT batches -- the
+                # two stand or fall together, and
+                # tests/internal/test_returning_order.py pins it.
                 assert len(returned_columns) == len(objs_without_id)
                 for obj_without_id, results in zip(objs_without_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
@@ -767,8 +742,8 @@ class QuerySet[T: "Model"]:
 
         if not unique_columns:
             raise ValueError("bulk_upsert() requires unique_fields.")
-        # The conflict key is also what matches each RETURNING row back to its
-        # object, so it has to be a value the caller holds and the row keeps.
+        # A conflict key the caller doesn't control can never actually conflict,
+        # so the upsert would silently be an insert every time.
         for field in unique_columns:
             if field.db_returning and not field.primary_key:
                 raise ValueError(
@@ -861,13 +836,11 @@ class QuerySet[T: "Model"]:
         object_name = self.model.model_options.object_name
         self._prepare_for_bulk_create(objs)
 
-        # Compute each object's conflict key exactly once. Reused below to sort
-        # the batches and to match RETURNING rows back to objects, so the keys
-        # have to be usable for both: no nulls (NULL never conflicts in
-        # Postgres) and no duplicates (one statement can only touch a row once).
-        obj_by_key: dict[tuple[Any, ...], T] = {}
+        # A NULL conflict key never conflicts in Postgres, so the row would
+        # always insert and the upsert would quietly be an insert.
+        sort_keys = []
         for obj in objs:
-            key_values = []
+            key = []
             for field in unique_columns:
                 value = field.value_from_object(obj)
                 if value is None:
@@ -876,16 +849,8 @@ class QuerySet[T: "Model"]:
                         "object; NULL never conflicts in Postgres, so it cannot "
                         "be upserted."
                     )
-                key_values.append(conflict_key_value(field, value))
-            key = tuple(key_values)
-            if key in obj_by_key:
-                names = [f.name for f in unique_columns]
-                raise ValueError(
-                    f"bulk_upsert() got more than one {object_name} with "
-                    f"{names} = {list(key)}. Postgres can only touch a row once "
-                    "per statement, so collapse the duplicates before calling."
-                )
-            obj_by_key[key] = obj
+                key.append(conflict_sort_value(field, value))
+            sort_keys.append(tuple(key))
 
         # An update_now column is stamped by pre_save on the way in, so the
         # object already holds a fresh value whether it inserts or updates.
@@ -904,46 +869,40 @@ class QuerySet[T: "Model"]:
         if not pk_is_unique:
             fields = [f for f in fields if not isinstance(f, PrimaryKeyField)]
 
-        # RETURNING must carry the DB-returned fields (to populate the objects)
-        # plus the unique fields (to match each returned row to its object).
-        returning_fields = list(meta.db_returning_fields)
-        for field in unique_columns:
-            if field not in returning_fields:
-                returning_fields.append(field)
-        unique_indices = [returning_fields.index(f) for f in unique_columns]
-
         # Issue the batches in conflict-key order so concurrent upserts touching
         # overlapping keys lock rows in the same order and can't deadlock each
-        # other. objs itself is untouched, so the caller gets its input order.
-        sorted_keys = sorted(obj_by_key, key=conflict_key_order)
+        # other. sorted() is stable, so equal keys keep their input order and
+        # the objects themselves are never compared. objs is left alone, so the
+        # caller gets its own order back.
+        order = sorted(range(len(objs)), key=lambda position: sort_keys[position])
+        ordered_objs = [objs[position] for position in order]
 
         with transaction.atomic(savepoint=False):
-            returned_rows = self._batched_insert(
-                [obj_by_key[key] for key in sorted_keys],
-                fields,
-                batch_size,
-                returning_fields=returning_fields,
-                on_conflict=OnConflict.UPDATE,
-                update_fields=conflict_update_columns,
-                unique_fields=unique_columns,
-            )
+            try:
+                returned_rows = self._batched_insert(
+                    ordered_objs,
+                    fields,
+                    batch_size,
+                    on_conflict=OnConflict.UPDATE,
+                    update_fields=conflict_update_columns,
+                    unique_fields=unique_columns,
+                )
+            except psycopg.errors.CardinalityViolation as exc:
+                names = [f.name for f in unique_columns]
+                raise ValueError(
+                    f"bulk_upsert() sent two {object_name} objects with the same "
+                    f"{names} in one statement, which Postgres refuses -- it can "
+                    "only touch a row once per statement. Collapse the duplicates "
+                    "before calling."
+                ) from exc
 
-            # RETURNING order isn't guaranteed to match VALUES order under ON
-            # CONFLICT, so match each returned row to its object by the unique
-            # key -- run through conflict_key_value() again so both sides of the
-            # match are spelled the same way. Still inside the transaction: a
-            # row that can't be matched would leave the objects half-populated,
-            # so roll the write back.
-            assert len(returned_rows) == len(obj_by_key)
-            row_by_key = {
-                tuple(
-                    conflict_key_value(field, row[index])
-                    for field, index in zip(unique_columns, unique_indices)
-                ): row
-                for row in returned_rows
-            }
-            for key, obj in obj_by_key.items():
-                row = row_by_key[key]
+            # Postgres emits one RETURNING row per VALUES row, in order, on the
+            # DO UPDATE path as much as the insert path, so the rows come back
+            # in the order the objects were sent. bulk_create() maps its rows
+            # onto objects by position for the same reason -- the two stand or
+            # fall together, and tests/internal/test_returning_order.py pins it.
+            assert len(returned_rows) == len(ordered_objs)
+            for obj, row in zip(ordered_objs, returned_rows):
                 for index, field in enumerate(meta.db_returning_fields):
                     setattr(obj, field.name, row[index])
                 obj._state.adding = False
@@ -1740,7 +1699,6 @@ class QuerySet[T: "Model"]:
         fields: Sequence[Field],
         batch_size: int | None,
         *,
-        returning_fields: list[Field] | None = None,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
@@ -1750,8 +1708,7 @@ class QuerySet[T: "Model"]:
         at a time, collecting the RETURNING rows from every batch. Pass the
         on_conflict kwargs to run each batch as ON CONFLICT DO UPDATE.
         """
-        if returning_fields is None:
-            returning_fields = self.model._model_meta.db_returning_fields
+        returning_fields = self.model._model_meta.db_returning_fields
         max_batch_size = max(len(objs), 1)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
         returned_rows = []

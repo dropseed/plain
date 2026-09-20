@@ -2,7 +2,7 @@
 
 One INSERT ... ON CONFLICT (unique_fields) DO UPDATE ... RETURNING per batch.
 Every returned object -- inserted or updated -- comes back with its DB-returned
-fields (primary key, DB defaults) populated, matched to its row by unique key.
+fields (primary key, DB defaults) populated from the row at its own position.
 """
 
 from __future__ import annotations
@@ -75,10 +75,9 @@ def test_bulk_upsert_updates_only_named_fields(db):
     assert row.label == "original"  # field not in update_fields preserved
 
 
-def test_bulk_upsert_matches_returned_rows_by_key_not_order(db):
-    # Seed so every input row conflicts; RETURNING order under ON CONFLICT is
-    # not guaranteed to match VALUES order, so each object must be matched to
-    # its own row by unique key.
+def test_bulk_upsert_hydrates_every_object_when_all_of_them_conflict(db):
+    # Seed so every input row takes the DO UPDATE path, and pass them out of
+    # key order so the deadlock sort actually reorders the batch.
     for key in ("a", "b", "c"):
         UpsertItem(key=key, value=0).create()
     seeded_ids = {row.key: row.id for row in UpsertItem.query.all()}
@@ -218,19 +217,35 @@ def test_bulk_upsert_composite_unique_fields(db):
     assert stored == {("b1", "s1"): 10, ("b1", "s2"): 20, ("b2", "s1"): 30}
 
 
-def test_bulk_upsert_duplicate_keys_rejected(db):
-    # Postgres raises a cardinality violation if one statement touches a row
-    # twice, and splitting duplicates across batches would silently let the
-    # last one win -- so they are refused up front, whatever the batch size.
-    with pytest.raises(ValueError, match="more than one UpsertItem"):
+def test_bulk_upsert_duplicate_keys_in_one_batch_rejected(db):
+    # Postgres refuses to touch a row twice in one statement. The raw
+    # CardinalityViolation is re-raised as something that names the problem.
+    # It aborts the surrounding transaction, so nothing is queried after it.
+    with pytest.raises(ValueError, match=r"same \['key'\] in one statement"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1), UpsertItem(key="a", value=2)],
             update_fields=[UpsertItem.value],
             unique_fields=[UpsertItem.key],
-            batch_size=1,
         )
 
-    assert UpsertItem.query.count() == 0
+
+def test_bulk_upsert_duplicate_keys_in_separate_batches_are_legal(db):
+    # Split across statements there is no cardinality violation: the first
+    # inserts the row and the second updates it.
+    items = [UpsertItem(key="a", value=1), UpsertItem(key="a", value=2)]
+    UpsertItem.query.bulk_upsert(
+        items,
+        update_fields=[UpsertItem.value],
+        unique_fields=[UpsertItem.key],
+        batch_size=1,
+    )
+
+    assert UpsertItem.query.count() == 1
+    row = UpsertItem.query.get(key="a")
+    # Both objects are hydrated, from their own returned row -- the same row.
+    assert [item.id for item in items] == [row.id, row.id]
+    # Equal keys keep their input order, so the later write is the one that lands.
+    assert row.value == 2
 
 
 def test_bulk_upsert_database_generated_unique_field_rejected(db):
@@ -344,9 +359,9 @@ def test_bulk_upsert_foreign_key_in_update_fields(db):
     assert row.value == 2
 
 
-def test_bulk_upsert_matches_keys_that_python_cannot_hash_or_sort(db):
-    # jsonb dicts are unhashable, ZoneInfo and memoryview are unorderable --
-    # the conflict key has to survive being a dict key and being sorted.
+def test_bulk_upsert_keys_that_python_cannot_sort(db):
+    # ZoneInfo and memoryview have no ordering at all and a jsonb dict has no
+    # useful one -- the batch still has to be put in a deterministic order.
     chicago = ZoneInfo("America/Chicago")
     utc = ZoneInfo("UTC")
     UpsertValueKey(payload={"a": 1}, blob=b"x", zone=utc, value=1).create()
@@ -400,8 +415,8 @@ def test_bulk_upsert_key_values_that_do_not_compare_to_each_other(db):
 
 def test_bulk_upsert_json_key_with_non_string_object_keys(db):
     # jsonb object keys are always strings -- the encoder stringifies an int
-    # key on the way in. The conflict key has to be canonicalized the same
-    # way, or sorting the keys compares an int against a str and raises.
+    # key on the way in. The sort key has to be canonicalized the same way, or
+    # sorting the object's keys compares an int against a str and raises.
     utc = ZoneInfo("UTC")
     UpsertValueKey(
         payload={1: "a", "2": "b", "nested": {"z": 1, "y": 2}},
@@ -435,8 +450,8 @@ def test_bulk_upsert_json_key_with_non_string_object_keys(db):
 
 
 def test_bulk_upsert_nan_key_round_trips(db):
-    # Postgres holds NaN equal to NaN for uniqueness; Python does not, so a
-    # NaN key has to be canonicalized or it can never match its own row back.
+    # Postgres holds NaN equal to NaN for uniqueness, so a NaN key really does
+    # conflict -- and sorting it must not raise the way `<` on a NaN would.
     items = [UpsertFloatKey(score=float("nan"), value=1)]
     UpsertFloatKey.query.bulk_upsert(
         items,
@@ -458,8 +473,9 @@ def test_bulk_upsert_nan_key_round_trips(db):
     assert UpsertFloatKey.query.get(id=seeded_id).value == 2
 
 
-def test_bulk_upsert_duplicate_nan_keys_rejected(db):
-    with pytest.raises(ValueError, match="more than one UpsertFloatKey"):
+def test_bulk_upsert_duplicate_nan_keys_in_one_batch_rejected(db):
+    # Postgres holds the two NaNs equal, so this is the same row twice.
+    with pytest.raises(ValueError, match=r"same \['score'\] in one statement"):
         UpsertFloatKey.query.bulk_upsert(
             [
                 UpsertFloatKey(score=float("nan"), value=1),
@@ -468,8 +484,6 @@ def test_bulk_upsert_duplicate_nan_keys_rejected(db):
             update_fields=[UpsertFloatKey.value],
             unique_fields=[UpsertFloatKey.score],
         )
-
-    assert UpsertFloatKey.query.count() == 0
 
 
 def test_bulk_upsert_accepts_any_sequence_of_field_references(db):

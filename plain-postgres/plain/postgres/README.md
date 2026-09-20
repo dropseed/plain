@@ -499,16 +499,17 @@ CachedItem.query.bulk_upsert(
 - Every object must have a non-null value for every unique field. `NULL` never
   conflicts in Postgres, so it can't be upserted. A database-generated column
   (`create_now`, `generate=True`, `RandomStringField`) can't be a unique field
-  either — your objects never hold its value. Nor can an `update_now=True`
-  column, which is stamped again on every write.
-- **Two objects with the same unique key raise `ValueError`.** Postgres can only
-  touch a row once per statement, so collapse duplicates before calling.
+  either — your objects never hold its value, so it could never conflict. Nor
+  can an `update_now=True` column, which is stamped again on every write.
+- **Two objects with the same unique key in one batch raise `ValueError`.**
+  Postgres won't touch a row twice in one statement. Split across batches it's
+  allowed — the first inserts, the second updates, and the later write wins.
 - **`update_now=True` columns are refreshed on a conflict automatically.** You
   don't name them in `update_fields`; a row that gets updated gets a fresh
   stamp, and the object handed back carries the same one.
-- Batches are issued in conflict-key order and returned rows are matched back to
-  objects by that key, so concurrent `bulk_upsert` calls over overlapping keys
-  can't deadlock each other.
+- Batches are issued in conflict-key order, so concurrent `bulk_upsert` calls
+  over overlapping keys can't deadlock each other. Returned rows are mapped onto
+  the objects by position, exactly as `bulk_create` does.
 
 #### Use queryset `.update()` / `.delete()` for mass operations
 
