@@ -1140,7 +1140,21 @@ class QuerySet[T: "Model"]:
                 "field."
             )
 
-        field_names = {f for f in fields if not isinstance(f, ResolvableExpression)}
+        # Names an internal alias must not collide with. The newly selected
+        # columns are the obvious ones, but the counter also has to clear
+        # everything already on the query:
+        #
+        #   * `self.sql_query.annotations` -- a user's own `annotate(upper1=...)`
+        #     would otherwise be silently overwritten, quietly changing what
+        #     `order_by("upper1")` means;
+        #   * `self._fields` -- re-selecting restarts the counter, so a second
+        #     `select(Upper(...))` would regenerate the first one's alias and
+        #     collide with it.
+        taken = {f for f in fields if not isinstance(f, ResolvableExpression)}
+        taken |= set(self.sql_query.annotations)
+        if self._fields:
+            taken |= set(self._fields)
+
         _fields = []
         expressions = {}
         counter = 1
@@ -1152,8 +1166,9 @@ class QuerySet[T: "Model"]:
                 while True:
                     field_id = field_id_prefix + str(counter)
                     counter += 1
-                    if field_id not in field_names:
+                    if field_id not in taken:
                         break
+                taken.add(field_id)
                 expressions[field_id] = field
                 _fields.append(field_id)
             else:
@@ -1519,14 +1534,18 @@ class QuerySet[T: "Model"]:
         annotations.update(kwargs)
 
         clone = self._chain()
+        # On a row-mode queryset the selected columns are what an alias can
+        # collide with; otherwise it is the model's own fields.
         names = self._fields
+        conflicts_with = "a selected column"
         if names is None:
             names = {field.name for field in self.model._model_meta.get_fields()}
+            conflicts_with = "a field on the model"
 
         for alias, annotation in annotations.items():
             if alias in names:
                 raise ValueError(
-                    f"The annotation '{alias}' conflicts with a field on the model."
+                    f"The annotation '{alias}' conflicts with {conflicts_with}."
                 )
             clone.sql_query.add_annotation(annotation, alias)
         for alias, annotation in clone.sql_query.annotations.items():
