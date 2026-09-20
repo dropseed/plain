@@ -254,6 +254,8 @@ A class-level many-to-many (`Widget.tags`) is _not_ an entry point: it has no tr
 
 A traversed field _is_ the related field, carrying the relation path as its name — so it offers exactly the conditions that field offers, including an encrypted field's refusals.
 
+**A condition belongs to the model whose field built it.** `Order.query.where(User.email.equals("x"))` raises `TypeError` naming both models. A type checker can't catch this — `Field[str]` is `Field[str]` whichever model declared it — and without the check the lookup name `"email"` just resolves against `Order`, which is silently the wrong column when both models have one. A traversed condition belongs to the model the traversal _started_ from, so `Order.query.where(Order.user.email.equals("x"))` is `Order`'s, not `User`'s. A hand-written `Q(email="x")` names no model and isn't checked — it's `filter()`'s untyped spelling and behaves like it.
+
 [Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`.
 
 ### Custom QuerySets

@@ -33,7 +33,7 @@ from plain.postgres.fields import (
 )
 from plain.postgres.fields.base import ColumnField
 from plain.postgres.functions import Cast
-from plain.postgres.query_utils import Q
+from plain.postgres.query_utils import Q, condition_origins_of
 from plain.postgres.sql import (
     AND,
     CURSOR,
@@ -1420,11 +1420,40 @@ class QuerySet[T: "Model"]:
 
         Conditions are produced by field methods like `Model.field.equals(...)`
         and combine with `|` and `&`. Unlike `filter()`, this accepts no
-        keyword arguments — every condition is a typed expression, so a
+        keyword arguments -- every condition is a typed expression, so a
         type checker can reject typos and value-type mismatches at the call
         site.
         """
+        for condition in conditions:
+            self._check_condition_model(condition)
         return self.filter(*conditions)
+
+    def _check_condition_model(self, condition: Q) -> None:
+        """Reject a condition built from another model's fields.
+
+        `Field[T]` carries no model identity, so `Order.query.where(
+        User.email.equals("x"))` type-checks, and the lookup name `"email"`
+        then resolves against `Order` -- silently the wrong column when both
+        models happen to have one, a confusing `FieldError` when they don't.
+        Each condition records the model and field that built it, so the
+        mismatch can be named here instead.
+
+        A traversed condition records the model the traversal *started* from,
+        so `Order.query.where(Order.user.email.equals("x"))` is `Order`'s, not
+        `User`'s. A hand-written `Q(email="x")` records nothing and is not
+        checked -- it is `filter()`'s untyped spelling and behaves like it.
+        """
+        for source_model, field_name in sorted(
+            condition_origins_of(condition), key=lambda pair: pair[1]
+        ):
+            if source_model is not self.model:
+                raise TypeError(
+                    f"where() got a condition built from "
+                    f"{source_model.__name__}.{field_name}, but this is a "
+                    f"{self.model.__name__} queryset. Build the condition on "
+                    f"{self.model.__name__}'s own field, or traverse to it "
+                    f"from {self.model.__name__}."
+                )
 
     def _filter_or_exclude(
         self, negate: bool, args: tuple[Any, ...], kwargs: dict[str, Any]
