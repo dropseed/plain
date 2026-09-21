@@ -1,5 +1,16 @@
 # plain-sessions changelog
 
+## [0.46.3](https://github.com/dropseed/plain/releases/plain-sessions@0.46.3) (2026-09-21)
+
+### What's changed
+
+- `SessionStore.flush()` no longer runs a lookup when the store has no session key. That lookup compiled to `WHERE session_key IS NULL`, which never matched; the keyless path now runs zero statements and ends in the same state ([0c7520d6dd](https://github.com/dropseed/plain/commit/0c7520d6dd))
+- The session lookups and the expired-session chore use typed `where()` conditions; SQL is unchanged ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.46.2](https://github.com/dropseed/plain/releases/plain-sessions@0.46.2) (2026-09-20)
 
 ### What's changed
