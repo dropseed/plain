@@ -23,7 +23,6 @@ from opentelemetry.semconv._incubating.metrics.messaging_metrics import (
     create_messaging_client_sent_messages,
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
-from plain.postgres import Q
 from plain.postgres.aggregates import Count, Min
 from plain.postgres.db import return_database_connection
 from plain.postgres.otel import suppress_db_tracing
@@ -264,9 +263,11 @@ class WorkerMetrics:
         from .models import JobRequest
 
         queues = active.worker.queues
+        # `values(...).annotate(...)` is a grouped aggregate, which has no
+        # typed spelling — only the condition converts.
         rows = (
             JobRequest.query.ready_to_run()
-            .filter(queue__in=queues)
+            .where(JobRequest.queue.is_in(queues))
             .values("queue")
             .annotate(oldest=Min("created_at"))
         )
@@ -315,8 +316,8 @@ class WorkerMetrics:
 
         cutoff = heartbeat_cutoff()
         counts = WorkerHeartbeat.query.aggregate(
-            active=Count("id", filter=Q(last_heartbeat_at__gte=cutoff)),
-            stale=Count("id", filter=Q(last_heartbeat_at__lt=cutoff)),
+            active=Count("id", filter=WorkerHeartbeat.last_heartbeat_at.gte(cutoff)),
+            stale=Count("id", filter=WorkerHeartbeat.last_heartbeat_at.lt(cutoff)),
         )
         return [
             Observation(counts["active"], {PLAIN_JOBS_WORKER_STATE: "active"}),
@@ -325,6 +326,10 @@ class WorkerMetrics:
 
 
 def _count_per_queue(queryset: Any, queues: list[str]) -> list[Observation]:
+    # Still `filter()`: this helper is handed JobRequest and JobProcess
+    # querysets alike, and a typed condition belongs to the model whose field
+    # built it — there is no model-agnostic way to say "this queryset's
+    # `queue` column".
     rows = queryset.filter(queue__in=queues).values("queue").annotate(c=Count("*"))
     counts = {row["queue"]: row["c"] for row in rows}
     return [
