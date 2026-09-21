@@ -1,5 +1,20 @@
 # plain-admin changelog
 
+## [0.87.0](https://github.com/dropseed/plain/releases/plain-admin@0.87.0) (2026-09-21)
+
+### What's changed
+
+- `search_fields`, `queryset_order`, and a `TrendCard`'s `datetime_field` and `group_field` take field references — `User.email`, the traversed `FlagResult.flag.name` — as well as the lookup path as a string. Both spellings normalize to the same path, so the query the admin runs is unchanged; what changes is that a reference to a field of the wrong model is a `TypeError` at class definition, with the traceback on the declaration, instead of a silently wrong column at render. A string stays the spelling for a path traversal can't reach (a reverse or many-to-many hop, `"memberships__team__name"`) and for a descending order term (`"-created_at"`). Declarations set on an instance or through a `property` are respected; the normalized values are read through `get_search_fields()`, `get_queryset_order()`, `get_datetime_field()` and `get_group_field()`. `filters` is filter _names_, not fields, and its comment now says so ([37257b6788](https://github.com/dropseed/plain/commit/37257b6788))
+- Impersonation start takes `start/<int:id>` and parses the session's impersonated user id at the boundary; a session holding something that isn't an integer id simply ends the impersonation instead of raising ([62d753bbaf](https://github.com/dropseed/plain/commit/62d753bbaf))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- No changes required — string declarations keep working. Prefer the field reference where the path starts at the view's model or a forward foreign key.
+- A hand-built impersonation URL must carry an integer id; `reverse("admin:impersonate:start", id=user.id)` is unchanged.
+- Requires plain.postgres 0.121.0.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.86.4](https://github.com/dropseed/plain/releases/plain-admin@0.86.4) (2026-09-21)
 
 ### What's changed
