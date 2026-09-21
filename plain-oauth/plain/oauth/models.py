@@ -24,7 +24,7 @@ class OAuthConnection(postgres.Model):
     created_at: Field[datetime] = types.DateTimeField(create_now=True)
     updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
 
-    user: User = types.ForeignKeyField(
+    user: Field[User] = types.ForeignKeyField(
         "users.User",
         on_delete=postgres.CASCADE,
     )

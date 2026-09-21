@@ -16,7 +16,11 @@ from plain.postgres.registry import ModelsRegistry
 
 
 def test_unresolved_model_is_not_swallowed_by_getattr():
-    field = types.ForeignKeyField("examples.Missing", on_delete=CASCADE)
+    # The runtime class, not the `types` facade: `types.ForeignKeyField` is
+    # stubbed as a descriptor factory, so its declared return type is the
+    # narrow attribute surface a model field offers -- not the internals this
+    # test reads. `ManyToManyField` below is imported the same way.
+    field = ForeignKeyField("examples.Missing", on_delete=CASCADE)
     rel = field.remote_field
 
     assert rel.model_ref == "examples.Missing"

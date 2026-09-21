@@ -91,7 +91,7 @@ class AuthorizationCode(postgres.Model):
     application: Field[OAuthApplication] = types.ForeignKeyField(
         OAuthApplication, on_delete=postgres.CASCADE
     )
-    user: User = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
+    user: Field[User] = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
     redirect_uri: Field[str] = types.TextField(max_length=2000)
     scope: Field[str] = types.TextField(max_length=500, default="", required=False)
     resource: Field[str] = types.TextField(max_length=2000, default="", required=False)
@@ -139,7 +139,7 @@ class AccessToken(postgres.Model):
     application: Field[OAuthApplication] = types.ForeignKeyField(
         OAuthApplication, on_delete=postgres.CASCADE
     )
-    user: User = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
+    user: Field[User] = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
     scope: Field[str] = types.TextField(max_length=500, default="", required=False)
     resource: Field[str] = types.TextField(max_length=2000, default="", required=False)
     created_at: Field[datetime] = types.DateTimeField(create_now=True)
@@ -185,7 +185,7 @@ class RefreshToken(postgres.Model):
     application: Field[OAuthApplication] = types.ForeignKeyField(
         OAuthApplication, on_delete=postgres.CASCADE
     )
-    user: User = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
+    user: Field[User] = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
     # CASCADE is load-bearing for the cleanup chore: it deletes access tokens
     # only when no live refresh token still points at them (see chores.py).
     access_token: Field[AccessToken] = types.ForeignKeyField(

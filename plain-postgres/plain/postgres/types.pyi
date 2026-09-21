@@ -521,15 +521,19 @@ def EncryptedJSONField(
 #    instance-access (`child.parent`) yields V (T or T | None for nullable
 #    FKs). Both survive the `Field[T]` annotation the model declares.
 #
-# 2. String-argument FK (`to="SomeModel"`, `to="self"`) — T can't be
-#    inferred from the string, so the return type falls back to bare `T`.
-#    This requires an explicit *value-type* LHS annotation
-#    (`parent: TreeNode | None = …`) which preserves instance-access typing
-#    for forward references and self-references, but makes class access a
-#    `TreeNode` rather than a field: type-level FK traversal isn't available
-#    through string-arg FKs. The runtime `RelatedFieldRef` still resolves
-#    `Child.parent.name` regardless. Declare the model before the FK and pass
-#    the class when you want traversal to type-check.
+# 2. String-argument FK (`to="SomeModel"`, `to="self"`) — the string says
+#    nothing about T, so T is solved from the `Field[T]` annotation on the
+#    left-hand side instead (bidirectional inference: the declared type is
+#    the inference context for the call). The return type is the same
+#    `_ForeignKeyDescriptor[T, V]` as the class-argument family, so class
+#    access, instance access, traversal and typed construction all behave
+#    identically — a string reference is a runtime device for import cycles
+#    and cross-package references, not a typing compromise.
+#
+#    The one thing that does *not* work is a value-type annotation
+#    (`parent: TreeNode | None = …`): that names a model instance rather
+#    than a field, so the checker never sees a descriptor and class access
+#    yields an instance. Annotate `Field[TreeNode | None]`.
 #
 # `__set__` accepts the related instance, None (via V), or a bare PK
 # value (int) — matching what `ForwardForeignKeyDescriptor` already
@@ -573,7 +577,9 @@ def ForeignKeyField[T: Model](
     validators: Sequence[Callable[..., Any]] = (),
 ) -> _ForeignKeyDescriptor[T, T]: ...
 
-# String-argument FK overloads (forward refs, self-refs) — T inferred from LHS annotation
+# String-argument FK overloads (forward refs, self-refs) — T is solved from the
+# `Field[...]` annotation on the left-hand side, so these return the same
+# descriptor the class-argument overloads do.
 @overload
 def ForeignKeyField[T: Model](
     to: str,
@@ -584,7 +590,7 @@ def ForeignKeyField[T: Model](
     allow_null: Literal[True],
     default: None = ...,
     validators: Sequence[Callable[..., Any]] = (),
-) -> T | None: ...
+) -> _ForeignKeyDescriptor[T, T | None]: ...
 @overload
 def ForeignKeyField[T: Model](
     to: str,
@@ -594,7 +600,7 @@ def ForeignKeyField[T: Model](
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
-) -> T: ...
+) -> _ForeignKeyDescriptor[T, T]: ...
 def ManyToManyField[T: Model](
     to: type[T] | str,
     *,
