@@ -20,9 +20,9 @@ from plain.postgres.dialect import (
 from plain.postgres.exceptions import EmptyResultSet, FullResultSet
 from plain.postgres.expressions import Expression, Func, ResolvableExpression, Value
 from plain.postgres.fields import (
+    BigIntegerField,
     BooleanField,
     DateTimeField,
-    DecimalField,
     Field,
     IntegerField,
     PrimaryKeyField,
@@ -257,12 +257,6 @@ class BuiltinLookup(Lookup):
             "lookup_name must be set on Lookup subclass"
         )
         return OPERATORS[self.lookup_name] % rhs
-
-
-# Postgres's bigint bounds. `AnyOf` compares every integer column as bigint,
-# so a candidate outside these can't equal a row in one -- see its process_rhs.
-_BIGINT_MIN = -9223372036854775808
-_BIGINT_MAX = 9223372036854775807
 
 
 def lookup_value_field(lhs: Any) -> Any:
@@ -551,24 +545,74 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
 class AnyOf(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
     """`col = ANY(%s::<type>[])` -- Postgres's own spelling of `IN (...)`.
 
-    This is what `Field.is_in([...])` builds. The whole collection binds as a
-    single array parameter, so one statement text serves any number of values,
-    including none -- the shape a prepared-statement plan can be cached
-    against. `In` (the `field__in=` kwarg) spells the same idea as
+    This is what `Field.is_in([...])` builds, and it is reachable as the
+    `field__any_of=` kwarg too. The whole collection binds as a single array
+    parameter, so one statement text serves any number of values, including
+    none. `In` (the `field__in=` kwarg) spells the same idea as
     `IN (%s, %s, ...)`: a placeholder per value, so the statement text changes
     with the list's length and an empty list has no statement at all.
+
+    Two consequences of the single parameter, both enforced in
+    `get_prep_lookup` so the typed and the kwarg spelling behave the same:
+
+    - The rhs is a collection of plain values. A subquery or an expression
+      can't be an element of a bound array, so those are refused by name and
+      sent to `__in`, which is built for them.
+    - No element is None. `col = ANY(ARRAY[1, NULL])` is unknown for every row
+      but a 1, and its negation is unknown for every row full stop, so a None
+      would silently drop rows either way. NULL belongs in `__isnull`.
 
     The array is cast to the type the column *compares* as, not the one it is
     stored in -- see `process_rhs` for why that distinction decides which rows
     come back.
 
-    The values never contain None -- `is_in()` refuses one at the call site,
-    because `col = ANY(ARRAY[1, NULL])` is unknown for every row but a 1, and
-    its negation is unknown for every row full stop. NULL belongs in
-    `is_null()`, so this lookup only ever binds real values.
+    There is deliberately no `RelatedAnyOf` registered on `ForeignKeyField`
+    (the counterpart of `RelatedIn`), which would normalise model instances to
+    their keys. The typed path can't reach it -- `Post.author` is the related
+    model to the checker, so conditions go through `Post.author.id`, whose
+    values are keys already -- and the kwarg path has `__in` for that.
     """
 
     lookup_name: str = "any_of"
+
+    def get_prep_lookup(self) -> Any:
+        """Refuse everything a single bound array can't carry.
+
+        These live here rather than in `Field.is_in()` because `any_of` is a
+        lookup name like any other: `filter(x__any_of=...)` reaches it without
+        passing through the typed call's own checks. `is_in()` still raises
+        first on the typed path, so its message -- which can name the field --
+        is the one a caller sees.
+        """
+        from plain.postgres.query import QuerySet
+        from plain.postgres.sql.query import Query
+
+        if isinstance(self.rhs, QuerySet | Query | ResolvableExpression):
+            raise TypeError(
+                "any_of takes a collection of values, not a queryset or an "
+                "expression: it binds one array parameter, and a subquery "
+                "can't be an element of one. Use `__in` instead "
+                "(`Field.is_in(queryset)` on the typed path)."
+            )
+
+        values = super().get_prep_lookup()
+
+        for value in values:
+            if isinstance(value, ResolvableExpression):
+                raise TypeError(
+                    "any_of takes a collection of values, and one element is "
+                    "an expression -- a bound array holds values, not SQL. "
+                    "Use `__in` instead, which compiles a placeholder per "
+                    "element and can mix the two."
+                )
+            if value is None:
+                raise ValueError(
+                    "any_of does not accept None: a SQL comparison against "
+                    "NULL is never true, so a None matches nothing and, "
+                    "negated, excludes every row. Use `__isnull=True` "
+                    "instead, or combine the two with `|` for both."
+                )
+        return values
 
     def process_rhs(
         self, compiler: SQLCompiler, connection: DatabaseConnection
@@ -581,23 +625,30 @@ class AnyOf(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
         `[1, 2]` can come out narrower than the column.
 
         It must not be the column's *storage* type, though, because a cast to
-        a constrained type rewrites the candidates before the comparison ever
+        a constrained one rewrites the candidates before the comparison ever
         happens:
 
         - `numeric(10,2)[]` rounds every candidate to two decimal places, so
           `amount = ANY(ARRAY[1.504]::numeric(10,2)[])` matches a row holding
           1.50 where `IN (1.504)` does not -- and a candidate wider than the
           declared precision raises instead of matching nothing.
+        - `character varying(100)[]` truncates a longer candidate, which then
+          matches a row it is not equal to.
         - `integer[]`/`smallint[]` raise on a candidate the column could never
           hold, where `IN (...)` simply matched no rows.
 
-        So each column is cast to the widest type that compares identically:
-        unconstrained `numeric` for a decimal, `bigint` for every integer
-        column (the cross-type `int2 = int8` and `int4 = int8` operators are
-        real, and an index on the column is still usable through them), and
-        the column's own type for everything else -- text, uuid, timestamptz,
-        date, time, interval, bytea, boolean and jsonb are all unconstrained
-        already, so their storage type *is* their comparison type.
+        Every one of those is the column's declared *limit* leaking into the
+        comparison, and every one is written as a parenthesised modifier on
+        the type name -- so dropping the modifier is the general fix, and it
+        covers types nothing here has to know about. `numeric(10,2)` becomes
+        `numeric`, `character varying(100)` becomes `character varying`, and
+        an unmodified type like `text` or `timestamp with time zone` is
+        already its own comparison type.
+
+        Integers are the one case a modifier strip can't reach, because their
+        limit is the type name: `smallint` and `integer` are widened to
+        `bigint`. The cross-type `int2 = int8` and `int4 = int8` operators are
+        real ones, so an index on the column is still usable through them.
         """
         prep_field = lookup_value_field(self.lhs)
 
@@ -607,21 +658,21 @@ class AnyOf(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
             # Candidates outside the bigint range can't equal a row in any
             # integer column, so drop them -- the array still binds as one
             # parameter, and an all-dropped list is the empty-array case.
-            values = [
-                int(value) for value in self.rhs if _BIGINT_MIN <= value <= _BIGINT_MAX
-            ]
+            low, high = BigIntegerField.integer_range
+            values = [int(value) for value in self.rhs if low <= value <= high]
             return "%s::bigint[]", [values]
 
         _, values = self.get_db_prep_lookup(self.rhs, connection)
-        if isinstance(prep_field, DecimalField):
-            return "%s::numeric[]", [values]
+        return f"%s::{self.comparison_db_type(prep_field)}[]", [values]
 
+    def comparison_db_type(self, prep_field: Any) -> str:
+        """The column's type with any modifier dropped -- see `process_rhs`."""
         db_type = prep_field.db_type()
         assert db_type, (
             f"{prep_field!r} has no column type, so `= ANY()` has no array "
             f"type to cast to."
         )
-        return f"%s::{db_type}[]", [values]
+        return db_type.split("(", 1)[0].strip()
 
     def get_rhs_op(self, connection: DatabaseConnection, rhs: str | list[str]) -> str:
         return f"= ANY({rhs})"

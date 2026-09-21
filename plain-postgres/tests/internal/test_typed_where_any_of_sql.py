@@ -16,11 +16,13 @@ from __future__ import annotations
 import datetime
 from decimal import Decimal
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import pytest
 from app.examples.models.delete import ChildCascade
 from app.examples.models.forms import FormsExample
 from app.examples.models.relationships import Widget, WidgetTag
+from app.examples.models.upsert import UpsertValueKey
 
 
 def where_clause(queryset) -> tuple[str, tuple]:
@@ -107,8 +109,8 @@ def test_a_traversed_field_casts_to_the_joined_columns_type(db):
 
 
 def test_the_statement_is_the_same_shape_for_every_length(db):
-    """The whole point: no placeholder per value, so plan caching has one
-    statement to cache."""
+    """The whole point: no placeholder per value, so `pg_stat_statements` has
+    one entry to group these calls under instead of one per list length."""
     shapes = {
         where_clause(FormsExample.query.where(FormsExample.name.is_in(names)))[0]
         for names in ([], ["a"], ["a", "b"], ["a", "b", "c"])
@@ -163,3 +165,16 @@ def test_integer_values_bind_as_plain_ints(db):
     back on and defeat the `bigint[]` cast."""
     _, params = where_clause(FormsExample.query.where(FormsExample.count.is_in([1, 2])))
     assert [type(value) for value in params[0]] == [int, int]
+
+
+def test_a_type_modifier_is_stripped_from_the_cast(db):
+    """`zone` is `character varying(100)`. Casting the array to
+    `character varying(100)[]` would truncate a longer candidate, which would
+    then match a row it isn't equal to -- the same bug `numeric(10,2)[]` has
+    with rounding. The modifier goes, the base type stays."""
+    clause, _ = where_clause(
+        UpsertValueKey.query.where(
+            UpsertValueKey.zone.is_in([ZoneInfo("America/Chicago")])
+        )
+    )
+    assert clause == ('"examples_upsertvaluekey"."zone" = ANY(%s::character varying[])')

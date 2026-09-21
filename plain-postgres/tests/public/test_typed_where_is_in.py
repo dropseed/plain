@@ -22,6 +22,7 @@ from app.examples.models.defaults import DefaultsExample
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.forms import FormsExample
 from app.examples.models.relationships import Tag, Widget, WidgetTag
+from plain.postgres.expressions import F
 
 
 def make_form_example(**overrides):
@@ -367,3 +368,60 @@ def test_the_in_kwarg_still_short_circuits_on_an_empty_list(db, capture_queries)
         assert list(FormsExample.query.filter(name__in=[])) == []
 
     assert queries == []
+
+
+# ---------------------------------------------------------------------------
+# The kwarg spelling
+#
+# `any_of` is a lookup name, so `filter(x__any_of=...)` reaches it without
+# passing through `is_in()`. The guards live on the lookup so both spellings
+# refuse the same things; `is_in()` keeps its own wording, which can name the
+# field, by raising first.
+# ---------------------------------------------------------------------------
+
+
+def test_the_kwarg_spelling_refuses_a_none_element(db):
+    DefaultsExample.query.create(name="alice", note="keep")
+
+    with pytest.raises(ValueError, match=r"any_of does not accept None"):
+        DefaultsExample.query.filter(note__any_of=["keep", None])
+
+
+def test_the_kwarg_spelling_refuses_a_none_element_when_negated(db):
+    """The case a silent drop would get wrong in the other direction."""
+    DefaultsExample.query.create(name="alice", note="keep")
+
+    with pytest.raises(ValueError, match=r"any_of does not accept None"):
+        DefaultsExample.query.exclude(note__any_of=["keep", None])
+
+
+def test_the_kwarg_spelling_refuses_a_queryset(db):
+    """A subquery can't be an element of a bound array -- `__in` is for that."""
+    ids = DefaultsExample.query.values_list("id", flat=True)
+
+    with pytest.raises(TypeError, match=r"any_of takes a collection of values"):
+        DefaultsExample.query.filter(id__any_of=ids)
+
+
+def test_the_kwarg_spelling_refuses_an_expression(db):
+    with pytest.raises(TypeError, match=r"any_of takes a collection of values"):
+        DefaultsExample.query.filter(name__any_of=F("status"))
+
+
+def test_the_kwarg_spelling_refuses_an_expression_element(db):
+    with pytest.raises(TypeError, match=r"one element is an expression"):
+        DefaultsExample.query.filter(name__any_of=[F("status"), "x"])
+
+
+def test_the_typed_call_raises_its_own_message_first(db):
+    """`is_in()` can name the field; the lookup's message can't."""
+    with pytest.raises(ValueError, match=r"TextField 'note': \.is_in\(\)"):
+        DefaultsExample.note.is_in(["keep", None])
+
+
+def test_the_kwarg_spelling_matches_values_like_the_typed_one(db):
+    DefaultsExample.query.create(name="alice")
+    DefaultsExample.query.create(name="bob")
+
+    rows = DefaultsExample.query.filter(name__any_of=["alice"])
+    assert [r.name for r in rows] == ["alice"]
