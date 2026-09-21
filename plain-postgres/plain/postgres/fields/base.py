@@ -769,10 +769,11 @@ class Field[T](Selectable[T], RegisterLookupMixin):
 # set rather than the methods themselves -- the relation-traversal advice in
 # related_typed.py, the tests that sweep the surface -- imports from here
 # instead of keeping its own copy in sync.
-# The string conditions, each paired with the lookup it builds. Almost every
-# one is named for its lookup; `iequals` is the exception -- there is no
+#
+# The string conditions come paired with the lookup each one builds. Almost
+# every one is named for its lookup; `iequals` is the exception -- there is no
 # `exact` condition method for an `iexact` to pair with -- so the pairing is
-# written down here instead of assumed by whatever needs it.
+# written down rather than assumed by whatever needs it.
 STRING_CONDITION_LOOKUPS = {
     "contains": "contains",
     "icontains": "icontains",
