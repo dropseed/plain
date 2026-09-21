@@ -332,7 +332,7 @@ Metadata is derived automatically:
 **Parametrized resources (URI templates).** For one class that serves many URIs — e.g. per-entity data — set `uri_template` instead of `uri` and accept the params on `__init__`:
 
 ```python
-class Order(MCPResource):
+class OrderResource(MCPResource):
     """An order by ID."""
 
     uri_template = "orders://{order_id}"
@@ -342,7 +342,8 @@ class Order(MCPResource):
         self.order_id = order_id
 
     def read(self) -> str:
-        return str(Order.query.get(pk=self.order_id))
+        order = Order.query.where(Order.id.equals(self.order_id)).get()
+        return str(order)
 ```
 
 Templates follow [RFC 6570](https://datatracker.ietf.org/doc/html/rfc6570) level 1 — `{name}` placeholders match a single path segment. Extracted params are coerced to the `__init__` annotation for `int`, `float`, `bool`; other types come through as strings. Setting both `uri` and `uri_template` is an error.
