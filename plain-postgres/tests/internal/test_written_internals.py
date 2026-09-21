@@ -152,7 +152,8 @@ def test_the_catalog_lookup_is_not_traced(db, otel_spans: InMemorySpanExporter):
     traced = [
         span
         for span in otel_spans.get_finished_spans()
-        if span.attributes and "pg_attribute" in str(span.attributes.get("db.query.text"))
+        if span.attributes
+        and "pg_attribute" in str(span.attributes.get("db.query.text"))
     ]
     assert traced == []
 

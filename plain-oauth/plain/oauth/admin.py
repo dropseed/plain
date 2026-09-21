@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from plain.admin.cards import ChartCard
 from plain.admin.views import (
     AdminModelDetailView,
@@ -5,28 +7,38 @@ from plain.admin.views import (
     AdminViewset,
     register_viewset,
 )
-from plain.postgres.aggregates import Count
 
 from .models import OAuthConnection
+
+
+@dataclass
+class ProviderCount:
+    provider_key: str
+    count: int
 
 
 class ProvidersChartCard(ChartCard):
     title = "Providers"
 
     def get_chart_data(self) -> dict:
-        results = (
-            OAuthConnection.query.all()
-            .values("provider_key")
-            .annotate(count=Count("id"))
-        )
+        results = OAuthConnection.query.sql(
+            """
+            SELECT {OAuthConnection.provider_key} AS provider_key,
+                   count(*) AS "count!"
+            FROM {OAuthConnection}
+            GROUP BY 1
+            ORDER BY 1
+            """,
+            result_type=ProviderCount,
+        ).all()
         return {
             "type": "doughnut",
             "data": {
-                "labels": [result["provider_key"] for result in results],
+                "labels": [result.provider_key for result in results],
                 "datasets": [
                     {
                         "label": "Providers",
-                        "data": [result["count"] for result in results],
+                        "data": [result.count for result in results],
                     }
                 ],
             },

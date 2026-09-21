@@ -403,9 +403,7 @@ def _fields_for_columns(
         if column.table_oid and column.table_column
     }
     resolved = _catalog_fields(connection, pairs)
-    return [
-        resolved.get((column.table_oid, column.table_column)) for column in columns
-    ]
+    return [resolved.get((column.table_oid, column.table_column)) for column in columns]
 
 
 def _catalog_fields(

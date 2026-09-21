@@ -43,9 +43,7 @@ class SizeCount:
 
 
 def test_model_reference_renders_the_table(widgets):
-    rows = Widget.query.sql(
-        "SELECT count(*) AS n FROM {Widget}", result_type=SizeCount
-    )
+    rows = Widget.query.sql("SELECT count(*) AS n FROM {Widget}", result_type=SizeCount)
     assert '"widget"' in rows.sql or Widget.model_options.db_table in rows.sql
 
 
@@ -61,7 +59,10 @@ def test_field_reference_renders_the_qualified_column(widgets):
     )
     table = Widget.model_options.db_table
     assert f'"{table}"."size"' in statement.sql
-    assert statement.all() == [SizeCount(size="large", n=1), SizeCount(size="small", n=1)]
+    assert statement.all() == [
+        SizeCount(size="large", n=1),
+        SizeCount(size="small", n=1),
+    ]
 
 
 def test_foreign_key_reference_renders_the_id_column(widgets):
@@ -496,9 +497,7 @@ def test_result_type_must_be_a_dataclass(db):
 
 def test_star_and_result_type_together_are_refused(db):
     with pytest.raises(TypeError, match="not both"):
-        Widget.query.sql(
-            "SELECT {Widget.*} FROM {Widget}", result_type=SizeCount
-        )
+        Widget.query.sql("SELECT {Widget.*} FROM {Widget}", result_type=SizeCount)
 
 
 def test_rows_with_no_result_type_are_refused(widgets):

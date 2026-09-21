@@ -15,7 +15,7 @@ dependencies = [
 
 
 [dependency-groups]
-dev = ["plain.pytest<1.0.0", "httpx>=0.27"]
+dev = ["plain.pytest<1.0.0", "httpx>=0.27", "plain.admin<1.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]
