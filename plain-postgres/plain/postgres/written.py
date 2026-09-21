@@ -18,6 +18,11 @@ What the object is decides what it renders as:
     {template}           another t-string, rendered inline
     {value}              anything else, bound as a parameter
 
+A row is an instance only when `{Model:*}` is the whole select list; every
+other shape is a `result_type` dataclass, where a field annotated with a model
+class takes that model's expansion — the one in the outer select list, since
+an expansion inside a subquery is just columns.
+
 What that guarantees, exactly: the literal halves of a t-string are SQL the
 author wrote in the source, and every interpolated object is dispatched on
 its type, where a value always binds as a parameter. `sql()` takes a
@@ -90,11 +95,18 @@ class _StarExpansion:
     The fields are in declared order and the column names are theirs, which is
     how the result columns are found again — the expansion decides which
     positions are the instance, never the catalog.
+
+    `depth` is how many parentheses were open where it was written. Depth 0 is
+    the statement's own select list (each branch of a UNION included); deeper
+    is inside a subquery, a CTE or a function call, where the expansion is
+    just columns and the outer statement names the ones it wants. `None` means
+    the statement's text couldn't be scanned to the end, so nobody knows.
     """
 
     model: type[Model]
     fields: tuple[Field, ...]
     columns: tuple[str, ...]
+    depth: int | None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -103,6 +115,148 @@ class _Rendered:
     bind_sql: str
     params: tuple[Any, ...]
     stars: tuple[_StarExpansion, ...]
+
+
+class _ParenDepth:
+    """How many parentheses are open, scanning the statement as it is written.
+
+    Only the author's own text is scanned. Everything this module renders is
+    either parenthesis-free (an identifier, a `%s`) or balanced (an embedded
+    queryset or statement, wrapped in its own `(` `)`), so skipping it leaves
+    the depth exactly where the author's text put it — and a stray `(` inside
+    an embedded query's string literal can't shift it.
+
+    What is skipped, because a parenthesis inside it is text and not
+    structure: `'a (quoted) string'` (a doubled `''` is an escaped quote and
+    the string goes on), `E'it\\'s ('` — an escape string, where a backslash
+    also escapes the character after it — `"a (quoted) identifier"` like a
+    plain string, `$$ ( $$` and `$tag$ ( $tag$` dollar-quoted strings (only
+    their own tag ends them), `-- ( to end of line`, and `/* ( */` block
+    comments, which nest in Postgres.
+
+    The state carries across calls: one string or comment can span the text on
+    either side of an interpolation. A statement that ends with the scan still
+    inside a string or block comment is one this scan misread — Postgres
+    would have refused it — so `unterminated` says its depths can't be
+    trusted.
+    """
+
+    def __init__(self) -> None:
+        self.depth = 0
+        self._inside = ""  # "", "'", '"', "--", "/*", or a dollar-quote tag
+        self._backslash_escapes = False  # inside an E'...' string
+        self._comment_depth = 0
+
+    @property
+    def unterminated(self) -> bool:
+        # A trailing `-- comment` is a legitimate way for a statement to end.
+        return self._inside not in ("", "--")
+
+    def scan(self, text: str) -> None:
+        index = 0
+        while index < len(text):
+            if self._inside == "":
+                index = self._scan_sql(text, index)
+            elif self._inside in ("'", '"'):
+                index = self._scan_quoted(text, index)
+            elif self._inside == "--":
+                if text[index] == "\n":
+                    self._inside = ""
+                index += 1
+            elif self._inside == "/*":
+                index = self._scan_comment(text, index)
+            else:
+                index = self._scan_dollar_quoted(text, index)
+
+    def _scan_sql(self, text: str, index: int) -> int:
+        char = text[index]
+        if char == "(":
+            self.depth += 1
+        elif char == ")":
+            # A statement can't have more `)` than `(`, but a fragment handed
+            # in on its own can -- never go below the outer select list.
+            self.depth = max(0, self.depth - 1)
+        elif char == "'":
+            self._inside = char
+            self._backslash_escapes = _opens_escape_string(text, index)
+        elif char == '"':
+            self._inside = char
+            self._backslash_escapes = False
+        elif text.startswith("--", index):
+            self._inside = "--"
+            return index + 2
+        elif text.startswith("/*", index):
+            self._inside = "/*"
+            self._comment_depth = 1
+            return index + 2
+        elif (tag := _dollar_quote_tag(text, index)) is not None:
+            self._inside = tag
+            return index + len(tag)
+        return index + 1
+
+    def _scan_quoted(self, text: str, index: int) -> int:
+        quote = self._inside
+        if self._backslash_escapes and text[index] == "\\":
+            return index + 2  # E'...': the next character is taken literally
+        if not text.startswith(quote, index):
+            return index + 1
+        if text.startswith(quote * 2, index):
+            return index + 2  # an escaped quote: the literal goes on
+        self._inside = ""
+        return index + 1
+
+    def _scan_comment(self, text: str, index: int) -> int:
+        if text.startswith("/*", index):
+            self._comment_depth += 1
+            return index + 2
+        if text.startswith("*/", index):
+            self._comment_depth -= 1
+            if self._comment_depth == 0:
+                self._inside = ""
+            return index + 2
+        return index + 1
+
+    def _scan_dollar_quoted(self, text: str, index: int) -> int:
+        if text.startswith(self._inside, index):
+            tag_length = len(self._inside)
+            self._inside = ""
+            return index + tag_length
+        return index + 1
+
+
+def _follows_identifier(text: str, index: int) -> bool:
+    """Whether the character before `index` is part of a word."""
+    return index > 0 and (text[index - 1].isalnum() or text[index - 1] == "_")
+
+
+def _opens_escape_string(text: str, index: int) -> bool:
+    """Whether the `'` at `index` opens an `E'...'` escape string.
+
+    The `E` has to stand alone: in `TYPE'x'` it ends a word, and the string
+    is an ordinary one.
+    """
+    return (
+        index > 0
+        and text[index - 1] in "Ee"
+        and not _follows_identifier(text, index - 1)
+    )
+
+
+def _dollar_quote_tag(text: str, index: int) -> str | None:
+    """The `$$` or `$tag$` that opens a dollar-quoted string at `index`.
+
+    A `$` inside a word is part of an identifier (`a$b$` is one), never a
+    quote.
+    """
+    if text[index] != "$" or _follows_identifier(text, index):
+        return None
+    end = text.find("$", index + 1)
+    if end == -1:
+        return None
+    tag = text[index + 1 : end]
+    if tag and not tag.isidentifier():
+        return None
+    return text[index : end + 1]
 
 
 class _Sql:
@@ -117,11 +271,13 @@ class _Sql:
     def __init__(self) -> None:
         self.bind: list[str] = []
         self.display: list[str] = []
+        self.paren_depth = _ParenDepth()
 
     def author(self, text: str) -> None:
         """Text the author wrote: template literals and fragments."""
         self.bind.append(text.replace("%", "%%"))
         self.display.append(text)
+        self.paren_depth.scan(text)
 
     def rendered(self, sql: str, display: str | None = None) -> None:
         """SQL this module produced: identifiers, placeholders, subqueries."""
@@ -145,6 +301,12 @@ def _render(template: Template) -> _Rendered:
     stars: list[_StarExpansion] = []
 
     _render_template(template, sql, params, stars)
+
+    if sql.paren_depth.unterminated:
+        # The scan ended inside a string or comment Postgres would have seen
+        # closed, so it misread something and no depth it recorded can be
+        # trusted. An unknown depth is never the outer select list.
+        stars = [dataclasses.replace(star, depth=None) for star in stars]
 
     binds_parameters = bool(params)
     return _Rendered(
@@ -328,8 +490,7 @@ def _render_model(
     if format_spec != "*":
         raise ValueError(
             f"{{{written}:{format_spec}}} — the only format spec a model takes "
-            "is `:*`, which expands to every column and makes each row an "
-            "instance."
+            "is `:*`, which expands to every column of it."
         )
 
     fields = tuple(model._model_meta.fields)
@@ -338,6 +499,7 @@ def _render_model(
             model=model,
             fields=fields,
             columns=tuple(field.column for field in fields),
+            depth=sql.paren_depth.depth,
         )
     )
     sql.rendered(", ".join(_qualified(table, field.column) for field in fields))
@@ -642,6 +804,23 @@ def _catalog_fields(
 
 
 @dataclasses.dataclass(frozen=True)
+class _ModelField:
+    """A `result_type` field that a `{Model:*}` expansion fills.
+
+    `start` is where the expansion's run of columns begins in the result, and
+    `pk_position` is the primary key's place inside that run — the one column
+    a real row can never have NULL in, so an all-NULL run (the outer side of a
+    join that matched nothing) is recognised by it alone.
+    """
+
+    name: str
+    star: _StarExpansion
+    start: int
+    pk_position: int
+    allow_null: bool
+
+
+@dataclasses.dataclass(frozen=True)
 class _Plan:
     """How to turn this statement's raw rows into results.
 
@@ -655,7 +834,8 @@ class _Plan:
     decryptable: tuple[int, ...]
     star: _StarExpansion | None
     star_start: int
-    extras: tuple[tuple[int, str], ...]
+    model_fields: tuple[_ModelField, ...]
+    named_columns: tuple[tuple[int, str], ...]
     stars: tuple[_StarExpansion, ...]
     result_type: Any
 
@@ -669,13 +849,10 @@ class _Plan:
             converted = apply_converters(iter(rows), self.converters, connection)
 
         if self.star is not None:
-            return [self._instance(row) for row in converted]
+            return [self._hydrate(self.star, self.star_start, row) for row in converted]
 
         assert self.result_type is not None
-        return [
-            self.result_type(**dict(zip(self.names, row, strict=True)))
-            for row in converted
-        ]
+        return [self._row(row) for row in converted]
 
     def _refuse_ciphertext(self, rows: list[tuple[Any, ...]]) -> None:
         """Refuse a column that lost its source and came back as ciphertext.
@@ -708,16 +885,36 @@ class _Plan:
                         "its own."
                     )
 
-    def _instance(self, row: Sequence[Any]) -> Model:
-        assert self.star is not None
-        width = len(self.star.fields)
-        instance = self.star.model.from_db(
-            [field.name for field in self.star.fields],
-            list(row[self.star_start : self.star_start + width]),
+    def _row(self, row: Sequence[Any]) -> Any:
+        """One `result_type` row: columns by name, expansions by model class."""
+        values = {name: row[position] for position, name in self.named_columns}
+        for model_field in self.model_fields:
+            values[model_field.name] = self._model_value(model_field, row)
+        return self.result_type(**values)
+
+    def _model_value(
+        self, model_field: _ModelField, row: Sequence[Any]
+    ) -> Model | None:
+        model = model_field.star.model
+        if row[model_field.start + model_field.pk_position] is None:
+            # The expansion came back all NULL, which only an outer join that
+            # matched nothing does -- a real row always has a primary key.
+            if model_field.allow_null:
+                return None
+            raise TypeError(
+                f"{self.result_type.__name__}.{model_field.name} came back with "
+                f"every {model.__name__} column NULL -- the outer side of a "
+                f"join that matched nothing. Annotate it "
+                f"`{model.__name__} | None` to get None there."
+            )
+        return self._hydrate(model_field.star, model_field.start, row)
+
+    def _hydrate(self, star: _StarExpansion, start: int, row: Sequence[Any]) -> Model:
+        """The instance one `{Model:*}` expansion's run of columns describes."""
+        return star.model.from_db(
+            [field.name for field in star.fields],
+            list(row[start : start + len(star.fields)]),
         )
-        for position, attribute in self.extras:
-            setattr(instance, attribute, row[position])
-        return instance
 
 
 def _build_plan(
@@ -733,22 +930,10 @@ def _build_plan(
     converters = _converters_for(columns, fields, connection)
     decryptable = _decryptable_positions(columns, fields)
 
-    if stars:
-        star = stars[0]
-        star_start = _star_start(names, fields, star)
-        taken = range(star_start, star_start + len(star.fields))
-        extras = tuple(
-            (position, name)
-            for position, name in enumerate(names)
-            if position not in taken
+    if result_type is None:
+        star, star_start = _instance_star(
+            model=model, stars=stars, names=names, fields=fields
         )
-        for _, name in extras:
-            if name in star.columns:
-                raise TypeError(
-                    f"This statement selects {{{star.model.__name__}:*}} and "
-                    f"another column called {name!r}, which would overwrite the "
-                    "instance's own. Alias the extra column."
-                )
         return _Plan(
             signature=_signature(columns),
             names=names,
@@ -756,20 +941,52 @@ def _build_plan(
             decryptable=decryptable,
             star=star,
             star_start=star_start,
-            extras=extras,
+            model_fields=(),
+            named_columns=(),
             stars=stars,
             result_type=None,
         )
 
-    if result_type is None:
-        star = f"{{{model.__name__}:*}}"
-        raise TypeError(
-            f"This statement returns columns ({', '.join(names)}) and nothing "
-            f"says what a row is. Select {star} to get instances, or pass "
-            "result_type= a dataclass."
-        )
+    # Only an expansion in the outer select list puts its columns in the
+    # result; a deeper one is just columns of a subquery, whatever the outer
+    # statement then names them.
+    outer = tuple(star for star in stars if star.depth == 0)
+    starts = _allocate_star_runs(names, fields, outer)
 
-    _check_result_type(result_type, names, columns, fields, connection)
+    model_fields = _model_fields_for(
+        result_type=result_type,
+        stars=stars,
+        outer=outer,
+        starts=starts,
+        names=names,
+    )
+    _refuse_an_unmapped_expansion(
+        result_type=result_type,
+        outer=outer,
+        starts=starts,
+        model_fields=model_fields,
+    )
+    expanded = {
+        position
+        for model_field in model_fields
+        for position in range(
+            model_field.start, model_field.start + len(model_field.star.fields)
+        )
+    }
+    named_columns = tuple(
+        (position, name)
+        for position, name in enumerate(names)
+        if position not in expanded
+    )
+    _check_result_type(
+        result_type=result_type,
+        names=names,
+        model_fields=model_fields,
+        named_columns=named_columns,
+        columns=columns,
+        fields=fields,
+        connection=connection,
+    )
     return _Plan(
         signature=_signature(columns),
         names=names,
@@ -777,31 +994,36 @@ def _build_plan(
         decryptable=decryptable,
         star=None,
         star_start=0,
-        extras=(),
-        stars=(),
+        model_fields=model_fields,
+        named_columns=named_columns,
+        stars=stars,
         result_type=result_type,
     )
 
 
-def _star_start(
-    names: tuple[str, ...], fields: list[Field | None], star: _StarExpansion
-) -> int:
-    """Where `{Model:*}`'s columns start in the result.
+def _instance_star(
+    *,
+    model: type[Model],
+    stars: tuple[_StarExpansion, ...],
+    names: tuple[str, ...],
+    fields: list[Field | None],
+) -> tuple[_StarExpansion, int]:
+    """The expansion a row *is*, for a statement with no `result_type`.
 
-    The expansion emitted the model's columns, in declared order, as one run —
-    so the run of result columns with those names *is* the instance. Reading it
-    back this way means the instance's fields are the ones the template asked
-    for, not whichever columns the catalog happens to trace to this model: a
-    self-join, a UNION branch, or another table with the same column names
-    can't shift them.
+    An instance is always complete and carries only its own columns, so this
+    is the one shape a statement can have without declaring it: `{Model:*}`
+    and nothing else. One more column and the row has a shape of its own.
     """
-    width = len(star.columns)
-    candidates = [
-        start
-        for start in range(len(names) - width + 1)
-        if tuple(names[start : start + width]) == star.columns
-    ]
-    if not candidates:
+    if not stars:
+        raise TypeError(
+            f"This statement returns columns ({', '.join(names)}) and nothing "
+            f"says what a row is. Select {{{model.__name__}:*}} to get "
+            "instances, or pass result_type= a dataclass."
+        )
+
+    star = _instance_stars(stars)[0]
+    start = _locate_star(names, fields, star, claimed=[])
+    if start is None:
         raise TypeError(
             f"This statement returns ({', '.join(names)}), which doesn't "
             f"contain {star.model.__name__}'s columns "
@@ -811,24 +1033,146 @@ def _star_start(
             "dataclass; otherwise something renamed them, and a "
             f"{{{star.model.__name__}:*}} row can't be aliased."
         )
-    if len(candidates) > 1:
-        # Two runs of columns have those names. Provenance breaks the tie when
-        # it survived; when it didn't, the statement is genuinely ambiguous.
-        confirmed = [
-            start
-            for start in candidates
-            if all(
-                fields[start + offset] is star.fields[offset] for offset in range(width)
-            )
+
+    extra = [
+        name
+        for position, name in enumerate(names)
+        if not start <= position < start + len(star.fields)
+    ]
+    if extra:
+        raise TypeError(
+            f"This statement selects {{{star.model.__name__}:*}} and other "
+            f"columns ({', '.join(extra)}), so a row is not a "
+            f"{star.model.__name__} -- it has a shape of its own. Declare that "
+            f"shape: a dataclass with a `{star.model.__name__}` field for the "
+            "instance and a field per extra column, passed as result_type=."
+        )
+    return star, start
+
+
+def _instance_stars(stars: tuple[_StarExpansion, ...]) -> tuple[_StarExpansion, ...]:
+    """The expansions that could be the row of a statement with no `result_type`.
+
+    The outer select list first — that is where a row is declared. With no
+    expansion there, a statement that passes a subquery's `{Model:*}` straight
+    through (`SELECT * FROM (SELECT {Model:*} ...) sub`) still means those
+    instances and nothing else, so the deeper ones are read as a fallback.
+    """
+    outer = tuple(star for star in stars if star.depth == 0)
+    return outer or stars
+
+
+def _allocate_star_runs(
+    names: tuple[str, ...],
+    fields: list[Field | None],
+    stars: tuple[_StarExpansion, ...],
+) -> list[int | None]:
+    """Where each expansion's run of columns is, in the order they were written.
+
+    Two expansions never read the same columns, so each takes the first run
+    left to it and the ones behind it have to look elsewhere. The exception is
+    the same model expanded in each branch of a UNION: the branches collapse
+    onto one set of result columns, so the second takes the very run the first
+    did.
+    """
+    starts: list[int | None] = []
+    claimed: list[tuple[int, int, type[Model]]] = []
+    for star in stars:
+        start = _locate_star(names, fields, star, claimed=claimed)
+        starts.append(start)
+        if start is not None:
+            run = (start, len(star.columns), star.model)
+            if run not in claimed:
+                claimed.append(run)
+    return starts
+
+
+def _run_is_unclaimed(
+    start: int,
+    width: int,
+    model: type[Model],
+    claimed: list[tuple[int, int, type[Model]]],
+) -> bool:
+    """Whether this run of columns is still free for this expansion to take."""
+    for claimed_start, claimed_width, claimed_model in claimed:
+        if (start, width, model) == (claimed_start, claimed_width, claimed_model):
+            continue  # the same model's run in another UNION branch
+        if start < claimed_start + claimed_width and claimed_start < start + width:
+            return False
+    return True
+
+
+def _star_runs(names: tuple[str, ...], star: _StarExpansion) -> list[int]:
+    """Every position where this expansion's run of columns could start.
+
+    The expansion emitted the model's columns, in declared order, as one run —
+    so a run of result columns with those names is where it could be. Reading
+    it back by name means the instance's fields are the ones the template asked
+    for, not whichever columns the catalog happens to trace to this model: a
+    self-join, a UNION branch, or another table with the same column names
+    can't shift them.
+    """
+    width = len(star.columns)
+    return [
+        start
+        for start in range(len(names) - width + 1)
+        if tuple(names[start : start + width]) == star.columns
+    ]
+
+
+def _locate_star(
+    names: tuple[str, ...],
+    fields: list[Field | None],
+    star: _StarExpansion,
+    *,
+    claimed: list[tuple[int, int, type[Model]]],
+) -> int | None:
+    """Where `{Model:*}`'s columns start in the result, or None if they aren't there.
+
+    Not there means the expansion's columns never reached the outer select
+    list under their own names — it is inside a subquery, or another
+    expansion already took the only run they match.
+    """
+    width = len(star.columns)
+    candidates = [
+        start
+        for start in _star_runs(names, star)
+        if _run_is_unclaimed(start, width, star.model, claimed)
+    ]
+    if not candidates:
+        return None
+
+    if len(candidates) == 1:
+        start = candidates[0]
+        # Column names alone are weak evidence: every model's columns start
+        # with `id`, so one model's list is often a prefix of another's. Every
+        # column that kept its source has to be this expansion's own column in
+        # that place; one that traces anywhere else means this run belongs to
+        # something else. (A UNION keeps no sources, so names are all it has.)
+        traced = [
+            (offset, fields[start + offset])
+            for offset in range(width)
+            if fields[start + offset] is not None
         ]
-        if len(confirmed) != 1:
-            raise TypeError(
-                f"This statement returns {star.model.__name__}'s columns "
-                f"({', '.join(star.columns)}) more than once, so which run is "
-                "the instance is ambiguous. Alias the other one's columns."
-            )
-        return confirmed[0]
-    return candidates[0]
+        if not all(field is star.fields[offset] for offset, field in traced):
+            return None
+        return start
+
+    # Two runs of columns have those names. Provenance breaks the tie when it
+    # survived; when it didn't, the statement is genuinely ambiguous.
+    confirmed = [
+        start
+        for start in candidates
+        if all(fields[start + offset] is star.fields[offset] for offset in range(width))
+    ]
+    if len(confirmed) != 1:
+        raise TypeError(
+            f"This statement returns {star.model.__name__}'s columns "
+            f"({', '.join(star.columns)}) more than once, so which run is "
+            f"the {star.model.__name__} is ambiguous. Alias the other one's "
+            "columns."
+        )
+    return confirmed[0]
 
 
 def _converters_for(
@@ -944,6 +1288,222 @@ def _python_type_for_column(
     return _OID_TO_PYTHON.get(column.type_oid)
 
 
+def _model_annotation(annotation: Any) -> tuple[type[Model], bool] | None:
+    """The model a `result_type` field is annotated with, and whether it allows None.
+
+    `widget: Widget` is `(Widget, False)` and `widget: Widget | None` is
+    `(Widget, True)`. Anything else is an ordinary column field.
+    """
+    allow_null = False
+    if typing.get_origin(annotation) in (typing.Union, types.UnionType):
+        args = typing.get_args(annotation)
+        named = [arg for arg in args if arg is not type(None)]
+        allow_null = len(named) < len(args)
+        if len(named) != 1:
+            return None  # a real union: nothing single to fill
+        annotation = named[0]
+
+    if isinstance(annotation, type) and issubclass(annotation, Model):
+        return annotation, allow_null
+    return None
+
+
+def _union_models(annotation: Any) -> list[type[Model]]:
+    """The model classes a union annotation names, `None` aside."""
+    if typing.get_origin(annotation) not in (typing.Union, types.UnionType):
+        return []
+    return [
+        arg
+        for arg in typing.get_args(annotation)
+        if isinstance(arg, type) and issubclass(arg, Model)
+    ]
+
+
+def _model_fields_for(
+    *,
+    result_type: Any,
+    stars: tuple[_StarExpansion, ...],
+    outer: tuple[_StarExpansion, ...],
+    starts: list[int | None],
+    names: tuple[str, ...],
+) -> tuple[_ModelField, ...]:
+    """Pair each model-annotated field of `result_type` with its expansion.
+
+    The annotation names the model and an expansion is *of* a model, so the two
+    find each other by model class. There is nothing else to match on, which is
+    why one model can fill one field, from one run of columns.
+    """
+    hints = _type_hints(result_type)
+    annotated: list[tuple[str, type[Model], bool]] = []
+    for field in dataclasses.fields(result_type):
+        if not field.init:
+            continue
+        model_annotation = _model_annotation(hints.get(field.name))
+        if model_annotation is not None:
+            model, allow_null = model_annotation
+            annotated.append((field.name, model, allow_null))
+            continue
+        union = _union_models(hints.get(field.name))
+        if len(union) > 1:
+            raise TypeError(
+                f"{result_type.__name__}.{field.name} is annotated "
+                f"{' | '.join(model.__name__ for model in union)}. A row has "
+                "one shape, so a model field names one model -- the one this "
+                "statement expands -- or you select the columns you want "
+                "instead."
+            )
+
+    fields_by_model: dict[type[Model], list[str]] = {}
+    for name, model, _ in annotated:
+        fields_by_model.setdefault(model, []).append(name)
+    for model, field_names in fields_by_model.items():
+        if len(field_names) > 1:
+            raise TypeError(
+                f"{result_type.__name__} declares more than one "
+                f"{model.__name__} field ({', '.join(field_names)}), and one "
+                f"{{{model.__name__}:*}} expansion can only fill one of them. A "
+                "self-join needs aliases an expansion can't give -- select the "
+                "columns you want instead."
+            )
+
+    if annotated:
+        _refuse_models_sharing_a_run(outer=outer, starts=starts)
+
+    model_fields = []
+    for name, model, allow_null in annotated:
+        if not any(star.model is model for star in stars):
+            raise TypeError(
+                f"{result_type.__name__}.{name} is a {model.__name__}, and "
+                f"nothing in this statement selects {{{model.__name__}:*}} to "
+                f"fill it. Declare {{{model.__name__}:*}} in the select list, or "
+                "drop the field."
+            )
+
+        located = [
+            (star, start)
+            for star, start in zip(outer, starts, strict=True)
+            if star.model is model and start is not None
+        ]
+        if not located and any(
+            star.model is model and star.depth is None for star in stars
+        ):
+            raise TypeError(
+                f"{result_type.__name__}.{name} is a {model.__name__}, but this "
+                "statement's SQL couldn't be scanned to the end -- it reads as "
+                "ending inside an unterminated string or comment -- so there is "
+                f"no telling whether its {{{model.__name__}:*}} is in the outer "
+                "select list. Check the quoting (an E'...' string, a $tag$ "
+                "string, a /* comment */), or select the columns you want "
+                "instead."
+            )
+        if not located:
+            # Either every expansion of this model is inside a subquery, or
+            # the outer one's columns never arrived under their own names.
+            raise TypeError(
+                f"{result_type.__name__}.{name} is a {model.__name__}, but this "
+                f"statement returns ({', '.join(names)}), which doesn't contain "
+                f"{model.__name__}'s columns in order. Select "
+                f"{{{model.__name__}:*}} in the outer select list -- an "
+                "expansion inside a subquery is just columns, and a "
+                f"{{{model.__name__}:*}} row can't be aliased."
+            )
+
+        runs = sorted({start for _, start in located})
+        if len(runs) > 1:
+            positions = ", ".join(str(start) for start in runs)
+            raise TypeError(
+                f"This statement expands {{{model.__name__}:*}} into two "
+                f"different runs of columns (starting at {positions}), and "
+                f"{result_type.__name__}.{name} can only be one of them. Select "
+                "the columns you want instead."
+            )
+
+        star, start = located[0]
+        model_fields.append(
+            _ModelField(
+                name=name,
+                star=star,
+                start=start,
+                pk_position=_pk_position(star),
+                allow_null=allow_null,
+            )
+        )
+
+    return tuple(model_fields)
+
+
+def _refuse_models_sharing_a_run(
+    *,
+    outer: tuple[_StarExpansion, ...],
+    starts: list[int | None],
+) -> None:
+    """Two models expanded onto one run of columns can't fill a model field.
+
+    An outer expansion that found no run of its own is in a later branch of a
+    UNION: its rows arrive in the same columns as the first branch's, by
+    position. When it is a different model from the one that did find the
+    run, a row can't say which model it is — hydrating it as the first would
+    turn the other's rows into that model's instances.
+    """
+    placed = [
+        star for star, start in zip(outer, starts, strict=True) if start is not None
+    ]
+    unplaced = [
+        star for star, start in zip(outer, starts, strict=True) if start is None
+    ]
+    for other in unplaced:
+        for star in placed:
+            if star.model is other.model:
+                continue
+            raise TypeError(
+                f"This statement expands {{{star.model.__name__}:*}} and "
+                f"{{{other.model.__name__}:*}} onto the same run of result "
+                "columns -- the branches of a UNION share one -- so a row "
+                "can't say which model it is. Give each model its own "
+                "statement, or select the columns you want and map them by "
+                "name."
+            )
+
+
+def _pk_position(star: _StarExpansion) -> int:
+    """Where the primary key sits inside the expansion's run of columns."""
+    return next(
+        position for position, field in enumerate(star.fields) if field.primary_key
+    )
+
+
+def _refuse_an_unmapped_expansion(
+    *,
+    result_type: Any,
+    outer: tuple[_StarExpansion, ...],
+    starts: list[int | None],
+    model_fields: tuple[_ModelField, ...],
+) -> None:
+    """A `{Model:*}` whose columns the dataclass has no room for.
+
+    An expansion no model field claimed is columns like any others: they map
+    onto same-named fields, which is what `SELECT {Model:*}` under a dataclass
+    of its columns means and what a UNION of two star selects needs. When some
+    of them have no field at all, the expansion is what the dataclass is
+    missing, and saying so is more use than naming its columns one by one.
+    """
+    claimed = {model_field.star.model for model_field in model_fields}
+    declared = {field.name for field in dataclasses.fields(result_type) if field.init}
+    for star, start in zip(outer, starts, strict=True):
+        if star.model in claimed or start is None:
+            continue
+        unmapped = [column for column in star.columns if column not in declared]
+        if not unmapped:
+            continue
+        raise TypeError(
+            f"This statement selects {{{star.model.__name__}:*}} and "
+            f"{result_type.__name__} has no field for "
+            f"{', '.join(unmapped)}. Declare "
+            f"`{star.model.__name__.lower()}: {star.model.__name__}` to take "
+            "the whole expansion, or select the columns you want instead."
+        )
+
+
 def _annotation_base(annotation: Any) -> Any:
     """`str | None` -> `str`, `list[int]` -> `list`, `dict[str, Any]` -> `dict`."""
     origin = typing.get_origin(annotation)
@@ -994,27 +1554,40 @@ def _has_default(field: Any) -> bool:
 
 
 def _check_result_type(
+    *,
     result_type: Any,
     names: tuple[str, ...],
+    model_fields: tuple[_ModelField, ...],
+    named_columns: tuple[tuple[int, str], ...],
     columns: list[_Column],
     fields: list[Field | None],
     connection: DatabaseConnection,
 ) -> None:
-    """Check the result columns against the dataclass, by name then by type."""
-    if len(set(names)) != len(names):
+    """Check the result columns against the dataclass, by name then by type.
+
+    The columns an expansion filled are already spoken for — they went into a
+    model-annotated field whole — so what is left is matched by name.
+    """
+    by_name = tuple(name for _, name in named_columns)
+    if len(set(by_name)) != len(by_name):
         raise TypeError(
-            f"This statement returns duplicate column names ({', '.join(names)}), "
+            f"This statement returns duplicate column names ({', '.join(by_name)}), "
             f"and {result_type.__name__} maps columns by name. Alias them apart."
         )
 
-    declared = [field for field in dataclasses.fields(result_type) if field.init]
+    expanded = {model_field.name for model_field in model_fields}
+    declared = [
+        field
+        for field in dataclasses.fields(result_type)
+        if field.init and field.name not in expanded
+    ]
     missing = [
         field.name
         for field in declared
-        if field.name not in names and not _has_default(field)
+        if field.name not in by_name and not _has_default(field)
     ]
     unexpected = [
-        name for name in names if name not in {field.name for field in declared}
+        name for name in by_name if name not in {field.name for field in declared}
     ]
     if missing or unexpected:
         problems = []
@@ -1022,14 +1595,22 @@ def _check_result_type(
             problems.append(f"no column for {', '.join(missing)}")
         if unexpected:
             problems.append(f"no field for column {', '.join(unexpected)}")
+        # Every column the statement returned, and which of them a model field
+        # already took whole — otherwise a statement whose expansion took
+        # everything reads as having returned nothing.
+        taken = "".join(
+            f" ({model_field.name} took "
+            f"{', '.join(names[model_field.start : model_field.start + len(model_field.star.columns)])})"
+            for model_field in model_fields
+        )
         raise TypeError(
             f"This statement doesn't match {result_type.__name__} — "
-            f"{'; '.join(problems)}. It returned {', '.join(names)}, and the "
-            f"dataclass declares\n{_describe_result_type(result_type)}"
+            f"{'; '.join(problems)}. It returned {', '.join(names)}{taken}, "
+            f"and the dataclass declares\n{_describe_result_type(result_type)}"
         )
 
     hints = _type_hints(result_type)
-    for position, name in enumerate(names):
+    for position, name in named_columns:
         expected = _python_type_for_column(
             columns[position], fields[position], connection
         )
@@ -1126,27 +1707,30 @@ class Written[R]:
 
         rendered = _render(template)
 
-        # `result_type=` says what a row is, so any `{Model:*}` in the
-        # template is just columns -- inside a subquery, most likely. What
-        # comes back is checked against the dataclass either way.
-        stars = () if result_type is not None else rendered.stars
-
-        # The same model's columns can be expanded more than once -- that is
-        # what each branch of a UNION needs -- but two models can't both be
-        # the row.
-        star_models = dict.fromkeys(star.model for star in stars)
-        if len(star_models) > 1:
-            names = ", ".join(model.__name__ for model in star_models)
-            raise TypeError(
-                f"sql() expands {{Model:*}} for more than one model ({names}), "
-                "so a row can't be one instance. Select the columns you need "
-                "and pass result_type= a dataclass."
+        # With a `result_type` each expansion fills the field annotated with
+        # its model, so several models can be starred -- and a row is the
+        # dataclass, never an instance. Without one, the row *is* the
+        # instance: the same model's columns can be expanded more than once
+        # (that is what each branch of a UNION needs), but two models can't
+        # both be the row.
+        instance_model = None
+        if result_type is None and rendered.stars:
+            star_models = dict.fromkeys(
+                star.model for star in _instance_stars(rendered.stars)
             )
+            if len(star_models) > 1:
+                names = ", ".join(model.__name__ for model in star_models)
+                raise TypeError(
+                    f"sql() expands {{Model:*}} for more than one model "
+                    f"({names}), so a row can't be one instance. Pass "
+                    "result_type= a dataclass with a field for each model."
+                )
+            instance_model = next(iter(star_models), None)
 
         self._model = model
         self._result_type = result_type
-        self._stars = stars
-        self._instance_model = next(iter(star_models), None)
+        self._stars = rendered.stars
+        self._instance_model = instance_model
         self._sql = rendered.sql
         self._bind_sql = rendered.bind_sql
         self._params = rendered.params

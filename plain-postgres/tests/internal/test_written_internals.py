@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import pytest
 from app.examples.models.encrypted import SecretStore
 from app.examples.models.relationships import Tag, Widget
+from app.examples.models.upsert import UpsertTenant
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import SpanKind
 from plain.postgres import written
@@ -90,6 +91,147 @@ def test_a_star_records_the_model_columns_in_declared_order(db):
 def test_two_stars_are_two_expansions(db):
     rendered = written._render(t"SELECT {Widget:*}, {Tag:*} FROM {Widget}, {Tag}")
     assert [star.model for star in rendered.stars] == [Widget, Tag]
+
+
+def test_a_star_records_how_deep_in_parentheses_it_was_written(db):
+    """Depth 0 is the outer select list; deeper is inside a subquery.
+
+    The scan walks the author's own text, and skips the places a parenthesis
+    is content rather than structure.
+    """
+    depths = {
+        "the outer select list": (t"SELECT {Widget:*} FROM {Widget}", 0),
+        "a balanced function call first": (
+            t"SELECT count(*) AS n, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "each branch of a UNION": (
+            t"SELECT {Widget:*} FROM {Widget} UNION ALL SELECT {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "a derived table": (
+            t"SELECT * FROM (SELECT {Widget:*} FROM {Widget}) sub",
+            1,
+        ),
+        "a CTE": (
+            t"WITH w AS (SELECT {Widget:*} FROM {Widget}) SELECT * FROM w",
+            1,
+        ),
+        "nested subqueries": (
+            t"SELECT * FROM (SELECT * FROM (SELECT {Widget:*} FROM {Widget}) a) b",
+            2,
+        ),
+        "a single-quoted string": (t"SELECT '(' AS b, {Widget:*} FROM {Widget}", 0),
+        "an escaped quote inside one": (
+            t"SELECT 'it''s (' AS b, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "a quoted identifier": (
+            t'SELECT "a (column" AS b, {Widget:*} FROM {Widget}',
+            0,
+        ),
+        "a dollar-quoted string": (
+            t"SELECT $tag$ ( $tag$ AS b, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "an escape string's backslash-escaped quote": (
+            t"SELECT E'it\\'s (' AS b, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "a lowercase escape string": (
+            t"SELECT e'it\\'s (' AS b, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "an escape string ending in an escaped backslash": (
+            t"SELECT E'\\\\' AS b, * FROM (SELECT {Widget:*} FROM {Widget}) sub",
+            1,
+        ),
+        "an escape string inside the subquery": (
+            t"SELECT * FROM (SELECT {Widget:*} FROM {Widget} WHERE {Widget.name} <> E'x\\'y') sub",
+            1,
+        ),
+        "a plain string ending in a backslash": (
+            t"SELECT 'c:\\' AS b, * FROM (SELECT {Widget:*} FROM {Widget}) sub",
+            1,
+        ),
+        "a word ending in E before a string": (
+            t"SELECT type'(' AS b, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "a $ inside an identifier": (
+            t"SELECT 1 AS a$b$, * FROM (SELECT {Widget:*} FROM {Widget}) sub",
+            1,
+        ),
+        "a line comment": (t"SELECT -- (\n {Widget:*} FROM {Widget}", 0),
+        "a trailing line comment": (
+            t"SELECT {Widget:*} FROM {Widget} -- the end (",
+            0,
+        ),
+        "nested block comments": (
+            t"SELECT /* ( /* ( */ */ {Widget:*} FROM {Widget}",
+            0,
+        ),
+    }
+    for description, (template, depth) in depths.items():
+        stars = written._render(template).stars
+        assert {star.depth for star in stars} == {depth}, description
+
+
+def test_a_scan_that_ends_inside_a_string_or_comment_knows_no_depths(db):
+    """Postgres would have seen it closed, so the scan misread something."""
+    for template in (
+        t"SELECT {Widget:*} FROM {Widget} /* never closed",
+        t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.name} = 'never closed",
+        t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.name} = $t$ never closed",
+    ):
+        (star,) = written._render(template).stars
+        assert star.depth is None
+
+
+def test_an_unscannable_statement_cannot_fill_a_model_field(db):
+    """An unknown depth is never the outer select list, and the error says why."""
+
+    @dataclass
+    class OnlyTag:
+        tag: Tag
+
+    stars = written._render(t"SELECT {Tag:*} FROM {Tag} /* never closed").stars
+    with pytest.raises(TypeError, match="couldn't be scanned to the end"):
+        written._model_fields_for(
+            result_type=OnlyTag,
+            stars=stars,
+            outer=(),
+            starts=[],
+            names=("id", "name"),
+        )
+
+
+def test_a_run_only_counts_when_every_traced_column_is_the_expansions_own(db):
+    """One column tracing to `Tag` and one to `UpsertTenant` is nobody's run."""
+    (star,) = written._render(t"SELECT {Tag:*} FROM {Tag}").stars
+    tag_id = next(field for field in Tag._model_meta.fields if field.name == "id")
+    tenant_name = next(
+        field for field in UpsertTenant._model_meta.fields if field.name == "name"
+    )
+
+    mixed = written._locate_star(
+        ("id", "name"), [tag_id, tenant_name], star, claimed=[]
+    )
+    assert mixed is None
+
+    own = written._locate_star(("id", "name"), list(star.fields), star, claimed=[])
+    assert own == 0
+
+    # A UNION keeps no sources, so the names are all there is to go on.
+    untraced = written._locate_star(("id", "name"), [None, None], star, claimed=[])
+    assert untraced == 0
+
+
+def test_a_nested_template_carries_the_depth_it_is_rendered_at(db):
+    """A t-string is inlined, so the parentheses around it are the outer ones."""
+    inner = t"SELECT {Widget:*} FROM {Widget}"
+    (star,) = written._render(t"SELECT * FROM ({inner}) sub").stars
+    assert star.depth == 1
 
 
 def test_author_text_is_percent_doubled_only_for_binding(db):
@@ -210,6 +352,36 @@ def test_converters_are_attached_to_the_columns_that_have_a_field(db):
     converters, expression = plan.converters[1]
     assert expression.target.name == "api_key"
     assert converters
+
+
+def test_a_model_field_plan_records_where_its_expansion_starts(db):
+    """Each expansion is a run of columns, found by name and matched by model."""
+
+    @dataclass
+    class Tagged:
+        widget: Widget
+        tag: Tag
+        shouted: str
+
+    Widget.query.sql(
+        t"""
+        SELECT {Widget:*}, {Tag:*}, upper({Widget.name}) AS shouted
+        FROM {Widget}
+        JOIN {Tag} ON true
+        """,
+        result_type=Tagged,
+    ).all()
+
+    (plan,) = _plans().values()
+    assert [
+        (model_field.name, model_field.star.model, model_field.start)
+        for model_field in plan.model_fields
+    ] == [("widget", Widget, 0), ("tag", Tag, 3)]
+    # The primary key is what says an expansion came back all NULL, and it
+    # leads the model's columns.
+    assert [model_field.pk_position for model_field in plan.model_fields] == [0, 0]
+    # The expansions' columns are spoken for; only `shouted` maps by name.
+    assert plan.named_columns == ((5, "shouted"),)
 
 
 def test_an_expression_column_resolves_to_no_field(db):
