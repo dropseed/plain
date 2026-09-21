@@ -1149,6 +1149,7 @@ dev = [
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-email", editable = "plain-email" },
+    { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-templates", editable = "plain-templates" },
 ]
 
@@ -1326,7 +1327,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-postgres"
-version = "0.119.0"
+version = "0.120.0"
 source = { editable = "plain-postgres" }
 dependencies = [
     { name = "plain" },

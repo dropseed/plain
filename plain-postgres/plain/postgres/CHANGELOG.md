@@ -1,5 +1,23 @@
 # plain-postgres changelog
 
+## [0.120.0](https://github.com/dropseed/plain/releases/plain-postgres@0.120.0) (2026-09-21)
+
+### What's changed
+
+- String-referenced foreign keys get the typed condition surface. `ForeignKeyField("users.User", ...)` now returns the same typed descriptor as the class-referenced form, so the model annotates it `user: Field[User]` (with a `TYPE_CHECKING` import where the runtime import would cycle) and `Model.user.email.equals(...)`, `Model.user.id.is_in(...)` and typed construction all work through it. The rule is now one rule for every foreign key: annotate `Field[Related]` (`Field[Related | None]` plus `default=None` when nullable, `Field[Foo | None]` for `"self"`); the string form is a runtime device for import cycles and cross-package references only. New preflight warning `postgres.foreign_key_annotated_as_value` reports a foreign key whose annotation names the related model instead of `Field[...]`, with the exact rewrite. It exists because the type checker is silent on the old non-nullable spelling: PEP 681 only compares a field's declared type against the annotation when `default=` is passed ([b072153088](https://github.com/dropseed/plain/commit/b072153088))
+- `iequals`, `istartswith` and `iendswith` on `Field[str]`, the case-insensitive counterparts of `equals`/`startswith`/`endswith` (the `iexact`/`istartswith`/`iendswith` lookups). Blocked on encrypted fields like the other string conditions ([26c35167d8](https://github.com/dropseed/plain/commit/26c35167d8))
+- Comparisons against another column: `equals`, `not_equal`, `gt`, `gte`, `lt` and `lte` accept a field of the same value type, so `Post.query.where(Post.updated_at.gt(Post.created_at))` replaces `filter(updated_at__gt=F("created_at"))` and type-checks. A non-null column accepts a nullable one on the right; the reverse can't be expressed. Traversed fields carry their relation prefix; a column from another model trips the cross-model guard; an encrypted column is refused on either side. `F()` and other expressions are still accepted as the untyped escape hatch ([26c35167d8](https://github.com/dropseed/plain/commit/26c35167d8))
+- New preflight warning `postgres.nullable_field_without_default`: an `allow_null=True` field with no declared default is optional in the constructor at runtime but required to a type checker; adding `default=None` makes them agree and changes no schema. `Field.has_declared_default()` reports a declared `default=None` on the fields that accept only that default ([55d2a71790](https://github.com/dropseed/plain/commit/55d2a71790))
+- Docs corrected and filled from the internal conversion pass: typed construction is opt-in at runtime but not for a type-checked app (an unannotated model's constructor calls are unknown-argument errors, so every model must be annotated); `is_null(False)` is the conversion for `__isnull=False` (`~x.is_null()` compiles to `NOT (x IS NULL)`); typed conditions are a `Q` replacement, accepted by `When()` and an aggregate's `filter=` unchanged; `where()` preserves written condition order where `filter()` sorted kwargs alphabetically, so a converted multi-condition filter can change the emitted clause order; value-type strictness is a type-checker guard and runtime coercion is unchanged ([55d2a71790](https://github.com/dropseed/plain/commit/55d2a71790)) ([10236185ea](https://github.com/dropseed/plain/commit/10236185ea))
+
+### Upgrade instructions
+
+- Rewrite every string-referenced foreign key annotation from `X: Related = types.ForeignKeyField("...")` to `X: Field[Related] = types.ForeignKeyField("...")`, nullable ones to `Field[Related | None]` with `default=None`. Import `Related` under `if TYPE_CHECKING:` where the runtime import would cycle. This corrects the 0.119.0 instruction to annotate a string forward reference with the bare model type. `plain preflight` lists the fields to change.
+- If the project runs a type checker, annotate every model; 0.119.0 called annotation optional, which is true only at runtime.
+- Add `default=None` to nullable fields that lack a declared default; `plain preflight` lists them. No behavior or schema change.
+- When converting a multi-kwarg `filter()` to `where()`, list the conditions in the order `filter()` sorted them (alphabetical by field name) if anything pins the generated SQL.
+- `filter()`, `exclude()`, `values()`, `values_list()`, `only()`, `defer()` and string `annotate()` are unchanged.
+
 ## [0.119.0](https://github.com/dropseed/plain/releases/plain-postgres@0.119.0) (2026-09-20)
 
 ### What's changed
