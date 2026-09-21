@@ -1529,9 +1529,11 @@ instance rather than a field, so the checker never sees a descriptor: class
 access is a `User` rather than `type[User]`, `Model.user.id` is an `int`, and
 the condition methods are gone. `plain preflight`'s
 `postgres.foreign_key_annotated_as_value` finds these: it reports a foreign key
-whose annotation — on the model or on any of its base classes — names a
-non-`Field` type. An unannotated foreign key isn't one of them (it's no
-constructor argument at all), and neither is a `ClassVar[...]` one.
+whose annotation — on the model or on any of its base classes — names the
+related model. It asks for positive evidence, so it stays quiet when it can't
+establish that: an unannotated foreign key (no constructor argument at all), a
+`ClassVar[...]` one, and any spelling whose meaning it can't read. Treat a clean
+run as "nothing found", not "nothing to find".
 
 ### Foreign key access
 

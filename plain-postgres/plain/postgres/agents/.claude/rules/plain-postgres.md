@@ -71,8 +71,10 @@ class Article(postgres.Model):
     model instance rather than a field: class access becomes a `User`,
     `Model.user.id` is an `int`, and the condition methods disappear.
     `plain preflight`'s `postgres.foreign_key_annotated_as_value` reports a
-    foreign key whose annotation — on the model or any base class — names a
-    non-`Field` type (an unannotated or `ClassVar[...]` one isn't covered).
+    foreign key whose annotation — on the model or any base class — names the
+    related model. It wants positive evidence, so an unannotated field, a
+    `ClassVar[...]` one, or a spelling it can't read stays quiet: a clean run
+    means "nothing found", not "nothing to find".
 - **Encrypted fields** are annotated `EncryptedField[T]` (imported from
   `plain.postgres` alongside `Field`), not `Field[T]`. It's a `Field[T]`
   subclass, so the constructor is typed identically, but it also carries the
