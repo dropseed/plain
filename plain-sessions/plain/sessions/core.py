@@ -131,10 +131,13 @@ class SessionStore(MutableMapping):
         key.
         """
         self.clear()
-        try:
-            self._model.query.get(session_key=self.session_key).delete()
-        except self._model.DoesNotExist:
-            pass
+        key = self.session_key
+        if key is not None:
+            try:
+                model = self._model
+                model.query.where(model.session_key.equals(key)).get().delete()
+            except self._model.DoesNotExist:
+                pass
         self.session_key = None
         self._session_instance = None
 
