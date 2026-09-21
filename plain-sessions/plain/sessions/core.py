@@ -132,7 +132,7 @@ class SessionStore(MutableMapping):
         """
         self.clear()
         key = self.session_key
-        if key:
+        if key is not None:
             try:
                 model = self._model
                 model.query.where(model.session_key.equals(key)).get().delete()

@@ -29,6 +29,12 @@ def test_flushing_a_keyless_session_queries_nothing(
     store = SessionStore()
     store["a"] = 1
 
+    # Canary: prove the exporter is actually capturing statements, so the
+    # zero-statement assertion below can't pass because capture is broken.
+    otel_spans.clear()
+    Session.query.exists()
+    assert statements(otel_spans) != []
+
     otel_spans.clear()
     store.flush()
 
