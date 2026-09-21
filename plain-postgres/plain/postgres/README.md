@@ -451,9 +451,153 @@ redeclare `query` just to type it; the base provides `QuerySet[Self]`. Declare
 `query` only when attaching a **custom** QuerySet, and then as a `ClassVar`
 (see [Custom QuerySets](#custom-querysets) above).
 
+### Written queries with sql()
+
+A query is either **built** or **written**. The ORM builds one when the code assembles it at runtime — `where()`, `order_by()`, a paginator, a filter that's only sometimes applied. You write one when the whole query is known as you type it, however complex: a grouped count, a three-table join, a CTE, an `UPDATE ... RETURNING`. **If you can write the query, write it; if the code has to build it, build it.**
+
+`Model.query.sql()` is the written half:
+
+```python
+from dataclasses import dataclass
+from datetime import datetime
+
+
+@dataclass
+class QueueStats:
+    queue: str
+    n: int
+    oldest: datetime | None
+
+
+stats = JobRequest.query.sql(
+    """
+    SELECT {JobRequest.queue} AS queue,
+           count(*) AS "n!",
+           min({JobRequest.created_at}) AS "oldest?"
+    FROM {JobRequest}
+    WHERE {JobRequest.queue} = ANY({queues})
+    GROUP BY 1
+    """,
+    queues=["default", "high"],
+    result_type=QueueStats,
+)
+
+for row in stats:
+    print(row.queue, row.n)
+```
+
+The call renders the statement; iterating it runs it. `all()`, `get()`, `first()`, `count()`, `exists()` and `execute()` are the other ways to run one, and it runs on the same connection and transaction as every other query. A statement runs **once** — its rows are cached, the way a queryset caches results — so iterating twice can't repeat a write. Call `sql()` again to run it again.
+
+Only the model matters on the queryset you call it from: `Widget.query.filter(...).sql(...)` ignores the filter.
+
+#### Interpolation
+
+Everything in a template that isn't SQL is a `{}` reference, and what it names decides what it renders as. Values never go into the SQL text — they bind as parameters — so there is never an f-string.
+
+| Reference                                             | Renders as                                                                      |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `{Model}`                                             | the table, quoted                                                               |
+| `{Model.field}`                                       | the qualified column, `"table"."column"` (a foreign key gives its `_id` column) |
+| `{Model.*}`                                           | every column of the model; rows come back as **model instances**                |
+| `{name}` where the value is a queryset                | `(SELECT ...)` — the built query as a subquery, its parameters merged           |
+| `{name}` where the value is another `sql()` statement | the same, rendered without running                                              |
+| `{name}` where the value is a `Fragment`              | inlined SQL text                                                                |
+| `{name}` otherwise                                    | a bound parameter, always                                                       |
+
+A value referenced twice binds twice. **A list binds as an array, never as an `IN` list**, so membership is written `= ANY(...)`:
+
+```python
+Widget.query.sql(
+    "SELECT {Widget.*} FROM {Widget} WHERE {Widget.id} = ANY({ids})",
+    ids=[1, 2, 3],
+)
+```
+
+A dict binds as `jsonb`, ready for `@>`, `->` and the rest.
+
+A queryset goes in as a subquery, which is the seam between the two halves — the built query decides the rows, the written one does what the ORM can't say:
+
+```python
+ready = JobRequest.query.ready_to_run()
+
+JobRequest.query.sql(
+    """
+    SELECT ready.queue AS queue, count(*) AS "n!"
+    FROM {ready} ready
+    GROUP BY 1
+    """,
+    ready=ready,
+    result_type=QueueCount,
+)
+```
+
+A [`Fragment`](./written.py#Fragment) is the only way to put text into a statement that the template doesn't spell out, and it has to be a string literal written at the call site — a variable or an f-string raises, because a fragment is inlined and a literal is the one shape that can't carry input:
+
+```python
+from plain.postgres import Fragment
+
+ACTIVE = Fragment("status = 'active' AND deleted_at IS NULL")
+```
+
+An unknown model or field name, a `{name}` with no value, and a template holding more than one statement all raise where the `sql()` call is written, before anything runs.
+
+#### Results
+
+`{Model.*}` gives live model instances, with encrypted and JSON fields decrypted and parsed like any other read. Any other column you select comes back as a plain attribute on the instance, the way `raw()` does:
+
+```python
+widgets = Widget.query.sql(
+    """
+    SELECT {Widget.*}, count(wt.id) AS tag_count
+    FROM {Widget}
+    LEFT JOIN {WidgetTag} wt ON wt.widget_id = {Widget.id}
+    GROUP BY {Widget.id}
+    """
+)
+for widget in widgets:
+    print(widget.name, widget.tag_count)
+```
+
+Otherwise `result_type=` is required, and it has to be a dataclass — no dicts, no bare tuples. Columns map to its fields **by name**, so the order you select in doesn't matter, but a missing or an extra column is an error.
+
+The sqlx alias convention says in the statement what the SQL itself leaves ambiguous: `AS "n!"` for "this is never null" and `AS "oldest?"` for "this can be". The marker is stripped before the column maps onto a field, so `count(*) AS "n!"` fills `n`. Today it is documentation — nothing enforces it — and nullability comes from the annotation.
+
+#### Writes
+
+`INSERT`, `UPDATE` and `DELETE` are the same call. With a `RETURNING` clause the rows come back like any other result; without one, iterating yields nothing and `execute()` returns how many rows were affected:
+
+```python
+updated = Widget.query.sql(
+    """
+    UPDATE {Widget} SET "size" = {size}
+    WHERE {Widget.id} = {id}
+    RETURNING {Widget.*}
+    """,
+    size="large",
+    id=widget.id,
+).get()
+
+gone = Widget.query.sql(
+    "DELETE FROM {Widget} WHERE {Widget.size} = {size}", size="tiny"
+).execute()
+```
+
+A violated check or unique constraint raises the same `ValidationError` a model write raises. A written statement has no instance to describe, so only declared constraints map; anything else re-raises as `psycopg.IntegrityError`.
+
+#### What Postgres checks, and when
+
+The first execution of each statement reads `cursor.description`, which carries every result column's name, type OID, and source table and column. That is enough to do two things, and both are cached per template — so the cost is one extra catalog query the first time a statement runs, and nothing after:
+
+- **Attach field converters.** A column that traces back to a model column — through table aliases, column aliases, joins, derived tables and CTEs — is decrypted, parsed, or converted exactly as the ORM would.
+- **Check `result_type`.** Every column has to have a field of that name, every field a column, and the column's Python type has to match the annotation with `None` stripped. A mismatch raises `TypeError` printing the dataclass it expected.
+
+What it does **not** check: **nullability** — the annotation is the declaration, and `!`/`?` documents it. And the check runs at first execution, not before deploy, so a statement no test and no code path ever runs is unverified.
+
+One trap worth knowing: Plain loads `jsonb` as text and a `JSONField`'s converter is what parses it, so a `jsonb` column that _doesn't_ come from a model field arrives as a `str`. Select it through the field, or annotate it `str`.
+
 ### Raw SQL
 
-For complex queries that can't be expressed with the ORM, you can use raw SQL.
+For complex queries that can't be expressed with the ORM, you can use raw SQL. Reach for [`sql()`](#written-queries-with-sql) first — it resolves `{}` references against the models, binds every value as a parameter, and checks the results against what you declared. `raw()` is the unchecked version of the same idea.
 
 Use `Model.query.raw()` to execute raw SQL and get model instances back:
 
