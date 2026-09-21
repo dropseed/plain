@@ -15,6 +15,7 @@ Plain is a Python web framework.
 - **Write code meant to be read** — clear names, natural flow, obvious structure. The next person reading it should understand it immediately.
 - **Simplify to the present need** — if it feels overcomplicated, it is. Get right to the heart of the issue.
 - **Declarative class attributes are tuples** — `urls` on a `Router`, `fields`/`search_fields`/`actions`/`filters`/`cards` on admin views, `fields` in a form `Meta`. They're read-once config, and the framework types them as tuples, so a list fails type checking. Write `("id",)` for a single element, not `("id")`.
+- **Admin field declarations take field references** — `search_fields`, `queryset_order`, and a `TrendCard`'s `datetime_field`/`group_field` accept `User.email` (and traversed `FlagResult.flag.name`) as well as the lookup path as a string. Prefer the reference; keep a string for a reverse or many-to-many path traversal can't reach, and for a descending ordering term (`"-created_at"`). `filters` is filter _names_, not fields.
 
 ## Settings
 
