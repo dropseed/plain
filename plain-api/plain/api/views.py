@@ -151,7 +151,7 @@ class APIKeyView(View[APIResult]):
                 )
 
             try:
-                api_key = APIKey.query.get(token=header_token)
+                api_key = APIKey.query.where(APIKey.token.equals(header_token)).get()
             except APIKey.DoesNotExist:
                 raise ResponseException(
                     _error_response(

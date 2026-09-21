@@ -118,7 +118,7 @@ def get_user(request: Request) -> User | None:
         return None
 
     try:
-        user = User.query.get(id=session[_USER_ID_SESSION_KEY])
+        user = User.query.where(User.id.equals(session[_USER_ID_SESSION_KEY])).get()
     except User.DoesNotExist:
         return None
 

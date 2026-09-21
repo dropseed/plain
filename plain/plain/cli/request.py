@@ -365,13 +365,15 @@ def request(
 
             user = None
             try:
-                user = User.query.get(id=user_id)
+                # int() up front: the typed `id` condition takes an int, and a
+                # non-numeric --user still raises ValueError, same as before.
+                user = User.query.where(User.id.equals(int(user_id))).get()
             except (User.DoesNotExist, ValueError):
                 pass
 
             if user is None:
                 try:
-                    user = User.query.get(email=user_id)
+                    user = User.query.where(User.email.equals(user_id)).get()
                 except User.DoesNotExist:
                     pass
 
