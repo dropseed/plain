@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.31.3](https://github.com/dropseed/plain/releases/plain-cache@0.31.3) (2026-09-21)
+
+### What's changed
+
+- The cache queries and the `live()`/`expired()`/`unexpired()`/`forever()` queryset methods use typed `where()` conditions; SQL is unchanged ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.31.2](https://github.com/dropseed/plain/releases/plain-cache@0.31.2) (2026-09-20)
 
 ### What's changed
