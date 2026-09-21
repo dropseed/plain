@@ -1,5 +1,17 @@
 # plain-code changelog
 
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-code@0.26.0) (2026-09-21)
+
+### What's changed
+
+- The bundled ruff defaults target Python 3.14 (`target-version = "py314"`). `plain fix` now writes 3.14 syntax: `except (A, B):` becomes `except A, B:` (PEP 758), and a quoted forward reference that deferred annotations make unnecessary loses its quotes. Expect a one-time mechanical reformat on the first run ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Run `plain fix` once after upgrading and commit the reformat on its own.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.25.0](https://github.com/dropseed/plain/releases/plain-code@0.25.0) (2026-09-20)
 
 ### What's changed
