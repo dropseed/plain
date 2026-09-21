@@ -14,7 +14,7 @@ class SessionAdmin(AdminViewset):
         model = Session
         description = "Active user sessions stored in the database."
         fields = ("id", "expires_at", "created_at")
-        search_fields = ("session_key",)
+        search_fields = (Session.session_key,)
         nav_section = "Sessions"
         nav_icon = "person-badge"
         queryset_order = ("-created_at",)
