@@ -15,7 +15,10 @@ directly, while the registered-model sweep goes through the check itself.
 
 from __future__ import annotations
 
+from typing import Any, ClassVar
+
 from plain.postgres import Field, ModelMixin, types
+from plain.postgres import Field as AliasedField
 from plain.postgres.base import Model
 from plain.postgres.preflight.models import (
     CheckForeignKeyAnnotatedAsValue,
@@ -115,6 +118,118 @@ def test_an_unannotated_foreign_key_is_not_this_checks_story():
     `postgres.field_leaks_into_constructor`'s counterpart in
     CheckTypedConstruction, not a wrong annotation."""
     assert foreign_keys_annotated_as_values(Unannotated) == []
+
+
+class OrdinaryMixin:
+    """A plain Python mixin -- no `postgres.ModelMixin`, so PEP 681 leaves its
+    fields out of the synthesized constructor. It still *types the attribute*,
+    which is all this check cares about."""
+
+    # No dataclass transform here, so ty runs the ordinary assignment check and
+    # catches the spelling. On a model it stays silent -- which is the gap this
+    # preflight check covers.
+    owner: AnnotationTarget = types.ForeignKeyField(  # ty: ignore[invalid-assignment]
+        "examples.AnnotationTarget", on_delete=postgres.CASCADE
+    )
+
+
+class UsesOrdinaryMixin(OrdinaryMixin, Model):
+    model_options = postgres.Options(package_label="examples")
+
+
+class AliasAnnotated(Model):
+    """`Field` under an import alias is the same class, so it reads the same."""
+
+    model_options = postgres.Options(package_label="examples")
+
+    owner: AliasedField[AnnotationTarget] = types.ForeignKeyField(
+        "examples.AnnotationTarget", on_delete=postgres.CASCADE
+    )
+
+
+class ClassVarAnnotated(Model):
+    """`ClassVar[...]` is the declared way to keep an attribute out of the
+    constructor, so it isn't this check's business -- and `Field[ClassVar[...]]`
+    would be a nonsense repair to suggest."""
+
+    model_options = postgres.Options(package_label="examples")
+
+    owner: ClassVar[Field[AnnotationTarget]] = types.ForeignKeyField(
+        "examples.AnnotationTarget", on_delete=postgres.CASCADE
+    )
+
+
+# A module compiled without `from __future__ import annotations`, so its
+# annotations arrive as evaluated objects rather than strings. `str()` renders
+# one as `<class 'tests...AnnotationTarget'>`, which has no business in a fix
+# message telling someone what to type.
+_EVALUATED: dict[str, Any] = {
+    "__name__": __name__,
+    "Model": Model,
+    "types": types,
+    "postgres": postgres,
+    "AnnotationTarget": AnnotationTarget,
+}
+_EVALUATED_SOURCE = (
+    "class EvaluatedAnnotations(Model):\n"
+    "    model_options = postgres.Options(package_label='examples')\n"
+    "    owner: AnnotationTarget = types.ForeignKeyField(\n"
+    "        'examples.AnnotationTarget', on_delete=postgres.CASCADE\n"
+    "    )\n"
+    "    backup: AnnotationTarget | None = types.ForeignKeyField(\n"
+    "        'examples.AnnotationTarget', on_delete=postgres.SET_NULL,\n"
+    "        allow_null=True, required=False, default=None,\n"
+    "    )\n"
+)
+# `dont_inherit` matters: without it the compiler hands this module's
+# `from __future__ import annotations` down to the nested compile and the
+# annotations come back as strings -- the case already covered above.
+exec(  # noqa: S102
+    compile(_EVALUATED_SOURCE, "<evaluated annotations>", "exec", dont_inherit=True),
+    _EVALUATED,
+)
+EvaluatedAnnotations: type = _EVALUATED["EvaluatedAnnotations"]
+
+
+def test_an_ordinary_mixins_annotation_is_read_too():
+    """The transform gates the *constructor* checks, where PEP 681 really does
+    ignore a transformless base. It has nothing to say about attribute types:
+    a plain mixin types `UsesOrdinaryMixin.owner` exactly as a model would."""
+    assert foreign_keys_annotated_as_values(UsesOrdinaryMixin) == [
+        ("owner", "AnnotationTarget")
+    ]
+
+
+def test_an_import_alias_for_field_is_recognized():
+    """Recognition resolves the annotation's head against the declaring
+    module, so it follows aliases instead of matching on the spelling."""
+    assert foreign_keys_annotated_as_values(AliasAnnotated) == []
+
+
+def test_a_classvar_annotation_is_left_alone():
+    assert foreign_keys_annotated_as_values(ClassVarAnnotated) == []
+
+
+def test_an_evaluated_class_annotation_yields_a_valid_rewrite():
+    """Nothing in the message may be un-typeable: the annotation is named by
+    qualname, and `| None` comes from the field's allow_null rather than from
+    the annotation text."""
+    assert EvaluatedAnnotations.__annotations__["owner"] is AnnotationTarget
+
+    fixes = {
+        str(r.obj).rsplit(".", 1)[-1]: r.fix
+        for r in foreign_key_annotation_results(EvaluatedAnnotations)
+    }
+    required = fixes["owner"]
+    nullable = fixes["backup"]
+
+    assert "<class" not in required
+    assert "<class" not in nullable
+    assert "'owner: Field[AnnotationTarget] = ...'" in required
+    assert "default=None" not in required
+    assert (
+        "'backup: Field[AnnotationTarget | None] = ...' with default=None" in nullable
+    )
 
 
 def test_the_nearest_annotation_in_the_mro_is_the_one_read():

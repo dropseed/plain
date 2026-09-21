@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import inspect
+import sys
+import typing
 from collections import defaultdict
 from collections.abc import Callable
 from typing import Any
@@ -133,15 +135,6 @@ class CheckTypedConstruction(PreflightCheck):
     """
 
     def run(self) -> list[PreflightResult]:
-        import typing
-
-        def is_classvar(ann: object) -> bool:
-            # Annotations are strings under `from __future__ import annotations`,
-            # objects otherwise -- handle both without resolving forward refs.
-            if isinstance(ann, str):
-                return ann.lstrip().startswith(("ClassVar", "typing.ClassVar"))
-            return typing.get_origin(ann) is typing.ClassVar
-
         errors: list[PreflightResult] = []
         for model in models_registry.get_models():
             meta = model._model_meta
@@ -158,7 +151,7 @@ class CheckTypedConstruction(PreflightCheck):
                 # eval_str=False (the default) keeps string annotations as
                 # strings, so forward refs are never resolved here.
                 for attr, ann in inspect.get_annotations(klass).items():
-                    if attr.startswith("__") or is_classvar(ann) or attr in real:
+                    if attr.startswith("__") or _is_classvar(ann) or attr in real:
                         continue
                     errors.append(
                         PreflightResult(
@@ -254,20 +247,92 @@ class CheckNullableFieldWithoutDefault(PreflightCheck):
         return results
 
 
-def _annotation_names_a_field(annotation: str | object) -> bool:
-    """Whether `annotation` is a `Field[...]`/`EncryptedField[...]` form.
+def _is_classvar(annotation: object) -> bool:
+    """Whether `annotation` is a ``ClassVar[...]`` form.
 
-    Read textually, never resolved: `inspect.get_annotations` is called with
-    `eval_str=False`, so under `from __future__ import annotations` every
-    annotation is a string -- and a string model reference exists precisely
-    because the related class isn't importable here.
+    Annotations are strings under ``from __future__ import annotations``,
+    objects otherwise -- handle both without resolving forward refs.
     """
-    text = annotation if isinstance(annotation, str) else str(annotation)
-    text = text.strip().lstrip("'\"").lstrip()
-    # `Field[User]`, `EncryptedField[User]`, and their dotted spellings
-    # (`postgres.Field[...]`, `plain.postgres.Field[...]`).
-    head = text.split("[", 1)[0].strip()
-    return head.rsplit(".", 1)[-1] in {"Field", "EncryptedField"}
+    if isinstance(annotation, str):
+        return (
+            annotation.strip().strip("\"'").startswith(("ClassVar", "typing.ClassVar"))
+        )
+    return typing.get_origin(annotation) is typing.ClassVar
+
+
+def _annotation_head(annotation: object, owner: type) -> object | None:
+    """The object the annotation's outermost name refers to, or None.
+
+    ``inspect.get_annotations`` is called with ``eval_str=False``, so under
+    ``from __future__ import annotations`` every annotation arrives as a
+    string. Only its *head* -- everything before the subscript -- is resolved,
+    against the module that declared ``owner``. The inner reference is
+    deliberately left alone: a string model reference exists precisely because
+    that class isn't importable here.
+
+    Resolving rather than string-matching is what makes an import alias
+    (``from plain.postgres import Field as F``) read the same as the plain
+    spelling.
+    """
+    if not isinstance(annotation, str):
+        return typing.get_origin(annotation) or annotation
+
+    head = annotation.strip().strip("\"'").split("[", 1)[0].strip()
+    if not head:
+        return None
+    module = sys.modules.get(owner.__module__)
+    if module is None:
+        return None
+    parts = head.split(".")
+    resolved: Any = getattr(module, parts[0], None)
+    for part in parts[1:]:
+        if resolved is None:
+            return None
+        resolved = getattr(resolved, part, None)
+    return resolved
+
+
+def _annotation_names_a_field(annotation: object, owner: type) -> bool:
+    """Whether `annotation` names a ``Field`` subclass -- ``Field[...]``,
+    ``EncryptedField[...]``, or any alias or subclass of them."""
+    from plain.postgres.fields.base import Field
+
+    head = _annotation_head(annotation, owner)
+    return isinstance(head, type) and issubclass(head, Field)
+
+
+def _annotation_text(annotation: object) -> str:
+    """The annotation as a reader would write it in source.
+
+    A string annotation is used as written, minus any wrapping quotes. An
+    evaluated one is named by qualname rather than ``str()``, which renders a
+    class as ``<class 'app.users.models.User'>`` and would put invalid Python
+    in a fix message.
+    """
+    if isinstance(annotation, str):
+        return annotation.strip().strip("\"'").strip()
+    if isinstance(annotation, type):
+        return annotation.__qualname__
+    if args := typing.get_args(annotation):
+        return " | ".join(
+            "None"
+            if arg is type(None)
+            else (arg.__qualname__ if isinstance(arg, type) else str(arg))
+            for arg in args
+        )
+    return str(annotation)
+
+
+def _related_type_name(annotation_text: str) -> str:
+    """The related model's name, with any ``| None`` dropped.
+
+    The fix message rebuilds the rewrite around this name and takes
+    nullability from the field itself, so it never echoes a half-written
+    union back at the reader.
+    """
+    named = [part.strip() for part in annotation_text.split("|")]
+    named = [part for part in named if part and part != "None"]
+    return named[0] if named else annotation_text
 
 
 def foreign_keys_annotated_as_values(model: type) -> list[tuple[str, str]]:
@@ -275,9 +340,10 @@ def foreign_keys_annotated_as_values(model: type) -> list[tuple[str, str]]:
     annotation names something other than a ``Field[...]`` form.
 
     An unannotated foreign key isn't reported here -- that's
-    ``CheckTypedConstruction``'s story (it isn't a constructor argument at all).
-    Only an annotation that names a non-Field type is a foreign key the checker
-    reads as a model *instance*.
+    ``CheckTypedConstruction``'s story (it isn't a constructor argument at all),
+    and neither is a ``ClassVar[...]`` one, which is already the declared way to
+    keep an attribute out of the constructor. Only an annotation that names a
+    non-Field type is a foreign key the checker reads as a model *instance*.
     """
     from plain.postgres.fields.related import ForeignKeyField
 
@@ -288,44 +354,56 @@ def foreign_keys_annotated_as_values(model: type) -> list[tuple[str, str]]:
     }
     if not foreign_key_names:
         return []
-    # The nearest annotation in the MRO is the one the checker reads, so a
-    # subclass re-annotating a mixin's foreign key wins -- right or wrong.
-    nearest: dict[str, str] = {}
+    # The nearest annotation in the MRO is the one a type checker reads, and
+    # every class on it counts -- an ordinary Python mixin types the attribute
+    # just as well as a model does. (`_carries_transform` gates the
+    # *constructor* checks above, where PEP 681 really does ignore a
+    # transformless base; it has nothing to say about attribute types.)
+    nearest: dict[str, tuple[type, object]] = {}
     for klass in model.__mro__:
-        if not _carries_transform(klass):
-            continue
         for attr, annotation in inspect.get_annotations(klass).items():
             if attr in foreign_key_names and attr not in nearest:
-                nearest[attr] = str(annotation)
+                nearest[attr] = (klass, annotation)
     return sorted(
-        (attr, annotation)
-        for attr, annotation in nearest.items()
-        if not _annotation_names_a_field(annotation)
+        (attr, _annotation_text(annotation))
+        for attr, (klass, annotation) in nearest.items()
+        if not _is_classvar(annotation)
+        and not _annotation_names_a_field(annotation, klass)
     )
 
 
 def foreign_key_annotation_results(model: type) -> list[PreflightResult]:
     """A warning per foreign key `foreign_keys_annotated_as_values` reports."""
-    return [
-        PreflightResult(
-            fix=(
-                f"'{model.__name__}.{field_name}' is a ForeignKeyField annotated "
-                f"'{annotation}', which names a model instance rather than a "
-                "field, so a type checker sees no field there: class access "
-                f"yields a {annotation} instead of type[{annotation}], "
-                f"{model.__name__}.{field_name}.id is a plain value, and the "
-                "where() condition methods are gone. Annotate it "
-                f"'Field[{annotation}]' instead (nullable: "
-                f"'Field[{annotation} | None]' with default=None), importing the "
-                "related model under `if TYPE_CHECKING:` when a runtime import "
-                "would be the cycle the string reference avoids."
-            ),
-            obj=f"{model.model_options.label}.{field_name}",  # ty: ignore[unresolved-attribute]
-            id="postgres.foreign_key_annotated_as_value",
-            warning=True,
+    fields = {
+        field.name: field
+        for field in model._model_meta.fields  # ty: ignore[unresolved-attribute]
+    }
+    results = []
+    for field_name, annotation in foreign_keys_annotated_as_values(model):
+        related = _related_type_name(annotation)
+        # Nullability comes from the field, not the annotation, so the message
+        # always shows one rewrite that compiles.
+        rewrite = f"{related} | None" if fields[field_name].allow_null else related
+        nullable_note = " with default=None" if fields[field_name].allow_null else ""
+        results.append(
+            PreflightResult(
+                fix=(
+                    f"'{model.__name__}.{field_name}' is a ForeignKeyField "
+                    f"annotated '{annotation}', which names a model instance "
+                    "rather than a field, so a type checker sees no field there: "
+                    f"class access yields a {related} instead of type[{related}], "
+                    f"{model.__name__}.{field_name}.id is a plain value, and the "
+                    "where() condition methods are gone. Annotate it "
+                    f"'{field_name}: Field[{rewrite}] = ...'{nullable_note}, "
+                    "importing the related model under `if TYPE_CHECKING:` when a "
+                    "runtime import would be the cycle the string reference avoids."
+                ),
+                obj=f"{model.model_options.label}.{field_name}",  # ty: ignore[unresolved-attribute]
+                id="postgres.foreign_key_annotated_as_value",
+                warning=True,
+            )
         )
-        for field_name, annotation in foreign_keys_annotated_as_values(model)
-    ]
+    return results
 
 
 @register_check("postgres.foreign_key_annotated_as_value")

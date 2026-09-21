@@ -1527,8 +1527,11 @@ What does _not_ work is annotating the field with the related model itself
 (`user: User = types.ForeignKeyField("users.User", ...)`). That names a model
 instance rather than a field, so the checker never sees a descriptor: class
 access is a `User` rather than `type[User]`, `Model.user.id` is an `int`, and
-the condition methods are gone. `plain preflight` reports any field still
-spelled that way as `postgres.foreign_key_annotated_as_value`.
+the condition methods are gone. `plain preflight`'s
+`postgres.foreign_key_annotated_as_value` finds these: it reports a foreign key
+whose annotation — on the model or on any of its base classes — names a
+non-`Field` type. An unannotated foreign key isn't one of them (it's no
+constructor argument at all), and neither is a `ClassVar[...]` one.
 
 ### Foreign key access
 
