@@ -29,11 +29,7 @@ class TaskListView(AuthView, ListView):
     def get_objects(self) -> QuerySet[Task]:
         # Ordering comes from Task.model_options (is_complete, -created_at),
         # so pagination is deterministic.
-        return (
-            Task.query.filter(owner=self.user)
-            .select_related("project")
-            .prefetch_related("tags")
-        )
+        return Task.query.filter(owner=self.user).join("project").prefetch("tags")
 
 
 class TaskDetailView(AuthView, HTMXView, DetailView):

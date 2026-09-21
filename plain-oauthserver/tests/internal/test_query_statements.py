@@ -142,7 +142,7 @@ def test_refresh_token_grant_statements(db, user, public_app) -> None:
 
     assert statements[2].startswith("SELECT ")
     assert 'FROM "plainoauthserver_refreshtoken"' in statements[2]
-    # select_related() joins the access token into the same locked read, and
+    # join() pulls the access token into the same locked read, and
     # with no `OF` clause the lock covers both joined rows — both of which
     # this grant revokes.
     assert 'INNER JOIN "plainoauthserver_accesstoken"' in statements[2]

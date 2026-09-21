@@ -155,7 +155,7 @@ def must_accept_row_mode_refusals_as_never_returning() -> None:
     assert_type(rows.values("name"), Never)
     assert_type(rows.values_list("name"), Never)
     assert_type(rows.get_or_create(name="a"), Never)
-    assert_type(rows.prefetch_related("tags"), Never)
+    assert_type(rows.prefetch("tags"), Never)
     assert_type(rows.bulk_update([], ["name"]), Never)
     assert_type(rows.returning(), Never)
     # annotate() appends a column, which would make the declared row type

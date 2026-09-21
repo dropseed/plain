@@ -736,11 +736,11 @@ class TestSelectTwiceWithExpressions:
             DefaultsExample.query.select(DefaultsExample.name).annotate(x=Value(1))
 
 
-class TestPrefetchRelatedAndSelect:
+class TestPrefetchAndSelect:
     """A prefetch hangs related objects off each result's attributes, and a
     row has nowhere to put them: it was silently wasted work for tuples and
     scalars, and an AttributeError for result_type=. Refused in both orders,
-    the same as select_related()."""
+    the same as join()."""
 
     @pytest.fixture
     def widget(self, db):
@@ -750,29 +750,27 @@ class TestPrefetchRelatedAndSelect:
         return w
 
     def test_select_after_prefetch_raises_in_tuple_mode(self, widget):
-        with pytest.raises(TypeError, match="after prefetch_related"):
-            Widget.query.prefetch_related("tags").select(Widget.name)
+        with pytest.raises(TypeError, match="after prefetch"):
+            Widget.query.prefetch("tags").select(Widget.name)
 
     def test_select_after_prefetch_raises_in_flat_mode(self, widget):
-        with pytest.raises(TypeError, match="after prefetch_related"):
-            Widget.query.prefetch_related("tags").select(Widget.name, flat=True)
+        with pytest.raises(TypeError, match="after prefetch"):
+            Widget.query.prefetch("tags").select(Widget.name, flat=True)
 
     def test_select_after_prefetch_raises_in_result_type_mode(self, widget):
         @dataclass
         class NameRow:
             name: str
 
-        with pytest.raises(TypeError, match="after prefetch_related"):
-            Widget.query.prefetch_related("tags").select(
-                Widget.name, result_type=NameRow
-            )
+        with pytest.raises(TypeError, match="after prefetch"):
+            Widget.query.prefetch("tags").select(Widget.name, result_type=NameRow)
 
     def test_prefetch_after_select_raises(self, widget):
         with pytest.raises(TypeError, match="after select"):
-            Widget.query.select(Widget.name).prefetch_related("tags")
+            Widget.query.select(Widget.name).prefetch("tags")
 
     def test_prefetch_without_select_is_unaffected(self, widget):
-        widgets = list(Widget.query.prefetch_related("tags"))
+        widgets = list(Widget.query.prefetch("tags"))
         assert [t.name for t in widgets[0].tags.query.all()] == ["t"]
 
 

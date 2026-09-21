@@ -238,7 +238,7 @@ def test_related_lock_target_is_still_fine_on_a_read(db, capture_queries, execut
 
     with capture_queries() as queries:
         list(
-            ChildCascade.query.select_related("parent")
+            ChildCascade.query.join("parent")
             .filter(parent__name="p")
             .for_update(of=("parent",))
         )

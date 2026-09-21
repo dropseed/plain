@@ -35,7 +35,7 @@ from plain.postgres.fields.related import RelatedField
 from plain.postgres.functions import Cast, Random
 from plain.postgres.lookups import Lookup
 from plain.postgres.meta import Meta
-from plain.postgres.query_utils import select_related_descend
+from plain.postgres.query_utils import join_relation_descend
 from plain.postgres.sql.constants import (
     CURSOR,
     MULTI,
@@ -400,7 +400,7 @@ class SQLCompiler:
             select.append((annotation, alias))
             select_idx += 1
 
-        if self.query.select_related:
+        if self.query.joined_relations:
             related_klass_infos = self.get_related_selections(select, select_mask)
             if klass_info is not None:
                 klass_info["related_klass_infos"] = related_klass_infos
@@ -842,7 +842,7 @@ class SQLCompiler:
     ) -> list[Any]:
         """
         Return Col expressions for every concrete field on the model. When
-        pulling in a related model (e.g. via select_related), the caller
+        pulling in a related model (e.g. via join()), the caller
         passes ``opts`` and ``start_alias`` to traverse from that join.
         """
         result = []
@@ -1014,7 +1014,7 @@ class SQLCompiler:
         restricted: bool | None = None,
     ) -> list[dict[str, Any]]:
         """
-        Fill in the information needed for a select_related query. The current
+        Fill in the information needed for a join() query. The current
         depth is measured as the number of connections away from the root model
         (for example, cur_depth=1 means we are looking at models with direct
         connections to the root model).
@@ -1029,7 +1029,7 @@ class SQLCompiler:
             return related_klass_infos
 
         if not opts:
-            assert self.query.model is not None, "select_related requires a model"
+            assert self.query.model is not None, "join() requires a model"
             opts = self.query.model._model_meta
             root_alias = self.query.get_initial_alias()
 
@@ -1051,9 +1051,9 @@ class SQLCompiler:
         # included in the related selection.
         fields_found = set()
         if requested is None:
-            restricted = isinstance(self.query.select_related, dict)
+            restricted = isinstance(self.query.joined_relations, dict)
             if restricted:
-                requested = cast(dict, self.query.select_related)
+                requested = cast(dict, self.query.joined_relations)
 
         def get_related_klass_infos(
             klass_info: dict, related_klass_infos: list
@@ -1070,7 +1070,7 @@ class SQLCompiler:
                 # or if a single non-relational field is given.
                 if not isinstance(f, RelatedField) and (next or f.name in requested):
                     raise FieldError(
-                        "Non-relational field given in select_related: '{}'. "
+                        "Non-relational field given in join(): '{}'. "
                         "Choices are: {}".format(
                             f.name,
                             ", ".join(_get_field_choices()) or "(none)",
@@ -1079,7 +1079,7 @@ class SQLCompiler:
             else:
                 next = None
 
-            if not select_related_descend(f, restricted, requested, select_mask):
+            if not join_relation_descend(f, restricted, requested, select_mask):
                 continue
             related_select_mask = select_mask.get(f) or {}
             klass_info: dict[str, Any] = {
@@ -1126,7 +1126,7 @@ class SQLCompiler:
             for related_field, model in related_fields:
                 related_select_mask = select_mask.get(related_field) or {}
 
-                if not select_related_descend(
+                if not join_relation_descend(
                     related_field,
                     restricted,
                     requested,
@@ -1178,8 +1178,7 @@ class SQLCompiler:
             if fields_not_found:
                 invalid_fields = (f"'{s}'" for s in fields_not_found)
                 raise FieldError(
-                    "Invalid field name(s) given in select_related: {}. "
-                    "Choices are: {}".format(
+                    "Invalid field name(s) given in join(): {}. Choices are: {}".format(
                         ", ".join(invalid_fields),
                         ", ".join(_get_field_choices()) or "(none)",
                     )
@@ -1800,7 +1799,7 @@ class SQLUpdateCompiler(SQLWriteCompiler):
         if count == 1 and not self.query.lock_mode:
             return
         query = self.query.chain(klass=Query)
-        query.select_related = False
+        query.joined_relations = False
         query.clear_ordering(force=True)
         query.select = ()
         query.add_fields(["id"])

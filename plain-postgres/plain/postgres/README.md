@@ -383,7 +383,7 @@ You can select expression columns too — `select(User.id, Sum("amount"))`, or a
 
 Per-column typing runs to **ten columns**. An eleventh is still selected and still returns rows, but the row type degrades to `tuple[Any, ...]` — reach for `result_type=` when a row is that wide.
 
-`select()` goes last in a chain: `annotate()` must come before it, because an annotation appends a column and would change the row shape out from under the type `select()` declared. `annotate()` after `select()` raises `TypeError` saying so. `prefetch_related()` is refused in both orders — a prefetch attaches related objects to a model instance's attributes, and a row has nowhere to put them; select the columns you need from the related model instead.
+`select()` goes last in a chain: `annotate()` must come before it, because an annotation appends a column and would change the row shape out from under the type `select()` declared. `annotate()` after `select()` raises `TypeError` saying so. `prefetch()` is refused in both orders — a prefetch attaches related objects to a model instance's attributes, and a row has nowhere to put them; select the columns you need from the related model instead.
 
 Re-selecting replaces the **column list**, not the joins: an expression that reached through a relation (`select(Upper("tags__name"))`) leaves its join in place, so a later `select(Widget.name)` still returns one row per joined row — and `count()`/`exists()` count those. This is `annotate(...)` followed by `values_list(...)` behaving as it always has; trimming joins no queryset needs any more is out of scope here.
 
@@ -391,7 +391,7 @@ Re-selecting replaces the **column list**, not the joins: an expression that rea
 
 Columns annotated `Field[Any]` are rejected by `select()`, because `Any` satisfies the model-valued `__get__` overload and class access resolves as `type[Any]` rather than a field. That's the same reason the field-annotation guidance says never to annotate a field `Field[Any]` — use the concrete type, or `Field[object]` when the column really does hold arbitrary JSON, which `select()` types as `object`.
 
-**`select()` returns rows, not partial model instances.** This is deliberate: a model instance with only some columns loaded is a type-level lie — the type checker thinks every field is present, so touching an unselected column looks fine but fails or fires a hidden query at runtime. Honest tuples/dataclasses keep the types truthful. As a result, iteration, `first()`, `get()`, `iterator()`, and slicing all return rows, and anything that would read or write model rows, or change the selected columns — `update()`, `delete()`, `get_or_create()`, `values()`, `values_list()`, `annotate()`, `prefetch_related()` — raises `TypeError`. `update()` and `delete()` refuse a queryset in row mode however it got there, `values()` and `values_list()` included.
+**`select()` returns rows, not partial model instances.** This is deliberate: a model instance with only some columns loaded is a type-level lie — the type checker thinks every field is present, so touching an unselected column looks fine but fails or fires a hidden query at runtime. Honest tuples/dataclasses keep the types truthful. As a result, iteration, `first()`, `get()`, `iterator()`, and slicing all return rows, and anything that would read or write model rows, or change the selected columns — `update()`, `delete()`, `get_or_create()`, `values()`, `values_list()`, `annotate()`, `prefetch()` — raises `TypeError`. `update()` and `delete()` refuse a queryset in row mode however it got there, `values()` and `values_list()` included.
 
 `select()` takes typed references only — a bare string like `select("email")` raises `TypeError` (use `User.email`).
 
@@ -469,11 +469,11 @@ for user in users:
     print(user.email)  # Full model instance with all fields
 ```
 
-Raw querysets support `prefetch_related()` for loading related objects:
+Raw querysets support `prefetch()` for loading related objects:
 
 ```python
 users = User.query.raw("SELECT * FROM users WHERE is_admin = %s", [True])
-users = users.prefetch_related("posts")
+users = users.prefetch("posts")
 ```
 
 For queries that don't map to a model, use the database cursor directly:
@@ -497,9 +497,9 @@ users = User.query.filter(Q(is_admin=True) | Q(is_staff=True))
 
 ### Avoiding N+1 queries
 
-#### Use `select_related` for ForeignKey access in loops
+#### Use `join()` for ForeignKey access in loops
 
-Accessing a FK in a loop without `select_related()` fires one query per row.
+Accessing a FK in a loop without `join()` fires one query per row.
 
 ```python
 # Bad — N+1 queries
@@ -507,11 +507,11 @@ for post in Post.query.all():
     print(post.author.name)
 
 # Good — single JOIN
-for post in Post.query.select_related("author").all():
+for post in Post.query.join("author").all():
     print(post.author.name)
 ```
 
-#### Use `prefetch_related` for reverse/M2N access in loops
+#### Use `prefetch()` for reverse/M2N access in loops
 
 Reverse ForeignKey and ManyToMany relations need a separate prefetch query.
 
@@ -521,7 +521,7 @@ for author in Author.query.all():
     print(author.posts.count())
 
 # Good — one extra query
-for author in Author.query.prefetch_related("posts").all():
+for author in Author.query.prefetch("posts").all():
     print(author.posts.count())
 ```
 
@@ -553,7 +553,7 @@ def get_template_context(self):
 
 # Good — eagerly load everything
 def get_template_context(self):
-    return {"posts": Post.query.select_related("author").prefetch_related("tags").all()}
+    return {"posts": Post.query.join("author").prefetch("tags").all()}
 ```
 
 ### Query efficiency
@@ -1606,7 +1606,7 @@ book.author.id  # no query — the foreign key value
 book.author.name  # one query — loads the rest of the row
 ```
 
-The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `select_related()` to load related rows up front and avoid a query per row.
+The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `join()` to load related rows up front and avoid a query per row.
 
 A foreign key with no value raises `RelatedObjectDoesNotExist` on access. That attribute still lives on the descriptor at runtime, but class-level access is now typed as the related model (that is what makes `Book.author.name.equals(...)` work), so `Book.author.RelatedObjectDoesNotExist` is a type error. Catch it as `Author.DoesNotExist` — the exception subclasses both that and `AttributeError` — or as `AttributeError`.
 

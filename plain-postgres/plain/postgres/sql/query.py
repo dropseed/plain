@@ -233,9 +233,9 @@ class Query(BaseExpression):
     lock_nowait = False
     lock_skip_locked = False
     lock_of: tuple[str, ...] = ()
-    select_related: bool | dict[str, Any] = False
+    joined_relations: bool | dict[str, Any] = False
     has_select_fields = False
-    # Arbitrary limit for select_related to prevents infinite recursion.
+    # Arbitrary limit for joined_relations to prevents infinite recursion.
     max_depth = 5
     # Holds the selects defined by a call to values() or values_list()
     # excluding annotation_select.
@@ -341,10 +341,10 @@ class Query(BaseExpression):
         # It will get re-populated in the cloned queryset the next time it's
         # used.
         obj._annotation_select_cache = None
-        if self.select_related is not False:
-            # Use deepcopy because select_related stores fields in nested
+        if self.joined_relations is not False:
+            # Use deepcopy because joined_relations stores fields in nested
             # dicts.
-            obj.select_related = copy.deepcopy(obj.select_related)
+            obj.joined_relations = copy.deepcopy(obj.joined_relations)
         if "subq_aliases" in self.__dict__:
             obj.subq_aliases = self.subq_aliases.copy()
         obj.used_aliases = self.used_aliases.copy()
@@ -429,7 +429,7 @@ class Query(BaseExpression):
             inner_query.subquery = True
             outer_query = AggregateQuery(self.model, inner_query)
             inner_query.lock_mode = None
-            inner_query.select_related = False
+            inner_query.joined_relations = False
             inner_query.set_annotation_mask(self.annotation_select)
             # Queries with distinct_fields need ordering and when a limit is
             # applied we must take the slice from the ordered query. Otherwise
@@ -521,7 +521,7 @@ class Query(BaseExpression):
         outer_query.clear_ordering(force=True)
         outer_query.clear_limits()
         outer_query.lock_mode = None
-        outer_query.select_related = False
+        outer_query.joined_relations = False
         compiler = outer_query.get_compiler(elide_empty=elide_empty)
         result = compiler.execute_sql(SINGLE)
         if result is None:
@@ -688,7 +688,7 @@ class Query(BaseExpression):
         select_mask[meta.get_forward_field("id")] = {}
         # All concrete fields that are not part of the defer mask must be
         # loaded. If a relational field is encountered it gets added to the
-        # mask for it be considered if `select_related` and the cycle continues
+        # mask for it be considered if `joined_relations` and the cycle continues
         # by recursively calling this function.
         for field in meta.fields:
             field_mask = mask.pop(field.name, None)
@@ -1953,7 +1953,7 @@ class Query(BaseExpression):
         """Remove all fields from SELECT clause."""
         self.select = ()
         self.default_cols = False
-        self.select_related = False
+        self.joined_relations = False
         self.set_annotation_mask(())
 
     def clear_select_fields(self) -> None:
@@ -2115,21 +2115,21 @@ class Query(BaseExpression):
                 group_by.extend(group_by_cols)
         self.group_by = tuple(group_by)
 
-    def add_select_related(self, fields: list[str]) -> None:
+    def add_joined_relations(self, fields: list[str]) -> None:
         """
-        Set up the select_related data structure so that we only select
+        Set up the joined_relations data structure so that we only select
         certain related models (as opposed to all models, when
-        self.select_related=True).
+        self.joined_relations=True).
         """
-        if isinstance(self.select_related, bool):
+        if isinstance(self.joined_relations, bool):
             field_dict: dict[str, Any] = {}
         else:
-            field_dict = self.select_related
+            field_dict = self.joined_relations
         for field in fields:
             d = field_dict
             for part in field.split(LOOKUP_SEP):
                 d = d.setdefault(part, {})
-        self.select_related = field_dict
+        self.joined_relations = field_dict
 
     def clear_deferred_loading(self) -> None:
         """Remove any fields from the deferred loading set."""
@@ -2206,7 +2206,7 @@ class Query(BaseExpression):
             self.set_annotation_mask(self.annotation_select_mask.union(names))
 
     def set_values(self, fields: list[str]) -> None:
-        self.select_related = False
+        self.joined_relations = False
         self.clear_deferred_loading()
         self.clear_select_fields()
         self.has_select_fields = True

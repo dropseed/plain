@@ -49,7 +49,7 @@ Never sum counts across hops — a query the framework runs once per request wou
 
 ## 3. Apply Fixes
 
-- Add `select_related()` / `prefetch_related()` for N+1
+- Add `join()` / `prefetch()` for N+1
 - Add database indexes for slow queries
 - Cache expensive computations
 

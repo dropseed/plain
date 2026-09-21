@@ -123,7 +123,7 @@ class ForwardForeignKeyDescriptor:
         if instance is None:
             return self
 
-        # The related object is cached on the model state -- by select_related,
+        # The related object is cached on the model state -- by join(),
         # prefetch, the reverse accessor, a prior access, or assignment.
         try:
             rel_obj = self._field.get_cached_value(instance)

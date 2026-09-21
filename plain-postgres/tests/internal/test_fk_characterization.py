@@ -54,10 +54,10 @@ def test_filter_by_related_field_lookup(db):
     assert ChildCascade.query.filter(parent__name="P").exists()
 
 
-def test_select_related(db):
+def test_join(db):
     parent = DeleteParent.query.create(name="P")
     child = ChildCascade.query.create(parent=parent)
-    fetched = ChildCascade.query.select_related("parent").get(id=child.id)
+    fetched = ChildCascade.query.join("parent").get(id=child.id)
     assert fetched.parent.name == "P"
 
 

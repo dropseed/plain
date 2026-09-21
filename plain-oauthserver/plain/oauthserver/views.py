@@ -331,7 +331,7 @@ class TokenView(View):
             try:
                 refresh = (
                     RefreshToken.query.for_update()
-                    .select_related("access_token")
+                    .join("access_token")
                     .where(
                         RefreshToken.application.id.equals(application.id),
                         RefreshToken.token_hash.equals(_hash_token(token_value)),
