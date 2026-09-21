@@ -52,6 +52,17 @@ def must_reject_pattern_conditions_on_a_non_string_field() -> None:
     DefaultsExample.priority.contains("a")  # ty: ignore[invalid-argument-type]
     DefaultsExample.priority.icontains("a")  # ty: ignore[invalid-argument-type]
     DefaultsExample.priority.endswith("a")  # ty: ignore[invalid-argument-type]
+    DefaultsExample.priority.iequals("a")  # ty: ignore[invalid-argument-type]
+    DefaultsExample.priority.istartswith("a")  # ty: ignore[invalid-argument-type]
+    DefaultsExample.priority.iendswith("a")  # ty: ignore[invalid-argument-type]
+
+
+def must_accept_case_insensitive_conditions_on_string_fields() -> None:
+    assert_type(DefaultsExample.name.iequals("a"), Q)
+    assert_type(DefaultsExample.name.istartswith("a"), Q)
+    assert_type(DefaultsExample.name.iendswith("a"), Q)
+    assert_type(DefaultsExample.note.iequals("a"), Q)
+    assert_type(StringConditionsExample.ip.istartswith("10."), Q)
 
 
 def must_accept_a_condition_from_another_model_because_the_checker_cannot_see_it() -> (

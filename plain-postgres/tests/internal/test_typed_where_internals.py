@@ -13,7 +13,7 @@ import pytest
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.encrypted import SecretStore
-from plain.postgres.fields.base import CONDITION_METHODS
+from plain.postgres.fields.base import CONDITION_METHODS, STRING_CONDITION_LOOKUPS
 
 
 def test_traversal_hands_back_the_field_itself():
@@ -99,3 +99,21 @@ def test_pattern_conditions_are_registered_on_every_field():
     `tests/typing/conditions_value_types.py`.
     """
     assert DefaultsExample.priority.get_lookup("contains") is not None
+
+
+def _compiled(queryset):
+    """The SQL and params a queryset would send."""
+    return queryset.sql_query.sql_with_params()
+
+
+@pytest.mark.parametrize(("method", "lookup"), STRING_CONDITION_LOOKUPS.items())
+def test_string_conditions_compile_like_their_filter_lookup(db, method, lookup):
+    """Each string condition is the typed spelling of one `filter()` lookup,
+    so the two have to compile to the same statement -- and the names don't
+    all match (`iequals` builds `iexact`), which is what this pins."""
+    typed = DefaultsExample.query.where(
+        getattr(DefaultsExample.name, method)("alice"),
+    )
+    untyped = DefaultsExample.query.filter(**{f"name__{lookup}": "alice"})
+
+    assert _compiled(typed) == _compiled(untyped)

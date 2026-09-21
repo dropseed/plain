@@ -234,7 +234,7 @@ admins = User.query.where(
 )
 ```
 
-Every field exposes `equals`, `not_equal`, `gt`, `gte`, `lt`, `lte`, `is_null`, and `is_in`. Text fields add `contains`, `icontains`, `startswith`, and `endswith`. Each returns a `Q`, so you can combine them with `|` and `&` or negate with `~`:
+Every field exposes `equals`, `not_equal`, `gt`, `gte`, `lt`, `lte`, `is_null`, and `is_in`. Text fields add `contains`, `startswith`, and `endswith`, plus their case-insensitive forms `icontains`, `istartswith`, `iendswith`, and `iequals` (the typed spelling of `filter(field__iexact=...)`). Each returns a `Q`, so you can combine them with `|` and `&` or negate with `~`:
 
 ```python
 # Membership, negation, and OR

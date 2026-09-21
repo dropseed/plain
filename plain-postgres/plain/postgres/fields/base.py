@@ -214,6 +214,18 @@ class Field[T](Selectable[T], RegisterLookupMixin):
     def endswith(self: Field[str] | Field[str | None], value: str) -> Q:
         return self._build_q("endswith", "endswith", value)
 
+    # The case-insensitive halves. `iequals` is named for the condition it is
+    # (`equals`, ignoring case) rather than for the `iexact` lookup it builds --
+    # there is no `exact` condition method for it to pair with.
+    def iequals(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("iequals", "iexact", value)
+
+    def istartswith(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("istartswith", "istartswith", value)
+
+    def iendswith(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("iendswith", "iendswith", value)
+
     def _build_q(self, method: str, suffix: str, value: Any) -> Q:
         """Build a Q from a lookup suffix + value. Uses Q's positional-tuple
         constructor to bypass its reserved `_connector`/`_negated` kwargs that
@@ -730,7 +742,20 @@ class Field[T](Selectable[T], RegisterLookupMixin):
 # set rather than the methods themselves -- the relation-traversal advice in
 # related_typed.py, the tests that sweep the surface -- imports from here
 # instead of keeping its own copy in sync.
-STRING_CONDITION_METHODS = ("contains", "icontains", "startswith", "endswith")
+# The string conditions, each paired with the lookup it builds. Almost every
+# one is named for its lookup; `iequals` is the exception -- there is no
+# `exact` condition method for an `iexact` to pair with -- so the pairing is
+# written down here instead of assumed by whatever needs it.
+STRING_CONDITION_LOOKUPS = {
+    "contains": "contains",
+    "icontains": "icontains",
+    "startswith": "startswith",
+    "endswith": "endswith",
+    "iequals": "iexact",
+    "istartswith": "istartswith",
+    "iendswith": "iendswith",
+}
+STRING_CONDITION_METHODS = tuple(STRING_CONDITION_LOOKUPS)
 CONDITION_METHODS = (
     "equals",
     "not_equal",

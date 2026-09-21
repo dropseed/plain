@@ -277,6 +277,12 @@ class EncryptedField[T](Field[T]):
 
         def endswith(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
+        def iequals(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def istartswith(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def iendswith(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
     def _lookup_unsupported_message(self, method: str) -> str:
         assert self.name, (
             "Encrypted field must be attached to a model before its typed-query "

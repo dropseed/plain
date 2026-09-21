@@ -67,6 +67,18 @@ def must_reject_endswith() -> None:
     SecretStore.api_key.endswith("x")  # ty: ignore[invalid-argument-type]
 
 
+def must_reject_iequals() -> None:
+    SecretStore.api_key.iequals("x")  # ty: ignore[invalid-argument-type]
+
+
+def must_reject_istartswith() -> None:
+    SecretStore.api_key.istartswith("x")  # ty: ignore[invalid-argument-type]
+
+
+def must_reject_iendswith() -> None:
+    SecretStore.api_key.iendswith("x")  # ty: ignore[invalid-argument-type]
+
+
 def must_reject_a_non_empty_string() -> None:
     # "" is stored as plaintext so it stays matchable; anything else is not.
     SecretStore.notes.equals("something")  # ty: ignore[no-matching-overload]
