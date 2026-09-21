@@ -107,10 +107,10 @@ class OAuthConnection(postgres.Model):
         cls, *, provider_key: str, oauth_token: OAuthToken, oauth_user: OAuthUser
     ) -> OAuthConnection:
         try:
-            connection = cls.query.get(
-                provider_key=provider_key,
-                provider_user_id=oauth_user.provider_id,
-            )
+            connection = cls.query.where(
+                cls.provider_key.equals(provider_key),
+                cls.provider_user_id.equals(oauth_user.provider_id),
+            ).get()
             connection.set_token_fields(oauth_token)
             connection.update()
             return connection
@@ -150,6 +150,9 @@ class OAuthConnection(postgres.Model):
         Connect will either create a new connection or update an existing connection
         """
         try:
+            # Stays on the string form: `user` is a string-ref FK
+            # (`ForeignKeyField("users.User")`), so it has no typed condition,
+            # and half-converting would leave a mixed where()/filter() chain.
             connection = cls.query.get(
                 user=user,
                 provider_key=provider_key,

@@ -64,9 +64,9 @@ class SessionStore(MutableMapping):
 
     def _get_new_session_key(self) -> str:
         "Return session key that isn't being used."
+        model = self._model
         while True:
             session_key = get_random_string(32, string.ascii_lowercase + string.digits)
-            model = self._model
             if not model.query.where(model.session_key.equals(session_key)).exists():
                 return session_key
 
