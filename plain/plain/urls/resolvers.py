@@ -379,7 +379,7 @@ class URLResolver:
         """Convert + validate one captured value for reverse()."""
         try:
             url_value = cap.converter.to_url(kwargs[cap.name])
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return None
         if not _segment_value_matches(cap.converter, url_value):
             return None

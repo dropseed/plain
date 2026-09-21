@@ -111,7 +111,7 @@ class LLMDocs:
         """Parse a Python file, returning None on failure."""
         try:
             return ast.parse(file_path.read_text())
-        except (SyntaxError, UnicodeDecodeError):
+        except SyntaxError, UnicodeDecodeError:
             return None
 
     @staticmethod

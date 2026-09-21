@@ -295,7 +295,7 @@ def ensure_database(cluster: Cluster, *, project_root: Path, db_name: str) -> No
             cluster.create_database(db_name)
             mechanism = "empty"
             click.secho(f"Created database {db_name!r}.", fg="green", err=True)
-    except (errors.DuplicateDatabase, errors.UniqueViolation):
+    except errors.DuplicateDatabase, errors.UniqueViolation:
         return
 
     cluster.record_created(

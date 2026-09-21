@@ -940,7 +940,7 @@ def _decode_header_value(value: str) -> str:
     encoded = value.removeprefix("=?base64?").removesuffix("?=")
     try:
         return base64.b64decode(encoded, validate=True).decode("utf-8")
-    except (ValueError, UnicodeDecodeError):
+    except ValueError, UnicodeDecodeError:
         return value
 
 

@@ -114,7 +114,7 @@ class Job(metaclass=JobType):
                             CODE_LINE_NUMBER: lineno,
                         }
                     )
-                except (ValueError, AttributeError):
+                except ValueError, AttributeError:
                     source = ""
 
                 parameters = JobParameters.to_json(self._init_args, self._init_kwargs)

@@ -124,7 +124,7 @@ class OAuthConnection(postgres.Model):
                             **oauth_user.user_model_fields,
                         )
                         user.create()
-                except (psycopg.IntegrityError, ValidationError):
+                except psycopg.IntegrityError, ValidationError:
                     raise OAuthUserAlreadyExistsError(
                         provider_key=provider_key,
                         user_model_fields=oauth_user.user_model_fields,

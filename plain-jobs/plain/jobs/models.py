@@ -283,7 +283,7 @@ class JobProcess(postgres.Model):
                         )
                     )
                 )
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 logger.warning(
                     "Invalid trace context for job",
                     extra={"job_uuid": self.uuid},

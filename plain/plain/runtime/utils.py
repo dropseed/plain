@@ -17,7 +17,7 @@ def get_app_info_from_pyproject() -> tuple[str, str]:
                     name = project.get("name", "App")
                     version = project.get("version", "dev")
                     return name, version
-            except (tomllib.TOMLDecodeError, OSError):
+            except tomllib.TOMLDecodeError, OSError:
                 continue
 
     return "App", "dev"

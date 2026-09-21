@@ -869,7 +869,7 @@ async def async_handle_h2_connection(
             writer.close()
         try:
             await asyncio.wait_for(writer.wait_closed(), timeout=1.0)
-        except (TimeoutError, OSError):
+        except TimeoutError, OSError:
             try:
                 writer.transport.abort()
             except Exception:

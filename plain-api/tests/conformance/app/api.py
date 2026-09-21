@@ -209,7 +209,7 @@ class NoteListAPIView(APIView):
         limit_raw = self.request.query_params.get("limit", "25")
         try:
             limit = max(1, min(int(limit_raw), 100))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise BadRequestError400("Invalid `limit`")
 
         return {"results": notes[:limit]}

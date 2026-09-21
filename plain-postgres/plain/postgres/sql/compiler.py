@@ -314,7 +314,7 @@ class SQLCompiler:
         for expr in expressions:
             try:
                 sql, params = self.compile(expr)
-            except (EmptyResultSet, FullResultSet):
+            except EmptyResultSet, FullResultSet:
                 continue
             # Use select index for GROUP BY when possible
             if (position := selected_expr_positions.get(expr)) is not None:

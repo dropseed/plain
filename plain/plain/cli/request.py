@@ -368,7 +368,7 @@ def request(
                 # int() up front: get() takes the key's own type, and a
                 # non-numeric --user still raises ValueError, same as before.
                 user = User.query.get(int(user_id))
-            except (User.DoesNotExist, ValueError):
+            except User.DoesNotExist, ValueError:
                 pass
 
             if user is None:

@@ -36,7 +36,7 @@ class FloatField[T: (float, float | None) = float](DefaultableField[T]):
             return value
         try:
             return float(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise exceptions.ValidationError(
                 '"%(value)s" value must be a float.',
                 code="invalid",
@@ -110,7 +110,7 @@ class IntegerField[T: (int, int | None) = int](DefaultableField[T]):
             return value
         try:
             return int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise exceptions.ValidationError(
                 '"%(value)s" value must be an integer.',
                 code="invalid",
@@ -254,7 +254,7 @@ class DecimalField[T: (decimal.Decimal, decimal.Decimal | None) = decimal.Decima
                 decimal_value = self.context.create_decimal_from_float(value)
             else:
                 decimal_value = decimal.Decimal(value)
-        except (decimal.InvalidOperation, TypeError, ValueError):
+        except decimal.InvalidOperation, TypeError, ValueError:
             raise exceptions.ValidationError(
                 '"%(value)s" value must be a decimal number.',
                 code="invalid",

@@ -122,7 +122,7 @@ def get_user(request: Request) -> User | None:
         # takes the id's own type. A session written when the id was stored
         # as a string still resolves; one holding anything else is no user.
         user = User.query.get(int(session[_USER_ID_SESSION_KEY]))
-    except (User.DoesNotExist, TypeError, ValueError):
+    except User.DoesNotExist, TypeError, ValueError:
         return None
 
     # If the user models defines a specific field to also hash and compare

@@ -762,7 +762,7 @@ class QuerySet[T: "Model"]:
             # attribute.
             try:
                 arg.default_alias  # noqa: B018 — probe; raises for complex aggregates
-            except (AttributeError, TypeError):
+            except AttributeError, TypeError:
                 raise TypeError("Complex aggregates require an alias")
             kwargs[arg.default_alias] = arg
 
@@ -1249,7 +1249,7 @@ class QuerySet[T: "Model"]:
                 with transaction.atomic():
                     params = dict(resolve_callables(params))
                     return self.create(**params), True
-            except (psycopg.IntegrityError, ValidationError):
+            except psycopg.IntegrityError, ValidationError:
                 # Since create() also validates by default,
                 # we can get any kind of ValidationError here,
                 # or it can flow through and get an IntegrityError from the database.
@@ -3561,7 +3561,7 @@ def prefetch_objects(
                 if not hasattr(obj, "_prefetched_objects_cache"):
                     try:
                         obj._prefetched_objects_cache = {}
-                    except (AttributeError, TypeError):
+                    except AttributeError, TypeError:
                         # Must be an immutable object from
                         # values_list(flat=True), for example (TypeError) or
                         # a QuerySet subclass that isn't returning Model

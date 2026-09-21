@@ -176,7 +176,7 @@ async def run_remote(
                         if json_output:
                             try:
                                 return_value = json.dumps(result)
-                            except (TypeError, ValueError):
+                            except TypeError, ValueError:
                                 return_value = repr(result)
                         else:
                             return_value = repr(result)

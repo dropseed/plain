@@ -332,7 +332,7 @@ def db_span(
     if port := cfg.get("PORT"):
         try:
             port_int = int(port)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
         else:
             attrs[SERVER_PORT] = port_int

@@ -65,7 +65,7 @@ def _run_git(args: list[str], cwd: Path) -> str | None:
             env=env,
         ).stdout.strip()
         return out or None
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except subprocess.CalledProcessError, FileNotFoundError:
         return None
 
 

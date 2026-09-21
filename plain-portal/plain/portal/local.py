@@ -288,7 +288,7 @@ async def send_command(request: dict) -> dict:
     """
     try:
         reader, writer = await asyncio.open_unix_connection(_socket_path())
-    except (FileNotFoundError, ConnectionRefusedError):
+    except FileNotFoundError, ConnectionRefusedError:
         print(
             "No active portal session. Run 'plain portal connect <code>' first.",
             file=sys.stderr,
@@ -315,7 +315,7 @@ async def send_exec_streaming(
     """
     try:
         reader, writer = await asyncio.open_unix_connection(_socket_path())
-    except (FileNotFoundError, ConnectionRefusedError):
+    except FileNotFoundError, ConnectionRefusedError:
         print(
             "No active portal session. Run 'plain portal connect <code>' first.",
             file=sys.stderr,

@@ -25,7 +25,7 @@ class CheckUnusedFlags(PreflightCheck):
 
         try:
             flag_names = set(flag_names)
-        except (psycopg.ProgrammingError, psycopg.OperationalError):
+        except psycopg.ProgrammingError, psycopg.OperationalError:
             # The table doesn't exist yet
             # (migrations probably haven't run yet),
             # so we can't check it.

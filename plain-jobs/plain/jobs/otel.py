@@ -240,7 +240,7 @@ class WorkerMetrics:
             return []
         try:
             n = len(active.worker.executor._processes)
-        except (AttributeError, TypeError):
+        except AttributeError, TypeError:
             # Pool may be mid-shutdown; report 0 rather than crashing the export.
             n = 0
         return [Observation(n)]

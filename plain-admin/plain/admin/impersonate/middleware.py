@@ -28,7 +28,7 @@ class ImpersonateMiddleware(HttpMiddleware):
                 user_to_impersonate = User.query.get(
                     int(session[_IMPERSONATE_SESSION_KEY])
                 )
-            except (User.DoesNotExist, TypeError, ValueError):
+            except User.DoesNotExist, TypeError, ValueError:
                 user_to_impersonate = None
 
             if user_to_impersonate:

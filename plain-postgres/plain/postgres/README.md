@@ -1960,7 +1960,7 @@ This applies to instance writes only. Set-based writes — `QuerySet.update()` a
 ```python
 try:
     obj.create()
-except (psycopg.IntegrityError, ValidationError):
+except psycopg.IntegrityError, ValidationError:
     ...  # lost a race — reload and retry, or report it
 ```
 

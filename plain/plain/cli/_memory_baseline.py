@@ -51,7 +51,7 @@ def _measure_package(pkg: str) -> tuple[str, float] | None:
             pkg_mb = float(out.stdout.strip())
             if pkg_mb >= 1.0:
                 return (pkg, pkg_mb)
-    except (subprocess.TimeoutExpired, ValueError, OSError):
+    except subprocess.TimeoutExpired, ValueError, OSError:
         pass
     return None
 

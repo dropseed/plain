@@ -1163,7 +1163,7 @@ class Model(metaclass=ModelBase):
                         _cls = fld.path_infos[-1].to_meta.model
                     else:
                         _cls = None
-                except (FieldDoesNotExist, AttributeError):
+                except FieldDoesNotExist, AttributeError:
                     if fld is None or (
                         not isinstance(fld, Field)
                         or (

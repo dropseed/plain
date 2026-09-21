@@ -20,7 +20,7 @@ class CheckOAuthProviderKeys(PreflightCheck):
                     OAuthConnection.provider_key, flat=True
                 ).distinct()
             )
-        except (psycopg.OperationalError, psycopg.ProgrammingError):
+        except psycopg.OperationalError, psycopg.ProgrammingError:
             # Check runs on plain migrations apply, and the table may not exist yet
             # or it may not be installed on the particular database intentionally
             return errors
