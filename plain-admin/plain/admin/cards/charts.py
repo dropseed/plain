@@ -3,12 +3,14 @@ from collections import defaultdict
 from typing import Any, ClassVar, Literal
 
 from plain.admin.dates import DatetimeRangeAliases
+from plain.postgres import Model
 from plain.postgres.aggregates import Count
 from plain.postgres.functions import (
     TruncDate,
     TruncMonth,
 )
 
+from ..field_refs import FieldRef, declared_field_ref, field_lookup_path
 from .base import Card
 
 
@@ -30,9 +32,11 @@ class TrendCard(ChartCard):
     Primarily intended for use with models, but it can also be customized.
     """
 
-    model = None
-    datetime_field = None
-    group_field: str | None = None
+    model: type[Model] | None = None
+    # Field references (`JobResult.created_at`, `JobResult.status`) or lookup
+    # paths. A reference has to belong to `model`.
+    datetime_field: FieldRef | None = None
+    group_field: FieldRef | None = None
     group_labels: ClassVar[dict[str, str] | None] = None
     # CSS color values resolved by charts.js. `var(--chart-N)` reads the
     # admin's chart palette so charts retheme automatically (incl. dark mode).
@@ -49,6 +53,39 @@ class TrendCard(ChartCard):
 
     filters = DatetimeRangeAliases
 
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        # Resolve the declared field references now, so a reference to another
+        # model's field is a TypeError at class definition rather than when
+        # the card is first rendered.
+        if cls.model is not None:
+            cls.get_datetime_field()
+            cls.get_group_field()
+
+    @classmethod
+    def get_datetime_field(cls) -> str | None:
+        """`datetime_field` as a lookup path, checked against the card's model."""
+        ref = declared_field_ref(cls, "datetime_field")
+        if ref is None:
+            return None
+        return field_lookup_path(
+            ref,
+            model=cls.model,
+            declared_as=f"{cls.__qualname__}.datetime_field",
+        )
+
+    @classmethod
+    def get_group_field(cls) -> str | None:
+        """`group_field` as a lookup path, checked against the card's model."""
+        ref = declared_field_ref(cls, "group_field")
+        if ref is None:
+            return None
+        return field_lookup_path(
+            ref,
+            model=cls.model,
+            declared_as=f"{cls.__qualname__}.group_field",
+        )
+
     def get_current_filter(self) -> str:
         if s := super().get_current_filter():
             return s
@@ -60,13 +97,15 @@ class TrendCard(ChartCard):
         Without group_field: {date_str: count}
         With group_field: {group_label: {date_str: count}}
         """
-        if not self.model or not self.datetime_field:
+        datetime_field = self.get_datetime_field()
+        if self.model is None or datetime_field is None:
             raise NotImplementedError(
                 "model and datetime_field must be set, or get_trend_data must be overridden"
             )
+        group_field = self.get_group_field()
 
         datetime_range = DatetimeRangeAliases.to_range(self.get_current_filter())
-        filter_kwargs = {f"{self.datetime_field}__range": datetime_range.as_tuple()}
+        filter_kwargs = {f"{datetime_field}__range": datetime_range.as_tuple()}
 
         if datetime_range.total_days() < 300:
             truncator = TruncDate
@@ -76,19 +115,19 @@ class TrendCard(ChartCard):
             iterator = datetime_range.iter_months
 
         value_fields = ["chart_date"]
-        if self.group_field:
-            value_fields.append(self.group_field)
+        if group_field:
+            value_fields.append(group_field)
 
         rows = (
             self.model.query.filter(**filter_kwargs)
-            .annotate(chart_date=truncator(self.datetime_field))
+            .annotate(chart_date=truncator(datetime_field))
             .values(*value_fields)
             .annotate(chart_date_count=Count("id"))
         )
 
         dates = list(iterator())
 
-        if not self.group_field:
+        if not group_field:
             date_values: defaultdict[Any, int] = defaultdict(int)
             for row in rows:
                 date_values[row["chart_date"]] = row["chart_date_count"]
@@ -96,7 +135,7 @@ class TrendCard(ChartCard):
 
         groups: dict[str, defaultdict[Any, int]] = defaultdict(lambda: defaultdict(int))
         for row in rows:
-            raw = row[self.group_field]
+            raw = row[group_field]
             raw_value = "Unknown" if raw is None else str(raw)
             groups[raw_value][row["chart_date"]] = row["chart_date_count"]
 
@@ -108,7 +147,7 @@ class TrendCard(ChartCard):
     def get_chart_data(self) -> dict:
         data = self.get_trend_data()
 
-        if self.group_field:
+        if self.get_group_field():
             return self._build_grouped_chart(data)
 
         return self._build_single_chart(data)
