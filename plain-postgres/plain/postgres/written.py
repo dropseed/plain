@@ -20,7 +20,8 @@ What the object is decides what it renders as:
 
 A row is an instance only when `{Model:*}` is the whole select list; every
 other shape is a `result_type` dataclass, where a field annotated with a model
-class takes that model's expansion.
+class takes that model's expansion — the one in the outer select list, since
+an expansion inside a subquery is just columns.
 
 What that guarantees, exactly: the literal halves of a t-string are SQL the
 author wrote in the source, and every interpolated object is dispatched on
@@ -94,11 +95,17 @@ class _StarExpansion:
     The fields are in declared order and the column names are theirs, which is
     how the result columns are found again — the expansion decides which
     positions are the instance, never the catalog.
+
+    `depth` is how many parentheses were open where it was written. Depth 0 is
+    the statement's own select list (each branch of a UNION included); deeper
+    is inside a subquery, a CTE or a function call, where the expansion is
+    just columns and the outer statement names the ones it wants.
     """
 
     model: type[Model]
     fields: tuple[Field, ...]
     columns: tuple[str, ...]
+    depth: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -107,6 +114,111 @@ class _Rendered:
     bind_sql: str
     params: tuple[Any, ...]
     stars: tuple[_StarExpansion, ...]
+
+
+class _ParenDepth:
+    """How many parentheses are open, scanning the statement as it is written.
+
+    Only the author's own text is scanned. Everything this module renders is
+    either parenthesis-free (an identifier, a `%s`) or balanced (an embedded
+    queryset or statement, wrapped in its own `(` `)`), so skipping it leaves
+    the depth exactly where the author's text put it — and a stray `(` inside
+    an embedded query's string literal can't shift it.
+
+    What is skipped, because a parenthesis inside it is text and not
+    structure: `'a (quoted) string'` (a doubled `''` is an escaped quote and
+    the string goes on), `"a (quoted) identifier"` likewise, `$$ ( $$` and
+    `$tag$ ( $tag$` dollar-quoted strings (only their own tag ends them),
+    `-- ( to end of line`, and `/* ( */` block comments, which nest in
+    Postgres. The one thing it doesn't model is a backslash escape inside an
+    `E'...'` string, which Postgres alone treats as an escape.
+
+    The state carries across calls: one string or comment can span the text on
+    either side of an interpolation.
+    """
+
+    def __init__(self) -> None:
+        self.depth = 0
+        self._inside = ""  # "", "'", '"', "--", "/*", or a dollar-quote tag
+        self._comment_depth = 0
+
+    def scan(self, text: str) -> None:
+        index = 0
+        while index < len(text):
+            if self._inside == "":
+                index = self._scan_sql(text, index)
+            elif self._inside in ("'", '"'):
+                index = self._scan_quoted(text, index)
+            elif self._inside == "--":
+                if text[index] == "\n":
+                    self._inside = ""
+                index += 1
+            elif self._inside == "/*":
+                index = self._scan_comment(text, index)
+            else:
+                index = self._scan_dollar_quoted(text, index)
+
+    def _scan_sql(self, text: str, index: int) -> int:
+        char = text[index]
+        if char == "(":
+            self.depth += 1
+        elif char == ")":
+            # A statement can't have more `)` than `(`, but a fragment handed
+            # in on its own can -- never go below the outer select list.
+            self.depth = max(0, self.depth - 1)
+        elif char in ("'", '"'):
+            self._inside = char
+        elif text.startswith("--", index):
+            self._inside = "--"
+            return index + 2
+        elif text.startswith("/*", index):
+            self._inside = "/*"
+            self._comment_depth = 1
+            return index + 2
+        elif (tag := _dollar_quote_tag(text, index)) is not None:
+            self._inside = tag
+            return index + len(tag)
+        return index + 1
+
+    def _scan_quoted(self, text: str, index: int) -> int:
+        quote = self._inside
+        if not text.startswith(quote, index):
+            return index + 1
+        if text.startswith(quote * 2, index):
+            return index + 2  # an escaped quote: the literal goes on
+        self._inside = ""
+        return index + 1
+
+    def _scan_comment(self, text: str, index: int) -> int:
+        if text.startswith("/*", index):
+            self._comment_depth += 1
+            return index + 2
+        if text.startswith("*/", index):
+            self._comment_depth -= 1
+            if self._comment_depth == 0:
+                self._inside = ""
+            return index + 2
+        return index + 1
+
+    def _scan_dollar_quoted(self, text: str, index: int) -> int:
+        if text.startswith(self._inside, index):
+            tag_length = len(self._inside)
+            self._inside = ""
+            return index + tag_length
+        return index + 1
+
+
+def _dollar_quote_tag(text: str, index: int) -> str | None:
+    """The `$$` or `$tag$` that opens a dollar-quoted string at `index`."""
+    if text[index] != "$":
+        return None
+    end = text.find("$", index + 1)
+    if end == -1:
+        return None
+    tag = text[index + 1 : end]
+    if tag and not tag.isidentifier():
+        return None
+    return text[index : end + 1]
 
 
 class _Sql:
@@ -121,11 +233,13 @@ class _Sql:
     def __init__(self) -> None:
         self.bind: list[str] = []
         self.display: list[str] = []
+        self.paren_depth = _ParenDepth()
 
     def author(self, text: str) -> None:
         """Text the author wrote: template literals and fragments."""
         self.bind.append(text.replace("%", "%%"))
         self.display.append(text)
+        self.paren_depth.scan(text)
 
     def rendered(self, sql: str, display: str | None = None) -> None:
         """SQL this module produced: identifiers, placeholders, subqueries."""
@@ -341,6 +455,7 @@ def _render_model(
             model=model,
             fields=fields,
             columns=tuple(field.column for field in fields),
+            depth=sql.paren_depth.depth,
         )
     )
     sql.rendered(", ".join(_qualified(table, field.column) for field in fields))
@@ -788,8 +903,24 @@ def _build_plan(
             result_type=None,
         )
 
+    # Only an expansion in the outer select list puts its columns in the
+    # result; a deeper one is just columns of a subquery, whatever the outer
+    # statement then names them.
+    outer = tuple(star for star in stars if star.depth == 0)
+    starts = _allocate_star_runs(names, fields, outer)
+
     model_fields = _model_fields_for(
-        result_type=result_type, stars=stars, names=names, fields=fields
+        result_type=result_type,
+        stars=stars,
+        outer=outer,
+        starts=starts,
+        names=names,
+    )
+    _refuse_an_unmapped_expansion(
+        result_type=result_type,
+        outer=outer,
+        starts=starts,
+        model_fields=model_fields,
     )
     expanded = {
         position
@@ -845,8 +976,8 @@ def _instance_star(
             "instances, or pass result_type= a dataclass."
         )
 
-    star = stars[0]
-    start = _locate_star(names, fields, star)
+    star = _instance_stars(stars)[0]
+    start = _locate_star(names, fields, star, claimed=[])
     if start is None:
         raise TypeError(
             f"This statement returns ({', '.join(names)}), which doesn't "
@@ -874,6 +1005,58 @@ def _instance_star(
     return star, start
 
 
+def _instance_stars(stars: tuple[_StarExpansion, ...]) -> tuple[_StarExpansion, ...]:
+    """The expansions that could be the row of a statement with no `result_type`.
+
+    The outer select list first — that is where a row is declared. With no
+    expansion there, a statement that passes a subquery's `{Model:*}` straight
+    through (`SELECT * FROM (SELECT {Model:*} ...) sub`) still means those
+    instances and nothing else, so the deeper ones are read as a fallback.
+    """
+    outer = tuple(star for star in stars if star.depth == 0)
+    return outer or stars
+
+
+def _allocate_star_runs(
+    names: tuple[str, ...],
+    fields: list[Field | None],
+    stars: tuple[_StarExpansion, ...],
+) -> list[int | None]:
+    """Where each expansion's run of columns is, in the order they were written.
+
+    Two expansions never read the same columns, so each takes the first run
+    left to it and the ones behind it have to look elsewhere. The exception is
+    the same model expanded in each branch of a UNION: the branches collapse
+    onto one set of result columns, so the second takes the very run the first
+    did.
+    """
+    starts: list[int | None] = []
+    claimed: list[tuple[int, int, type[Model]]] = []
+    for star in stars:
+        start = _locate_star(names, fields, star, claimed=claimed)
+        starts.append(start)
+        if start is not None:
+            run = (start, len(star.columns), star.model)
+            if run not in claimed:
+                claimed.append(run)
+    return starts
+
+
+def _run_is_unclaimed(
+    start: int,
+    width: int,
+    model: type[Model],
+    claimed: list[tuple[int, int, type[Model]]],
+) -> bool:
+    """Whether this run of columns is still free for this expansion to take."""
+    for claimed_start, claimed_width, claimed_model in claimed:
+        if (start, width, model) == (claimed_start, claimed_width, claimed_model):
+            continue  # the same model's run in another UNION branch
+        if start < claimed_start + claimed_width and claimed_start < start + width:
+            return False
+    return True
+
+
 def _star_runs(names: tuple[str, ...], star: _StarExpansion) -> list[int]:
     """Every position where this expansion's run of columns could start.
 
@@ -893,22 +1076,44 @@ def _star_runs(names: tuple[str, ...], star: _StarExpansion) -> list[int]:
 
 
 def _locate_star(
-    names: tuple[str, ...], fields: list[Field | None], star: _StarExpansion
+    names: tuple[str, ...],
+    fields: list[Field | None],
+    star: _StarExpansion,
+    *,
+    claimed: list[tuple[int, int, type[Model]]],
 ) -> int | None:
     """Where `{Model:*}`'s columns start in the result, or None if they aren't there.
 
-    Not there means the expansion is inside a subquery: it put its columns in
-    that subquery's select list, and the outer statement named its own.
+    Not there means the expansion's columns never reached the outer select
+    list under their own names — it is inside a subquery, or another
+    expansion already took the only run they match.
     """
-    candidates = _star_runs(names, star)
+    width = len(star.columns)
+    candidates = [
+        start
+        for start in _star_runs(names, star)
+        if _run_is_unclaimed(start, width, star.model, claimed)
+    ]
     if not candidates:
         return None
+
     if len(candidates) == 1:
-        return candidates[0]
+        start = candidates[0]
+        # Column names alone are weak evidence: every model's columns start
+        # with `id`, so one model's list is often a prefix of another's. When
+        # the columns did keep their source and none of it is this model's,
+        # this run belongs to something else.
+        traced = [
+            (offset, fields[start + offset])
+            for offset in range(width)
+            if fields[start + offset] is not None
+        ]
+        if traced and not any(field is star.fields[offset] for offset, field in traced):
+            return None
+        return start
 
     # Two runs of columns have those names. Provenance breaks the tie when it
     # survived; when it didn't, the statement is genuinely ambiguous.
-    width = len(star.columns)
     confirmed = [
         start
         for start in candidates
@@ -1057,18 +1262,30 @@ def _model_annotation(annotation: Any) -> tuple[type[Model], bool] | None:
     return None
 
 
+def _union_models(annotation: Any) -> list[type[Model]]:
+    """The model classes a union annotation names, `None` aside."""
+    if typing.get_origin(annotation) not in (typing.Union, types.UnionType):
+        return []
+    return [
+        arg
+        for arg in typing.get_args(annotation)
+        if isinstance(arg, type) and issubclass(arg, Model)
+    ]
+
+
 def _model_fields_for(
     *,
     result_type: Any,
     stars: tuple[_StarExpansion, ...],
+    outer: tuple[_StarExpansion, ...],
+    starts: list[int | None],
     names: tuple[str, ...],
-    fields: list[Field | None],
 ) -> tuple[_ModelField, ...]:
     """Pair each model-annotated field of `result_type` with its expansion.
 
     The annotation names the model and an expansion is *of* a model, so the two
     find each other by model class. There is nothing else to match on, which is
-    why one model can be starred once and annotated once in one statement.
+    why one model can fill one field, from one run of columns.
     """
     hints = _type_hints(result_type)
     annotated: list[tuple[str, type[Model], bool]] = []
@@ -1079,6 +1296,16 @@ def _model_fields_for(
         if model_annotation is not None:
             model, allow_null = model_annotation
             annotated.append((field.name, model, allow_null))
+            continue
+        union = _union_models(hints.get(field.name))
+        if len(union) > 1:
+            raise TypeError(
+                f"{result_type.__name__}.{field.name} is annotated "
+                f"{' | '.join(model.__name__ for model in union)}. A row has "
+                "one shape, so a model field names one model -- the one this "
+                "statement expands -- or you select the columns you want "
+                "instead."
+            )
 
     fields_by_model: dict[type[Model], list[str]] = {}
     for name, model, _ in annotated:
@@ -1095,33 +1322,42 @@ def _model_fields_for(
 
     model_fields = []
     for name, model, allow_null in annotated:
-        matching = [star for star in stars if star.model is model]
-        if not matching:
+        if not any(star.model is model for star in stars):
             raise TypeError(
                 f"{result_type.__name__}.{name} is a {model.__name__}, and "
                 f"nothing in this statement selects {{{model.__name__}:*}} to "
                 f"fill it. Declare {{{model.__name__}:*}} in the select list, or "
                 "drop the field."
             )
-        if len(matching) > 1:
-            raise TypeError(
-                f"This statement expands {{{model.__name__}:*}} "
-                f"{len(matching)} times, and {result_type.__name__}.{name} can "
-                "only be filled from one of them. A self-join needs aliases an "
-                "expansion can't give -- select the columns you want instead."
-            )
 
-        star = matching[0]
-        start = _locate_star(names, fields, star)
-        if start is None:
+        located = [
+            (star, start)
+            for star, start in zip(outer, starts, strict=True)
+            if star.model is model and start is not None
+        ]
+        if not located:
+            # Either every expansion of this model is inside a subquery, or
+            # the outer one's columns never arrived under their own names.
             raise TypeError(
                 f"{result_type.__name__}.{name} is a {model.__name__}, but this "
                 f"statement returns ({', '.join(names)}), which doesn't contain "
-                f"{model.__name__}'s columns ({', '.join(star.columns)}) in "
-                f"order. Select {{{model.__name__}:*}} in the outer select list "
-                "-- an expansion inside a subquery is just columns, and a "
+                f"{model.__name__}'s columns in order. Select "
+                f"{{{model.__name__}:*}} in the outer select list -- an "
+                "expansion inside a subquery is just columns, and a "
                 f"{{{model.__name__}:*}} row can't be aliased."
             )
+
+        runs = sorted({start for _, start in located})
+        if len(runs) > 1:
+            positions = ", ".join(str(start) for start in runs)
+            raise TypeError(
+                f"This statement expands {{{model.__name__}:*}} into two "
+                f"different runs of columns (starting at {positions}), and "
+                f"{result_type.__name__}.{name} can only be one of them. Select "
+                "the columns you want instead."
+            )
+
+        star, start = located[0]
         model_fields.append(
             _ModelField(
                 name=name,
@@ -1132,12 +1368,6 @@ def _model_fields_for(
             )
         )
 
-    _refuse_a_star_with_no_field(
-        result_type=result_type,
-        stars=stars,
-        names=names,
-        annotated_models={model for _, model, _ in annotated},
-    )
     return tuple(model_fields)
 
 
@@ -1148,31 +1378,35 @@ def _pk_position(star: _StarExpansion) -> int:
     )
 
 
-def _refuse_a_star_with_no_field(
+def _refuse_an_unmapped_expansion(
     *,
     result_type: Any,
-    stars: tuple[_StarExpansion, ...],
-    names: tuple[str, ...],
-    annotated_models: set[type[Model]],
+    outer: tuple[_StarExpansion, ...],
+    starts: list[int | None],
+    model_fields: tuple[_ModelField, ...],
 ) -> None:
-    """A `{Model:*}` in the outer select list needs a field to land in.
+    """A `{Model:*}` whose columns the dataclass has no room for.
 
-    Inside a subquery an expansion is just columns, and the outer statement
-    names the ones it wants — that is why its columns aren't in the result. In
-    the outer select list there is nothing else it could be, so dropping it
-    silently would throw away everything it selected.
+    An expansion no model field claimed is columns like any others: they map
+    onto same-named fields, which is what `SELECT {Model:*}` under a dataclass
+    of its columns means and what a UNION of two star selects needs. When some
+    of them have no field at all, the expansion is what the dataclass is
+    missing, and saying so is more use than naming its columns one by one.
     """
-    for star in stars:
-        if star.model in annotated_models:
+    claimed = {model_field.star.model for model_field in model_fields}
+    declared = {field.name for field in dataclasses.fields(result_type) if field.init}
+    for star, start in zip(outer, starts, strict=True):
+        if star.model in claimed or start is None:
             continue
-        if not _star_runs(names, star):
+        unmapped = [column for column in star.columns if column not in declared]
+        if not unmapped:
             continue
         raise TypeError(
             f"This statement selects {{{star.model.__name__}:*}} and "
-            f"{result_type.__name__} has no {star.model.__name__} field to put "
-            f"it in, so those columns would be dropped. Declare "
-            f"`{star.model.__name__.lower()}: {star.model.__name__}` on "
-            f"{result_type.__name__}, or select the columns you want instead."
+            f"{result_type.__name__} has no field for "
+            f"{', '.join(unmapped)}. Declare "
+            f"`{star.model.__name__.lower()}: {star.model.__name__}` to take "
+            "the whole expansion, or select the columns you want instead."
         )
 
 
@@ -1377,8 +1611,10 @@ class Written[R]:
         # (that is what each branch of a UNION needs), but two models can't
         # both be the row.
         instance_model = None
-        if result_type is None:
-            star_models = dict.fromkeys(star.model for star in rendered.stars)
+        if result_type is None and rendered.stars:
+            star_models = dict.fromkeys(
+                star.model for star in _instance_stars(rendered.stars)
+            )
             if len(star_models) > 1:
                 names = ", ".join(model.__name__ for model in star_models)
                 raise TypeError(

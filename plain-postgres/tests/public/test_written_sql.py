@@ -415,6 +415,172 @@ def test_two_models_fill_two_fields(widgets):
     ]
 
 
+def test_an_expansion_below_the_select_list_is_just_columns(widgets):
+    """A subquery's `{Model:*}` passed through the outer list maps by name."""
+
+    @dataclass
+    class WidgetColumns:
+        id: int
+        name: str
+        size: str
+
+    passed_through = Widget.query.sql(
+        t"""
+        SELECT * FROM (SELECT {Widget:*} FROM {Widget}) sub ORDER BY sub.name
+        """,
+        result_type=WidgetColumns,
+    )
+    assert [row.name for row in passed_through] == ["large-widget", "small-widget"]
+
+    named = Widget.query.sql(
+        t"""
+        SELECT sub.id, sub.name, sub.size
+        FROM (SELECT {Widget:*} FROM {Widget}) sub
+        ORDER BY sub.name
+        """,
+        result_type=WidgetColumns,
+    )
+    assert [row.name for row in named] == ["large-widget", "small-widget"]
+
+
+def test_a_cte_expansion_is_just_columns(widgets):
+    @dataclass
+    class WidgetColumns:
+        id: int
+        name: str
+        size: str
+
+    statement = Widget.query.sql(
+        t"""
+        WITH w AS (SELECT {Widget:*} FROM {Widget})
+        SELECT * FROM w ORDER BY name
+        """,
+        result_type=WidgetColumns,
+    )
+    assert [row.name for row in statement] == ["large-widget", "small-widget"]
+
+
+def test_union_branches_of_expansions_map_by_name(widgets):
+    """Every branch is the outer select list, and they collapse onto one row."""
+
+    @dataclass
+    class WidgetColumns:
+        id: int
+        name: str
+        size: str
+
+    size = "small"
+    statement = Widget.query.sql(
+        t"""
+        SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {size}
+        UNION ALL
+        SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} <> {size}
+        """,
+        result_type=WidgetColumns,
+    )
+    assert sorted(row.name for row in statement) == [
+        "large-widget",
+        "small-widget",
+    ]
+
+
+def test_a_passed_through_expansion_still_gives_instances(widgets):
+    """With nothing declared, a subquery's expansion is still what a row is."""
+    statement = Widget.query.sql(
+        t"SELECT * FROM (SELECT {Widget:*} FROM {Widget}) sub ORDER BY sub.name"
+    )
+    rows = statement.all()
+    assert [widget.name for widget in rows] == ["large-widget", "small-widget"]
+    assert all(isinstance(widget, Widget) for widget in rows)
+
+
+def test_an_expansion_in_a_cte_can_repeat_in_the_select_list(widgets):
+    """Only the outer one fills the field; the CTE's is just columns."""
+
+    @dataclass
+    class WidgetRow:
+        widget: Widget
+        tag_count: int
+
+    statement = Widget.query.sql(
+        t"""
+        WITH counts AS (
+            SELECT {Widget:*}, count(wt.id) AS n
+            FROM {Widget} LEFT JOIN {WidgetTag} wt ON wt.widget_id = {Widget.id}
+            GROUP BY {Widget.id}
+        )
+        SELECT {Widget:*}, counts.n AS tag_count
+        FROM {Widget} JOIN counts ON counts.id = {Widget.id}
+        ORDER BY {Widget.name}
+        """,
+        result_type=WidgetRow,
+    )
+    assert [(row.widget.name, row.tag_count) for row in statement] == [
+        ("large-widget", 1),
+        ("small-widget", 2),
+    ]
+
+
+@dataclass
+class BracketRow:
+    bracket: str
+    widget: Widget
+
+
+def test_a_parenthesis_in_a_string_literal_is_not_a_subquery(widgets):
+    """Whether an expansion is in the outer select list is decided by `(` and `)`.
+
+    Quoted text and comments carry parentheses that aren't structure, so the
+    scan skips them — otherwise `'('` would read as a subquery and the
+    expansion after it would stop being the outer list's.
+    """
+    statement = Widget.query.sql(
+        t"SELECT '(' AS bracket, {Widget:*} FROM {Widget} ORDER BY {Widget.name}",
+        result_type=BracketRow,
+    )
+    row = statement.first()
+    assert row is not None
+    assert row.bracket == "("
+    assert row.widget.name == "large-widget"
+
+
+def test_a_parenthesis_in_a_dollar_quoted_string_is_not_a_subquery(widgets):
+    statement = Widget.query.sql(
+        t"SELECT $tag$($tag$ AS bracket, {Widget:*} FROM {Widget} ORDER BY {Widget.name}",
+        result_type=BracketRow,
+    )
+    row = statement.first()
+    assert row is not None
+    assert row.bracket == "("
+
+
+def test_a_parenthesis_in_a_line_comment_is_not_a_subquery(widgets):
+    statement = Widget.query.sql(
+        t"""
+        SELECT '(' AS bracket, -- a ( nobody opened
+               {Widget:*}
+        FROM {Widget} ORDER BY {Widget.name}
+        """,
+        result_type=BracketRow,
+    )
+    row = statement.first()
+    assert row is not None
+    assert row.widget.name == "large-widget"
+
+
+def test_a_parenthesis_in_a_block_comment_is_not_a_subquery(widgets):
+    statement = Widget.query.sql(
+        t"""
+        SELECT '(' AS bracket, /* a ( nobody opened */ {Widget:*}
+        FROM {Widget} ORDER BY {Widget.name}
+        """,
+        result_type=BracketRow,
+    )
+    row = statement.first()
+    assert row is not None
+    assert row.widget.name == "large-widget"
+
+
 def test_an_outer_join_that_matched_nothing_is_none(widgets):
     """`Tag | None` is what the outer side of a LEFT JOIN needs."""
     Widget.query.create(name="bare-widget", size="tiny")
@@ -485,12 +651,64 @@ def test_a_model_field_with_no_expansion_is_refused(widgets):
         statement.all()
 
 
-def test_an_expansion_with_no_model_field_is_refused(widgets):
-    """In the outer select list there is nothing else a `{Model:*}` could be."""
+def test_an_expansion_the_dataclass_has_no_room_for_is_refused(widgets):
+    """The expansion is what the dataclass is missing, so that is what it says."""
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget}", result_type=NameRow
     )
-    with pytest.raises(TypeError, match="no Widget field to put it in"):
+    with pytest.raises(TypeError, match="has no field for id, size"):
+        statement.all()
+
+
+def test_an_expansion_in_a_subquery_cannot_fill_a_model_field(widgets):
+    """Its columns never reached the outer list, whatever else is named there.
+
+    `Tag`'s columns are a prefix of `Widget`'s -- every model starts with
+    `id` -- so a run that merely matches by name is not evidence.
+    """
+
+    @dataclass
+    class OnlyTag:
+        tag: Tag
+
+    statement = Widget.query.sql(
+        t"""
+        SELECT {Widget.id} AS id, {Widget.name} AS name
+        FROM {Widget}
+        WHERE EXISTS (SELECT {Tag:*} FROM {Tag})
+        """,
+        result_type=OnlyTag,
+    )
+    with pytest.raises(TypeError, match="in the outer select list"):
+        statement.all()
+
+
+def test_two_model_fields_never_read_the_same_columns(widgets):
+    """The joined subquery's `{Tag:*}` can't borrow the `{Widget:*}` run."""
+
+    @dataclass
+    class Tagged:
+        widget: Widget
+        tag: Tag
+
+    statement = Widget.query.sql(
+        t"""
+        SELECT {Widget:*} FROM {Widget}
+        JOIN (SELECT {Tag:*} FROM {Tag} LIMIT 1) sub ON true
+        """,
+        result_type=Tagged,
+    )
+    with pytest.raises(TypeError, match="in the outer select list"):
+        statement.all()
+
+
+def test_a_field_that_names_two_models_is_refused(widgets):
+    @dataclass
+    class Either:
+        either: Widget | Tag
+
+    statement = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}", result_type=Either)
+    with pytest.raises(TypeError, match=r"annotated Widget \| Tag"):
         statement.all()
 
 
@@ -517,8 +735,8 @@ def test_a_non_nullable_model_field_that_came_back_null_is_refused(widgets):
         statement.all()
 
 
-def test_the_same_model_expanded_twice_is_refused(widgets):
-    """Which expansion fills the field is the question a self-join can't answer."""
+def test_one_expansion_per_union_branch_fills_one_field(widgets):
+    """The branches collapse onto one set of columns, so both expansions are it."""
 
     @dataclass
     class Ranked:
@@ -530,12 +748,14 @@ def test_the_same_model_expanded_twice_is_refused(widgets):
         t"""
         SELECT {Widget:*}, 1 AS rank FROM {Widget} WHERE {Widget.size} = {size}
         UNION ALL
-        SELECT {Widget:*}, 2 AS rank FROM {Widget}
+        SELECT {Widget:*}, 2 AS rank FROM {Widget} WHERE {Widget.size} <> {size}
         """,
         result_type=Ranked,
     )
-    with pytest.raises(TypeError, match=r"expands \{Widget:\*\} 2 times"):
-        statement.all()
+    assert sorted((row.widget.name, row.rank) for row in statement) == [
+        ("large-widget", 2),
+        ("small-widget", 1),
+    ]
 
 
 def test_two_fields_of_one_model_are_refused(widgets):

@@ -92,6 +92,65 @@ def test_two_stars_are_two_expansions(db):
     assert [star.model for star in rendered.stars] == [Widget, Tag]
 
 
+def test_a_star_records_how_deep_in_parentheses_it_was_written(db):
+    """Depth 0 is the outer select list; deeper is inside a subquery.
+
+    The scan walks the author's own text, and skips the places a parenthesis
+    is content rather than structure.
+    """
+    depths = {
+        "the outer select list": (t"SELECT {Widget:*} FROM {Widget}", 0),
+        "a balanced function call first": (
+            t"SELECT count(*) AS n, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "each branch of a UNION": (
+            t"SELECT {Widget:*} FROM {Widget} UNION ALL SELECT {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "a derived table": (
+            t"SELECT * FROM (SELECT {Widget:*} FROM {Widget}) sub",
+            1,
+        ),
+        "a CTE": (
+            t"WITH w AS (SELECT {Widget:*} FROM {Widget}) SELECT * FROM w",
+            1,
+        ),
+        "nested subqueries": (
+            t"SELECT * FROM (SELECT * FROM (SELECT {Widget:*} FROM {Widget}) a) b",
+            2,
+        ),
+        "a single-quoted string": (t"SELECT '(' AS b, {Widget:*} FROM {Widget}", 0),
+        "an escaped quote inside one": (
+            t"SELECT 'it''s (' AS b, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "a quoted identifier": (
+            t'SELECT "a (column" AS b, {Widget:*} FROM {Widget}',
+            0,
+        ),
+        "a dollar-quoted string": (
+            t"SELECT $tag$ ( $tag$ AS b, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "a line comment": (t"SELECT -- (\n {Widget:*} FROM {Widget}", 0),
+        "nested block comments": (
+            t"SELECT /* ( /* ( */ */ {Widget:*} FROM {Widget}",
+            0,
+        ),
+    }
+    for description, (template, depth) in depths.items():
+        stars = written._render(template).stars
+        assert {star.depth for star in stars} == {depth}, description
+
+
+def test_a_nested_template_carries_the_depth_it_is_rendered_at(db):
+    """A t-string is inlined, so the parentheses around it are the outer ones."""
+    inner = t"SELECT {Widget:*} FROM {Widget}"
+    (star,) = written._render(t"SELECT * FROM ({inner}) sub").stars
+    assert star.depth == 1
+
+
 def test_author_text_is_percent_doubled_only_for_binding(db):
     """psycopg parses `%s` in the text it is handed; `.sql` shows it as written."""
     pattern = "small"
