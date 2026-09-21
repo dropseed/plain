@@ -69,6 +69,7 @@ __all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet", "RowQuerySet"]
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
     from plain.postgres import Model
+    from plain.postgres.written import Written
 
 
 def conflict_sort_value(field: Field, value: Any) -> str:
@@ -1880,6 +1881,35 @@ class QuerySet[T: "Model"]:
         )
         qs._prefetch_lookups = self._prefetch_lookups[:]
         return qs
+
+    @overload
+    def sql[R: DataclassInstance](
+        self, template: str, *, result_type: type[R], **values: Any
+    ) -> Written[R]: ...
+
+    @overload
+    def sql(
+        self, template: str, *, result_type: None = None, **values: Any
+    ) -> Written[T]: ...
+
+    def sql(self, template: str, *, result_type: Any = None, **values: Any) -> Any:
+        """Write the query out, with `{}` references resolved against the models.
+
+        The written half of the query API: `where()`/`order_by()` build a query
+        the code assembles, `sql()` runs one you wrote. Only this queryset's
+        model is used -- anything already filtered onto it is not part of the
+        statement.
+
+        See `plain.postgres.written` and the README for the reference table.
+        """
+        from plain.postgres.written import Written
+
+        return Written(
+            model=self.model,
+            template=template,
+            values=values,
+            result_type=result_type,
+        )
 
     def _values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
         clone = self._chain()
