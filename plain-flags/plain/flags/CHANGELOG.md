@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.37.4](https://github.com/dropseed/plain/releases/plain-flags@0.37.4) (2026-09-21)
+
+### What's changed
+
+- The flag-result lookup and the preflight name check use typed `where()`/`select()`; SQL is unchanged. `FlagResult.flag` references `Flag` by class (`Flag` is declared first), which is what lets the lookup traverse it ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.37.3](https://github.com/dropseed/plain/releases/plain-flags@0.37.3) (2026-09-20)
 
 ### What's changed
