@@ -157,8 +157,8 @@ def test_many_to_many_through_model(db):
     assert through_instance.tag == gps
 
 
-def test_many_to_many_prefetch_related(db, capture_queries):
-    """prefetch_related on a forward M2M batches the related rows into one
+def test_many_to_many_prefetch(db, capture_queries):
+    """prefetch() on a forward M2M batches the related rows into one
     query and assigns each set to the right instance.
 
     Correct per-instance assignment depends on the prefetch query exposing the
@@ -178,9 +178,7 @@ def test_many_to_many_prefetch_related(db, capture_queries):
     toyota.tags.add(leather)
 
     with capture_queries() as queries:
-        widgets = {
-            w.name: w for w in Widget.query.prefetch_related("tags").order_by("id")
-        }
+        widgets = {w.name: w for w in Widget.query.prefetch("tags").order_by("id")}
         prefetched = {
             name: {t.name for t in w.tags.query.all()} for name, w in widgets.items()
         }

@@ -26,9 +26,7 @@ def validate_access_token(
     from .models import AccessToken, _hash_token
 
     try:
-        access_token = AccessToken.query.select_related("user").get(
-            token_hash=_hash_token(token)
-        )
+        access_token = AccessToken.query.join("user").get(token_hash=_hash_token(token))
     except AccessToken.DoesNotExist:
         return None
 

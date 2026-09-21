@@ -114,11 +114,11 @@ class TestReverseForeignKey:
     # that's beyond the scope of the Manager->QuerySet migration
 
 
-class TestPrefetchRelated:
-    """Test prefetch_related functionality"""
+class TestPrefetch:
+    """Test prefetch() functionality"""
 
-    def test_prefetch_related_basic(self, db):
-        """Test basic prefetch_related functionality with reverse FK"""
+    def test_prefetch_basic(self, db):
+        """Test basic prefetch() functionality with reverse FK"""
         # Create test data
         parent1 = DeleteParent.query.create(name="Parent 1")
         parent2 = DeleteParent.query.create(name="Parent 2")
@@ -128,8 +128,8 @@ class TestPrefetchRelated:
         child2 = ChildCascade.query.create(parent=parent1)
         child3 = ChildCascade.query.create(parent=parent2)
 
-        # Test prefetch_related on reverse FK
-        parents = DeleteParent.query.prefetch_related("childcascade_set").all()
+        # Test prefetch() on reverse FK
+        parents = DeleteParent.query.prefetch("childcascade_set").all()
 
         # Should be able to access related objects without additional queries
         assert len(parents) == 3
@@ -157,8 +157,8 @@ class TestPrefetchRelated:
         parent3_children = list(parent3_from_query.childcascade_set.query.all())
         assert len(parent3_children) == 0
 
-    def test_prefetch_related_forward_fk(self, db):
-        """Test prefetch_related functionality with forward FK"""
+    def test_prefetch_forward_fk(self, db):
+        """Test prefetch() functionality with forward FK"""
         # Create test data
         parent1 = DeleteParent.query.create(name="Parent 1")
         parent2 = DeleteParent.query.create(name="Parent 2")
@@ -167,8 +167,8 @@ class TestPrefetchRelated:
         child2 = ChildCascade.query.create(parent=parent1)
         child3 = ChildCascade.query.create(parent=parent2)
 
-        # Test prefetch_related on forward FK
-        children = ChildCascade.query.prefetch_related("parent").all()
+        # Test prefetch() on forward FK
+        children = ChildCascade.query.prefetch("parent").all()
 
         assert len(children) == 3
 
@@ -180,32 +180,32 @@ class TestPrefetchRelated:
             elif child == child3:
                 assert child.parent.name == "Parent 2"
 
-    def test_prefetch_related_empty_result(self, db):
-        """Test prefetch_related works correctly with empty results"""
+    def test_prefetch_empty_result(self, db):
+        """Test prefetch() works correctly with empty results"""
         # Create parent with no children
         DeleteParent.query.create(name="Lonely Parent")
 
-        parents = DeleteParent.query.prefetch_related("childcascade_set").all()
+        parents = DeleteParent.query.prefetch("childcascade_set").all()
         assert len(parents) == 1
 
         parent_children = list(parents[0].childcascade_set.query.all())
         assert len(parent_children) == 0
 
-    def test_prefetch_related_nonexistent_relation(self, db):
-        """Test that prefetch_related raises appropriate error for nonexistent relations"""
+    def test_prefetch_nonexistent_relation(self, db):
+        """Test that prefetch() raises appropriate error for nonexistent relations"""
         # Create at least one parent so we have something to prefetch on
         DeleteParent.query.create(name="Test Parent")
 
         with pytest.raises((AttributeError, ValueError)):
-            list(DeleteParent.query.prefetch_related("nonexistent_relation").all())
+            list(DeleteParent.query.prefetch("nonexistent_relation").all())
 
-    def test_prefetch_related_queryset_all_preserves_cache(self, db):
+    def test_prefetch_queryset_all_preserves_cache(self, db):
         """Test that queryset.all() preserves prefetch cache"""
         parent = DeleteParent.query.create(name="Test Parent")
         ChildCascade.query.create(parent=parent)
         ChildCascade.query.create(parent=parent)
 
-        parents = list(DeleteParent.query.prefetch_related("childcascade_set").all())
+        parents = list(DeleteParent.query.prefetch("childcascade_set").all())
         parent_from_query = parents[0]
 
         # .query returns the prefetched queryset with _result_cache populated
@@ -539,10 +539,10 @@ class TestForeignKeyPartialInstance:
         reloaded = ChildCascade.query.get(id=child.id)
         assert reloaded.parent.id == parent.id
 
-    def test_select_related_returns_fully_loaded_instance(self, db, capture_queries):
+    def test_join_returns_fully_loaded_instance(self, db, capture_queries):
         parent = DeleteParent.query.create(name="Parent")
         created = ChildCascade.query.create(parent=parent)
-        child = ChildCascade.query.select_related("parent").get(id=created.id)
+        child = ChildCascade.query.join("parent").get(id=created.id)
 
         # The JOIN already loaded every column -- no query for any field.
         with capture_queries() as queries:
