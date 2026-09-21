@@ -163,14 +163,14 @@ class OAuthProvider(ABC):
         # Scope to the requesting user so one user can't disconnect another
         # user's connection by supplying their provider_user_id.
         user = get_request_user(request)
-        # Stays on the string form: `user` is a string-ref FK
-        # (`ForeignKeyField("users.User")`), so it has no typed condition, and
-        # half-converting would leave a mixed where()/filter() chain.
-        connection = OAuthConnection.query.get(
-            user=user,
-            provider_key=self.provider_key,
-            provider_user_id=provider_user_id,
-        )
+        assert user is not None, "OAuthDisconnectView sets login_required"
+        # Conditions in the order get() sorted its kwargs, so the SQL is
+        # byte-identical to the string form this replaced.
+        connection = OAuthConnection.query.where(
+            OAuthConnection.provider_key.equals(self.provider_key),
+            OAuthConnection.provider_user_id.equals(provider_user_id),
+            OAuthConnection.user.id.equals(user.id),
+        ).get()
         connection.delete()
         redirect_url = self.get_disconnect_redirect_url(request=request)
         return self.get_redirect_response(redirect_url)
