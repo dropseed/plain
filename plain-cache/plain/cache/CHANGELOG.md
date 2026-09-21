@@ -1,5 +1,16 @@
 # plain-cache changelog
 
+## [0.32.0](https://github.com/dropseed/plain/releases/plain-cache@0.32.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires plain.postgres 0.121.0.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.31.3](https://github.com/dropseed/plain/releases/plain-cache@0.31.3) (2026-09-21)
 
 ### What's changed
